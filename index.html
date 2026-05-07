@@ -329,6 +329,306 @@
         .victory { color: #ffd700; }
         .defeat { color: #f44336; }
         .hidden { display: none; }
+        
+        /* 背包、商店、炼丹按钮样式 */
+        .btn-inventory {
+            background: linear-gradient(135deg, #00897b, #4db6ac);
+            color: white;
+        }
+        .btn-shop {
+            background: linear-gradient(135deg, #7b1fa2, #ba68c8);
+            color: white;
+        }
+        .btn-alchemy {
+            background: linear-gradient(135deg, #e65100, #ff9800);
+            color: white;
+        }
+        
+        /* 装备栏 */
+        .equipment-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        .equipment-slot {
+            width: 60px;
+            height: 60px;
+            border: 2px dashed rgba(255, 215, 0, 0.5);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75em;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .equipment-slot:hover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .equipment-slot.filled {
+            border-style: solid;
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
+        .equipment-slot .slot-icon {
+            font-size: 1.5em;
+        }
+        .equipment-slot .slot-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            white-space: nowrap;
+            font-size: 0.8em;
+            display: none;
+            z-index: 10;
+        }
+        .equipment-slot:hover .slot-tooltip {
+            display: block;
+        }
+        
+        /* 背包模态框 */
+        .inventory-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .inventory-tab {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .inventory-tab:hover, .inventory-tab.active {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border-color: #ffd700;
+        }
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .inventory-slot {
+            aspect-ratio: 1;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            padding: 5px;
+        }
+        .inventory-slot:hover, .inventory-slot.selected {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+        .inventory-slot .item-name {
+            font-size: 0.7em;
+            text-align: center;
+            color: #ccc;
+        }
+        .inventory-slot .item-quantity {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            font-size: 0.65em;
+            color: #ffd700;
+        }
+        .inventory-slot .quality-common { color: #ffffff; }
+        .inventory-slot .quality-rare { color: #64b5f6; }
+        .inventory-slot .quality-precious { color: #ba68c8; }
+        .inventory-slot .quality-legendary { color: #ffd700; }
+        .inventory-detail {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .inventory-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .capacity-display {
+            text-align: center;
+            color: #888;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        
+        /* 商店模态框 */
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .shop-name {
+            color: #ffd700;
+            font-size: 1.3em;
+        }
+        .btn-refresh {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #555, #777);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .btn-refresh:hover {
+            background: linear-gradient(135deg, #666, #888);
+        }
+        .shop-intro {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-style: italic;
+            color: #aaa;
+        }
+        .shop-grid {
+            display: grid;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .shop-item:hover {
+            border-color: rgba(255, 215, 0, 0.5);
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .shop-item-info {
+            flex: 1;
+        }
+        .shop-item-name {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .shop-item-desc {
+            font-size: 0.8em;
+            color: #888;
+        }
+        .shop-item-price {
+            color: #87ceeb;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .btn-buy {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #4caf50, #81c784);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-buy:hover {
+            background: linear-gradient(135deg, #66bb6a, #a5d6a7);
+        }
+        .btn-buy:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        /* 炼丹模态框 */
+        .alchemy-recipes {
+            display: grid;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .alchemy-recipe {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .alchemy-recipe:hover, .alchemy-recipe.selected {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+        .recipe-info {
+            flex: 1;
+        }
+        .recipe-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        .recipe-materials {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 3px;
+        }
+        .recipe-success {
+            font-size: 0.85em;
+            color: #4caf50;
+        }
+        .btn-craft {
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #e65100, #ff9800);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .btn-craft:hover {
+            background: linear-gradient(135deg, #ff6d00, #ffa726);
+        }
+        .btn-craft:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .alchemy-result {
+            text-align: center;
+            padding: 20px;
+        }
+        .result-success {
+            color: #4caf50;
+            font-size: 1.2em;
+        }
+        .result-fail {
+            color: #f44336;
+            font-size: 1.2em;
+        }
     </style>
 </head>
 <body>
@@ -375,10 +675,28 @@
             </div>
         </div>
 
+        <div id="equipmentBar" class="equipment-bar hidden">
+            <div class="equipment-slot" id="equipSlot0" onclick="unequipTreasure(0)">
+                <span class="slot-icon">⚔️</span>
+                <span class="slot-tooltip">空</span>
+            </div>
+            <div class="equipment-slot" id="equipSlot1" onclick="unequipTreasure(1)">
+                <span class="slot-icon">🛡️</span>
+                <span class="slot-tooltip">空</span>
+            </div>
+            <div class="equipment-slot" id="equipSlot2" onclick="unequipTreasure(2)">
+                <span class="slot-icon">💍</span>
+                <span class="slot-tooltip">空</span>
+            </div>
+        </div>
+
         <div id="gameButtons" class="buttons hidden">
             <button class="btn btn-cultivate" onclick="doCultivate()">🧘 修炼</button>
             <button class="btn btn-explore" onclick="doExplore()">🗺️ 探索</button>
             <button class="btn btn-breakthrough" onclick="tryBreakthrough()">⬆️ 突破</button>
+            <button class="btn btn-inventory" onclick="openInventory()">🎒 背包</button>
+            <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
+            <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
         </div>
 
@@ -409,6 +727,53 @@
         </div>
     </div>
 
+    <!-- 背包模态框 -->
+    <div id="inventoryModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🎒 背包</h2>
+            <div class="capacity-display">容量：<span id="invCapacity">0</span>/20</div>
+            <div class="inventory-tabs">
+                <div class="inventory-tab active" onclick="switchInvTab('all')">全部</div>
+                <div class="inventory-tab" onclick="switchInvTab('pill')">丹药</div>
+                <div class="inventory-tab" onclick="switchInvTab('treasure')">灵宝</div>
+                <div class="inventory-tab" onclick="switchInvTab('material')">材料</div>
+            </div>
+            <div class="inventory-grid" id="inventoryGrid"></div>
+            <div class="inventory-detail" id="invDetail" style="display:none;">
+                <div id="invDetailContent"></div>
+                <div class="inventory-actions" id="invActions"></div>
+            </div>
+            <button class="close-btn" onclick="closeInventory()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 商店模态框 -->
+    <div id="shopModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🏪 修仙坊市</h2>
+            <div class="shop-header">
+                <span class="shop-name">天机阁</span>
+                <button class="btn-refresh" onclick="refreshShop()">🔄 刷新(消耗1天)</button>
+            </div>
+            <div class="shop-intro" id="shopIntro">掌柜笑迎各位修士光临...</div>
+            <div class="shop-grid" id="shopGrid"></div>
+            <button class="close-btn" onclick="closeShop()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 炼丹模态框 -->
+    <div id="alchemyModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">⚗️ 炼丹炉</h2>
+            <div class="alchemy-recipes" id="alchemyRecipes"></div>
+            <div class="inventory-detail" id="alchemyDetail" style="display:none;">
+                <div id="alchemyDetailContent"></div>
+            </div>
+            <div id="alchemyResult" class="alchemy-result" style="display:none;"></div>
+            <button class="close-btn" onclick="closeAlchemy()">关闭</button>
+        </div>
+    </div>
+
     <script>
         // 游戏配置
         const CONFIG = {
@@ -418,6 +783,35 @@
             apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_pro',
             storageKey: 'cultivationSave',
             apiConfigKey: 'cultivationApiConfig'
+        };
+
+        // 丹药定义
+        const PILLS = {
+            '聚灵丹': { quality: 'common', effect: { type: 'qi', value: 50 }, price: 50, desc: '恢复50灵气', icon: '💊' },
+            '心魔丹': { quality: 'common', effect: { type: 'mindset', value: 30 }, price: 80, desc: '恢复30心境', icon: '💊' },
+            '金髓丹': { quality: 'rare', effect: { type: 'qi', value: 200 }, price: 200, desc: '恢复200灵气', icon: '💊' },
+            '筑基丹': { quality: 'rare', effect: { type: 'breakthrough_boost', value: 0.2 }, price: 500, desc: '突破成功率+20%', icon: '💊' },
+            '破境丹': { quality: 'precious', effect: { type: 'breakthrough_boost', value: 0.3 }, price: 2000, desc: '突破+30%', icon: '💊' },
+            '洗髓丹': { quality: 'precious', effect: { type: 'cultivate_speed', value: 0.1 }, price: 3000, desc: '修炼速度+10%', icon: '💊' },
+            '定神丹': { quality: 'precious', effect: { type: '渡劫_mindset_protect', value: 0.5 }, price: 5000, desc: '渡劫心境消耗-50%', icon: '💊' }
+        };
+
+        // 灵宝定义
+        const TREASURES = {
+            '青锋剑': { type: 'weapon', quality: 'common', effect: { type: 'attack', value: 0.1 }, price: 300, desc: '攻击+10%', icon: '⚔️' },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { type: 'defense', value: 0.1 }, price: 300, desc: '防御+10%', icon: '🛡️' },
+            '聚灵阵': { type: 'accessory', quality: 'rare', effect: { type: 'cultivate_qi_rate', value: 0.2 }, price: 1000, desc: '修炼灵气+20%', icon: '📿' },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { type: '渡劫_damage_reduce', value: 0.3 }, price: 2000, desc: '渡劫伤害-30%', icon: '🔥' },
+            '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 800, desc: '逃跑成功率+50%', icon: '📜' },
+            '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 5000, desc: '预知事件类型', icon: '🔮' },
+            '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 20000, desc: '全属性+5%', icon: '珠' }
+        };
+
+        // 炼丹配方
+        const ALCHEMY_RECIPES = {
+            '聚灵丹': { materials: { '灵草': 2, '灵石': 30 }, successRate: 0.8, desc: '炼制聚灵丹' },
+            '心魔丹': { materials: { '安神草': 1, '灵石': 50 }, successRate: 0.7, desc: '炼制心魔丹' },
+            '筑基丹': { materials: { '灵芝': 3, '灵石': 300 }, successRate: 0.5, desc: '炼制筑基丹' }
         };
 
         // 游戏状态
@@ -432,7 +826,25 @@
             cultivationProgress: 0,
             eventLog: [],
             isGameOver: false,
-            isVictory: false
+            isVictory: false,
+            // V2新增字段
+            inventory: [],
+            equippedTreasures: [null, null, null],
+            maxInventorySlots: 20,
+            shopItems: [],
+            lastShopDay: 0,
+            activeEffects: {
+                breakthrough_boost: 0,
+                cultivate_speed: 0,
+                渡劫_mindset_protect: 0,
+                attack: 0,
+                defense: 0,
+                cultivate_qi_rate: 0,
+                渡劫_damage_reduce: 0,
+                escape: 0,
+                foresee_event: 0,
+                all_stats: 0
+            }
         };
 
         // 每个境界需要的灵气和进度阈值
@@ -487,7 +899,24 @@
                 cultivationProgress: 0,
                 eventLog: [],
                 isGameOver: false,
-                isVictory: false
+                isVictory: false,
+                inventory: [],
+                equippedTreasures: [null, null, null],
+                maxInventorySlots: 20,
+                shopItems: [],
+                lastShopDay: 0,
+                activeEffects: {
+                    breakthrough_boost: 0,
+                    cultivate_speed: 0,
+                    渡劫_mindset_protect: 0,
+                    attack: 0,
+                    defense: 0,
+                    cultivate_qi_rate: 0,
+                    渡劫_damage_reduce: 0,
+                    escape: 0,
+                    foresee_event: 0,
+                    all_stats: 0
+                }
             };
             saveGame();
             showGameUI();
@@ -498,7 +927,30 @@
         function loadGame() {
             const saved = localStorage.getItem(CONFIG.storageKey);
             if (saved) {
-                gameState = JSON.parse(saved);
+                const loaded = JSON.parse(saved);
+                // 确保V2新增字段存在（向后兼容）
+                gameState = {
+                    ...gameState,
+                    ...loaded,
+                    activeEffects: loaded.activeEffects || {
+                        breakthrough_boost: 0,
+                        cultivate_speed: 0,
+                        渡劫_mindset_protect: 0,
+                        attack: 0,
+                        defense: 0,
+                        cultivate_qi_rate: 0,
+                        渡劫_damage_reduce: 0,
+                        escape: 0,
+                        foresee_event: 0,
+                        all_stats: 0
+                    },
+                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
+                    inventory: loaded.inventory || [],
+                    shopItems: loaded.shopItems || [],
+                    lastShopDay: loaded.lastShopDay || 0
+                };
+                // 重新计算装备效果
+                recalculateAllEffects();
                 if (gameState.isGameOver) {
                     showGameOverScreen();
                 } else {
@@ -515,10 +967,16 @@
             document.getElementById('apiConfig').classList.add('hidden');
             document.getElementById('gameStats').classList.remove('hidden');
             document.getElementById('cultivationProgress').classList.remove('hidden');
+            document.getElementById('equipmentBar').classList.remove('hidden');
             document.getElementById('gameButtons').classList.remove('hidden');
             document.getElementById('eventLog').classList.remove('hidden');
             updateDisplay();
             renderLog();
+            updateEquipmentBar();
+            // 检查商店刷新
+            if (gameState.lastShopDay < gameState.days) {
+                refreshShop(true);
+            }
         }
 
         // 显示游戏结束画面
@@ -526,6 +984,7 @@
             document.getElementById('startScreen').classList.remove('hidden');
             document.getElementById('gameStats').classList.add('hidden');
             document.getElementById('cultivationProgress').classList.add('hidden');
+            document.getElementById('equipmentBar').classList.add('hidden');
             document.getElementById('gameButtons').classList.add('hidden');
             document.getElementById('eventLog').classList.add('hidden');
             
@@ -592,7 +1051,12 @@
         // 修炼
         function doCultivate() {
             const req = REALM_REQUIREMENTS[gameState.realm];
-            const gain = Math.floor(5 + Math.random() * 10 + gameState.realm * 3);
+            let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
+            // 应用装备和丹药效果
+            baseGain *= (1 + gameState.activeEffects.cultivate_speed);
+            baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
+            baseGain *= (1 + gameState.activeEffects.all_stats);
+            const gain = Math.floor(baseGain);
             gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
             gameState.cultivationProgress += gain;
             
@@ -857,7 +1321,10 @@
 
         // 渡劫处理
         async function handleTribulation() {
-            const survivalChance = gameState.mindset / 100;
+            let survivalChance = gameState.mindset / 100;
+            // 应用定神丹效果
+            survivalChance *= (1 + gameState.activeEffects.渡劫_mindset_protect);
+            survivalChance *= (1 + gameState.activeEffects.all_stats);
             
             if (Math.random() < survivalChance) {
                 addLog('good', '渡劫成功', '天雷降临，你成功渡过天劫，修为大涨！');
@@ -867,9 +1334,13 @@
                 gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
                 gameState.qi = Math.floor(gameState.qi / 2);
             } else {
-                addLog('bad', '渡劫失败', '天雷过于猛烈，你重伤垂死...');
-                gameState.qi = Math.floor(gameState.qi * 0.2);
-                gameState.mindset = Math.max(0, gameState.mindset - 30);
+                // 应用避火罩效果减伤
+                const damageReduction = gameState.activeEffects.渡劫_damage_reduce + gameState.activeEffects.all_stats;
+                const qiLoss = Math.floor(gameState.qi * (0.8 * (1 - damageReduction)));
+                const mindsetLoss = Math.floor(30 * (1 - gameState.activeEffects.渡劫_mindset_protect));
+                addLog('bad', '渡劫失败', `天雷过于猛烈，你重伤垂死...`);
+                gameState.qi = Math.max(0, gameState.qi - qiLoss);
+                gameState.mindset = Math.max(0, gameState.mindset - mindsetLoss);
             }
         }
 
@@ -907,7 +1378,10 @@
         // 本地突破
         function localBreakthrough() {
             const req = REALM_REQUIREMENTS[gameState.realm];
-            const chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
+            let chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
+            // 应用突破加成效果
+            chance *= (1 + gameState.activeEffects.breakthrough_boost);
+            chance *= (1 + gameState.activeEffects.all_stats);
             
             if (Math.random() < chance) {
                 if (gameState.realm >= 4) {
@@ -1052,6 +1526,606 @@
 
         // 初始化游戏
         init();
+
+        // ========== V2 新增功能 ==========
+
+        // 重新计算所有装备效果
+        function recalculateAllEffects() {
+            // 重置所有效果
+            for (let key in gameState.activeEffects) {
+                gameState.activeEffects[key] = 0;
+            }
+            // 累加装备效果
+            for (const treasure of gameState.equippedTreasures) {
+                if (treasure) {
+                    const effectType = treasure.effect.type;
+                    if (gameState.activeEffects.hasOwnProperty(effectType)) {
+                        gameState.activeEffects[effectType] += treasure.effect.value;
+                    }
+                }
+            }
+        }
+
+        // 更新装备栏显示
+        function updateEquipmentBar() {
+            const icons = ['⚔️', '🛡️', '💍'];
+            for (let i = 0; i < 3; i++) {
+                const slot = document.getElementById(`equipSlot${i}`);
+                const treasure = gameState.equippedTreasures[i];
+                if (treasure) {
+                    slot.classList.add('filled');
+                    slot.querySelector('.slot-icon').textContent = treasure.icon || icons[i];
+                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}\n${treasure.desc}`;
+                } else {
+                    slot.classList.remove('filled');
+                    slot.querySelector('.slot-icon').textContent = icons[i];
+                    slot.querySelector('.slot-tooltip').textContent = '空';
+                }
+            }
+        }
+
+        // 卸下灵宝
+        function unequipTreasure(slotIndex) {
+            const treasure = gameState.equippedTreasures[slotIndex];
+            if (treasure) {
+                // 移回背包
+                addToInventory(treasure.type, treasure.name, 1, treasure.quality, treasure.effect, treasure.desc, treasure.icon);
+                gameState.equippedTreasures[slotIndex] = null;
+                recalculateAllEffects();
+                updateEquipmentBar();
+                saveGame();
+                addLog('neutral', '卸下灵宝', `卸下了${treasure.name}`);
+            }
+        }
+
+        // 添加物品到背包
+        function addToInventory(type, name, quantity, quality, effect, desc, icon) {
+            // 查找是否已存在同类型物品
+            const existing = gameState.inventory.find(item => item.name === name && item.type === type);
+            if (existing) {
+                existing.quantity += quantity;
+            } else {
+                if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                    return false; // 背包满了
+                }
+                gameState.inventory.push({
+                    id: Date.now(),
+                    type,
+                    name,
+                    quantity,
+                    quality,
+                    effect,
+                    desc,
+                    icon
+                });
+            }
+            return true;
+        }
+
+        // 获取品质颜色
+        function getQualityColor(quality) {
+            const colors = {
+                common: '#ffffff',
+                rare: '#64b5f6',
+                precious: '#ba68c8',
+                legendary: '#ffd700'
+            };
+            return colors[quality] || colors.common;
+        }
+
+        // 打开背包
+        let currentInvTab = 'all';
+        let selectedInvItem = null;
+
+        function openInventory() {
+            currentInvTab = 'all';
+            selectedInvItem = null;
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            document.getElementById('inventoryModal').classList.add('active');
+        }
+
+        function closeInventory() {
+            document.getElementById('inventoryModal').classList.remove('active');
+        }
+
+        function switchInvTab(tab) {
+            currentInvTab = tab;
+            selectedInvItem = null;
+            document.querySelectorAll('.inventory-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        function renderInventoryGrid() {
+            const grid = document.getElementById('inventoryGrid');
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            
+            document.getElementById('invCapacity').textContent = gameState.inventory.length;
+            
+            grid.innerHTML = items.map((item, idx) => `
+                <div class="inventory-slot ${selectedInvItem === idx ? 'selected' : ''}" 
+                     onclick="selectInvItem(${idx})">
+                    <span style="font-size:1.5em">${item.icon || '📦'}</span>
+                    <span class="item-name quality-${item.quality}">${item.name}</span>
+                    ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function selectInvItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            selectedInvItem = idx;
+            const item = items[idx];
+            renderInventoryGrid();
+            
+            document.getElementById('invDetail').style.display = 'block';
+            document.getElementById('invDetailContent').innerHTML = `
+                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
+                    <span style="font-size:2em">${item.icon || '📦'}</span>
+                    <div>
+                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(item.quality)}">${item.name}</div>
+                        <div style="color:#888">${item.desc}</div>
+                    </div>
+                </div>
+                <div style="color:#aaa">数量: ${item.quantity}</div>
+            `;
+            
+            let actions = '';
+            if (item.type === 'pill') {
+                actions = `<button class="btn btn-cultivate" onclick="usePill('${item.name}', ${idx})">使用</button>`;
+            } else if (item.type === 'treasure') {
+                actions = `<button class="btn btn-breakthrough" onclick="equipTreasure('${item.name}', ${idx})">装备</button>`;
+            }
+            actions += `<button class="btn btn-save" onclick="sellItem(${idx})">出售(${Math.floor(item.quality === 'common' ? 10 : item.quality === 'rare' ? 50 : item.quality === 'precious' ? 200 : 1000)}灵石)</button>`;
+            actions += `<button class="btn btn-new" onclick="discardItem(${idx})">丢弃</button>`;
+            document.getElementById('invActions').innerHTML = actions;
+        }
+
+        function usePill(name, idx) {
+            const pill = PILLS[name];
+            if (!pill) return;
+            
+            const item = gameState.inventory.find((i, iidx) => {
+                let items = gameState.inventory;
+                if (currentInvTab !== 'all') items = items.filter(it => it.type === currentInvTab);
+                return iidx === idx;
+            });
+            if (!item || item.quantity <= 0) return;
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i.name !== name || i.type !== 'pill');
+            }
+            
+            // 应用丹药效果
+            switch (pill.effect.type) {
+                case 'qi':
+                    gameState.qi = Math.min(gameState.maxQi, gameState.qi + pill.effect.value);
+                    addLog('good', '使用丹药', `服下${name}，灵气+${pill.effect.value}`);
+                    break;
+                case 'mindset':
+                    gameState.mindset = Math.min(100, gameState.mindset + pill.effect.value);
+                    addLog('good', '使用丹药', `服下${name}，心境+${pill.effect.value}`);
+                    break;
+                case 'breakthrough_boost':
+                case 'cultivate_speed':
+                case '渡劫_mindset_protect':
+                    gameState.activeEffects[pill.effect.type] += pill.effect.value;
+                    addLog('good', '使用丹药', `服下${name}，${pill.desc}（永久生效）`);
+                    break;
+            }
+            
+            saveGame();
+            updateDisplay();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        function equipTreasure(name, idx) {
+            const treasure = TREASURES[name];
+            if (!treasure) return;
+            
+            // 找到空槽位
+            const emptySlot = gameState.equippedTreasures.findIndex(t => t === null);
+            if (emptySlot === -1) {
+                alert('装备栏已满！');
+                return;
+            }
+            
+            // 查找背包中的物品
+            const itemIdx = gameState.inventory.findIndex(i => i.name === name && i.type === 'treasure');
+            if (itemIdx === -1) return;
+            
+            const item = gameState.inventory[itemIdx];
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory.splice(itemIdx, 1);
+            }
+            
+            // 装备
+            gameState.equippedTreasures[emptySlot] = {
+                name: item.name,
+                type: item.type,
+                quality: item.quality,
+                effect: item.effect,
+                desc: item.desc,
+                icon: item.icon
+            };
+            
+            recalculateAllEffects();
+            updateEquipmentBar();
+            saveGame();
+            addLog('good', '装备灵宝', `装备了${name}`);
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        function sellItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item) return;
+            
+            const prices = { common: 10, rare: 50, precious: 200, legendary: 1000 };
+            const price = prices[item.quality] || 10;
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i !== item);
+            }
+            
+            gameState.spiritStones += price;
+            saveGame();
+            updateDisplay();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            addLog('neutral', '出售物品', `出售了${item.name}，获得${price}灵石`);
+        }
+
+        function discardItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item) return;
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i !== item);
+            }
+            
+            saveGame();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            addLog('neutral', '丢弃物品', `丢弃了${item.name}`);
+        }
+
+        // ========== 商店功能 ==========
+
+        function openShop() {
+            if (gameState.shopItems.length === 0) {
+                generateShopItems();
+            }
+            renderShopItems();
+            document.getElementById('shopModal').classList.add('active');
+            if (apiConfig.apiKey && apiConfig.groupId) {
+                generateShopIntro();
+            }
+        }
+
+        function closeShop() {
+            document.getElementById('shopModal').classList.remove('active');
+        }
+
+        function generateShopItems() {
+            const allItems = [];
+            // 收集所有丹药和灵宝
+            for (const [name, pill] of Object.entries(PILLS)) {
+                allItems.push({ type: 'pill', name, ...pill });
+            }
+            for (const [name, treasure] of Object.entries(TREASURES)) {
+                allItems.push({ type: 'treasure', name, ...treasure });
+            }
+            
+            // 随机选8-12个
+            const count = 8 + Math.floor(Math.random() * 5);
+            const shuffled = allItems.sort(() => Math.random() - 0.5);
+            gameState.shopItems = shuffled.slice(0, Math.min(count, allItems.length));
+            gameState.lastShopDay = gameState.days;
+            saveGame();
+        }
+
+        async function generateShopIntro() {
+            if (!apiConfig.apiKey || !apiConfig.groupId) return;
+            
+            try {
+                const realmName = CONFIG.realms[gameState.realm];
+                const prompt = `你是一个修仙世界的商店掌柜。请为"天机阁"生成一段简短的问候语（20-40字），要符合当前境界的修士。掌柜语气要亲切但不啰嗦。当前修士是${realmName}期修士。只返回问候语，不要其他内容。`;
+                
+                const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiConfig.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "MiniMax-Text-01",
+                        tokens_to_generate: 100,
+                        temperature: 0.8,
+                        messages: [{ role: "user", content: prompt }]
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const intro = data.choices[0].text.trim();
+                    document.getElementById('shopIntro').textContent = intro;
+                }
+            } catch (error) {
+                console.log('生成商店开场白失败，使用默认');
+            }
+        }
+
+        function renderShopItems() {
+            const grid = document.getElementById('shopGrid');
+            grid.innerHTML = gameState.shopItems.map((item, idx) => `
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-name" style="color:${getQualityColor(item.quality)}">${item.icon || '📦'} ${item.name}</div>
+                        <div class="shop-item-desc">${item.desc}</div>
+                    </div>
+                    <div class="shop-item-price">💎 ${item.price}</div>
+                    <button class="btn-buy" onclick="buyItem(${idx})" ${gameState.spiritStones < item.price ? 'disabled' : ''}>购买</button>
+                </div>
+            `).join('');
+        }
+
+        function buyItem(idx) {
+            const item = gameState.shopItems[idx];
+            if (!item || gameState.spiritStones < item.price) {
+                alert('灵石不足！');
+                return;
+            }
+            
+            if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                alert('背包已满！');
+                return;
+            }
+            
+            gameState.spiritStones -= item.price;
+            addToInventory(item.type, item.name, 1, item.quality, item.effect, item.desc, item.icon);
+            saveGame();
+            updateDisplay();
+            renderShopItems();
+            addLog('good', '购买物品', `购买了${item.name}`);
+        }
+
+        function refreshShop(isAuto = false) {
+            if (!isAuto) {
+                gameState.days++;
+                saveGame();
+                updateDisplay();
+            }
+            generateShopItems();
+            renderShopItems();
+            if (!isAuto) {
+                addLog('neutral', '刷新商店', '商店已刷新');
+            }
+        }
+
+        // ========== 炼丹功能 ==========
+
+        let selectedRecipe = null;
+
+        function openAlchemy() {
+            selectedRecipe = null;
+            document.getElementById('alchemyDetail').style.display = 'none';
+            document.getElementById('alchemyResult').style.display = 'none';
+            renderAlchemyRecipes();
+            document.getElementById('alchemyModal').classList.add('active');
+        }
+
+        function closeAlchemy() {
+            document.getElementById('alchemyModal').classList.remove('active');
+        }
+
+        function renderAlchemyRecipes() {
+            const container = document.getElementById('alchemyRecipes');
+            container.innerHTML = Object.entries(ALCHEMY_RECIPES).map(([name, recipe]) => {
+                const pill = PILLS[name];
+                const materialsStr = Object.entries(recipe.materials)
+                    .map(([m, q]) => `${m}×${q}`)
+                    .join(' + ');
+                return `
+                    <div class="alchemy-recipe ${selectedRecipe === name ? 'selected' : ''}" onclick="selectRecipe('${name}')">
+                        <div class="recipe-info">
+                            <div class="recipe-name" style="color:${getQualityColor(pill.quality)}">${pill.icon} ${name}</div>
+                            <div class="recipe-materials">材料: ${materialsStr}</div>
+                            <div class="recipe-success">成功率: ${Math.round(recipe.successRate * 100)}%</div>
+                        </div>
+                        <button class="btn-craft">炼制</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectRecipe(name) {
+            selectedRecipe = name;
+            renderAlchemyRecipes();
+            
+            const recipe = ALCHEMY_RECIPES[name];
+            const pill = PILLS[name];
+            const materialsStr = Object.entries(recipe.materials)
+                .map(([m, q]) => `${m}×${q}`)
+                .join(' + ');
+            
+            // 检查材料是否足够
+            const canCraft = checkMaterials(recipe.materials);
+            
+            document.getElementById('alchemyDetail').style.display = 'block';
+            document.getElementById('alchemyDetailContent').innerHTML = `
+                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
+                    <span style="font-size:2em">${pill.icon}</span>
+                    <div>
+                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(pill.quality)}">${name}</div>
+                        <div style="color:#aaa">${pill.desc}</div>
+                    </div>
+                </div>
+                <div style="margin:10px 0;">材料: ${materialsStr}</div>
+                <div style="color:#4caf50;">基础成功率: ${Math.round(recipe.successRate * 100)}%</div>
+                <div style="margin-top:15px;">
+                    <button class="btn-craft" onclick="craftPill('${name}')" ${!canCraft ? 'disabled' : ''}>
+                        ${canCraft ? '开始炼制(消耗1天)' : '材料不足'}
+                    </button>
+                </div>
+            `;
+        }
+
+        function checkMaterials(materials) {
+            // 检查灵石
+            if (materials['灵石'] && gameState.spiritStones < materials['灵石']) {
+                return false;
+            }
+            // 检查灵草类材料（通过探索获得）
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') continue;
+                const hasItem = gameState.inventory.some(item => 
+                    item.name === mat && item.quantity >= qty
+                );
+                if (!hasItem) return false;
+            }
+            return true;
+        }
+
+        function consumeMaterials(materials) {
+            // 消耗灵石
+            if (materials['灵石']) {
+                gameState.spiritStones -= materials['灵石'];
+            }
+            // 消耗其他材料
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') continue;
+                const item = gameState.inventory.find(i => i.name === mat);
+                if (item) {
+                    item.quantity -= qty;
+                    if (item.quantity <= 0) {
+                        gameState.inventory = gameState.inventory.filter(i => i !== item);
+                    }
+                }
+            }
+        }
+
+        function returnMaterials(materials, rate) {
+            // 返还30%材料
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    gameState.spiritStones += Math.floor(qty * rate);
+                } else {
+                    const item = gameState.inventory.find(i => i.name === mat);
+                    if (item) {
+                        item.quantity += Math.floor(qty * rate);
+                    } else if (Math.floor(qty * rate) > 0) {
+                        gameState.inventory.push({
+                            id: Date.now(),
+                            type: 'material',
+                            name: mat,
+                            quantity: Math.floor(qty * rate),
+                            quality: 'common',
+                            effect: {},
+                            desc: `回收的${mat}`,
+                            icon: '🌿'
+                        });
+                    }
+                }
+            }
+        }
+
+        async function craftPill(name) {
+            const recipe = ALCHEMY_RECIPES[name];
+            const pill = PILLS[name];
+            
+            // 消耗材料
+            consumeMaterials(recipe.materials);
+            
+            // 消耗1天
+            gameState.days++;
+            
+            // 关闭详情，显示结果
+            document.getElementById('alchemyDetail').style.display = 'none';
+            const resultDiv = document.getElementById('alchemyResult');
+            resultDiv.style.display = 'block';
+            
+            // 生成AI描述
+            let craftDesc = '';
+            if (apiConfig.apiKey && apiConfig.groupId) {
+                try {
+                    const prompt = `描述一次炼丹过程，丹药名称是${name}，用50-80字描述炼丹时的情景，包括火候、灵气变化等。`;
+                    const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiConfig.apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "MiniMax-Text-01",
+                            tokens_to_generate: 150,
+                            temperature: 0.8,
+                            messages: [{ role: "user", content: prompt }]
+                        })
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        craftDesc = data.choices[0].text.trim();
+                    }
+                } catch (error) {
+                    craftDesc = `丹炉中灵光闪烁，药香四溢...`;
+                }
+            } else {
+                craftDesc = `丹炉中灵光闪烁，药香四溢...`;
+            }
+            
+            // 判定成功
+            const roll = Math.random();
+            if (roll < recipe.successRate) {
+                // 成功
+                addToInventory('pill', name, 1, pill.quality, pill.effect, pill.desc, pill.icon);
+                resultDiv.innerHTML = `
+                    <div class="result-success">🎉 炼制成功！</div>
+                    <p style="margin-top:10px;color:#aaa">${craftDesc}</p>
+                    <p style="margin-top:10px;color:#ffd700">获得${name}×1，已放入背包</p>
+                `;
+                addLog('good', '炼丹成功', `成功炼制了${name}`);
+            } else {
+                // 失败，返还30%材料
+                returnMaterials(recipe.materials, 0.3);
+                resultDiv.innerHTML = `
+                    <div class="result-fail">💔 炼制失败...</div>
+                    <p style="margin-top:10px;color:#aaa">${craftDesc}</p>
+                    <p style="margin-top:10px;color:#888">材料损毁严重，返还30%材料</p>
+                `;
+                addLog('bad', '炼丹失败', `炼制${name}失败`);
+            }
+            
+            saveGame();
+            updateDisplay();
+            
+            // 3秒后刷新炼丹界面
+            setTimeout(() => {
+                document.getElementById('alchemyResult').style.display = 'none';
+                renderAlchemyRecipes();
+            }, 3000);
+        }
     </script>
 </body>
 </html>
