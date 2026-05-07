@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修仙模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(100, 100, 255, 0.2);
+            border: 1px solid rgba(100, 100, 255, 0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(50, 50, 100, 0.5);
+            border-radius: 15px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .stat-value.qi { color: #00ff88; }
+        .stat-value.stones { color: #87ceeb; }
+        .stat-value.mindset { color: #ff69b4; }
+        .stat-value.days { color: #ffa500; }
+        .realm-bar {
+            margin-bottom: 20px;
+        }
+        .realm-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .realm-name {
+            font-size: 1.3em;
+            color: #ffd700;
+        }
+        .realm-stage {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .progress-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            height: 25px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4a90d9, #7b68ee);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.85em;
+        }
+        .progress-bar.cultivation {
+            background: linear-gradient(90deg, #00c853, #69f0ae);
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-cultivate {
+            background: linear-gradient(135deg, #00c853, #69f0ae);
+            color: #1a1a2e;
+        }
+        .btn-explore {
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            color: #1a1a2e;
+        }
+        .btn-breakthrough {
+            background: linear-gradient(135deg, #e91e63, #f48fb1);
+            color: white;
+        }
+        .btn-save {
+            background: linear-gradient(135deg, #2196f3, #64b5f6);
+            color: white;
+        }
+        .btn-load {
+            background: linear-gradient(135deg, #9c27b0, #ba68c8);
+            color: white;
+        }
+        .btn-new {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: white;
+        }
+        .event-log {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .event-log h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 10px;
+        }
+        .log-entry {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: rgba(50, 50, 100, 0.3);
+            border-left: 3px solid #4a90d9;
+        }
+        .log-entry.good { border-left-color: #00c853; }
+        .log-entry.bad { border-left-color: #f44336; }
+        .log-entry.neutral { border-left-color: #ff9800; }
+        .log-entry-title {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+        .log-entry-text {
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.3);
+        }
+        .modal-title {
+            font-size: 1.8em;
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        .modal-description {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            color: #ddd;
+        }
+        .modal-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .option-btn {
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(50, 50, 100, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+        .option-btn:hover {
+            background: rgba(70, 70, 120, 0.7);
+            border-color: #ffd700;
+        }
+        .option-risk {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .option-risk.low { background: #4caf50; color: white; }
+        .option-risk.medium { background: #ff9800; color: white; }
+        .option-risk.high { background: #f44336; color: white; }
+        .result-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        .result-title {
+            color: #ffd700;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .close-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #666, #888);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .close-btn:hover {
+            background: linear-gradient(135deg, #888, #aaa);
+        }
+        .api-config {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .api-config h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        .api-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        .api-input:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #ffd700;
+        }
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        .game-over {
+            text-align: center;
+            padding: 40px;
+        }
+        .game-over h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .victory { color: #ffd700; }
+        .defeat { color: #f44336; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 修仙模拟器 🌟</h1>
+        
+        <div id="apiConfig" class="api-config">
+            <h4>⚙️ API 配置</h4>
+            <input type="text" id="apiKey" class="api-input" placeholder="MiniMax API Key">
+            <input type="text" id="groupId" class="api-input" placeholder="Group ID">
+            <button class="btn btn-save" onclick="saveApiConfig()">保存配置</button>
+        </div>
+
+        <div id="gameStats" class="stats-bar hidden">
+            <div class="stat-item">
+                <div class="stat-label">境界</div>
+                <div class="stat-value" id="realmDisplay">炼气期</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">灵气</div>
+                <div class="stat-value qi" id="qiDisplay">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">灵石</div>
+                <div class="stat-value stones" id="stonesDisplay">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">心境</div>
+                <div class="stat-value mindset" id="mindsetDisplay">50</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">游戏天数</div>
+                <div class="stat-value days" id="daysDisplay">1</div>
+            </div>
+        </div>
+
+        <div id="cultivationProgress" class="realm-bar hidden">
+            <div class="realm-info">
+                <span class="realm-name" id="realmName">炼气期</span>
+                <span class="realm-stage" id="realmStage">初期</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar cultivation" id="cultivationBar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div id="gameButtons" class="buttons hidden">
+            <button class="btn btn-cultivate" onclick="doCultivate()">🧘 修炼</button>
+            <button class="btn btn-explore" onclick="doExplore()">🗺️ 探索</button>
+            <button class="btn btn-breakthrough" onclick="tryBreakthrough()">⬆️ 突破</button>
+            <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
+        </div>
+
+        <div id="eventLog" class="event-log hidden">
+            <h3>📜 事件日志</h3>
+            <div id="logEntries"></div>
+        </div>
+
+        <div id="startScreen">
+            <div style="text-align: center; padding: 40px;">
+                <p style="font-size: 1.2em; margin-bottom: 30px; color: #aaa;">
+                    踏入修仙之路，历经磨难，终得飞升<br>
+                    或陨落于半途...
+                </p>
+                <button class="btn btn-cultivate" onclick="startNewGame()" style="margin: 10px;">🆕 开始新游戏</button>
+                <button class="btn btn-load" onclick="loadGame()" style="margin: 10px;">📂 继续游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="eventModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modalTitle">事件标题</h2>
+            <div class="modal-description" id="modalDescription">事件描述...</div>
+            <div class="modal-options" id="modalOptions"></div>
+            <div id="modalResult" class="result-box hidden"></div>
+            <button class="close-btn" onclick="closeModal()">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置
+        const CONFIG = {
+            realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
+            stages: ['初期', '中期', '后期'],
+            stageNames: ['凡人', '修士', '真人', '天君', '大能'],
+            apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_pro',
+            storageKey: 'cultivationSave',
+            apiConfigKey: 'cultivationApiConfig'
+        };
+
+        // 游戏状态
+        let gameState = {
+            realm: 0,       // 0-4 对应 炼气到化神
+            stage: 0,       // 0-2 对应 初期/中期/后期
+            qi: 0,
+            maxQi: 100,
+            spiritStones: 50,
+            mindset: 50,
+            days: 1,
+            cultivationProgress: 0,
+            eventLog: [],
+            isGameOver: false,
+            isVictory: false
+        };
+
+        // 每个境界需要的灵气和进度阈值
+        const REALM_REQUIREMENTS = {
+            0: { maxQi: 100, stageThreshold: [30, 60, 90], breakthroughQi: 100 },
+            1: { maxQi: 200, stageThreshold: [60, 120, 180], breakthroughQi: 200 },
+            2: { maxQi: 400, stageThreshold: [120, 240, 360], breakthroughQi: 400 },
+            3: { maxQi: 800, stageThreshold: [240, 480, 720], breakthroughQi: 800 },
+            4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 }
+        };
+
+        // API配置
+        let apiConfig = {
+            apiKey: '',
+            groupId: ''
+        };
+
+        // 初始化
+        function init() {
+            loadApiConfig();
+            updateDisplay();
+        }
+
+        // 加载API配置
+        function loadApiConfig() {
+            const saved = localStorage.getItem(CONFIG.apiConfigKey);
+            if (saved) {
+                apiConfig = JSON.parse(saved);
+                document.getElementById('apiKey').value = apiConfig.apiKey || '';
+                document.getElementById('groupId').value = apiConfig.groupId || '';
+            }
+        }
+
+        // 保存API配置
+        function saveApiConfig() {
+            apiConfig.apiKey = document.getElementById('apiKey').value.trim();
+            apiConfig.groupId = document.getElementById('groupId').value.trim();
+            localStorage.setItem(CONFIG.apiConfigKey, JSON.stringify(apiConfig));
+            alert('API配置已保存!');
+        }
+
+        // 开始新游戏
+        function startNewGame() {
+            gameState = {
+                realm: 0,
+                stage: 0,
+                qi: 20,
+                maxQi: 100,
+                spiritStones: 50,
+                mindset: 50,
+                days: 1,
+                cultivationProgress: 0,
+                eventLog: [],
+                isGameOver: false,
+                isVictory: false
+            };
+            saveGame();
+            showGameUI();
+            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
+        }
+
+        // 加载游戏
+        function loadGame() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            if (saved) {
+                gameState = JSON.parse(saved);
+                if (gameState.isGameOver) {
+                    showGameOverScreen();
+                } else {
+                    showGameUI();
+                }
+            } else {
+                alert('没有找到存档！');
+            }
+        }
+
+        // 显示游戏UI
+        function showGameUI() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('apiConfig').classList.add('hidden');
+            document.getElementById('gameStats').classList.remove('hidden');
+            document.getElementById('cultivationProgress').classList.remove('hidden');
+            document.getElementById('gameButtons').classList.remove('hidden');
+            document.getElementById('eventLog').classList.remove('hidden');
+            updateDisplay();
+            renderLog();
+        }
+
+        // 显示游戏结束画面
+        function showGameOverScreen() {
+            document.getElementById('startScreen').classList.remove('hidden');
+            document.getElementById('gameStats').classList.add('hidden');
+            document.getElementById('cultivationProgress').classList.add('hidden');
+            document.getElementById('gameButtons').classList.add('hidden');
+            document.getElementById('eventLog').classList.add('hidden');
+            
+            let html = '<div class="game-over">';
+            if (gameState.isVictory) {
+                html += `<h2 class="victory">🎉 飞升成功！🎉</h2>
+                         <p>历经${gameState.days}天，你终于突破化神期，白日飞升！</p>`;
+            } else {
+                html += `<h2 class="defeat">💀 陨落 💀</h2>
+                         <p>修仙之路充满危险，你在第${gameState.days}天陨落...</p>`;
+            }
+            html += '<button class="btn btn-new" onclick="startNewGame()">重新开始</button></div>';
+            document.getElementById('startScreen').innerHTML = html;
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            const realmName = CONFIG.realms[gameState.realm];
+            const stageName = CONFIG.stages[gameState.stage];
+            
+            document.getElementById('realmDisplay').textContent = `${realmName}期`;
+            document.getElementById('qiDisplay').textContent = `${gameState.qi}/${gameState.maxQi}`;
+            document.getElementById('stonesDisplay').textContent = gameState.spiritStones;
+            document.getElementById('mindsetDisplay').textContent = gameState.mindset;
+            document.getElementById('daysDisplay').textContent = gameState.days;
+            
+            document.getElementById('realmName').textContent = `${realmName}期`;
+            document.getElementById('realmStage').textContent = stageName;
+            
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            const progressInStage = gameState.stage === 0 ? 
+                gameState.cultivationProgress : 
+                gameState.cultivationProgress - req.stageThreshold[gameState.stage - 1];
+            const stageSize = gameState.stage === 0 ? 
+                req.stageThreshold[0] : 
+                (req.stageThreshold[gameState.stage] - req.stageThreshold[gameState.stage - 1]);
+            const percentage = Math.min(100, (progressInStage / stageSize) * 100);
+            
+            document.getElementById('cultivationBar').style.width = `${percentage}%`;
+            document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
+        }
+
+        // 添加日志
+        function addLog(type, title, text) {
+            gameState.eventLog.unshift({ type, title, text, day: gameState.days });
+            if (gameState.eventLog.length > 50) {
+                gameState.eventLog.pop();
+            }
+            renderLog();
+        }
+
+        // 渲染日志
+        function renderLog() {
+            const container = document.getElementById('logEntries');
+            const recentLogs = gameState.eventLog.slice(0, 5);
+            container.innerHTML = recentLogs.map(log => `
+                <div class="log-entry ${log.type}">
+                    <div class="log-entry-title">第${log.day}天 - ${log.title}</div>
+                    <div class="log-entry-text">${log.text}</div>
+                </div>
+            `).join('');
+        }
+
+        // 修炼
+        function doCultivate() {
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            const gain = Math.floor(5 + Math.random() * 10 + gameState.realm * 3);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.cultivationProgress += gain;
+            
+            let logType = 'good';
+            let logText = `修炼${gain}点灵气，感觉体内的灵力更加充沛。`;
+            
+            // 检查是否需要晋级
+            if (gameState.cultivationProgress >= req.stageThreshold[gameState.stage] && gameState.stage < 2) {
+                gameState.stage++;
+                logText = `修炼${gain}点灵气，境界突破到${CONFIG.stages[gameState.stage]}！`;
+                addLog(logType, '境界突破', logText);
+            } else if (gameState.cultivationProgress >= req.stageThreshold[2]) {
+                logText = `修炼${gain}点灵气，${CONFIG.realms[gameState.realm]}期修炼圆满，可以尝试突破到下一个境界！`;
+                addLog('neutral', '境界圆满', logText);
+            } else {
+                addLog(logType, '修炼', logText);
+            }
+            
+            gameState.days++;
+            saveGame();
+            updateDisplay();
+            doMorningExercise();
+        }
+
+        // 晨运
+        function doMorningExercise() {
+            const gain = Math.floor(2 + Math.random() * 5);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.mindset = Math.min(100, gameState.mindset + 1);
+            updateDisplay();
+        }
+
+        // 探索（触发AI事件）
+        async function doExplore() {
+            if (!apiConfig.apiKey || !apiConfig.groupId) {
+                alert('请先配置MiniMax API Key和Group ID！');
+                document.getElementById('apiConfig').classList.remove('hidden');
+                return;
+            }
+
+            openModal('探索中...', '<div class="loading">正在生成随机事件</div>', []);
+
+            try {
+                const eventData = await generateEvent();
+                displayEventModal(eventData);
+            } catch (error) {
+                console.error('生成事件失败:', error);
+                // 如果API失败，使用本地备用事件
+                const localEvent = getLocalRandomEvent();
+                displayEventModal(localEvent);
+            }
+        }
+
+        // 生成随机事件
+        async function generateEvent() {
+            const realmName = CONFIG.realms[gameState.realm];
+            const stageName = CONFIG.stages[gameState.stage];
+            
+            const eventTypes = ['奇遇', '挑战', '机缘', '平静', '劫难'];
+            const weights = [0.2, 0.25, 0.15, 0.3, 0.1];
+            const rand = Math.random();
+            let cumulative = 0;
+            let eventType = '平静';
+            for (let i = 0; i < weights.length; i++) {
+                cumulative += weights[i];
+                if (rand < cumulative) {
+                    eventType = eventTypes[i];
+                    break;
+                }
+            }
+
+            const prompt = `你是一个修仙游戏的事件生成器。
+
+当前玩家状态：
+- 境界：${realmName}期${stageName}
+- 灵气：${gameState.qi}/${gameState.maxQi}
+- 灵石：${gameState.spiritStones}
+- 心境：${gameState.mindset}/100
+- 游戏天数：${gameState.days}
+
+请生成一个"${eventType}"类型的修仙事件。
+
+要求：
+1. 事件标题简洁有力（4-10字）
+2. 事件描述生动有趣，体现修仙世界的奇妙
+3. 提供3个不同风险等级的选项（低风险/中风险/高风险）
+4. 每个选项都要有明确的效果描述
+
+请以JSON格式返回：
+{
+    "title": "事件标题",
+    "description": "事件描述（50-100字）",
+    "options": [
+        {"text": "选项1描述", "risk": "low", "effects": {"qi": 10, "mindset": 5, "spiritStones": 0}},
+        {"text": "选项2描述", "risk": "medium", "effects": {"qi": 30, "mindset": -10, "spiritStones": 0}},
+        {"text": "选项3描述", "risk": "high", "effects": {"qi": 80, "mindset": -30, "spiritStones": 0}}
+    ]
+}
+
+注意：
+- 低风险选项效果较小但安全
+- 高风险选项效果大但可能失败
+- effects中的值可以是负数表示减少
+- qi和spiritStones可以是0表示无影响
+- 只返回JSON，不要其他内容`;
+
+            const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiConfig.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "MiniMax-Text-01",
+                    tokens_to_generate: 500,
+                    temperature: 0.8,
+                    messages: [{ role: "user", content: prompt }]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('API请求失败');
+            }
+
+            const data = await response.json();
+            const content = data.choices[0].text;
+            
+            // 解析JSON
+            let jsonStr = content;
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                jsonStr = jsonMatch[0];
+            }
+            
+            return JSON.parse(jsonStr);
+        }
+
+        // 本地备用事件
+        function getLocalRandomEvent() {
+            const events = [
+                {
+                    title: '🌿 发现灵草',
+                    description: '在山林间发现一株散发幽香的灵草，似乎可以服用增强灵气。',
+                    options: [
+                        { text: '小心采摘', risk: 'low', effects: { qi: 15, mindset: 0, spiritStones: 0 } },
+                        { text: '直接服用', risk: 'medium', effects: { qi: 35, mindset: -5, spiritStones: 0 } },
+                        { text: '连根拔起研究', risk: 'high', effects: { qi: 60, mindset: -15, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '⚔️ 遇到妖兽',
+                    description: '一只妖兽从林中窜出，眼中闪烁着凶光，似乎把你当成了猎物。',
+                    options: [
+                        { text: '悄悄绕行', risk: 'low', effects: { qi: 0, mindset: 5, spiritStones: 0 } },
+                        { text: '与之搏斗', risk: 'medium', effects: { qi: -20, mindset: -10, spiritStones: 30 } },
+                        { text: '全力击杀', risk: 'high', effects: { qi: -40, mindset: -25, spiritStones: 80 } }
+                    ]
+                },
+                {
+                    title: '🏯 废弃洞府',
+                    description: '前方有一座废弃的修士洞府，门口的石碑上刻着模糊的文字。',
+                    options: [
+                        { text: '礼貌叩门', risk: 'low', effects: { qi: 10, mindset: 5, spiritStones: 0 } },
+                        { text: '尝试破阵', risk: 'medium', effects: { qi: 30, mindset: -10, spiritStones: 50 } },
+                        { text: '强行闯入', risk: 'high', effects: { qi: -30, mindset: -30, spiritStones: 150 } }
+                    ]
+                },
+                {
+                    title: '☁️ 灵气潮汐',
+                    description: '天地灵气突然变得躁动，形成一股灵气潮汐，正是修炼的好时机。',
+                    options: [
+                        { text: '静心吸收', risk: 'low', effects: { qi: 25, mindset: 10, spiritStones: 0 } },
+                        { text: '引导入体', risk: 'medium', effects: { qi: 50, mindset: 0, spiritStones: 0 } },
+                        { text: '强行吞噬', risk: 'high', effects: { qi: 100, mindset: -20, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '🧘 偶遇前辈',
+                    description: '一位神秘的前辈高人出现在你面前，似乎对你有所指点。',
+                    options: [
+                        { text: '恭敬请教', risk: 'low', effects: { qi: 20, mindset: 15, spiritStones: 0 } },
+                        { text: '交流心得', risk: 'medium', effects: { qi: 40, mindset: 5, spiritStones: 0 } },
+                        { text: '请求收徒', risk: 'high', effects: { qi: 80, mindset: -10, spiritStones: -50 } }
+                    ]
+                }
+            ];
+            return events[Math.floor(Math.random() * events.length)];
+        }
+
+        // 显示事件弹窗
+        function displayEventModal(event) {
+            document.getElementById('modalTitle').textContent = event.title;
+            document.getElementById('modalDescription').textContent = event.description;
+            
+            const optionsContainer = document.getElementById('modalOptions');
+            optionsContainer.innerHTML = event.options.map((opt, idx) => `
+                <button class="option-btn" onclick="handleOption(${idx}, ${JSON.stringify(event.options[idx]).replace(/"/g, '&quot;')})">
+                    ${opt.text}
+                    <span class="option-risk ${opt.risk}">${opt.risk === 'low' ? '低风险' : opt.risk === 'medium' ? '中风险' : '高风险'}</span>
+                </button>
+            `).join('');
+            
+            // 保存当前事件
+            window.currentEvent = event;
+        }
+
+        // 处理选项
+        async function handleOption(index, option) {
+            const effects = option.effects;
+            
+            // 应用效果
+            gameState.qi = Math.max(0, Math.min(gameState.maxQi, gameState.qi + (effects.qi || 0)));
+            gameState.mindset = Math.max(0, Math.min(100, gameState.mindset + (effects.mindset || 0)));
+            gameState.spiritStones = Math.max(0, gameState.spiritStones + (effects.spiritStones || 0));
+            
+            // 心境影响事件触发
+            if (gameState.mindset <= 10) {
+                gameState.isGameOver = true;
+                gameState.isVictory = false;
+                addLog('bad', '心境崩溃', '心境过低，走火入魔...');
+                saveGame();
+                closeModal();
+                showGameOverScreen();
+                return;
+            }
+            
+            // 检查渡劫（筑基和金丹之间有天劫）
+            if (gameState.realm === 1 && gameState.cultivationProgress >= REALM_REQUIREMENTS[1].stageThreshold[2]) {
+                if (Math.random() < 0.3) {
+                    // 触发天劫
+                    await handleTribulation();
+                }
+            }
+            
+            // 显示结果
+            let resultTitle = '结果';
+            let resultText = '';
+            
+            if (effects.qi > 0) resultText += `灵气 +${effects.qi} `;
+            if (effects.qi < 0) resultText += `灵气 ${effects.qi} `;
+            if (effects.mindset > 0) resultText += `心境 +${effects.mindset} `;
+            if (effects.mindset < 0) resultText += `心境 ${effects.mindset} `;
+            if (effects.spiritStones > 0) resultText += `灵石 +${effects.spiritStones} `;
+            if (effects.spiritStones < 0) resultText += `灵石 ${effects.spiritStones} `;
+            
+            if (!resultText) resultText = '没有变化';
+            
+            addLog(effects.qi >= 0 && effects.mindset >= 0 ? 'good' : 'bad', option.text, resultText);
+            
+            gameState.days++;
+            saveGame();
+            updateDisplay();
+            
+            // 显示结果区域
+            document.getElementById('modalResult').innerHTML = `
+                <div class="result-title">${resultTitle}</div>
+                <p>${resultText}</p>
+            `;
+            document.getElementById('modalResult').classList.remove('hidden');
+            document.getElementById('modalOptions').classList.add('hidden');
+        }
+
+        // 渡劫处理
+        async function handleTribulation() {
+            const survivalChance = gameState.mindset / 100;
+            
+            if (Math.random() < survivalChance) {
+                addLog('good', '渡劫成功', '天雷降临，你成功渡过天劫，修为大涨！');
+                gameState.cultivationProgress = 0;
+                gameState.stage = 0;
+                gameState.realm = Math.min(4, gameState.realm + 1);
+                gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                gameState.qi = Math.floor(gameState.qi / 2);
+            } else {
+                addLog('bad', '渡劫失败', '天雷过于猛烈，你重伤垂死...');
+                gameState.qi = Math.floor(gameState.qi * 0.2);
+                gameState.mindset = Math.max(0, gameState.mindset - 30);
+            }
+        }
+
+        // 尝试突破
+        async function tryBreakthrough() {
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            
+            if (gameState.cultivationProgress < req.stageThreshold[2]) {
+                alert('境界尚未圆满，无法突破！');
+                return;
+            }
+            
+            if (gameState.qi < req.breakthroughQi) {
+                alert('灵气不足，无法突破！');
+                return;
+            }
+            
+            if (!apiConfig.apiKey || !apiConfig.groupId) {
+                // 本地突破
+                localBreakthrough();
+                return;
+            }
+            
+            openModal('突破中...', '<div class="loading">正在生成突破描述</div>', []);
+            
+            try {
+                const result = await generateBreakthroughResult();
+                displayBreakthroughResult(result);
+            } catch (error) {
+                console.error('突破描述生成失败:', error);
+                localBreakthrough();
+            }
+        }
+
+        // 本地突破
+        function localBreakthrough() {
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            const chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
+            
+            if (Math.random() < chance) {
+                if (gameState.realm >= 4) {
+                    // 飞升！
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                    saveGame();
+                    showGameOverScreen();
+                } else {
+                    // 突破成功
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                    saveGame();
+                    updateDisplay();
+                }
+            } else {
+                // 突破失败
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+                saveGame();
+                updateDisplay();
+            }
+        }
+
+        // 生成突破结果
+        async function generateBreakthroughResult() {
+            const nextRealm = CONFIG.realms[Math.min(4, gameState.realm + 1)];
+            const currentRealm = CONFIG.realms[gameState.realm];
+            
+            const prompt = `你是一个修仙游戏的突破场景描述器。
+
+当前玩家状态：
+- 当前境界：${currentRealm}期
+- 目标境界：${nextRealm}期
+- 灵气：${gameState.qi}/${gameState.maxQi}
+- 心境：${gameState.mindset}/100
+
+请生成一段突破时的场景描述，包括：
+1. 天象变化（雷云、灵气漩涡等）
+2. 身体的剧烈变化
+3. 成功或失败的描述
+
+请以JSON格式返回：
+{
+    "success": true或false,
+    "title": "突破标题",
+    "description": "详细描述（80-150字）"
+}`;
+
+            const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiConfig.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "MiniMax-Text-01",
+                    tokens_to_generate: 300,
+                    temperature: 0.8,
+                    messages: [{ role: "user", content: prompt }]
+                })
+            });
+
+            const data = await response.json();
+            const content = data.choices[0].text;
+            
+            let jsonStr = content;
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                jsonStr = jsonMatch[0];
+            }
+            
+            return JSON.parse(jsonStr);
+        }
+
+        // 显示突破结果
+        function displayBreakthroughResult(result) {
+            document.getElementById('modalDescription').innerHTML = '';
+            const descDiv = document.createElement('div');
+            descDiv.className = 'modal-description';
+            descDiv.innerHTML = `<strong>${result.title}</strong><br><br>${result.description}`;
+            document.getElementById('modalDescription').appendChild(descDiv);
+            
+            if (result.success) {
+                if (gameState.realm >= 4) {
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                } else {
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                }
+            } else {
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+            }
+            
+            saveGame();
+            updateDisplay();
+            
+            document.getElementById('modalOptions').classList.add('hidden');
+        }
+
+        // 打开弹窗
+        function openModal(title, description, options) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalDescription').innerHTML = description;
+            document.getElementById('modalOptions').innerHTML = options;
+            document.getElementById('modalOptions').classList.remove('hidden');
+            document.getElementById('modalResult').classList.add('hidden');
+            document.getElementById('eventModal').classList.add('active');
+        }
+
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('eventModal').classList.remove('active');
+        }
+
+        // 手动存档
+        function manualSave() {
+            saveGame();
+            alert('游戏已保存！');
+        }
+
+        // 保存游戏
+        function saveGame() {
+            localStorage.setItem(CONFIG.storageKey, JSON.stringify(gameState));
+        }
+
+        // 初始化游戏
+        init();
+    </script>
+</body>
+</html>
