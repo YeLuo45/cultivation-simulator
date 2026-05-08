@@ -1322,6 +1322,203 @@
         .battle-record-result.lose { color: #f44336; }
         .battle-record-opponent { color: #aaa; font-size: 0.9em; }
         .battle-record-reward { color: #87ceeb; font-size: 0.85em; }
+
+        /* ========== V6 奇遇系统样式 ========== */
+        .btn-serendipity {
+            background: linear-gradient(135deg, #ff6b00, #ffa500);
+            color: white;
+        }
+
+        /* 奇遇模态框 */
+        #serendipityModal .modal-content {
+            max-width: 650px;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+        }
+        #serendipityModal .modal-content.positive {
+            border-color: rgba(255, 215, 0, 0.8);
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.4);
+        }
+        #serendipityModal .modal-content.negative {
+            border-color: rgba(244, 67, 54, 0.6);
+            box-shadow: 0 0 40px rgba(244, 67, 54, 0.3);
+        }
+        #serendipityModal .modal-content.neutral {
+            border-color: rgba(158, 158, 158, 0.6);
+            box-shadow: 0 0 40px rgba(158, 158, 158, 0.3);
+        }
+
+        .serendipity-icon {
+            font-size: 4em;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .serendipity-type-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-bottom: 15px;
+        }
+        .serendipity-type-badge.positive {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+        }
+        .serendipity-type-badge.negative {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.5);
+        }
+        .serendipity-type-badge.neutral {
+            background: rgba(158, 158, 158, 0.2);
+            color: #aaa;
+            border: 1px solid rgba(158, 158, 158, 0.5);
+        }
+
+        .serendipity-effect {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .serendipity-effect-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .serendipity-effect-item:last-child {
+            border-bottom: none;
+        }
+        .effect-positive { color: #4caf50; }
+        .effect-negative { color: #f44336; }
+
+        /* 秘境战斗样式 */
+        .secret-realm-arena {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a0a2a 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 250px;
+            border: 2px solid rgba(138, 43, 226, 0.5);
+            box-shadow: 0 0 30px rgba(138, 43, 226, 0.2);
+        }
+        .realm-wave {
+            text-align: center;
+            padding: 10px;
+            background: rgba(138, 43, 226, 0.2);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+        .realm-enemy {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(50, 50, 100, 0.5);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 100, 100, 0.3);
+        }
+        .realm-enemy-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .realm-enemy-avatar { font-size: 2em; }
+        .realm-enemy-name { font-weight: bold; color: #ffd700; }
+        .realm-enemy-realm { font-size: 0.85em; color: #aaa; }
+        .realm-enemy-hp {
+            text-align: right;
+        }
+        .realm-hp-bar {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            height: 20px;
+            width: 150px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .realm-hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f44336, #ef5350);
+            transition: width 0.3s ease;
+        }
+        .realm-rewards {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .realm-rewards h4 { color: #ffd700; margin-bottom: 10px; }
+        .reward-item {
+            display: inline-block;
+            padding: 5px 15px;
+            margin: 5px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 5px;
+            color: #ffd700;
+        }
+        .realm-progress {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .wave-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: rgba(100, 100, 100, 0.5);
+        }
+        .wave-dot.completed { background: #4caf50; }
+        .wave-dot.current { background: #ffd700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        .wave-dot.failed { background: #f44336; }
+
+        /* 奇遇日志 */
+        .serendipity-log {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .serendipity-log-entry {
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        .serendipity-log-entry.positive { border-left: 3px solid #ffd700; }
+        .serendipity-log-entry.negative { border-left: 3px solid #f44336; }
+        .serendipity-log-entry.neutral { border-left: 3px solid #aaa; }
+
+        /* 状态指示器 */
+        .status-indicators {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 5px;
+        }
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 0.7em;
+        }
+        .status-badge.lucky {
+            background: rgba(255, 215, 0, 0.3);
+            color: #ffd700;
+        }
+        .status-badge.unlucky {
+            background: rgba(244, 67, 54, 0.3);
+            color: #f44336;
+        }
+        .status-badge.serendipity-boost {
+            background: rgba(100, 181, 246, 0.3);
+            color: #64b5f6;
+        }
     </style>
 </head>
 <body>
@@ -1391,6 +1588,7 @@
             <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
+            <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
         </div>
@@ -1499,6 +1697,23 @@
             <h2 class="modal-title">🏛️ 宗门系统</h2>
             <div id="sectContent"></div>
             <button class="close-btn" onclick="closeSect()">关闭</button>
+        </div>
+    </div>
+
+    <!-- V6 奇遇系统模态框 -->
+    <div id="serendipityModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="serendipityTitle">✨ 奇遇降临 ✨</h2>
+            <div id="serendipityContent"></div>
+            <button class="close-btn" onclick="closeSerendipityModal()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 秘境战斗模态框 -->
+    <div id="secretRealmModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🌀 秘境探险 🌀</h2>
+            <div id="secretRealmContent"></div>
         </div>
     </div>
 
@@ -1612,6 +1827,182 @@
             '筑基丹': { materials: { '灵芝': 3, '灵石': 300 }, successRate: 0.5, desc: '炼制筑基丹' }
         };
 
+        // ========== V6 奇遇系统数据 ==========
+        // 奇遇事件定义
+        const SERENDIPITY_EVENTS = {
+            // 正面奇遇
+            '古修士传承': {
+                type: 'positive',
+                icon: '📜',
+                minRealm: 2, // 金丹及以上
+                effect: (state) => {
+                    const rewards = [
+                        { type: 'spiritStones', value: Math.floor(1000 + Math.random() * 2000) },
+                        { type: 'technique', value: 1 }
+                    ];
+                    const reward = rewards[Math.floor(Math.random() * rewards.length)];
+                    if (reward.type === 'spiritStones') {
+                        state.spiritStones += reward.value;
+                        return { title: '古修士传承', text: `获得前辈遗留的 ${reward.value} 灵石！`, effects: [{ type: '灵石', value: reward.value, positive: true }] };
+                    } else {
+                        return { title: '古修士传承', text: '获得高阶功法传承！', effects: [{ type: '功法', value: 1, positive: true }] };
+                    }
+                }
+            },
+            '秘境入口': {
+                type: 'positive',
+                icon: '🌀',
+                minRealm: 0,
+                effect: (state) => {
+                    state.currentEvent = { type: '秘境入口', inProgress: true };
+                    return { title: '秘境入口', text: '发现一处神秘秘境入口，进入可能获得稀有奖励！', effects: [], showRealmBattle: true };
+                }
+            },
+            '神兽认主': {
+                type: 'positive',
+                icon: '🦅',
+                minRealm: 3, // 元婴及以上
+                effect: (state) => {
+                    const bonuses = [
+                        { type: 'attack', value: 0.1 },
+                        { type: 'defense', value: 0.1 },
+                        { type: 'cultivate_speed', value: 0.05 }
+                    ];
+                    const bonus = bonuses[Math.floor(Math.random() * bonuses.length)];
+                    state.activeEffects[bonus.type] += bonus.value;
+                    return { title: '神兽认主', text: `神兽与你结缘，${bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度'}+${Math.round(bonus.value * 100)}%！`, effects: [{ type: bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度', value: Math.round(bonus.value * 100) + '%', positive: true }] };
+                }
+            },
+            '仙人指路': {
+                type: 'positive',
+                icon: '🧙',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.serendipityBoostEndDay = state.days + 3;
+                    state.activeEffects.serendipity_boost = 0.15;
+                    return { title: '仙人指路', text: '仙人指点，突破成功率+30%，持续3天！', effects: [{ type: '突破成功率', value: '+30%', positive: true }] };
+                }
+            },
+            '灵根觉醒': {
+                type: 'positive',
+                icon: '✨',
+                minRealm: 0,
+                effect: (state) => {
+                    const gain = Math.floor(5 + Math.random() * 10);
+                    state.activeEffects.cultivate_speed += gain / 1000;
+                    return { title: '灵根觉醒', text: `灵根资质提升，修炼速度+${gain}%！`, effects: [{ type: '修炼速度', value: gain + '%', positive: true }] };
+                }
+            },
+            '顿悟': {
+                type: 'positive',
+                icon: '💡',
+                minRealm: 0,
+                effect: (state) => {
+                    state.spiritStones += 10000;
+                    return { title: '顿悟', text: '修炼中顿悟，获得10000灵石！', effects: [{ type: '灵石', value: 10000, positive: true }] };
+                }
+            },
+            // 负面奇遇
+            '心魔入侵': {
+                type: 'negative',
+                icon: '👹',
+                minRealm: 3, // 元婴及以上
+                effect: (state) => {
+                    const loss = Math.floor(state.spiritStones * 0.3);
+                    state.spiritStones -= loss;
+                    state.serendipity.luckStatus = 'unlucky';
+                    state.serendipity.luckEndDay = state.days + 3;
+                    return { title: '心魔入侵', text: `心魔入侵，损失 ${loss} 灵石，运气-，持续3天！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
+                }
+            },
+            '仇家追杀': {
+                type: 'negative',
+                icon: '⚔️',
+                minRealm: 0,
+                condition: (state) => state.combat.losses > 0,
+                effect: (state) => {
+                    const loss = Math.floor(state.spiritStones * 0.5);
+                    state.spiritStones -= loss;
+                    return { title: '仇家追杀', text: `旧日仇家找上门来，损失 ${loss} 灵石！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
+                }
+            },
+            '魔器诱惑': {
+                type: 'negative',
+                icon: '🗡️',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '魔器诱惑', inProgress: true };
+                    return { title: '魔器诱惑', text: '发现一把散发魔气的武器，装备后每回合扣血！', effects: [], showChoice: true };
+                }
+            },
+            '走火入魔': {
+                type: 'negative',
+                icon: '💀',
+                minRealm: 0,
+                condition: (state) => state.cultivationProgress > 1000,
+                effect: (state) => {
+                    if (state.realm > 0) state.realm--;
+                    state.cultivationProgress = 0;
+                    state.serendipity.luckStatus = 'unlucky';
+                    state.serendipity.luckEndDay = state.days + 3;
+                    return { title: '走火入魔', text: '修炼过度，走火入魔！境界-1，强制休息！', effects: [{ type: '境界', value: -1, positive: false }] };
+                }
+            },
+            '妖兽袭击': {
+                type: 'negative',
+                icon: '🐺',
+                minRealm: 0,
+                effect: (state) => {
+                    state.currentEvent = { type: '妖兽袭击', inProgress: true };
+                    return { title: '妖兽袭击', text: '遭遇妖兽袭击！', effects: [], showRealmBattle: true, isNegative: true };
+                }
+            },
+            // 中性奇遇
+            '乞丐讨缘': {
+                type: 'neutral',
+                icon: '🙏',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '乞丐讨缘', inProgress: true, choices: ['施舍100灵石', '不给'] };
+                    return { title: '乞丐讨缘', text: '路遇乞丐向你讨缘，你会怎么做？', effects: [] };
+                }
+            },
+            '商人交易': {
+                type: 'neutral',
+                icon: '💰',
+                minRealm: 0,
+                effect: (state) => {
+                    const items = ['聚灵丹', '心魔丹', '金髓丹'];
+                    const item = items[Math.floor(Math.random() * items.length)];
+                    const cost = Math.floor(100 + Math.random() * 200);
+                    if (state.spiritStones >= cost) {
+                        state.spiritStones -= cost;
+                        addItemToInventory(item, 1);
+                        return { title: '商人交易', text: `花费 ${cost} 灵石购买了 ${item}！`, effects: [{ type: '灵石', value: -cost, positive: false }, { type: item, value: 1, positive: true }] };
+                    } else {
+                        return { title: '商人交易', text: '灵石不足，无法交易！', effects: [] };
+                    }
+                }
+            },
+            '散修求助': {
+                type: 'neutral',
+                icon: '👤',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '散修求助', inProgress: true, choices: ['帮助', '不帮'] };
+                    return { title: '散修求助', text: '一位散修请求你帮忙，你会帮助吗？', effects: [] };
+                }
+            }
+        };
+
+        // 奇遇道具定义
+        const SERENDIPITY_TALISMANS = {
+            '祥云符': { type: 'consumable', effect: { type: 'serendipity_boost', value: 0.1 }, duration: 1, price: 2000, desc: '奇遇概率+10%，持续1天', icon: '☁️' },
+            '避厄符': { type: 'consumable', effect: { type: 'immune_negative', value: 1 }, duration: 1, price: 1500, desc: '免疫下次负面奇遇', icon: '🛡️' },
+            '探路符': { type: 'consumable', effect: { type: 'force_realm', value: 1 }, duration: 0, price: 3000, desc: '指定触发"秘境入口"奇遇', icon: '📜' },
+            '还童丹': { type: 'consumable', effect: { type: 'convert_demon', value: 1 }, duration: 0, price: 5000, desc: '将魔器转换为正常法宝', icon: '💊' }
+        };
+
         // 游戏状态
         let gameState = {
             realm: 0,       // 0-4 对应 炼气到化神
@@ -1641,7 +2032,8 @@
                 渡劫_damage_reduce: 0,
                 escape: 0,
                 foresee_event: 0,
-                all_stats: 0
+                all_stats: 0,
+                serendipity_boost: 0
             },
             // V3渡劫系统字段
             tribulation: {
@@ -1682,6 +2074,19 @@
                 contributionShop: [],
                 lastShopRefresh: 0,
                 lastResourceCollection: 0
+            },
+            // V6 奇遇系统字段
+            serendipity: {
+                lastTriggerDay: 0,
+                todayCount: 0,
+                lastTriggerType: null,
+                cooldownTypes: {},
+                badLuck: 0,
+                currentEvent: null,
+                log: [],
+                luckStatus: null,
+                luckEndDay: 0,
+                serendipityBoostEndDay: 0
             }
         };
 
@@ -1791,6 +2196,19 @@
                     contributionShop: [],
                     lastShopRefresh: 0,
                     lastResourceCollection: 0
+                },
+                // V6 奇遇系统字段
+                serendipity: {
+                    lastTriggerDay: 0,
+                    todayCount: 0,
+                    lastTriggerType: null,
+                    cooldownTypes: {},
+                    badLuck: 0,
+                    currentEvent: null,
+                    log: [],
+                    luckStatus: null,
+                    luckEndDay: 0,
+                    serendipityBoostEndDay: 0
                 }
             };
             saveGame();
@@ -1859,8 +2277,24 @@
                         contributionShop: [],
                         lastShopRefresh: 0,
                         lastResourceCollection: 0
+                    },
+                    serendipity: loaded.serendipity || {
+                        lastTriggerDay: 0,
+                        todayCount: 0,
+                        lastTriggerType: null,
+                        cooldownTypes: {},
+                        badLuck: 0,
+                        currentEvent: null,
+                        log: [],
+                        luckStatus: null,
+                        luckEndDay: 0,
+                        serendipityBoostEndDay: 0
                     }
                 };
+                // 确保activeEffects包含serendipity_boost
+                if (!gameState.activeEffects.serendipity_boost) {
+                    gameState.activeEffects.serendipity_boost = 0;
+                }
                 // 重新计算装备效果
                 recalculateAllEffects();
                 if (gameState.isGameOver) {
@@ -2004,6 +2438,15 @@
             gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
             gameState.mindset = Math.min(100, gameState.mindset + 1);
             updateDisplay();
+
+            // V6: 处理每日奇遇结算
+            processEndOfDaySerendipity();
+
+            // V6: 检查是否触发奇遇
+            const serendipityResult = checkSerendipity();
+            if (serendipityResult) {
+                showSerendipityModal(serendipityResult);
+            }
         }
 
         // 探索（触发AI事件）
@@ -2480,10 +2923,24 @@
 
         // 重新计算所有装备效果
         function recalculateAllEffects() {
+            // 保存需要保留的非装备效果（来自奇遇等系统）
+            const savedSerendipityBoost = gameState.activeEffects.serendipity_boost || 0;
+            const savedBreakthroughBoost = gameState.activeEffects.breakthrough_boost || 0;
+            const savedCultivateSpeed = gameState.activeEffects.cultivate_speed || 0;
+            const saved渡劫MindsetProtect = gameState.activeEffects['渡劫_mindset_protect'] || 0;
+            const saved渡劫DamageReduce = gameState.activeEffects['渡劫_damage_reduce'] || 0;
+            const savedAllStats = gameState.activeEffects.all_stats || 0;
+            const savedAttack = gameState.activeEffects.attack || 0;
+            const savedDefense = gameState.activeEffects.defense || 0;
+            const savedCultivateQiRate = gameState.activeEffects.cultivate_qi_rate || 0;
+            const savedEscape = gameState.activeEffects.escape || 0;
+            const savedForeseeEvent = gameState.activeEffects.foresee_event || 0;
+
             // 重置所有效果
             for (let key in gameState.activeEffects) {
                 gameState.activeEffects[key] = 0;
             }
+
             // 累加装备效果
             for (const treasure of gameState.equippedTreasures) {
                 if (treasure) {
@@ -2493,6 +2950,19 @@
                     }
                 }
             }
+
+            // 恢复非装备效果（这些效果由奇遇系统或丹药管理，不应被清除）
+            if (savedSerendipityBoost > 0) gameState.activeEffects.serendipity_boost = savedSerendipityBoost;
+            if (savedBreakthroughBoost > 0) gameState.activeEffects.breakthrough_boost = savedBreakthroughBoost;
+            if (savedCultivateSpeed > 0) gameState.activeEffects.cultivate_speed = savedCultivateSpeed;
+            if (saved渡劫MindsetProtect > 0) gameState.activeEffects['渡劫_mindset_protect'] = saved渡劫MindsetProtect;
+            if (saved渡劫DamageReduce > 0) gameState.activeEffects['渡劫_damage_reduce'] = saved渡劫DamageReduce;
+            if (savedAllStats > 0) gameState.activeEffects.all_stats = savedAllStats;
+            if (savedAttack > 0) gameState.activeEffects.attack = savedAttack;
+            if (savedDefense > 0) gameState.activeEffects.defense = savedDefense;
+            if (savedCultivateQiRate > 0) gameState.activeEffects.cultivate_qi_rate = savedCultivateQiRate;
+            if (savedEscape > 0) gameState.activeEffects.escape = savedEscape;
+            if (savedForeseeEvent > 0) gameState.activeEffects.foresee_event = savedForeseeEvent;
         }
 
         // 更新装备栏显示
@@ -5303,6 +5773,655 @@
             } else {
                 sectBtn.style.display = 'none';
             }
+        }
+
+        // ========== V6 奇遇系统核心功能 ==========
+
+        // 计算奇遇触发概率
+        function calculateSerendipityChance() {
+            let chance = 0.15; // 基础15%
+
+            // 连续未触发加成
+            if (gameState.serendipity.badLuck > 0) {
+                chance += Math.min(0.10, gameState.serendipity.badLuck * 0.01);
+            }
+
+            // 祥云符效果
+            if (gameState.serendipity.serendipityBoostEndDay >= gameState.days) {
+                chance += 0.10;
+            }
+
+            // 鸿运当头状态
+            if (gameState.serendipity.luckStatus === 'lucky' && gameState.serendipity.luckEndDay >= gameState.days) {
+                chance += 0.15;
+            }
+
+            // 厄运缠身状态
+            if (gameState.serendipity.luckStatus === 'unlucky' && gameState.serendipity.luckEndDay >= gameState.days) {
+                chance -= 0.10;
+            }
+
+            // 境界提升加成
+            if (gameState.serendipity.lastTriggerDay > 0 && gameState.days - gameState.serendipity.lastTriggerDay <= 1) {
+                chance += 0.05;
+            }
+
+            // 渡劫期间不触发
+            if (gameState.tribulation && gameState.tribulation.inProgress) {
+                return 0;
+            }
+
+            return Math.max(0.05, Math.min(0.30, chance));
+        }
+
+        // 检查奇遇触发
+        function checkSerendipity() {
+            // 每日最多2次
+            if (gameState.serendipity.todayCount >= 2) {
+                return null;
+            }
+
+            // 渡劫期间不触发
+            if (gameState.tribulation && gameState.tribulation.inProgress) {
+                return null;
+            }
+
+            const chance = calculateSerendipityChance();
+
+            if (Math.random() < chance) {
+                return triggerRandomSerendipity();
+            } else {
+                // 累计连续未触发
+                gameState.serendipity.badLuck++;
+            }
+
+            return null;
+        }
+
+        // 触发随机奇遇
+        function triggerRandomSerendipity() {
+            // 获取符合条件的奇遇
+            const eligibleEvents = [];
+            for (const [name, event] of Object.entries(SERENDIPITY_EVENTS)) {
+                // 检查境界要求
+                if (gameState.realm < event.minRealm) continue;
+
+                // 检查冷却
+                if (gameState.serendipity.cooldownTypes[name] && gameState.serendipity.cooldownTypes[name] > gameState.days) continue;
+
+                // 检查条件
+                if (event.condition && !event.condition(gameState)) continue;
+
+                eligibleEvents.push({ name, event });
+            }
+
+            if (eligibleEvents.length === 0) return null;
+
+            // 随机选择
+            const selected = eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
+            return executeSerendipity(selected.name, selected.event);
+        }
+
+        // 执行奇遇
+        function executeSerendipity(name, event) {
+            const serendipity = gameState.serendipity;
+
+            // 更新状态
+            serendipity.lastTriggerDay = gameState.days;
+            serendipity.todayCount++;
+            serendipity.lastTriggerType = name;
+            serendipity.badLuck = 0;
+            serendipity.cooldownTypes[name] = gameState.days + 1; // 24小时冷却
+
+            // 执行效果
+            const result = event.effect(gameState);
+
+            // 记录日志
+            const logEntry = {
+                day: gameState.days,
+                type: event.type,
+                name: name,
+                result: result.text
+            };
+            serendipity.log.unshift(logEntry);
+            if (serendipity.log.length > 20) serendipity.log.pop();
+
+            return { name, event, result };
+        }
+
+        // 显示奇遇弹窗
+        function showSerendipityModal(serendipityData) {
+            if (!serendipityData) return;
+
+            const { name, event, result } = serendipityData;
+            const modal = document.getElementById('serendipityModal');
+            const content = document.getElementById('serendipityContent');
+            const titleEl = document.getElementById('serendipityTitle');
+
+            // 设置边框颜色
+            modal.querySelector('.modal-content').className = `modal-content ${event.type}`;
+
+            // 设置标题
+            titleEl.textContent = `${event.icon} ${name} ${event.icon}`;
+
+            let html = `
+                <div style="text-align:center;">
+                    <span class="serendipity-type-badge ${event.type}">${event.type === 'positive' ? '✨ 吉利' : event.type === 'negative' ? '💀 凶险' : '⚖️ 中性'}</span>
+                </div>
+                <div class="serendipity-effect">
+                    <p style="text-align:center;margin-bottom:15px;">${result.text}</p>
+            `;
+
+            if (result.effects && result.effects.length > 0) {
+                html += '<div class="serendipity-effect-item" style="font-weight:bold;margin-bottom:10px;">效果：</div>';
+                for (const effect of result.effects) {
+                    const valueStr = effect.value > 0 ? `+${effect.value}` : `${effect.value}`;
+                    html += `
+                        <div class="serendipity-effect-item">
+                            <span>${effect.type}</span>
+                            <span class="${effect.positive ? 'effect-positive' : 'effect-negative'}">${valueStr}</span>
+                        </div>
+                    `;
+                }
+            }
+
+            html += '</div>';
+
+            // 秘境战斗按钮
+            if (result.showRealmBattle) {
+                const isNegative = result.isNegative || false;
+                html += `
+                    <div style="text-align:center;margin-top:15px;">
+                        <button class="btn ${isNegative ? 'btn-combat' : 'btn-explore'}" onclick="startSecretRealmBattle('${name}', ${isNegative})">
+                            ${isNegative ? '⚔️ 应战' : '🌀 进入秘境'}
+                        </button>
+                        <button class="btn btn-save" onclick="skipRealmBattle()" style="margin-left:10px;">跳过</button>
+                    </div>
+                `;
+            }
+
+            // 选择类奇遇
+            if (result.showChoice) {
+                html += `
+                    <div style="text-align:center;margin-top:15px;">
+                        <button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', true)">接受</button>
+                        <button class="btn btn-new" onclick="handleSerendipityChoice('${name}', false)" style="margin-left:10px;">拒绝</button>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+            modal.classList.add('active');
+
+            // 记录日志
+            addLog(event.type === 'positive' ? 'good' : event.type === 'negative' ? 'bad' : 'neutral', name, result.text);
+        }
+
+        // 处理奇遇选择
+        function handleSerendipityChoice(name, accept) {
+            closeSerendipityModal();
+
+            if (name === '乞丐讨缘') {
+                if (accept) {
+                    gameState.spiritStones -= 100;
+                    gameState.serendipity.luckStatus = 'lucky';
+                    gameState.serendipity.luckEndDay = gameState.days + 3;
+                    addLog('good', '乞丐讨缘', '施舍乞丐，获得好运buff 3天');
+                } else {
+                    gameState.serendipity.badLuck += 3;
+                    addLog('bad', '乞丐讨缘', '拒绝施舍，运气下降');
+                }
+            } else if (name === '散修求助') {
+                if (accept) {
+                    gameState.spiritStones -= 200;
+                    gameState.serendipity.serendipityBoostEndDay = gameState.days + 3;
+                    gameState.activeEffects.serendipity_boost = 0.10;
+                    addLog('good', '散修求助', '帮助散修，后续奇遇概率+10% 3天');
+                } else {
+                    addLog('neutral', '散修求助', '拒绝帮助，无影响');
+                }
+            } else if (name === '魔器诱惑') {
+                if (accept) {
+                    // 添加魔器到背包
+                    addToInventory('treasure', '魔刃', 1, 'rare',
+                        { type: 'attack', value: 0.3 },
+                        '攻击+30%，但每回合扣5灵气', '🗡️');
+                    addLog('bad', '魔器诱惑', '获得魔刃，但每回合扣5灵气');
+                } else {
+                    addLog('good', '魔器诱惑', '拒绝魔器诱惑');
+                }
+            }
+
+            saveGame();
+            updateDisplay();
+        }
+
+        // 秘境战斗状态
+        let secretRealmState = {
+            wave: 0,
+            totalWaves: 3,
+            enemies: [],
+            playerHP: 0,
+            playerMaxHP: 0,
+            rewards: []
+        };
+
+        // 开始秘境战斗
+        function startSecretRealmBattle(eventName, isNegative) {
+            closeSerendipityModal();
+
+            // 初始化战斗状态
+            const maxHP = { 1: 200, 2: 500, 3: 1000, 4: 2000, 5: 5000 };
+            secretRealmState = {
+                wave: 0,
+                totalWaves: 3,
+                enemies: generateRealmEnemies(isNegative),
+                playerHP: maxHP[gameState.realm + 1] || 500,
+                playerMaxHP: maxHP[gameState.realm + 1] || 500,
+                rewards: [],
+                eventName: eventName,
+                isNegative: isNegative
+            };
+
+            // 显示秘境战斗UI
+            showSecretRealmBattleUI();
+        }
+
+        // 生成秘境敌人
+        function generateRealmEnemies(isNegative) {
+            const enemies = [];
+            const names = isNegative
+                ? ['灰狼', '黑熊', '巨蟒']
+                : ['守护傀儡', '妖兽', '禁制守卫'];
+            const icons = isNegative
+                ? ['🐺', '🐻', '🐍']
+                : ['🤖', '👹', '⚔️'];
+
+            for (let i = 0; i < 3; i++) {
+                const realm = Math.max(0, gameState.realm - 1 + i);
+                const hp = Math.floor(50 + realm * 50 + Math.random() * 50);
+                enemies.push({
+                    name: names[i] + (isNegative ? '' : ` ${i + 1}号'),
+                    icon: icons[i],
+                    hp: hp,
+                    maxHP: hp,
+                    attack: Math.floor(10 + realm * 10 + Math.random() * 10),
+                    realm: realm
+                });
+            }
+            return enemies;
+        }
+
+        // 显示秘境战斗UI
+        function showSecretRealmBattleUI() {
+            const content = document.getElementById('secretRealmContent');
+            const modal = document.getElementById('secretRealmModal');
+
+            let html = `
+                <div class="secret-realm-arena">
+                    <div class="realm-wave">第 ${secretRealmState.wave + 1} / ${secretRealmState.totalWaves} 波</div>
+                    <div class="realm-progress">
+            `;
+
+            for (let i = 0; i < secretRealmState.totalWaves; i++) {
+                let cls = 'wave-dot';
+                if (i < secretRealmState.wave) cls += ' completed';
+                else if (i === secretRealmState.wave) cls += ' current';
+                html += `<div class="${cls}"></div>`;
+            }
+
+            html += '</div>';
+
+            // 玩家状态
+            html += `
+                <div style="margin-bottom:20px;text-align:center;">
+                    <div style="color:#ffd700;font-size:1.2em;">你的状态</div>
+                    <div class="realm-hp-bar" style="margin:10px auto;width:200px;">
+                        <div class="realm-hp-fill" style="width:${(secretRealmState.playerHP / secretRealmState.playerMaxHP) * 100}%"></div>
+                    </div>
+                    <div style="color:#aaa;">${secretRealmState.playerHP} / ${secretRealmState.playerMaxHP}</div>
+                </div>
+            `;
+
+            // 敌人列表
+            for (let i = secretRealmState.wave; i < secretRealmState.enemies.length; i++) {
+                const enemy = secretRealmState.enemies[i];
+                const hpPercent = (enemy.hp / enemy.maxHP) * 100;
+                html += `
+                    <div class="realm-enemy">
+                        <div class="realm-enemy-info">
+                            <span class="realm-enemy-avatar">${enemy.icon}</span>
+                            <div>
+                                <div class="realm-enemy-name">${enemy.name}</div>
+                                <div class="realm-enemy-realm">${CONFIG.realms[enemy.realm]}期</div>
+                            </div>
+                        </div>
+                        <div class="realm-enemy-hp">
+                            <div>攻击: ${enemy.attack}</div>
+                            <div class="realm-hp-bar">
+                                <div class="realm-hp-fill" style="width:${hpPercent}%"></div>
+                            </div>
+                            <div style="font-size:0.85em;color:#aaa;">${enemy.hp} / ${enemy.maxHP}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            // 操作按钮
+            html += `
+                <div style="text-align:center;">
+                    <button class="btn btn-cultivate" onclick="attackRealmEnemy()">⚔️ 攻击</button>
+                    <button class="btn btn-breakthrough" onclick="defendRealmAttack()">🛡️ 防御</button>
+                </div>
+            `;
+
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        // 攻击秘境敌人
+        function attackRealmEnemy() {
+            const enemy = secretRealmState.enemies[secretRealmState.wave];
+            const playerAttack = Math.floor(20 + gameState.realm * 15 + Math.random() * 20);
+
+            // 计算伤害（考虑功法加成和装备）
+            let totalAttack = playerAttack * (1 + gameState.activeEffects.attack);
+
+            enemy.hp -= Math.floor(totalAttack);
+
+            // 记录伤害
+            addLog('good', '秘境战斗', `对${enemy.name}造成 ${Math.floor(totalAttack)} 点伤害！`);
+
+            // 检查是否击败敌人
+            if (enemy.hp <= 0) {
+                secretRealmState.wave++;
+
+                // 发放波次奖励
+                const waveRewards = [
+                    { type: 'spiritStones', value: Math.floor(100 + Math.random() * 100) },
+                    { type: 'qi', value: Math.floor(20 + Math.random() * 30) }
+                ];
+                const reward = waveRewards[Math.floor(Math.random() * waveRewards.length)];
+
+                if (reward.type === 'spiritStones') {
+                    gameState.spiritStones += reward.value;
+                    secretRealmState.rewards.push(`${reward.value} 灵石`);
+                } else {
+                    gameState.qi = Math.min(gameState.maxQi, gameState.qi + reward.value);
+                    secretRealmState.rewards.push(`${reward.value} 灵气`);
+                }
+
+                addLog('good', '秘境战斗', `击败${enemy.name}！获得 ${secretRealmState.rewards[secretRealmState.rewards.length - 1]}`);
+
+                // 检查是否通关
+                if (secretRealmState.wave >= secretRealmState.totalWaves) {
+                    completeSecretRealm();
+                    return;
+                }
+            } else {
+                // 敌人反击
+                const damage = Math.floor(enemy.attack * (1 - gameState.activeEffects.defense));
+                secretRealmState.playerHP -= damage;
+                addLog('bad', '秘境战斗', `${enemy.name}反击，造成 ${damage} 点伤害！`);
+
+                // 检查玩家是否死亡
+                if (secretRealmState.playerHP <= 0) {
+                    failSecretRealm();
+                    return;
+                }
+            }
+
+            saveGame();
+            updateDisplay();
+            showSecretRealmBattleUI();
+        }
+
+        // 防御秘境攻击
+        function defendRealmAttack() {
+            const enemy = secretRealmState.enemies[secretRealmState.wave];
+            const damage = Math.floor(enemy.attack * 0.3 * (1 - gameState.activeEffects.defense));
+            secretRealmState.playerHP -= damage;
+
+            addLog('neutral', '秘境战斗', `防御成功，受到 ${damage} 点伤害！`);
+
+            if (secretRealmState.playerHP <= 0) {
+                failSecretRealm();
+                return;
+            }
+
+            saveGame();
+            updateDisplay();
+            showSecretRealmBattleUI();
+        }
+
+        // 完成秘境
+        function completeSecretRealm() {
+            const modal = document.getElementById('secretRealmModal');
+            modal.classList.remove('active');
+
+            // 发放最终奖励
+            const finalRewards = [];
+            const stones = Math.floor(500 + gameState.realm * 300 + Math.random() * 500);
+            gameState.spiritStones += stones;
+            finalRewards.push(`${stones} 灵石`);
+
+            // 随机额外奖励
+            if (Math.random() < 0.5) {
+                const qi = Math.floor(50 + Math.random() * 100);
+                gameState.qi = Math.min(gameState.maxQi, gameState.qi + qi);
+                finalRewards.push(`${qi} 灵气`);
+            }
+            if (Math.random() < 0.3) {
+                const pill = ['聚灵丹', '心魔丹', '金髓丹'][Math.floor(Math.random() * 3)];
+                addItemToInventory(pill, 1);
+                finalRewards.push(`${pill} x1`);
+            }
+
+            const rewardText = finalRewards.join('、');
+            addLog('good', '秘境通关', `秘境探险完成！获得：${rewardText}`);
+
+            // 记录到奇遇日志
+            gameState.serendipity.log.unshift({
+                day: gameState.days,
+                type: 'positive',
+                name: secretRealmState.eventName,
+                result: `秘境通关，获得：${rewardText}`
+            });
+
+            saveGame();
+            updateDisplay();
+
+            alert(`🎉 秘境通关！\n\n获得：${rewardText}`);
+        }
+
+        // 秘境失败
+        function failSecretRealm() {
+            const modal = document.getElementById('secretRealmModal');
+            modal.classList.remove('active');
+
+            // 失败惩罚
+            if (secretRealmState.isNegative) {
+                const loss = Math.floor(gameState.spiritStones * 0.2);
+                gameState.spiritStones -= loss;
+                addLog('bad', '秘境失败', `抵御妖兽失败！损失 ${loss} 灵石`);
+            } else {
+                const loss = Math.floor(gameState.spiritStones * 0.1);
+                gameState.spiritStones -= loss;
+                addLog('bad', '秘境失败', `秘境挑战失败！损失 ${loss} 灵石`);
+            }
+
+            // 记录到奇遇日志
+            gameState.serendipity.log.unshift({
+                day: gameState.days,
+                type: 'negative',
+                name: secretRealmState.eventName,
+                result: '秘境挑战失败'
+            });
+
+            saveGame();
+            updateDisplay();
+        }
+
+        // 跳过秘境
+        function skipRealmBattle() {
+            const modal = document.getElementById('secretRealmModal');
+            modal.classList.remove('active');
+            addLog('neutral', '秘境探险', '选择跳过秘境探险');
+            saveGame();
+        }
+
+        // 关闭奇遇弹窗
+        function closeSerendipityModal() {
+            document.getElementById('serendipityModal').classList.remove('active');
+        }
+
+        // 打开奇遇日志
+        function openSerendipityLog() {
+            const serendipity = gameState.serendipity;
+            const modal = document.getElementById('serendipityModal');
+            const titleEl = document.getElementById('serendipityTitle');
+            const content = document.getElementById('serendipityContent');
+
+            titleEl.textContent = '✨ 奇遇记录 ✨';
+            modal.querySelector('.modal-content').className = 'modal-content neutral';
+
+            // 显示当前状态
+            let statusHtml = '<div style="margin-bottom:15px;">';
+
+            // 运气状态
+            if (serendipity.luckStatus === 'lucky' && serendipity.luckEndDay >= gameState.days) {
+                statusHtml += '<span class="status-badge lucky">🌟 鸿运当头 (剩余' + (serendipity.luckEndDay - gameState.days) + '天)</span> ';
+            }
+            if (serendipity.luckStatus === 'unlucky' && serendipity.luckEndDay >= gameState.days) {
+                statusHtml += '<span class="status-badge unlucky">💀 厄运缠身 (剩余' + (serendipity.luckEndDay - gameState.days) + '天)</span> ';
+            }
+            if (serendipity.serendipityBoostEndDay >= gameState.days) {
+                statusHtml += '<span class="status-badge serendipity-boost">🔮 奇遇加成 (剩余' + (serendipity.serendipityBoostEndDay - gameState.days) + '天)</span> ';
+            }
+
+            statusHtml += '</div>';
+
+            // 奇遇概率
+            const chance = calculateSerendipityChance();
+            statusHtml += `<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;">
+                    <span>当前奇遇概率</span>
+                    <span style="color:#ffd700;">${Math.round(chance * 100)}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.85em;color:#aaa;">
+                    <span>今日奇遇次数</span>
+                    <span>${serendipity.todayCount} / 2</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.85em;color:#aaa;">
+                    <span>连续未触发</span>
+                    <span>${serendipity.badLuck} 回合</span>
+                </div>
+            </div>`;
+
+            // 奇遇日志
+            if (serendipity.log.length === 0) {
+                statusHtml += '<p style="text-align:center;color:#888;padding:30px;">暂无奇遇记录</p>';
+            } else {
+                statusHtml += '<div class="serendipity-log">';
+                for (const entry of serendipity.log.slice(0, 10)) {
+                    statusHtml += `
+                        <div class="serendipity-log-entry ${entry.type}">
+                            <div style="display:flex;justify-content:space-between;">
+                                <span>第${entry.day}天 - ${entry.name}</span>
+                                <span style="font-size:0.85em;color:#aaa;">${entry.type === 'positive' ? '✨' : entry.type === 'negative' ? '💀' : '⚖️'}</span>
+                            </div>
+                            <div style="font-size:0.9em;color:#ccc;">${entry.result}</div>
+                        </div>
+                    `;
+                }
+                statusHtml += '</div>';
+            }
+
+            // 奇遇道具说明
+            statusHtml += `
+                <div style="margin-top:20px;padding:15px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                    <h4 style="color:#ffd700;margin-bottom:10px;">🧿 奇遇道具</h4>
+                    <div style="font-size:0.9em;color:#aaa;">
+                        <p>☁️ 祥云符 - 奇遇概率+10%，持续1天 | 2000灵石</p>
+                        <p>🛡️ 避厄符 - 免疫下次负面奇遇 | 1500灵石</p>
+                        <p>📜 探路符 - 指定触发秘境入口 | 3000灵石</p>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = statusHtml;
+            modal.classList.add('active');
+        }
+
+        // 使用探路符
+        function useExploreTalisman() {
+            const talismanIdx = gameState.inventory.findIndex(i => i.name === '探路符');
+            if (talismanIdx === -1) {
+                alert('没有探路符！');
+                return;
+            }
+
+            const talisman = gameState.inventory[talismanIdx];
+            talisman.quantity--;
+            if (talisman.quantity <= 0) {
+                gameState.inventory.splice(talismanIdx, 1);
+            }
+
+            // 强制触发秘境入口
+            const event = SERENDIPITY_EVENTS['秘境入口'];
+            const result = executeSerendipity('秘境入口', event);
+            showSerendipityModal(result);
+
+            saveGame();
+        }
+
+        // 每回合结算时检查奇遇
+        function processEndOfDaySerendipity() {
+            // 重置每日计数
+            if (gameState.serendipity.lastTriggerDay < gameState.days) {
+                gameState.serendipity.todayCount = 0;
+            }
+
+            // 检查状态持续时间
+            if (gameState.serendipity.luckEndDay > 0 && gameState.serendipity.luckEndDay <= gameState.days) {
+                gameState.serendipity.luckStatus = null;
+                addLog('neutral', '状态结束', '运气状态已结束');
+            }
+            if (gameState.serendipity.serendipityBoostEndDay > 0 && gameState.serendipity.serendipityBoostEndDay <= gameState.days) {
+                gameState.activeEffects.serendipity_boost = 0;
+                addLog('neutral', '状态结束', '奇遇加成状态已结束');
+            }
+
+            // 检查魔器扣血效果
+            const demonWeapon = gameState.inventory.find(i => i.name === '魔刃');
+            if (demonWeapon) {
+                const hpLoss = 5;
+                gameState.qi = Math.max(0, gameState.qi - hpLoss);
+                addLog('bad', '魔器侵蚀', `魔刃吸取灵气，-${hpLoss}灵气`);
+            }
+        }
+
+        // 购买奇遇道具（从商店）
+        function buySerendipityItem(name) {
+            const talisman = SERENDIPITY_TALISMANS[name];
+            if (!talisman) return;
+
+            if (gameState.spiritStones < talisman.price) {
+                alert('灵石不足！');
+                return;
+            }
+
+            gameState.spiritStones -= talisman.price;
+            addToInventory('talisman', name, 1, 'rare',
+                talisman.effect,
+                talisman.desc,
+                talisman.icon);
+
+            addLog('good', '购买道具', `购买了 ${name}！`);
+            saveGame();
+            updateDisplay();
         }
     </script>
 </body>
