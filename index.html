@@ -2306,15 +2306,15 @@
         </div>
 
         <div id="equipmentBar" class="equipment-bar hidden">
-            <div class="equipment-slot" id="equipSlot0" onclick="unequipTreasure(0)">
+            <div class="equipment-slot" id="equipSlot0" onclick="openEquipSlotMenu(0)">
                 <span class="slot-icon">⚔️</span>
                 <span class="slot-tooltip">空</span>
             </div>
-            <div class="equipment-slot" id="equipSlot1" onclick="unequipTreasure(1)">
+            <div class="equipment-slot" id="equipSlot1" onclick="openEquipSlotMenu(1)">
                 <span class="slot-icon">🛡️</span>
                 <span class="slot-tooltip">空</span>
             </div>
-            <div class="equipment-slot" id="equipSlot2" onclick="unequipTreasure(2)">
+            <div class="equipment-slot" id="equipSlot2" onclick="openEquipSlotMenu(2)">
                 <span class="slot-icon">💍</span>
                 <span class="slot-tooltip">空</span>
             </div>
@@ -2627,6 +2627,272 @@
             '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 2000 },
             '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 800 }
         };
+
+        // ========== V11 装备强化系统 ==========
+        // 强化等级配置：每级需要的材料和灵石，成功率
+        const ENHANCE_CONFIG = {
+            // 1→2, 2→3, ... : [玄铁, 天材, 混沌石, 灵石]
+            costs: {
+                1: { iron: 3,  heavenly: 0, chaos: 0, stones: 200 },
+                2: { iron: 5,  heavenly: 0, chaos: 0, stones: 400 },
+                3: { iron: 8,  heavenly: 0, chaos: 0, stones: 800 },
+                4: { iron: 10, heavenly: 1, chaos: 0, stones: 1500 },
+                5: { iron: 12, heavenly: 2, chaos: 0, stones: 3000 },
+                6: { iron: 15, heavenly: 3, chaos: 0, stones: 6000 },
+                7: { iron: 0,  heavenly: 5, chaos: 1, stones: 15000 },
+                8: { iron: 0,  heavenly: 8, chaos: 2, stones: 30000 },
+                9: { iron: 0,  heavenly: 10, chaos: 3, stones: 60000 }
+            },
+            // 每级基础成功率（1→2用costs[1]）
+            successRates: {
+                1: 0.85, 2: 0.80, 3: 0.75, 4: 0.65, 5: 0.55,
+                6: 0.45, 7: 0.35, 8: 0.30, 9: 0.25
+            },
+            // 每级强化后属性倍率
+            starMultipliers: {
+                1: 1.0, 2: 1.15, 3: 1.35, 4: 1.60, 5: 1.90,
+                6: 2.25, 7: 2.70, 8: 3.20, 9: 4.00
+            },
+            // 炼器台等级限制可强化的最高星级
+            anvilStarLimit: { 1: 3, 2: 6, 3: 9 }
+        };
+
+        let selectedEnhanceItem = null; // 背包中选中的待强化灵宝
+        let selectedEnhanceSlot = null; // 装备栏中选中的槽位（0/1/2）
+
+        // 获取装备强化后的星级显示
+        function getStarDisplay(star) {
+            if (!star || star <= 1) return '';
+            let s = '★';
+            if (star >= 3) s = '★★';
+            if (star >= 5) s = '★★★';
+            if (star >= 7) s = '✦★★★';
+            if (star >= 9) s = '✦✦★★★';
+            return s;
+        }
+
+        // 获取星级颜色
+        function getStarColor(star) {
+            if (star >= 8) return '#ffd700';
+            if (star >= 5) return '#ba68c8';
+            if (star >= 3) return '#64b5f6';
+            return '#aaaaaa';
+        }
+
+        // 计算强化所需材料
+        function getEnhanceCost(currentStar) {
+            const next = currentStar + 1;
+            if (next > 9) return null;
+            return ENHANCE_CONFIG.costs[next];
+        }
+
+        // 检查强化材料是否足够
+        function checkEnhanceMaterials(cost) {
+            if (!cost) return false;
+            if (gameState.spiritStones < cost.stones) return false;
+            if (cost.iron > 0) {
+                const ironItem = gameState.inventory.find(i => i.name === '玄铁' && i.quantity >= cost.iron);
+                if (!ironItem) return false;
+            }
+            if (cost.heavenly > 0) {
+                const heavItem = gameState.inventory.find(i => i.name === '天材' && i.quantity >= cost.heavenly);
+                if (!heavItem) return false;
+            }
+            if (cost.chaos > 0) {
+                const chaosItem = gameState.inventory.find(i => i.name === '混沌石' && i.quantity >= cost.chaos);
+                if (!chaosItem) return false;
+            }
+            return true;
+        }
+
+        // 打开强化面板（从背包选中灵宝）
+        function openEnhanceFromInventory(itemIdx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') items = items.filter(it => it.type === 'treasure');
+            const item = items[itemIdx];
+            if (!item || item.type !== 'treasure') return;
+            selectedEnhanceItem = { source: 'inventory', idx: itemIdx, item };
+            selectedEnhanceSlot = null;
+            openEnhancePanel();
+        }
+
+        // 打开强化面板（从装备栏选中槽位）
+        function openEnhanceFromEquip(slotIndex) {
+            const treasure = gameState.equippedTreasures[slotIndex];
+            if (!treasure) return;
+            selectedEnhanceSlot = slotIndex;
+            selectedEnhanceItem = { source: 'equip', idx: slotIndex, item: treasure };
+            openEnhancePanel();
+        }
+
+        function openEnhancePanel() {
+            if (!selectedEnhanceItem) return;
+            const item = selectedEnhanceItem.item;
+            const star = item.star || 1;
+            const nextStar = star + 1;
+            const atMax = star >= 9;
+            const cost = getEnhanceCost(star);
+            const anvilLevel = gameState.crafting.anvil.level;
+            const maxAllowed = ENHANCE_CONFIG.anvilStarLimit[anvilLevel] || 3;
+            const blockedByAnvil = nextStar > maxAllowed;
+
+            // 计算基础成功率
+            const baseRate = atMax ? 0 : (ENHANCE_CONFIG.successRates[star] || 0.5);
+            const furnaceData = Object.values(ANVILS).find(a => a.level === anvilLevel);
+            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
+            const totalRate = atMax ? 0 : Math.min(0.95, baseRate + furnaceBonus);
+
+            // 计算强化后属性倍率
+            const currentMult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
+            const nextMult = ENHANCE_CONFIG.starMultipliers[nextStar] || 1.0;
+
+            // 当前和强化后的效果值
+            const baseEffect = getBaseEffectValue(item);
+            const currentVal = Math.round(baseEffect * currentMult * 100);
+            const nextVal = Math.round(baseEffect * nextMult * 100);
+
+            const canAfford = !atMax && !blockedByAnvil && checkEnhanceMaterials(cost);
+            const hasFuel = gameState.spiritStones >= (cost ? cost.stones : 0);
+
+            // 显示强化面板（在炼器模态框上覆盖）
+            let html = `<div id="enhancePanel" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1001;background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #ffd700;border-radius:15px;padding:25px;min-width:380px;max-width:90vw;box-shadow:0 0 30px rgba(255,215,0,0.3);">
+                <h2 style="color:#ffd700;text-align:center;margin-bottom:15px;">⬆️ 装备强化</h2>
+                <div style="background:rgba(0,0,0,0.4);border-radius:10px;padding:15px;margin-bottom:15px;">
+                    <div style="text-align:center;margin-bottom:10px;">
+                        <span style="font-size:2em">${item.icon || '📦'}</span>
+                        <div style="color:${getStarColor(star)};font-weight:bold;font-size:1.1em;margin-top:5px;">${item.name} ${getStarDisplay(star)}</div>
+                        <div style="color:#aaa;font-size:0.9em;margin-top:3px;">${item.desc}</div>
+                    </div>
+                    <div style="display:flex;justify-content:space-around;margin-top:10px;">
+                        <div style="text-align:center;">
+                            <div style="color:#aaa;font-size:0.8em;">当前星级</div>
+                            <div style="color:${getStarColor(star)};font-size:1.2em;font-weight:bold;">${star}星</div>
+                            <div style="color:#64b5f6;font-size:0.85em;">${item.effect.type === 'attack' || item.effect.type === 'attackBonus' ? '攻击' : item.effect.type === 'defense' || item.effect.type === 'defenseBonus' ? '防御' : item.effect.type === 'crit' || item.effect.type === 'critBonus' ? '暴击' : item.effect.type === 'hp' || item.effect.type === 'hpBonus' ? '生命' : '效果'}+${currentVal}%</div>
+                        </div>
+                        <div style="color:#ffd700;font-size:1.5em;align-self:center;">→</div>
+                        <div style="text-align:center;">
+                            <div style="color:#aaa;font-size:0.8em;">强化后</div>
+                            <div style="color:${getStarColor(nextStar)};font-size:1.2em;font-weight:bold;">${atMax ? '已满级' : nextStar + '星'}</div>
+                            <div style="color:#4caf50;font-size:0.85em;">${atMax ? '—' : (item.effect.type === 'attack' || item.effect.type === 'attackBonus' ? '攻击' : item.effect.type === 'defense' || item.effect.type === 'defenseBonus' ? '防御' : item.effect.type === 'crit' || item.effect.type === 'critBonus' ? '暴击' : item.effect.type === 'hp' || item.effect.type === 'hpBonus' ? '生命' : '效果') + '+' + nextVal + '%'}</div>
+                        </div>
+                    </div>
+                </div>`;
+
+            if (atMax) {
+                html += `<div style="text-align:center;color:#ffd700;font-size:1.1em;margin-bottom:15px;">★★★★★ 此装备已达最高强化等级 ★★★★★</div>`;
+            } else if (blockedByAnvil) {
+                html += `<div style="text-align:center;color:#ff6b6b;font-size:1em;margin-bottom:15px;">⚠️ 当前炼器台等级不足<br><span style="color:#aaa;font-size:0.9em;">升级炼器台至「天工神炉」可强化至${maxAllowed}星</span></div>`;
+            } else {
+                html += `<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;margin-bottom:15px;">
+                    <div style="color:#aaa;font-size:0.9em;margin-bottom:8px;">强化消耗：</div>
+                    <div style="display:flex;gap:15px;flex-wrap:wrap;margin-bottom:8px;">
+                        ${cost.iron > 0 ? `<span style="color:#64b5f6;">玄铁×${cost.iron}</span>` : ''}
+                        ${cost.heavenly > 0 ? `<span style="color:#ba68c8;">天材×${cost.heavenly}</span>` : ''}
+                        ${cost.chaos > 0 ? `<span style="color:#ffd700;">混沌石×${cost.chaos}</span>` : ''}
+                        <span style="color:#ffd700;">灵石×${cost.stones}</span>
+                    </div>
+                    <div style="color:#4caf50;font-size:0.9em;">基础成功率: ${Math.round(baseRate * 100)}% | 炼器台加成: +${Math.round(furnaceBonus * 100)}% | 总计: ${Math.round(totalRate * 100)}%</div>
+                </div>`;
+            }
+
+            html += `<div style="text-align:center;display:flex;gap:10px;justify-content:center;">
+                <button onclick="closeEnhancePanel()" style="padding:8px 20px;background:rgba(100,100,100,0.3);border:1px solid #888;border-radius:8px;color:#ccc;cursor:pointer;">取消</button>`;
+
+            if (!atMax && !blockedByAnvil) {
+                const btnDisabled = (!canAfford || !hasFuel);
+                html += `<button onclick="doEnhance()" ${btnDisabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : 'style="padding:8px 20px;background:rgba(76,175,80,0.3);border:1px solid #4caf50;border-radius:8px;color:#4caf50;cursor:pointer;"'}>
+                    ${btnDisabled ? (blockedByAnvil ? '炼器台等级不足' : (!hasFuel ? '灵石不足' : '材料不足')) : '▶ 开始强化'}
+                </button>`;
+            }
+            html += `</div></div>`;
+
+            // 遮罩
+            let overlay = document.getElementById('enhanceOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'enhanceOverlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;';
+                overlay.onclick = closeEnhancePanel;
+                document.body.appendChild(overlay);
+            }
+            let panel = document.getElementById('enhancePanel');
+            if (panel) panel.remove();
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function closeEnhancePanel() {
+            const panel = document.getElementById('enhancePanel');
+            const overlay = document.getElementById('enhanceOverlay');
+            if (panel) panel.remove();
+            if (overlay) overlay.remove();
+            selectedEnhanceItem = null;
+            selectedEnhanceSlot = null;
+        }
+
+        // 获取装备的基础效果值（从百分比中提取）
+        function getBaseEffectValue(item) {
+            if (!item || !item.effect) return 0;
+            const eff = item.effect;
+            // 兼容两种格式
+            return eff.value || eff.attackBonus || eff.defenseBonus || eff.critBonus || eff.hpBonus || eff.thunderBonus || eff.fireBonus || eff.waterBonus || eff.bodyBonus || 0;
+        }
+
+        // 执行强化
+        function doEnhance() {
+            if (!selectedEnhanceItem) return;
+            const { source, idx, item } = selectedEnhanceItem;
+            const star = item.star || 1;
+            const cost = getEnhanceCost(star);
+            if (!cost) return;
+
+            // 扣材料
+            gameState.spiritStones -= cost.stones;
+            if (cost.iron > 0) {
+                const ironItem = gameState.inventory.find(i => i.name === '玄铁');
+                if (ironItem) ironItem.quantity -= cost.iron;
+            }
+            if (cost.heavenly > 0) {
+                const heavItem = gameState.inventory.find(i => i.name === '天材');
+                if (heavItem) heavItem.quantity -= cost.heavenly;
+            }
+            if (cost.chaos > 0) {
+                const chaosItem = gameState.inventory.find(i => i.name === '混沌石');
+                if (chaosItem) chaosItem.quantity -= cost.chaos;
+            }
+
+            // 成功率判定
+            const baseRate = ENHANCE_CONFIG.successRates[star] || 0.5;
+            const anvilLevel = gameState.crafting.anvil.level;
+            const furnaceData = Object.values(ANVILS).find(a => a.level === anvilLevel);
+            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
+            const totalRate = Math.min(0.95, baseRate + furnaceBonus);
+            const success = Math.random() < totalRate;
+
+            const newStar = success ? star + 1 : star;
+
+            // 更新装备星级
+            if (source === 'equip') {
+                gameState.equippedTreasures[idx].star = newStar;
+            } else {
+                const invIdx = gameState.inventory.findIndex(i => i.name === item.name && i.type === 'treasure');
+                if (invIdx !== -1) {
+                    gameState.inventory[invIdx].star = newStar;
+                }
+            }
+
+            // 日志
+            if (success) {
+                addLog('good', '强化成功', `${item.name}强化至${newStar}星！属性大幅提升！`);
+            } else {
+                addLog('negative', '强化失败', `${item.name}强化失败，材料化为乌有...`);
+            }
+
+            saveGame();
+            recalculateAllEffects();
+            updateEquipmentBar();
+            updateDisplay();
+            closeEnhancePanel();
+        }
 
         // 天劫类型定义
         const TRIBULATIONS = {
@@ -4719,7 +4985,9 @@
                 if (treasure) {
                     slot.classList.add('filled');
                     slot.querySelector('.slot-icon').textContent = treasure.icon || icons[i];
-                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}\n${treasure.desc}`;
+                    const star = treasure.star || 1;
+                    const starDisplay = getStarDisplay(star);
+                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}${starDisplay}\n${treasure.desc}`;
                 } else {
                     slot.classList.remove('filled');
                     slot.querySelector('.slot-icon').textContent = icons[i];
@@ -4728,12 +4996,50 @@
             }
         }
 
-        // 卸下灵宝
+        // 打开装备槽位操作菜单
+        function openEquipSlotMenu(slotIndex) {
+            const treasure = gameState.equippedTreasures[slotIndex];
+            if (!treasure) return;
+            // 移除已存在的菜单
+            const existing = document.getElementById('equipSlotMenu');
+            if (existing) existing.remove();
+
+            const star = treasure.star || 1;
+            const html = `<div id="equipSlotMenu" style="position:fixed;z-index:1002;background:#1a1a2e;border:1px solid #ffd700;border-radius:10px;padding:10px;min-width:160px;box-shadow:0 0 20px rgba(255,215,0,0.3);">
+                <div style="color:#ffd700;font-weight:bold;text-align:center;margin-bottom:8px;">${treasure.icon || '📦'} ${treasure.name} ${getStarDisplay(star)}</div>
+                <button onclick="openEnhanceFromEquip(${slotIndex})" style="display:block;width:100%;padding:6px 12px;background:rgba(255,215,0,0.15);border:1px solid #ffd700;border-radius:6px;color:#ffd700;cursor:pointer;margin-bottom:5px;">⬆️ 强化</button>
+                <button onclick="unequipTreasure(${slotIndex});closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:rgba(100,100,100,0.2);border:1px solid #888;border-radius:6px;color:#ccc;cursor:pointer;">卸下</button>
+                <button onclick="closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:transparent;border:none;color:#888;cursor:pointer;margin-top:3px;">取消</button>
+            </div>`;
+            const slot = document.getElementById(`equipSlot${slotIndex}`);
+            const rect = slot.getBoundingClientRect();
+            document.body.insertAdjacentHTML('beforeend', html);
+            const menu = document.getElementById('equipSlotMenu');
+            menu.style.top = (rect.bottom + 5) + 'px';
+            menu.style.left = rect.left + 'px';
+        }
+
+        function closeEquipSlotMenu() {
+            const menu = document.getElementById('equipSlotMenu');
+            if (menu) menu.remove();
+        }
+
+        // 卸下灵宝（保留星级）
         function unequipTreasure(slotIndex) {
             const treasure = gameState.equippedTreasures[slotIndex];
             if (treasure) {
-                // 移回背包
-                addToInventory(treasure.type, treasure.name, 1, treasure.quality, treasure.effect, treasure.desc, treasure.icon);
+                // 移回背包（保留星级）
+                const invItem = {
+                    type: treasure.type,
+                    name: treasure.name,
+                    quantity: 1,
+                    quality: treasure.quality,
+                    effect: treasure.effect,
+                    desc: treasure.desc,
+                    icon: treasure.icon,
+                    star: treasure.star || 1
+                };
+                addToInventoryObj(invItem);
                 gameState.equippedTreasures[slotIndex] = null;
                 recalculateAllEffects();
                 updateEquipmentBar();
@@ -4742,8 +5048,8 @@
             }
         }
 
-        // 添加物品到背包
-        function addToInventory(type, name, quantity, quality, effect, desc, icon) {
+        // 添加物品到背包（支持星级）
+        function addToInventory(type, name, quantity, quality, effect, desc, icon, star) {
             // 查找是否已存在同类型物品
             const existing = gameState.inventory.find(item => item.name === name && item.type === type);
             if (existing) {
@@ -4760,7 +5066,32 @@
                     quality,
                     effect,
                     desc,
-                    icon
+                    icon,
+                    star: star || 1
+                });
+            }
+            return true;
+        }
+
+        // 添加物品对象到背包
+        function addToInventoryObj(itemObj) {
+            const existing = gameState.inventory.find(i => i.name === itemObj.name && i.type === itemObj.type);
+            if (existing) {
+                existing.quantity += itemObj.quantity;
+            } else {
+                if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                    return false;
+                }
+                gameState.inventory.push({
+                    id: Date.now(),
+                    type: itemObj.type,
+                    name: itemObj.name,
+                    quantity: itemObj.quantity,
+                    quality: itemObj.quality,
+                    effect: itemObj.effect,
+                    desc: itemObj.desc,
+                    icon: itemObj.icon,
+                    star: itemObj.star || 1
                 });
             }
             return true;
@@ -4846,7 +5177,11 @@
             if (item.type === 'pill') {
                 actions = `<button class="btn btn-cultivate" onclick="usePill('${item.name}', ${idx})">使用</button>`;
             } else if (item.type === 'treasure') {
+                const star = item.star || 1;
+                const starDisplay = getStarDisplay(star);
+                const starColor = getStarColor(star);
                 actions = `<button class="btn btn-breakthrough" onclick="equipTreasure('${item.name}', ${idx})">装备</button>`;
+                actions += `<button class="btn btn-enhance" onclick="openEnhanceFromInventory(${idx})" style="background:rgba(255,215,0,0.15);border:1px solid #ffd700;color:#ffd700;padding:5px 12px;border-radius:5px;cursor:pointer;margin-left:5px;">强化</button>`;
             }
             actions += `<button class="btn btn-save" onclick="sellItem(${idx})">出售(${Math.floor(item.quality === 'common' ? 10 : item.quality === 'rare' ? 50 : item.quality === 'precious' ? 200 : 1000)}灵石)</button>`;
             actions += `<button class="btn btn-new" onclick="discardItem(${idx})">丢弃</button>`;
@@ -4896,32 +5231,34 @@
         function equipTreasure(name, idx) {
             const treasure = TREASURES[name];
             if (!treasure) return;
-            
+
             // 找到空槽位
             const emptySlot = gameState.equippedTreasures.findIndex(t => t === null);
             if (emptySlot === -1) {
                 alert('装备栏已满！');
                 return;
             }
-            
+
             // 查找背包中的物品
             const itemIdx = gameState.inventory.findIndex(i => i.name === name && i.type === 'treasure');
             if (itemIdx === -1) return;
-            
+
             const item = gameState.inventory[itemIdx];
+            const star = item.star || 1; // 保留星级
             item.quantity--;
             if (item.quantity <= 0) {
                 gameState.inventory.splice(itemIdx, 1);
             }
-            
-            // 装备
+
+            // 装备（携带星级）
             gameState.equippedTreasures[emptySlot] = {
                 name: item.name,
                 type: item.type,
                 quality: item.quality,
                 effect: item.effect,
                 desc: item.desc,
-                icon: item.icon
+                icon: item.icon,
+                star
             };
             
             recalculateAllEffects();
@@ -6323,16 +6660,25 @@
             let playerCritRate = 0.1 + gameState.realm * 0.03;
             let playerTechnique = getPlayerTechnique();
 
-            // 应用装备效果
+            // 应用装备星级加成
             if (playerWeapon && COMBAT_TREASURES[playerWeapon.name]) {
-                const effect = COMBAT_TREASURES[playerWeapon.name].effect;
-                if (effect.attackBonus) playerAttack = Math.floor(playerAttack * (1 + effect.attackBonus));
-                if (effect.critBonus) playerCritRate += effect.critBonus;
+                const weaponData = COMBAT_TREASURES[playerWeapon.name];
+                const star = playerWeapon.star || 1;
+                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
+                const baseVal = weaponData.effect.attackBonus || 0;
+                playerAttack = Math.floor(playerAttack * (1 + baseVal * mult));
+                if (weaponData.effect.critBonus) {
+                    playerCritRate += weaponData.effect.critBonus * mult;
+                }
             }
             if (playerArmor && COMBAT_TREASURES[playerArmor.name]) {
-                const effect = COMBAT_TREASURES[playerArmor.name].effect;
-                if (effect.defenseBonus) playerDefense = Math.floor(playerDefense * (1 + effect.defenseBonus));
-                if (effect.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + effect.hpBonus));
+                const armorData = COMBAT_TREASURES[playerArmor.name];
+                const star = playerArmor.star || 1;
+                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
+                const baseDef = armorData.effect.defenseBonus || 0;
+                const baseHP = armorData.effect.hpBonus || 0;
+                if (baseDef > 0) playerDefense = Math.floor(playerDefense * (1 + baseDef * mult));
+                if (baseHP > 0) playerMaxHP = Math.floor(playerMaxHP * (1 + baseHP * mult));
             }
             
             // V7 应用体质战斗效果
