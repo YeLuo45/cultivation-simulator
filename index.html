@@ -973,6 +973,283 @@
             margin-top: 10px;
         }
         
+        /* ========== V9 世界地图样式 ========== */
+        .btn-worldmap {
+            background: linear-gradient(135deg, #006064, #00838f);
+            color: white;
+        }
+        
+        /* 世界地图模态框 */
+        #worldMapModal .modal-content {
+            max-width: 900px;
+            background: linear-gradient(135deg, #0a1628 0%, #1a3a5c 50%, #0a1628 100%);
+            border: 2px solid rgba(0, 188, 212, 0.5);
+        }
+        .worldmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 188, 212, 0.2);
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .current-location {
+            color: #ffd700;
+            font-size: 1.2em;
+        }
+        .action-power {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .action-power-label {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .action-power-value {
+            background: rgba(0, 188, 212, 0.3);
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: #00bcd4;
+            font-weight: bold;
+        }
+        .worldmap-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .continent-card {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .continent-card:hover:not(.locked) {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 188, 212, 0.3);
+            border-color: rgba(0, 188, 212, 0.5);
+        }
+        .continent-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .continent-card.current {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        .continent-card.explored {
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+        .continent-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        .continent-name {
+            color: #ffd700;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .continent-realm {
+            color: #aaa;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+        }
+        .continent-danger {
+            display: flex;
+            justify-content: center;
+            gap: 3px;
+            margin-bottom: 8px;
+        }
+        .danger-star {
+            color: #f44336;
+            font-size: 0.9em;
+        }
+        .danger-star.empty {
+            color: #555;
+        }
+        .continent-status {
+            font-size: 0.8em;
+            padding: 3px 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .status-safe { background: rgba(76, 175, 80, 0.3); color: #4caf50; }
+        .status-danger { background: rgba(255, 152, 0, 0.3); color: #ff9800; }
+        .status-extreme { background: rgba(244, 67, 54, 0.3); color: #f44336; }
+        .status-locked { background: rgba(100, 100, 100, 0.3); color: #888; }
+        .lock-reason {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* 区域详情面板 */
+        .region-detail {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+        .region-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .region-detail-title {
+            color: #ffd700;
+            font-size: 1.5em;
+        }
+        .region-detail-info {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .region-info-item {
+            flex: 1;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            text-align: center;
+        }
+        .region-info-label {
+            color: #aaa;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .region-info-value {
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+        .region-monsters, .region-resources {
+            margin-top: 15px;
+        }
+        .region-section-title {
+            color: #ffd700;
+            font-size: 1em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .region-item-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .region-item-tag {
+            padding: 5px 12px;
+            background: rgba(50, 50, 100, 0.5);
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #ccc;
+        }
+        .region-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-travel {
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #006064, #00838f);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .btn-travel:hover:not(:disabled) {
+            background: linear-gradient(135deg, #00838f, #00acc1);
+        }
+        .btn-travel:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .btn-enter-region {
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #4caf50, #81c784);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .btn-enter-region:hover {
+            background: linear-gradient(135deg, #66bb6a, #a5d6a7);
+        }
+        
+        /* 小地图显示 */
+        .minimap-display {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .minimap-display:hover {
+            background: rgba(0, 188, 212, 0.2);
+        }
+        .minimap-icon { font-size: 1.2em; }
+        .minimap-text { color: #00bcd4; font-size: 0.9em; }
+        
+        /* 探索动画 */
+        .exploring-animation {
+            text-align: center;
+            padding: 30px;
+        }
+        .exploring-text {
+            color: #ffd700;
+            font-size: 1.2em;
+            margin-top: 15px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 秘境入口 */
+        .secret-realm-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        
+        /* 首领妖兽 */
+        .boss-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: linear-gradient(135deg, #c62828, #ef5350);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            color: white;
+        }
+        
         /* 创建宗门 */
         .create-sect-form {
             text-align: center;
@@ -1749,6 +2026,16 @@
                 <div class="stat-value days" id="daysDisplay">1</div>
             </div>
             <div class="stat-item">
+                <div class="minimap-display" id="minimapDisplay" onclick="openWorldMap()">
+                    <span class="minimap-icon">🏯</span>
+                    <span class="minimap-text">中州</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">行动力</div>
+                <div class="stat-value" id="actionPowerDisplay" style="color:#00bcd4;">10/10</div>
+            </div>
+            <div class="stat-item">
                 <div class="spirit-root-display" id="spiritRootDisplay" onclick="openSpiritRootModal()">
                     <span class="spirit-root-icon">🌱</span>
                     <span class="spirit-root-name grade-1" id="spiritRootName">中品灵根</span>
@@ -1807,6 +2094,7 @@
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
             <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
+            <button class="btn btn-worldmap" onclick="openWorldMap()">🗺️ 世界地图</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
         </div>
 
@@ -1932,6 +2220,15 @@
             <h2 class="modal-title" id="serendipityTitle">✨ 奇遇降临 ✨</h2>
             <div id="serendipityContent"></div>
             <button class="close-btn" onclick="closeSerendipityModal()">关闭</button>
+        </div>
+    </div>
+
+    <!-- V9 世界地图模态框 -->
+    <div id="worldMapModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🗺️ 世界地图</h2>
+            <div id="worldMapContent"></div>
+            <button class="close-btn" onclick="closeWorldMap()">关闭</button>
         </div>
     </div>
 
@@ -2620,6 +2917,25 @@
                     furnace: { level: 1, type: 'alchemy' },
                     anvil: { level: 1, type: 'forge' },
                     transactionLog: []
+                },
+                // V9 世界地图系统
+                worldMap: {
+                    currentContinent: '中州',
+                    currentRegion: '中州城',
+                    exploredContinents: ['中州'],
+                    exploredRegions: ['中州城', '中州野外'],
+                    actionPower: 10,
+                    maxActionPower: 10,
+                    continentUnlocks: {
+                        '中州': 0,
+                        '南疆': 1,
+                        '北域': 2,
+                        '西域': 3,
+                        '东海': 2,
+                        '仙界碎片': 4
+                    },
+                    bossRefreshDays: {},
+                    lastTravelDay: 0
                 }
             };
             saveGame();
@@ -2709,6 +3025,25 @@
                         furnace: { level: 1, type: 'alchemy' },
                         anvil: { level: 1, type: 'forge' },
                         transactionLog: []
+                    },
+                    // V9 世界地图系统
+                    worldMap: loaded.worldMap || {
+                        currentContinent: '中州',
+                        currentRegion: '中州城',
+                        exploredContinents: ['中州'],
+                        exploredRegions: ['中州城', '中州野外'],
+                        actionPower: 10,
+                        maxActionPower: 10,
+                        continentUnlocks: {
+                            '中州': 0,
+                            '南疆': 1,
+                            '北域': 2,
+                            '西域': 3,
+                            '东海': 2,
+                            '仙界碎片': 4
+                        },
+                        bossRefreshDays: {},
+                        lastTravelDay: 0
                     }
                 };
                 // 确保activeEffects包含serendipity_boost
@@ -2719,6 +3054,8 @@
                 initializeConstitutionEffects();
                 // 重新计算装备效果
                 recalculateAllEffects();
+                // 初始化世界地图
+                initWorldMap();
                 if (gameState.isGameOver) {
                     showGameOverScreen();
                 } else {
@@ -2744,6 +3081,14 @@
             // 检查商店刷新
             if (gameState.lastShopDay < gameState.days) {
                 refreshShop(true);
+            }
+            // 重置每日行动力
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                if (wm.lastTravelDay < gameState.days) {
+                    wm.actionPower = wm.maxActionPower;
+                    wm.lastTravelDay = 0;
+                }
             }
             // 检查宗门按钮显示
             const sectBtn = document.getElementById('sectBtn');
@@ -2801,6 +3146,13 @@
             
             // V7 更新灵根显示
             updateSpiritRootDisplay();
+            
+            // V9 更新世界地图显示
+            updateMinimapDisplay();
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
+            }
         }
 
         // ========== V7 灵根/体质系统函数 ==========
@@ -7624,6 +7976,728 @@
             saveGame();
             updateDisplay();
         }
+
+        // ========== V9 世界地图系统 ==========
+
+        // 大陆配置
+        const CONTINENTS = {
+            '中州': {
+                icon: '🏯',
+                requiredRealm: 0, // 筑基
+                dangerLevel: 1,
+                description: '新手大陆，安全区域，宗门林立',
+                color: '#4caf50',
+                regions: ['中州城', '中州野外', '青云山']
+            },
+            '南疆': {
+                icon: '🌴',
+                requiredRealm: 1, // 金丹
+                dangerLevel: 2,
+                description: '妖兽聚集之地，材料丰富',
+                color: '#ff9800',
+                regions: ['南疆密林', '妖兽谷', '毒瘴沼泽']
+            },
+            '北域': {
+                icon: '❄️',
+                requiredRealm: 2, // 元婴
+                dangerLevel: 3,
+                description: '宗门林立，功法交易盛行',
+                color: '#2196f3',
+                regions: ['北域雪山', '冰魄宫', '寒冰洞府']
+            },
+            '西域': {
+                icon: '🏜️',
+                requiredRealm: 3, // 化神
+                dangerLevel: 4,
+                description: '秘境众多，机缘深厚',
+                color: '#ff5722',
+                regions: ['西域沙漠', '火焰山', '风沙遗迹']
+            },
+            '东海': {
+                icon: '🌊',
+                requiredRealm: 2, // 元婴
+                dangerLevel: 3,
+                description: '海族领地，神兽出没',
+                color: '#00bcd4',
+                regions: ['东海渔村', '深海礁石', '龙宫入口']
+            },
+            '仙界碎片': {
+                icon: '✨',
+                requiredRealm: 4, // 渡劫
+                dangerLevel: 5,
+                description: '飞升前最终试炼，蕴含成仙之秘',
+                color: '#9c27b0',
+                regions: ['仙府遗迹', '天劫之渊', '飞升祭坛']
+            }
+        };
+
+        // 区域配置
+        const REGIONS = {
+            '中州城': {
+                type: 'safe', // 安全区
+                monsters: [],
+                resources: ['灵草', '普通矿石'],
+                description: '繁华的修仙者聚落，可休息和交易'
+            },
+            '中州野外': {
+                type: 'wild', // 野外区
+                monsters: ['野兔精', '狐狸精'],
+                monsterLevel: [1, 5],
+                resources: ['灵草', '妖兽血'],
+                description: '中州边缘的野外区域，有低级妖兽出没'
+            },
+            '青云山': {
+                type: 'secret', // 秘境
+                secretRealm: '青云洞府',
+                difficulty: 'low',
+                description: '上古修士洞府，藏有入门功法'
+            },
+            '南疆密林': {
+                type: 'wild',
+                monsters: ['妖兽狼', '巨蟒'],
+                monsterLevel: [10, 20],
+                resources: ['妖兽皮', '妖兽骨', '南疆蛊虫'],
+                description: '密林深处，妖兽横行'
+            },
+            '妖兽谷': {
+                type: 'boss', // 有首领
+                monsters: ['妖兽狼王'],
+                monsterLevel: [25],
+                bossName: '妖兽谷主',
+                resources: ['妖兽皮', '兽王胆'],
+                description: '妖兽聚集之地，首领，每7天刷新'
+            },
+            '毒瘴沼泽': {
+                type: 'wild',
+                monsters: ['毒蛙', '沼蟒'],
+                monsterLevel: [15, 25],
+                resources: ['毒囊', '沼泽精华'],
+                description: '充满毒气的沼泽区域'
+            },
+            '北域雪山': {
+                type: 'wild',
+                monsters: ['冰魄熊', '雪怪'],
+                monsterLevel: [25, 35],
+                resources: ['冰魄精', '寒冰髓'],
+                description: '终年积雪，寒冷刺骨'
+            },
+            '冰魄宫': {
+                type: 'boss',
+                monsters: ['冰魄熊王'],
+                monsterLevel: [40],
+                bossName: '冰魄宫主',
+                resources: ['冰魄精', '万年寒冰'],
+                description: '冰系修士的圣地，首领，每7天刷新'
+            },
+            '寒冰洞府': {
+                type: 'secret',
+                secretRealm: '上古冰宫',
+                difficulty: 'medium',
+                description: '上古遗迹，藏有冰系高阶功法'
+            },
+            '西域沙漠': {
+                type: 'wild',
+                monsters: ['沙虫', '蝎王'],
+                monsterLevel: [40, 50],
+                resources: ['沙之心', '蝎王毒'],
+                description: '茫茫沙漠，危机四伏'
+            },
+            '火焰山': {
+                type: 'boss',
+                monsters: ['火焰狮王'],
+                monsterLevel: [55],
+                bossName: '火焰山主',
+                resources: ['火精', '熔岩核心'],
+                description: '火焰肆虐之地，首领，每7天刷新'
+            },
+            '风沙遗迹': {
+                type: 'secret',
+                secretRealm: '古修士遗迹',
+                difficulty: 'high',
+                description: '上古遗迹，藏有混沌石'
+            },
+            '东海渔村': {
+                type: 'safe',
+                monsters: [],
+                resources: ['珍珠', '海藻'],
+                description: '东海之滨的小渔村，可休整'
+            },
+            '深海礁石': {
+                type: 'wild',
+                monsters: ['海妖', '巨型章鱼'],
+                monsterLevel: [35, 45],
+                resources: ['海妖珠', '深海珍珠'],
+                description: '深海区域，海族妖兽出没'
+            },
+            '龙宫入口': {
+                type: 'secret',
+                secretRealm: '东海龙宫',
+                difficulty: 'high',
+                description: '传说中龙族的宫殿，藏有龙族秘宝'
+            },
+            '仙府遗迹': {
+                type: 'secret',
+                secretRealm: '仙府',
+                difficulty: 'extreme',
+                description: '仙界碎片中的遗迹，有飞升道具'
+            },
+            '天劫之渊': {
+                type: 'boss',
+                monsters: ['天劫守护兽'],
+                monsterLevel: [70],
+                bossName: '天劫化身',
+                resources: ['天劫雷晶', '渡劫丹方'],
+                description: '天劫之力凝聚，首领，每7天刷新'
+            },
+            '飞升祭坛': {
+                type: 'secret',
+                secretRealm: '飞升台',
+                difficulty: 'extreme',
+                description: '最终飞升之地，需要渡劫期才能进入'
+            }
+        };
+
+        // 秘境配置
+        const SECRET_REALMS = {
+            '青云洞府': {
+                duration: 30,
+                reward: '入门功法',
+                successRate: 0.8
+            },
+            '上古冰宫': {
+                duration: 40,
+                reward: '冰系功法',
+                successRate: 0.6
+            },
+            '古修士遗迹': {
+                duration: 50,
+                reward: '混沌石',
+                successRate: 0.4
+            },
+            '东海龙宫': {
+                duration: 50,
+                reward: '龙族材料',
+                successRate: 0.35
+            },
+            '仙府': {
+                duration: 60,
+                reward: '飞升道具',
+                successRate: 0.25
+            },
+            '飞升台': {
+                duration: 60,
+                reward: '飞升丹',
+                successRate: 0.2
+            }
+        };
+
+        // 初始化世界地图数据
+        function initWorldMap() {
+            if (!gameState.worldMap) {
+                gameState.worldMap = {
+                    currentContinent: '中州',
+                    currentRegion: '中州城',
+                    exploredContinents: ['中州'],
+                    exploredRegions: ['中州城', '中州野外'],
+                    actionPower: 10,
+                    maxActionPower: 10,
+                    continentUnlocks: {
+                        '中州': 0,   // 筑基
+                        '南疆': 1,   // 金丹
+                        '北域': 2,   // 元婴
+                        '西域': 3,   // 化神
+                        '东海': 2,   // 元婴
+                        '仙界碎片': 4 // 渡劫
+                    },
+                    bossRefreshDays: {}, // 记录首领刷新时间
+                    lastTravelDay: 0
+                };
+            }
+        }
+
+        // 打开世界地图
+        function openWorldMap() {
+            initWorldMap();
+            renderWorldMap();
+            document.getElementById('worldMapModal').classList.add('active');
+        }
+
+        // 关闭世界地图
+        function closeWorldMap() {
+            document.getElementById('worldMapModal').classList.remove('active');
+        }
+
+        // 渲染世界地图
+        function renderWorldMap(selectedContinent = null) {
+            const wm = gameState.worldMap;
+            let html = `
+                <div class="worldmap-header">
+                    <div class="current-location">
+                        📍 ${wm.currentContinent} - ${wm.currentRegion}
+                    </div>
+                    <div class="action-power">
+                        <span class="action-power-label">今日行动力:</span>
+                        <span class="action-power-value">${wm.actionPower}/${wm.maxActionPower}</span>
+                    </div>
+                </div>
+                <div class="worldmap-grid">
+            `;
+
+            // 渲染大陆卡片
+            for (const [name, data] of Object.entries(CONTINENTS)) {
+                const isUnlocked = gameState.realm >= data.requiredRealm;
+                const isExplored = wm.exploredContinents.includes(name);
+                const isCurrent = wm.currentContinent === name;
+                const isSelected = selectedContinent === name;
+
+                let statusClass = 'explored';
+                let statusText = '已探索';
+                if (isCurrent) {
+                    statusClass = 'current';
+                    statusText = '当前';
+                } else if (!isExplored) {
+                    statusClass = 'danger';
+                    statusText = '未探索';
+                }
+
+                let dangerStars = '';
+                for (let i = 1; i <= 5; i++) {
+                    dangerStars += `<span class="danger-star ${i <= data.dangerLevel ? '' : 'empty'}">★</span>`;
+                }
+
+                const realmNames = ['筑基', '金丹', '元婴', '化神', '渡劫'];
+                const requiredText = realmNames[data.requiredRealm] + '期';
+
+                html += `
+                    <div class="continent-card ${!isUnlocked ? 'locked' : ''} ${isCurrent ? 'current' : ''} ${isExplored ? 'explored' : ''}"
+                         onclick="${isUnlocked ? `selectContinent('${name}')` : ''}"
+                         style="border-color: ${isCurrent ? '#ffd700' : (isExplored ? 'rgba(76,175,80,0.5)' : 'rgba(255,255,255,0.1)')}">
+                        ${!isUnlocked ? '<span class="boss-indicator">🔒</span>' : ''}
+                        ${data.regions.some(r => REGIONS[r] && REGIONS[r].type === 'secret') ? '<span class="secret-realm-badge">秘境</span>' : ''}
+                        <div class="continent-icon">${data.icon}</div>
+                        <div class="continent-name">${name}</div>
+                        <div class="continent-realm">需要: ${requiredText}</div>
+                        <div class="continent-danger">${dangerStars}</div>
+                        <span class="continent-status status-${isCurrent ? 'safe' : (!isExplored ? 'danger' : 'safe')}">${isCurrent ? '当前' : (!isExplored ? '未探索' : '已探索')}</span>
+                        ${!isUnlocked ? `<div class="lock-reason">境界不足，无法进入</div>` : ''}
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            // 渲染区域详情
+            if (selectedContinent) {
+                html += renderRegionDetail(selectedContinent);
+            } else {
+                html += renderRegionDetail(wm.currentContinent);
+            }
+
+            document.getElementById('worldMapContent').innerHTML = html;
+        }
+
+        // 渲染区域详情
+        function renderRegionDetail(continentName) {
+            const wm = gameState.worldMap;
+            const continentData = CONTINENTS[continentName];
+            const isUnlocked = gameState.realm >= continentData.requiredRealm;
+
+            let html = `<div class="region-detail">`;
+            html += `<div class="region-detail-header">`;
+            html += `<div class="region-detail-title">${continentName} - 区域</div>`;
+            html += `</div>`;
+
+            // 区域信息
+            html += `<div class="region-detail-info">`;
+            html += `<div class="region-info-item">
+                        <div class="region-info-label">大陆危险度</div>
+                        <div class="region-info-value">${'★'.repeat(continentData.dangerLevel)}${'☆'.repeat(5 - continentData.dangerLevel)}</div>
+                    </div>`;
+            html += `<div class="region-info-item">
+                        <div class="region-info-label">进入境界</div>
+                        <div class="region-info-value">${['筑基', '金丹', '元婴', '化神', '渡劫'][continentData.requiredRealm]}期</div>
+                    </div>`;
+            html += `<div class="region-info-item">
+                        <div class="region-info-label">探索状态</div>
+                        <div class="region-info-value">${wm.exploredContinents.includes(continentName) ? '已探索' : '未探索'}</div>
+                    </div>`;
+            html += `</div>`;
+
+            // 显示区域列表
+            html += `<div class="region-monsters">`;
+            html += `<div class="region-section-title">🏰 区域列表</div>`;
+            html += `<div class="region-item-list">`;
+            for (const regionName of continentData.regions) {
+                const regionData = REGIONS[regionName];
+                if (!regionData) continue;
+
+                const isExplored = wm.exploredRegions.includes(regionName);
+                const isCurrent = wm.currentRegion === regionName;
+                const isBossRegion = regionData.type === 'boss';
+                const isSecret = regionData.type === 'secret';
+                const isSafe = regionData.type === 'safe';
+
+                let regionClass = '';
+                if (isCurrent) regionClass = 'style="background:rgba(255,215,0,0.3);border:1px solid #ffd700;"';
+                else if (isExplored) regionClass = 'style="background:rgba(76,175,80,0.2);border:1px solid rgba(76,175,80,0.5);"';
+
+                let typeIcon = isSafe ? '🏠' : isBoss ? '👹' : isSecret ? '🌀' : '⚔️';
+                let typeText = isSafe ? '安全' : isBoss ? '首领' : isSecret ? '秘境' : '野外';
+
+                html += `
+                    <div class="region-item-tag" ${regionClass} onclick="selectRegion('${regionName}')">
+                        ${typeIcon} ${regionName} <span style="font-size:0.75em;color:#888;">(${typeText})</span>
+                        ${isCurrent ? '<span style="color:#ffd700;">[当前]</span>' : ''}
+                    </div>
+                `;
+            }
+            html += `</div></div>`;
+
+            // 行动按钮
+            html += `<div class="region-actions">`;
+            if (continentName !== wm.currentContinent && isUnlocked) {
+                const travelCost = 1;
+                const canTravel = wm.actionPower >= travelCost && wm.lastTravelDay < gameState.days;
+                html += `<button class="btn-travel" ${!canTravel ? 'disabled' : ''} onclick="travelToContinent('${continentName}')">
+                    🚀 前往${continentName} (消耗${travelCost}行动力)
+                </button>`;
+            } else if (continentName === wm.currentContinent) {
+                html += `<button class="btn-travel" disabled>📍 已在${continentName}</button>`;
+            } else {
+                html += `<button class="btn-travel" disabled>🔒 境界不足</button>`;
+            }
+            html += `</div>`;
+            html += `</div>`;
+
+            return html;
+        }
+
+        // 选择大陆
+        function selectContinent(continentName) {
+            renderWorldMap(continentName);
+        }
+
+        // 选择区域
+        function selectRegion(regionName) {
+            const wm = gameState.worldMap;
+            const regionData = REGIONS[regionName];
+            if (!regionData) return;
+
+            // 如果是当前区域，显示进入选项
+            if (wm.currentRegion === regionName) {
+                enterRegion(regionName);
+            } else {
+                // 前往该大陆
+                const continentName = Object.keys(CONTINENTS).find(c => CONTINENTS[c].regions.includes(regionName));
+                if (continentName && gameState.realm >= CONTINENTS[continentName].requiredRealm) {
+                    travelToContinent(continentName, regionName);
+                }
+            }
+        }
+
+        // 前往大陆
+        function travelToContinent(continentName, targetRegion = null) {
+            const wm = gameState.worldMap;
+            if (wm.actionPower < 1) {
+                alert('行动力不足！');
+                return;
+            }
+            if (wm.lastTravelDay >= gameState.days) {
+                alert('今日已移动过，每天最多移动2次！');
+                return;
+            }
+
+            wm.actionPower -= 1;
+            wm.lastTravelDay = gameState.days;
+            wm.currentContinent = continentName;
+
+            // 探索新大陆
+            if (!wm.exploredContinents.includes(continentName)) {
+                wm.exploredContinents.push(continentName);
+                addLog('good', '新大陆', `发现了${continentName}！这是一片新的领域。`);
+            }
+
+            // 设置区域
+            if (targetRegion) {
+                wm.currentRegion = targetRegion;
+            } else {
+                // 默认进入该大陆的第一个安全区
+                const continentData = CONTINENTS[continentName];
+                const safeRegion = continentData.regions.find(r => REGIONS[r] && REGIONS[r].type === 'safe') || continentData.regions[0];
+                wm.currentRegion = safeRegion;
+            }
+
+            gameState.days += 1;
+            addLog('neutral', '旅行', `经过1天跋涉，你来到了${continentName}的${wm.currentRegion}。`);
+
+            saveGame();
+            updateDisplay();
+            renderWorldMap(continentName);
+            checkDailyEffects();
+        }
+
+        // 进入区域
+        function enterRegion(regionName) {
+            const wm = gameState.worldMap;
+            const regionData = REGIONS[regionName];
+            if (!regionData) return;
+
+            wm.currentRegion = regionName;
+
+            // 探索新区域
+            if (!wm.exploredRegions.includes(regionName)) {
+                wm.exploredRegions.push(regionName);
+                addLog('good', '探索', `探索了${regionName}！`);
+            }
+
+            // 根据区域类型触发事件
+            if (regionData.type === 'safe') {
+                addLog('neutral', '安全区域', regionData.description);
+                // 安全区休息，恢复少量灵气
+                const recover = Math.floor(gameState.maxQi * 0.1);
+                gameState.qi = Math.min(gameState.maxQi, gameState.qi + recover);
+                addLog('good', '休息', `在${regionName}休息，恢复${recover}灵气。`);
+            } else if (regionData.type === 'wild') {
+                // 野外区，强制战斗
+                triggerWildEncounter(regionName);
+            } else if (regionData.type === 'boss') {
+                // 首领区
+                triggerBossEncounter(regionName);
+            } else if (regionData.type === 'secret') {
+                // 秘境入口
+                triggerSecretRealm(regionName);
+            }
+
+            saveGame();
+            updateDisplay();
+            renderWorldMap(wm.currentContinent);
+        }
+
+        // 野外遭遇
+        function triggerWildEncounter(regionName) {
+            const regionData = REGIONS[regionName];
+            if (!regionData || regionData.monsters.length === 0) {
+                addLog('neutral', '探索', `在${regionName}探索，未发现妖兽。`);
+                return;
+            }
+
+            const monsterName = regionData.monsters[Math.floor(Math.random() * regionData.monsters.length)];
+            const levelRange = regionData.monsterLevel || [1, 10];
+            const level = Math.floor(Math.random() * (levelRange[1] - levelRange[0] + 1)) + levelRange[0];
+
+            // 随机事件
+            const eventRoll = Math.random();
+            if (eventRoll < 0.4) {
+                // 40% 遭遇战斗
+                startMonsterBattle(monsterName, level, regionData);
+            } else if (eventRoll < 0.6) {
+                // 20% 发现资源
+                const resource = regionData.resources[Math.floor(Math.random() * regionData.resources.length)];
+                addLog('good', '发现资源', `在${regionName}发现了${resource}！`);
+                if (Math.random() < 0.5) {
+                    addToInventory('material', resource, 1, 'common');
+                }
+            } else if (eventRoll < 0.7) {
+                // 10% 遇到商人
+                const bonus = Math.floor(Math.random() * 20) + 10;
+                gameState.spiritStones += bonus;
+                addLog('good', '遇到商人', `在${regionName}遇到行商，获得${bonus}灵石！`);
+            } else if (eventRoll < 0.85) {
+                // 15% 触发奇遇
+                addLog('neutral', '奇遇', `在${regionName}感受到灵气波动，似乎有奇遇降临...`);
+                if (Math.random() < 0.3) {
+                    triggerRandomSerendipity();
+                }
+            } else {
+                // 15% 无事发生
+                addLog('neutral', '探索', `在${regionName}探索，未有特殊发现。`);
+            }
+        }
+
+        // 首领遭遇
+        function triggerBossEncounter(regionName) {
+            const regionData = REGIONS[regionName];
+            if (!regionData) return;
+
+            const bossName = regionData.bossName || regionData.monsters[0];
+            const bossLevel = regionData.monsterLevel ? regionData.monsterLevel[0] : 30;
+
+            // 检查首领是否刷新
+            const wm = gameState.worldMap;
+            const lastDefeatDay = wm.bossRefreshDays[regionName] || 0;
+            const daysSinceDefeat = gameState.days - lastDefeatDay;
+
+            if (daysSinceDefeat < 7 && lastDefeatDay > 0) {
+                addLog('neutral', '首领', `${bossName}尚未刷新，还需${7 - daysSinceDefeat}天。`);
+                // 普通野外事件
+                triggerWildEncounter(regionName);
+                return;
+            }
+
+            // 首领战斗
+            startBossBattle(bossName, bossLevel, regionName);
+        }
+
+        // 开始妖兽战斗
+        function startMonsterBattle(monsterName, level, regionData) {
+            const playerPower = calculatePlayerPower();
+
+            if (playerPower < level * 10) {
+                // 实力不足，有风险
+                const fleeChance = 0.3 + (gameState.activeEffects.escape || 0) * 0.1;
+                if (Math.random() < fleeChance) {
+                    addLog('neutral', '遭遇', `遭遇${monsterName}，你选择避战绕行。`);
+                    return;
+                } else {
+                    // 战斗失败
+                    const stoneLoss = Math.floor(gameState.spiritStones * 0.2);
+                    gameState.spiritStones -= stoneLoss;
+                    addLog('bad', '战斗失败', `不是${monsterName}的对手，损失${stoneLoss}灵石！`);
+                    return;
+                }
+            }
+
+            // 战斗成功
+            const expGain = level * 5;
+            gameState.cultivationProgress += expGain;
+            addLog('good', '战斗胜利', `击败${monsterName}，获得${expGain}修为！`);
+
+            // 掉落材料
+            if (regionData.resources && Math.random() < 0.5) {
+                const resource = regionData.resources[Math.floor(Math.random() * regionData.resources.length)];
+                addToInventory('material', resource, 1, 'common');
+                addLog('good', '获得材料', `获得${resource}！`);
+            }
+
+            // 消耗行动力
+            const wm = gameState.worldMap;
+            wm.actionPower = Math.max(0, wm.actionPower - 1);
+        }
+
+        // 开始首领战斗
+        function startBossBattle(bossName, bossLevel, regionName) {
+            const playerPower = calculatePlayerPower();
+
+            addLog('neutral', '首领出现', `${bossName}出现在${regionName}！这是一场硬仗！`);
+
+            if (playerPower < bossLevel * 15) {
+                // 实力不足
+                const stoneLoss = Math.floor(gameState.spiritStones * 0.3);
+                gameState.spiritStones -= stoneLoss;
+                addLog('bad', '首领击败', `${bossName}太强了！损失${stoneLoss}灵石！`);
+                return;
+            }
+
+            // 首领战斗
+            const wm = gameState.worldMap;
+            const expGain = bossLevel * 20;
+            gameState.cultivationProgress += expGain;
+            wm.bossRefreshDays[regionName] = gameState.days;
+
+            addLog('good', '首领击败', `艰难击败${bossName}！获得${expGain}修为！`);
+
+            // 稀有掉落
+            const regionData = REGIONS[regionName];
+            if (regionData && regionData.resources && Math.random() < 0.7) {
+                const resource = regionData.resources[Math.floor(Math.random() * regionData.resources.length)];
+                const quality = Math.random() < 0.3 ? 'rare' : 'precious';
+                addToInventory('material', resource, 1, quality);
+                addLog('good', '稀有掉落', `获得稀有材料${resource}！`);
+            }
+
+            wm.actionPower = Math.max(0, wm.actionPower - 2);
+        }
+
+        // 秘境入口
+        function triggerSecretRealm(regionName) {
+            const regionData = REGIONS[regionName];
+            if (!regionData || !regionData.secretRealm) return;
+
+            const realmData = SECRET_REALMS[regionData.secretRealm];
+            if (!realmData) return;
+
+            // 检查秘境令
+            const token = gameState.inventory.find(i => i.type === 'material' && i.name === '秘境令');
+            if (!token) {
+                addLog('neutral', '秘境', `${regionData.secretRealm}需要秘境令才能进入。`);
+                // 可以触发其他事件
+                if (Math.random() < 0.5) {
+                    triggerWildEncounter(regionName);
+                }
+                return;
+            }
+
+            // 消耗秘境令
+            removeFromInventory('秘境令', 1);
+
+            addLog('good', '进入秘境', `消耗秘境令，进入${regionData.secretRealm}！`);
+
+            // 秘境探索结果
+            if (Math.random() < realmData.successRate) {
+                // 成功
+                const reward = realmData.reward;
+                if (reward === '入门功法') {
+                    addToInventory('technique', '青云诀', 1, 'spirit', '修炼速度+10%', '基础功法');
+                } else if (reward === '冰系功法') {
+                    addToInventory('technique', '冰魄心法', 1, 'heaven', '冰系亲和+15', '高阶冰系功法');
+                } else if (reward === '混沌石') {
+                    addToInventory('material', '混沌石', 1, 'legendary');
+                } else if (reward === '龙族材料') {
+                    addToInventory('material', '龙鳞', 1, 'precious');
+                } else if (reward === '飞升道具') {
+                    addToInventory('material', '飞升丹', 1, 'legendary');
+                } else if (reward === '飞升丹') {
+                    addToInventory('material', '飞升丹', 1, 'legendary');
+                }
+                addLog('good', '秘境探索', `在${regionData.secretRealm}获得${reward}！`);
+            } else {
+                // 失败
+                addLog('bad', '秘境失败', `${regionData.secretRealm}探索失败，未能获得奖励。`);
+            }
+
+            const wm = gameState.worldMap;
+            wm.actionPower = Math.max(0, wm.actionPower - 2);
+        }
+
+        // 计算玩家战力
+        function calculatePlayerPower() {
+            let power = gameState.realm * 50 + gameState.stage * 20 + Math.floor(gameState.qi / 10);
+            power += gameState.activeEffects.attack || 0;
+            power += gameState.activeEffects.all_stats || 0;
+
+            // 装备加成
+            for (const equip of gameState.equippedTreasures) {
+                if (equip && equip.effect) {
+                    if (typeof equip.effect === 'number') {
+                        power += equip.effect;
+                    }
+                }
+            }
+
+            return power;
+        }
+
+        // 从背包移除物品
+        function removeFromInventory(itemName, quantity) {
+            const idx = gameState.inventory.findIndex(i => i.name === itemName);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity -= quantity;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+        }
+
+        // 更新世界地图显示（用于小地图）
+        function updateMinimapDisplay() {
+            const minimapEl = document.getElementById('minimapDisplay');
+            if (minimapEl && gameState.worldMap) {
+                const wm = gameState.worldMap;
+                const continentIcon = CONTINENTS[wm.currentContinent]?.icon || '🏰';
+                minimapEl.innerHTML = `<span class="minimap-icon">${continentIcon}</span><span class="minimap-text">${wm.currentContinent}</span>`;
+            }
+        }
+
     </script>
 </body>
 </html>
