@@ -343,6 +343,14 @@
             background: linear-gradient(135deg, #e65100, #ff9800);
             color: white;
         }
+        .btn-forge {
+            background: linear-gradient(135deg, #6d4c41, #8d6e63);
+            color: white;
+        }
+        .btn-market {
+            background: linear-gradient(135deg, #283593, #5c6bc0);
+            color: white;
+        }
         
         /* 装备栏 */
         .equipment-bar {
@@ -1794,6 +1802,8 @@
             <button class="btn btn-inventory" onclick="openInventory()">🎒 背包</button>
             <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
+            <button class="btn btn-forge" onclick="openForge()">🔨 炼器</button>
+            <button class="btn btn-market" onclick="openMarket()">🏷️ 市场</button>
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
             <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
@@ -2036,13 +2046,54 @@
             }
         };
 
-        // 炼丹配方
-        const ALCHEMY_RECIPES = {
-            '聚灵丹': { materials: { '灵草': 2, '灵石': 30 }, successRate: 0.8, desc: '炼制聚灵丹' },
-            '心魔丹': { materials: { '安神草': 1, '灵石': 50 }, successRate: 0.7, desc: '炼制心魔丹' },
-            '筑基丹': { materials: { '灵芝': 3, '灵石': 300 }, successRate: 0.5, desc: '炼制筑基丹' }
+        // V6 奇遇系统数据
+        // ========== V8 丹药炼器系统数据 ==========
+        // 炼丹炉定义
+        const FURNACES = {
+            '土炼丹炉': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼丹炉' },
+            '玄火丹炉': { level: 2, successBonus: 0.15, cost: 50000, unlockCondition: '宗门2级或50000灵石', desc: '中级炼丹炉，成功率+15%' },
+            '天玄神炉': { level: 3, successBonus: 0.30, cost: 200000, unlockCondition: '化神期', desc: '高级炼丹炉，成功率+30%' }
         };
 
+        // 炼器台定义
+        const ANVILS = {
+            '土炼器台': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼器台' },
+            '玄铁熔炉': { level: 2, successBonus: 0.15, cost: 50000, unlockCondition: '宗门2级或50000灵石', desc: '中级炼器台，成功率+15%' },
+            '天工神炉': { level: 3, successBonus: 0.30, cost: 200000, unlockCondition: '化神期', desc: '高级炼器台，成功率+30%' }
+        };
+
+        // 炼丹配方
+        const ALCHEMY_RECIPES = {
+            '回气丹': { materials: { '灵草': 3 }, successRate: 0.80, fuelCost: 100, desc: '恢复20%灵力', icon: '💊' },
+            '疗伤丹': { materials: { '灵草': 2, '妖兽血': 1 }, successRate: 0.75, fuelCost: 100, desc: '恢复30%生命', icon: '💊' },
+            '聚灵丹': { materials: { '灵石': 100, '灵草': 5 }, successRate: 0.60, fuelCost: 100, desc: '修炼速度+20%，持续3天', icon: '💊' },
+            '破境丹': { materials: { '灵石': 500, '天材': 2 }, successRate: 0.40, fuelCost: 100, desc: '突破瓶颈概率+15%', icon: '💊' },
+            '渡劫丹': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.30, fuelCost: 100, desc: '渡劫成功率+10%', icon: '💊' },
+            '洗髓丹': { materials: { '天材': 3, '灵石': 500 }, successRate: 0.50, fuelCost: 100, desc: '灵根刷新', icon: '💊' },
+            '混沌丹': { materials: { '混沌石': 1, '天材': 10 }, successRate: 0.20, fuelCost: 100, desc: '保底混沌灵根', icon: '💊', requireChaos: true }
+        };
+
+        // 炼器配方
+        const FORGE_RECIPES = {
+            '凡铁剑': { materials: { '玄铁': 5 }, successRate: 0.90, fuelCost: 200, effect: { type: 'attack', value: 0.05 }, desc: '攻击+5%', icon: '⚔️' },
+            '青云剑': { materials: { '玄铁': 10, '天材': 1 }, successRate: 0.60, fuelCost: 200, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚔️' },
+            '混元珠': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.40, fuelCost: 200, effect: { type: 'crit', value: 0.10 }, desc: '暴击+10%', icon: '🔮' },
+            '金缕衣': { materials: { '天材': 3, '妖兽皮': 5 }, successRate: 0.50, fuelCost: 200, effect: { type: 'hp', value: 0.10 }, desc: '生命+10%', icon: '👘' },
+            '避火罩': { materials: { '天材': 2, '妖兽骨': 5 }, successRate: 0.45, fuelCost: 200, effect: { type: 'fireResist', value: 0.30 }, desc: '火抗+30%', icon: '🔥' },
+            '定神珠': { materials: { '天材': 5, '灵石': 2000 }, successRate: 0.35, fuelCost: 200, effect: { type: 'mindset', value: 0.20 }, desc: '精神状态+20%', icon: '📿' }
+        };
+
+        // 材料定义
+        const MATERIALS = {
+            '灵草': { type: 'herb', basePrice: 100, icon: '🌿', desc: '普通灵草，炼丹材料' },
+            '妖兽血': { type: 'beast', basePrice: 200, icon: '🩸', desc: '妖兽血液，炼丹炼器材料' },
+            '天材': { type: 'rare', basePrice: 500, icon: '✨', desc: '稀有天材，高级材料' },
+            '混沌石': { type: 'legendary', basePrice: 10000, icon: '💎', desc: '混沌神石，传说材料', requireChaos: true },
+            '玄铁': { type: 'metal', basePrice: 150, icon: '🔩', desc: '玄铁矿物，炼器材料' },
+            '妖兽皮': { type: 'beast', basePrice: 180, icon: '🐾', desc: '妖兽皮毛，炼器材料' },
+            '妖兽骨': { type: 'beast', basePrice: 220, icon: '🦴', desc: '妖兽骨骼，炼器材料' }
+        };
+        
         // ========== V6 奇遇系统数据 ==========
         // 奇遇事件定义
         const SERENDIPITY_EVENTS = {
@@ -2432,7 +2483,13 @@
                 resonance: 0,
                 lastRefreshDay: 0
             },
-            constitutions: [] // 已获得的体质
+            constitutions: [], // 已获得的体质
+            // V8 丹药炼器系统字段
+            crafting: {
+                furnace: { level: 1, type: 'alchemy' },
+                anvil: { level: 1, type: 'forge' },
+                transactionLog: []
+            }
         };
 
         // 每个境界需要的灵气和进度阈值
@@ -2557,7 +2614,13 @@
                 },
                 // V7 灵根/体质系统
                 spiritRoot: generateRandomSpiritRoot(),
-                constitutions: []
+                constitutions: [],
+                // V8 丹药炼器系统
+                crafting: {
+                    furnace: { level: 1, type: 'alchemy' },
+                    anvil: { level: 1, type: 'forge' },
+                    transactionLog: []
+                }
             };
             saveGame();
             showGameUI();
@@ -2640,7 +2703,13 @@
                     },
                     // V7 灵根/体质系统
                     spiritRoot: loaded.spiritRoot || generateRandomSpiritRoot(),
-                    constitutions: loaded.constitutions || []
+                    constitutions: loaded.constitutions || [],
+                    // V8 丹药炼器系统
+                    crafting: loaded.crafting || {
+                        furnace: { level: 1, type: 'alchemy' },
+                        anvil: { level: 1, type: 'forge' },
+                        transactionLog: []
+                    }
                 };
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
@@ -4169,97 +4238,204 @@
             }
         }
 
-        // ========== 炼丹功能 ==========
+        // ========== V8 丹药炼器功能 ==========
 
-        let selectedRecipe = null;
+        let selectedCraftType = 'alchemy'; // 'alchemy' or 'forge'
+        let selectedRecipeName = null;
 
-        function openAlchemy() {
-            selectedRecipe = null;
+        // 打开制作面板
+        function openCrafting(type) {
+            selectedCraftType = type;
+            selectedRecipeName = null;
             document.getElementById('alchemyDetail').style.display = 'none';
             document.getElementById('alchemyResult').style.display = 'none';
-            renderAlchemyRecipes();
+            renderCraftingRecipes();
             document.getElementById('alchemyModal').classList.add('active');
         }
 
+        // 打开炼丹界面（兼容原有按钮）
+        function openAlchemy() {
+            openCrafting('alchemy');
+        }
+
+        // 打开炼器界面
+        function openForge() {
+            openCrafting('forge');
+        }
+
+        // 关闭制作面板
         function closeAlchemy() {
             document.getElementById('alchemyModal').classList.remove('active');
         }
 
-        function renderAlchemyRecipes() {
+        // 渲染制作配方列表
+        function renderCraftingRecipes() {
             const container = document.getElementById('alchemyRecipes');
-            container.innerHTML = Object.entries(ALCHEMY_RECIPES).map(([name, recipe]) => {
-                const pill = PILLS[name];
+            const modalTitle = document.querySelector('#alchemyModal .modal-title');
+            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
+
+            modalTitle.textContent = selectedCraftType === 'alchemy' ? '⚗️ 炼丹系统' : '🔨 炼器系统';
+
+            // 渲染炉子选择和升级
+            let furnaceHtml = '<div style="margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">';
+            furnaceHtml += '<div style="color:#aaa;margin-bottom:8px;">当前炉/台:</div>';
+            furnaceHtml += '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
+
+            for (const [name, data] of Object.entries(furnace)) {
+                const isOwned = data.level <= currentLevel;
+                const isEquipped = data.level === currentLevel;
+                const canBuy = data.cost > 0 && !isOwned;
+                const canAfford = gameState.spiritStones >= data.cost;
+
+                if (isEquipped) {
+                    furnaceHtml += `<span style="padding:5px 12px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;border-radius:5px;color:#ffd700;">${name} ${data.level === 1 ? '(免费)' : data.level === 2 ? '+15%' : '+30%'}</span>`;
+                } else if (isOwned) {
+                    furnaceHtml += `<button onclick="selectFurnace('${name}')" style="padding:5px 12px;background:rgba(0,0,0,0.4);border:1px solid #aaa;border-radius:5px;color:#aaa;cursor:pointer;">${name}</button>`;
+                } else if (canBuy) {
+                    furnaceHtml += `<button onclick="upgradeFurnace('${name}')" ${!canAfford ? 'disabled title="灵石不足"' : ''} style="padding:5px 12px;background:rgba(76,175,80,0.2);border:1px solid #4caf50;border-radius:5px;color:#4caf50;cursor:${canAfford ? 'pointer' : 'not-allowed'};">升级 ${name}(${data.cost}灵石)</button>`;
+                }
+            }
+            furnaceHtml += '</div></div>';
+
+            // 渲染配方列表
+            let recipesHtml = '<div style="max-height:250px;overflow-y:auto;">';
+            for (const [name, recipe] of Object.entries(recipes)) {
                 const materialsStr = Object.entries(recipe.materials)
                     .map(([m, q]) => `${m}×${q}`)
                     .join(' + ');
-                return `
-                    <div class="alchemy-recipe ${selectedRecipe === name ? 'selected' : ''}" onclick="selectRecipe('${name}')">
+                const canCraft = checkMaterialsForRecipe(recipe);
+                const isSelected = selectedRecipeName === name;
+
+                recipesHtml += `
+                    <div class="alchemy-recipe ${isSelected ? 'selected' : ''}" onclick="selectCraftRecipe('${name}')">
                         <div class="recipe-info">
-                            <div class="recipe-name" style="color:${getQualityColor(pill.quality)}">${pill.icon} ${name}</div>
+                            <div class="recipe-name" style="color:${getQualityColor(getRecipeQuality(name))}">${recipe.icon || '📦'} ${name}</div>
                             <div class="recipe-materials">材料: ${materialsStr}</div>
-                            <div class="recipe-success">成功率: ${Math.round(recipe.successRate * 100)}%</div>
+                            <div class="recipe-success">成功率: ${Math.round(recipe.successRate * 100)}% + 炉加成</div>
                         </div>
                         <button class="btn-craft">炼制</button>
                     </div>
                 `;
-            }).join('');
+            }
+            recipesHtml += '</div>';
+
+            container.innerHTML = furnaceHtml + recipesHtml;
         }
 
-        function selectRecipe(name) {
-            selectedRecipe = name;
-            renderAlchemyRecipes();
-            
-            const recipe = ALCHEMY_RECIPES[name];
-            const pill = PILLS[name];
+        // 获取配方品质
+        function getRecipeQuality(name) {
+            const recipe = ALCHEMY_RECIPES[name] || FORGE_RECIPES[name];
+            if (!recipe) return 'common';
+            const rate = recipe.successRate;
+            if (rate >= 0.7) return 'common';
+            if (rate >= 0.5) return 'rare';
+            if (rate >= 0.35) return 'precious';
+            return 'legendary';
+        }
+
+        // 选择炉子
+        function selectFurnace(name) {
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            if (furnace[name]) {
+                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = furnace[name].level;
+                saveGame();
+                renderCraftingRecipes();
+            }
+        }
+
+        // 升级炉子
+        function upgradeFurnace(name) {
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const data = furnace[name];
+            if (data && gameState.spiritStones >= data.cost) {
+                gameState.spiritStones -= data.cost;
+                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = data.level;
+                addLog('good', '升级成功', `升级${selectedCraftType === 'alchemy' ? '炼丹炉' : '炼器台'}到${name}`);
+                saveGame();
+                updateDisplay();
+                renderCraftingRecipes();
+            }
+        }
+
+        // 选择配方
+        function selectCraftRecipe(name) {
+            selectedRecipeName = name;
+            renderCraftingRecipes();
+
+            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
+            const recipe = recipes[name];
+            if (!recipe) return;
+
             const materialsStr = Object.entries(recipe.materials)
                 .map(([m, q]) => `${m}×${q}`)
                 .join(' + ');
-            
-            // 检查材料是否足够
-            const canCraft = checkMaterials(recipe.materials);
-            
+
+            // 计算实际成功率
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
+            const furnaceData = Object.values(furnace).find(f => f.level === currentLevel);
+            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
+            const totalSuccessRate = Math.min(0.95, recipe.successRate + furnaceBonus);
+
+            // 检查材料
+            const canCraft = checkMaterialsForRecipe(recipe);
+
+            // 检查燃料费
+            const hasFuel = gameState.spiritStones >= recipe.fuelCost;
+
             document.getElementById('alchemyDetail').style.display = 'block';
             document.getElementById('alchemyDetailContent').innerHTML = `
                 <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
-                    <span style="font-size:2em">${pill.icon}</span>
+                    <span style="font-size:2em">${recipe.icon || '📦'}</span>
                     <div>
-                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(pill.quality)}">${name}</div>
-                        <div style="color:#aaa">${pill.desc}</div>
+                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(getRecipeQuality(name))}">${name}</div>
+                        <div style="color:#aaa">${recipe.desc}</div>
                     </div>
                 </div>
                 <div style="margin:10px 0;">材料: ${materialsStr}</div>
+                <div style="color:#aaa;">燃料费: ${recipe.fuelCost}灵石</div>
                 <div style="color:#4caf50;">基础成功率: ${Math.round(recipe.successRate * 100)}%</div>
+                <div style="color:#ffd700;">炉/台加成: +${Math.round(furnaceBonus * 100)}%</div>
+                <div style="color:#00ff88;">总计成功率: ${Math.round(totalSuccessRate * 100)}%</div>
                 <div style="margin-top:15px;">
-                    <button class="btn-craft" onclick="craftPill('${name}')" ${!canCraft ? 'disabled' : ''}>
-                        ${canCraft ? '开始炼制(消耗1天)' : '材料不足'}
+                    <button class="btn-craft" onclick="doCraft('${name}')" ${!canCraft || !hasFuel ? 'disabled' : ''}>
+                        ${!canCraft ? '材料不足' : !hasFuel ? '灵石不足(燃料)' : '开始炼制(消耗1天)'}
                     </button>
                 </div>
             `;
         }
 
-        function checkMaterials(materials) {
-            // 检查灵石
-            if (materials['灵石'] && gameState.spiritStones < materials['灵石']) {
-                return false;
-            }
-            // 检查灵草类材料（通过探索获得）
-            for (const [mat, qty] of Object.entries(materials)) {
-                if (mat === '灵石') continue;
-                const hasItem = gameState.inventory.some(item => 
-                    item.name === mat && item.quantity >= qty
-                );
-                if (!hasItem) return false;
+        // 检查材料是否足够
+        function checkMaterialsForRecipe(recipe) {
+            for (const [mat, qty] of Object.entries(recipe.materials)) {
+                if (mat === '灵石') {
+                    if (gameState.spiritStones < qty) return false;
+                } else {
+                    const hasItem = gameState.inventory.some(item =>
+                        item.name === mat && item.quantity >= qty
+                    );
+                    if (!hasItem) return false;
+                }
             }
             return true;
         }
 
-        function consumeMaterials(materials) {
-            // 消耗灵石
-            if (materials['灵石']) {
-                gameState.spiritStones -= materials['灵石'];
+        // 执行炼制/锻造
+        async function doCraft(name) {
+            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
+            const recipe = recipes[name];
+            if (!recipe) return;
+
+            // 消耗灵石(燃料+材料)
+            if (recipe.materials['灵石']) {
+                gameState.spiritStones -= recipe.materials['灵石'];
             }
-            // 消耗其他材料
-            for (const [mat, qty] of Object.entries(materials)) {
+            gameState.spiritStones -= recipe.fuelCost;
+
+            // 消耗材料
+            for (const [mat, qty] of Object.entries(recipe.materials)) {
                 if (mat === '灵石') continue;
                 const item = gameState.inventory.find(i => i.name === mat);
                 if (item) {
@@ -4269,53 +4445,21 @@
                     }
                 }
             }
-        }
 
-        function returnMaterials(materials, rate) {
-            // 返还30%材料
-            for (const [mat, qty] of Object.entries(materials)) {
-                if (mat === '灵石') {
-                    gameState.spiritStones += Math.floor(qty * rate);
-                } else {
-                    const item = gameState.inventory.find(i => i.name === mat);
-                    if (item) {
-                        item.quantity += Math.floor(qty * rate);
-                    } else if (Math.floor(qty * rate) > 0) {
-                        gameState.inventory.push({
-                            id: Date.now(),
-                            type: 'material',
-                            name: mat,
-                            quantity: Math.floor(qty * rate),
-                            quality: 'common',
-                            effect: {},
-                            desc: `回收的${mat}`,
-                            icon: '🌿'
-                        });
-                    }
-                }
-            }
-        }
-
-        async function craftPill(name) {
-            const recipe = ALCHEMY_RECIPES[name];
-            const pill = PILLS[name];
-            
-            // 消耗材料
-            consumeMaterials(recipe.materials);
-            
             // 消耗1天
             gameState.days++;
-            
+
             // 关闭详情，显示结果
             document.getElementById('alchemyDetail').style.display = 'none';
             const resultDiv = document.getElementById('alchemyResult');
             resultDiv.style.display = 'block';
-            
-            // 生成AI描述
-            let craftDesc = '';
+
+            // 生成描述
+            const craftType = selectedCraftType === 'alchemy' ? '炼丹' : '炼器';
+            let craftDesc = `丹炉中灵光闪烁，药香四溢...`;
             if (apiConfig.apiKey && apiConfig.groupId) {
                 try {
-                    const prompt = `描述一次炼丹过程，丹药名称是${name}，用50-80字描述炼丹时的情景，包括火候、灵气变化等。`;
+                    const prompt = `描述一次${craftType}过程，物品名称是${name}，用50-80字描述${craftType}时的情景，包括火候、灵气变化等。`;
                     const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
                         method: 'POST',
                         headers: {
@@ -4336,40 +4480,265 @@
                 } catch (error) {
                     craftDesc = `丹炉中灵光闪烁，药香四溢...`;
                 }
-            } else {
-                craftDesc = `丹炉中灵光闪烁，药香四溢...`;
             }
-            
+
+            // 计算成功率
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
+            const furnaceData = Object.values(furnace).find(f => f.level === currentLevel);
+            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
+            const totalSuccessRate = Math.min(0.95, recipe.successRate + furnaceBonus);
+
             // 判定成功
             const roll = Math.random();
-            if (roll < recipe.successRate) {
+            if (roll < totalSuccessRate) {
                 // 成功
-                addToInventory('pill', name, 1, pill.quality, pill.effect, pill.desc, pill.icon);
+                if (selectedCraftType === 'alchemy') {
+                    // 丹药
+                    addToInventory('pill', name, 1, getRecipeQuality(name), getPillEffect(name), recipe.desc, recipe.icon);
+                } else {
+                    // 法宝
+                    addToInventory('treasure', name, 1, getRecipeQuality(name), recipe.effect, recipe.desc, recipe.icon);
+                }
                 resultDiv.innerHTML = `
-                    <div class="result-success">🎉 炼制成功！</div>
+                    <div class="result-success">🎉 ${craftType}成功！</div>
                     <p style="margin-top:10px;color:#aaa">${craftDesc}</p>
                     <p style="margin-top:10px;color:#ffd700">获得${name}×1，已放入背包</p>
                 `;
-                addLog('good', '炼丹成功', `成功炼制了${name}`);
+                addLog('good', `${craftType}成功`, `成功${craftType === '炼丹' ? '炼制' : '锻造'}了${name}`);
             } else {
-                // 失败，返还30%材料
-                returnMaterials(recipe.materials, 0.3);
+                // 失败，返还50%材料
+                returnCraftMaterials(recipe.materials, 0.5);
                 resultDiv.innerHTML = `
-                    <div class="result-fail">💔 炼制失败...</div>
+                    <div class="result-fail">💔 ${craftType}失败...</div>
                     <p style="margin-top:10px;color:#aaa">${craftDesc}</p>
-                    <p style="margin-top:10px;color:#888">材料损毁严重，返还30%材料</p>
+                    <p style="margin-top:10px;color:#888">材料损毁，返还50%材料</p>
                 `;
-                addLog('bad', '炼丹失败', `炼制${name}失败`);
+                addLog('bad', `${craftType}失败`, `${craftType === '炼丹' ? '炼制' : '锻造'}${name}失败`);
             }
-            
+
             saveGame();
             updateDisplay();
-            
-            // 3秒后刷新炼丹界面
+
+            // 3秒后刷新界面
             setTimeout(() => {
                 document.getElementById('alchemyResult').style.display = 'none';
-                renderAlchemyRecipes();
+                renderCraftingRecipes();
             }, 3000);
+        }
+
+        // 获取丹药效果
+        function getPillEffect(name) {
+            const effects = {
+                '回气丹': { type: 'qi', value: 0.2 },
+                '疗伤丹': { type: 'health', value: 0.3 },
+                '聚灵丹': { type: 'cultivate_speed', value: 0.2 },
+                '破境丹': { type: 'breakthrough_boost', value: 0.15 },
+                '渡劫丹': { type: '渡劫_success', value: 0.1 },
+                '洗髓丹': { type: 'spiritRoot_refresh', value: 1 },
+                '混沌丹': { type: '混沌灵根', value: 1 }
+            };
+            return effects[name] || {};
+        }
+
+        // 返还材料
+        function returnCraftMaterials(materials, rate) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    gameState.spiritStones += Math.floor(qty * rate);
+                } else {
+                    const item = gameState.inventory.find(i => i.name === mat);
+                    if (item) {
+                        item.quantity += Math.floor(qty * rate);
+                    } else if (Math.floor(qty * rate) > 0) {
+                        const matData = MATERIALS[mat] || { icon: '📦', type: 'material' };
+                        gameState.inventory.push({
+                            id: Date.now() + Math.random(),
+                            type: 'material',
+                            name: mat,
+                            quantity: Math.floor(qty * rate),
+                            quality: 'common',
+                            effect: {},
+                            desc: `回收的${mat}`,
+                            icon: matData.icon
+                        });
+                    }
+                }
+            }
+        }
+
+        // ========== 交易系统 ==========
+        let selectedMarketItem = null;
+
+        function openMarket() {
+            renderMarketItems();
+            document.getElementById('alchemyModal').classList.add('active');
+            document.querySelector('#alchemyModal .modal-title').textContent = '🏪 交易市场';
+        }
+
+        function renderMarketItems() {
+            const container = document.getElementById('alchemyRecipes');
+            const logs = gameState.crafting.transactionLog || [];
+
+            let html = '<div style="margin-bottom:15px;">';
+            html += '<div style="color:#aaa;margin-bottom:10px;">上架你的物品出售(定价5%手续费)</div>';
+
+            // 玩家可上架的物品
+            const sellableItems = gameState.inventory.filter(item =>
+                item.type === 'pill' || item.type === 'treasure'
+            );
+
+            if (sellableItems.length > 0) {
+                html += '<div style="max-height:150px;overflow-y:auto;">';
+                for (const item of sellableItems) {
+                    const price = item.price || MATERIALS[item.name]?.basePrice || 100;
+                    html += `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:5px;margin-bottom:5px;">
+                            <span>${item.icon} ${item.name} ×${item.quantity}</span>
+                            <button onclick="listItem('${item.name}', ${price})" style="padding:3px 10px;background:#4caf50;border:none;border-radius:5px;color:white;cursor:pointer;">上架</button>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="color:#888;text-align:center;padding:20px;">背包中没有可出售的物品</div>';
+            }
+            html += '</div>';
+
+            // 交易记录
+            html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:15px;">';
+            html += '<div style="color:#ffd700;margin-bottom:10px;">最近交易记录</div>';
+            if (logs.length > 0) {
+                html += '<div style="max-height:150px;overflow-y:auto;">';
+                for (const log of logs.slice(-10).reverse()) {
+                    html += `
+                        <div style="padding:5px;background:rgba(0,0,0,0.2);border-radius:3px;margin-bottom:3px;font-size:0.9em;">
+                            <span style="color:${log.type === 'sell' ? '#4caf50' : '#ff9800'}">[${log.type === 'sell' ? '售出' : '购买'}]</span>
+                            ${log.itemName} ×${log.quantity} @ ${log.price}灵石
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="color:#888;text-align:center;padding:10px;">暂无交易记录</div>';
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function listItem(name, basePrice) {
+            const price = prompt(`请输入${name}的售价:`, basePrice);
+            if (!price) return;
+            const finalPrice = parseInt(price);
+            if (isNaN(finalPrice) || finalPrice <= 0) {
+                alert('请输入有效的价格');
+                return;
+            }
+
+            // 扣除上架费(5%)
+            const fee = Math.floor(finalPrice * 0.05);
+            if (gameState.spiritStones < fee) {
+                alert(`上架费${fee}灵石，你的灵石不足`);
+                return;
+            }
+
+            gameState.spiritStones -= fee;
+
+            // 消耗物品
+            const item = gameState.inventory.find(i => i.name === name);
+            if (item) {
+                item.quantity -= 1;
+                if (item.quantity <= 0) {
+                    gameState.inventory = gameState.inventory.filter(i => i !== item);
+                }
+            }
+
+            // 记录上架
+            if (!gameState.crafting.listedItems) {
+                gameState.crafting.listedItems = [];
+            }
+            gameState.crafting.listedItems.push({
+                name,
+                price: finalPrice,
+                seller: '玩家',
+                day: gameState.days
+            });
+
+            addLog('neutral', '物品上架', `${name}已上架，售价${finalPrice}灵石(手续费${fee})`);
+            saveGame();
+            updateDisplay();
+            renderMarketItems();
+        }
+
+        function buyFromMarket(listingIndex) {
+            const listing = gameState.crafting.listedItems[listingIndex];
+            if (!listing) return;
+
+            if (gameState.spiritStones < listing.price) {
+                alert('灵石不足');
+                return;
+            }
+
+            gameState.spiritStones -= listing.price;
+            addToInventory('pill', listing.name, 1, 'common', {}, '购买的物品', '📦');
+
+            // 记录交易
+            gameState.crafting.transactionLog.push({
+                type: 'buy',
+                itemName: listing.name,
+                quantity: 1,
+                price: listing.price,
+                day: gameState.days
+            });
+
+            // 从上架列表移除
+            gameState.crafting.listedItems.splice(listingIndex, 1);
+
+            addLog('good', '购买成功', `购买了${listing.name}`);
+            saveGame();
+            updateDisplay();
+            renderMarketItems();
+        }
+
+        // 保留旧函数用于兼容
+        function selectRecipe(name) {
+            selectCraftRecipe(name);
+        }
+
+        function craftPill(name) {
+            doCraft(name);
+        }
+
+        function checkMaterials(materials) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    if (gameState.spiritStones < qty) return false;
+                } else {
+                    if (!gameState.inventory.some(item => item.name === mat && item.quantity >= qty)) return false;
+                }
+            }
+            return true;
+        }
+
+        function consumeMaterials(materials) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    gameState.spiritStones -= qty;
+                } else {
+                    const item = gameState.inventory.find(i => i.name === mat);
+                    if (item) {
+                        item.quantity -= qty;
+                        if (item.quantity <= 0) {
+                            gameState.inventory = gameState.inventory.filter(i => i !== item);
+                        }
+                    }
+                }
+            }
+        }
+
+        function returnMaterials(materials, rate) {
+            returnCraftMaterials(materials, rate);
         }
 
         // ========== 渡劫系统 ==========
