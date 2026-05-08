@@ -749,6 +749,344 @@
             font-size: 0.8em;
             color: #e1bee7;
         }
+
+        /* ========== V4 斗法战斗系统样式 ========== */
+        .btn-combat {
+            background: linear-gradient(135deg, #c62828, #ef5350);
+            color: white;
+        }
+        .btn-challenge {
+            background: linear-gradient(135deg, #b71c1c, #e53935);
+            color: white;
+        }
+
+        /* 战斗模态框 */
+        #combatModal .modal-content {
+            max-width: 900px;
+            background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a1a2e 100%);
+            border: 2px solid rgba(255, 215, 0, 0.5);
+        }
+        .combat-arena {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 200px;
+        }
+        .combatants {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .combatant {
+            flex: 1;
+            background: rgba(50, 50, 100, 0.5);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .combatant.player { border-color: rgba(0, 255, 136, 0.5); }
+        .combatant.opponent { border-color: rgba(255, 100, 100, 0.5); }
+        .combatant-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .combatant-avatar {
+            font-size: 2.5em;
+        }
+        .combatant-info {
+            text-align: left;
+        }
+        .combatant-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #ffd700;
+        }
+        .combatant-realm {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+        .combatant-hp-bar {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            height: 25px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .combatant-hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #81c784);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.85em;
+        }
+        .combatant-hp-fill.low { background: linear-gradient(90deg, #f44336, #ef5350); }
+        .combatant-hp-fill.medium { background: linear-gradient(90deg, #ff9800, #ffb74d); }
+        .combatant-stats {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #aaa;
+        }
+        .combatant-stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .combatant-stat .icon { font-size: 1.1em; }
+        .combatant-effects {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .combat-effect {
+            background: rgba(156, 39, 176, 0.3);
+            border: 1px solid rgba(156, 39, 176, 0.5);
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 0.75em;
+            color: #e1bee7;
+        }
+        .combat-effect.debuff {
+            background: rgba(244, 67, 54, 0.3);
+            border-color: rgba(244, 67, 54, 0.5);
+            color: #ffcdd2;
+        }
+
+        .combat-log {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        .combat-log-title {
+            color: #ffd700;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 5px;
+        }
+        .combat-log-entry {
+            padding: 5px 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            background: rgba(50, 50, 100, 0.3);
+            font-size: 0.9em;
+        }
+        .combat-log-entry.player-action { border-left: 3px solid #00ff88; }
+        .combat-log-entry.opponent-action { border-left: 3px solid #ff6666; }
+        .combat-log-entry.system { border-left: 3px solid #ffd700; color: #ffd700; }
+        .combat-log-entry.damage { color: #ff6666; }
+        .combat-log-entry.heal { color: #4caf50; }
+        .combat-log-entry.critical { color: #ff00ff; font-weight: bold; }
+
+        .combat-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .combat-action-btn {
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(50, 50, 100, 0.5);
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+        .combat-action-btn:hover:not(:disabled) {
+            background: rgba(70, 70, 120, 0.7);
+            border-color: #ffd700;
+            transform: translateY(-2px);
+        }
+        .combat-action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .combat-action-btn.attack { background: rgba(244, 67, 54, 0.3); border-color: rgba(244, 67, 54, 0.5); }
+        .combat-action-btn.attack:hover:not(:disabled) { background: rgba(244, 67, 54, 0.5); }
+        .combat-action-btn.defend { background: rgba(33, 150, 243, 0.3); border-color: rgba(33, 150, 243, 0.5); }
+        .combat-action-btn.defend:hover:not(:disabled) { background: rgba(33, 150, 243, 0.5); }
+        .combat-action-btn.escape { background: rgba(255, 152, 0, 0.3); border-color: rgba(255, 152, 0, 0.5); }
+        .combat-action-btn.escape:hover:not(:disabled) { background: rgba(255, 152, 0, 0.5); }
+
+        .combat-submenu {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .combat-submenu-btn {
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+        .combat-submenu-btn:hover:not(:disabled) {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: #ffd700;
+        }
+        .combat-submenu-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* 对手选择界面 */
+        .opponent-list {
+            display: grid;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .opponent-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .opponent-card:hover {
+            border-color: rgba(255, 215, 0, 0.5);
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .opponent-card-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .opponent-card-avatar { font-size: 2em; }
+        .opponent-card-name {
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .opponent-card-realm { font-size: 0.85em; color: #aaa; }
+        .opponent-card-technique { font-size: 0.8em; color: #ba68c8; }
+        .opponent-card-difficulty {
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .difficulty-easy { background: #4caf50; color: white; }
+        .difficulty-normal { background: #ff9800; color: white; }
+        .difficulty-hard { background: #f44336; color: white; }
+
+        .challenge-cost {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #aaa;
+        }
+        .challenge-cost span { color: #87ceeb; font-weight: bold; }
+
+        /* 战斗结果 */
+        .combat-result {
+            text-align: center;
+            padding: 30px;
+        }
+        .combat-result h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        .combat-result.win h2 { color: #ffd700; }
+        .combat-result.lose h2 { color: #f44336; }
+        .combat-result.escape h2 { color: #ff9800; }
+        .combat-result-rewards {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        .combat-result-rewards div { margin: 5px 0; }
+        .combat-result-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .combat-result-stat {
+            text-align: center;
+        }
+        .combat-result-stat .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .combat-result-stat .label {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        /* 荣誉榜/战绩 */
+        .honor-display {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .honor-stats {
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+        }
+        .honor-stat {
+            text-align: center;
+        }
+        .honor-stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .honor-stat-label {
+            font-size: 0.8em;
+            color: #aaa;
+        }
+        .battle-history {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .battle-record {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .battle-record.win { border-left: 3px solid #4caf50; }
+        .battle-record.lose { border-left: 3px solid #f44336; }
+        .battle-record-info { display: flex; align-items: center; gap: 10px; }
+        .battle-record-result { font-weight: bold; }
+        .battle-record-result.win { color: #4caf50; }
+        .battle-record-result.lose { color: #f44336; }
+        .battle-record-opponent { color: #aaa; font-size: 0.9em; }
+        .battle-record-reward { color: #87ceeb; font-size: 0.85em; }
     </style>
 </head>
 <body>
@@ -817,6 +1155,7 @@
             <button class="btn btn-inventory" onclick="openInventory()">🎒 背包</button>
             <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
+            <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
         </div>
 
@@ -910,6 +1249,14 @@
         </div>
     </div>
 
+    <!-- 斗法战斗模态框 -->
+    <div id="combatModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">⚔️ 斗法切磋 ⚔️</h2>
+            <div id="combatContent"></div>
+        </div>
+    </div>
+
     <script>
         // 游戏配置
         const CONFIG = {
@@ -941,6 +1288,27 @@
             '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 800, desc: '逃跑成功率+50%', icon: '📜' },
             '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 5000, desc: '预知事件类型', icon: '🔮' },
             '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 20000, desc: '全属性+5%', icon: '珠' }
+        };
+
+        // V4 战斗法宝定义
+        const COMBAT_TREASURES = {
+            '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 500 },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 400 },
+            '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 800 },
+            '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 600 },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 450 },
+            '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 3000 },
+            '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 3000 },
+            '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 3000 },
+            '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 3000 }
+        };
+
+        // V4 战斗丹药定义
+        const COMBAT_PILLS = {
+            '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 1000 },
+            '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 1000 },
+            '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 2000 },
+            '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 800 }
         };
 
         // 天劫类型定义
@@ -1041,7 +1409,17 @@
                 tribKey: null
             },
             hasTransmigrationBuff: false,
-            tribulationRecord: []
+            tribulationRecord: [],
+            // V4 战斗系统字段
+            combat: {
+                wins: 0,
+                losses: 0,
+                honor: 0,
+                fame: 0,
+                battleHistory: [],
+                injured: false,
+                injuryEndDay: 0
+            }
         };
 
         // 每个境界需要的灵气和进度阈值
@@ -1166,7 +1544,16 @@
                         tribKey: null
                     },
                     hasTransmigrationBuff: loaded.hasTransmigrationBuff || false,
-                    tribulationRecord: loaded.tribulationRecord || []
+                    tribulationRecord: loaded.tribulationRecord || [],
+                    combat: loaded.combat || {
+                        wins: 0,
+                        losses: 0,
+                        honor: 0,
+                        fame: 0,
+                        battleHistory: [],
+                        injured: false,
+                        injuryEndDay: 0
+                    }
                 };
                 // 重新计算装备效果
                 recalculateAllEffects();
@@ -2088,7 +2475,17 @@
             for (const [name, treasure] of Object.entries(TREASURES)) {
                 allItems.push({ type: 'treasure', name, ...treasure });
             }
-            
+            // V4战斗道具
+            for (const [name, treasure] of Object.entries(COMBAT_TREASURES)) {
+                allItems.push({ type: 'treasure', name, ...treasure });
+            }
+            // 挑战状
+            allItems.push({ type: 'special', name: '挑战状', quality: 'common', price: 500, desc: '用于发起斗法挑战', icon: '📜' });
+            // 战斗丹药
+            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
+                allItems.push({ type: 'pill', name, ...pill, price: pill.price || 1000 });
+            }
+
             // 随机选8-12个
             const count = 8 + Math.floor(Math.random() * 5);
             const shuffled = allItems.sort(() => Math.random() - 0.5);
@@ -2879,6 +3276,863 @@
             closeTribulationModal();
             addLog('neutral', '暂缓突破', '你决定暂缓突破，继续积累实力...');
             saveGame();
+        }
+
+        // ========== V4 斗法战斗系统 ==========
+
+        // 战斗相关常量
+        const TECHNIQUES = ['雷法', '火法', '水法', '体术'];
+        const TECHNIQUE_BONUS = {
+            '雷法': { beats: '体术', losesTo: '火法' },
+            '火法': { beats: '雷法', losesTo: '水法' },
+            '水法': { beats: '火法', losesTo: '体术' },
+            '体术': { beats: '水法', losesTo: '雷法' }
+        };
+        const TECHNIQUE_COLORS = {
+            '雷法': '#ffff00',
+            '火法': '#ff4500',
+            '水法': '#00bfff',
+            '体术': '#228b22'
+        };
+
+        // 固定对手池
+        const FIXED_OPPONENTS = [
+            { name: '青云子', avatar: '👴', baseRealm: 2 },
+            { name: '赤焰仙', avatar: '👩‍🦰', baseRealm: 2 },
+            { name: '寒冰仙子', avatar: '👸', baseRealm: 3 },
+            { name: '金刚罗汉', avatar: '💪', baseRealm: 3 },
+            { name: '雷霆真君', avatar: '👨‍🔬', baseRealm: 4 }
+        ];
+
+        // 战斗状态
+        let combatState = {
+            inProgress: false,
+            player: null,
+            opponent: null,
+            round: 0,
+            turn: 'player',
+            playerAction: null,
+            playerSubAction: null,
+            log: [],
+            effects: {
+                player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
+                opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
+            },
+            battleRecord: []
+        };
+
+        // 玩家功法（根据境界决定）
+        function getPlayerTechnique() {
+            if (gameState.realm <= 1) return '体术';
+            if (gameState.realm === 2) return ['雷法', '火法', '水法'][Math.floor(Math.random() * 3)];
+            return TECHNIQUES[Math.floor(Math.random() * 4)];
+        }
+
+        // 获取对手数据
+        function generateOpponent(difficulty) {
+            const playerRealm = gameState.realm;
+            let targetRealm = playerRealm;
+            if (difficulty === 'easy') targetRealm = Math.max(0, playerRealm - 1);
+            else if (difficulty === 'normal') targetRealm = playerRealm;
+            else if (difficulty === 'hard') targetRealm = Math.min(4, playerRealm + 1);
+
+            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
+            const stages = ['初期', '中期', '后期'];
+            const stage = Math.floor(Math.random() * 3);
+
+            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
+            const baseHp = hpByRealm[targetRealm] || 1000;
+            const baseAttack = 80 + targetRealm * 40;
+            const baseDefense = 40 + targetRealm * 20;
+            const baseSpeed = 80 + targetRealm * 15;
+
+            const technique = TECHNIQUES[Math.floor(Math.random() * 4)];
+            const treasures = Object.keys(COMBAT_TREASURES);
+            const weapon = treasures.filter(t => COMBAT_TREASURES[t].type === 'weapon');
+            const armor = treasures.filter(t => COMBAT_TREASURES[t].type === 'armor');
+
+            const opponentFixed = FIXED_OPPONENTS[Math.floor(Math.random() * FIXED_OPPONENTS.length)];
+            const name = difficulty === 'normal' ? opponentFixed.name : `${opponentFixed.name}（${['初级', '中级', '高级'][difficulty === 'easy' ? 0 : difficulty === 'normal' ? 1 : 2]}）`;
+
+            return {
+                name: name,
+                avatar: opponentFixed.avatar,
+                realm: targetRealm,
+                realmName: realmNames[targetRealm] + '期' + stages[stage],
+                maxHP: baseHp,
+                hp: baseHp,
+                attack: baseAttack,
+                defense: baseDefense,
+                speed: baseSpeed,
+                technique: technique,
+                techniqueColor: TECHNIQUE_COLORS[technique],
+                weapon: weapon[Math.floor(Math.random() * weapon.length)],
+                armor: armor[Math.floor(Math.random() * armor.length)],
+                critRate: 0.1 + targetRealm * 0.03
+            };
+        }
+
+        // 打开斗法界面
+        function openCombat() {
+            renderCombatHome();
+            document.getElementById('combatModal').classList.add('active');
+        }
+
+        function closeCombat() {
+            document.getElementById('combatModal').classList.remove('active');
+            combatState.inProgress = false;
+        }
+
+        // 渲染斗法主界面
+        function renderCombatHome() {
+            const wins = gameState.combat?.wins || 0;
+            const losses = gameState.combat?.losses || 0;
+            const honor = gameState.combat?.honor || 0;
+            const fame = gameState.combat?.fame || 0;
+            const total = wins + losses;
+
+            let html = `
+                <div class="honor-display">
+                    <div class="honor-stats">
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${honor}</div>
+                            <div class="honor-stat-label">荣誉点</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${fame}</div>
+                            <div class="honor-stat-label">声望</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${wins}</div>
+                            <div class="honor-stat-label">胜</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${losses}</div>
+                            <div class="honor-stat-label">负</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="challenge-cost">
+                    挑战消耗：<span>挑战状 ×1</span> | 当前拥有：<span>${getItemCount('挑战状')}张</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">
+                    <button class="combat-action-btn" onclick="startCombatChallenge('easy')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🟢 初级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界低于你</div>
+                    </button>
+                    <button class="combat-action-btn" onclick="startCombatChallenge('normal')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🟡 中级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界相当</div>
+                    </button>
+                    <button class="combat-action-btn" onclick="startCombatChallenge('hard')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🔴 高级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界高于你</div>
+                    </button>
+                </div>
+                <h3 style="color:#ffd700;margin:15px 0 10px;">历史战绩</h3>
+                <div class="battle-history" id="battleHistory">
+            `;
+
+            const history = gameState.combat?.battleHistory || [];
+            if (history.length === 0) {
+                html += '<p style="text-align:center;color:#888;padding:20px;">暂无战绩记录</p>';
+            } else {
+                history.slice(0, 10).forEach(record => {
+                    const resultClass = record.result === 'win' ? 'win' : 'lose';
+                    const resultText = record.result === 'win' ? '胜' : '负';
+                    html += `
+                        <div class="battle-record ${resultClass}">
+                            <div class="battle-record-info">
+                                <span class="battle-record-result ${resultClass}">${resultText}</span>
+                                <span class="battle-record-opponent">vs ${record.opponent}</span>
+                            </div>
+                            <span class="battle-record-reward">${record.result === 'win' ? '+' + record.reward : '-' + record.penalty}灵石</span>
+                        </div>
+                    `;
+                });
+            }
+            html += '</div><button class="close-btn" onclick="closeCombat()">关闭</button>';
+            document.getElementById('combatContent').innerHTML = html;
+        }
+
+        // 获取物品数量
+        function getItemCount(name) {
+            const item = gameState.inventory.find(i => i.name === name);
+            return item ? item.quantity : 0;
+        }
+
+        // 开始挑战
+        function startCombatChallenge(difficulty) {
+            if (getItemCount('挑战状') < 1) {
+                alert('挑战状不足！请在商店购买。');
+                return;
+            }
+
+            // 消耗挑战状
+            const idx = gameState.inventory.findIndex(i => i.name === '挑战状');
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+
+            const opponent = generateOpponent(difficulty);
+            initCombat(opponent);
+            renderCombatArena();
+        }
+
+        // 初始化战斗
+        function initCombat(opponent) {
+            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
+            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
+
+            const playerWeapon = gameState.equippedTreasures[0];
+            const playerArmor = gameState.equippedTreasures[1];
+
+            let playerMaxHP = hpByRealm[gameState.realm] || 1000;
+            let playerAttack = 80 + gameState.realm * 40;
+            let playerDefense = 40 + gameState.realm * 20;
+            let playerSpeed = 80 + gameState.realm * 15;
+            let playerCritRate = 0.1 + gameState.realm * 0.03;
+            let playerTechnique = getPlayerTechnique();
+
+            // 应用装备效果
+            if (playerWeapon && COMBAT_TREASURES[playerWeapon.name]) {
+                const effect = COMBAT_TREASURES[playerWeapon.name].effect;
+                if (effect.attackBonus) playerAttack = Math.floor(playerAttack * (1 + effect.attackBonus));
+                if (effect.critBonus) playerCritRate += effect.critBonus;
+            }
+            if (playerArmor && COMBAT_TREASURES[playerArmor.name]) {
+                const effect = COMBAT_TREASURES[playerArmor.name].effect;
+                if (effect.defenseBonus) playerDefense = Math.floor(playerDefense * (1 + effect.defenseBonus));
+                if (effect.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + effect.hpBonus));
+            }
+
+            combatState = {
+                inProgress: true,
+                round: 0,
+                turn: playerSpeed >= opponent.speed ? 'player' : 'opponent',
+                player: {
+                    name: '你',
+                    avatar: '🧑‍🎓',
+                    realm: gameState.realm,
+                    realmName: realmNames[gameState.realm] + '期',
+                    maxHP: playerMaxHP,
+                    hp: playerMaxHP,
+                    attack: playerAttack,
+                    defense: playerDefense,
+                    speed: playerSpeed,
+                    technique: playerTechnique,
+                    techniqueColor: TECHNIQUE_COLORS[playerTechnique],
+                    weapon: playerWeapon ? playerWeapon.name : null,
+                    armor: playerArmor ? playerArmor.name : null,
+                    critRate: playerCritRate
+                },
+                opponent: opponent,
+                log: [],
+                effects: {
+                    player: { defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0 },
+                    opponent: { defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
+                }
+            };
+
+            combatState.log.push({
+                type: 'system',
+                text: `战斗开始！${opponent.name}（${opponent.realmName}，功法：${opponent.technique}）`,
+                round: 0
+            });
+
+            if (combatState.turn === 'opponent') {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // 渲染战斗场景
+        function renderCombatArena() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const pHpPercent = (p.hp / p.maxHP) * 100;
+            const oHpPercent = (o.hp / o.maxHP) * 100;
+            const pHpClass = pHpPercent <= 25 ? 'low' : pHpPercent <= 50 ? 'medium' : '';
+            const oHpClass = oHpPercent <= 25 ? 'low' : oHpPercent <= 50 ? 'medium' : '';
+
+            let html = `
+                <div class="combat-arena">
+                    <div class="combatants">
+                        <div class="combatant player">
+                            <div class="combatant-header">
+                                <span class="combatant-avatar">${p.avatar}</span>
+                                <div class="combatant-info">
+                                    <div class="combatant-name">${p.name}</div>
+                                    <div class="combatant-realm">${p.realmName} | ${p.technique}</div>
+                                </div>
+                            </div>
+                            <div class="combatant-hp-bar">
+                                <div class="combatant-hp-fill ${pHpClass}" style="width:${pHpPercent}%">
+                                    ${p.hp}/${p.maxHP}
+                                </div>
+                            </div>
+                            <div class="combatant-stats">
+                                <span class="combatant-stat"><span class="icon">⚔️</span>${p.attack}</span>
+                                <span class="combatant-stat"><span class="icon">🛡️</span>${p.defense}</span>
+                                <span class="combatant-stat"><span class="icon">💨</span>${p.speed}</span>
+                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
+                            </div>
+                            <div class="combatant-effects">
+                                ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
+                                ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="combatant opponent">
+                            <div class="combatant-header">
+                                <span class="combatant-avatar">${o.avatar}</span>
+                                <div class="combatant-info">
+                                    <div class="combatant-name">${o.name}</div>
+                                    <div class="combatant-realm">${o.realmName} | ${o.technique}</div>
+                                </div>
+                            </div>
+                            <div class="combatant-hp-bar">
+                                <div class="combatant-hp-fill ${oHpClass}" style="width:${oHpPercent}%">
+                                    ${o.hp}/${o.maxHP}
+                                </div>
+                            </div>
+                            <div class="combatant-stats">
+                                <span class="combatant-stat"><span class="icon">⚔️</span>${o.attack}</span>
+                                <span class="combatant-stat"><span class="icon">🛡️</span>${o.defense}</span>
+                                <span class="combatant-stat"><span class="icon">💨</span>${o.speed}</span>
+                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(o.critRate * 100)}%</span>
+                            </div>
+                            <div class="combatant-effects">
+                                ${o.weapon ? `<span class="combat-effect">${o.weapon}</span>` : ''}
+                                ${o.armor ? `<span class="combat-effect">${o.armor}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="combat-log">
+                        <div class="combat-log-title">⚔️ 战斗日志</div>
+                        ${combatState.log.slice(-8).map(entry => `
+                            <div class="combat-log-entry ${entry.type} ${entry.actionType || ''}">${entry.text}</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            if (combatState.turn === 'player' && combatState.inProgress) {
+                html += renderPlayerActions();
+            } else if (!combatState.inProgress) {
+                html += renderCombatResult();
+            } else {
+                html += '<div style="text-align:center;padding:20px;color:#aaa;">对方行动中...</div>';
+            }
+
+            document.getElementById('combatContent').innerHTML = html;
+        }
+
+        // 渲染玩家行动按钮
+        function renderPlayerActions() {
+            return `
+                <div class="combat-actions">
+                    <button class="combat-action-btn attack" onclick="selectCombatAction('attack')">
+                        ⚔️ 攻击
+                    </button>
+                    <button class="combat-action-btn defend" onclick="selectCombatAction('defend')">
+                        🛡️ 防御
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('treasure')">
+                        🔮 法宝
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('pill')">
+                        💊 丹药
+                    </button>
+                    <button class="combat-action-btn escape" onclick="selectCombatAction('escape')">
+                        🏃 逃跑
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('technique')">
+                        📖 功法
+                    </button>
+                </div>
+            `;
+        }
+
+        // 选择战斗行动
+        function selectCombatAction(action) {
+            if (action === 'attack') {
+                executePlayerAttack();
+            } else if (action === 'defend') {
+                executePlayerDefend();
+            } else if (action === 'escape') {
+                executePlayerEscape();
+            } else if (action === 'treasure') {
+                showTreasureMenu();
+            } else if (action === 'pill') {
+                showPillMenu();
+            } else if (action === 'technique') {
+                showTechniqueInfo();
+            }
+        }
+
+        // 显示法宝子菜单
+        function showTreasureMenu() {
+            const availableTreasures = [];
+            for (const item of gameState.inventory) {
+                if (COMBAT_TREASURES[item.name]) {
+                    availableTreasures.push(item);
+                }
+            }
+
+            let html = '<div class="combat-submenu">';
+            if (availableTreasures.length === 0) {
+                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有可用法宝</p>';
+            } else {
+                availableTreasures.forEach(item => {
+                    const treasure = COMBAT_TREASURES[item.name];
+                    html += `
+                        <button class="combat-submenu-btn" onclick="useCombatTreasure('${item.name}')">
+                            ${treasure.icon} ${item.name}
+                            <div style="font-size:0.8em;color:#aaa">${treasure.desc}</div>
+                        </button>
+                    `;
+                });
+            }
+            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // 使用战斗法宝
+        function useCombatTreasure(name) {
+            const treasure = COMBAT_TREASURES[name];
+            if (!treasure) return;
+
+            const idx = gameState.inventory.findIndex(i => i.name === name);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+
+            const effect = treasure.effect;
+            let effectText = '';
+            if (effect.attackBonus) {
+                combatState.effects.player.attackBoost += effect.attackBonus;
+                effectText = `${name}发动！攻击+${Math.round(effect.attackBonus * 100)}%`;
+            } else if (effect.defenseBonus) {
+                combatState.effects.player.defenseBoost += effect.defenseBonus;
+                effectText = `${name}发动！防御+${Math.round(effect.defenseBonus * 100)}%`;
+            } else if (effect.critBonus) {
+                combatState.player.critRate += effect.critBonus;
+                effectText = `${name}发动！暴击率+${Math.round(effect.critBonus * 100)}%`;
+            } else if (effect.hpBonus) {
+                const heal = Math.floor(combatState.player.maxHP * effect.hpBonus);
+                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
+                effectText = `${name}发动！生命+${heal}`;
+            }
+
+            combatState.log.push({ type: 'player-action', text: `你使用了${name}！${effectText}`, round: combatState.round });
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // 显示丹药子菜单
+        function showPillMenu() {
+            let html = '<div class="combat-submenu">';
+            let hasPills = false;
+
+            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
+                if (getItemCount(name) > 0) {
+                    hasPills = true;
+                    html += `
+                        <button class="combat-submenu-btn" onclick="useCombatPill('${name}')">
+                            ${pill.icon} ${name}
+                            <div style="font-size:0.8em;color:#aaa">${pill.desc}</div>
+                        </button>
+                    `;
+                }
+            }
+
+            if (!hasPills) {
+                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有战斗丹药</p>';
+            }
+            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // 使用战斗丹药
+        function useCombatPill(name) {
+            const pill = COMBAT_PILLS[name];
+            if (!pill) return;
+
+            const idx = gameState.inventory.findIndex(i => i.name === name);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+
+            const effect = pill.effect;
+            let effectText = '';
+
+            if (effect.type === 'attackBoost') {
+                combatState.effects.player.attackBoost += effect.value;
+                effectText = `攻击+${Math.round(effect.value * 100)}%`;
+            } else if (effect.type === 'defenseBoost') {
+                combatState.effects.player.defenseBoost += effect.value;
+                effectText = `防御+${Math.round(effect.value * 100)}%`;
+            } else if (effect.type === 'ignoreDefense') {
+                combatState.effects.player.ignoreDefense = true;
+                effectText = '无视对方防御';
+            } else if (effect.type === 'heal') {
+                const heal = Math.floor(combatState.player.maxHP * effect.value);
+                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
+                effectText = `恢复${heal}生命`;
+            }
+
+            combatState.log.push({ type: 'player-action', text: `你服用了${name}！${effectText}`, round: combatState.round });
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // 显示功法信息
+        function showTechniqueInfo() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const myTechnique = p.technique;
+            const oppTechnique = o.technique;
+
+            let克制关系 = '';
+            if (TECHNIQUE_BONUS[myTechnique].beats === oppTechnique) {
+                克制关系 = `你的${myTechnique}克制对方的${oppTechnique}，伤害+50%`;
+            } else if (TECHNIQUE_BONUS[myTechnique].losesTo === oppTechnique) {
+                克制关系 = `对方的${oppTechnique}克制你的${myTechnique}，伤害-30%`;
+            } else {
+                克制关系 = '功法无克制关系';
+            }
+
+            const html = `
+                <div class="combat-submenu">
+                    <div style="grid-column:span 2;text-align:center;padding:20px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                        <p style="color:${p.techniqueColor};font-size:1.2em;margin-bottom:10px;">你的功法：${myTechnique}</p>
+                        <p style="color:${o.techniqueColor};font-size:1.2em;margin-bottom:10px;">对方功法：${oppTechnique}</p>
+                        <p style="color:#ffd700;margin-top:15px;">${克制关系}</p>
+                    </div>
+                    <button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button>
+                </div>
+            `;
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // 执行玩家攻击
+        function executePlayerAttack() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const effects = combatState.effects.player;
+
+            // 清除防御状态
+            effects.defending = false;
+
+            // 计算伤害
+            let baseDamage = p.attack;
+            baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+
+            // 功法相克
+            let techniqueMultiplier = 1;
+            if (TECHNIQUE_BONUS[p.technique].beats === o.technique) {
+                techniqueMultiplier = 1.5;
+                combatState.log.push({ type: 'system', text: `功法克制！伤害+50%`, round: combatState.round });
+            } else if (TECHNIQUE_BONUS[p.technique].losesTo === o.technique) {
+                techniqueMultiplier = 0.7;
+                combatState.log.push({ type: 'system', text: `被功法克制！伤害-30%`, round: combatState.round });
+            }
+            baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+
+            // 防御减伤
+            let finalDamage = baseDamage;
+            if (!effects.ignoreDefense) {
+                const defReduction = effects.defending ? o.defense * 1.5 : o.defense;
+                finalDamage = Math.max(1, baseDamage - defReduction);
+            }
+
+            // 暴击判定
+            const isCrit = Math.random() < p.critRate;
+            if (isCrit) {
+                finalDamage = Math.floor(finalDamage * 1.5);
+                combatState.log.push({ type: 'player-action', actionType: 'critical', text: `💥暴击！`, round: combatState.round });
+            }
+
+            o.hp = Math.max(0, o.hp - finalDamage);
+
+            const techniqueColor = TECHNIQUE_COLORS[p.technique];
+            combatState.log.push({
+                type: 'player-action',
+                actionType: 'damage',
+                text: `你施展<span style="color:${techniqueColor}">${p.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
+                round: combatState.round
+            });
+
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            if (o.hp <= 0) {
+                setTimeout(() => endCombat('win'), 500);
+            } else {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // 执行玩家防御
+        function executePlayerDefend() {
+            combatState.effects.player.defending = true;
+            combatState.log.push({
+                type: 'player-action',
+                text: '你进入防御姿态，下回合受到伤害降低50%',
+                round: combatState.round
+            });
+
+            combatState.turn = 'opponent';
+            renderCombatArena();
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // 执行玩家逃跑
+        function executePlayerEscape() {
+            const escapeChance = 0.4 + gameState.activeEffects.escape;
+            const success = Math.random() < escapeChance;
+
+            if (success) {
+                const cost = Math.floor(gameState.spiritStones * 0.5);
+                gameState.spiritStones -= cost;
+                combatState.log.push({
+                    type: 'system',
+                    text: `逃跑成功！损失${cost}灵石`,
+                    round: combatState.round
+                });
+                combatState.turn = 'opponent';
+                renderCombatArena();
+                setTimeout(() => endCombat('escape'), 500);
+            } else {
+                combatState.log.push({
+                    type: 'system',
+                    text: '逃跑失败！被对方追击',
+                    round: combatState.round
+                });
+                const extraCost = Math.floor(gameState.spiritStones * 0.2);
+                gameState.spiritStones -= extraCost;
+                combatState.log.push({
+                    type: 'system',
+                    text: `被追击！额外损失${extraCost}灵石`,
+                    round: combatState.round
+                });
+                combatState.turn = 'opponent';
+                renderCombatArena();
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // 执行对手回合
+        function executeOpponentTurn() {
+            if (!combatState.inProgress || combatState.opponent.hp <= 0) return;
+
+            combatState.round++;
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const effects = combatState.effects.opponent;
+
+            // 清除防御状态
+            effects.defending = false;
+
+            // 对手AI：随机选择行动
+            const rand = Math.random();
+            let action = 'attack';
+            if (rand < 0.1 && getItemCount('回春丹') > 0 && o.hp < o.maxHP * 0.5) {
+                action = 'heal';
+            }
+
+            if (action === 'heal') {
+                // 使用回春丹
+                const idx = gameState.inventory.findIndex(i => i.name === '回春丹');
+                if (idx !== -1) {
+                    gameState.inventory[idx].quantity--;
+                    if (gameState.inventory[idx].quantity <= 0) {
+                        gameState.inventory.splice(idx, 1);
+                    }
+                }
+                const heal = Math.floor(o.maxHP * 0.3);
+                o.hp = Math.min(o.maxHP, o.hp + heal);
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'heal',
+                    text: `${o.name}使用了回春丹，恢复${heal}生命`,
+                    round: combatState.round
+                });
+            } else {
+                // 攻击
+                let baseDamage = o.attack;
+                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+
+                // 功法相克
+                let techniqueMultiplier = 1;
+                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
+                    techniqueMultiplier = 1.5;
+                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
+                    techniqueMultiplier = 0.7;
+                }
+                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+
+                // 玩家防御减伤
+                let finalDamage = baseDamage;
+                if (combatState.effects.player.defending) {
+                    finalDamage = Math.floor(baseDamage * 0.5);
+                }
+                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * (1 + combatState.effects.player.defenseBoost)));
+
+                // 暴击
+                const isCrit = Math.random() < o.critRate;
+                if (isCrit) {
+                    finalDamage = Math.floor(finalDamage * 1.5);
+                }
+
+                p.hp = Math.max(0, p.hp - finalDamage);
+                combatState.effects.player.defending = false;
+
+                const techniqueColor = TECHNIQUE_COLORS[o.technique];
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'damage',
+                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
+                    round: combatState.round
+                });
+            }
+
+            renderCombatArena();
+
+            if (p.hp <= 0) {
+                setTimeout(() => endCombat('lose'), 500);
+            } else {
+                combatState.turn = 'player';
+                renderCombatArena();
+            }
+        }
+
+        // 结束战斗
+        function endCombat(result) {
+            combatState.inProgress = false;
+            const p = combatState.player;
+            const o = combatState.opponent;
+
+            let reward = 0;
+            let penalty = 0;
+            let honorChange = 0;
+            let fameChange = 0;
+            let realmDropChance = 0;
+
+            if (result === 'win') {
+                reward = Math.floor(o.maxHP * 0.5);
+                gameState.spiritStones += reward;
+                honorChange = 10;
+                fameChange = 5;
+                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
+                gameState.combat.wins++;
+                gameState.combat.honor += honorChange;
+                gameState.combat.fame += fameChange;
+                combatState.log.push({
+                    type: 'system',
+                    text: `🎉 胜利！获得${reward}灵石，荣誉+${honorChange}，声望+${fameChange}`,
+                    round: combatState.round
+                });
+            } else if (result === 'lose') {
+                penalty = Math.floor(gameState.spiritStones * 0.3);
+                gameState.spiritStones -= penalty;
+                honorChange = -5;
+                fameChange = -3;
+                realmDropChance = 0.1;
+                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
+                gameState.combat.losses++;
+                gameState.combat.honor = Math.max(0, gameState.combat.honor + honorChange);
+                gameState.combat.fame = Math.max(0, gameState.combat.fame + fameChange);
+
+                // 境界跌落
+                if (Math.random() < realmDropChance) {
+                    const oldRealm = gameState.realm;
+                    gameState.realm = Math.max(0, gameState.realm - 1);
+                    combatState.log.push({
+                        type: 'system',
+                        text: `💔 境界跌落！从${CONFIG.realms[oldRealm]}期跌落到${CONFIG.realms[gameState.realm]}期`,
+                        round: combatState.round
+                    });
+                }
+
+                // 重伤debuff：3场内属性-20%
+                gameState.combat.injured = true;
+                gameState.combat.injuryEndDay = gameState.days + 3;
+                combatState.log.push({
+                    type: 'system',
+                    text: `💔 重伤！未来3场战斗属性降低20%`,
+                    round: combatState.round
+                });
+
+                combatState.log.push({
+                    type: 'system',
+                    text: `😢 战败！损失${penalty}灵石，荣誉${honorChange}，声望${fameChange}`,
+                    round: combatState.round
+                });
+            }
+
+            // 记录战斗历史
+            gameState.combat.battleHistory = gameState.combat.battleHistory || [];
+            gameState.combat.battleHistory.unshift({
+                opponent: o.name,
+                result: result,
+                reward: reward,
+                penalty: penalty,
+                day: gameState.days
+            });
+            if (gameState.combat.battleHistory.length > 50) {
+                gameState.combat.battleHistory.pop();
+            }
+
+            saveGame();
+            renderCombatArena();
+        }
+
+        // 渲染战斗结果
+        function renderCombatResult() {
+            const result = combatState.opponent.hp <= 0 ? 'win' : (combatState.player.hp <= 0 ? 'lose' : 'escape');
+            const o = combatState.opponent;
+            let reward = 0;
+            let penalty = 0;
+
+            if (result === 'win') {
+                reward = Math.floor(o.maxHP * 0.5);
+            } else if (result === 'lose') {
+                penalty = Math.floor(gameState.spiritStones / 0.7 * 0.3) || Math.floor(gameState.spiritStones * 0.3);
+            }
+
+            const resultTitle = result === 'win' ? '🎉 胜利！' : result === 'lose' ? '💔 战败' : '🏃 逃跑';
+            const resultClass = result === 'win' ? 'win' : result === 'lose' ? 'lose' : 'escape';
+
+            return `
+                <div class="combat-result ${resultClass}">
+                    <h2>${resultTitle}</h2>
+                    <div class="combat-result-stats">
+                        <div class="combat-result-stat">
+                            <div class="value">${combatState.round}</div>
+                            <div class="label">回合数</div>
+                        </div>
+                        <div class="combat-result-stat">
+                            <div class="value" style="color:${result === 'win' ? '#4caf50' : '#ff6666'}">${result === 'win' ? '+' + reward : '-' + penalty}</div>
+                            <div class="label">灵石</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-combat" onclick="renderCombatHome()" style="margin-top:20px;">返回斗法界面</button>
+                    <button class="close-btn" onclick="closeCombat()">关闭</button>
+                </div>
+            `;
         }
     </script>
 </body>
