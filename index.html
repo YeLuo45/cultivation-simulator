@@ -2807,8 +2807,8 @@
                 minRealm: 2, // 金丹及以上
                 condition: (state) => !state.constitutions.find(c => c.type === '至尊骨'),
                 effect: (state) => {
-                    acquireConstitutionFromSerendipity('至尊骨');
-                    return { title: '天赐体质·至尊骨', text: '天降祥瑞，你获得了传说中的至尊骨！', effects: [{ type: '至尊骨', value: 1, positive: true }] };
+                    state.serendipity.currentEvent = { type: '天赐体质·至尊骨', inProgress: true, choices: ['接受完整传承', '只取部分精华'] };
+                    return { title: '天赐体质·至尊骨', text: '异象降世！骨如金铁，光耀万里……你可否愿接受完整传承？', effects: [], showChoice: true };
                 }
             },
             '天赐体质·疾风灵体': {
@@ -2817,8 +2817,8 @@
                 minRealm: 1, // 筑基及以上
                 condition: (state) => !state.constitutions.find(c => c.type === '疾风灵体'),
                 effect: (state) => {
-                    acquireConstitutionFromSerendipity('疾风灵体');
-                    return { title: '天赐体质·疾风灵体', text: '风之精灵与你结缘，你获得了疾风灵体！', effects: [{ type: '疾风灵体', value: 1, positive: true }] };
+                    state.serendipity.currentEvent = { type: '天赐体质·疾风灵体', inProgress: true, choices: ['与风融为一体', '保持自我意识'] };
+                    return { title: '天赐体质·疾风灵体', text: '风之精灵感应你的存在……与风融为一体可获完整灵体，但需冒风险。', effects: [], showChoice: true };
                 }
             },
             '天赐体质·重瞳': {
@@ -2827,8 +2827,8 @@
                 minRealm: 3, // 元婴及以上
                 condition: (state) => !state.constitutions.find(c => c.type === '重瞳'),
                 effect: (state) => {
-                    acquireConstitutionFromSerendipity('重瞳');
-                    return { title: '天赐体质·重瞳', text: '异象降临，你的双眼化为重瞳！', effects: [{ type: '重瞳', value: 1, positive: true }] };
+                    state.serendipity.currentEvent = { type: '天赐体质·重瞳', inProgress: true, choices: ['承受重瞳试炼', '以凡眼视之'] };
+                    return { title: '天赐体质·重瞳', text: '天道震怒！重瞳降临将开启你的天眼……试炼凶险，但成功后可看透万物本质。', effects: [], showChoice: true };
                 }
             },
             // 负面奇遇
@@ -2920,6 +2920,35 @@
                 effect: (state) => {
                     state.serendipity.currentEvent = { type: '散修求助', inProgress: true, choices: ['帮助', '不帮'] };
                     return { title: '散修求助', text: '一位散修请求你帮忙，你会帮助吗？', effects: [] };
+                }
+            },
+            // B1 扩充奇遇
+            '天地精华': {
+                type: 'positive',
+                icon: '🌟',
+                minRealm: 0,
+                effect: (state) => {
+                    const qiGain = Math.floor(state.maxQi * 0.5);
+                    state.qi = Math.min(state.maxQi, state.qi + qiGain);
+                    return { title: '天地精华', text: `吸收天地精华，灵气+${qiGain}！`, effects: [{ type: '灵气', value: qiGain, positive: true }] };
+                }
+            },
+            '心魔试炼': {
+                type: 'negative',
+                icon: '👹',
+                minRealm: 1, // 筑基及以上
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '心魔试炼', inProgress: true, choices: ['勇敢面对', '退缩'] };
+                    return { title: '心魔试炼', text: '识海中浮现心魔化身！你要直面还是退缩？', effects: [], showChoice: true };
+                }
+            },
+            '上古遗迹': {
+                type: 'neutral',
+                icon: '🏛️',
+                minRealm: 2, // 金丹及以上
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '上古遗迹', inProgress: true, choices: ['深入探索', '浅尝辄止', '离开'] };
+                    return { title: '上古遗迹', text: '发现一处上古遗迹，灵气浓郁！如何行动？', effects: [], showChoice: true };
                 }
             }
         };
@@ -7972,14 +8001,15 @@
                 `;
             }
 
-            // 选择类奇遇
-            if (result.showChoice) {
-                html += `
-                    <div style="text-align:center;margin-top:15px;">
-                        <button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', true)">接受</button>
-                        <button class="btn btn-new" onclick="handleSerendipityChoice('${name}', false)" style="margin-left:10px;">拒绝</button>
-                    </div>
-                `;
+            // 选择类奇遇（支持多个选项）
+            if (result.showChoice && result.choices && result.choices.length > 0) {
+                const choiceLabels = { 0: '接受', 1: '拒绝' };
+                html += `<div style="text-align:center;margin-top:15px;">`;
+                result.choices.forEach((label, idx) => {
+                    const btnLabel = choiceLabels[idx] || label;
+                    html += `<button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', ${idx})" style="margin-left:${idx > 0 ? '8px' : '0'}">${btnLabel}</button>`;
+                });
+                html += `</div>`;
             }
 
             content.innerHTML = html;
@@ -7989,12 +8019,12 @@
             addLog(event.type === 'positive' ? 'good' : event.type === 'negative' ? 'bad' : 'neutral', name, result.text);
         }
 
-        // 处理奇遇选择
-        function handleSerendipityChoice(name, accept) {
+        // 处理奇遇选择（idx: 0=接受/选项1, 1=拒绝/选项2, 2=选项3）
+        function handleSerendipityChoice(name, idx) {
             closeSerendipityModal();
 
             if (name === '乞丐讨缘') {
-                if (accept) {
+                if (idx === 0) {
                     gameState.spiritStones -= 100;
                     gameState.serendipity.luckStatus = 'lucky';
                     gameState.serendipity.luckEndDay = gameState.days + 3;
@@ -8004,7 +8034,7 @@
                     addLog('bad', '乞丐讨缘', '拒绝施舍，运气下降');
                 }
             } else if (name === '散修求助') {
-                if (accept) {
+                if (idx === 0) {
                     gameState.spiritStones -= 200;
                     gameState.serendipity.serendipityBoostEndDay = gameState.days + 3;
                     gameState.activeEffects.serendipity_boost = 0.10;
@@ -8013,7 +8043,7 @@
                     addLog('neutral', '散修求助', '拒绝帮助，无影响');
                 }
             } else if (name === '魔器诱惑') {
-                if (accept) {
+                if (idx === 0) {
                     // 添加魔器到背包
                     addToInventory('treasure', '魔刃', 1, 'rare',
                         { type: 'attack', value: 0.3 },
@@ -8021,6 +8051,92 @@
                     addLog('bad', '魔器诱惑', '获得魔刃，但每回合扣5灵气');
                 } else {
                     addLog('good', '魔器诱惑', '拒绝魔器诱惑');
+                }
+            } else if (name === '心魔试炼') {
+                if (idx === 0) {
+                    // 勇敢面对：心境判定，胜利则大收益，失败则扣心境
+                    const mindCheck = Math.random() < (gameState.mindset / 100);
+                    if (mindCheck) {
+                        const gain = 20;
+                        gameState.mindset = Math.min(100, gameState.mindset + gain);
+                        addLog('good', '心魔试炼', `击败心魔，心境+${gain}！`);
+                    } else {
+                        const loss = 15;
+                        gameState.mindset = Math.max(0, gameState.mindset - loss);
+                        addLog('bad', '心魔试炼', `心魔反噬，心境-${loss}`);
+                    }
+                } else {
+                    // 退缩：无事发生，但浪费一次奇遇
+                    addLog('neutral', '心魔试炼', '退缩逃避，无事发生');
+                }
+            } else if (name === '上古遗迹') {
+                if (idx === 0) {
+                    // 深入探索：70%获得大量灵石/功法，30%遇险
+                    if (Math.random() < 0.7) {
+                        const reward = Math.random() < 0.5
+                            ? { type: 'spiritStones', value: Math.floor(2000 + Math.random() * 3000) }
+                            : { type: 'technique', value: 1 };
+                        if (reward.type === 'spiritStones') {
+                            gameState.spiritStones += reward.value;
+                            addLog('good', '上古遗迹', `深入探索成功，获得 ${reward.value} 灵石！`);
+                        } else {
+                            addLog('good', '上古遗迹', '深入探索成功，获得上古功法传承！');
+                        }
+                    } else {
+                        const loss = Math.floor(gameState.spiritStones * 0.2);
+                        gameState.spiritStones -= loss;
+                        addLog('bad', '上古遗迹', `触发机关陷阱，损失 ${loss} 灵石！`);
+                    }
+                } else if (idx === 1) {
+                    // 浅尝辄止：稳定小收益
+                    const gain = Math.floor(500 + Math.random() * 500);
+                    gameState.spiritStones += gain;
+                    addLog('good', '上古遗迹', `浅尝辄止，稳定获得 ${gain} 灵石`);
+                } else {
+                    // 离开
+                    addLog('neutral', '上古遗迹', '谨慎离开，无事发生');
+                }
+            } else if (name === '天赐体质·至尊骨') {
+                if (idx === 0) {
+                    // 接受完整传承
+                    acquireConstitutionFromSerendipity('至尊骨');
+                    addLog('good', '至尊骨', '接受完整传承，获得至尊骨！攻击+30%，暴击+15%');
+                } else {
+                    // 只取部分精华
+                    acquireConstitutionFromSerendipity('至尊骨');
+                    gameState.activeEffects.attack += 0.15;
+                    addLog('good', '至尊骨', '只取精华，获得弱化版至尊骨：攻击+15%');
+                }
+            } else if (name === '天赐体质·疾风灵体') {
+                if (idx === 0) {
+                    // 与风融为一体：70%成功获完整灵体，30%失败获部分
+                    if (Math.random() < 0.7) {
+                        acquireConstitutionFromSerendipity('疾风灵体');
+                        addLog('good', '疾风灵体', '与风融为一体，成功获得疾风灵体！速度+35%，先手+25%');
+                    } else {
+                        acquireConstitutionFromSerendipity('疾风灵体');
+                        gameState.activeEffects.cultivate_speed += 0.1;
+                        addLog('neutral', '疾风灵体', '融合不完全，获得弱化版：修炼速度+10%');
+                    }
+                } else {
+                    // 保持自我：获得部分buff
+                    acquireConstitutionFromSerendipity('疾风灵体');
+                    addLog('good', '疾风灵体', '保持自我，获得疾风灵体！');
+                }
+            } else if (name === '天赐体质·重瞳') {
+                if (idx === 0) {
+                    // 承受试炼：60%成功获完整重瞳，40%失败仅获感知
+                    if (Math.random() < 0.6) {
+                        acquireConstitutionFromSerendipity('重瞳');
+                        addLog('good', '重瞳', '试炼成功！获得重瞳：闪避+20%，可预判攻击');
+                    } else {
+                        acquireConstitutionFromSerendipity('重瞳');
+                        gameState.activeEffects.defense += 0.1;
+                        addLog('neutral', '重瞳', '试炼失败，仅获得部分感知：防御+10%');
+                    }
+                } else {
+                    // 以凡眼视之：无事发生
+                    addLog('neutral', '重瞳', '放弃试炼，重瞳消散……');
                 }
             }
 
