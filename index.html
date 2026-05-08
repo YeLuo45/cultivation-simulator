@@ -2503,35 +2503,21 @@
                         <div class="form-group">
                             <label>API Key</label>
                             <input type="password" id="settingsApiKey" class="settings-input" placeholder="输入 MiniMax API Key">
-                            <div class="hint">用于调用MiniMax大模型API</div>
-                            <div id="apiKeyTestResult" class="test-result"></div>
+                            <div class="hint">用于调用MiniMax大模型API（Token Plan Key）</div>
                         </div>
                         <div class="form-group">
                             <label>Base URL</label>
-                            <div style="display: flex; align-items: center;">
-                                <input type="text" id="settingsBaseUrl" class="settings-input" placeholder="https://api.minimaxi.com/v1" style="flex: 1;">
-                                <button class="test-btn" onclick="testApiConfig('baseUrl')">测试</button>
-                            </div>
-                            <div class="hint">API基础地址，默认: https://api.minimaxi.com/v1</div>
-                            <div id="baseUrlTestResult" class="test-result"></div>
+                            <input type="text" id="settingsBaseUrl" class="settings-input" placeholder="https://api.minimaxi.com/v1">
+                            <div class="hint">API地址，默认: https://api.minimaxi.com/v1</div>
                         </div>
                         <div class="form-group">
                             <label>Model</label>
-                            <div style="display: flex; align-items: center;">
-                                <input type="text" id="settingsModel" class="settings-input" placeholder="输入 Model 名称，如 MiniMax-M2.7" style="flex: 1;">
-                                <button class="test-btn" onclick="testApiConfig('model')">测试</button>
-                            </div>
-                            <div class="hint">手动输入模型名称</div>
-                            <div id="modelTestResult" class="test-result"></div>
+                            <input type="text" id="settingsModel" class="settings-input" placeholder="MiniMax-M2.7" value="MiniMax-M2.7">
+                            <div class="hint">模型名称，默认 MiniMax-M2.7</div>
                         </div>
                         <div class="form-group">
-                            <label>API Group ID</label>
-                            <div style="display: flex; align-items: center;">
-                                <input type="text" id="settingsGroupId" class="settings-input" placeholder="输入 Group ID">
-                                <button class="test-btn" onclick="testApiConfig('groupId')">测试</button>
-                            </div>
-                            <div class="hint">MiniMax Group ID（可选）</div>
-                            <div id="groupIdTestResult" class="test-result"></div>
+                            <button class="test-btn" onclick="testApiConfig()">测试连接</button>
+                            <div id="apiKeyTestResult" class="test-result"></div>
                         </div>
                     </div>
                     <!-- 功能开关 -->
@@ -3200,7 +3186,6 @@
             document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
             document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
             document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-M2.7';
-            document.getElementById('settingsGroupId').value = miniMaxConfig.groupId || '';
             document.getElementById('featureAiDialogue').checked = miniMaxConfig.features.aiDialogue || false;
             document.getElementById('featureAiSerendipity').checked = miniMaxConfig.features.aiSerendipity || false;
             document.getElementById('featureAiTechnique').checked = miniMaxConfig.features.aiTechnique || false;
@@ -3233,7 +3218,6 @@
             miniMaxConfig.apiKey = document.getElementById('settingsApiKey').value.trim();
             miniMaxConfig.baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimaxi.com/v1';
             miniMaxConfig.model = document.getElementById('settingsModel').value.trim() || 'MiniMax-M2.7';
-            miniMaxConfig.groupId = document.getElementById('settingsGroupId').value.trim();
             miniMaxConfig.features.aiDialogue = document.getElementById('featureAiDialogue').checked;
             miniMaxConfig.features.aiSerendipity = document.getElementById('featureAiSerendipity').checked;
             miniMaxConfig.features.aiTechnique = document.getElementById('featureAiTechnique').checked;
@@ -3253,7 +3237,6 @@
             document.getElementById('settingsApiKey').value = '';
             document.getElementById('settingsBaseUrl').value = DEFAULT_MINIMAX_CONFIG.baseUrl;
             document.getElementById('settingsModel').value = DEFAULT_MINIMAX_CONFIG.model;
-            document.getElementById('settingsGroupId').value = '';
             document.getElementById('featureAiDialogue').checked = false;
             document.getElementById('featureAiSerendipity').checked = false;
             document.getElementById('featureAiTechnique').checked = false;
@@ -3266,55 +3249,51 @@
         }
 
         // 测试API配置
-        async function testApiConfig(type) {
-            const resultEl = document.getElementById(`${type}TestResult`);
-            resultEl.className = 'test-result';
-            resultEl.style.display = 'block';
-            resultEl.textContent = '测试中...';
-            
+        async function testApiConfig() {
             const apiKey = document.getElementById('settingsApiKey').value.trim();
-            const baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimax.chat';
-            const model = document.getElementById('settingsModel').value;
-            const groupId = document.getElementById('settingsGroupId').value.trim();
-            
-            // 简单的连通性测试
+            const baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimaxi.com/v1';
+            const model = document.getElementById('settingsModel').value.trim() || 'MiniMax-M2.7';
+
+            if (!apiKey) {
+                document.getElementById('apiKeyTestResult').textContent = '✗ 请先填写API Key';
+                document.getElementById('apiKeyTestResult').className = 'test-result error';
+                document.getElementById('apiKeyTestResult').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('apiKeyTestResult').textContent = '测试中...';
+            document.getElementById('apiKeyTestResult').className = 'test-result';
+            document.getElementById('apiKeyTestResult').style.display = 'block';
+
             try {
                 const startTime = Date.now();
-                
-                if (type === 'baseUrl') {
-                    // 测试URL是否可达
-                    const response = await fetch(baseUrl, {
-                        method: 'HEAD',
-                        mode: 'no-cors'
-                    });
-                    const elapsed = Date.now() - startTime;
-                    resultEl.className = 'test-result success';
-                    resultEl.textContent = `✓ 连接成功 (${elapsed}ms)`;
-                } else if (type === 'model') {
-                    // 模型输入只验证非空
-                    if (model && model.trim()) {
-                        resultEl.className = 'test-result success';
-                        resultEl.textContent = `✓ 模型已设置: ${model}`;
-                    } else {
-                        resultEl.className = 'test-result error';
-                        resultEl.textContent = `✗ 请输入模型名称`;
-                    }
-                } else if (type === 'apiKey' || type === 'groupId') {
-                    // 需要实际API调用的测试，这里做简化处理
-                    if (type === 'apiKey' && apiKey) {
-                        resultEl.className = 'test-result success';
-                        resultEl.textContent = '✓ API Key格式正确（实际连接测试需保存后进行）';
-                    } else if (type === 'groupId') {
-                        resultEl.className = 'test-result success';
-                        resultEl.textContent = '✓ Group ID已记录（可不填写）';
-                    } else {
-                        resultEl.className = 'test-result error';
-                        resultEl.textContent = '✗ 请先填写必填项';
-                    }
+                const response = await fetch(`${baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        max_tokens: 20,
+                        temperature: 0.8,
+                        messages: [{ role: "user", content: "hi" }]
+                    })
+                });
+
+                const elapsed = Date.now() - startTime;
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('apiKeyTestResult').className = 'test-result success';
+                    document.getElementById('apiKeyTestResult').textContent = `✓ 连接成功 (${elapsed}ms)`;
+                } else {
+                    document.getElementById('apiKeyTestResult').className = 'test-result error';
+                    document.getElementById('apiKeyTestResult').textContent = `✗ ${data.base_resp?.status_msg || data.error?.message || '请求失败'}`;
                 }
             } catch (error) {
-                resultEl.className = 'test-result error';
-                resultEl.textContent = `✗ 连接失败: ${error.message}`;
+                document.getElementById('apiKeyTestResult').className = 'test-result error';
+                document.getElementById('apiKeyTestResult').textContent = `✗ ${error.message}`;
             }
         }
 
@@ -5302,7 +5281,7 @@
             if (apiConfig.apiKey) {
                 try {
                     const prompt = `描述一次${craftType}过程，物品名称是${name}，用50-80字描述${craftType}时的情景，包括火候、灵气变化等。`;
-                    const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
+                    const response = await fetch(`${CONFIG.apiUrl}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
