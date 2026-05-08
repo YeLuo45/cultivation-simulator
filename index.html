@@ -1519,6 +1519,193 @@
             background: rgba(100, 181, 246, 0.3);
             color: #64b5f6;
         }
+        
+        /* V7 灵根/体质系统样式 */
+        .spirit-root-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: rgba(138, 43, 226, 0.2);
+            border-radius: 20px;
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .spirit-root-display:hover {
+            background: rgba(138, 43, 226, 0.4);
+            transform: translateY(-2px);
+        }
+        .spirit-root-icon { font-size: 1.2em; }
+        .spirit-root-name { font-weight: bold; color: #dda0dd; }
+        .spirit-root-name.grade-0 { color: #888; }
+        .spirit-root-name.grade-1 { color: #ffffff; }
+        .spirit-root-name.grade-2 { color: #64b5f6; }
+        .spirit-root-name.grade-3 { color: #ba68c8; }
+        .spirit-root-name.grade-4 { color: #ffd700; }
+        .spirit-root-name.grade-5 { color: #ff6b6b; text-shadow: 0 0 10px rgba(255, 107, 107, 0.5); }
+        
+        .constitution-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .constitution-display:hover {
+            background: rgba(255, 215, 0, 0.2);
+        }
+        .constitution-display.has-constitution {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+        .constitution-icon { font-size: 1.2em; }
+        .constitution-name { font-weight: bold; color: #ffd700; }
+        .constitution-count { font-size: 0.8em; color: #aaa; }
+        
+        .five-elements-bar {
+            display: flex;
+            gap: 3px;
+            margin-top: 5px;
+        }
+        .element-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        .element-dot:hover { transform: scale(1.3); }
+        .element-dot.metal { background: #ffd700; }
+        .element-dot.wood { background: #4caf50; }
+        .element-dot.water { background: #2196f3; }
+        .element-dot.fire { background: #f44336; }
+        .element-dot.earth { background: #795548; }
+        
+        /* 灵根/体质模态框 */
+        .spirit-root-modal .modal-content {
+            max-width: 700px;
+        }
+        .sr-header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3));
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .sr-quality {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .sr-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .sr-stat {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .sr-stat-value { font-size: 1.5em; font-weight: bold; color: #ffd700; }
+        .sr-stat-label { font-size: 0.85em; color: #aaa; margin-top: 5px; }
+        .sr-stat-bonus { color: #4caf50; font-size: 0.9em; }
+        
+        .sr-section {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .sr-section-title {
+            color: #ffd700;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .five-elements-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+        .element-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .element-icon { font-size: 1.5em; margin-bottom: 5px; }
+        .element-name { font-size: 0.85em; color: #aaa; }
+        .element-value { font-size: 1.2em; font-weight: bold; color: #ffd700; }
+        .element-value.high { color: #4caf50; }
+        
+        .constitutions-list {
+            display: grid;
+            gap: 10px;
+        }
+        .constitution-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+        }
+        .constitution-card.inactive {
+            opacity: 0.5;
+            border-left-color: #666;
+        }
+        .constitution-card .icon { font-size: 2em; }
+        .constitution-card .info { flex: 1; }
+        .constitution-card .name { font-weight: bold; color: #ffd700; margin-bottom: 5px; }
+        .constitution-card .effect { font-size: 0.9em; color: #aaa; }
+        .constitution-card .source { font-size: 0.8em; color: #888; }
+        .constitution-card .status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+        }
+        .constitution-card .status.active { background: rgba(76, 175, 80, 0.3); color: #4caf50; }
+        .constitution-card .status.inactive { background: rgba(100, 100, 100, 0.3); color: #888; }
+        
+        .sr-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .btn-refresh-sr {
+            background: linear-gradient(135deg, #7b1fa2, #ba68c8);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .btn-refresh-sr:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(123, 31, 162, 0.4); }
+        .btn-refresh-sr:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .sr-tips {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        .sr-tips h4 { color: #ffd700; margin-bottom: 10px; }
+        .sr-tips ul { margin: 0; padding-left: 20px; color: #aaa; font-size: 0.9em; }
+        .sr-tips li { margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -1552,6 +1739,26 @@
             <div class="stat-item">
                 <div class="stat-label">游戏天数</div>
                 <div class="stat-value days" id="daysDisplay">1</div>
+            </div>
+            <div class="stat-item">
+                <div class="spirit-root-display" id="spiritRootDisplay" onclick="openSpiritRootModal()">
+                    <span class="spirit-root-icon">🌱</span>
+                    <span class="spirit-root-name grade-1" id="spiritRootName">中品灵根</span>
+                </div>
+                <div class="five-elements-bar" id="fiveElementsBar">
+                    <span class="element-dot metal" id="elementMetal" title="金: 0%"></span>
+                    <span class="element-dot wood" id="elementWood" title="木: 0%"></span>
+                    <span class="element-dot water" id="elementWater" title="水: 0%"></span>
+                    <span class="element-dot fire" id="elementFire" title="火: 0%"></span>
+                    <span class="element-dot earth" id="elementEarth" title="土: 0%"></span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="constitution-display" id="constitutionDisplay" onclick="openSpiritRootModal()">
+                    <span class="constitution-icon" id="constitutionIcon">⚗️</span>
+                    <span class="constitution-name" id="constitutionName">无体质</span>
+                    <span class="constitution-count" id="constitutionCount">(0/2)</span>
+                </div>
             </div>
         </div>
 
@@ -1700,7 +1907,16 @@
         </div>
     </div>
 
-    <!-- V6 奇遇系统模态框 -->
+    <!-- V7 灵根/体质模态框 -->
+    <div id="spiritRootModal" class="modal spirit-root-modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🌟 灵根与体质 🌟</h2>
+            <div id="spiritRootContent"></div>
+            <button class="close-btn" onclick="closeSpiritRootModal()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 奇遇模态框 -->
     <div id="serendipityModal" class="modal">
         <div class="modal-content">
             <h2 class="modal-title" id="serendipityTitle">✨ 奇遇降临 ✨</h2>
@@ -1902,6 +2118,37 @@
                     return { title: '顿悟', text: '修炼中顿悟，获得10000灵石！', effects: [{ type: '灵石', value: 10000, positive: true }] };
                 }
             },
+            // V7 体质相关奇遇
+            '天赐体质·至尊骨': {
+                type: 'positive',
+                icon: '🦴',
+                minRealm: 2, // 金丹及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '至尊骨'),
+                effect: (state) => {
+                    acquireConstitutionFromSerendipity('至尊骨');
+                    return { title: '天赐体质·至尊骨', text: '天降祥瑞，你获得了传说中的至尊骨！', effects: [{ type: '至尊骨', value: 1, positive: true }] };
+                }
+            },
+            '天赐体质·疾风灵体': {
+                type: 'positive',
+                icon: '💨',
+                minRealm: 1, // 筑基及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '疾风灵体'),
+                effect: (state) => {
+                    acquireConstitutionFromSerendipity('疾风灵体');
+                    return { title: '天赐体质·疾风灵体', text: '风之精灵与你结缘，你获得了疾风灵体！', effects: [{ type: '疾风灵体', value: 1, positive: true }] };
+                }
+            },
+            '天赐体质·重瞳': {
+                type: 'positive',
+                icon: '👁️',
+                minRealm: 3, // 元婴及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '重瞳'),
+                effect: (state) => {
+                    acquireConstitutionFromSerendipity('重瞳');
+                    return { title: '天赐体质·重瞳', text: '异象降临，你的双眼化为重瞳！', effects: [{ type: '重瞳', value: 1, positive: true }] };
+                }
+            },
             // 负面奇遇
             '心魔入侵': {
                 type: 'negative',
@@ -2003,6 +2250,96 @@
             '还童丹': { type: 'consumable', effect: { type: 'convert_demon', value: 1 }, duration: 0, price: 5000, desc: '将魔器转换为正常法宝', icon: '💊' }
         };
 
+        // ========== V7 灵根/体质系统数据 ==========
+        
+        // 灵根品质定义
+        const SPIRIT_ROOT_QUALITIES = {
+            '伪灵根': { grade: 0, icon: '🌱', speedBonus: 0.6, bottleneckBonus: 0.4, tribulationBonus: -0.2, weight: 35 },
+            '下品灵根': { grade: 1, icon: '🌿', speedBonus: 0.8, bottleneckBonus: 0.2, tribulationBonus: -0.1, weight: 25 },
+            '中品灵根': { grade: 2, icon: '🌳', speedBonus: 1.0, bottleneckBonus: 0, tribulationBonus: 0, weight: 20 },
+            '上品灵根': { grade: 3, icon: '🌲', speedBonus: 1.3, bottleneckBonus: -0.15, tribulationBonus: 0.1, weight: 12 },
+            '天灵根': { grade: 4, icon: '✨', speedBonus: 1.6, bottleneckBonus: -0.25, tribulationBonus: 0.2, weight: 6 },
+            '混沌灵根': { grade: 5, icon: '🌈', speedBonus: 2.0, bottleneckBonus: -0.4, tribulationBonus: 0.3, weight: 2 }
+        };
+        
+        // 五行功法定义
+        const FIVE_ELEMENT_TECHNIQUES = {
+            '金': { name: '庚金剑诀', icon: '⚔️', bonusType: 'attack', bonusValue: 0.25, threshold: 20 },
+            '木': { name: '青木长生诀', icon: '🌿', bonusType: 'heal', bonusValue: 0.5, threshold: 20 },
+            '水': { name: '玄冰寒咒', icon: '❄️', bonusType: 'defense', bonusValue: 0.2, threshold: 20 },
+            '火': { name: '烈焰真经', icon: '🔥', bonusType: 'attack', bonusValue: 0.2, threshold: 20 },
+            '土': { name: '厚土玄功', icon: '🛡️', bonusType: 'resist', bonusValue: 0.25, threshold: 20 }
+        };
+        
+        // 体质定义
+        const CONSTITUTIONS = {
+            '先天道体': {
+                icon: '👼',
+                desc: '全属性+20%，修炼速度+50%',
+                effect: { allStats: 0.2, cultivateSpeed: 0.5 },
+                trigger: (state) => state.spiritRoot.quality === '混沌灵根' && state.realm >= 3,
+                source: '混沌灵根突破元婴'
+            },
+            '至尊骨': {
+                icon: '🦴',
+                desc: '攻击+30%，战斗中暴击+15%',
+                effect: { attack: 0.3, crit: 0.15 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            },
+            '琉璃玉体': {
+                icon: '💎',
+                desc: '防御+25%，受到伤害-15%',
+                effect: { defense: 0.25, damageReduce: 0.15 },
+                trigger: (state) => {
+                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
+                    return grade >= 2 && state.realm === 2 && state.cultivationProgress >= REALM_REQUIREMENTS[2].stageThreshold[2];
+                },
+                source: '中品以上灵根突破金丹'
+            },
+            '玄冥之体': {
+                icon: '🌊',
+                desc: '水系功法伤害+40%，水系抗性+50%',
+                effect: { waterBonus: 0.4, waterResist: 0.5 },
+                trigger: (state) => state.spiritRoot.affinity.water >= 80,
+                source: '水属性亲和≥80'
+            },
+            '烈焰战体': {
+                icon: '🔥',
+                desc: '火系功法伤害+40%，生命上限+20%',
+                effect: { fireBonus: 0.4, hpBonus: 0.2 },
+                trigger: (state) => state.spiritRoot.affinity.fire >= 80,
+                source: '火属性亲和≥80'
+            },
+            '疾风灵体': {
+                icon: '💨',
+                desc: '速度+35%，先手概率+25%',
+                effect: { speed: 0.35, firstStrike: 0.25 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            },
+            '不灭金身': {
+                icon: '🛡️',
+                desc: '免疫一次致命伤害，每日1次',
+                effect: { lethalImmune: 1 },
+                trigger: (state) => {
+                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
+                    return grade >= 3 && state.realm === 4 && state.cultivationProgress >= REALM_REQUIREMENTS[4].stageThreshold[2];
+                },
+                source: '上品以上灵根突破化神'
+            },
+            '重瞳': {
+                icon: '👁️',
+                desc: '可预判敌人攻击，闪避+20%',
+                effect: { dodge: 0.2, foresee: 1 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            }
+        };
+        
+        // 五行亲和阈值（用于显示高加成）
+        const ELEMENT_HIGH_THRESHOLD = 50;
+
         // 游戏状态
         let gameState = {
             realm: 0,       // 0-4 对应 炼气到化神
@@ -2087,7 +2424,15 @@
                 luckStatus: null,
                 luckEndDay: 0,
                 serendipityBoostEndDay: 0
-            }
+            },
+            // V7 灵根/体质系统字段
+            spiritRoot: {
+                quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
+                affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+                resonance: 0,
+                lastRefreshDay: 0
+            },
+            constitutions: [] // 已获得的体质
         };
 
         // 每个境界需要的灵气和进度阈值
@@ -2209,7 +2554,10 @@
                     luckStatus: null,
                     luckEndDay: 0,
                     serendipityBoostEndDay: 0
-                }
+                },
+                // V7 灵根/体质系统
+                spiritRoot: generateRandomSpiritRoot(),
+                constitutions: []
             };
             saveGame();
             showGameUI();
@@ -2289,12 +2637,17 @@
                         luckStatus: null,
                         luckEndDay: 0,
                         serendipityBoostEndDay: 0
-                    }
+                    },
+                    // V7 灵根/体质系统
+                    spiritRoot: loaded.spiritRoot || generateRandomSpiritRoot(),
+                    constitutions: loaded.constitutions || []
                 };
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
                 }
+                // 初始化体质效果
+                initializeConstitutionEffects();
                 // 重新计算装备效果
                 recalculateAllEffects();
                 if (gameState.isGameOver) {
@@ -2376,6 +2729,453 @@
             
             document.getElementById('cultivationBar').style.width = `${percentage}%`;
             document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
+            
+            // V7 更新灵根显示
+            updateSpiritRootDisplay();
+        }
+
+        // ========== V7 灵根/体质系统函数 ==========
+        
+        // 生成随机灵根
+        function generateRandomSpiritRoot() {
+            const rand = Math.random() * 100;
+            let cumulative = 0;
+            let selectedQuality = '中品灵根';
+            
+            for (const [quality, data] of Object.entries(SPIRIT_ROOT_QUALITIES)) {
+                cumulative += data.weight;
+                if (rand < cumulative) {
+                    selectedQuality = quality;
+                    break;
+                }
+            }
+            
+            // 生成随机五行亲和
+            const affinity = {
+                metal: Math.floor(Math.random() * 40) + 10,
+                wood: Math.floor(Math.random() * 40) + 10,
+                water: Math.floor(Math.random() * 40) + 10,
+                fire: Math.floor(Math.random() * 40) + 10,
+                earth: Math.floor(Math.random() * 40) + 10
+            };
+            
+            // 计算总点数并归一化
+            const total = affinity.metal + affinity.wood + affinity.water + affinity.fire + affinity.earth;
+            const scale = 100 / total;
+            for (const el in affinity) {
+                affinity[el] = Math.floor(affinity[el] * scale);
+            }
+            
+            // 随机共鸣度 0-10
+            const resonance = Math.floor(Math.random() * 11);
+            
+            return {
+                quality: selectedQuality,
+                affinity: affinity,
+                resonance: resonance,
+                lastRefreshDay: 0
+            };
+        }
+        
+        // 计算灵根修炼速度加成
+        function getSpiritRootSpeedBonus() {
+            const quality = gameState.spiritRoot.quality;
+            return SPIRIT_ROOT_QUALITIES[quality].speedBonus;
+        }
+        
+        // 计算灵根瓶颈加成（降低瓶颈概率）
+        function getSpiritRootBottleneckBonus() {
+            const quality = gameState.spiritRoot.quality;
+            return SPIRIT_ROOT_QUALITIES[quality].bottleneckBonus;
+        }
+        
+        // 计算灵根渡劫加成
+        function getSpiritRootTribulationBonus() {
+            const quality = gameState.spiritRoot.quality;
+            return SPIRIT_ROOT_QUALITIES[quality].tribulationBonus;
+        }
+        
+        // 计算五行功法加成
+        function getFiveElementBonus(element) {
+            const affinity = gameState.spiritRoot.affinity[element.toLowerCase()];
+            if (!affinity) return 0;
+            
+            const tech = FIVE_ELEMENT_TECHNIQUES[element];
+            if (!tech) return 0;
+            
+            if (affinity >= tech.threshold) {
+                return tech.bonusValue;
+            }
+            return 0;
+        }
+        
+        // 获取最高加成五行
+        function getHighestElementBonus() {
+            let best = null;
+            let bestValue = 0;
+            
+            for (const [element, tech] of Object.entries(FIVE_ELEMENT_TECHNIQUES)) {
+                const affinity = gameState.spiritRoot.affinity[element.toLowerCase()];
+                if (affinity >= tech.threshold && tech.bonusValue > bestValue) {
+                    best = element;
+                    bestValue = tech.bonusValue;
+                }
+            }
+            
+            return best ? { element: best, technique: FIVE_ELEMENT_TECHNIQUES[best], affinity: gameState.spiritRoot.affinity[best.toLowerCase()] } : null;
+        }
+        
+        // 刷新灵根（洗髓丹）
+        function refreshSpiritRoot(withChaos = false) {
+            const cost = withChaos ? 50000 : 10000;
+            
+            if (gameState.spiritStones < cost) {
+                alert(`灵石不足！需要 ${cost} 灵石`);
+                return;
+            }
+            
+            if (withChaos && gameState.realm < 4) {
+                alert('需要化神期才能使用混沌丹！');
+                return;
+            }
+            
+            if (withChaos) {
+                // 混沌丹保底混沌灵根
+                gameState.spiritRoot = {
+                    quality: '混沌灵根',
+                    affinity: {
+                        metal: 20, wood: 20, water: 20, fire: 20, earth: 20
+                    },
+                    resonance: 10,
+                    lastRefreshDay: gameState.days
+                };
+            } else {
+                gameState.spiritRoot = generateRandomSpiritRoot();
+                gameState.spiritRoot.lastRefreshDay = gameState.days;
+            }
+            
+            gameState.spiritStones -= cost;
+            
+            // 重新初始化体质效果
+            initializeConstitutionEffects();
+            
+            addLog('good', '灵根重塑', `使用${withChaos ? '混沌丹' : '洗髓丹'}重塑灵根，新的灵根为：${gameState.spiritRoot.quality}！`);
+            
+            closeSpiritRootModal();
+            updateDisplay();
+            saveGame();
+        }
+        
+        // 初始化体质效果
+        function initializeConstitutionEffects() {
+            // 重置所有体质相关效果
+            if (!gameState.activeEffects.constitution_bonuses) {
+                gameState.activeEffects.constitution_bonuses = {};
+            }
+            
+            // 检查并激活符合条件的体质
+            for (const [name, data] of Object.entries(CONSTITUTIONS)) {
+                const existing = gameState.constitutions.find(c => c.type === name);
+                
+                // 检查是否应该激活
+                if (data.trigger(gameState)) {
+                    if (!existing) {
+                        // 新激活体质
+                        if (gameState.constitutions.length >= 2) {
+                            // 超过2个体质，替换最弱的
+                            const weakest = findWeakestConstitution();
+                            if (weakest) {
+                                gameState.constitutions = gameState.constitutions.filter(c => c.type !== weakest);
+                            }
+                        }
+                        gameState.constitutions.push({
+                            type: name,
+                            active: true,
+                            acquiredAt: gameState.days
+                        });
+                        addLog('good', '体质觉醒', `你的${name}觉醒了！效果：${data.desc}`);
+                    }
+                }
+            }
+            
+            // 应用体质效果到activeEffects
+            recalculateConstitutionEffects();
+        }
+        
+        // 找到最弱的体质（用于替换）
+        function findWeakestConstitution() {
+            if (gameState.constitutions.length === 0) return null;
+            
+            let weakest = null;
+            let weakestPower = Infinity;
+            
+            for (const c of gameState.constitutions) {
+                const data = CONSTITUTIONS[c.type];
+                let power = 0;
+                for (const v of Object.values(data.effect)) {
+                    power += typeof v === 'number' ? v : 0;
+                }
+                if (power < weakestPower) {
+                    weakestPower = power;
+                    weakest = c.type;
+                }
+            }
+            
+            return weakest;
+        }
+        
+        // 重新计算体质效果
+        function recalculateConstitutionEffects() {
+            // 重置体质加成
+            gameState.activeEffects.constitution_bonuses = {
+                attack: 0,
+                defense: 0,
+                cultivateSpeed: 0,
+                crit: 0,
+                dodge: 0,
+                damageReduce: 0,
+                waterBonus: 0,
+                fireBonus: 0,
+                hpBonus: 0,
+                lethalImmune: 0,
+                firstStrike: 0
+            };
+            
+            // 应用激活的体质效果
+            for (const c of gameState.constitutions) {
+                if (!c.active) continue;
+                const data = CONSTITUTIONS[c.type];
+                if (!data) continue;
+                
+                const effects = data.effect;
+                if (effects.attack) gameState.activeEffects.constitution_bonuses.attack += effects.attack;
+                if (effects.defense) gameState.activeEffects.constitution_bonuses.defense += effects.defense;
+                if (effects.cultivateSpeed) gameState.activeEffects.constitution_bonuses.cultivateSpeed += effects.cultivateSpeed;
+                if (effects.crit) gameState.activeEffects.constitution_bonuses.crit += effects.crit;
+                if (effects.dodge) gameState.activeEffects.constitution_bonuses.dodge += effects.dodge;
+                if (effects.damageReduce) gameState.activeEffects.constitution_bonuses.damageReduce += effects.damageReduce;
+                if (effects.waterBonus) gameState.activeEffects.constitution_bonuses.waterBonus += effects.waterBonus;
+                if (effects.fireBonus) gameState.activeEffects.constitution_bonuses.fireBonus += effects.fireBonus;
+                if (effects.hpBonus) gameState.activeEffects.constitution_bonuses.hpBonus += effects.hpBonus;
+                if (effects.lethalImmune) gameState.activeEffects.constitution_bonuses.lethalImmune += effects.lethalImmune;
+                if (effects.firstStrike) gameState.activeEffects.constitution_bonuses.firstStrike += effects.firstStrike;
+                if (effects.allStats) {
+                    gameState.activeEffects.constitution_bonuses.attack += effects.allStats;
+                    gameState.activeEffects.constitution_bonuses.defense += effects.allStats;
+                }
+            }
+        }
+        
+        // 更新灵根显示
+        function updateSpiritRootDisplay() {
+            if (!gameState.spiritRoot) return;
+            
+            const sr = gameState.spiritRoot;
+            const srData = SPIRIT_ROOT_QUALITIES[sr.quality];
+            
+            // 更新灵根名称和图标
+            const srNameEl = document.getElementById('spiritRootName');
+            if (srNameEl) {
+                srNameEl.textContent = sr.quality;
+                srNameEl.className = `spirit-root-name grade-${srData.grade}`;
+            }
+            
+            const srIcon = document.querySelector('.spirit-root-icon');
+            if (srIcon) {
+                srIcon.textContent = srData.icon;
+            }
+            
+            // 更新五行亲和显示
+            const elementIds = ['metal', 'wood', 'water', 'fire', 'earth'];
+            const elementNames = { metal: '金', wood: '木', water: '水', fire: '火', earth: '土' };
+            elementIds.forEach(el => {
+                const dot = document.getElementById('element' + el.charAt(0).toUpperCase() + el.slice(1));
+                if (dot) {
+                    const value = sr.affinity[el];
+                    dot.style.opacity = value >= ELEMENT_HIGH_THRESHOLD ? '1' : '0.4';
+                    dot.title = `${elementNames[el]}: ${value}%`;
+                }
+            });
+            
+            // 更新体质显示
+            const cons = gameState.constitutions.filter(c => c.active);
+            const consIcon = document.getElementById('constitutionIcon');
+            const consName = document.getElementById('constitutionName');
+            const consCount = document.getElementById('constitutionCount');
+            const consDisplay = document.getElementById('constitutionDisplay');
+            
+            if (consIcon && consName && consCount && consDisplay) {
+                if (cons.length > 0) {
+                    consIcon.textContent = CONSTITUTIONS[cons[0].type].icon;
+                    consName.textContent = cons[0].type;
+                    consDisplay.classList.add('has-constitution');
+                } else {
+                    consIcon.textContent = '⚗️';
+                    consName.textContent = '无体质';
+                    consDisplay.classList.remove('has-constitution');
+                }
+                consCount.textContent = `(${cons.length}/2)`;
+            }
+        }
+        
+        // 打开灵根/体质模态框
+        function openSpiritRootModal() {
+            document.getElementById('spiritRootModal').classList.add('active');
+            renderSpiritRootContent();
+        }
+        
+        // 关闭灵根/体质模态框
+        function closeSpiritRootModal() {
+            document.getElementById('spiritRootModal').classList.remove('active');
+        }
+        
+        // 渲染灵根/体质内容
+        function renderSpiritRootContent() {
+            const content = document.getElementById('spiritRootContent');
+            const sr = gameState.spiritRoot;
+            const srData = SPIRIT_ROOT_QUALITIES[sr.quality];
+            const cons = gameState.constitutions;
+            
+            const speedBonus = Math.round((srData.speedBonus - 1) * 100);
+            const bottleneckEffect = srData.bottleneckBonus >= 0 ? `+${Math.round(srData.bottleneckBonus * 100)}%` : `${Math.round(srData.bottleneckBonus * 100)}%`;
+            const tribEffect = srData.tribulationBonus >= 0 ? `+${Math.round(srData.tribulationBonus * 100)}%` : `${Math.round(srData.tribulationBonus * 100)}%`;
+            
+            const highestBonus = getHighestElementBonus();
+            
+            let html = `
+                <div class="sr-header">
+                    <div class="sr-quality">${srData.icon} ${sr.quality}</div>
+                    <div style="color:#aaa;">灵根资质评估</div>
+                </div>
+                
+                <div class="sr-stats">
+                    <div class="sr-stat">
+                        <div class="sr-stat-value" style="color: ${speedBonus >= 0 ? '#4caf50' : '#f44336'}">${speedBonus >= 0 ? '+' : ''}${speedBonus}%</div>
+                        <div class="sr-stat-label">修炼速度</div>
+                        <div class="sr-stat-bonus">${srData.speedBonus >= 1 ? '🌟 超越常人' : '📉 低于常人'}</div>
+                    </div>
+                    <div class="sr-stat">
+                        <div class="sr-stat-value">${bottleneckEffect}</div>
+                        <div class="sr-stat-label">瓶颈概率</div>
+                        <div class="sr-stat-bonus">${srData.bottleneckBonus <= 0 ? '🌟 更易突破' : '📉 较难突破'}</div>
+                    </div>
+                    <div class="sr-stat">
+                        <div class="sr-stat-value" style="color: ${srData.tribulationBonus >= 0 ? '#4caf50' : '#f44336'}">${tribEffect}</div>
+                        <div class="sr-stat-label">渡劫成功率</div>
+                        <div class="sr-stat-bonus">${srData.tribulationBonus >= 0 ? '🌟 天道眷顾' : '📉 渡劫艰难'}</div>
+                    </div>
+                </div>
+                
+                <div class="sr-section">
+                    <div class="sr-section-title">🌈 五行亲和</div>
+                    <div class="five-elements-grid">
+                        <div class="element-card">
+                            <div class="element-icon">⚔️</div>
+                            <div class="element-name">金</div>
+                            <div class="element-value ${sr.affinity.metal >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.metal}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🌿</div>
+                            <div class="element-name">木</div>
+                            <div class="element-value ${sr.affinity.wood >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.wood}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">❄️</div>
+                            <div class="element-name">水</div>
+                            <div class="element-value ${sr.affinity.water >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.water}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🔥</div>
+                            <div class="element-name">火</div>
+                            <div class="element-value ${sr.affinity.fire >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.fire}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🛡️</div>
+                            <div class="element-name">土</div>
+                            <div class="element-value ${sr.affinity.earth >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.earth}%</div>
+                        </div>
+                    </div>
+                    ${highestBonus ? `
+                    <div style="text-align:center;margin-top:10px;color:#ffd700;">
+                        当前最高加成：${highestBonus.element} ${highestBonus.technique.icon} ${highestBonus.technique.name} (${highestBonus.affinity}%)
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="sr-section">
+                    <div class="sr-section-title">👼 体质列表</div>
+                    <div class="constitutions-list">
+            `;
+            
+            // 渲染所有体质
+            for (const [name, data] of Object.entries(CONSTITUTIONS)) {
+                const acquired = cons.find(c => c.type === name);
+                const canActivate = data.trigger(gameState);
+                
+                html += `
+                    <div class="constitution-card ${acquired ? 'active' : 'inactive'}">
+                        <div class="icon">${data.icon}</div>
+                        <div class="info">
+                            <div class="name">${name}</div>
+                            <div class="effect">${data.desc}</div>
+                            <div class="source">触发条件：${data.source}</div>
+                        </div>
+                        <div class="status ${acquired ? 'active' : 'inactive'}">
+                            ${acquired ? '已激活' : canActivate ? '可激活' : '未获得'}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="sr-actions">
+                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(false)" ${gameState.spiritStones < 10000 ? 'disabled' : ''}>
+                        🔄 洗髓丹 (10000灵石)
+                    </button>
+                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(true)" ${gameState.spiritStones < 50000 || gameState.realm < 4 ? 'disabled' : ''}>
+                        🌈 混沌丹 (50000灵石)
+                    </button>
+                </div>
+                
+                <div class="sr-tips">
+                    <h4>💡 小提示</h4>
+                    <ul>
+                        <li>灵根品质影响修炼速度、瓶颈概率和渡劫成功率</li>
+                        <li>五行亲和达到一定数值可激活对应功法加成</li>
+                        <li>部分体质通过奇遇获得，部分通过突破境界激活</li>
+                        <li>最多同时拥有2种体质</li>
+                        <li>混沌丹需要化神期才能使用，100%获得混沌灵根</li>
+                    </ul>
+                </div>
+            `;
+            
+            content.innerHTML = html;
+        }
+        
+        // 通过奇遇获得体质
+        function acquireConstitutionFromSerendipity(type) {
+            if (gameState.constitutions.length >= 2) {
+                // 超过2个体质，替换
+                const weakest = findWeakestConstitution();
+                if (weakest) {
+                    gameState.constitutions = gameState.constitutions.filter(c => c.type !== weakest);
+                    addLog('neutral', '体质替换', `由于体质数量已达上限，${weakest}被${type}替换！`);
+                }
+            }
+            
+            gameState.constitutions.push({
+                type: type,
+                active: true,
+                acquiredAt: gameState.days
+            });
+            
+            initializeConstitutionEffects();
+            addLog('good', '获得体质', `恭喜！通过奇遇获得了${type}！效果：${CONSTITUTIONS[type].desc}`);
+            updateDisplay();
+            saveGame();
         }
 
         // 添加日志
@@ -2403,6 +3203,12 @@
         function doCultivate() {
             const req = REALM_REQUIREMENTS[gameState.realm];
             let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
+            // V7 应用灵根速度加成
+            baseGain *= getSpiritRootSpeedBonus();
+            // 应用体质修炼速度加成
+            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.cultivateSpeed) {
+                baseGain *= (1 + gameState.activeEffects.constitution_bonuses.cultivateSpeed);
+            }
             // 应用装备和丹药效果
             baseGain *= (1 + gameState.activeEffects.cultivate_speed);
             baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
@@ -2682,6 +3488,12 @@
         // 渡劫处理
         async function handleTribulation() {
             let survivalChance = gameState.mindset / 100;
+            // V7 应用灵根渡劫加成
+            survivalChance *= (1 + getSpiritRootTribulationBonus());
+            // 应用体质减伤效果
+            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.damageReduce) {
+                survivalChance *= (1 + gameState.activeEffects.constitution_bonuses.damageReduce * 0.5);
+            }
             // 应用定神丹效果
             survivalChance *= (1 + gameState.activeEffects.渡劫_mindset_protect);
             survivalChance *= (1 + gameState.activeEffects.all_stats);
@@ -2693,6 +3505,8 @@
                 gameState.realm = Math.min(4, gameState.realm + 1);
                 gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
                 gameState.qi = Math.floor(gameState.qi / 2);
+                // V7 检查体质激活
+                initializeConstitutionEffects();
             } else {
                 // 应用避火罩效果减伤
                 const damageReduction = gameState.activeEffects.渡劫_damage_reduce + gameState.activeEffects.all_stats;
@@ -2792,6 +3606,8 @@
                     gameState.qi = Math.floor(gameState.qi * 0.3);
                     gameState.mindset = Math.max(0, gameState.mindset - 10);
                     addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                    // V7 检查体质激活
+                    initializeConstitutionEffects();
                     saveGame();
                     updateDisplay();
                 }
@@ -4288,6 +5104,22 @@
                 const effect = COMBAT_TREASURES[playerArmor.name].effect;
                 if (effect.defenseBonus) playerDefense = Math.floor(playerDefense * (1 + effect.defenseBonus));
                 if (effect.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + effect.hpBonus));
+            }
+            
+            // V7 应用体质战斗效果
+            if (gameState.activeEffects.constitution_bonuses) {
+                const cb = gameState.activeEffects.constitution_bonuses;
+                if (cb.attack) playerAttack = Math.floor(playerAttack * (1 + cb.attack));
+                if (cb.defense) playerDefense = Math.floor(playerDefense * (1 + cb.defense));
+                if (cb.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + cb.hpBonus));
+                if (cb.crit) playerCritRate += cb.crit;
+                if (cb.dodge) playerSpeed += Math.floor(playerSpeed * cb.dodge);
+            }
+            // 应用all_stats加成
+            if (gameState.activeEffects.all_stats) {
+                playerAttack = Math.floor(playerAttack * (1 + gameState.activeEffects.all_stats));
+                playerDefense = Math.floor(playerDefense * (1 + gameState.activeEffects.all_stats));
+                playerMaxHP = Math.floor(playerMaxHP * (1 + gameState.activeEffects.all_stats));
             }
 
             combatState = {
