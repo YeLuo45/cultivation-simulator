@@ -6977,7 +6977,9 @@
                     critRate: playerCritRate,
                     setBonuses: {},
                     skills: [],
-                    accessories: []
+                    accessories: [],
+                    counterEnergy: 0,
+                    inDefenseStance: false
                 },
                 opponent: opponent,
                 log: [],
@@ -7021,6 +7023,25 @@
             `;
         }
 
+        // A5 反击能量条
+        function renderCounterEnergyBar() {
+            const energy = combatState.player.counterEnergy || 0;
+            const max = 100;
+            const pct = (energy / max) * 100;
+            const ready = energy >= 50;
+            const color = ready ? '#ffeb3b' : '#888888';
+            const glow = ready ? 'box-shadow: 0 0 8px #ffeb3b;' : '';
+            return `
+                <div style="margin-top:4px;display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:11px;color:#aaa;">⚡反击</span>
+                    <div style="flex:1;height:8px;background:#333;border-radius:4px;overflow:hidden;">
+                        <div style="width:${pct}%;height:100%;background:${color};${glow}transition:width 0.3s,background 0.3s;"></div>
+                    </div>
+                    <span style="font-size:10px;color:#888;">${energy}/${max}</span>
+                </div>
+            `;
+        }
+
         // 渲染战斗场景
         function renderCombatArena() {
             const p = combatState.player;
@@ -7053,6 +7074,7 @@
                                 <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
                             </div>
                             ${renderUltimateEnergyBar()}
+                            ${renderCounterEnergyBar()}
                             <div class="combatant-effects">
                                 ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
                                 ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
@@ -7317,6 +7339,7 @@
 
             // 清除防御状态
             effects.defending = false;
+            combatState.player.inDefenseStance = false;
 
             // 计算伤害
             let baseDamage = p.attack;
@@ -7392,9 +7415,12 @@
         // 执行玩家防御
         function executePlayerDefend() {
             combatState.effects.player.defending = true;
+            combatState.player.inDefenseStance = true;
+            if (typeof combatState.player.counterEnergy === 'undefined') combatState.player.counterEnergy = 0;
+            combatState.player.counterEnergy = Math.min(100, combatState.player.counterEnergy + 35);
             combatState.log.push({
                 type: 'player-action',
-                text: '你进入防御姿态，下回合受到伤害降低50%',
+                text: `🛡️ 防御姿态！反击能量+35（${combatState.player.counterEnergy}/100）`,
                 round: combatState.round
             });
 
@@ -7511,6 +7537,27 @@
                     text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
                     round: combatState.round
                 });
+
+                // ========== A5 防御反击系统 ==========
+                // 反击逻辑：受到攻击时检查反击能量
+                if (combatState.player.counterEnergy >= 50 && !combatState.player.inDefenseStance) {
+                    const weaponData = combatState.player.weaponData || { name: '空手', star: 1 };
+                    const starMultiplier = ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1;
+                    const baseWeaponDamage = 50; // 基础反击伤害基数
+                    let counterDamage = Math.floor(baseWeaponDamage * p.attack * starMultiplier * 0.01); // 0.01为反击系数
+
+                    // 玄武甲套装效果：反击伤害+50%，额外恢复HP
+                    if (combatState.player.skills && combatState.player.skills.includes('玄武反击')) {
+                        counterDamage = Math.floor(counterDamage * 1.5);
+                        const healAmount = Math.floor(counterDamage * 0.15);
+                        combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + healAmount);
+                        combatState.log.push({ type: 'system', text: `🐢 玄武反击！伤害+50%并恢复 ${healAmount} HP！`, round: combatState.round });
+                    }
+
+                    combatState.opponent.hp = Math.max(1, combatState.opponent.hp - counterDamage);
+                    combatState.player.counterEnergy -= 50;
+                    combatState.log.push({ type: 'player-action', text: `⚡ 反击！对敌人造成 ${counterDamage} 点伤害！（-${50}反击能量）`, round: combatState.round });
+                }
             }
 
             renderCombatArena();
