@@ -755,6 +755,241 @@
             background: linear-gradient(135deg, #c62828, #ef5350);
             color: white;
         }
+        
+        /* ========== V5 宗门系统样式 ========== */
+        .btn-sect {
+            background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+            color: white;
+        }
+        
+        /* 宗门模态框 */
+        #sectModal .modal-content {
+            max-width: 700px;
+            background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a1a2e 100%);
+            border: 2px solid rgba(156, 39, 176, 0.5);
+        }
+        .sect-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(156, 39, 176, 0.2);
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .sect-name {
+            color: #ffd700;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .sect-level {
+            padding: 5px 15px;
+            background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+            border-radius: 20px;
+            color: white;
+            font-size: 0.9em;
+        }
+        .sect-resources {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .sect-resource {
+            flex: 1;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            text-align: center;
+        }
+        .sect-resource-icon { font-size: 1.5em; }
+        .sect-resource-value { color: #ffd700; font-size: 1.2em; font-weight: bold; }
+        .sect-resource-label { color: #aaa; font-size: 0.85em; }
+        
+        .sect-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .sect-tab {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid rgba(156, 39, 176, 0.3);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .sect-tab:hover, .sect-tab.active {
+            background: rgba(156, 39, 176, 0.3);
+            color: #ffd700;
+            border-color: #9c27b0;
+        }
+        
+        .sect-content {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        /* 弟子列表 */
+        .disciple-list {
+            display: grid;
+            gap: 10px;
+        }
+        .disciple-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .disciple-info { display: flex; align-items: center; gap: 15px; }
+        .disciple-avatar { font-size: 1.8em; }
+        .disciple-name { font-weight: bold; color: #ffd700; }
+        .disciple-realm { font-size: 0.85em; color: #aaa; }
+        .disciple-talent {
+            font-size: 0.8em;
+            padding: 2px 8px;
+            border-radius: 5px;
+        }
+        .talent-low { background: #888; color: white; }
+        .talent-mid { background: #4caf50; color: white; }
+        .talent-high { background: #2196f3; color: white; }
+        .talent-super { background: #ffd700; color: #1a1a2e; }
+        .disciple-contribution { color: #87ceeb; font-size: 0.9em; }
+        .disciple-status {
+            font-size: 0.8em;
+            padding: 3px 10px;
+            border-radius: 5px;
+        }
+        .status-idle { background: rgba(76, 175, 80, 0.3); color: #4caf50; }
+        .status-training { background: rgba(255, 152, 0, 0.3); color: #ff9800; }
+        .status-elder { background: rgba(156, 39, 176, 0.3); color: #9c27b0; }
+        
+        /* 建筑列表 */
+        .building-list {
+            display: grid;
+            gap: 10px;
+        }
+        .building-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .building-card.built {
+            border-color: rgba(76, 175, 80, 0.5);
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .building-card.locked {
+            opacity: 0.6;
+        }
+        .building-info { display: flex; align-items: center; gap: 15px; }
+        .building-icon { font-size: 2em; }
+        .building-name { font-weight: bold; color: #ffd700; }
+        .building-effect { font-size: 0.85em; color: #aaa; }
+        .building-status { font-size: 0.85em; padding: 5px 15px; border-radius: 5px; }
+        .building-status.built { background: #4caf50; color: white; }
+        .building-status.unbuilt { background: #888; color: white; cursor: pointer; }
+        .building-status.locked { background: #555; color: #888; }
+        
+        /* 功法阁 */
+        .technique-list {
+            display: grid;
+            gap: 10px;
+        }
+        .technique-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .technique-info { display: flex; align-items: center; gap: 15px; }
+        .technique-icon { font-size: 1.5em; }
+        .technique-name { font-weight: bold; color: #ffd700; }
+        .technique-grade { font-size: 0.8em; padding: 2px 8px; border-radius: 5px; }
+        .grade-human { background: #888; color: white; }
+        .grade-spirit { background: #4caf50; color: white; }
+        .grade-heaven { background: #2196f3; color: white; }
+        .grade-immortal { background: #ffd700; color: #1a1a2e; }
+        .technique-effect { font-size: 0.85em; color: #aaa; }
+        .technique-action { display: flex; gap: 10px; }
+        
+        /* 贡献商店 */
+        .contribution-shop {
+            display: grid;
+            gap: 10px;
+        }
+        .shop-item-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .shop-item-info { flex: 1; }
+        .contribution-cost { color: #9c27b0; font-weight: bold; margin-right: 15px; }
+        
+        /* 长老管理 */
+        .elder-slot {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            text-align: center;
+            border: 2px dashed rgba(156, 39, 176, 0.5);
+        }
+        .elder-slot.filled {
+            border-style: solid;
+            border-color: #9c27b0;
+            background: rgba(156, 39, 176, 0.1);
+        }
+        .elder-empty { color: #888; }
+        .elder-assign-btn {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #6a1b9a, #9c27b0);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        /* 创建宗门 */
+        .create-sect-form {
+            text-align: center;
+            padding: 30px;
+        }
+        .sect-name-input {
+            width: 80%;
+            padding: 15px;
+            border: 2px solid rgba(156, 39, 176, 0.5);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #ffd700;
+            font-size: 1.2em;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .sect-name-input:focus {
+            outline: none;
+            border-color: #9c27b0;
+        }
+        .create-sect-cost {
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+        .create-sect-cost span { color: #87ceeb; font-weight: bold; }
         .btn-challenge {
             background: linear-gradient(135deg, #b71c1c, #e53935);
             color: white;
@@ -1156,6 +1391,7 @@
             <button class="btn btn-shop" onclick="openShop()">🏪 商店</button>
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
+            <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
         </div>
 
@@ -1254,6 +1490,15 @@
         <div class="modal-content">
             <h2 class="modal-title">⚔️ 斗法切磋 ⚔️</h2>
             <div id="combatContent"></div>
+        </div>
+    </div>
+
+    <!-- V5 宗门模态框 -->
+    <div id="sectModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🏛️ 宗门系统</h2>
+            <div id="sectContent"></div>
+            <button class="close-btn" onclick="closeSect()">关闭</button>
         </div>
     </div>
 
@@ -1419,6 +1664,24 @@
                 battleHistory: [],
                 injured: false,
                 injuryEndDay: 0
+            },
+            // V5 宗门系统字段
+            sect: {
+                name: null,
+                level: 0,
+                spiritStones: 0,
+                disciples: [],
+                elders: [],
+                buildings: {
+                    library: false,
+                    alchemy: false,
+                    forge: false,
+                    archive: false
+                },
+                techniques: [],
+                contributionShop: [],
+                lastShopRefresh: 0,
+                lastResourceCollection: 0
             }
         };
 
@@ -1502,7 +1765,33 @@
                     tribKey: null
                 },
                 hasTransmigrationBuff: false,
-                tribulationRecord: []
+                tribulationRecord: [],
+                combat: {
+                    wins: 0,
+                    losses: 0,
+                    honor: 0,
+                    fame: 0,
+                    battleHistory: [],
+                    injured: false,
+                    injuryEndDay: 0
+                },
+                sect: {
+                    name: null,
+                    level: 0,
+                    spiritStones: 0,
+                    disciples: [],
+                    elders: [],
+                    buildings: {
+                        library: false,
+                        alchemy: false,
+                        forge: false,
+                        archive: false
+                    },
+                    techniques: [],
+                    contributionShop: [],
+                    lastShopRefresh: 0,
+                    lastResourceCollection: 0
+                }
             };
             saveGame();
             showGameUI();
@@ -1553,6 +1842,23 @@
                         battleHistory: [],
                         injured: false,
                         injuryEndDay: 0
+                    },
+                    sect: loaded.sect || {
+                        name: null,
+                        level: 0,
+                        spiritStones: 0,
+                        disciples: [],
+                        elders: [],
+                        buildings: {
+                            library: false,
+                            alchemy: false,
+                            forge: false,
+                            archive: false
+                        },
+                        techniques: [],
+                        contributionShop: [],
+                        lastShopRefresh: 0,
+                        lastResourceCollection: 0
                     }
                 };
                 // 重新计算装备效果
@@ -1582,6 +1888,11 @@
             // 检查商店刷新
             if (gameState.lastShopDay < gameState.days) {
                 refreshShop(true);
+            }
+            // 检查宗门按钮显示
+            const sectBtn = document.getElementById('sectBtn');
+            if (sectBtn) {
+                sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
             }
         }
 
@@ -4133,6 +4444,865 @@
                     <button class="close-btn" onclick="closeCombat()">关闭</button>
                 </div>
             `;
+        }
+
+        // ========== V5 宗门系统 ==========
+
+        // 宗门配置
+        const SECT_CONFIG = {
+            createCost: 50000,
+            maxDisciples: { 1: 30, 2: 50, 3: 80 },
+            upgradeCost: { 2: 80000, 3: 150000 },
+            upgradeDisciples: { 2: 20, 3: 40 },
+            buildings: {
+                library: { name: '功法阁', icon: '📚', cost: 10000, unlockLevel: 1, desc: '存放可供传承的功法' },
+                alchemy: { name: '炼丹房', icon: '⚗️', cost: 20000, unlockLevel: 2, desc: '宗门产出丹药' },
+                forge: { name: '炼器室', icon: '🔨', cost: 20000, unlockLevel: 2, desc: '宗门产出法宝' },
+                archive: { name: '藏经阁', icon: '🏛️', cost: 50000, unlockLevel: 3, desc: '存放至高功法' }
+            },
+            talents: ['下品', '中品', '上品', '极品'],
+            talentWeights: [0.4, 0.35, 0.2, 0.05],
+            techniqueGrades: ['人阶', '灵阶', '天阶', '仙阶'],
+            techniqueGradeColors: ['grade-human', 'grade-spirit', 'grade-heaven', 'grade-immortal']
+        };
+
+        // 宗门功法定义
+        const SECT_TECHNIQUES = {
+            '基础练气诀': { grade: 0, effect: { type: 'cultivate_speed', value: 0.05 }, desc: '修炼速度+5%', icon: '📖' },
+            '灵根培育法': { grade: 1, effect: { type: 'qi_rate', value: 0.1 }, desc: '灵气获取+10%', icon: '🌱' },
+            '天元心法': { grade: 1, effect: { type: 'breakthrough_boost', value: 0.1 }, desc: '突破成功率+10%', icon: '☀️' },
+            '金刚炼体术': { grade: 2, effect: { type: 'defense', value: 0.15 }, desc: '防御+15%', icon: '🛡️' },
+            '紫霄雷法': { grade: 2, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚡' },
+            '九转玄天诀': { grade: 3, effect: { type: 'all_stats', value: 0.1 }, desc: '全属性+10%', icon: '🌟' }
+        };
+
+        // 贡献商店物品
+        const CONTRIBUTION_SHOP_ITEMS = [
+            { name: '灵阶功法·灵根培育法', cost: 500, type: 'technique', data: '灵根培育法' },
+            { name: '天阶功法·金刚炼体术', cost: 2000, type: 'technique', data: '金刚炼体术' },
+            { name: '上品筑基丹', cost: 300, type: 'pill', data: '筑基丹', quantity: 1 },
+            { name: '破境丹', cost: 800, type: 'pill', data: '破境丹', quantity: 1 },
+            { name: '宗门特权·双倍修炼', cost: 1000, type: 'buff', data: 'double_cultivate', duration: 7 }
+        ];
+
+        // 打开宗门界面
+        function openSect() {
+            document.getElementById('sectModal').classList.add('active');
+            renderSectHome();
+        }
+
+        // 关闭宗门界面
+        function closeSect() {
+            document.getElementById('sectModal').classList.remove('active');
+        }
+
+        // 渲染宗门主页
+        function renderSectHome() {
+            const sect = gameState.sect;
+            const content = document.getElementById('sectContent');
+            
+            // 检查是否已创建宗门
+            if (!sect.name) {
+                content.innerHTML = renderCreateSectForm();
+                return;
+            }
+
+            const html = `
+                <div class="sect-header">
+                    <div class="sect-name">🏛️ ${sect.name}</div>
+                    <div class="sect-level">等级 ${sect.level}</div>
+                </div>
+                <div class="sect-resources">
+                    <div class="sect-resource">
+                        <div class="sect-resource-icon">💎</div>
+                        <div class="sect-resource-value">${sect.spiritStones}</div>
+                        <div class="sect-resource-label">宗门灵石</div>
+                    </div>
+                    <div class="sect-resource">
+                        <div class="sect-resource-icon">👥</div>
+                        <div class="sect-resource-value">${sect.disciples.length}/${SECT_CONFIG.maxDisciples[sect.level]}</div>
+                        <div class="sect-resource-label">弟子人数</div>
+                    </div>
+                    <div class="sect-resource">
+                        <div class="sect-resource-icon">⚡</div>
+                        <div class="sect-resource-value">${calculateSectIncome()}</div>
+                        <div class="sect-resource-label">每日产出</div>
+                    </div>
+                </div>
+                <div class="sect-tabs">
+                    <div class="sect-tab active" onclick="switchSectTab('disciples')">👥 弟子</div>
+                    <div class="sect-tab" onclick="switchSectTab('buildings')">🏗️ 建筑</div>
+                    <div class="sect-tab" onclick="switchSectTab('techniques')">📚 功法</div>
+                    <div class="sect-tab" onclick="switchSectTab('shop')">🏪 贡献商店</div>
+                    <div class="sect-tab" onclick="switchSectTab('manage')">⚙️ 管理</div>
+                </div>
+                <div class="sect-content" id="sectTabContent">
+                    ${renderDisciplesTab()}
+                </div>
+            `;
+            content.innerHTML = html;
+        }
+
+        // 切换宗门标签页
+        function switchSectTab(tab) {
+            // 更新标签样式
+            document.querySelectorAll('.sect-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 渲染对应内容
+            const tabContent = document.getElementById('sectTabContent');
+            switch(tab) {
+                case 'disciples':
+                    tabContent.innerHTML = renderDisciplesTab();
+                    break;
+                case 'buildings':
+                    tabContent.innerHTML = renderBuildingsTab();
+                    break;
+                case 'techniques':
+                    tabContent.innerHTML = renderTechniquesTab();
+                    break;
+                case 'shop':
+                    tabContent.innerHTML = renderContributionShop();
+                    break;
+                case 'manage':
+                    tabContent.innerHTML = renderManageTab();
+                    break;
+            }
+        }
+
+        // 渲染创建宗门表单
+        function renderCreateSectForm() {
+            const canCreate = gameState.realm >= 4 && gameState.spiritStones >= SECT_CONFIG.createCost;
+            const realmName = CONFIG.realms[gameState.realm];
+            
+            let html = `
+                <div class="create-sect-form">
+                    <h3 style="color:#9c27b0;margin-bottom:20px;">🏛️ 创建宗门</h3>
+                    <p style="color:#aaa;margin-bottom:15px;">
+                        宗主境界：${realmName}期<br>
+                        ${gameState.realm >= 4 ? '✅ 已达到元婴期，可创建宗门' : '❌ 需要元婴期才能创建宗门'}
+                    </p>
+                    <input type="text" class="sect-name-input" id="sectNameInput" placeholder="请输入宗门名称" maxlength="10">
+                    <div class="create-sect-cost">
+                        创建消耗：<span>${SECT_CONFIG.createCost}</span> 灵石<br>
+                        当前拥有：<span>${gameState.spiritStones}</span> 灵石
+                    </div>
+                    <button class="btn btn-sect" onclick="createSect()" ${canCreate ? '' : 'disabled'} style="padding:15px 40px;">
+                        🏛️ 创建宗门
+                    </button>
+                </div>
+            `;
+            return html;
+        }
+
+        // 创建宗门
+        function createSect() {
+            const nameInput = document.getElementById('sectNameInput');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('请输入宗门名称！');
+                return;
+            }
+            
+            if (gameState.spiritStones < SECT_CONFIG.createCost) {
+                alert('灵石不足！');
+                return;
+            }
+            
+            if (gameState.realm < 4) {
+                alert('需要元婴期才能创建宗门！');
+                return;
+            }
+            
+            gameState.spiritStones -= SECT_CONFIG.createCost;
+            gameState.sect = {
+                name: name,
+                level: 1,
+                spiritStones: 0,
+                disciples: [],
+                elders: [],
+                buildings: {
+                    library: false,
+                    alchemy: false,
+                    forge: false,
+                    archive: false
+                },
+                techniques: [],
+                contributionShop: [],
+                lastShopRefresh: gameState.days,
+                lastResourceCollection: gameState.days
+            };
+            
+            // 给宗主添加一个初始弟子
+            addDisciple('入门弟子', 3);
+            
+            addLog('good', '宗门创建', `恭喜！${name}正式成立，你成为开山宗主！`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 渲染弟子标签页
+        function renderDisciplesTab() {
+            const sect = gameState.sect;
+            const disciples = sect.disciples;
+            
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <button class="btn btn-sect" onclick="recruitDisciple()" style="padding:10px 20px;">
+                        ➕ 招募弟子
+                    </button>
+                    <button class="btn btn-sect" onclick="collectSectResources()" style="padding:10px 20px;margin-left:10px;">
+                        💎 领取产出
+                    </button>
+                </div>
+            `;
+            
+            if (disciples.length === 0) {
+                html += '<p style="text-align:center;color:#888;padding:40px;">暂无弟子，快去招募吧！</p>';
+                return html;
+            }
+            
+            html += '<div class="disciple-list">';
+            disciples.forEach((d, idx) => {
+                const talentClass = d.talent === '下品' ? 'talent-low' : d.talent === '中品' ? 'talent-mid' : d.talent === '上品' ? 'talent-high' : 'talent-super';
+                const statusClass = d.status === 'idle' ? 'status-idle' : d.status === 'training' ? 'status-training' : 'status-elder';
+                const realmName = CONFIG.realms[d.realm] + '期';
+                const isElder = sect.elders.includes(d.uid);
+                
+                html += `
+                    <div class="disciple-card">
+                        <div class="disciple-info">
+                            <span class="disciple-avatar">${isElder ? '👴' : '🧑‍🎓'}</span>
+                            <div>
+                                <div class="disciple-name">${d.name}</div>
+                                <div class="disciple-realm">${realmName}</div>
+                            </div>
+                            <span class="disciple-talent ${talentClass}">${d.talent}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="disciple-contribution">贡献: ${d.contribution}</div>
+                            <span class="disciple-status ${statusClass}">${isElder ? '长老' : d.status}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            return html;
+        }
+
+        // 渲染建筑标签页
+        function renderBuildingsTab() {
+            const sect = gameState.sect;
+            const level = sect.level;
+            
+            let html = '<div class="building-list">';
+            
+            for (const [key, building] of Object.entries(SECT_CONFIG.buildings)) {
+                const isBuilt = sect.buildings[key];
+                const isLocked = building.unlockLevel > level;
+                const canBuild = !isBuilt && !isLocked && sect.spiritStones >= building.cost;
+                
+                let cardClass = 'building-card';
+                if (isBuilt) cardClass += ' built';
+                else if (isLocked) cardClass += ' locked';
+                
+                let statusHtml = '';
+                if (isBuilt) {
+                    statusHtml = '<span class="building-status built">已建造</span>';
+                } else if (isLocked) {
+                    statusHtml = `<span class="building-status locked">等级${building.unlockLevel}解锁</span>`;
+                } else {
+                    statusHtml = `<button class="building-status unbuilt" onclick="buildBuilding('${key}')" ${canBuild ? '' : 'disabled'}>建造(${building.cost}灵石)</button>`;
+                }
+                
+                html += `
+                    <div class="${cardClass}">
+                        <div class="building-info">
+                            <span class="building-icon">${building.icon}</span>
+                            <div>
+                                <div class="building-name">${building.name}</div>
+                                <div class="building-effect">${building.desc}</div>
+                            </div>
+                        </div>
+                        ${statusHtml}
+                    </div>
+                `;
+            }
+            html += '</div>';
+            
+            // 添加升级按钮
+            if (level < 3) {
+                const nextLevel = level + 1;
+                const upgradeCost = SECT_CONFIG.upgradeCost[nextLevel];
+                const requiredDisciples = SECT_CONFIG.upgradeDisciples[nextLevel];
+                const canUpgrade = sect.spiritStones >= upgradeCost && sect.disciples.length >= requiredDisciples;
+                
+                html += `
+                    <div style="margin-top:20px;text-align:center;">
+                        <h4 style="color:#9c27b0;margin-bottom:10px;">升级宗门到 ${nextLevel} 级</h4>
+                        <p style="color:#aaa;font-size:0.9em;">
+                            消耗：${upgradeCost}灵石 | 需要：${requiredDisciples}名弟子<br>
+                            当前弟子：${sect.disciples.length}名
+                        </p>
+                        <button class="btn btn-sect" onclick="upgradeSect()" ${canUpgrade ? '' : 'disabled'} style="margin-top:10px;">
+                            ⬆️ 升级宗门
+                        </button>
+                    </div>
+                `;
+            } else {
+                html += '<p style="text-align:center;color:#ffd700;padding:20px;">🏆 宗门已升至最高等级！</p>';
+            }
+            
+            return html;
+        }
+
+        // 渲染功法标签页
+        function renderTechniquesTab() {
+            const sect = gameState.sect;
+            
+            let html = '';
+            
+            // 宗主功法
+            if (gameState.techniques && gameState.techniques.length > 0) {
+                html += '<h4 style="color:#9c27b0;margin-bottom:10px;">📖 你的功法</h4>';
+                html += '<div class="technique-list" style="margin-bottom:20px;">';
+                gameState.techniques.forEach(tech => {
+                    const gradeClass = SECT_CONFIG.techniqueGradeColors[tech.grade] || 'grade-human';
+                    html += `
+                        <div class="technique-card">
+                            <div class="technique-info">
+                                <span class="technique-icon">${tech.icon || '📖'}</span>
+                                <div>
+                                    <div class="technique-name">${tech.name}</div>
+                                    <div class="technique-effect">${tech.desc}</div>
+                                </div>
+                            </div>
+                            <div class="technique-action">
+                                <span class="technique-grade ${gradeClass}">${SECT_CONFIG.techniqueGrades[tech.grade] || '人阶'}</span>
+                                ${sect.buildings.library ? `<button class="btn btn-sect" onclick="donateTechnique('${tech.name}')" style="padding:5px 15px;font-size:0.85em;">存入功法阁</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // 宗门功法阁
+            if (!sect.buildings.library) {
+                html += '<p style="text-align:center;color:#888;padding:20px;">📚 建造功法阁后可存放功法</p>';
+            } else if (sect.techniques.length === 0) {
+                html += '<p style="text-align:center;color:#888;padding:20px;">📚 功法阁暂无功法，快存入功法吧！</p>';
+            } else {
+                html += '<h4 style="color:#9c27b0;margin-bottom:10px;">📚 功法阁</h4>';
+                html += '<div class="technique-list">';
+                sect.techniques.forEach((tech, idx) => {
+                    const gradeClass = SECT_CONFIG.techniqueGradeColors[tech.grade] || 'grade-human';
+                    html += `
+                        <div class="technique-card">
+                            <div class="technique-info">
+                                <span class="technique-icon">${tech.icon || '📖'}</span>
+                                <div>
+                                    <div class="technique-name">${tech.name}</div>
+                                    <div class="technique-effect">${tech.desc}</div>
+                                </div>
+                            </div>
+                            <div class="technique-action">
+                                <span class="technique-grade ${gradeClass}">${SECT_CONFIG.techniqueGrades[tech.grade] || '人阶'}</span>
+                                <button class="btn btn-sect" onclick="learnSectTechnique(${idx})" style="padding:5px 15px;font-size:0.85em;">学习</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            return html;
+        }
+
+        // 渲染贡献商店
+        function renderContributionShop() {
+            const sect = gameState.sect;
+            
+            // 刷新商店
+            if (sect.lastShopRefresh === 0 || gameState.days - sect.lastShopRefresh >= 3) {
+                refreshContributionShop();
+            }
+            
+            let html = `
+                <div style="margin-bottom:15px;text-align:center;">
+                    <p style="color:#aaa;">贡献商店每72小时刷新</p>
+                    <p style="color:#9c27b0;">你的贡献点：<span style="font-weight:bold;">${getPlayerContribution()}</span></p>
+                </div>
+            `;
+            
+            if (sect.contributionShop.length === 0) {
+                html += '<p style="text-align:center;color:#888;padding:40px;">商店暂无物品</p>';
+                return html;
+            }
+            
+            html += '<div class="contribution-shop">';
+            sect.contributionShop.forEach((item, idx) => {
+                const canBuy = getPlayerContribution() >= item.cost;
+                html += `
+                    <div class="shop-item-card">
+                        <div class="shop-item-info">
+                            <div class="shop-item-name">${item.icon || '📦'} ${item.name}</div>
+                            <div class="shop-item-desc">${item.desc}</div>
+                        </div>
+                        <div class="contribution-cost">${item.cost}贡献</div>
+                        <button class="btn btn-sect" onclick="buyContributionItem(${idx})" ${canBuy ? '' : 'disabled'} style="padding:8px 15px;font-size:0.85em;">
+                            购买
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            return html;
+        }
+
+        // 渲染管理标签页
+        function renderManageTab() {
+            const sect = gameState.sect;
+            
+            let html = `
+                <h4 style="color:#9c27b0;margin-bottom:15px;">👴 长老席位</h4>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:20px;">
+            `;
+            
+            const maxElders = sect.level >= 2 ? 3 : 0;
+            
+            for (let i = 0; i < maxElders; i++) {
+                const elder = sect.elders[i] ? sect.disciples.find(d => d.uid === sect.elders[i]) : null;
+                
+                if (elder) {
+                    html += `
+                        <div class="elder-slot filled">
+                            <div style="font-size:2em;">👴</div>
+                            <div class="disciple-name">${elder.name}</div>
+                            <div class="disciple-realm">${CONFIG.realms[elder.realm]}期</div>
+                            <button class="elder-assign-btn" onclick="removeElder(${i})" style="background:#c62828;margin-top:10px;">免职</button>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="elder-slot">
+                            <div class="elder-empty">空缺</div>
+                            <button class="elder-assign-btn" onclick="assignElder(${i})">任命</button>
+                        </div>
+                    `;
+                }
+            }
+            
+            if (maxElders === 0) {
+                html += '<p style="grid-column:span 3;text-align:center;color:#888;padding:20px;">宗门2级后解锁长老席位</p>';
+            }
+            
+            html += '</div>';
+            
+            // 宗主操作
+            html += `
+                <h4 style="color:#9c27b0;margin-bottom:15px;">⚙️ 宗主操作</h4>
+                <div style="display:grid;gap:10px;">
+                    <button class="btn btn-sect" onclick="disbandSect()" style="background:#c62828;padding:12px;">
+                        💀 解散宗门（不可恢复）
+                    </button>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        // 招募弟子
+        function recruitDisciple() {
+            const sect = gameState.sect;
+            const maxDisciples = SECT_CONFIG.maxDisciples[sect.level];
+            
+            if (sect.disciples.length >= maxDisciples) {
+                alert(`宗门人数已达上限（${maxDisciples}人）！`);
+                return;
+            }
+            
+            // 消耗灵石
+            const recruitCost = 100;
+            if (gameState.spiritStones < recruitCost) {
+                alert('灵石不足！需要 ' + recruitCost + ' 灵石');
+                return;
+            }
+            
+            gameState.spiritStones -= recruitCost;
+            
+            // 随机生成弟子
+            const names = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十', '钱二', '孙三'];
+            const randomName = names[Math.floor(Math.random() * names.length)] + ' [' + Math.floor(Math.random() * 100) + ']';
+            const talent = weightedRandom(SECT_CONFIG.talentWeights);
+            const talentIndex = SECT_CONFIG.talents.indexOf(talent);
+            const realm = Math.max(0, gameState.realm - 1);
+            
+            addDisciple(randomName, realm, talentIndex);
+            
+            addLog('good', '招募弟子', `成功招募 ${randomName}（${talent}资质）`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 添加弟子
+        function addDisciple(name, realm, talentIndex = 1) {
+            const sect = gameState.sect;
+            const uid = 'd_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            
+            sect.disciples.push({
+                uid: uid,
+                name: name,
+                realm: realm,
+                talent: SECT_CONFIG.talents[talentIndex],
+                talentIndex: talentIndex,
+                contribution: 0,
+                techniques: [],
+                status: 'idle'
+            });
+        }
+
+        // 加权随机
+        function weightedRandom(weights) {
+            const total = weights.reduce((a, b) => a + b, 0);
+            let random = Math.random() * total;
+            for (let i = 0; i < weights.length; i++) {
+                random -= weights[i];
+                if (random <= 0) return i;
+            }
+            return weights.length - 1;
+        }
+
+        // 领取宗门产出
+        function collectSectResources() {
+            const sect = gameState.sect;
+            const daysPassed = gameState.days - sect.lastResourceCollection;
+            
+            if (daysPassed < 1) {
+                alert('今日已领取产出！');
+                return;
+            }
+            
+            const income = calculateSectIncome();
+            const totalIncome = income * daysPassed;
+            
+            sect.spiritStones += totalIncome;
+            sect.lastResourceCollection = gameState.days;
+            
+            // 弟子贡献值增加
+            sect.disciples.forEach(d => {
+                const contribGain = Math.floor(5 + d.talentIndex * 2);
+                d.contribution += contribGain;
+            });
+            
+            // 建筑产出
+            if (sect.buildings.alchemy) {
+                const pills = daysPassed * 2;
+                addItemToInventory('聚灵丹', pills);
+            }
+            
+            if (sect.buildings.forge && daysPassed >= 3) {
+                const treasures = Math.floor(daysPassed / 3);
+                if (treasures > 0) {
+                    addItemToInventory('青云剑', treasures);
+                }
+            }
+            
+            addLog('good', '宗门产出', `领取了 ${daysPassed} 天的宗门产出，共 ${totalIncome} 灵石`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 计算宗门每日收入
+        function calculateSectIncome() {
+            const sect = gameState.sect;
+            let income = 0;
+            
+            // 弟子修炼产出
+            sect.disciples.forEach(d => {
+                const realmMultiplier = (d.realm + 1) * 10;
+                const talentMultiplier = 1 + d.talentIndex * 0.2;
+                income += Math.floor(realmMultiplier * talentMultiplier);
+            });
+            
+            // 长老加成
+            sect.elders.forEach(elderUid => {
+                const elder = sect.disciples.find(d => d.uid === elderUid);
+                if (elder) {
+                    income += 500;
+                }
+            });
+            
+            return income;
+        }
+
+        // 建造建筑
+        function buildBuilding(key) {
+            const sect = gameState.sect;
+            const building = SECT_CONFIG.buildings[key];
+            
+            if (sect.spiritStones < building.cost) {
+                alert('宗门灵石不足！');
+                return;
+            }
+            
+            sect.spiritStones -= building.cost;
+            sect.buildings[key] = true;
+            
+            addLog('good', '建筑建造', `成功建造 ${building.name}！`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 升级宗门
+        function upgradeSect() {
+            const sect = gameState.sect;
+            const nextLevel = sect.level + 1;
+            const cost = SECT_CONFIG.upgradeCost[nextLevel];
+            const requiredDisciples = SECT_CONFIG.upgradeDisciples[nextLevel];
+            
+            if (sect.spiritStones < cost) {
+                alert('宗门灵石不足！');
+                return;
+            }
+            
+            if (sect.disciples.length < requiredDisciples) {
+                alert(`弟子人数不足！需要 ${requiredDisciples} 名弟子`);
+                return;
+            }
+            
+            // 检查1级建筑是否全部建成
+            if (nextLevel === 3) {
+                if (!sect.buildings.library || !sect.buildings.alchemy || !sect.buildings.forge) {
+                    alert('升级需要全部1级建筑！');
+                    return;
+                }
+            }
+            
+            sect.spiritStones -= cost;
+            sect.level = nextLevel;
+            
+            addLog('good', '宗门升级', `宗门升级为 ${nextLevel} 级！`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 存入功法到功法阁
+        function donateTechnique(techName) {
+            const sect = gameState.sect;
+            const techIndex = gameState.techniques.findIndex(t => t.name === techName);
+            
+            if (techIndex === -1) return;
+            
+            const tech = gameState.techniques[techIndex];
+            sect.techniques.push(tech);
+            gameState.techniques.splice(techIndex, 1);
+            
+            addLog('good', '功法传承', `将 ${techName} 存入功法阁`);
+            saveGame();
+            renderSectHome();
+        }
+
+        // 学习功法阁功法
+        function learnSectTechnique(idx) {
+            const sect = gameState.sect;
+            const tech = sect.techniques[idx];
+            
+            if (!tech) return;
+            
+            // 检查是否已学习
+            if (gameState.techniques.find(t => t.name === tech.name)) {
+                alert('已学习此功法！');
+                return;
+            }
+            
+            // 检查等级要求
+            if (tech.grade >= 2 && sect.level < 2) {
+                alert('宗门等级不足！');
+                return;
+            }
+            if (tech.grade >= 3 && sect.level < 3) {
+                alert('宗门等级不足！');
+                return;
+            }
+            
+            // 学习消耗灵石
+            const cost = (tech.grade + 1) * 500;
+            if (gameState.spiritStones < cost) {
+                alert('灵石不足！需要 ' + cost + ' 灵石');
+                return;
+            }
+            
+            gameState.spiritStones -= cost;
+            gameState.techniques.push(tech);
+            
+            // 应用功法效果
+            if (tech.effect) {
+                const effectType = tech.effect.type;
+                if (gameState.activeEffects.hasOwnProperty(effectType)) {
+                    gameState.activeEffects[effectType] += tech.effect.value;
+                }
+            }
+            
+            addLog('good', '功法学习', `学习了 ${tech.name}！`);
+            saveGame();
+            updateDisplay();
+            renderSectHome();
+        }
+
+        // 刷新贡献商店
+        function refreshContributionShop() {
+            const sect = gameState.sect;
+            sect.contributionShop = [...CONTRIBUTION_SHOP_ITEMS];
+            sect.lastShopRefresh = gameState.days;
+        }
+
+        // 获取玩家贡献点
+        function getPlayerContribution() {
+            const sect = gameState.sect;
+            const myDisciple = sect.disciples.find(d => d.uid === 'player');
+            return myDisciple ? myDisciple.contribution : 0;
+        }
+
+        // 购买贡献商店物品
+        function buyContributionItem(idx) {
+            const sect = gameState.sect;
+            const item = sect.contributionShop[idx];
+            
+            if (!item) return;
+            
+            const contribution = getPlayerContribution();
+            if (contribution < item.cost) {
+                alert('贡献点不足！');
+                return;
+            }
+            
+            // 扣除贡献
+            const myDisciple = sect.disciples.find(d => d.uid === 'player');
+            if (myDisciple) {
+                myDisciple.contribution -= item.cost;
+            }
+            
+            // 给予物品
+            if (item.type === 'technique') {
+                const tech = SECT_TECHNIQUES[item.data];
+                if (tech && !gameState.techniques.find(t => t.name === item.data)) {
+                    gameState.techniques.push({
+                        name: item.data,
+                        grade: tech.grade,
+                        icon: tech.icon,
+                        desc: tech.desc,
+                        effect: tech.effect
+                    });
+                    addLog('good', '购买功法', `获得 ${item.data}！`);
+                }
+            } else if (item.type === 'pill') {
+                addItemToInventory(item.data, item.quantity || 1);
+                addLog('good', '购买丹药', `获得 ${item.name}！`);
+            } else if (item.type === 'buff') {
+                addLog('good', '购买特权', `获得 ${item.name}！`);
+            }
+            
+            saveGame();
+            renderSectHome();
+        }
+
+        // 添加物品到背包
+        function addItemToInventory(name, quantity) {
+            const existing = gameState.inventory.find(i => i.name === name);
+            if (existing) {
+                existing.quantity += quantity;
+            } else {
+                gameState.inventory.push({ name: name, quantity: quantity });
+            }
+        }
+
+        // 任命长老
+        function assignElder(slot) {
+            const sect = gameState.sect;
+            const availableDisciples = sect.disciples.filter(d => !sect.elders.includes(d.uid));
+            
+            if (availableDisciples.length === 0) {
+                alert('没有可任命的弟子！');
+                return;
+            }
+            
+            // 简单实现：自动任命第一个非长老弟子
+            const newElder = availableDisciples[0];
+            sect.elders[slot] = newElder.uid;
+            newElder.status = 'elder';
+            
+            addLog('good', '任命长老', `${newElder.name} 被任命为长老！`);
+            saveGame();
+            renderSectHome();
+        }
+
+        // 免职长老
+        function removeElder(slot) {
+            const sect = gameState.sect;
+            const elderUid = sect.elders[slot];
+            
+            if (!elderUid) return;
+            
+            const elder = sect.disciples.find(d => d.uid === elderUid);
+            if (elder) {
+                elder.status = 'idle';
+            }
+            
+            sect.elders.splice(slot, 1);
+            
+            addLog('neutral', '免职长老', `${elder ? elder.name : '长老'} 被免职`);
+            saveGame();
+            renderSectHome();
+        }
+
+        // 解散宗门
+        function disbandSect() {
+            if (!confirm('确定要解散宗门吗？此操作不可恢复！')) return;
+            
+            addLog('bad', '宗门解散', `${gameState.sect.name} 已解散！`);
+            
+            gameState.sect = {
+                name: null,
+                level: 0,
+                spiritStones: 0,
+                disciples: [],
+                elders: [],
+                buildings: {
+                    library: false,
+                    alchemy: false,
+                    forge: false,
+                    archive: false
+                },
+                techniques: [],
+                contributionShop: [],
+                lastShopRefresh: 0,
+                lastResourceCollection: 0
+            };
+            
+            saveGame();
+            updateDisplay();
+            closeSect();
+        }
+
+        // 检查宗门创建条件并更新UI
+        function checkSectCreation() {
+            const sectBtn = document.getElementById('sectBtn');
+            if (!sectBtn) return;
+            
+            if (gameState.sect && gameState.sect.name) {
+                sectBtn.style.display = 'inline-block';
+            } else {
+                sectBtn.style.display = 'none';
+            }
         }
     </script>
 </body>
