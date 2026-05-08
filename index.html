@@ -2518,15 +2518,10 @@
                         <div class="form-group">
                             <label>Model</label>
                             <div style="display: flex; align-items: center;">
-                                <select id="settingsModel" class="settings-select">
-                                    <option value="MiniMax-Text-01">MiniMax-Text-01</option>
-                                    <option value="MiniMax-Text-01-32K">MiniMax-Text-01-32K</option>
-                                    <option value="MiniMax-Text-01-128K">MiniMax-Text-01-128K</option>
-                                    <option value="MiniMax-Embedding-01">MiniMax-Embedding-01</option>
-                                </select>
+                                <input type="text" id="settingsModel" class="settings-input" placeholder="输入 Model 名称，如 MiniMax-Text-01" style="flex: 1;">
                                 <button class="test-btn" onclick="testApiConfig('model')">测试</button>
                             </div>
-                            <div class="hint">选择要使用的模型</div>
+                            <div class="hint">手动输入模型名称</div>
                             <div id="modelTestResult" class="test-result"></div>
                         </div>
                         <div class="form-group">
