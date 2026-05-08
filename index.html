@@ -2374,6 +2374,106 @@
             margin-bottom: 10px;
             line-height: 1.6;
         }
+
+        /* ========== A5 成就系统样式 ========== */
+        .achievement-header {
+            padding: 10px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .achievement-title-display {
+            font-size: 1.1em;
+            color: #ffd700;
+        }
+        .achievement-category {
+            margin-bottom: 15px;
+        }
+        .achievement-category h4 {
+            color: #aaa;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .achievement-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(50, 50, 80, 0.5);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #333;
+        }
+        .achievement-item.unlocked {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+        }
+        .achievement-item.locked {
+            opacity: 0.6;
+        }
+        .achievement-icon {
+            font-size: 1.5em;
+            width: 40px;
+            text-align: center;
+        }
+        .achievement-info {
+            flex: 1;
+        }
+        .achievement-name {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 3px;
+        }
+        .achievement-desc {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+        .achievement-progress {
+            height: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .achievement-progress .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+        }
+        .achievement-progress-text {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 2px;
+        }
+        .achievement-reward {
+            text-align: right;
+            font-size: 0.85em;
+        }
+        .title-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .title-item {
+            padding: 8px 15px;
+            background: rgba(60, 60, 100, 0.5);
+            border-radius: 20px;
+            cursor: pointer;
+            border: 1px solid #444;
+            transition: all 0.2s;
+        }
+        .title-item:hover {
+            background: rgba(80, 80, 120, 0.5);
+            border-color: #ffd700;
+        }
+        .title-item.equipped {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
     </style>
 </head>
 <body>
@@ -2437,6 +2537,7 @@
             <div class="realm-info">
                 <span class="realm-name" id="realmName">炼气期</span>
                 <span class="realm-stage" id="realmStage">初期</span>
+                <span class="title-display" id="titleDisplay" style="color:#ffd700;margin-left:10px;">【筑基修士】</span>
             </div>
             <div class="progress-container">
                 <div class="progress-bar cultivation" id="cultivationBar" style="width: 0%">0%</div>
@@ -2471,6 +2572,7 @@
             <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
             <button class="btn btn-worldmap" onclick="openWorldMap()">🗺️ 世界地图</button>
+            <button class="btn btn-achievement" onclick="openAchievements()">🏆 成就</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
             <button class="btn btn-settings" onclick="openSettings()">⚙️ 设置</button>
         </div>
@@ -2599,6 +2701,15 @@
             <h2 class="modal-title">🌟 灵根与体质 🌟</h2>
             <div id="spiritRootContent"></div>
             <button class="close-btn" onclick="closeSpiritRootModal()">关闭</button>
+        </div>
+    </div>
+
+    <!-- A5 成就/称号模态框 -->
+    <div id="achievementModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">🏆 成就与称号 🏆</h2>
+            <div id="achievementContent"></div>
+            <button class="close-btn" onclick="closeAchievements()">关闭</button>
         </div>
     </div>
 
@@ -3028,6 +3139,13 @@
             // 日志
             if (success) {
                 addLog('good', '强化成功', `${item.name}强化至${newStar}星！属性大幅提升！`);
+
+                // A5 成就检查 - 强化9星装备成功
+                if (star === 9 && newStar === 10) {
+                    if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+                    gameState.achievements.stats.treasuresRefined++;
+                    checkAchievements();
+                }
             } else {
                 addLog('negative', '强化失败', `${item.name}强化失败，材料化为乌有...`);
             }
@@ -3168,40 +3286,86 @@
                 twoPiece: '攻击+15%，暴击+10%',
                 threePiece: null,
                 skill: null
-            },
-            '混元套装': {
-                pieces: ['混元珠', '混元袍'],
-                count: 2,
-                stats: { qiRegenPercent: 0.20 },
-                twoPiece: '灵气恢复+20%',
-                threePiece: null,
-                skill: null
-            },
-            '玄冰套装': {
-                pieces: ['玄冰剑', '玄冰甲'],
-                count: 2,
-                stats: { icePercent: 0.15 },
-                twoPiece: '冰冻触发+15%',
-                threePiece: '攻击25%冻结敌人1回合',
-                skill: 'freezeAura'
-            },
-            '赤炎套装': {
-                pieces: ['赤炎剑', '赤炎甲'],
-                count: 2,
-                stats: { burnPercent: 0.20 },
-                twoPiece: '灼烧伤害+20%',
-                threePiece: '攻击30%灼烧持续3回合',
-                skill: 'burnAura'
-            },
-            '天使套装': {
-                pieces: ['天使神剑', '天使神甲', '天使神翼'],
-                count: 3,
-                stats: { attackPercent: 0.25, defensePercent: 0.25 },
-                twoPiece: '攻击+25%，防御+25%',
-                threePiece: '+50%攻击，+50%防御，+15%吸血',
-                skill: 'angelJudgment'
             }
         };
+
+        // ========== A5 成就/称号系统 ==========
+        const ACHIEVEMENTS = [
+            {
+                id: 'tribulation_master',
+                name: '渡劫宗师',
+                desc: '渡过10次天劫',
+                category: 'cultivation',
+                requirement: { type: 'stat', key: 'tribulationsCompleted', value: 10 },
+                reward: { type: 'attribute', target: 'cultivationSpeed', bonus: 0.05 },
+                title: '渡劫宗师'
+            },
+            {
+                id: 'dungeon_slayer',
+                name: '秘境杀手',
+                desc: '击杀10个秘境首领',
+                category: 'combat',
+                requirement: { type: 'stat', key: 'dungeonBossesKilled', value: 10 },
+                reward: { type: 'attribute', target: 'attack', bonus: 0.03 },
+                title: '秘境杀手'
+            },
+            {
+                id: 'sect_founder',
+                name: '宗门创始人',
+                desc: '创建宗门',
+                category: 'story',
+                requirement: { type: 'stat', key: 'sectContributions', value: 1 },
+                reward: { type: 'attribute', target: 'sectContribution', bonus: 0.10 },
+                title: '宗门创始人'
+            },
+            {
+                id: 'treasure_master',
+                name: '炼器宗师',
+                desc: '强化9星装备1件',
+                category: 'collection',
+                requirement: { type: 'stat', key: 'treasuresRefined', value: 1 },
+                reward: { type: 'attribute', target: 'craftingSuccess', bonus: 0.05 },
+                title: '炼器宗师'
+            },
+            {
+                id: 'serendipity_finder',
+                name: '天选之人',
+                desc: '触发20次奇遇',
+                category: 'cultivation',
+                requirement: { type: 'stat', key: 'serendipitiesEncountered', value: 20 },
+                reward: { type: 'attribute', target: 'serendipityRate', bonus: 0.05 },
+                title: '天选之人'
+            },
+            {
+                id: 'first_ascension',
+                name: '飞升者',
+                desc: '首次突破化神',
+                category: 'story',
+                requirement: { type: 'realm', value: 4 },
+                reward: { type: 'attribute', target: 'realmSuppression', bonus: 0.10 },
+                title: '飞升者'
+            },
+            {
+                id: 'equipment_collector',
+                name: '套装收藏家',
+                desc: '收集全套青云套装',
+                category: 'collection',
+                requirement: { type: 'set', setName: '青云套装' },
+                reward: { type: 'attribute', target: 'setBonus', bonus: 0.15 },
+                title: '套装收藏家'
+            },
+            {
+                id: 'flawless_tribulation',
+                name: '完美渡劫',
+                desc: '零消耗渡劫成功',
+                category: 'special',
+                requirement: { type: 'stat', key: 'flawlessTribulations', value: 1 },
+                reward: { type: 'attribute', target: 'tribulationCost', bonus: -0.10 },
+                title: '完美渡劫'
+            }
+        ];
+
+        // ========== 套装共鸣系统 (已在上方定义) ==========
 
         // 计算套装效果
         function calculateSetBonuses() {
@@ -4126,6 +4290,20 @@
                 furnace: { level: 1, type: 'alchemy' },
                 anvil: { level: 1, type: 'forge' },
                 transactionLog: []
+            },
+            // V11 成就/称号系统字段
+            title: '筑基修士',
+            achievements: {
+                unlocked: [],
+                titles: [],
+                stats: {
+                    tribulationsCompleted: 0,
+                    dungeonBossesKilled: 0,
+                    sectContributions: 0,
+                    treasuresRefined: 0,
+                    serendipitiesEncountered: 0,
+                    flawlessTribulations: 0
+                }
             }
         };
 
@@ -4453,7 +4631,21 @@
                     lastTravelDay: 0
                 },
                 // E1 NPC对话记忆
-                npcMemory: []
+                npcMemory: [],
+                // B 成就/称号系统
+                title: '筑基修士',
+                achievements: {
+                    unlocked: [],
+                    titles: [],
+                    stats: {
+                        tribulationsCompleted: 0,
+                        dungeonBossesKilled: 0,
+                        sectContributions: 0,
+                        treasuresRefined: 0,
+                        serendipitiesEncountered: 0,
+                        flawlessTribulations: 0
+                    }
+                }
             };
             saveGame();
             showGameUI();
@@ -4565,6 +4757,22 @@
                 };
                 // E1 确保npcMemory字段存在（向后兼容）
                 if (!gameState.npcMemory) gameState.npcMemory = [];
+                // B 成就/称号系统向后兼容
+                if (!gameState.title) gameState.title = '筑基修士';
+                if (!gameState.achievements) {
+                    gameState.achievements = {
+                        unlocked: [],
+                        titles: [],
+                        stats: {
+                            tribulationsCompleted: 0,
+                            dungeonBossesKilled: 0,
+                            sectContributions: 0,
+                            treasuresRefined: 0,
+                            serendipitiesEncountered: 0,
+                            flawlessTribulations: 0
+                        }
+                    };
+                }
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
@@ -4650,7 +4858,13 @@
             
             document.getElementById('realmName').textContent = `${realmName}期`;
             document.getElementById('realmStage').textContent = stageName;
-            
+
+            // A5 更新称号显示
+            const titleDisplay = document.getElementById('titleDisplay');
+            if (titleDisplay) {
+                titleDisplay.textContent = `【${gameState.title || '筑基修士'}】`;
+            }
+
             const req = REALM_REQUIREMENTS[gameState.realm];
             const progressInStage = gameState.stage === 0 ? 
                 gameState.cultivationProgress : 
@@ -4967,6 +5181,257 @@
         // 关闭灵根/体质模态框
         function closeSpiritRootModal() {
             document.getElementById('spiritRootModal').classList.remove('active');
+        }
+
+        // ========== A5 成就/称号系统函数 ==========
+
+        // 检查并解锁成就
+        function checkAchievements() {
+            if (!gameState.achievements) {
+                gameState.achievements = {
+                    unlocked: [],
+                    titles: [],
+                    stats: {
+                        tribulationsCompleted: 0,
+                        dungeonBossesKilled: 0,
+                        sectContributions: 0,
+                        treasuresRefined: 0,
+                        serendipitiesEncountered: 0,
+                        flawlessTribulations: 0
+                    }
+                };
+            }
+
+            const ach = gameState.achievements;
+
+            for (const achievement of ACHIEVEMENTS) {
+                // 跳过已解锁的
+                if (ach.unlocked.includes(achievement.id)) continue;
+
+                let unlocked = false;
+                const req = achievement.requirement;
+
+                if (req.type === 'stat') {
+                    const currentValue = ach.stats[req.key] || 0;
+                    if (currentValue >= req.value) {
+                        unlocked = true;
+                    }
+                } else if (req.type === 'realm') {
+                    if (gameState.realm >= req.value) {
+                        unlocked = true;
+                    }
+                } else if (req.type === 'set') {
+                    // 检查套装是否收集完成
+                    const set = SET_BONUSES[req.setName];
+                    if (set) {
+                        const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                        const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                        const allPieces = [...new Set([...equipped, ...owned])];
+                        const hasAll = set.pieces.every(p => allPieces.includes(p));
+                        if (hasAll) unlocked = true;
+                    }
+                }
+
+                if (unlocked) {
+                    ach.unlocked.push(achievement.id);
+                    if (achievement.title && !ach.titles.includes(achievement.title)) {
+                        ach.titles.push(achievement.title);
+                        // 如果没有装备称号，自动装备新称号
+                        if (!gameState.title || gameState.title === '筑基修士') {
+                            gameState.title = achievement.title;
+                        }
+                    }
+                    addLog('good', '🏆 成就解锁', `【${achievement.name}】${achievement.desc}！获得称号：${achievement.title}`);
+                    saveGame();
+                }
+            }
+        }
+
+        // 获取当前称号的加成
+        function getTitleBonus() {
+            const bonuses = {
+                cultivationSpeed: 0,
+                attack: 0,
+                defense: 0,
+                craftingSuccess: 0,
+                serendipityRate: 0,
+                realmSuppression: 0,
+                setBonus: 0,
+                tribulationCost: 0,
+                sectContribution: 0
+            };
+
+            if (!gameState.title || !gameState.achievements) return bonuses;
+
+            // 遍历所有已解锁的成就，找出当前称号对应的加成
+            const ach = gameState.achievements;
+            for (const achievement of ACHIEVEMENTS) {
+                if (ach.unlocked.includes(achievement.id)) {
+                    const reward = achievement.reward;
+                    if (reward.type === 'attribute') {
+                        if (bonuses.hasOwnProperty(reward.target)) {
+                            bonuses[reward.target] += reward.bonus;
+                        }
+                    }
+                }
+            }
+
+            return bonuses;
+        }
+
+        // 装备称号
+        function equipTitle(titleName) {
+            if (!gameState.achievements || !gameState.achievements.titles.includes(titleName)) {
+                addLog('bad', '称号装备', '你还没有获得这个称号！');
+                return;
+            }
+            gameState.title = titleName;
+            addLog('good', '称号装备', `已装备称号：【${titleName}】`);
+            updateDisplay();
+            saveGame();
+        }
+
+        // 打开成就面板
+        function openAchievements() {
+            document.getElementById('achievementModal').classList.add('active');
+            renderAchievements();
+        }
+
+        // 关闭成就面板
+        function closeAchievements() {
+            document.getElementById('achievementModal').classList.remove('active');
+        }
+
+        // 渲染成就面板
+        function renderAchievements() {
+            const content = document.getElementById('achievementContent');
+            if (!content) return;
+
+            const ach = gameState.achievements || { unlocked: [], titles: [], stats: {} };
+
+            let html = `<div class="achievement-header">`;
+            html += `<div class="achievement-title-display">当前称号：<span style="color:#ffd700;">【${gameState.title || '无'}】</span></div>`;
+            html += `</div>`;
+
+            // 分类显示
+            const categories = {
+                cultivation: '修炼',
+                combat: '战斗',
+                collection: '收集',
+                story: '剧情',
+                special: '特殊'
+            };
+
+            for (const [catKey, catName] of Object.entries(categories)) {
+                const catAchievements = ACHIEVEMENTS.filter(a => a.category === catKey);
+                if (catAchievements.length === 0) continue;
+
+                html += `<div class="achievement-category">`;
+                html += `<h4>${catName}</h4>`;
+
+                for (const a of catAchievements) {
+                    const isUnlocked = ach.unlocked.includes(a.id);
+                    const progress = getAchievementProgress(a, ach);
+
+                    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">`;
+                    html += `<div class="achievement-icon">${isUnlocked ? '🏆' : '🔒'}</div>`;
+                    html += `<div class="achievement-info">`;
+                    html += `<div class="achievement-name">${a.name}</div>`;
+                    html += `<div class="achievement-desc">${a.desc}</div>`;
+
+                    if (!isUnlocked && progress > 0) {
+                        html += `<div class="achievement-progress">`;
+                        html += `<div class="progress-bar" style="width:${progress}%"></div>`;
+                        html += `</div>`;
+                        html += `<div class="achievement-progress-text">${getAchievementProgressText(a, ach)}</div>`;
+                    }
+
+                    html += `</div>`;
+                    html += `<div class="achievement-reward">`;
+                    html += `<div style="color:#4caf50;">奖励：${getRewardText(a)}</div>`;
+                    if (a.title) html += `<div style="color:#ffd700;">称号：${a.title}</div>`;
+                    html += `</div>`;
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+            }
+
+            // 已获得称号列表
+            if (ach.titles.length > 0) {
+                html += `<div class="achievement-category">`;
+                html += `<h4>已获称号</h4>`;
+                html += `<div class="title-list">`;
+                for (const t of ach.titles) {
+                    const isEquipped = gameState.title === t;
+                    html += `<div class="title-item ${isEquipped ? 'equipped' : ''}" onclick="equipTitle('${t}')">`;
+                    html += `【${t}】${isEquipped ? '(已装备)' : '(点击装备)'}`;
+                    html += `</div>`;
+                }
+                html += `</div>`;
+                html += `</div>`;
+            }
+
+            content.innerHTML = html;
+        }
+
+        // 获取成就进度
+        function getAchievementProgress(achievement, ach) {
+            const req = achievement.requirement;
+            if (req.type === 'stat') {
+                const current = ach.stats[req.key] || 0;
+                return Math.min(100, (current / req.value) * 100);
+            } else if (req.type === 'realm') {
+                return gameState.realm >= req.value ? 100 : 0;
+            } else if (req.type === 'set') {
+                const set = SET_BONUSES[req.setName];
+                if (!set) return 0;
+                const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                const allPieces = [...new Set([...equipped.filter(p => p), ...owned])];
+                return Math.min(100, (allPieces.length / set.pieces.length) * 100);
+            }
+            return 0;
+        }
+
+        // 获取成就进度文本
+        function getAchievementProgressText(achievement, ach) {
+            const req = achievement.requirement;
+            if (req.type === 'stat') {
+                const current = ach.stats[req.key] || 0;
+                return `${current}/${req.value}`;
+            } else if (req.type === 'realm') {
+                return `当前：${CONFIG.realms[gameState.realm]}`;
+            } else if (req.type === 'set') {
+                const set = SET_BONUSES[req.setName];
+                if (!set) return '0/2';
+                const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                const allPieces = [...new Set([...equipped.filter(p => p), ...owned])];
+                return `${allPieces.length}/${set.pieces.length}`;
+            }
+            return '';
+        }
+
+        // 获取奖励文本
+        function getRewardText(achievement) {
+            const r = achievement.reward;
+            if (r.type === 'attribute') {
+                const bonusText = r.bonus >= 0 ? `+${Math.round(r.bonus * 100)}%` : `${Math.round(r.bonus * 100)}%`;
+                const targetNames = {
+                    cultivationSpeed: '修炼速度',
+                    attack: '攻击',
+                    defense: '防御',
+                    craftingSuccess: '炼器成功率',
+                    serendipityRate: '奇遇触发率',
+                    realmSuppression: '境界压制',
+                    setBonus: '套装效果',
+                    tribulationCost: '渡劫消耗',
+                    sectContribution: '宗门贡献'
+                };
+                return `${targetNames[r.target] || r.target}${bonusText}`;
+            }
+            return '';
         }
         
         // 渲染灵根/体质内容
@@ -5458,11 +5923,21 @@
                 addLog('good', '渡劫成功', '天雷降临，你成功渡过天劫，修为大涨！');
                 gameState.cultivationProgress = 0;
                 gameState.stage = 0;
+                const oldRealm = gameState.realm;
                 gameState.realm = Math.min(4, gameState.realm + 1);
                 gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
                 gameState.qi = Math.floor(gameState.qi / 2);
                 // V7 检查体质激活
                 initializeConstitutionEffects();
+
+                // A5 成就检查 - 渡劫成功
+                if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+                gameState.achievements.stats.tribulationsCompleted++;
+                // 检查零消耗渡劫（damageTaken为0或很小时）
+                if (gameState.tribulation && gameState.tribulation.damageTaken === 0) {
+                    gameState.achievements.stats.flawlessTribulations++;
+                }
+                checkAchievements();
             } else {
                 // 应用避火罩效果减伤
                 const damageReduction = gameState.activeEffects.渡劫_damage_reduce + gameState.activeEffects.all_stats;
@@ -8625,6 +9100,12 @@
             addDisciple('入门弟子', 3);
             
             addLog('good', '宗门创建', `恭喜！${name}正式成立，你成为开山宗主！`);
+
+            // A5 成就检查 - 宗门创建
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            gameState.achievements.stats.sectContributions++;
+            checkAchievements();
+
             saveGame();
             updateDisplay();
             renderSectHome();
@@ -9472,6 +9953,11 @@
             };
             serendipity.log.unshift(logEntry);
             if (serendipity.log.length > 20) serendipity.log.pop();
+
+            // A5 成就检查 - 奇遇触发
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            gameState.achievements.stats.serendipitiesEncountered++;
+            checkAchievements();
 
             return { name, event, result };
         }
@@ -10831,6 +11317,11 @@
             wm.bossRefreshDays[regionName] = gameState.days;
 
             addLog('good', '首领击败', `艰难击败${bossName}！获得${expGain}修为！`);
+
+            // A5 成就检查 - 秘境首领击杀
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            gameState.achievements.stats.dungeonBossesKilled++;
+            checkAchievements();
 
             // 稀有掉落
             const regionData = REGIONS[regionName];
