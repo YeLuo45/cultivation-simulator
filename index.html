@@ -2392,6 +2392,7 @@
                 <div class="inventory-tab" onclick="switchInvTab('material')">材料</div>
             </div>
             <div class="inventory-grid" id="inventoryGrid"></div>
+            <div id="setStatusContainer"></div>
             <div class="inventory-detail" id="invDetail" style="display:none;">
                 <div id="invDetailContent"></div>
                 <div class="inventory-actions" id="invActions"></div>
@@ -2919,6 +2920,90 @@
             // 默认空手绝技
             '_fist': { name: '气功波', desc: '灵力冲击', icon: '💨', cost: 40, damage: 1.8, effect: null, color: '#888888' }
         };
+
+        // ========== A4 套装共鸣系统 ==========
+        const SET_BONUSES = {
+            '青云套装': {
+                pieces: ['青云剑', '青云甲'],
+                count: 2,
+                stats: { attackPercent: 0.15, critPercent: 0.10 },
+                twoPiece: '攻击+15%，暴击+10%',
+                threePiece: null,
+                skill: null
+            },
+            '混元套装': {
+                pieces: ['混元珠', '混元袍'],
+                count: 2,
+                stats: { qiRegenPercent: 0.20 },
+                twoPiece: '灵气恢复+20%',
+                threePiece: null,
+                skill: null
+            },
+            '玄冰套装': {
+                pieces: ['玄冰剑', '玄冰甲'],
+                count: 2,
+                stats: { icePercent: 0.15 },
+                twoPiece: '冰冻触发+15%',
+                threePiece: '攻击25%冻结敌人1回合',
+                skill: 'freezeAura'
+            },
+            '赤炎套装': {
+                pieces: ['赤炎剑', '赤炎甲'],
+                count: 2,
+                stats: { burnPercent: 0.20 },
+                twoPiece: '灼烧伤害+20%',
+                threePiece: '攻击30%灼烧持续3回合',
+                skill: 'burnAura'
+            },
+            '天使套装': {
+                pieces: ['天使神剑', '天使神甲', '天使神翼'],
+                count: 3,
+                stats: { attackPercent: 0.25, defensePercent: 0.25 },
+                twoPiece: '攻击+25%，防御+25%',
+                threePiece: '+50%攻击，+50%防御，+15%吸血',
+                skill: 'angelJudgment'
+            }
+        };
+
+        // 计算套装效果
+        function calculateSetBonuses() {
+            const equipped = [];
+            if (combatState.player.weaponData) equipped.push(combatState.player.weaponData.name);
+            if (combatState.player.armorData) equipped.push(combatState.player.armorData.name);
+            if (combatState.player.accessories) {
+                combatState.player.accessories.forEach(a => { if (a) equipped.push(a.name); });
+            }
+            const bonuses = {};
+            const skills = [];
+            for (const setName in SET_BONUSES) {
+                const set = SET_BONUSES[setName];
+                const matched = set.pieces.filter(p => equipped.includes(p));
+                if (matched.length >= 2) {
+                    bonuses[setName] = matched.length; // 2 or 3
+                    if (matched.length === set.count && set.skill) skills.push(set.skill);
+                }
+            }
+            combatState.player.setBonuses = bonuses;
+            combatState.player.skills = skills;
+            return bonuses;
+        }
+
+        // 重新计算玩家属性（基于套装加成）
+        function recalculatePlayerStats() {
+            let attackBonus = 1.0, critBonus = 0, defenseBonus = 1.0, qiRegenBonus = 0;
+            for (const setName in combatState.player.setBonuses) {
+                const set = SET_BONUSES[setName];
+                const count = combatState.player.setBonuses[setName];
+                if (set.stats.attackPercent) attackBonus += set.stats.attackPercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.critPercent) critBonus += set.stats.critPercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.defensePercent) defenseBonus += set.stats.defensePercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.qiRegenPercent) qiRegenBonus += set.stats.qiRegenPercent * (count === 3 ? 1 : 0.5);
+            }
+            combatState.player.attackPercent = attackBonus;
+            combatState.player.critBonus = critBonus;
+            combatState.player.defensePercent = defenseBonus;
+            combatState.player.qiRegenBonus = qiRegenBonus;
+        }
 
         // 战斗中能量状态
         let combatEnergy = 0;
@@ -5136,6 +5221,31 @@
             }
         }
 
+        // A4 套装状态显示
+        function renderSetStatus() {
+            let html = '<div style="margin-top:8px;padding:6px;background:#1a1a2e;border-radius:6px;font-size:11px;">';
+            html += '<b style="color:#ffd700;">套装状态</b><br>';
+            let hasAny = false;
+            for (const setName in SET_BONUSES) {
+                const set = SET_BONUSES[setName];
+                const equipped = [];
+                const treasures = gameState.equippedTreasures;
+                for (const t of treasures) {
+                    if (t && set.pieces.includes(t.name)) equipped.push(t.name);
+                }
+                if (equipped.length > 0) {
+                    hasAny = true;
+                    const count = equipped.length;
+                    const color = count >= set.count ? '#00ff88' : '#aaaaaa';
+                    const status = count >= set.count ? '✓ ' + (count === 3 ? set.threePiece : set.twoPiece) : `(${equipped.length}/${set.count}) ${set.twoPiece}`;
+                    html += `<span style="color:${color};">${setName} ${status}</span><br>`;
+                }
+            }
+            if (!hasAny) html += '<span style="color:#666;">无套装激活</span>';
+            html += '</div>';
+            return html;
+        }
+
         // 打开装备槽位操作菜单
         function openEquipSlotMenu(slotIndex) {
             const treasure = gameState.equippedTreasures[slotIndex];
@@ -5185,6 +5295,9 @@
                 updateEquipmentBar();
                 saveGame();
                 addLog('neutral', '卸下灵宝', `卸下了${treasure.name}`);
+                if (document.getElementById('setStatusContainer')) {
+                    document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
+                }
             }
         }
 
@@ -5258,6 +5371,7 @@
             renderInventoryGrid();
             document.getElementById('invDetail').style.display = 'none';
             document.getElementById('inventoryModal').classList.add('active');
+            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
         }
 
         function closeInventory() {
@@ -5407,6 +5521,7 @@
             addLog('good', '装备灵宝', `装备了${name}`);
             renderInventoryGrid();
             document.getElementById('invDetail').style.display = 'none';
+            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
         }
 
         function sellItem(idx) {
@@ -6858,7 +6973,11 @@
                     weapon: playerWeapon ? playerWeapon.name : null,
                     weaponData: playerWeapon, // 完整对象含星级
                     armor: playerArmor ? playerArmor.name : null,
-                    critRate: playerCritRate
+                    armorData: playerArmor,
+                    critRate: playerCritRate,
+                    setBonuses: {},
+                    skills: [],
+                    accessories: []
                 },
                 opponent: opponent,
                 log: [],
@@ -6867,6 +6986,10 @@
                     opponent: { defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
                 }
             };
+
+            // A4 套装共鸣加成
+            calculateSetBonuses();
+            recalculatePlayerStats();
 
             combatState.log.push({
                 type: 'system',
@@ -7210,6 +7333,11 @@
             }
             baseDamage = Math.floor(baseDamage * techniqueMultiplier);
 
+            // A4 套装攻击加成
+            if (p.attackPercent) {
+                baseDamage = Math.floor(baseDamage * p.attackPercent);
+            }
+
             // 防御减伤
             let finalDamage = baseDamage;
             if (!effects.ignoreDefense) {
@@ -7218,13 +7346,29 @@
             }
 
             // 暴击判定
-            const isCrit = Math.random() < p.critRate;
+            const critRateWithSet = p.critRate + (p.critBonus || 0);
+            const isCrit = Math.random() < critRateWithSet;
             if (isCrit) {
                 finalDamage = Math.floor(finalDamage * 1.5);
                 combatState.log.push({ type: 'player-action', actionType: 'critical', text: `💥暴击！`, round: combatState.round });
             }
 
             o.hp = Math.max(0, o.hp - finalDamage);
+
+            // A4 套装技能触发
+            if (p.skills && p.skills.includes('freezeAura') && Math.random() < 0.25) {
+                combatState.effects.opponent.frozen = 2;
+                combatState.log.push({ type: 'system', text: `❄️ 玄冰领域生效！敌人被冻结2回合！`, round: combatState.round });
+            }
+            if (p.skills && p.skills.includes('burnAura') && Math.random() < 0.30) {
+                combatState.effects.opponent.burning = 3;
+                combatState.log.push({ type: 'system', text: `🔥 烈焰领域生效！敌人被灼烧3回合！`, round: combatState.round });
+            }
+            if (p.skills && p.skills.includes('angelJudgment') && Math.random() < 0.20) {
+                const healAmount = Math.floor(p.maxHP * 0.15);
+                p.hp = Math.min(p.maxHP, p.hp + healAmount);
+                combatState.log.push({ type: 'system', text: `👼 天使审判生效！恢复${healAmount}点生命！`, round: combatState.round });
+            }
 
             const techniqueColor = TECHNIQUE_COLORS[p.technique];
             combatState.log.push({
