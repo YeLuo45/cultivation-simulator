@@ -2509,16 +2509,16 @@
                         <div class="form-group">
                             <label>Base URL</label>
                             <div style="display: flex; align-items: center;">
-                                <input type="text" id="settingsBaseUrl" class="settings-input" placeholder="https://api.minimax.chat" style="flex: 1;">
+                                <input type="text" id="settingsBaseUrl" class="settings-input" placeholder="https://api.minimaxi.com/v1" style="flex: 1;">
                                 <button class="test-btn" onclick="testApiConfig('baseUrl')">测试</button>
                             </div>
-                            <div class="hint">API基础地址，默认: https://api.minimax.chat</div>
+                            <div class="hint">API基础地址，默认: https://api.minimaxi.com/v1</div>
                             <div id="baseUrlTestResult" class="test-result"></div>
                         </div>
                         <div class="form-group">
                             <label>Model</label>
                             <div style="display: flex; align-items: center;">
-                                <input type="text" id="settingsModel" class="settings-input" placeholder="输入 Model 名称，如 MiniMax-Text-01" style="flex: 1;">
+                                <input type="text" id="settingsModel" class="settings-input" placeholder="输入 Model 名称，如 MiniMax-M2.7" style="flex: 1;">
                                 <button class="test-btn" onclick="testApiConfig('model')">测试</button>
                             </div>
                             <div class="hint">手动输入模型名称</div>
@@ -2593,7 +2593,7 @@
             realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
             stages: ['初期', '中期', '后期'],
             stageNames: ['凡人', '修士', '真人', '天君', '大能'],
-            apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_pro',
+            apiUrl: 'https://api.minimaxi.com/v1/chat/completions',
             storageKey: 'cultivationSave',
             apiConfigKey: 'cultivationApiConfig',
             miniMaxConfigKey: 'cultivationMiniMaxConfig'
@@ -3149,8 +3149,8 @@
         // V10 MiniMax配置
         let miniMaxConfig = {
             apiKey: '',
-            baseUrl: 'https://api.minimax.chat',
-            model: 'MiniMax-Text-01',
+            baseUrl: 'https://api.minimaxi.com/v1',
+            model: 'MiniMax-M2.7',
             groupId: '',
             features: {
                 aiDialogue: false,
@@ -3162,8 +3162,8 @@
         // 默认配置
         const DEFAULT_MINIMAX_CONFIG = {
             apiKey: '',
-            baseUrl: 'https://api.minimax.chat',
-            model: 'MiniMax-Text-01',
+            baseUrl: 'https://api.minimaxi.com/v1',
+            model: 'MiniMax-M2.7',
             groupId: '',
             features: {
                 aiDialogue: false,
@@ -3198,8 +3198,8 @@
         function openSettings() {
             // 填充当前配置
             document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
-            document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimax.chat';
-            document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-Text-01';
+            document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
+            document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-M2.7';
             document.getElementById('settingsGroupId').value = miniMaxConfig.groupId || '';
             document.getElementById('featureAiDialogue').checked = miniMaxConfig.features.aiDialogue || false;
             document.getElementById('featureAiSerendipity').checked = miniMaxConfig.features.aiSerendipity || false;
@@ -3231,8 +3231,8 @@
         // 保存设置
         function saveSettings() {
             miniMaxConfig.apiKey = document.getElementById('settingsApiKey').value.trim();
-            miniMaxConfig.baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimax.chat';
-            miniMaxConfig.model = document.getElementById('settingsModel').value;
+            miniMaxConfig.baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimaxi.com/v1';
+            miniMaxConfig.model = document.getElementById('settingsModel').value.trim() || 'MiniMax-M2.7';
             miniMaxConfig.groupId = document.getElementById('settingsGroupId').value.trim();
             miniMaxConfig.features.aiDialogue = document.getElementById('featureAiDialogue').checked;
             miniMaxConfig.features.aiSerendipity = document.getElementById('featureAiSerendipity').checked;
@@ -3241,7 +3241,7 @@
             localStorage.setItem(CONFIG.miniMaxConfigKey, JSON.stringify(miniMaxConfig));
             
             // 更新CONFIG中的apiUrl
-            CONFIG.apiUrl = miniMaxConfig.baseUrl + '/v1/text/chatcompletion_pro';
+            CONFIG.apiUrl = miniMaxConfig.baseUrl + '/chat/completions';
             
             closeSettings();
             addLog('good', '设置', '配置已保存！');
@@ -4240,15 +4240,15 @@
 - qi和spiritStones可以是0表示无影响
 - 只返回JSON，不要其他内容`;
 
-            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
+            const response = await fetch(`${CONFIG.apiUrl}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: "MiniMax-Text-01",
-                    tokens_to_generate: 500,
+                    model: apiConfig.model || 'MiniMax-M2.7',
+                    max_tokens: 500,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
                 })
@@ -4259,7 +4259,7 @@
             }
 
             const data = await response.json();
-            const content = data.choices[0].text;
+            const content = data.choices[0].message.content;
             
             // 解析JSON
             let jsonStr = content;
@@ -4557,22 +4557,22 @@
     "description": "详细描述（80-150字）"
 }`;
 
-            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
+            const response = await fetch(`${CONFIG.apiUrl}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: "MiniMax-Text-01",
-                    tokens_to_generate: 300,
+                    model: apiConfig.model || 'MiniMax-M2.7',
+                    max_tokens: 300,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
                 })
             });
 
             const data = await response.json();
-            const content = data.choices[0].text;
+            const content = data.choices[0].message.content;
             
             let jsonStr = content;
             const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -5009,15 +5009,15 @@
                 const realmName = CONFIG.realms[gameState.realm];
                 const prompt = `你是一个修仙世界的商店掌柜。请为"天机阁"生成一段简短的问候语（20-40字），要符合当前境界的修士。掌柜语气要亲切但不啰嗦。当前修士是${realmName}期修士。只返回问候语，不要其他内容。`;
                 
-                const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
+                const response = await fetch(`${CONFIG.apiUrl}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${apiConfig.apiKey}`
                     },
                     body: JSON.stringify({
-                        model: "MiniMax-Text-01",
-                        tokens_to_generate: 100,
+                        model: apiConfig.model || 'MiniMax-M2.7',
+                        max_tokens: 100,
                         temperature: 0.8,
                         messages: [{ role: "user", content: prompt }]
                     })
@@ -5025,7 +5025,7 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const intro = data.choices[0].text.trim();
+                    const intro = data.choices[0].message.content.trim();
                     document.getElementById('shopIntro').textContent = intro;
                 }
             } catch (error) {
@@ -5309,15 +5309,15 @@
                             'Authorization': `Bearer ${apiConfig.apiKey}`
                         },
                         body: JSON.stringify({
-                            model: "MiniMax-Text-01",
-                            tokens_to_generate: 150,
+                            model: apiConfig.model || 'MiniMax-M2.7',
+                            max_tokens: 150,
                             temperature: 0.8,
                             messages: [{ role: "user", content: prompt }]
                         })
                     });
                     if (response.ok) {
                         const data = await response.json();
-                        craftDesc = data.choices[0].text.trim();
+                        craftDesc = data.choices[0].message.content.trim();
                     }
                 } catch (error) {
                     craftDesc = `丹炉中灵光闪烁，药香四溢...`;
@@ -5805,15 +5805,15 @@
 
             const prompt = prompts[trib.type] || '描写修仙渡劫场景';
 
-            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
+            const response = await fetch(`${CONFIG.apiUrl}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'abab6.5s-chat',
-                    tokens_to_generate: 200,
+                    model: apiConfig.model || 'MiniMax-M2.7',
+                    max_tokens: 200,
                     messages: [{
                         role: 'user',
                         content: `你是一个修仙游戏场景描述器。请生成一段50字左右的渡劫场景描述，描写${prompt}。只返回描述文字，不要其他内容。`
@@ -5823,7 +5823,7 @@
             });
 
             const data = await response.json();
-            return data.choices?.[0]?.messages?.[0]?.text || trib.desc;
+            return data.choices?.[0]?.message?.content || trib.desc;
         }
 
         // 执行渡劫判定
