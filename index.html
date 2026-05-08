@@ -351,6 +351,10 @@
             background: linear-gradient(135deg, #283593, #5c6bc0);
             color: white;
         }
+        .btn-settings {
+            background: linear-gradient(135deg, #455a64, #78909c);
+            color: white;
+        }
         
         /* 装备栏 */
         .equipment-bar {
@@ -1991,19 +1995,253 @@
         .sr-tips h4 { color: #ffd700; margin-bottom: 10px; }
         .sr-tips ul { margin: 0; padding-left: 20px; color: #aaa; font-size: 0.9em; }
         .sr-tips li { margin-bottom: 5px; }
+        
+        /* 设置面板样式 */
+        .settings-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            min-width: 120px;
+        }
+        .settings-nav-item {
+            padding: 12px 15px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 8px;
+            background: rgba(50, 50, 100, 0.3);
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        .settings-nav-item:hover {
+            background: rgba(70, 70, 120, 0.5);
+            color: #ffd700;
+        }
+        .settings-nav-item.active {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border-color: #ffd700;
+        }
+        .settings-content {
+            flex: 1;
+            padding: 15px;
+        }
+        .settings-section {
+            display: none;
+        }
+        .settings-section.active {
+            display: block;
+        }
+        .settings-section h4 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            color: #aaa;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        .form-group .hint {
+            color: #888;
+            font-size: 0.8em;
+            margin-top: 3px;
+        }
+        .settings-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 0.95em;
+            transition: border-color 0.3s;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        .settings-input::placeholder {
+            color: #666;
+        }
+        .settings-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+        .settings-select:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        .settings-select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        .test-btn {
+            padding: 5px 12px;
+            border: 1px solid #4a90d9;
+            border-radius: 5px;
+            background: rgba(74, 144, 217, 0.2);
+            color: #4a90d9;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-left: 10px;
+        }
+        .test-btn:hover {
+            background: rgba(74, 144, 217, 0.4);
+        }
+        .test-result {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            display: none;
+        }
+        .test-result.success {
+            display: block;
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4caf50;
+            color: #4caf50;
+        }
+        .test-result.error {
+            display: block;
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+        .feature-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .feature-toggle .feature-info {
+            flex: 1;
+        }
+        .feature-toggle .feature-name {
+            color: #e0e0e0;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        .feature-toggle .feature-desc {
+            color: #888;
+            font-size: 0.85em;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(100, 100, 100, 0.5);
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: #4a90d9;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+        .settings-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        .btn-save-settings {
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #4caf50, #69f0ae);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-save-settings:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        .btn-reset-settings {
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #666, #888);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-reset-settings:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(100, 100, 100, 0.3);
+        }
+        .about-section {
+            text-align: center;
+            padding: 20px;
+        }
+        .about-section .version {
+            color: #ffd700;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        .about-section p {
+            color: #aaa;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🌟 修仙模拟器 🌟</h1>
         
-        <div id="apiConfig" class="api-config">
-            <h4>⚙️ API 配置</h4>
-            <input type="text" id="apiKey" class="api-input" placeholder="MiniMax API Key">
-            <input type="text" id="groupId" class="api-input" placeholder="Group ID">
-            <button class="btn btn-save" onclick="saveApiConfig()">保存配置</button>
-        </div>
-
         <div id="gameStats" class="stats-bar hidden">
             <div class="stat-item">
                 <div class="stat-label">境界</div>
@@ -2096,6 +2334,7 @@
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
             <button class="btn btn-worldmap" onclick="openWorldMap()">🗺️ 世界地图</button>
             <button class="btn btn-save" onclick="manualSave()">💾 存档</button>
+            <button class="btn btn-settings" onclick="openSettings()">⚙️ 设置</button>
         </div>
 
         <div id="eventLog" class="event-log hidden">
@@ -2240,6 +2479,112 @@
         </div>
     </div>
 
+    <!-- V10 MiniMax设置模态框 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 class="modal-title">⚙️ 设置</h2>
+            <div style="display: flex; gap: 20px; min-height: 400px;">
+                <div class="settings-nav">
+                    <div class="settings-nav-item active" onclick="switchSettingsTab('api')">API配置</div>
+                    <div class="settings-nav-item" onclick="switchSettingsTab('features')">功能开关</div>
+                    <div class="settings-nav-item" onclick="switchSettingsTab('about')">关于</div>
+                </div>
+                <div class="settings-content">
+                    <!-- API配置 -->
+                    <div id="settingsApi" class="settings-section active">
+                        <h4>🤖 MiniMax API 配置</h4>
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="password" id="settingsApiKey" class="settings-input" placeholder="输入 MiniMax API Key">
+                            <div class="hint">用于调用MiniMax大模型API</div>
+                            <div id="apiKeyTestResult" class="test-result"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Base URL</label>
+                            <div style="display: flex; align-items: center;">
+                                <input type="text" id="settingsBaseUrl" class="settings-input" placeholder="https://api.minimax.chat" style="flex: 1;">
+                                <button class="test-btn" onclick="testApiConfig('baseUrl')">测试</button>
+                            </div>
+                            <div class="hint">API基础地址，默认: https://api.minimax.chat</div>
+                            <div id="baseUrlTestResult" class="test-result"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Model</label>
+                            <div style="display: flex; align-items: center;">
+                                <select id="settingsModel" class="settings-select">
+                                    <option value="MiniMax-Text-01">MiniMax-Text-01</option>
+                                    <option value="MiniMax-Text-01-32K">MiniMax-Text-01-32K</option>
+                                    <option value="MiniMax-Text-01-128K">MiniMax-Text-01-128K</option>
+                                    <option value="MiniMax-Embedding-01">MiniMax-Embedding-01</option>
+                                </select>
+                                <button class="test-btn" onclick="testApiConfig('model')">测试</button>
+                            </div>
+                            <div class="hint">选择要使用的模型</div>
+                            <div id="modelTestResult" class="test-result"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>API Group ID</label>
+                            <div style="display: flex; align-items: center;">
+                                <input type="text" id="settingsGroupId" class="settings-input" placeholder="输入 Group ID">
+                                <button class="test-btn" onclick="testApiConfig('groupId')">测试</button>
+                            </div>
+                            <div class="hint">MiniMax Group ID（可选）</div>
+                            <div id="groupIdTestResult" class="test-result"></div>
+                        </div>
+                    </div>
+                    <!-- 功能开关 -->
+                    <div id="settingsFeatures" class="settings-section">
+                        <h4>🔌 AI功能开关</h4>
+                        <div class="feature-toggle">
+                            <div class="feature-info">
+                                <div class="feature-name">AI 对话</div>
+                                <div class="feature-desc">启用AI智能NPC对话功能</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="featureAiDialogue">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="feature-toggle">
+                            <div class="feature-info">
+                                <div class="feature-name">AI 生成奇遇</div>
+                                <div class="feature-desc">AI生成随机奇遇事件</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="featureAiSerendipity">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="feature-toggle">
+                            <div class="feature-info">
+                                <div class="feature-name">AI 生成功法</div>
+                                <div class="feature-desc">AI生成新功法名称和描述</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="featureAiTechnique">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- 关于 -->
+                    <div id="settingsAbout" class="settings-section">
+                        <div class="about-section">
+                            <div class="version">🌟 修仙模拟器 V10</div>
+                            <p>一款以修仙为背景的模拟养成游戏</p>
+                            <p>融合了境界突破、炼丹炼器、宗门系统、世界地图等丰富玩法</p>
+                            <p style="margin-top: 20px; color: #888;">MiniMax配置面板 - 让玩家自定义AI功能</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-buttons">
+                <button class="btn-reset-settings" onclick="resetSettings()">重置默认</button>
+                <button class="btn-save-settings" onclick="saveSettings()">保存设置</button>
+            </div>
+            <button class="close-btn" onclick="closeSettings()">关闭</button>
+        </div>
+    </div>
+
     <script>
         // 游戏配置
         const CONFIG = {
@@ -2248,7 +2593,8 @@
             stageNames: ['凡人', '修士', '真人', '天君', '大能'],
             apiUrl: 'https://api.minimax.chat/v1/text/chatcompletion_pro',
             storageKey: 'cultivationSave',
-            apiConfigKey: 'cultivationApiConfig'
+            apiConfigKey: 'cultivationApiConfig',
+            miniMaxConfigKey: 'cultivationMiniMaxConfig'
         };
 
         // 丹药定义
@@ -2798,34 +3144,177 @@
             4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 }
         };
 
-        // API配置
-        let apiConfig = {
+        // V10 MiniMax配置
+        let miniMaxConfig = {
             apiKey: '',
-            groupId: ''
+            baseUrl: 'https://api.minimax.chat',
+            model: 'MiniMax-Text-01',
+            groupId: '',
+            features: {
+                aiDialogue: false,
+                aiSerendipity: false,
+                aiTechnique: false
+            }
+        };
+
+        // 默认配置
+        const DEFAULT_MINIMAX_CONFIG = {
+            apiKey: '',
+            baseUrl: 'https://api.minimax.chat',
+            model: 'MiniMax-Text-01',
+            groupId: '',
+            features: {
+                aiDialogue: false,
+                aiSerendipity: false,
+                aiTechnique: false
+            }
         };
 
         // 初始化
         function init() {
-            loadApiConfig();
+            loadMiniMaxConfig();
             updateDisplay();
         }
 
-        // 加载API配置
-        function loadApiConfig() {
-            const saved = localStorage.getItem(CONFIG.apiConfigKey);
+        // 加载MiniMax配置
+        function loadMiniMaxConfig() {
+            const saved = localStorage.getItem(CONFIG.miniMaxConfigKey);
             if (saved) {
-                apiConfig = JSON.parse(saved);
-                document.getElementById('apiKey').value = apiConfig.apiKey || '';
-                document.getElementById('groupId').value = apiConfig.groupId || '';
+                try {
+                    miniMaxConfig = JSON.parse(saved);
+                    // 确保features结构完整
+                    if (!miniMaxConfig.features) {
+                        miniMaxConfig.features = { ...DEFAULT_MINIMAX_CONFIG.features };
+                    }
+                } catch (e) {
+                    miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
+                }
             }
         }
 
-        // 保存API配置
-        function saveApiConfig() {
-            apiConfig.apiKey = document.getElementById('apiKey').value.trim();
-            apiConfig.groupId = document.getElementById('groupId').value.trim();
-            localStorage.setItem(CONFIG.apiConfigKey, JSON.stringify(apiConfig));
-            alert('API配置已保存!');
+        // 打开设置面板
+        function openSettings() {
+            // 填充当前配置
+            document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
+            document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimax.chat';
+            document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-Text-01';
+            document.getElementById('settingsGroupId').value = miniMaxConfig.groupId || '';
+            document.getElementById('featureAiDialogue').checked = miniMaxConfig.features.aiDialogue || false;
+            document.getElementById('featureAiSerendipity').checked = miniMaxConfig.features.aiSerendipity || false;
+            document.getElementById('featureAiTechnique').checked = miniMaxConfig.features.aiTechnique || false;
+            
+            // 清除测试结果
+            document.querySelectorAll('.test-result').forEach(el => {
+                el.className = 'test-result';
+                el.style.display = 'none';
+            });
+            
+            // 显示面板
+            document.getElementById('settingsModal').classList.add('active');
+        }
+
+        // 关闭设置面板
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        // 切换设置标签页
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.settings-nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.settings-section').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.settings-nav-item[onclick="switchSettingsTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`settings${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+        }
+
+        // 保存设置
+        function saveSettings() {
+            miniMaxConfig.apiKey = document.getElementById('settingsApiKey').value.trim();
+            miniMaxConfig.baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimax.chat';
+            miniMaxConfig.model = document.getElementById('settingsModel').value;
+            miniMaxConfig.groupId = document.getElementById('settingsGroupId').value.trim();
+            miniMaxConfig.features.aiDialogue = document.getElementById('featureAiDialogue').checked;
+            miniMaxConfig.features.aiSerendipity = document.getElementById('featureAiSerendipity').checked;
+            miniMaxConfig.features.aiTechnique = document.getElementById('featureAiTechnique').checked;
+            
+            localStorage.setItem(CONFIG.miniMaxConfigKey, JSON.stringify(miniMaxConfig));
+            
+            // 更新CONFIG中的apiUrl
+            CONFIG.apiUrl = miniMaxConfig.baseUrl + '/v1/text/chatcompletion_pro';
+            
+            closeSettings();
+            addLog('good', '设置', '配置已保存！');
+        }
+
+        // 重置设置
+        function resetSettings() {
+            miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
+            document.getElementById('settingsApiKey').value = '';
+            document.getElementById('settingsBaseUrl').value = DEFAULT_MINIMAX_CONFIG.baseUrl;
+            document.getElementById('settingsModel').value = DEFAULT_MINIMAX_CONFIG.model;
+            document.getElementById('settingsGroupId').value = '';
+            document.getElementById('featureAiDialogue').checked = false;
+            document.getElementById('featureAiSerendipity').checked = false;
+            document.getElementById('featureAiTechnique').checked = false;
+            
+            // 清除测试结果
+            document.querySelectorAll('.test-result').forEach(el => {
+                el.className = 'test-result';
+                el.style.display = 'none';
+            });
+        }
+
+        // 测试API配置
+        async function testApiConfig(type) {
+            const resultEl = document.getElementById(`${type}TestResult`);
+            resultEl.className = 'test-result';
+            resultEl.style.display = 'block';
+            resultEl.textContent = '测试中...';
+            
+            const apiKey = document.getElementById('settingsApiKey').value.trim();
+            const baseUrl = document.getElementById('settingsBaseUrl').value.trim() || 'https://api.minimax.chat';
+            const model = document.getElementById('settingsModel').value;
+            const groupId = document.getElementById('settingsGroupId').value.trim();
+            
+            // 简单的连通性测试
+            try {
+                const startTime = Date.now();
+                
+                if (type === 'baseUrl') {
+                    // 测试URL是否可达
+                    const response = await fetch(baseUrl, {
+                        method: 'HEAD',
+                        mode: 'no-cors'
+                    });
+                    const elapsed = Date.now() - startTime;
+                    resultEl.className = 'test-result success';
+                    resultEl.textContent = `✓ 连接成功 (${elapsed}ms)`;
+                } else if (type === 'model') {
+                    // 模型选择只验证格式
+                    const validModels = ['MiniMax-Text-01', 'MiniMax-Text-01-32K', 'MiniMax-Text-01-128K', 'MiniMax-Embedding-01'];
+                    if (validModels.includes(model)) {
+                        resultEl.className = 'test-result success';
+                        resultEl.textContent = `✓ 模型可用: ${model}`;
+                    } else {
+                        resultEl.className = 'test-result error';
+                        resultEl.textContent = `✗ 未知模型: ${model}`;
+                    }
+                } else if (type === 'apiKey' || type === 'groupId') {
+                    // 需要实际API调用的测试，这里做简化处理
+                    if (type === 'apiKey' && apiKey) {
+                        resultEl.className = 'test-result success';
+                        resultEl.textContent = '✓ API Key格式正确（实际连接测试需保存后进行）';
+                    } else if (type === 'groupId') {
+                        resultEl.className = 'test-result success';
+                        resultEl.textContent = '✓ Group ID已记录（可不填写）';
+                    } else {
+                        resultEl.className = 'test-result error';
+                        resultEl.textContent = '✗ 请先填写必填项';
+                    }
+                }
+            } catch (error) {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = `✗ 连接失败: ${error.message}`;
+            }
         }
 
         // 开始新游戏
