@@ -2,9 +2,138 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>修仙模拟器</title>
     <style>
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            * { box-sizing: border-box; }
+            body { font-size: 14px; margin: 0; padding: 0; overflow-x: hidden; }
+            
+            /* 按钮尺寸 - 移动端最小44px */
+            button, .btn, .action-btn {
+                min-height: 44px !important;
+                min-width: 44px !important;
+                font-size: 14px !important;
+                padding: 8px 12px !important;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
+            /* 防止按钮文字选中 */
+            button, .btn { user-select: none; -webkit-user-select: none; }
+            
+            /* 装备/背包网格缩小 */
+            .inventory-grid, .equipment-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important;
+                gap: 8px !important;
+            }
+            
+            /* 战斗UI堆叠布局 */
+            .combat-container {
+                flex-direction: column !important;
+            }
+            
+            /* 模态框全屏 */
+            .modal-content, .modal {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+            }
+            
+            /* 状态栏紧凑 */
+            .status-bar { font-size: 12px; padding: 4px 8px; }
+            
+            /* 能量条高度 */
+            .energy-bar { height: 12px; }
+            
+            /* 日志区域固定高度可滚动 */
+            .combat-log, .event-log {
+                height: 150px !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        /* 横屏提示 */
+        @media (orientation: landscape) and (max-height: 500px) {
+            .landscape-warning {
+                display: flex !important;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.95);
+                z-index: 99999;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 16px;
+                text-align: center;
+                padding: 20px;
+            }
+        }
+
+        /* 技能网格 */
+        .skill-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 6px;
+            padding: 8px;
+        }
+        .skill-item {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #252540;
+            border: 1px solid #444;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .skill-item:hover, .skill-item:active {
+            background: #303060;
+            transform: scale(1.05);
+        }
+        .skill-item .skill-icon { font-size: 20px; }
+        .skill-item .skill-name { font-size: 9px; color: #aaa; margin-top: 2px; }
+
+        /* 状态栏紧凑化 */
+        .status-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 6px 10px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .status-bar .stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .status-bar .stat-value { color: #ffd700; font-weight: bold; }
+
+        /* 响应式布局断点优化 */
+        @media (min-width: 1024px) {
+            .game-container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .combat-panel {
+                display: grid;
+                grid-template-columns: 1fr 300px;
+            }
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -2347,7 +2476,10 @@
         </div>
 
         <div id="eventLog" class="event-log hidden">
-            <h3>📜 事件日志</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3>📜 事件日志</h3>
+                <button onclick="showEventLogHistory()" style="padding:2px 8px;background:#333;color:#888;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:10px;">历史</button>
+            </div>
             <div id="logEntries"></div>
         </div>
 
@@ -3905,6 +4037,8 @@
             days: 1,
             cultivationProgress: 0,
             eventLog: [],
+            combatLogHistory: [],
+            eventLogHistory: [],
             isGameOver: false,
             isVictory: false,
             // V2新增字段
@@ -4947,6 +5081,11 @@
             if (gameState.eventLog.length > 50) {
                 gameState.eventLog.pop();
             }
+            // 存储历史（最多100条）
+            if (!gameState.eventLogHistory) gameState.eventLogHistory = [];
+            const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            gameState.eventLogHistory.push({time, type, title, text, day: gameState.days});
+            if (gameState.eventLogHistory.length > 100) gameState.eventLogHistory.shift();
             renderLog();
         }
 
@@ -5507,13 +5646,97 @@
 
         // 手动存档
         function manualSave() {
-            saveGame();
-            alert('游戏已保存！');
+            showSaveLoadModal();
         }
 
         // 保存游戏
         function saveGame() {
             localStorage.setItem(CONFIG.storageKey, JSON.stringify(gameState));
+        }
+
+        // 存档管理面板
+        function showSaveLoadModal() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            let saveInfo = '未找到存档';
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    saveInfo = `存档时间: ${new Date(data.days ? data.days : Date.now()).toLocaleString('zh-CN')}`;
+                } catch(e) {
+                    saveInfo = '存档损坏';
+                }
+            }
+            
+            let html = '<div style="padding:16px;background:#1a1a2e;border-radius:8px;min-width:280px;">';
+            html += '<div style="margin-bottom:16px;text-align:center;">';
+            html += '<b style="color:#ffd700;font-size:16px;">📁 存档管理</b>';
+            html += `<div style="color:#888;font-size:11px;margin-top:4px;">${saveInfo}</div>`;
+            html += '</div>';
+            html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+            html += `<button onclick="doSaveGame();closeModal();" style="padding:12px;background:#2e7d32;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">💾 保存游戏</button>`;
+            html += `<button onclick="doLoadGame();closeModal();" style="padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">📂 加载存档</button>`;
+            html += `<button onclick="showAutoSaveInfo()" style="padding:12px;background:#333;color:#aaa;border:1px solid #555;border-radius:6px;cursor:pointer;font-size:14px;">ℹ️ 自动存档</button>`;
+            html += `<button onclick="doResetGame()" style="padding:12px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">⚠️ 重置游戏</button>`;
+            html += '</div>';
+            html += '<button onclick="closeModal()" style="margin-top:16px;width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>';
+            html += '</div>';
+            showModal(html);
+        }
+
+        function doSaveGame() {
+            try {
+                saveGame();
+                addLog('good', '存档成功', '游戏已保存到本地存储');
+            } catch (e) {
+                addLog('bad', '存档失败', '保存失败: ' + e.message);
+            }
+        }
+
+        function doLoadGame() {
+            try {
+                const saved = localStorage.getItem(CONFIG.storageKey);
+                if (!saved) {
+                    addLog('bad', '加载失败', '没有找到存档');
+                    return;
+                }
+                const data = JSON.parse(saved);
+                // 确保新增字段存在（向后兼容）
+                if (!data.combatLogHistory) data.combatLogHistory = [];
+                if (!data.eventLogHistory) data.eventLogHistory = [];
+                gameState = data;
+                addLog('good', '加载成功', `存档已加载 (第${gameState.days}天)`);
+                // 重新渲染UI
+                if (typeof renderGameUI === 'function') renderGameUI();
+                if (typeof refreshInventoryUI === 'function') refreshInventoryUI();
+                if (typeof updateDisplay === 'function') updateDisplay();
+                showGameUI();
+            } catch (e) {
+                addLog('bad', '加载失败', '加载失败: ' + e.message);
+            }
+        }
+
+        function doResetGame() {
+            if (!confirm('确定要重置游戏吗？所有进度将丢失！')) return;
+            try {
+                localStorage.removeItem(CONFIG.storageKey);
+                location.reload();
+            } catch (e) {
+                addLog('bad', '重置失败', '重置失败');
+            }
+        }
+
+        function showAutoSaveInfo() {
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;">';
+            html += '<b style="color:#ffd700;">ℹ️ 自动存档说明</b><br><br>';
+            html += '<div style="color:#ccc;font-size:13px;line-height:1.6;">';
+            html += '• 游戏会自动在重要操作后保存到本地<br>';
+            html += '• 点击「保存游戏」可手动保存当前进度<br>';
+            html += '• 存档保存在浏览器本地存储中<br>';
+            html += '• 清除浏览器数据会导致存档丢失<br>';
+            html += '• 建议定期手动保存重要进度</div>';
+            html += '<button onclick="showSaveLoadModal()" style="margin-top:12px;width:100%;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">知道了</button>';
+            html += '</div>';
+            showModal(html);
         }
 
         // 初始化游戏
@@ -7424,6 +7647,87 @@
             `;
         }
 
+        // 添加战斗日志到历史
+        function addCombatLog(message) {
+            if (!gameState.combatLogHistory) gameState.combatLogHistory = [];
+            const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            gameState.combatLogHistory.push({time, message});
+            if (gameState.combatLogHistory.length > 100) gameState.combatLogHistory.shift();
+        }
+
+        // 事件日志快捷函数（用于非游戏逻辑的提示）
+        function addEventLog(message, type='normal') {
+            const colors = { normal:'#ccc', success:'#00ff88', warning:'#ff9800', danger:'#f44336' };
+            const color = colors[type] || colors.normal;
+            // 通过addLog系统记录
+            addLog(type === 'success' ? 'good' : type === 'danger' ? 'bad' : type, '提示', message);
+        }
+
+        // 显示战斗日志历史
+        function showCombatLogHistory() {
+            const history = gameState.combatLogHistory || [];
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+            html += '<b style="color:#ffd700;font-size:14px;">⚔️ 战斗日志历史</b>';
+            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
+            html += '</div>';
+            if (history.length === 0) {
+                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
+            } else {
+                history.forEach(entry => {
+                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
+                    html += `<span style="color:#666;font-size:10px;">[${entry.time}]</span> `;
+                    html += `<span style="color:#ccc;">${entry.message}</span>`;
+                    html += '</div>';
+                });
+            }
+            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
+            html += `<button onclick="clearCombatLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
+            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
+            html += '</div></div>';
+            showModal(html);
+        }
+
+        function clearCombatLogHistory() {
+            gameState.combatLogHistory = [];
+            addEventLog('⚠️ 战斗日志已清空', 'warning');
+            closeModal();
+        }
+
+        // 显示事件日志历史
+        function showEventLogHistory() {
+            const history = gameState.eventLogHistory || [];
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+            html += '<b style="color:#ffd700;font-size:14px;">📜 事件日志历史</b>';
+            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
+            html += '</div>';
+            if (history.length === 0) {
+                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
+            } else {
+                history.slice().reverse().forEach(entry => {
+                    const colors = { good:'#00ff88', bad:'#f44336', neutral:'#ccc', negative:'#f44336', warning:'#ff9800', welcome:'#ffd700' };
+                    const color = colors[entry.type] || '#ccc';
+                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
+                    html += `<span style="color:#666;font-size:10px;">[${entry.time}] 第${entry.day}天</span> `;
+                    html += `<span style="color:${color};">${entry.title}</span> `;
+                    html += `<span style="color:#aaa;">${entry.text}</span>`;
+                    html += '</div>';
+                });
+            }
+            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
+            html += `<button onclick="clearEventLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
+            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
+            html += '</div></div>';
+            showModal(html);
+        }
+
+        function clearEventLogHistory() {
+            gameState.eventLogHistory = [];
+            addLog('warning', '日志清空', '事件日志已清空');
+            closeModal();
+        }
+
         // 渲染战斗场景
         function renderCombatArena() {
             const p = combatState.player;
@@ -7455,8 +7759,10 @@
                                 <span class="combatant-stat"><span class="icon">💨</span>${p.speed}</span>
                                 <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
                             </div>
-                            ${renderUltimateEnergyBar()}
-                            ${renderCounterEnergyBar()}
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div style="flex:1;">${renderUltimateEnergyBar()}</div>
+                                <div style="flex:1;">${renderCounterEnergyBar()}</div>
+                            </div>
                             <div class="combatant-effects">
                                 ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
                                 ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
@@ -7487,8 +7793,11 @@
                             </div>
                         </div>
                     </div>
-                    <div class="combat-log">
-                        <div class="combat-log-title">⚔️ 战斗日志</div>
+                    <div class="combat-log" style="height:120px;overflow-y:auto;padding:8px;background:#111;border-radius:4px;font-size:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="color:#ffd700;font-size:11px;">⚔️ 战斗日志</span>
+                            <button onclick="showCombatLogHistory()" style="padding:2px 8px;background:#333;color:#888;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:10px;">历史</button>
+                        </div>
                         ${combatState.log.slice(-8).map(entry => `
                             <div class="combat-log-entry ${entry.type} ${entry.actionType || ''}">${entry.text}</div>
                         `).join('')}
@@ -10397,5 +10706,6 @@
         }
 
     </script>
+    <div class="landscape-warning" style="display:none;">请竖屏体验以获得最佳效果</div>
 </body>
 </html>
