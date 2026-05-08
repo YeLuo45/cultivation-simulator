@@ -1447,6 +1447,15 @@
         .combat-action-btn.defend:hover:not(:disabled) { background: rgba(33, 150, 243, 0.5); }
         .combat-action-btn.escape { background: rgba(255, 152, 0, 0.3); border-color: rgba(255, 152, 0, 0.5); }
         .combat-action-btn.escape:hover:not(:disabled) { background: rgba(255, 152, 0, 0.5); }
+        .combat-action-btn.ultimate { background: rgba(255, 215, 0, 0.3); border-color: rgba(255, 215, 0, 0.5); color: #ffd700; }
+        .combat-action-btn.ultimate:hover:not(:disabled) { background: rgba(255, 215, 0, 0.5); }
+        .combat-action-btn.ultimate:disabled { opacity: 0.4; cursor: not-allowed; }
+        .energy-fill { transition: width 0.3s; }
+        .energy-ready { animation: pulse-energy 1s infinite; }
+        @keyframes pulse-energy {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
 
         .combat-submenu {
             display: grid;
@@ -2629,7 +2638,6 @@
         };
 
         // ========== V11 装备强化系统 ==========
-        // 强化等级配置：每级需要的材料和灵石，成功率
         const ENHANCE_CONFIG = {
             // 1→2, 2→3, ... : [玄铁, 天材, 混沌石, 灵石]
             costs: {
@@ -2892,6 +2900,138 @@
             updateEquipmentBar();
             updateDisplay();
             closeEnhancePanel();
+        }
+
+        // ========== V12 必杀技系统 ==========
+        // 每把武器对应一个绝技：充能型爆发技能
+        const ULTIMATE_SKILLS = {
+            // 普通武器
+            '凡铁剑': { name: '重击', desc: '基础重击', icon: '⚔️', cost: 50, damage: 2.0, effect: null, color: '#aaaaaa' },
+            '青云剑': { name: '青云剑意', desc: '剑气纵横', icon: '⚔️', cost: 60, damage: 2.5, effect: null, color: '#64b5f6' },
+            '混元珠': { name: '混元爆发', desc: '暴击率+30%', icon: '🔮', cost: 50, damage: 1.5, effect: { critBonus: 0.30 }, color: '#ba68c8' },
+            '金缕衣': { name: '金身护体', desc: '防御+50%', icon: '👘', cost: 50, damage: 0, effect: { defenseBoost: 0.50 }, color: '#ffd700' },
+            '避火罩': { name: '烈焰护盾', desc: '火抗+100%', icon: '🔥', cost: 50, damage: 0, effect: { fireResistBoost: 1.0 }, color: '#ff5722' },
+            // 珍稀武器
+            '雷霆铛': { name: '九天神雷', desc: '雷法绝技', icon: '⚡', cost: 70, damage: 3.5, effect: { thunderBonus: 0.50 }, color: '#ffeb3b' },
+            '赤焰刀': { name: '焚天斩', desc: '火法绝技', icon: '🔥', cost: 70, damage: 3.5, effect: { fireBonus: 0.50 }, color: '#ff5722' },
+            '寒冰剑': { name: '寒冰封天', desc: '水法绝技', icon: '❄️', cost: 70, damage: 3.5, effect: { waterBonus: 0.50 }, color: '#03a9f4' },
+            '金刚杵': { name: '金刚伏魔', desc: '体术绝技', icon: '🔨', cost: 70, damage: 3.5, effect: { bodyBonus: 0.50 }, color: '#ff9800' },
+            // 默认空手绝技
+            '_fist': { name: '气功波', desc: '灵力冲击', icon: '💨', cost: 40, damage: 1.8, effect: null, color: '#888888' }
+        };
+
+        // 战斗中能量状态
+        let combatEnergy = 0;
+        const MAX_ENERGY = 100;
+
+        // 获取当前武器对应的绝技
+        function getCurrentUltimateSkill() {
+            const weapon = combatState.player.weapon;
+            if (weapon && ULTIMATE_SKILLS[weapon]) {
+                return ULTIMATE_SKILLS[weapon];
+            }
+            // 空手
+            return ULTIMATE_SKILLS['_fist'];
+        }
+
+        // 获取绝技能量条显示
+        function getEnergyBar() {
+            const skill = getCurrentUltimateSkill();
+            const pct = Math.min(100, (combatEnergy / skill.cost) * 100);
+            const ready = combatEnergy >= skill.cost;
+            return {
+                current: combatEnergy,
+                cost: skill.cost,
+                pct,
+                ready,
+                skill
+            };
+        }
+
+        // 释放绝技
+        function executeUltimateSkill() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const skill = getCurrentUltimateSkill();
+
+            if (combatEnergy < skill.cost) return;
+
+            combatEnergy -= skill.cost;
+            combatState.round++;
+
+            let logText = `🔥 发动绝技「${skill.name}」！`;
+
+            // 伤害计算
+            if (skill.damage > 0) {
+                let baseDamage = Math.floor(p.attack * skill.damage);
+                // 功法加成
+                if (TECHNIQUE_BONUS[p.technique].beats === o.technique) {
+                    baseDamage = Math.floor(baseDamage * 1.5);
+                    logText += '（功法克制）';
+                }
+                // 星级增幅
+                const weaponStar = p.weapon ? (p.weaponData && p.weaponData.star || 1) : 1;
+                const starMult = ENHANCE_CONFIG.starMultipliers[weaponStar] || 1.0;
+                baseDamage = Math.floor(baseDamage * starMult);
+
+                const isCrit = Math.random() < p.critRate;
+                if (isCrit) baseDamage = Math.floor(baseDamage * 1.5);
+
+                let finalDamage = baseDamage;
+                if (!combatState.effects.player.ignoreDefense) {
+                    finalDamage = Math.max(1, baseDamage - Math.floor(o.defense * 0.3));
+                }
+                o.hp = Math.max(0, o.hp - finalDamage);
+                logText += ` 造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}！`;
+            }
+
+            // 特殊效果
+            if (skill.effect) {
+                if (skill.effect.critBonus) {
+                    combatState.effects.player.critBoostNext = (combatState.effects.player.critBoostNext || 0) + skill.effect.critBonus;
+                    logText += ` 下次暴击率+${Math.round(skill.effect.critBonus * 100)}%！`;
+                }
+                if (skill.effect.defenseBoost) {
+                    combatState.effects.player.defenseBoost += skill.effect.defenseBoost;
+                    logText += ` 防御+${Math.round(skill.effect.defenseBoost * 100)}%！`;
+                }
+                if (skill.effect.fireResistBoost) {
+                    combatState.effects.player.fireResist = (combatState.effects.player.fireResist || 0) + skill.effect.fireResistBoost;
+                    logText += ` 火抗+${Math.round(skill.effect.fireResistBoost * 100)}%！`;
+                }
+                if (skill.effect.thunderBonus) {
+                    combatState.effects.player.thunderBonus = (combatState.effects.player.thunderBonus || 0) + skill.effect.thunderBonus;
+                    logText += ` 雷法伤害+${Math.round(skill.effect.thunderBonus * 100)}%！`;
+                }
+                if (skill.effect.fireBonus) {
+                    combatState.effects.player.fireBonus = (combatState.effects.player.fireBonus || 0) + skill.effect.fireBonus;
+                    logText += ` 火法伤害+${Math.round(skill.effect.fireBonus * 100)}%！`;
+                }
+                if (skill.effect.waterBonus) {
+                    combatState.effects.player.waterBonus = (combatState.effects.player.waterBonus || 0) + skill.effect.waterBonus;
+                    logText += ` 水法伤害+${Math.round(skill.effect.waterBonus * 100)}%！`;
+                }
+                if (skill.effect.bodyBonus) {
+                    combatState.effects.player.bodyBonus = (combatState.effects.player.bodyBonus || 0) + skill.effect.bodyBonus;
+                    logText += ` 体术伤害+${Math.round(skill.effect.bodyBonus * 100)}%！`;
+                }
+            }
+
+            combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
+
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            if (o.hp <= 0) {
+                setTimeout(() => endCombat('win'), 500);
+            } else {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // 攻击后增加能量
+        function addEnergy(amount) {
+            combatEnergy = Math.min(MAX_ENERGY, combatEnergy + amount);
         }
 
         // 天劫类型定义
@@ -6697,6 +6837,8 @@
                 playerMaxHP = Math.floor(playerMaxHP * (1 + gameState.activeEffects.all_stats));
             }
 
+            combatEnergy = 0; // 重置必杀技能量
+
             combatState = {
                 inProgress: true,
                 round: 0,
@@ -6714,6 +6856,7 @@
                     technique: playerTechnique,
                     techniqueColor: TECHNIQUE_COLORS[playerTechnique],
                     weapon: playerWeapon ? playerWeapon.name : null,
+                    weaponData: playerWeapon, // 完整对象含星级
                     armor: playerArmor ? playerArmor.name : null,
                     critRate: playerCritRate
                 },
@@ -6734,6 +6877,25 @@
             if (combatState.turn === 'opponent') {
                 setTimeout(() => executeOpponentTurn(), 1000);
             }
+        }
+
+        // 渲染必杀技能量条
+        function renderUltimateEnergyBar() {
+            const info = getEnergyBar();
+            const skill = info.skill;
+            const barColor = info.ready ? skill.color : '#555';
+            const readyClass = info.ready ? 'energy-ready' : '';
+            return `
+                <div class="ultimate-energy-bar" style="margin-top:5px;">
+                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+                        <span style="font-size:0.75em;color:${skill.color};">${skill.icon} ${skill.name}</span>
+                        <span style="font-size:0.7em;color:#aaa;margin-left:auto;">${info.current}/${info.cost}</span>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.4);border-radius:4px;height:8px;overflow:hidden;">
+                        <div class="energy-fill ${readyClass}" style="width:${info.pct}%;background:${barColor};height:100%;border-radius:4px;transition:width 0.3s;"></div>
+                    </div>
+                </div>
+            `;
         }
 
         // 渲染战斗场景
@@ -6767,6 +6929,7 @@
                                 <span class="combatant-stat"><span class="icon">💨</span>${p.speed}</span>
                                 <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
                             </div>
+                            ${renderUltimateEnergyBar()}
                             <div class="combatant-effects">
                                 ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
                                 ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
@@ -6819,6 +6982,9 @@
 
         // 渲染玩家行动按钮
         function renderPlayerActions() {
+            const info = getEnergyBar();
+            const skill = info.skill;
+            const canUltimate = info.ready;
             return `
                 <div class="combat-actions">
                     <button class="combat-action-btn attack" onclick="selectCombatAction('attack')">
@@ -6826,6 +6992,9 @@
                     </button>
                     <button class="combat-action-btn defend" onclick="selectCombatAction('defend')">
                         🛡️ 防御
+                    </button>
+                    <button class="combat-action-btn ultimate ${canUltimate ? '' : ''}" onclick="selectCombatAction('ultimate')" ${canUltimate ? '' : 'disabled'}>
+                        ${skill.icon} 必杀技 ${canUltimate ? '' : `(${info.current}/${info.cost})`}
                     </button>
                     <button class="combat-action-btn" onclick="selectCombatAction('treasure')">
                         🔮 法宝
@@ -6857,6 +7026,8 @@
                 showPillMenu();
             } else if (action === 'technique') {
                 showTechniqueInfo();
+            } else if (action === 'ultimate') {
+                executeUltimateSkill();
             }
         }
 
@@ -7063,6 +7234,7 @@
                 round: combatState.round
             });
 
+            addEnergy(20); // 攻击积蓄能量
             combatState.turn = 'opponent';
             renderCombatArena();
 
