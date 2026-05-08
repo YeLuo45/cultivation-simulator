@@ -4147,9 +4147,9 @@
 
         // 探索（触发AI事件）
         async function doExplore() {
-            if (!apiConfig.apiKey) {
+            if (!miniMaxConfig.apiKey) {
                 alert('请先配置MiniMax API Key！');
-                document.getElementById('apiConfig').classList.remove('hidden');
+                openSettings('api');
                 return;
             }
 
@@ -4223,10 +4223,10 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiConfig.apiKey}`
+                    'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: apiConfig.model || 'MiniMax-M2.7',
+                    model: miniMaxConfig.model || 'MiniMax-M2.7',
                     max_tokens: 500,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
@@ -4438,7 +4438,7 @@
                 return;
             }
             
-            if (!apiConfig.apiKey) {
+            if (!miniMaxConfig.apiKey) {
                 // 本地突破
                 localBreakthrough(false);
                 return;
@@ -4540,10 +4540,10 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiConfig.apiKey}`
+                    'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: apiConfig.model || 'MiniMax-M2.7',
+                    model: miniMaxConfig.model || 'MiniMax-M2.7',
                     max_tokens: 300,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
@@ -4944,7 +4944,7 @@
             }
             renderShopItems();
             document.getElementById('shopModal').classList.add('active');
-            if (apiConfig.apiKey) {
+            if (miniMaxConfig.apiKey) {
                 generateShopIntro();
             }
         }
@@ -4982,7 +4982,7 @@
         }
 
         async function generateShopIntro() {
-            if (!apiConfig.apiKey) return;
+            if (!miniMaxConfig.apiKey) return;
             
             try {
                 const realmName = CONFIG.realms[gameState.realm];
@@ -4992,10 +4992,10 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiConfig.apiKey}`
+                        'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                     },
                     body: JSON.stringify({
-                        model: apiConfig.model || 'MiniMax-M2.7',
+                        model: miniMaxConfig.model || 'MiniMax-M2.7',
                         max_tokens: 100,
                         temperature: 0.8,
                         messages: [{ role: "user", content: prompt }]
@@ -5278,17 +5278,17 @@
             // 生成描述
             const craftType = selectedCraftType === 'alchemy' ? '炼丹' : '炼器';
             let craftDesc = `丹炉中灵光闪烁，药香四溢...`;
-            if (apiConfig.apiKey) {
+            if (miniMaxConfig.apiKey) {
                 try {
                     const prompt = `描述一次${craftType}过程，物品名称是${name}，用50-80字描述${craftType}时的情景，包括火候、灵气变化等。`;
                     const response = await fetch(`${CONFIG.apiUrl}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${apiConfig.apiKey}`
+                            'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                         },
                         body: JSON.stringify({
-                            model: apiConfig.model || 'MiniMax-M2.7',
+                            model: miniMaxConfig.model || 'MiniMax-M2.7',
                             max_tokens: 150,
                             temperature: 0.8,
                             messages: [{ role: "user", content: prompt }]
@@ -5752,7 +5752,7 @@
             }
 
             // 显示AI描述或本地处理
-            if (!apiConfig.apiKey) {
+            if (!miniMaxConfig.apiKey) {
                 executeTribulation();
                 return;
             }
@@ -5788,10 +5788,10 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiConfig.apiKey}`
+                    'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: apiConfig.model || 'MiniMax-M2.7',
+                    model: miniMaxConfig.model || 'MiniMax-M2.7',
                     max_tokens: 200,
                     messages: [{
                         role: 'user',
