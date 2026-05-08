@@ -3291,14 +3291,13 @@
                     resultEl.className = 'test-result success';
                     resultEl.textContent = `✓ 连接成功 (${elapsed}ms)`;
                 } else if (type === 'model') {
-                    // 模型选择只验证格式
-                    const validModels = ['MiniMax-Text-01', 'MiniMax-Text-01-32K', 'MiniMax-Text-01-128K', 'MiniMax-Embedding-01'];
-                    if (validModels.includes(model)) {
+                    // 模型输入只验证非空
+                    if (model && model.trim()) {
                         resultEl.className = 'test-result success';
-                        resultEl.textContent = `✓ 模型可用: ${model}`;
+                        resultEl.textContent = `✓ 模型已设置: ${model}`;
                     } else {
                         resultEl.className = 'test-result error';
-                        resultEl.textContent = `✗ 未知模型: ${model}`;
+                        resultEl.textContent = `✗ 请输入模型名称`;
                     }
                 } else if (type === 'apiKey' || type === 'groupId') {
                     // 需要实际API调用的测试，这里做简化处理
@@ -4169,8 +4168,8 @@
 
         // 探索（触发AI事件）
         async function doExplore() {
-            if (!apiConfig.apiKey || !apiConfig.groupId) {
-                alert('请先配置MiniMax API Key和Group ID！');
+            if (!apiConfig.apiKey) {
+                alert('请先配置MiniMax API Key！');
                 document.getElementById('apiConfig').classList.remove('hidden');
                 return;
             }
@@ -4241,7 +4240,7 @@
 - qi和spiritStones可以是0表示无影响
 - 只返回JSON，不要其他内容`;
 
-            const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4460,7 +4459,7 @@
                 return;
             }
             
-            if (!apiConfig.apiKey || !apiConfig.groupId) {
+            if (!apiConfig.apiKey) {
                 // 本地突破
                 localBreakthrough(false);
                 return;
@@ -4558,7 +4557,7 @@
     "description": "详细描述（80-150字）"
 }`;
 
-            const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4966,7 +4965,7 @@
             }
             renderShopItems();
             document.getElementById('shopModal').classList.add('active');
-            if (apiConfig.apiKey && apiConfig.groupId) {
+            if (apiConfig.apiKey) {
                 generateShopIntro();
             }
         }
@@ -5004,13 +5003,13 @@
         }
 
         async function generateShopIntro() {
-            if (!apiConfig.apiKey || !apiConfig.groupId) return;
+            if (!apiConfig.apiKey) return;
             
             try {
                 const realmName = CONFIG.realms[gameState.realm];
                 const prompt = `你是一个修仙世界的商店掌柜。请为"天机阁"生成一段简短的问候语（20-40字），要符合当前境界的修士。掌柜语气要亲切但不啰嗦。当前修士是${realmName}期修士。只返回问候语，不要其他内容。`;
                 
-                const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -5300,10 +5299,10 @@
             // 生成描述
             const craftType = selectedCraftType === 'alchemy' ? '炼丹' : '炼器';
             let craftDesc = `丹炉中灵光闪烁，药香四溢...`;
-            if (apiConfig.apiKey && apiConfig.groupId) {
+            if (apiConfig.apiKey) {
                 try {
                     const prompt = `描述一次${craftType}过程，物品名称是${name}，用50-80字描述${craftType}时的情景，包括火候、灵气变化等。`;
-                    const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+                    const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5774,7 +5773,7 @@
             }
 
             // 显示AI描述或本地处理
-            if (!apiConfig.apiKey || !apiConfig.groupId) {
+            if (!apiConfig.apiKey) {
                 executeTribulation();
                 return;
             }
@@ -5806,7 +5805,7 @@
 
             const prompt = prompts[trib.type] || '描写修仙渡劫场景';
 
-            const response = await fetch(`${CONFIG.apiUrl}?GroupId=${apiConfig.groupId}`, {
+            const response = await fetch(`${CONFIG.apiUrl}${apiConfig.groupId ? `?GroupId=${apiConfig.groupId}` : ''}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
