@@ -2596,46 +2596,50 @@
         };
 
         // 丹药定义
+        // 经济调整：基础丹药降价（约×0.5）让玩家更容易生存，高级丹药提价（约×2-3）作为长期目标
         const PILLS = {
-            '聚灵丹': { quality: 'common', effect: { type: 'qi', value: 50 }, price: 50, desc: '恢复50灵气', icon: '💊' },
-            '心魔丹': { quality: 'common', effect: { type: 'mindset', value: 30 }, price: 80, desc: '恢复30心境', icon: '💊' },
-            '金髓丹': { quality: 'rare', effect: { type: 'qi', value: 200 }, price: 200, desc: '恢复200灵气', icon: '💊' },
-            '筑基丹': { quality: 'rare', effect: { type: 'breakthrough_boost', value: 0.2 }, price: 500, desc: '突破成功率+20%', icon: '💊' },
-            '破境丹': { quality: 'precious', effect: { type: 'breakthrough_boost', value: 0.3 }, price: 2000, desc: '突破+30%', icon: '💊' },
-            '洗髓丹': { quality: 'precious', effect: { type: 'cultivate_speed', value: 0.1 }, price: 3000, desc: '修炼速度+10%', icon: '💊' },
-            '定神丹': { quality: 'precious', effect: { type: '渡劫_mindset_protect', value: 0.5 }, price: 5000, desc: '渡劫心境消耗-50%', icon: '💊' }
+            '聚灵丹': { quality: 'common', effect: { type: 'qi', value: 50 }, price: 30, desc: '恢复50灵气', icon: '💊' },
+            '心魔丹': { quality: 'common', effect: { type: 'mindset', value: 30 }, price: 40, desc: '恢复30心境', icon: '💊' },
+            '金髓丹': { quality: 'rare', effect: { type: 'qi', value: 200 }, price: 100, desc: '恢复200灵气', icon: '💊' },
+            '筑基丹': { quality: 'rare', effect: { type: 'breakthrough_boost', value: 0.2 }, price: 1200, desc: '突破成功率+20%', icon: '💊' },
+            '破境丹': { quality: 'precious', effect: { type: 'breakthrough_boost', value: 0.3 }, price: 5000, desc: '突破+30%', icon: '💊' },
+            '洗髓丹': { quality: 'precious', effect: { type: 'cultivate_speed', value: 0.1 }, price: 8000, desc: '修炼速度+10%', icon: '💊' },
+            '定神丹': { quality: 'precious', effect: { type: '渡劫_mindset_protect', value: 0.5 }, price: 12000, desc: '渡劫心境消耗-50%', icon: '💊' }
         };
 
         // 灵宝定义
+        // 经济调整：低阶灵宝降价，高阶灵宝/圣器/天神器提价
         const TREASURES = {
-            '青锋剑': { type: 'weapon', quality: 'common', effect: { type: 'attack', value: 0.1 }, price: 300, desc: '攻击+10%', icon: '⚔️' },
-            '玄铁盾': { type: 'armor', quality: 'common', effect: { type: 'defense', value: 0.1 }, price: 300, desc: '防御+10%', icon: '🛡️' },
-            '聚灵阵': { type: 'accessory', quality: 'rare', effect: { type: 'cultivate_qi_rate', value: 0.2 }, price: 1000, desc: '修炼灵气+20%', icon: '📿' },
-            '避火罩': { type: 'armor', quality: 'rare', effect: { type: '渡劫_damage_reduce', value: 0.3 }, price: 2000, desc: '渡劫伤害-30%', icon: '🔥' },
-            '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 800, desc: '逃跑成功率+50%', icon: '📜' },
-            '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 5000, desc: '预知事件类型', icon: '🔮' },
-            '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 20000, desc: '全属性+5%', icon: '珠' }
+            '青锋剑': { type: 'weapon', quality: 'common', effect: { type: 'attack', value: 0.1 }, price: 150, desc: '攻击+10%', icon: '⚔️' },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { type: 'defense', value: 0.1 }, price: 150, desc: '防御+10%', icon: '🛡️' },
+            '聚灵阵': { type: 'accessory', quality: 'rare', effect: { type: 'cultivate_qi_rate', value: 0.2 }, price: 800, desc: '修炼灵气+20%', icon: '📿' },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { type: '渡劫_damage_reduce', value: 0.3 }, price: 1500, desc: '渡劫伤害-30%', icon: '🔥' },
+            '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 600, desc: '逃跑成功率+50%', icon: '📜' },
+            '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 8000, desc: '预知事件类型', icon: '🔮' },
+            '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 40000, desc: '全属性+5%', icon: '珠' }
         };
 
         // V4 战斗法宝定义
+        // 经济调整：低阶法宝降价，高阶法宝提价
         const COMBAT_TREASURES = {
-            '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 500 },
-            '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 400 },
-            '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 800 },
-            '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 600 },
-            '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 450 },
-            '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 3000 },
-            '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 3000 },
-            '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 3000 },
-            '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 3000 }
+            '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 300 },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 250 },
+            '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 600 },
+            '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 400 },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 500 },
+            '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 5000 },
+            '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 5000 },
+            '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 5000 },
+            '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 5000 }
         };
 
         // V4 战斗丹药定义
+        // 经济调整：基础战斗丹药降价，高级战斗丹药提价
         const COMBAT_PILLS = {
-            '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 1000 },
-            '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 1000 },
-            '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 2000 },
-            '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 800 }
+            '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 600 },
+            '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 600 },
+            '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 4000 },
+            '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 500 }
         };
 
         // ========== V11 装备强化系统 ==========
@@ -3471,10 +3475,11 @@
         };
 
         // 炼器台定义
+        // 经济调整：提高炼器台升级费用，让玩家需要更多积累
         const ANVILS = {
             '土炼器台': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼器台' },
-            '玄铁熔炉': { level: 2, successBonus: 0.15, cost: 50000, unlockCondition: '宗门2级或50000灵石', desc: '中级炼器台，成功率+15%' },
-            '天工神炉': { level: 3, successBonus: 0.30, cost: 200000, unlockCondition: '化神期', desc: '高级炼器台，成功率+30%' }
+            '玄铁熔炉': { level: 2, successBonus: 0.15, cost: 80000, unlockCondition: '宗门2级或80000灵石', desc: '中级炼器台，成功率+15%' },
+            '天工神炉': { level: 3, successBonus: 0.30, cost: 300000, unlockCondition: '化神期', desc: '高级炼器台，成功率+30%' }
         };
 
         // 炼丹配方
@@ -3499,14 +3504,68 @@
         };
 
         // 材料定义
+        // 经济调整：材料basePrice用于计算出售价格（出售=basePrice×0.3）
         const MATERIALS = {
             '灵草': { type: 'herb', basePrice: 100, icon: '🌿', desc: '普通灵草，炼丹材料' },
             '妖兽血': { type: 'beast', basePrice: 200, icon: '🩸', desc: '妖兽血液，炼丹炼器材料' },
             '天材': { type: 'rare', basePrice: 500, icon: '✨', desc: '稀有天材，高级材料' },
-            '混沌石': { type: 'legendary', basePrice: 10000, icon: '💎', desc: '混沌神石，传说材料', requireChaos: true },
-            '玄铁': { type: 'metal', basePrice: 150, icon: '🔩', desc: '玄铁矿物，炼器材料' },
+            '混沌石': { type: 'legendary', basePrice: 1667, icon: '💎', desc: '混沌神石，传说材料', requireChaos: true },
+            '玄铁': { type: 'metal', basePrice: 100, icon: '🔩', desc: '玄铁矿物，炼器材料' },
             '妖兽皮': { type: 'beast', basePrice: 180, icon: '🐾', desc: '妖兽皮毛，炼器材料' },
             '妖兽骨': { type: 'beast', basePrice: 220, icon: '🦴', desc: '妖兽骨骼，炼器材料' }
+        };
+        
+        // ========== V13 经济平衡：高级装备打造配方 ==========
+        // 经济调整：新增灵宝/圣器/天神器打造配方，提高高阶装备获取门槛
+        const ADVANCED_FORGE_RECIPES = {
+            '灵宝·苍穹印': { 
+                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
+                fuelCost: 2000, 
+                desc: '灵宝·攻击+25%', icon: '🔮', 
+                effect: { type: 'attack', value: 0.25 }
+            },
+            '灵宝·玄武甲': { 
+                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
+                fuelCost: 2000, 
+                desc: '灵宝·防御+25%', icon: '🛡️', 
+                effect: { type: 'defense', value: 0.25 }
+            },
+            '圣器·天使神剑': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·攻击+40%', icon: '⚔️', 
+                effect: { type: 'attack', value: 0.40 }
+            },
+            '圣器·天使神甲': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·防御+40%', icon: '👘', 
+                effect: { type: 'defense', value: 0.40 }
+            },
+            '圣器·天使神翼': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·全属性+15%', icon: '👼', 
+                effect: { type: 'all_stats', value: 0.15 }
+            },
+            '天神器·天使神剑': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·攻击+60%', icon: '⚔️', 
+                effect: { type: 'attack', value: 0.60 }
+            },
+            '天神器·天使神甲': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·防御+60%', icon: '👘', 
+                effect: { type: 'defense', value: 0.60 }
+            },
+            '天神器·天使神翼': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·全属性+25%', icon: '👼', 
+                effect: { type: 'all_stats', value: 0.25 }
+            }
         };
         
         // ========== V6 奇遇系统数据 ==========
@@ -4129,6 +4188,7 @@
                 maxInventorySlots: 20,
                 shopItems: [],
                 lastShopDay: 0,
+                shopRefreshCount: 0, // 经济调整：商店刷新次数计数器，用于递增刷新费用
                 activeEffects: {
                     breakthrough_boost: 0,
                     cultivate_speed: 0,
@@ -5176,6 +5236,17 @@
             addLog(effects.qi >= 0 && effects.mindset >= 0 ? 'good' : 'bad', option.text, resultText);
             
             gameState.days++;
+            
+            // 经济调整：探索结束后额外灵石奖励（基于境界），防止玩家灵石严重不足
+            // 只有当灵石低于500时才给予，且最多给予境界×50灵石
+            if (gameState.spiritStones < 500) {
+                const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
+                if (bonusStones > 0) {
+                    gameState.spiritStones += bonusStones;
+                    addLog('good', '意外收获', `探索途中发现散落的灵石，获得${bonusStones}灵石`);
+                }
+            }
+            
             saveGame();
             updateDisplay();
             
@@ -5825,8 +5896,17 @@
             const item = items[idx];
             if (!item) return;
             
-            const prices = { common: 10, rare: 50, precious: 200, legendary: 1000 };
-            const price = prices[item.quality] || 10;
+            // 经济调整：出售价格改为材料原价的30%（原为品质固定值）
+            // 这样更符合经济逻辑：稀有材料出售价格更高
+            let price = 10; // 默认普通物品
+            if (item.type === 'material' && MATERIALS[item.name]) {
+                // 材料出售价格 = basePrice × 0.3（约为原价的三折）
+                price = Math.floor(MATERIALS[item.name].basePrice * 0.3);
+            } else {
+                // 非材料物品仍按品质定价（但略微降低）
+                const prices = { common: 8, rare: 40, precious: 150, legendary: 800 };
+                price = prices[item.quality] || 10;
+            }
             
             item.quantity--;
             if (item.quantity <= 0) {
@@ -5971,7 +6051,16 @@
         }
 
         function refreshShop(isAuto = false) {
+            // 经济调整：商店刷新费用递增，防止玩家无限制刷新刷出稀有物品
             if (!isAuto) {
+                const refreshCost = Math.floor(100 * (1 + (gameState.shopRefreshCount || 0) * 0.5));
+                if (gameState.spiritStones < refreshCost) {
+                    alert(`灵石不足！刷新商店需要 ${refreshCost} 灵石`);
+                    return;
+                }
+                gameState.spiritStones -= refreshCost;
+                gameState.shopRefreshCount++;
+                
                 gameState.days++;
                 saveGame();
                 updateDisplay();
@@ -5979,7 +6068,7 @@
             generateShopItems();
             renderShopItems();
             if (!isAuto) {
-                addLog('neutral', '刷新商店', '商店已刷新');
+                addLog('neutral', '刷新商店', `商店已刷新，花费${refreshCost}灵石`);
             }
         }
 
@@ -9363,8 +9452,9 @@
             modal.classList.remove('active');
 
             // 发放最终奖励
+            // 经济调整：秘境灵石奖励 ×1.5，让秘境成为更重要的发展途径
             const finalRewards = [];
-            const stones = Math.floor(500 + gameState.realm * 300 + Math.random() * 500);
+            const stones = Math.floor((500 + gameState.realm * 300 + Math.random() * 500) * 1.5);
             gameState.spiritStones += stones;
             finalRewards.push(`${stones} 灵石`);
 
