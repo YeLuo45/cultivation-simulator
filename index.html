@@ -2903,22 +2903,124 @@
             closeEnhancePanel();
         }
 
-        // ========== V12 必杀技系统 ==========
-        // 每把武器对应一个绝技：充能型爆发技能
+        // ========== V12 必杀技系统 (A6多分支升级版) ==========
+        // 每把武器对应多个绝技分支，每系最高5级
         const ULTIMATE_SKILLS = {
             // 普通武器
-            '凡铁剑': { name: '重击', desc: '基础重击', icon: '⚔️', cost: 50, damage: 2.0, effect: null, color: '#aaaaaa' },
-            '青云剑': { name: '青云剑意', desc: '剑气纵横', icon: '⚔️', cost: 60, damage: 2.5, effect: null, color: '#64b5f6' },
-            '混元珠': { name: '混元爆发', desc: '暴击率+30%', icon: '🔮', cost: 50, damage: 1.5, effect: { critBonus: 0.30 }, color: '#ba68c8' },
-            '金缕衣': { name: '金身护体', desc: '防御+50%', icon: '👘', cost: 50, damage: 0, effect: { defenseBoost: 0.50 }, color: '#ffd700' },
-            '避火罩': { name: '烈焰护盾', desc: '火抗+100%', icon: '🔥', cost: 50, damage: 0, effect: { fireResistBoost: 1.0 }, color: '#ff5722' },
-            // 珍稀武器
-            '雷霆铛': { name: '九天神雷', desc: '雷法绝技', icon: '⚡', cost: 70, damage: 3.5, effect: { thunderBonus: 0.50 }, color: '#ffeb3b' },
-            '赤焰刀': { name: '焚天斩', desc: '火法绝技', icon: '🔥', cost: 70, damage: 3.5, effect: { fireBonus: 0.50 }, color: '#ff5722' },
-            '寒冰剑': { name: '寒冰封天', desc: '水法绝技', icon: '❄️', cost: 70, damage: 3.5, effect: { waterBonus: 0.50 }, color: '#03a9f4' },
-            '金刚杵': { name: '金刚伏魔', desc: '体术绝技', icon: '🔨', cost: 70, damage: 3.5, effect: { bodyBonus: 0.50 }, color: '#ff9800' },
-            // 默认空手绝技
-            '_fist': { name: '气功波', desc: '灵力冲击', icon: '💨', cost: 40, damage: 1.8, effect: null, color: '#888888' }
+            '凡铁剑': [
+                { id:'basic_heavy', name:'重击', cost:50, damage:2.0, effects:{}, maxLevel:5 },
+                { id:'basic_quick', name:'连击', cost:40, damage:1.2, effects:{doubleHit:0.3}, maxLevel:5 },
+                { id:'basic_crash', name:'碎甲', cost:60, damage:1.8, effects:{armorBreak:0.25}, maxLevel:5 }
+            ],
+            '青云剑': [
+                { id:'qy_heavy', name:'青云重击', cost:50, damage:2.0, effects:{}, maxLevel:5 },
+                { id:'qy_slash', name:'剑气纵横', cost:65, damage:2.5, effects:{cleave:0.2}, maxLevel:5 },
+                { id:'qy_fly', name:'御剑术', cost:80, damage:3.2, effects:{pierce:0.15}, maxLevel:5 }
+            ],
+            '雷霆铛': [
+                { id:'thunder_1', name:'神雷', cost:70, damage:3.0, effects:{thunder:0.5}, maxLevel:5 },
+                { id:'thunder_chain', name:'雷链', cost:75, damage:2.5, effects:{chain:0.25}, maxLevel:5 },
+                { id:'thunder_storm', name:'雷罚', cost:90, damage:4.0, effects:{stun:0.15}, maxLevel:5 }
+            ],
+            '赤炎刀': [
+                { id:'fire_slash', name:'焚天斩', cost:70, damage:3.0, effects:{burn:0.5}, maxLevel:5 },
+                { id:'fire_inferno', name:'烈焰焚天', cost:85, damage:3.5, effects:{burn:0.35,defBoost:0.2}, maxLevel:5 },
+                { id:'fire_immortal', name:'焚尽苍穹', cost:100, damage:4.5, effects:{burn:0.5,burnTurns:5}, maxLevel:5 }
+            ],
+            '寒冰剑': [
+                { id:'ice_slash', name:'寒冰斩', cost:70, damage:3.0, effects:{freeze:0.4}, maxLevel:5 },
+                { id:'ice_prison', name:'寒冰牢笼', cost:80, damage:2.0, effects:{freeze:0.3,freezeTurns:2}, maxLevel:5 },
+                { id:'ice_shatter', name:'玄冰碎裂', cost:90, damage:3.8, effects:{freeze:0.45,freezeTurns:3}, maxLevel:5 }
+            ],
+            '金刚杵': [
+                { id:'vajra_hit', name:'金刚杵击', cost:70, damage:3.0, effects:{armorBreak:0.3}, maxLevel:5 },
+                { id:'vajra_beast', name:'伏魔金身', cost:75, damage:2.2, effects:{counterRate:0.4,defBoost:0.3}, maxLevel:5 },
+                { id:'vajra_smash', name:'金刚碎岳', cost:95, damage:4.2, effects:{stun:0.2,armorBreak:0.3}, maxLevel:5 }
+            ],
+            '混元珠': [
+                { id:'hunyuan_boom', name:'混元爆发', cost:50, damage:1.5, effects:{critBonus:0.30}, maxLevel:5 },
+                { id:'hunyuan_shield', name:'混元护盾', cost:60, damage:0, effects:{defBoost:0.5,dmgReduce:0.2}, maxLevel:5 },
+                { id:'hunyuan_orbit', name:'混元流转', cost:70, damage:2.2, effects:{drain:0.2,healRate:0.1}, maxLevel:5 }
+            ],
+            '金缕衣': [
+                { id:'jinroo_guard', name:'金身护体', cost:50, damage:0, effects:{defBoost:0.5,dmgReduce:0.2}, maxLevel:5 },
+                { id:'jinroo_reflect', name:'金缕反伤', cost:55, damage:0.8, effects:{reflect:0.3}, maxLevel:5 },
+                { id:'jinroo_blessing', name:'金仙祝福', cost:70, damage:0, effects:{healRate:0.15,maxHpBoost:0.2}, maxLevel:5 }
+            ],
+            '避火罩': [
+                { id:'fireproof_shield', name:'烈焰护盾', cost:50, damage:0, effects:{fireResist:1.0}, maxLevel:5 },
+                { id:'fireproof_counter', name:'火抗反击', cost:60, damage:1.5, effects:{counterRate:0.35,fireResist:0.5}, maxLevel:5 },
+                { id:'fireproof_absorb', name:'烈焰吸收', cost:75, damage:0, effects:{fireDrain:0.4,healRate:0.12}, maxLevel:5 }
+            ],
+            '玄冰甲': [
+                { id:'icearmor_counter', name:'玄冰反击', cost:55, damage:1.2, effects:{counterRate:0.50,freeze:0.2}, maxLevel:5 },
+                { id:'icearmor_wall', name:'玄冰冰墙', cost:65, damage:0, effects:{dmgReduce:0.4,freezeAura:0.25}, maxLevel:5 },
+                { id:'icearmor_shatter', name:'冰霜爆裂', cost:80, damage:2.8, effects:{freeze:0.35,freezeTurns:2}, maxLevel:5 }
+            ],
+            // 灵宝
+            '灵玉镯': [
+                { id:'jade_shield', name:'灵玉护盾', cost:60, damage:0, effects:{defBoost:0.6,dmgReduce:0.25}, maxLevel:5 },
+                { id:'jade_heal', name:'灵玉治愈', cost:55, damage:0, effects:{healRate:0.2,cleanse:1}, maxLevel:5 },
+                { id:'jade_curse', name:'灵玉诅咒', cost:70, damage:2.2, effects:{curse:0.3,dmgReduce:0.2}, maxLevel:5 }
+            ],
+            '赤炎剑': [
+                { id:'redfire_slash', name:'烈焰斩', cost:60, damage:2.8, effects:{burn:0.25}, maxLevel:5 },
+                { id:'redfire_storm', name:'烈焰风暴', cost:80, damage:3.5, effects:{burn:0.35,cleave:0.25}, maxLevel:5 },
+                { id:'redfire_immortal', name:'焚天灭世', cost:100, damage:4.5, effects:{burn:0.5,burnTurns:4}, maxLevel:5 }
+            ],
+            '风灵扇': [
+                { id:'wind_fan', name:'风暴降临', cost:65, damage:2.2, effects:{speedReduce:0.30}, maxLevel:5 },
+                { id:'wind_blade', name:'风刃连斩', cost:75, damage:2.8, effects:{doubleHit:0.25,speedReduce:0.15}, maxLevel:5 },
+                { id:'wind_tornado', name:'龙卷风暴', cost:90, damage:3.8, effects:{speedReduce:0.45,cleave:0.2}, maxLevel:5 }
+            ],
+            '玄铁重甲': [
+                { id:'iron_guard', name:'玄铁金身', cost:65, damage:0, effects:{defBoost:0.8,dmgReduce:0.25}, maxLevel:5 },
+                { id:'iron_crash', name:'玄铁冲击', cost:70, damage:2.2, effects:{armorBreak:0.3,stun:0.15}, maxLevel:5 },
+                { id:'iron_ultimate', name:'金铁合鸣', cost:85, damage:3.0, effects:{counterRate:0.45,dmgReduce:0.3}, maxLevel:5 }
+            ],
+            // 圣器
+            '紫电锤': [
+                { id:'purple_thunder', name:'雷霆万钧', cost:75, damage:3.5, effects:{thunder:0.6}, maxLevel:5 },
+                { id:'purple_chain', name:'紫电神链', cost:80, damage:3.0, effects:{chain:0.35,stun:0.15}, maxLevel:5 },
+                { id:'purple_divine', name:'神雷灭世', cost:100, damage:5.0, effects:{thunder:0.7,stun:0.25}, maxLevel:5 }
+            ],
+            '天火扇': [
+                { id:'divine_fire', name:'焚天之怒', cost:70, damage:3.0, effects:{burn:0.35,burnTurns:4}, maxLevel:5 },
+                { id:'divine_inferno', name:'天火灭世', cost:90, damage:4.0, effects:{burn:0.5,burnTurns:5,dmgReduce:0.2}, maxLevel:5 },
+                { id:'divine_meteor', name:'流星火雨', cost:95, damage:4.2, effects:{burn:0.45,cleave:0.3}, maxLevel:5 }
+            ],
+            '玄冰剑': [
+                { id:'ice_crystal', name:'玄冰碎裂', cost:70, damage:2.8, effects:{freeze:0.35,freezeTurns:2}, maxLevel:5 },
+                { id:'ice_domain', name:'玄冰领域', cost:85, damage:3.5, effects:{freeze:0.45,freezeTurns:3,freezeAura:0.2}, maxLevel:5 },
+                { id:'ice_shatter', name:'万冰穿心', cost:100, damage:4.5, effects:{freeze:0.55,freezeTurns:4}, maxLevel:5 }
+            ],
+            '玄武甲': [
+                { id:'blackturtle_guard', name:'玄武真身', cost:70, damage:0, effects:{defBoost:1.0,dmgReduce:0.35,healRate:0.10}, maxLevel:5 },
+                { id:'blackturtle_counter', name:'玄武反击', cost:75, damage:1.8, effects:{counterRate:0.5,healRate:0.12}, maxLevel:5 },
+                { id:'blackturtle_immortal', name:'玄武永固', cost:90, damage:0, effects:{invincible:1,dmgReduce:0.5,healRate:0.15}, maxLevel:5 }
+            ],
+            // 天神器
+            '天使神剑': [
+                { id:'angel_slash', name:'天使裁决', cost:80, damage:4.5, effects:{trueDamage:0.30}, maxLevel:5 },
+                { id:'angel_justice', name:'神圣审判', cost:90, damage:5.0, effects:{trueDamage:0.40,healRate:0.15}, maxLevel:5 },
+                { id:'angel_divine', name:'神圣灭魔斩', cost:110, damage:6.0, effects:{trueDamage:0.5,burn:0.3}, maxLevel:5 }
+            ],
+            '天使神甲': [
+                { id:'angel_armor_guard', name:'天使守护', cost:80, damage:0, effects:{invincible:1,dmgReduce:0.50,healRate:0.15}, maxLevel:5 },
+                { id:'angel_armor_holy', name:'圣光护盾', cost:70, damage:0, effects:{defBoost:0.8,healRate:0.2,cleanse:2}, maxLevel:5 },
+                { id:'angel_armor_final', name:'神盾永固', cost:95, damage:0, effects:{invincible:2,dmgReduce:0.6,healRate:0.25}, maxLevel:5 }
+            ],
+            '天使神翼': [
+                { id:'angel_wing_strike', name:'天使制裁', cost:80, damage:3.0, effects:{drain:0.30}, maxLevel:5 },
+                { id:'angel_wing_judgment', name:'天堂之拳', cost:90, damage:4.5, effects:{drain:0.35,stun:0.2}, maxLevel:5 },
+                { id:'angel_wing_divine', name:'神圣审判之翼', cost:105, damage:5.5, effects:{drain:0.45,trueDamage:0.25}, maxLevel:5 }
+            ],
+            // 空手
+            '空手': [
+                { id:'empty_qigong', name:'气功波', cost:45, damage:1.8, effects:{}, maxLevel:5 },
+                { id:'empty_chi', name:'气吞天下', cost:60, damage:2.5, effects:{drain:0.15}, maxLevel:5 },
+                { id:'empty_ultimate', name:'混沌元气', cost:80, damage:3.5, effects:{drain:0.25,healRate:0.1}, maxLevel:5 }
+            ]
         };
 
         // ========== A4 套装共鸣系统 ==========
@@ -3009,109 +3111,300 @@
         let combatEnergy = 0;
         const MAX_ENERGY = 100;
 
-        // 获取当前武器对应的绝技
-        function getCurrentUltimateSkill() {
-            const weapon = combatState.player.weapon;
-            if (weapon && ULTIMATE_SKILLS[weapon]) {
-                return ULTIMATE_SKILLS[weapon];
-            }
-            // 空手
-            return ULTIMATE_SKILLS['_fist'];
+        // 获取当前武器对应的绝技列表
+        function getCurrentUltimateSkills() {
+            const weaponData = combatState.player.weaponData || { name:'空手' };
+            return ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
         }
 
         // 获取绝技能量条显示
         function getEnergyBar() {
-            const skill = getCurrentUltimateSkill();
-            const pct = Math.min(100, (combatEnergy / skill.cost) * 100);
-            const ready = combatEnergy >= skill.cost;
+            const skills = getCurrentUltimateSkills();
+            // 找到最低cost的技能作为能量条参考
+            const minCost = skills.length > 0 ? Math.min(...skills.map(s => s.cost)) : 50;
+            const pct = Math.min(100, (combatEnergy / minCost) * 100);
+            const ready = combatEnergy >= minCost;
             return {
                 current: combatEnergy,
-                cost: skill.cost,
+                cost: minCost,
                 pct,
                 ready,
-                skill
+                skills
             };
         }
 
-        // 释放绝技
-        function executeUltimateSkill() {
-            const p = combatState.player;
-            const o = combatState.opponent;
-            const skill = getCurrentUltimateSkill();
+        // 释放绝技(多分支版本)
+        function executeUltimateSkill(skill) {
+            const weaponData = combatState.player.weaponData || { name:'空手', star:1 };
+            const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
+            const starMultiplier = ENHANCE_CONFIG && ENHANCE_CONFIG.starMultipliers ? (ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1.0) : 1.0;
 
             if (combatEnergy < skill.cost) return;
 
             combatEnergy -= skill.cost;
             combatState.round++;
 
-            let logText = `🔥 发动绝技「${skill.name}」！`;
+            // 计算基础伤害
+            const baseAttack = typeof calculatePlayerAttack === 'function' ? calculatePlayerAttack() : combatState.player.attack;
+            const levelMultiplier = 1 + (level - 1) * 0.2;
+            let damage = Math.floor(baseAttack * skill.damage * levelMultiplier * starMultiplier);
 
-            // 伤害计算
-            if (skill.damage > 0) {
-                let baseDamage = Math.floor(p.attack * skill.damage);
-                // 功法加成
-                if (TECHNIQUE_BONUS[p.technique].beats === o.technique) {
-                    baseDamage = Math.floor(baseDamage * 1.5);
-                    logText += '（功法克制）';
-                }
-                // 星级增幅
-                const weaponStar = p.weapon ? (p.weaponData && p.weaponData.star || 1) : 1;
-                const starMult = ENHANCE_CONFIG.starMultipliers[weaponStar] || 1.0;
-                baseDamage = Math.floor(baseDamage * starMult);
-
-                const isCrit = Math.random() < p.critRate;
-                if (isCrit) baseDamage = Math.floor(baseDamage * 1.5);
-
-                let finalDamage = baseDamage;
-                if (!combatState.effects.player.ignoreDefense) {
-                    finalDamage = Math.max(1, baseDamage - Math.floor(o.defense * 0.3));
-                }
-                o.hp = Math.max(0, o.hp - finalDamage);
-                logText += ` 造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}！`;
+            // 功法克制
+            if (TECHNIQUE_BONUS[combatState.player.technique].beats === combatState.opponent.technique) {
+                damage = Math.floor(damage * 1.5);
             }
 
-            // 特殊效果
-            if (skill.effect) {
-                if (skill.effect.critBonus) {
-                    combatState.effects.player.critBoostNext = (combatState.effects.player.critBoostNext || 0) + skill.effect.critBonus;
-                    logText += ` 下次暴击率+${Math.round(skill.effect.critBonus * 100)}%！`;
+            const isCrit = Math.random() < combatState.player.critRate;
+            if (isCrit) damage = Math.floor(damage * 1.5);
+
+            let finalDamage = damage;
+            if (!combatState.effects.player.ignoreDefense) {
+                finalDamage = Math.max(1, damage - Math.floor(combatState.opponent.defense * 0.3));
+            }
+            combatState.opponent.hp = Math.max(0, combatState.opponent.hp - finalDamage);
+            let logText = `⚡ ${weaponData.name} 发动 ${skill.name} Lv.${level}！造成 ${finalDamage} 伤害！${isCrit ? '（暴击）' : ''}`;
+
+            // 应用效果
+            if (skill.effects) {
+                if (skill.effects.burn) {
+                    const chance = skill.effects.burn * levelMultiplier;
+                    if (Math.random() < chance) {
+                        combatState.opponent.burning = skill.effects.burnTurns || 3;
+                        logText += ` 🔥敌人被灼烧 ${combatState.opponent.burning} 回合！`;
+                    }
                 }
-                if (skill.effect.defenseBoost) {
-                    combatState.effects.player.defenseBoost += skill.effect.defenseBoost;
-                    logText += ` 防御+${Math.round(skill.effect.defenseBoost * 100)}%！`;
+                if (skill.effects.freeze) {
+                    const chance = skill.effects.freeze * levelMultiplier;
+                    if (Math.random() < chance) {
+                        combatState.opponent.frozen = skill.effects.freezeTurns || 2;
+                        logText += ` ❄️敌人被冻结 ${combatState.opponent.frozen} 回合！`;
+                    }
                 }
-                if (skill.effect.fireResistBoost) {
-                    combatState.effects.player.fireResist = (combatState.effects.player.fireResist || 0) + skill.effect.fireResistBoost;
-                    logText += ` 火抗+${Math.round(skill.effect.fireResistBoost * 100)}%！`;
+                if (skill.effects.stun) {
+                    if (Math.random() < skill.effects.stun * levelMultiplier) {
+                        combatState.opponent.stunned = 1;
+                        logText += ` 💫敌人被眩晕 1 回合！`;
+                    }
                 }
-                if (skill.effect.thunderBonus) {
-                    combatState.effects.player.thunderBonus = (combatState.effects.player.thunderBonus || 0) + skill.effect.thunderBonus;
-                    logText += ` 雷法伤害+${Math.round(skill.effect.thunderBonus * 100)}%！`;
+                if (skill.effects.defBoost) {
+                    combatState.effects.player.defenseBoost = (combatState.effects.player.defenseBoost || 0) + skill.effects.defBoost * levelMultiplier;
+                    logText += ` 🛡️防御提升 ${Math.round(skill.effects.defBoost * levelMultiplier * 100)}%！`;
                 }
-                if (skill.effect.fireBonus) {
-                    combatState.effects.player.fireBonus = (combatState.effects.player.fireBonus || 0) + skill.effect.fireBonus;
-                    logText += ` 火法伤害+${Math.round(skill.effect.fireBonus * 100)}%！`;
+                if (skill.effects.critBonus) {
+                    combatState.effects.player.critBoostNext = (combatState.effects.player.critBoostNext || 0) + skill.effects.critBonus * levelMultiplier;
+                    logText += ` 💥暴击率提升 ${Math.round(skill.effects.critBonus * levelMultiplier * 100)}%！`;
                 }
-                if (skill.effect.waterBonus) {
-                    combatState.effects.player.waterBonus = (combatState.effects.player.waterBonus || 0) + skill.effect.waterBonus;
-                    logText += ` 水法伤害+${Math.round(skill.effect.waterBonus * 100)}%！`;
+                if (skill.effects.drain) {
+                    const drainAmount = Math.floor(finalDamage * skill.effects.drain * levelMultiplier);
+                    combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + drainAmount);
+                    logText += ` 💉吸取 ${drainAmount} HP！`;
                 }
-                if (skill.effect.bodyBonus) {
-                    combatState.effects.player.bodyBonus = (combatState.effects.player.bodyBonus || 0) + skill.effect.bodyBonus;
-                    logText += ` 体术伤害+${Math.round(skill.effect.bodyBonus * 100)}%！`;
+                if (skill.effects.trueDamage) {
+                    const trueDmg = Math.floor(finalDamage * skill.effects.trueDamage * levelMultiplier);
+                    combatState.opponent.hp = Math.max(0, combatState.opponent.hp - trueDmg);
+                    logText += ` ✨真实伤害 +${trueDmg}！`;
+                }
+                if (skill.effects.healRate) {
+                    const healPerTurn = Math.floor(combatState.player.maxHp * skill.effects.healRate * levelMultiplier);
+                    combatState.effects.player.healRate = (combatState.effects.player.healRate || 0) + healPerTurn;
+                    logText += ` 💚每回合恢复 ${healPerTurn} HP！`;
+                }
+                if (skill.effects.dmgReduce) {
+                    combatState.effects.player.damageReduction = (combatState.effects.player.damageReduction || 0) + skill.effects.dmgReduce * levelMultiplier;
+                    logText += ` 🛡️伤害减免 ${Math.round(skill.effects.dmgReduce * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.counterRate) {
+                    combatState.effects.player.counterRate = (combatState.effects.player.counterRate || 0) + skill.effects.counterRate * levelMultiplier;
+                    logText += ` ⚡反击率提升 ${Math.round(skill.effects.counterRate * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.speedReduce) {
+                    combatState.opponent.speedReduce = (combatState.opponent.speedReduce || 0) + skill.effects.speedReduce * levelMultiplier;
+                    logText += ` 🌪️敌人速度降低！`;
+                }
+                if (skill.effects.armorBreak) {
+                    combatState.opponent.armorBroken = true;
+                    logText += ` 💥敌人护甲破碎！`;
+                }
+                if (skill.effects.chain) {
+                    if (combatState.opponent.hp > 0) {
+                        const chainDmg = Math.floor(finalDamage * skill.effects.chain);
+                        combatState.opponent.hp = Math.max(0, combatState.opponent.hp - chainDmg);
+                        logText += ` ⛓️雷链传导，额外 ${chainDmg} 伤害！`;
+                    }
+                }
+                if (skill.effects.fireResist) {
+                    combatState.effects.player.fireResist = (combatState.effects.player.fireResist || 0) + skill.effects.fireResist;
+                    logText += ` 🔥火抗提升！`;
+                }
+                if (skill.effects.fireDrain) {
+                    combatState.effects.player.fireDrain = (combatState.effects.player.fireDrain || 0) + skill.effects.fireDrain;
+                    logText += ` 🔥火焰吸收！`;
+                }
+                if (skill.effects.reflect) {
+                    combatState.effects.player.reflect = (combatState.effects.player.reflect || 0) + skill.effects.reflect;
+                    logText += ` 🔄伤害反射！`;
+                }
+                if (skill.effects.maxHpBoost) {
+                    combatState.player.maxHP += Math.floor(combatState.player.maxHP * skill.effects.maxHpBoost);
+                    combatState.player.hp = Math.min(combatState.player.hp, combatState.player.maxHP);
+                    logText += ` ❤️最大HP提升！`;
+                }
+                if (skill.effects.cleanse) {
+                    combatState.effects.player.cleanseStacks = (combatState.effects.player.cleanseStacks || 0) + skill.effects.cleanse;
+                    logText += ` ✨净化负面状态！`;
+                }
+                if (skill.effects.invincible) {
+                    combatState.effects.player.invincible = skill.effects.invincible;
+                    logText += ` 👼无敌状态！`;
+                }
+                if (skill.effects.thunder) {
+                    combatState.effects.player.thunderBonus = (combatState.effects.player.thunderBonus || 0) + skill.effects.thunder * levelMultiplier;
+                    logText += ` ⚡雷法伤害+${Math.round(skill.effects.thunder * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.doubleHit) {
+                    combatState.effects.player.doubleHit = (combatState.effects.player.doubleHit || 0) + skill.effects.doubleHit * levelMultiplier;
+                    logText += ` ⚔️连击+${Math.round(skill.effects.doubleHit * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.pierce) {
+                    combatState.effects.player.pierce = (combatState.effects.player.pierce || 0) + skill.effects.pierce * levelMultiplier;
+                    logText += ` 🗡️穿刺+${Math.round(skill.effects.pierce * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.cleave) {
+                    combatState.effects.player.cleave = (combatState.effects.player.cleave || 0) + skill.effects.cleave * levelMultiplier;
+                    logText += ` 🌀顺劈+${Math.round(skill.effects.cleave * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.freezeAura) {
+                    combatState.effects.player.freezeAura = (combatState.effects.player.freezeAura || 0) + skill.effects.freezeAura * levelMultiplier;
+                    logText += ` ❄️冰霜光环！`;
+                }
+                if (skill.effects.burnAura) {
+                    combatState.effects.player.burnAura = (combatState.effects.player.burnAura || 0) + skill.effects.burnAura * levelMultiplier;
+                    logText += ` 🔥灼烧光环！`;
+                }
+                if (skill.effects.curse) {
+                    combatState.effects.opponent.curse = (combatState.effects.opponent.curse || 0) + skill.effects.curse * levelMultiplier;
+                    logText += ` 💀诅咒！`;
                 }
             }
 
             combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
-
             combatState.turn = 'opponent';
             renderCombatArena();
 
-            if (o.hp <= 0) {
+            if (combatState.opponent.hp <= 0) {
                 setTimeout(() => endCombat('win'), 500);
             } else {
                 setTimeout(() => executeOpponentTurn(), 1000);
             }
+        }
+
+        // A6 通用弹窗显示
+        function showModal(html) {
+            const modal = document.getElementById('eventModal');
+            if (!modal) return;
+            document.getElementById('modalTitle').textContent = '⚡ 绝技选择';
+            document.getElementById('modalDescription').innerHTML = html;
+            document.getElementById('modalOptions').innerHTML = '';
+            document.getElementById('modalResult').classList.add('hidden');
+            modal.classList.add('active');
+        }
+
+        // A6 通用弹窗关闭
+        function closeModal() {
+            const modal = document.getElementById('eventModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        // A6 绝技选择面板
+        function showUltimateSkillPanel() {
+            const weaponData = combatState.player.weaponData || { name:'空手' };
+            const skills = ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
+            if (!skills || skills.length === 0) {
+                addCombatLog('当前武器没有可用的绝技');
+                return;
+            }
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:350px;overflow-y:auto;">';
+            html += '<b style="color:#ffd700;font-size:14px;">⚡选择绝技</b><br><br>';
+            skills.forEach((skill, idx) => {
+                const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
+                const maxed = level >= skill.maxLevel;
+                const canUse = combatEnergy >= skill.cost;
+                const color = canUse ? '#00ff88' : '#666';
+                const upgradeCost = maxed ? null : getSkillUpgradeCost(level);
+                html += `<div style="margin-bottom:10px;padding:8px;background:#252540;border-radius:6px;cursor:${canUse?'pointer':'not-allowed'};opacity:${canUse?1:0.6};" onclick="${canUse ? `selectUltimateSkill(${idx})` : ''}">`;
+                html += `<div style="display:flex;justify-content:space-between;">`;
+                html += `<span style="color:${color};font-size:13px;">${skill.name}</span>`;
+                html += `<span style="color:#888;font-size:11px;">Lv.${level}${maxed?' <span style="color:#ffd700;">MAX</span>':''}</span>`;
+                html += `</div>`;
+                html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">`;
+                html += `消耗: ${skill.cost}能量 | 伤害: ×${(skill.damage * (1 + (level-1)*0.2)).toFixed(1)}`;
+                if (skill.effects && Object.keys(skill.effects).length > 0) {
+                    const effNames = Object.keys(skill.effects).join('/');
+                    html += ` | 效果: ${effNames}`;
+                }
+                html += `</div>`;
+                if (!maxed) {
+                    html += `<div style="color:#888;font-size:10px;margin-top:3px;">升级(${level}→${level+1}): ${upgradeCost.text}</div>`;
+                    html += `<button onclick="event.stopPropagation();upgradeUltimateSkill('${skill.id}')" style="margin-top:4px;padding:3px 10px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:10px;">升级</button>`;
+                }
+                html += `</div>`;
+            });
+            html += '<button onclick="closeModal()" style="margin-top:8px;padding:6px 16px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">返回</button>';
+            html += '</div>';
+            showModal(html);
+        }
+
+        function getSkillUpgradeCost(level) {
+            const materials = [
+                { text:'100灵石', cost:100 },
+                { text:'300灵石+1天材', cost:300, tiancai:1 },
+                { text:'800灵石+1混沌石', cost:800, hunyuan:1 },
+                { text:'2000灵石+1混沌石', cost:2000, hunyuan:1 },
+                { text:'5000灵石+2混沌石', cost:5000, hunyuan:2 }
+            ];
+            return materials[Math.min(level, materials.length-1)];
+        }
+
+        function upgradeUltimateSkill(skillId) {
+            const weaponData = combatState.player.weaponData || { name:'空手' };
+            const skills = ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
+            const skill = skills.find(s => s.id === skillId);
+            if (!skill) return;
+            const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skillId] || 1) : 1;
+            if (level >= skill.maxLevel) return;
+            const upgradeInfo = getSkillUpgradeCost(level);
+            // 检查灵石
+            if ((gameState.stones || 0) < upgradeInfo.cost) {
+                addCombatLog(`升级${skill.name}需要${upgradeInfo.text}，灵石不足！`);
+                return;
+            }
+            // 检查天材/混沌石
+            if (upgradeInfo.tiancai && (gameState.materials['天材'] || 0) < upgradeInfo.tiancai) {
+                addCombatLog(`升级${skill.name}需要${upgradeInfo.text}，天材不足！`);
+                return;
+            }
+            if (upgradeInfo.hunyuan && (gameState.materials['混沌石'] || 0) < upgradeInfo.hunyuan) {
+                addCombatLog(`升级${skill.name}需要${upgradeInfo.text}，混沌石不足！`);
+                return;
+            }
+            // 扣除并升级
+            gameState.stones -= upgradeInfo.cost;
+            if (upgradeInfo.tiancai) gameState.materials['天材'] -= upgradeInfo.tiancai;
+            if (upgradeInfo.hunyuan) gameState.materials['混沌石'] -= upgradeInfo.hunyuan;
+            if (!combatState.player.skillLevels) combatState.player.skillLevels = {};
+            combatState.player.skillLevels[skillId] = level + 1;
+            addCombatLog(`⚡ ${skill.name} 升级到 Lv.${level+1}！`);
+            if (typeof refreshInventoryUI === 'function') refreshInventoryUI();
+            showUltimateSkillPanel();
+        }
+
+        function selectUltimateSkill(idx) {
+            const weaponData = combatState.player.weaponData || { name:'空手' };
+            const skills = ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
+            const skill = skills[idx];
+            if (!skill || combatEnergy < skill.cost) return;
+            executeUltimateSkill(skill);
+            closeModal();
         }
 
         // 攻击后增加能量
@@ -6979,7 +7272,8 @@
                     skills: [],
                     accessories: [],
                     counterEnergy: 0,
-                    inDefenseStance: false
+                    inDefenseStance: false,
+                    skillLevels: {}
                 },
                 opponent: opponent,
                 log: [],
@@ -7007,17 +7301,16 @@
         // 渲染必杀技能量条
         function renderUltimateEnergyBar() {
             const info = getEnergyBar();
-            const skill = info.skill;
-            const barColor = info.ready ? skill.color : '#555';
             const readyClass = info.ready ? 'energy-ready' : '';
+            const skillName = info.skills.length > 0 ? info.skills[0].name.substring(0,3) : '绝技';
             return `
                 <div class="ultimate-energy-bar" style="margin-top:5px;">
                     <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-                        <span style="font-size:0.75em;color:${skill.color};">${skill.icon} ${skill.name}</span>
+                        <span style="font-size:0.75em;color:#ffd700;">⚡ ${skillName}</span>
                         <span style="font-size:0.7em;color:#aaa;margin-left:auto;">${info.current}/${info.cost}</span>
                     </div>
                     <div style="background:rgba(0,0,0,0.4);border-radius:4px;height:8px;overflow:hidden;">
-                        <div class="energy-fill ${readyClass}" style="width:${info.pct}%;background:${barColor};height:100%;border-radius:4px;transition:width 0.3s;"></div>
+                        <div class="energy-fill ${readyClass}" style="width:${info.pct}%;background:${info.ready ? '#ffd700' : '#555'};height:100%;border-radius:4px;transition:width 0.3s;"></div>
                     </div>
                 </div>
             `;
@@ -7128,7 +7421,6 @@
         // 渲染玩家行动按钮
         function renderPlayerActions() {
             const info = getEnergyBar();
-            const skill = info.skill;
             const canUltimate = info.ready;
             return `
                 <div class="combat-actions">
@@ -7138,8 +7430,8 @@
                     <button class="combat-action-btn defend" onclick="selectCombatAction('defend')">
                         🛡️ 防御
                     </button>
-                    <button class="combat-action-btn ultimate ${canUltimate ? '' : ''}" onclick="selectCombatAction('ultimate')" ${canUltimate ? '' : 'disabled'}>
-                        ${skill.icon} 必杀技 ${canUltimate ? '' : `(${info.current}/${info.cost})`}
+                    <button class="combat-action-btn ultimate" onclick="showUltimateSkillPanel()" ${canUltimate ? '' : 'disabled'}>
+                        ⚡ 必杀技 ${canUltimate ? '' : `(${info.current}/${info.cost})`}
                     </button>
                     <button class="combat-action-btn" onclick="selectCombatAction('treasure')">
                         🔮 法宝
@@ -7171,8 +7463,6 @@
                 showPillMenu();
             } else if (action === 'technique') {
                 showTechniqueInfo();
-            } else if (action === 'ultimate') {
-                executeUltimateSkill();
             }
         }
 
