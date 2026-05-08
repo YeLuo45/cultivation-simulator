@@ -4303,6 +4303,45 @@
             }
         }
 
+        // E2/E3/E4 通用MiniMax API调用函数
+        function callMiniMaxAPI(prompt, model, maxTokens, successCallback, errorCallback) {
+            if (!miniMaxConfig.apiKey) {
+                if (errorCallback) errorCallback('API未配置');
+                return;
+            }
+            
+            const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
+            
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + miniMaxConfig.apiKey
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'user', content: prompt }
+                    ],
+                    max_tokens: maxTokens,
+                    temperature: 0.8
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                    successCallback(data.choices[0].message.content);
+                } else if (data.error) {
+                    if (errorCallback) errorCallback(data.error.message || 'API错误');
+                } else {
+                    if (errorCallback) errorCallback('返回格式错误');
+                }
+            })
+            .catch(e => {
+                if (errorCallback) errorCallback(e.message);
+            });
+        }
+
         // 开始新游戏
         function startNewGame() {
             gameState = {
@@ -4412,7 +4451,9 @@
                     },
                     bossRefreshDays: {},
                     lastTravelDay: 0
-                }
+                },
+                // E1 NPC对话记忆
+                npcMemory: []
             };
             saveGame();
             showGameUI();
@@ -4522,6 +4563,8 @@
                         lastTravelDay: 0
                     }
                 };
+                // E1 确保npcMemory字段存在（向后兼容）
+                if (!gameState.npcMemory) gameState.npcMemory = [];
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
@@ -7007,38 +7050,54 @@
             }
         }
 
-        // 生成渡劫描述
+        // E2 生成渡劫描述（使用AI生成独特场景）
+        function generateTribulationScene(realm, callback) {
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
+            
+当前玩家信息：
+- 境界：${REALMS[realm] || '未知'}
+- 灵石：${gameState.stones}
+- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
+
+要求：
+1. 生成一段50-100字的渡劫场景描述
+2. 包含天象异变（雷电/乌云/异火等）
+3. 包含内心心境描写
+4. 描述要独特，每次生成都不同
+5. 用中文输出，不要加引号
+
+直接输出场景描述文字，不要前缀。`;
+
+            callMiniMaxAPI(prompt, model, 200, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim());
+                } else {
+                    callback(getDefaultTribulationScene(realm));
+                }
+            }, (err) => {
+                callback(getDefaultTribulationScene(realm));
+            });
+        }
+
+        function getDefaultTribulationScene(realm) {
+            const scenes = [
+                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
+                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
+                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
+            ];
+            return scenes[realm % scenes.length];
+        }
+
+        // 兼容旧版本的generateTribulationDesc
         async function generateTribulationDesc(tribKey) {
             const trib = TRIBULATIONS[tribKey];
-            const prompts = {
-                thunder: '描写一道金丹修士面对九天神雷降临时，雷云翻涌、电闪雷鸣的壮观场景',
-                fire: '描写一位修士面对琉璃阴火时，周身火焰缭绕、焚心烧魄的险恶处境',
-                wind: '描写修士经历九幽阴风时，狂风呼啸、刮骨伐髓的可怕体验',
-                demon: '描写元婴修士面对心魔入侵时，心魔乱神、幻象丛生的诡异局面',
-                all: '描写化神大能飞升之际，天劫齐至、毁天灭地的终极考验'
-            };
-
-            const prompt = prompts[trib.type] || '描写修仙渡劫场景';
-
-            const response = await fetch(`${CONFIG.apiUrl}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${miniMaxConfig.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: miniMaxConfig.model || 'MiniMax-M2.7',
-                    max_tokens: 200,
-                    messages: [{
-                        role: 'user',
-                        content: `你是一个修仙游戏场景描述器。请生成一段50字左右的渡劫场景描述，描写${prompt}。只返回描述文字，不要其他内容。`
-                    }],
-                    temperature: 0.9
-                })
+            
+            return new Promise((resolve) => {
+                generateTribulationScene(gameState.realm, (sceneDesc) => {
+                    resolve(sceneDesc || trib.desc);
+                });
             });
-
-            const data = await response.json();
-            return data.choices?.[0]?.message?.content || trib.desc;
         }
 
         // 执行渡劫判定
@@ -9320,6 +9379,76 @@
             return executeSerendipity(selected.name, selected.event);
         }
 
+        // E4 生成奇遇AI描述
+        function generateAiSerendipity(serendipityType, callback) {
+            if (!miniMaxConfig.apiKey) {
+                callback(getDefaultSerendipityText(serendipityType));
+                return;
+            }
+            
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const prompts = {
+                'positive': `你是一个修仙游戏的奇遇描述生成器。请为玩家的一个正面奇遇生成独特描述。
+
+玩家信息：
+- 境界：${REALMS[gameState.realm] || '凡人'}
+- 灵石：${gameState.stones}
+
+要求：
+1. 生成20-40字的中文奇遇描述
+2. 描述要独特有画面感
+3. 包含发现的物品或遇到的机缘
+4. 直接输出描述，不要前缀
+
+直接输出描述文字。`,
+                'negative': `你是一个修仙游戏的奇遇描述生成器。请为玩家的一个负面奇遇生成独特描述。
+
+玩家信息：
+- 境界：${REALMS[gameState.realm] || '凡人'}
+- 灵石：${gameState.stones}
+
+要求：
+1. 生成20-40字的中文奇遇描述
+2. 描述危险或困境
+3. 直接输出描述，不要前缀
+
+直接输出描述文字。`,
+                'neutral': `你是一个修仙游戏的奇遇描述生成器。请为玩家的一个中性奇遇生成独特描述。
+
+玩家信息：
+- 境界：${REALMS[gameState.realm] || '凡人'}
+- 灵石：${gameState.stones}
+
+要求：
+1. 生成20-40字的中文奇遇描述
+2. 描述一个需要选择的情况
+3. 直接输出描述，不要前缀
+
+直接输出描述文字。`
+            };
+            
+            const prompt = prompts[serendipityType] || prompts['neutral'];
+            
+            callMiniMaxAPI(prompt, model, 100, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim());
+                } else {
+                    callback(getDefaultSerendipityText(serendipityType));
+                }
+            }, (err) => {
+                callback(getDefaultSerendipityText(serendipityType));
+            });
+        }
+
+        function getDefaultSerendipityText(type) {
+            const texts = {
+                'positive': '你在路边发现了一株散发奇异光芒的灵草，似乎是罕见的天地精华！',
+                'negative': '你不慎踏入了一处危险的禁地，四周弥漫着诡异的气息...',
+                'neutral': '你遇到了一位神秘的散修，他似乎有话要对你说...'
+            };
+            return texts[type] || texts['neutral'];
+        }
+
         // 执行奇遇
         function executeSerendipity(name, event) {
             const serendipity = gameState.serendipity;
@@ -9347,7 +9476,7 @@
             return { name, event, result };
         }
 
-        // 显示奇遇弹窗
+        // E4 显示奇遇弹窗（带AI描述增强）
         function showSerendipityModal(serendipityData) {
             if (!serendipityData) return;
 
@@ -9362,55 +9491,114 @@
             // 设置标题
             titleEl.textContent = `${event.icon} ${name} ${event.icon}`;
 
-            let html = `
-                <div style="text-align:center;">
-                    <span class="serendipity-type-badge ${event.type}">${event.type === 'positive' ? '✨ 吉利' : event.type === 'negative' ? '💀 凶险' : '⚖️ 中性'}</span>
-                </div>
-                <div class="serendipity-effect">
-                    <p style="text-align:center;margin-bottom:15px;">${result.text}</p>
-            `;
+            // E4 使用AI生成独特描述
+            if (miniMaxConfig.features.aiSerendipity && miniMaxConfig.apiKey) {
+                // 先显示默认描述，然后异步获取AI描述更新
+                let html = `
+                    <div style="text-align:center;">
+                        <span class="serendipity-type-badge ${event.type}">${event.type === 'positive' ? '✨ 吉利' : event.type === 'negative' ? '💀 凶险' : '⚖️ 中性'}</span>
+                    </div>
+                    <div class="serendipity-effect">
+                        <p id="serendipityAiDesc" style="text-align:center;margin-bottom:15px;color:#aaa;">${result.text}<br><small>(AI描述生成中...)</small></p>
+                `;
 
-            if (result.effects && result.effects.length > 0) {
-                html += '<div class="serendipity-effect-item" style="font-weight:bold;margin-bottom:10px;">效果：</div>';
-                for (const effect of result.effects) {
-                    const valueStr = effect.value > 0 ? `+${effect.value}` : `${effect.value}`;
+                if (result.effects && result.effects.length > 0) {
+                    html += '<div class="serendipity-effect-item" style="font-weight:bold;margin-bottom:10px;">效果：</div>';
+                    for (const effect of result.effects) {
+                        const valueStr = effect.value > 0 ? `+${effect.value}` : `${effect.value}`;
+                        html += `
+                            <div class="serendipity-effect-item">
+                                <span>${effect.type}</span>
+                                <span class="${effect.positive ? 'effect-positive' : 'effect-negative'}">${valueStr}</span>
+                            </div>
+                        `;
+                    }
+                }
+                html += '</div>';
+
+                if (result.showRealmBattle) {
+                    const isNegative = result.isNegative || false;
                     html += `
-                        <div class="serendipity-effect-item">
-                            <span>${effect.type}</span>
-                            <span class="${effect.positive ? 'effect-positive' : 'effect-negative'}">${valueStr}</span>
+                        <div style="text-align:center;margin-top:15px;">
+                            <button class="btn ${isNegative ? 'btn-combat' : 'btn-explore'}" onclick="startSecretRealmBattle('${name}', ${isNegative})">
+                                ${isNegative ? '⚔️ 应战' : '🌀 进入秘境'}
+                            </button>
+                            <button class="btn btn-save" onclick="skipRealmBattle()" style="margin-left:10px;">跳过</button>
                         </div>
                     `;
                 }
-            }
 
-            html += '</div>';
+                if (result.showChoice && result.choices && result.choices.length > 0) {
+                    const choiceLabels = { 0: '接受', 1: '拒绝' };
+                    html += `<div style="text-align:center;margin-top:15px;">`;
+                    result.choices.forEach((label, idx) => {
+                        const btnLabel = choiceLabels[idx] || label;
+                        html += `<button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', ${idx})" style="margin-left:${idx > 0 ? '8px' : '0'}">${btnLabel}</button>`;
+                    });
+                    html += `</div>`;
+                }
 
-            // 秘境战斗按钮
-            if (result.showRealmBattle) {
-                const isNegative = result.isNegative || false;
-                html += `
-                    <div style="text-align:center;margin-top:15px;">
-                        <button class="btn ${isNegative ? 'btn-combat' : 'btn-explore'}" onclick="startSecretRealmBattle('${name}', ${isNegative})">
-                            ${isNegative ? '⚔️ 应战' : '🌀 进入秘境'}
-                        </button>
-                        <button class="btn btn-save" onclick="skipRealmBattle()" style="margin-left:10px;">跳过</button>
-                    </div>
-                `;
-            }
+                content.innerHTML = html;
+                modal.classList.add('active');
 
-            // 选择类奇遇（支持多个选项）
-            if (result.showChoice && result.choices && result.choices.length > 0) {
-                const choiceLabels = { 0: '接受', 1: '拒绝' };
-                html += `<div style="text-align:center;margin-top:15px;">`;
-                result.choices.forEach((label, idx) => {
-                    const btnLabel = choiceLabels[idx] || label;
-                    html += `<button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', ${idx})" style="margin-left:${idx > 0 ? '8px' : '0'}">${btnLabel}</button>`;
+                // 异步生成AI描述
+                generateAiSerendipity(event.type, (aiDescription) => {
+                    gameState.currentSerendipityDescription = aiDescription;
+                    const descEl = document.getElementById('serendipityAiDesc');
+                    if (descEl) {
+                        descEl.innerHTML = `<strong>${aiDescription}</strong>`;
+                        descEl.style.color = '#ffd700';
+                    }
                 });
-                html += `</div>`;
-            }
+            } else {
+                // 不使用AI时直接显示默认描述
+                let html = `
+                    <div style="text-align:center;">
+                        <span class="serendipity-type-badge ${event.type}">${event.type === 'positive' ? '✨ 吉利' : event.type === 'negative' ? '💀 凶险' : '⚖️ 中性'}</span>
+                    </div>
+                    <div class="serendipity-effect">
+                        <p style="text-align:center;margin-bottom:15px;">${result.text}</p>
+                `;
 
-            content.innerHTML = html;
-            modal.classList.add('active');
+                if (result.effects && result.effects.length > 0) {
+                    html += '<div class="serendipity-effect-item" style="font-weight:bold;margin-bottom:10px;">效果：</div>';
+                    for (const effect of result.effects) {
+                        const valueStr = effect.value > 0 ? `+${effect.value}` : `${effect.value}`;
+                        html += `
+                            <div class="serendipity-effect-item">
+                                <span>${effect.type}</span>
+                                <span class="${effect.positive ? 'effect-positive' : 'effect-negative'}">${valueStr}</span>
+                            </div>
+                        `;
+                    }
+                }
+                html += '</div>';
+
+                if (result.showRealmBattle) {
+                    const isNegative = result.isNegative || false;
+                    html += `
+                        <div style="text-align:center;margin-top:15px;">
+                            <button class="btn ${isNegative ? 'btn-combat' : 'btn-explore'}" onclick="startSecretRealmBattle('${name}', ${isNegative})">
+                                ${isNegative ? '⚔️ 应战' : '🌀 进入秘境'}
+                            </button>
+                            <button class="btn btn-save" onclick="skipRealmBattle()" style="margin-left:10px;">跳过</button>
+                        </div>
+                    `;
+                }
+
+                if (result.showChoice && result.choices && result.choices.length > 0) {
+                    const choiceLabels = { 0: '接受', 1: '拒绝' };
+                    html += `<div style="text-align:center;margin-top:15px;">`;
+                    result.choices.forEach((label, idx) => {
+                        const btnLabel = choiceLabels[idx] || label;
+                        html += `<button class="btn btn-cultivate" onclick="handleSerendipityChoice('${name}', ${idx})" style="margin-left:${idx > 0 ? '8px' : '0'}">${btnLabel}</button>`;
+                    });
+                    html += `</div>`;
+                }
+
+                content.innerHTML = html;
+                modal.classList.add('active');
+            }
 
             // 记录日志
             addLog(event.type === 'positive' ? 'good' : event.type === 'negative' ? 'bad' : 'neutral', name, result.text);
@@ -9555,21 +9743,60 @@
         function startSecretRealmBattle(eventName, isNegative) {
             closeSerendipityModal();
 
-            // 玩家最大生命值随境界成长
-            const playerMaxHP = 100 + gameState.realm * 100;
-            secretRealmState = {
-                wave: 0,
-                totalWaves: 3,
-                enemies: generateRealmEnemies(isNegative),
-                playerHP: playerMaxHP,
-                playerMaxHP: playerMaxHP,
-                rewards: [],
-                eventName: eventName,
-                isNegative: isNegative
-            };
+            // E3 生成秘境名称
+            generateRealmName((realmName) => {
+                gameState.currentSecretRealmName = realmName;
+                addEventLog(`📍 你进入了「${realmName}」`, 'success');
+                
+                // 玩家最大生命值随境界成长
+                const playerMaxHP = 100 + gameState.realm * 100;
+                secretRealmState = {
+                    wave: 0,
+                    totalWaves: 3,
+                    enemies: generateRealmEnemies(isNegative),
+                    playerHP: playerMaxHP,
+                    playerMaxHP: playerMaxHP,
+                    rewards: [],
+                    eventName: eventName,
+                    isNegative: isNegative,
+                    realmName: realmName
+                };
 
-            // 显示秘境战斗UI
-            showSecretRealmBattleUI();
+                // 显示秘境战斗UI
+                showSecretRealmBattleUI();
+            });
+        }
+
+        // E3 生成秘境名称（AI）
+        function generateRealmName(callback) {
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const prompt = `你是一个修仙游戏的秘境名称生成器。请为玩家的下一个秘境生成一个独特的名字。
+
+当前玩家境界：${REALMS[gameState.realm] || '凡人'}
+秘境难度：第${gameState.realm + 1}层秘境
+
+要求：
+1. 生成一个2-5字的秘境名称
+2. 要有仙侠风格（可以用：深渊/裂隙/遗迹/洞府/秘境/禁地/幻境等词）
+3. 名称要独特有诗意
+4. 直接输出名称，不要加引号或解释
+
+直接输出名称。`;
+
+            callMiniMaxAPI(prompt, model, 30, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim().substring(0, 8));
+                } else {
+                    callback(getDefaultRealmName());
+                }
+            }, (err) => {
+                callback(getDefaultRealmName());
+            });
+        }
+
+        function getDefaultRealmName() {
+            const names = ['迷雾深渊', '星辰裂隙', '上古遗迹', '天机洞府', '幽冥禁地', '幻境之海', '苍穹秘境', '永恒禁域'];
+            return names[Math.floor(Math.random() * names.length)];
         }
 
         // 生成秘境敌人
@@ -9615,9 +9842,11 @@
         function showSecretRealmBattleUI() {
             const content = document.getElementById('secretRealmContent');
             const modal = document.getElementById('secretRealmModal');
+            const realmName = gameState.currentSecretRealmName || secretRealmState.realmName || '神秘秘境';
 
             let html = `
                 <div class="secret-realm-arena">
+                    <div class="realm-name" style="color:#ffd700;font-size:1.3em;margin-bottom:10px;">「${realmName}」</div>
                     <div class="realm-wave">第 ${secretRealmState.wave + 1} / ${secretRealmState.totalWaves} 波</div>
                     <div class="realm-progress">
             `;
