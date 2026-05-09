@@ -2699,6 +2699,10 @@
                 <div class="stat-label">心境</div>
                 <div class="stat-value mindset" id="mindsetDisplay">50</div>
             </div>
+            <div class="stat-item" id="reincarnationDisplay" style="display:none;">
+                <div class="stat-label">轮回</div>
+                <div class="stat-value" id="reincarnationStatDisplay" style="color:#9c27b0;">0次</div>
+            </div>
             <div class="stat-item">
                 <div class="stat-label">游戏天数</div>
                 <div class="stat-value days" id="daysDisplay">1</div>
@@ -3914,7 +3918,16 @@
             },
             // 仙宠灵兽系统字段
             pets: [],
-            summonedPet: null
+            summonedPet: null,
+            // V15 轮回转世系统字段
+            reincarnation: {
+                count: 0,              // 转世次数
+                soulAge: 0,           // 灵魂修为（累计）
+                pastLifeMemories: [],  // 前世记忆（可获得加成）
+                rebirthCultivation: 0, // 重修时保留的修为（转化为基础属性）
+                hasReincarnatedBuff: false, // 转世重修buff
+                reincarnatedFromAchievement: false // 是否通过成就触发转世
+            }
         };
 
         // --- miniMaxConfig (1492-1502) ---
@@ -4464,6 +4477,32 @@
             html += `
                     </div>
                 </div>
+                
+                ${gameState.reincarnation && gameState.reincarnation.count > 0 ? `
+                <div class="sr-section">
+                    <div class="sr-section-title">🔄 轮回信息</div>
+                    <div style="text-align:center;">
+                        <div style="margin:10px 0;">
+                            <span style="color:#9c27b0;">轮回次数：</span>
+                            <span style="color:#ffd700;font-size:1.2em;">${gameState.reincarnation.count}</span>
+                        </div>
+                        <div style="margin:10px 0;">
+                            <span style="color:#9c27b0;">灵魂修为：</span>
+                            <span style="color:#ffd700;font-size:1.2em;">${gameState.reincarnation.soulAge}</span>
+                        </div>
+                        <div style="margin:10px 0;">
+                            <span style="color:#9c27b0;">保留修为：</span>
+                            <span style="color:#4caf50;font-size:1.2em;">${gameState.reincarnation.rebirthCultivation}</span>
+                        </div>
+                    </div>
+                    ${gameState.reincarnation.pastLifeMemories.length > 0 ? `
+                    <div style="margin-top:15px;">
+                        <div style="color:#aaa;margin-bottom:5px;">前世记忆碎片：</div>
+                        ${gameState.reincarnation.pastLifeMemories.map(m => `<div style="color:#888;font-size:0.9em;margin:5px 0;">✨ ${m}</div>`).join('')}
+                    </div>
+                    ` : ''}
+                </div>
+                ` : ''}
                 
                 <div class="sr-actions">
                     <button class="btn-refresh-sr" onclick="refreshSpiritRoot(false)" ${gameState.spiritStones < 10000 ? 'disabled' : ''}>
@@ -8845,11 +8884,70 @@
                 html += `<h2 class="victory">🎉 飞升成功！🎉</h2>
                          <p>历经${gameState.days}天，你终于突破化神期，白日飞升！</p>`;
             } else {
+                // 陨落时显示轮回转世选项
+                const reincarnationCount = gameState.reincarnation.count;
+                const soulAge = gameState.reincarnation.soulAge;
                 html += `<h2 class="defeat">💀 陨落 💀</h2>
                          <p>修仙之路充满危险，你在第${gameState.days}天陨落...</p>`;
+                
+                // 显示轮回信息
+                if (reincarnationCount > 0) {
+                    html += `<div style="margin:15px 0;padding:10px;background:rgba(100,100,255,0.2);border-radius:10px;">
+                        <p style="color:#aaa;">已轮回 <span style="color:#ffd700;">${reincarnationCount}</span> 次</p>
+                        <p style="color:#aaa;">灵魂修为 <span style="color:#ffd700;">${soulAge}</span></p>
+                    </div>`;
+                }
+                
+                // 转世重修按钮
+                html += `<button class="btn" onclick="reincarnate()" style="margin:10px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;">
+                    🔄 轮回转世（保留${Math.floor(soulAge * 0.3)}点灵魂修为）
+                </button>`;
             }
-            html += '<button class="btn btn-new" onclick="startNewGame()">重新开始</button></div>';
+            html += '<button class="btn btn-new" onclick="startNewGame()" style="margin:10px;">重新开始</button></div>';
             document.getElementById('startScreen').innerHTML = html;
+        }
+
+        // ===== reincarnate =====
+        // 轮回转世：保留部分灵魂修为重修
+        function reincarnate() {
+            const reincarnation = gameState.reincarnation;
+            
+            // 计算保留的灵魂修为（每次转世累加）
+            // 灵魂修为来源：境界(5)、天数(0.1)、灵石(0.01)
+            const realmExp = gameState.realm * 50;
+            const daysExp = gameState.days * 0.5;
+            const stonesExp = Math.min(gameState.spiritStones, 100000) * 0.01;
+            const totalExp = Math.floor(realmExp + daysExp + stonesExp);
+            
+            // 累加到灵魂修为
+            reincarnation.soulAge += totalExp;
+            reincarnation.count++;
+            reincarnation.hasReincarnatedBuff = true;
+            reincarnation.rebirthCultivation = Math.floor(reincarnation.soulAge * 0.3);
+            
+            // 记录前世的某些记忆
+            if (gameState.days > 365) {
+                const memories = [
+                    '前世的修炼经验让你对灵气感知更加敏锐',
+                    '前世的记忆让你更容易参悟功法',
+                    '前世经历的劫难让你心境更加坚定',
+                    '前世的感悟让你的灵魂更加纯净'
+                ];
+                const randomMem = memories[Math.floor(Math.random() * memories.length)];
+                reincarnation.pastLifeMemories.push(randomMem);
+            }
+            
+            // 保存转世数据到localStorage
+            const savedReincarnation = {
+                count: reincarnation.count,
+                soulAge: reincarnation.soulAge,
+                pastLifeMemories: reincarnation.pastLifeMemories,
+                rebirthCultivation: reincarnation.rebirthCultivation
+            };
+            localStorage.setItem('reincarnationData', JSON.stringify(savedReincarnation));
+            
+            // 执行真正的重置，但保留加成
+            startNewGame(true);
         }
 
         // ===== generateRandomSpiritRoot =====
@@ -12629,7 +12727,17 @@
         }
 
         // ===== startNewGame =====
-        function startNewGame() {
+        function startNewGame(fromReincarnation = false) {
+            let reincarnationData = null;
+            
+            // 如果是从轮回转世来的，恢复转世数据
+            if (fromReincarnation) {
+                const saved = localStorage.getItem('reincarnationData');
+                if (saved) {
+                    reincarnationData = JSON.parse(saved);
+                }
+            }
+            
             gameState = {
                 realm: 0,
                 stage: 0,
@@ -12766,11 +12874,57 @@
                     }
                 },
                 pets: [],
-                summonedPet: null
+                summonedPet: null,
+                // V15 轮回转世系统
+                reincarnation: reincarnationData ? {
+                    count: reincarnationData.count,
+                    soulAge: reincarnationData.soulAge,
+                    pastLifeMemories: reincarnationData.pastLifeMemories || [],
+                    rebirthCultivation: reincarnationData.rebirthCultivation,
+                    hasReincarnatedBuff: reincarnationData.count > 0,
+                    reincarnatedFromAchievement: false
+                } : {
+                    count: 0,
+                    soulAge: 0,
+                    pastLifeMemories: [],
+                    rebirthCultivation: 0,
+                    hasReincarnatedBuff: false,
+                    reincarnatedFromAchievement: false
+                }
             };
+            
+            // 如果是转世重修，应用灵魂修为加成
+            if (fromReincarnation && reincarnationData && reincarnationData.rebirthCultivation > 0) {
+                const bonus = reincarnationData.rebirthCultivation;
+                // 根据保留的灵魂修为给予加成
+                // 每100点灵魂修为：初始灵气+10，最大灵气+10，心境+5
+                const qiBonus = Math.floor(bonus / 10) * 10;
+                const maxQiBonus = Math.floor(bonus / 10) * 10;
+                const mindsetBonus = Math.floor(bonus / 20) * 5;
+                
+                gameState.qi = Math.min(gameState.qi + qiBonus, gameState.maxQi + maxQiBonus);
+                gameState.maxQi += maxQiBonus;
+                gameState.mindset = Math.min(100, gameState.mindset + mindsetBonus);
+                
+                // 显示转世欢迎信息
+                addLog('good', '转世觉醒', 
+                    `灵魂觉醒！你保留了 ${bonus} 点灵魂修为。<br>` +
+                    `初始灵气 +${qiBonus}，最大灵气 +${maxQiBonus}，心境 +${mindsetBonus}<br>` +
+                    `转世次数：${reincarnationData.count}，当前灵魂修为：${reincarnationData.soulAge}`);
+                
+                // 如果有前世记忆，显示第一条
+                if (reincarnationData.pastLifeMemories && reincarnationData.pastLifeMemories.length > 0) {
+                    addLog('neutral', '前世记忆', reincarnationData.pastLifeMemories[reincarnationData.pastLifeMemories.length - 1]);
+                }
+            }
+            
             saveGame();
             showGameUI();
-            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
+            
+            // 只有非转世才显示欢迎消息
+            if (!fromReincarnation) {
+                addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
+            }
         }
 
         // ===== loadGame =====
@@ -12990,6 +13144,18 @@
             if (gameState.worldMap) {
                 const wm = gameState.worldMap;
                 document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
+            }
+            
+            // V15 更新轮回显示
+            const reincarnationDisplay = document.getElementById('reincarnationDisplay');
+            if (reincarnationDisplay) {
+                const rc = gameState.reincarnation;
+                if (rc && rc.count > 0) {
+                    reincarnationDisplay.style.display = 'inline-block';
+                    document.getElementById('reincarnationStatDisplay').textContent = `${rc.count}次`;
+                } else {
+                    reincarnationDisplay.style.display = 'none';
+                }
             }
         }
 </script>
