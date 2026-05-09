@@ -3912,7 +3912,22 @@
             // 仙宫产出周期(天)
             productionCycle: 1,
             // 最大仙宫弟子
-            maxPalaceDisciples: { 1: 5, 2: 10, 3: 20, 4: 40, 5: 80 }
+            maxPalaceDisciples: { 1: 5, 2: 10, 3: 20, 4: 40, 5: 80 },
+            // 仙宫弟子任务配置
+            taskTypes: {
+                'cultivate': { name: '闭关修炼', icon: '🧘', desc: '在修炼殿修炼', duration: 3, reward: { spiritStones: 100, reputation: 10 }, requirement: { type: 'room', roomType: '修炼殿' } },
+                'mine': { name: '采集灵石', icon: '⛏️', desc: '前往灵矿采集灵石', duration: 2, reward: { spiritStones: 200, reputation: 5 }, requirement: { type: 'discipleCount', count: 1 } },
+                'herbal': { name: '采药炼丹', icon: '🌿', desc: '采集灵草并尝试炼丹', duration: 3, reward: { spiritStones: 150, reputation: 15, items: ['丹药'] }, requirement: { type: 'room', roomType: '炼丹房' } },
+                'patrol': { name: '巡逻护宫', icon: '🛡️', desc: '巡视仙宫周围', duration: 2, reward: { spiritStones: 80, reputation: 25 }, requirement: { type: 'none' } },
+                'forge': { name: '锻造法宝', icon: '🔨', desc: '使用炼器室锻造法宝', duration: 4, reward: { spiritStones: 300, reputation: 20, items: ['法宝'] }, requirement: { type: 'room', roomType: '炼器室' } },
+                'study': { name: '研读典籍', icon: '📖', desc: '在藏经阁研读功法', duration: 3, reward: { spiritStones: 50, reputation: 30, exp: 50 }, requirement: { type: 'room', roomType: '悟道阁' } },
+                'collect_revenue': { name: '收取贡赋', icon: '💎', desc: '向附庸势力收取贡赋', duration: 5, reward: { spiritStones: 500, reputation: 10 }, requirement: { type: 'palaceLevel', level: 2 } },
+                'explore': { name: '探索秘境', icon: '🌀', desc: '组队探索附近秘境', duration: 4, reward: { spiritStones: 400, reputation: 40, items: ['灵草'] }, requirement: { type: 'discipleCount', count: 2 } },
+                'defend': { name: '守护仙宫', icon: '⚔️', desc: '抵御外来入侵者', duration: 3, reward: { spiritStones: 250, reputation: 50 }, requirement: { type: 'discipleCount', count: 3 } },
+                'diplomacy': { name: '外交往来', icon: '🤝', desc: '与其他势力进行外交', duration: 5, reward: { spiritStones: 100, reputation: 60 }, requirement: { type: 'palaceLevel', level: 3 } }
+            },
+            // 任务难度对应奖励倍数
+            taskDifficultyMultiplier: { easy: 1, normal: 1.5, hard: 2.5 }
         };
 
         // --- SECT_TECHNIQUES (6104-6111) ---
@@ -4047,7 +4062,9 @@
                 rooms: [],
                 disciples: [],
                 lastProductionDay: 0,
-                decorationBonus: 0
+                decorationBonus: 0,
+                tasks: [],           // 弟子任务列表
+                taskRecord: { completed: 0, failed: 0, totalReward: 0 }  // 任务统计
             },
             // V6 奇遇系统字段
             serendipity: {
@@ -11418,6 +11435,7 @@
         // ===== openPalace =====
         function openPalace() {
             document.getElementById('palaceModal').classList.add('active');
+            checkTaskProgress();
             renderPalaceHome();
         }
 
@@ -11467,6 +11485,7 @@
                 <div class="palace-tabs" style="display:flex;gap:10px;margin-bottom:15px;">
                     <div class="palace-tab active" onclick="switchPalaceTab('rooms')" style="flex:1;padding:12px;border:1px solid rgba(255,111,0,0.3);border-radius:10px;background:rgba(0,0,0,0.3);color:#aaa;cursor:pointer;text-align:center;transition:all 0.3s;">🏗️ 房间</div>
                     <div class="palace-tab" onclick="switchPalaceTab('disciples')" style="flex:1;padding:12px;border:1px solid rgba(255,111,0,0.3);border-radius:10px;background:rgba(0,0,0,0.3);color:#aaa;cursor:pointer;text-align:center;transition:all 0.3s;">👥 弟子</div>
+                    <div class="palace-tab" onclick="switchPalaceTab('tasks')" style="flex:1;padding:12px;border:1px solid rgba(255,111,0,0.3);border-radius:10px;background:rgba(0,0,0,0.3);color:#aaa;cursor:pointer;text-align:center;transition:all 0.3s;">📜 任务</div>
                     <div class="palace-tab" onclick="switchPalaceTab('manage')" style="flex:1;padding:12px;border:1px solid rgba(255,111,0,0.3);border-radius:10px;background:rgba(0,0,0,0.3);color:#aaa;cursor:pointer;text-align:center;transition:all 0.3s;">⚙️ 管理</div>
                 </div>
                 <div class="palace-content" id="palaceTabContent" style="max-height:400px;overflow-y:auto;">
@@ -11495,9 +11514,293 @@
                 case 'disciples':
                     tabContent.innerHTML = renderPalaceDisciplesTab();
                     break;
+                case 'tasks':
+                    tabContent.innerHTML = renderPalaceTasksTab();
+                    break;
                 case 'manage':
                     tabContent.innerHTML = renderPalaceManageTab();
                     break;
+            }
+        }
+
+        // ===== renderPalaceTasksTab =====
+        function renderPalaceTasksTab() {
+            const palace = gameState.palace;
+            const tasks = palace.tasks || [];
+            const activeTasks = tasks.filter(t => t.status === 'active');
+            const completedTasks = tasks.filter(t => t.status === 'completed');
+            
+            let html = `
+                <div style="margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="color:#aaa;">
+                        进行中: <span style="color:#ffb300;">${activeTasks.length}</span> | 
+                        已完成: <span style="color:#4caf50;">${completedTasks.length}</span>
+                    </div>
+                    <button onclick="generatePalaceTask()" ${palace.disciples.length === 0 ? 'disabled' : ''} style="padding:10px 20px;background:${palace.disciples.length === 0 ? '#555' : 'linear-gradient(135deg,#ff6f00,#ffb300)'};color:white;border:none;border-radius:8px;cursor:${palace.disciples.length === 0 ? 'not-allowed' : 'pointer'};font-size:0.9em;">
+                        📜 生成任务
+                    </button>
+                </div>
+                <div style="color:#888;font-size:0.85em;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                    💡 派遣弟子执行任务可获得灵石、声望和稀有物品奖励。<br>
+                    📊 任务统计：完成 ${palace.taskRecord?.completed || 0} 次，失败 ${palace.taskRecord?.failed || 0} 次
+                </div>
+            `;
+            
+            // 进行中的任务
+            if (activeTasks.length > 0) {
+                html += `<h4 style="color:#ffb300;margin-bottom:10px;">🔄 进行中的任务</h4>`;
+                html += '<div style="display:grid;gap:10px;margin-bottom:20px;">';
+                activeTasks.forEach((task, idx) => {
+                    const taskConfig = PALACE_CONFIG.taskTypes[task.type];
+                    const daysLeft = task.endDay - gameState.days;
+                    const progress = Math.max(0, Math.min(100, ((task.duration - daysLeft) / task.duration) * 100));
+                    const assignedDisciples = task.assignedDisciples || [];
+                    const discipleNames = assignedDisciples.map(dId => {
+                        const d = palace.disciples.find(pd => pd.uid === dId);
+                        return d ? d.name : '未知';
+                    }).join(', ');
+                    
+                    html += `
+                        <div style="padding:15px;background:rgba(0,0,0,0.4);border-radius:10px;border:1px solid rgba(255,111,0,0.3);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div>
+                                    <span style="font-size:1.3em;">${taskConfig.icon}</span>
+                                    <span style="color:#ffd700;font-weight:bold;margin-left:8px;">${taskConfig.name}</span>
+                                    ${task.difficulty ? `<span style="font-size:0.8em;padding:2px 8px;border-radius:5px;margin-left:8px;background:${task.difficulty === 'hard' ? '#f44336' : task.difficulty === 'normal' ? '#ff9800' : '#4caf50'};color:white;">${task.difficulty === 'hard' ? '困难' : task.difficulty === 'normal' ? '普通' : '简单'}</span>` : ''}
+                                </div>
+                                <div style="color:#aaa;font-size:0.85em;">
+                                    ${daysLeft <= 0 ? '<span style="color:#4caf50;">可领取</span>' : `剩余 ${daysLeft} 天`}
+                                </div>
+                            </div>
+                            <div style="color:#888;font-size:0.85em;margin-bottom:8px;">
+                                ${taskConfig.desc} | 派遣弟子: ${discipleNames || '未指定'}
+                            </div>
+                            <div style="margin-bottom:8px;">
+                                <div style="display:flex;justify-content:space-between;color:#888;font-size:0.8em;margin-bottom:3px;">
+                                    <span>进度</span>
+                                    <span>${Math.round(progress)}%</span>
+                                </div>
+                                <div style="height:8px;background:rgba(0,0,0,0.5);border-radius:4px;overflow:hidden;">
+                                    <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#ff6f00,#ffb300);border-radius:4px;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <div style="font-size:0.8em;color:#aaa;">
+                                    💎 ${Math.floor((taskConfig.reward.spiritStones || 0) * (task.difficulty ? PALACE_CONFIG.taskDifficultyMultiplier[task.difficulty] : 1))}
+                                </div>
+                                <div style="font-size:0.8em;color:#aaa;">
+                                    ⭐ +${Math.floor((taskConfig.reward.reputation || 0) * (task.difficulty ? PALACE_CONFIG.taskDifficultyMultiplier[task.difficulty] : 1))} 声望
+                                </div>
+                                ${taskConfig.reward.items ? `<div style="font-size:0.8em;color:#87ceeb;">🎁 ${taskConfig.reward.items.join(',')}</div>` : ''}
+                            </div>
+                            ${daysLeft <= 0 ? `
+                                <button onclick="claimPalaceTask(${idx})" style="margin-top:10px;width:100%;padding:8px;background:linear-gradient(135deg,#4caf50,#69f0ae);color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.9em;">
+                                    ✨ 领取奖励
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // 空闲弟子（可分配任务）
+            const idleDisciples = palace.disciples.filter(d => !tasks.some(t => t.status === 'active' && (t.assignedDisciples || []).includes(d.uid)));
+            
+            if (idleDisciples.length > 0 && activeTasks.length < 3) {
+                html += `<h4 style="color:#87ceeb;margin-bottom:10px;">🧑‍🎓 可用弟子 (${idleDisciples.length})</h4>`;
+                html += '<div style="display:grid;gap:8px;margin-bottom:15px;">';
+                idleDisciples.slice(0, 5).forEach(d => {
+                    html += `
+                        <div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="color:#ffd700;">${d.name}</span>
+                                <span style="color:#888;font-size:0.85em;margin-left:10px;">${CONFIG.realms[d.realm] || '炼气'}期 · ${d.talent}</span>
+                            </div>
+                            <div style="color:#aaa;font-size:0.8em;">
+                                ${d.work || '修炼中'}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // 最近完成的任务记录
+            if (completedTasks.length > 0) {
+                html += `<h4 style="color:#888;margin-bottom:10px;">📋 任务记录</h4>`;
+                html += '<div style="max-height:200px;overflow-y:auto;">';
+                completedTasks.slice(-5).reverse().forEach(task => {
+                    const taskConfig = PALACE_CONFIG.taskTypes[task.type];
+                    html += `
+                        <div style="padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="color:#888;font-size:0.9em;">${taskConfig.icon} ${taskConfig.name}</span>
+                                ${task.success ? '<span style="color:#4caf50;font-size:0.8em;margin-left:8px;">✅成功</span>' : '<span style="color:#f44336;font-size:0.8em;margin-left:8px;">❌失败</span>'}
+                            </div>
+                            <div style="color:#888;font-size:0.8em;">
+                                ${task.claimedAt ? new Date(task.claimedAt).toLocaleDateString() : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            if (tasks.length === 0) {
+                html += `
+                    <div style="text-align:center;padding:40px;color:#888;">
+                        <div style="font-size:48px;margin-bottom:15px;">📜</div>
+                        <div>暂无任务</div>
+                        <div style="font-size:0.85em;margin-top:10px;">点击"生成任务"为弟子分配任务</div>
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        // ===== generatePalaceTask =====
+        function generatePalaceTask() {
+            const palace = gameState.palace;
+            const tasks = palace.tasks || [];
+            
+            if (tasks.filter(t => t.status === 'active').length >= 3) {
+                showToast('最多同时进行3个任务！');
+                return;
+            }
+            
+            // 获取可用弟子
+            const activeTaskDisciples = tasks.filter(t => t.status === 'active').flatMap(t => t.assignedDisciples || []);
+            const availableDisciples = palace.disciples.filter(d => !activeTaskDisciples.includes(d.uid));
+            
+            if (availableDisciples.length === 0) {
+                showToast('没有空闲弟子！');
+                return;
+            }
+            
+            // 随机选择一个任务类型
+            const taskTypeKeys = Object.keys(PALACE_CONFIG.taskTypes);
+            const randomTaskType = taskTypeKeys[Math.floor(Math.random() * taskTypeKeys.length)];
+            const taskConfig = PALACE_CONFIG.taskTypes[randomTaskType];
+            
+            // 随机分配1-3个弟子
+            const numDisciples = Math.min(availableDisciples.length, Math.floor(Math.random() * 3) + 1);
+            const assignedDisciples = availableDisciples.slice(0, numDisciples);
+            
+            // 随机难度
+            const difficulties = ['easy', 'normal', 'hard'];
+            const difficultyWeights = [0.4, 0.4, 0.2];
+            let rand = Math.random();
+            let difficulty = 'easy';
+            for (let i = 0; i < difficulties.length; i++) {
+                if (rand < difficultyWeights[i]) {
+                    difficulty = difficulties[i];
+                    break;
+                }
+                rand -= difficultyWeights[i];
+            }
+            
+            const task = {
+                id: Date.now(),
+                type: randomTaskType,
+                difficulty: difficulty,
+                duration: taskConfig.duration,
+                startDay: gameState.days,
+                endDay: gameState.days + taskConfig.duration,
+                assignedDisciples: assignedDisciples.map(d => d.uid),
+                status: 'active',
+                success: null,
+                claimedAt: null
+            };
+            
+            palace.tasks.push(task);
+            
+            const discipleNames = assignedDisciples.map(d => d.name).join(', ');
+            addLog('neutral', '任务分配', `弟子 ${discipleNames} 开始执行「${taskConfig.name}」任务`);
+            
+            saveGame();
+            updateDisplay();
+            renderPalaceHome();
+        }
+
+        // ===== claimPalaceTask =====
+        function claimPalaceTask(taskIndex) {
+            const palace = gameState.palace;
+            const tasks = palace.tasks.filter(t => t.status === 'active');
+            
+            if (taskIndex < 0 || taskIndex >= tasks.length) return;
+            
+            const task = tasks[taskIndex];
+            const taskConfig = PALACE_CONFIG.taskTypes[task.type];
+            const difficultyMult = PALACE_CONFIG.taskDifficultyMultiplier[task.difficulty] || 1;
+            
+            // 计算成功率（基于难度和弟子数量）
+            let baseSuccessRate = 0.8;
+            if (task.difficulty === 'easy') baseSuccessRate = 0.95;
+            else if (task.difficulty === 'normal') baseSuccessRate = 0.75;
+            else if (task.difficulty === 'hard') baseSuccessRate = 0.5;
+            
+            // 弟子数量加成
+            const discipleCount = task.assignedDisciples?.length || 1;
+            baseSuccessRate += (discipleCount - 1) * 0.05;
+            baseSuccessRate = Math.min(0.98, baseSuccessRate);
+            
+            // 判定成功
+            const success = Math.random() < baseSuccessRate;
+            
+            task.status = 'completed';
+            task.success = success;
+            task.claimedAt = Date.now();
+            
+            if (success) {
+                // 发放奖励
+                const spiritReward = Math.floor((taskConfig.reward.spiritStones || 0) * difficultyMult * (0.8 + Math.random() * 0.4));
+                const repReward = Math.floor((taskConfig.reward.reputation || 0) * difficultyMult * (0.8 + Math.random() * 0.4));
+                
+                palace.spiritStones += spiritReward;
+                palace.reputation += repReward;
+                palace.taskRecord.completed++;
+                palace.taskRecord.totalReward += spiritReward;
+                
+                let rewardText = `💎 ${spiritReward}灵石，⭐ ${repReward}声望`;
+                
+                // 额外物品奖励
+                if (taskConfig.reward.items && Math.random() < 0.3 * difficultyMult) {
+                    const itemType = taskConfig.reward.items[Math.floor(Math.random() * taskConfig.reward.items.length)];
+                    // 简单添加物品到背包
+                    if (!gameState.inventory) gameState.inventory = [];
+                    gameState.inventory.push({ name: itemType, type: 'material', quality: 'normal' });
+                    rewardText += `，🎁 ${itemType}`;
+                }
+                
+                addLog('good', '任务完成', `「${taskConfig.name}」任务成功！获得：${rewardText}`);
+            } else {
+                palace.taskRecord.failed++;
+                addLog('bad', '任务失败', `「${taskConfig.name}」任务失败，弟子安全返回`);
+            }
+            
+            // 清理旧记录（保留最近20条）
+            const completedTasks = palace.tasks.filter(t => t.status === 'completed');
+            if (completedTasks.length > 20) {
+                palace.tasks = [...palace.tasks.filter(t => t.status === 'active'), ...completedTasks.slice(-20)];
+            }
+            
+            saveGame();
+            updateDisplay();
+            renderPalaceHome();
+        }
+
+        // ===== checkTaskProgress =====
+        function checkTaskProgress() {
+            const palace = gameState.palace;
+            if (!palace.name || !palace.tasks) return;
+            
+            const activeTasks = palace.tasks.filter(t => t.status === 'active');
+            for (const task of activeTasks) {
+                if (gameState.days >= task.endDay && task.endDay > 0) {
+                    // 任务到期但未领取，在领取时判定
+                }
             }
         }
 
@@ -11556,7 +11859,9 @@
                 rooms: [],
                 disciples: [],
                 lastProductionDay: gameState.days,
-                decorationBonus: 0
+                decorationBonus: 0,
+                tasks: [],
+                taskRecord: { completed: 0, failed: 0, totalReward: 0 }
             };
             
             // 初始赠送一个修炼殿
@@ -11960,7 +12265,9 @@
                 rooms: [],
                 disciples: [],
                 lastProductionDay: 0,
-                decorationBonus: 0
+                decorationBonus: 0,
+                tasks: [],
+                taskRecord: { completed: 0, failed: 0, totalReward: 0 }
             };
             
             checkPalaceCreation();
