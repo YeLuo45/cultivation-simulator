@@ -2481,7 +2481,21 @@
         <h1>🌟 修仙模拟器 🌟</h1>
         
         <div id="gameStats" class="stats-bar hidden">
-            <div class="stat-item">
+            <!-- V11 仙界状态显示 -->
+            <div id="immortalStatsDisplay" class="stat-item" style="display:none;">
+                <div class="stat-label">仙界境界</div>
+                <div class="stat-value" id="immortalRealmDisplay" style="color:#ffd700;">🌱 地仙境</div>
+            </div>
+            <div id="immortalStoneDisplay" class="stat-item" style="display:none;">
+                <div class="stat-label">仙石</div>
+                <div class="stat-value" style="color:#9c27b0;">💎 0</div>
+            </div>
+            <div id="immortalRegionDisplay" class="stat-item" style="display:none;">
+                <div class="stat-label">当前位置</div>
+                <div class="stat-value" id="immortalCurrentRegion">🌿 仙灵谷</div>
+            </div>
+            <!-- 凡界状态 -->
+            <div id="mortalStatsDisplay" class="stat-item">
                 <div class="stat-label">境界</div>
                 <div class="stat-value" id="realmDisplay">炼气期</div>
             </div>
@@ -2568,6 +2582,14 @@
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
             <button class="btn btn-forge" onclick="openForge()">🔨 炼器</button>
             <button class="btn btn-market" onclick="openMarket()">🏷️ 市场</button>
+        </div>
+        <div id="v11Buttons" style="margin-top:8px;">
+            <!-- V11 飞升按钮 -->
+            <button id="ascensionBtn" class="btn" style="display:none;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;" onclick="showAscensionModal()">🌟 飞升</button>
+            <!-- V11 仙界切换按钮 -->
+            <button id="realmSwitchBtn" class="btn" style="display:none;" onclick="switchRealm('immortal')">☁️ 仙界</button>
+        </div>
+        <div id="moreButtons" class="buttons">
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
             <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>

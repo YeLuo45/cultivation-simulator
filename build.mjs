@@ -5,6 +5,8 @@ const modules = [
   'achievements.js', 'cultivation.js', 'combat.js',
   'core.js', 'crafting.js', 'data.js',
   'sect.js', 'serendipity.js', 'worldmap.js', 'init.js',
+  // V11 飞升系统模块
+  'immortal.js', 'mount.js', 'immortalSkill.js', 'immortalEquip.js', 'ascension.js'
 ];
 
 mkdirSync('dist', { recursive: true });

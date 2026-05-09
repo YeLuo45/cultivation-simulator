@@ -514,12 +514,15 @@
             // 3秒后关闭
             setTimeout(() => {
                 closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
             }, 3000);
         }
 
         // ===== handleSuccess =====
         function handleSuccess() {
             const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            const wasTranscending = gameState.realm >= 4; // V11: 记录是否在渡劫期
 
             // 突破成功
             gameState.realm++;
@@ -550,6 +553,7 @@
                     <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
                     <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
                     <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
+                    ${wasTranscending ? '<p style="color:#e91e63;margin-top:15px;font-size:16px;">✨ 可以准备飞升了！ ✨</p>' : ''}
                 </div>
             `;
 
@@ -559,6 +563,8 @@
 
             setTimeout(() => {
                 closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
             }, 3000);
         }
 

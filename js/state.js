@@ -115,7 +115,21 @@
                     serendipitiesEncountered: 0,
                     flawlessTribulations: 0
                 }
-            }
+            },
+            // V11 飞升系统字段
+            currentRealm: 'mortal',  // 'mortal' | 'immortal'
+            immortal: null,          // 仙界状态，飞升后初始化
+            mounts: [],              // 仙兽列表（最多3只）
+            immortalSkills: [],       // 仙法列表
+            immortalEquipment: {      // 飞升装备栏
+                head: null,
+                body: null,
+                foot: null,
+                weapon: null,
+                shield: null,
+                accessory: null
+            },
+            currentMount: null       // 当前骑乘的仙兽
         };
 
         // --- miniMaxConfig (1492-1502) ---
