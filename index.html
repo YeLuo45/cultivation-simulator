@@ -2076,6 +2076,131 @@
             color: #aaa;
         }
 
+        /* ========== 三界排行榜PVP系统样式 ========== */
+        .ranking-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid rgba(255,215,0,0.3);
+            padding-bottom: 10px;
+        }
+        .ranking-tab {
+            padding: 8px 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        .ranking-tab:hover { background: rgba(255,215,0,0.1); }
+        .ranking-tab.active {
+            background: rgba(255,215,0,0.2);
+            border-color: #ffd700;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .ranking-realm-title {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .ranking-realm-title.human { background: linear-gradient(90deg, #4caf50, #8bc34a); color: #1a1a2e; }
+        .ranking-realm-title.cultivation { background: linear-gradient(90deg, #2196f3, #03a9f4); color: white; }
+        .ranking-realm-title.immortal { background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; }
+
+        .ranking-list {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+        }
+        .ranking-item:hover { border-color: rgba(255,215,0,0.5); background: rgba(255,215,0,0.05); }
+        .ranking-item.top-1 { border-color: rgba(255,215,0,0.8); background: rgba(255,215,0,0.15); }
+        .ranking-item.top-2 { border-color: rgba(192,192,192,0.8); background: rgba(192,192,192,0.1); }
+        .ranking-item.top-3 { border-color: rgba(205,127,50,0.8); background: rgba(205,127,50,0.1); }
+        .ranking-item.player-item { border-color: #00ff88; background: rgba(0,255,136,0.1); }
+
+        .ranking-rank {
+            font-size: 1.2em;
+            font-weight: bold;
+            width: 40px;
+            text-align: center;
+        }
+        .rank-1 { color: #ffd700; }
+        .rank-2 { color: #c0c0c0; }
+        .rank-3 { color: #cd7f32; }
+        .rank-other { color: #888; }
+
+        .ranking-avatar { font-size: 1.5em; margin-right: 10px; }
+        .ranking-info { flex: 1; }
+        .ranking-name { color: #ffd700; font-weight: bold; }
+        .ranking-name .player-tag { color: #00ff88; font-size: 0.8em; }
+        .ranking-details { font-size: 0.85em; color: #aaa; }
+        .ranking-rating {
+            text-align: right;
+            min-width: 80px;
+        }
+        .ranking-rating-value { font-size: 1.3em; font-weight: bold; color: #ffd700; }
+        .ranking-rating-label { font-size: 0.75em; color: #888; }
+
+        .ranking-stats-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .ranking-stat-box { text-align: center; }
+        .ranking-stat-box .value { font-size: 1.5em; font-weight: bold; color: #ffd700; }
+        .ranking-stat-box .label { font-size: 0.8em; color: #888; }
+
+        .pvp-challenge-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #c62828, #ef5350);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .pvp-challenge-btn:hover { transform: scale(1.05); box-shadow: 0 3px 15px rgba(198,40,40,0.4); }
+        .pvp-challenge-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .season-info {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,215,0,0.1);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+        .season-timer { font-size: 0.9em; color: #aaa; }
+
+        .pvp-matchmaking {
+            text-align: center;
+            padding: 40px;
+        }
+        .pvp-matchmaking .spinner {
+            font-size: 3em;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         /* 荣誉榜/战绩 */
         .honor-display {
             background: rgba(255, 215, 0, 0.1);
@@ -3390,6 +3515,7 @@
         <div id="moreButtons" class="buttons">
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
             <button class="btn btn-serendipity" onclick="openSerendipityLog()">✨ 奇遇</button>
+            <button class="btn btn-ranking" onclick="openRankingPVP()" id="rankingPVPBtn" style="background:linear-gradient(135deg,#ff6f00,#ff8f00);color:white;">🏆 排行榜</button>
             <button class="btn btn-sect" onclick="openSect()" id="sectBtn" style="display:none;">🏛️ 宗门</button>
             <button class="btn btn-palace" onclick="openPalace()" id="palaceBtn" style="display:none;">🏯 仙宫</button>
             <button class="btn btn-worldmap" onclick="openWorldMap()">🗺️ 世界地图</button>
@@ -3594,6 +3720,15 @@
         <div class="modal-content">
             <h2 class="modal-title">🌀 秘境探险 🌀</h2>
             <div id="secretRealmContent"></div>
+        </div>
+    </div>
+
+    <!-- 三界排行榜PVP模态框 -->
+    <div id="rankingPVPModal" class="modal">
+        <div class="modal-content" style="max-width:700px;background:linear-gradient(135deg,#0a1628,#1a2a48,#0d1a2d);border:2px solid rgba(255,215,0,0.5);">
+            <h2 class="modal-title">🏆 三界排行榜 PVP 🏆</h2>
+            <div id="rankingPVPContent"></div>
+            <button class="close-btn" onclick="closeRankingPVP()">关闭</button>
         </div>
     </div>
 
@@ -4803,6 +4938,28 @@
                 rebirthCultivation: 0, // 重修时保留的修为（转化为基础属性）
                 hasReincarnatedBuff: false, // 转世重修buff
                 reincarnatedFromAchievement: false // 是否通过成就触发转世
+            },
+            // 三界排行榜PVP系统字段
+            rankingPVP: {
+                enabled: true,
+                rating: 1000,              // 积分
+                rank: '凡人',              // 段位名称
+                rankLevel: 0,              // 段位等级 (0-9)
+                wins: 0,                   // 累计胜场
+                losses: 0,                 // 累计负场
+                currentStreak: 0,          // 当前连胜/连负
+                bestStreak: 0,             // 最高连胜
+                season: 1,                  // 当前赛季
+                seasonStartDay: 1,         // 赛季开始天数
+                lastSeasonRewardClaimed: false, // 上赛季奖励是否已领取
+                realmDivision: 'human',     // 所在境界分区: human/cultivation/immortal
+                battleHistory: [],         // PVP战斗历史
+                dailyChallenges: 3,       // 每日挑战次数
+                lastChallengeDay: 0,      // 上次重置挑战次数的日期
+                seasonRewards: {           // 赛季奖励记录
+                    lastSeason: 0,
+                    claimed: []
+                }
             }
         };
 
@@ -6778,6 +6935,652 @@
             combatState.inProgress = false;
         }
 
+        // ===== 三界排行榜PVP系统 =====
+
+        // 段位配置
+        const RANK_CONFIG = {
+            human: { // 人间界 (炼气-筑基)
+                name: '人间界',
+                icon: '🌍',
+                ranks: [
+                    { name: '凡人', icon: '👤', minRating: 0 },
+                    { name: '炼气修士', icon: '🌀', minRating: 1000 },
+                    { name: '筑基修士', icon: '🧱', minRating: 1100 },
+                    { name: '金丹真人', icon: '🌟', minRating: 1200 },
+                    { name: '元婴老怪', icon: '👴', minRating: 1300 },
+                    { name: '化神大能', icon: '🦢', minRating: 1400 }
+                ]
+            },
+            cultivation: { // 修仙界 (元婴-化神)
+                name: '修仙界',
+                icon: '☁️',
+                ranks: [
+                    { name: '散修', icon: '🧙', minRating: 1400 },
+                    { name: '宗门弟子', icon: '⚔️', minRating: 1500 },
+                    { name: '内门精英', icon: '💎', minRating: 1600 },
+                    { name: '长老', icon: '👑', minRating: 1700 },
+                    { name: '宗主', icon: '🏰', minRating: 1800 },
+                    { name: '飞升仙人', icon: '🌈', minRating: 1900 }
+                ]
+            },
+            immortal: { // 仙界 (飞升后)
+                name: '仙界',
+                icon: '✨',
+                ranks: [
+                    { name: '地仙', icon: '🌍', minRating: 1900 },
+                    { name: '天仙', icon: '☀️', minRating: 2000 },
+                    { name: '金仙', icon: '🌟', minRating: 2100 },
+                    { name: '大罗金仙', icon: '💫', minRating: 2200 },
+                    { name: '准圣', icon: '🔱', minRating: 2300 },
+                    { name: '圣人', icon: '👼', minRating: 2400 }
+                ]
+            }
+        };
+
+        // AI对手名称库
+        const AI_OPPONENTS = {
+            human: [
+                '青云子', '玄天', '灵虚子', '玉清子', '天璇', '天玑', '天权', '玉衡',
+                '开阳', '摇光', '紫霞仙子', '青莲剑仙', '血魔老祖', '九幽散人'
+            ],
+            cultivation: [
+                '太虚真人', '虚无宗主', '万剑归宗', '九天玄女', '太古魔尊', '天道子',
+                '轮回王', '不灭魔君', '仙盟盟主', '天魔教教主', '万妖女王', '诸神黄昏'
+            ],
+            immortal: [
+                '盘古始祖', '鸿钧道祖', '女娲娘娘', '伏羲圣皇', '神农氏', '轩辕黄帝',
+                '昊天上帝', '西王母', '东皇太一', '帝俊', '烛龙', '应龙'
+            ]
+        };
+
+        // 获取玩家段位信息
+        function getPlayerRankInfo() {
+            const pvp = gameState.rankingPVP;
+            const division = RANK_CONFIG[pvp.realmDivision];
+            let rankIndex = 0;
+            for (let i = 0; i < division.ranks.length; i++) {
+                if (pvp.rating >= division.ranks[i].minRating) {
+                    rankIndex = i;
+                }
+            }
+            return {
+                ...division.ranks[rankIndex],
+                division: division,
+                rankIndex: rankIndex,
+                nextRank: division.ranks[rankIndex + 1] || null,
+                rating: pvp.rating,
+                wins: pvp.wins,
+                losses: pvp.losses,
+                streak: pvp.currentStreak
+            };
+        }
+
+        // 更新玩家段位
+        function updatePlayerRank() {
+            const pvp = gameState.rankingPVP;
+            const division = RANK_CONFIG[pvp.realmDivision];
+            let rankIndex = 0;
+            for (let i = 0; i < division.ranks.length; i++) {
+                if (pvp.rating >= division.ranks[i].minRating) {
+                    rankIndex = i;
+                }
+            }
+            pvp.rank = division.ranks[rankIndex].name;
+            pvp.rankLevel = rankIndex;
+        }
+
+        // 根据境界确定分区
+        function getRealmDivision(realm) {
+            if (realm <= 1) return 'human';      // 炼气、筑基
+            if (realm <= 3) return 'cultivation'; // 元婴、化神
+            return 'immortal';                   // 飞升后
+        }
+
+        // 获取每日挑战次数
+        function getDailyChallenges() {
+            const pvp = gameState.rankingPVP;
+            if (pvp.lastChallengeDay < gameState.days) {
+                pvp.dailyChallenges = 3;
+                pvp.lastChallengeDay = gameState.days;
+            }
+            return pvp.dailyChallenges;
+        }
+
+        // 生成AI对手列表
+        function generateAIOpponents(division, count = 10) {
+            const pvp = gameState.rankingPVP;
+            const opponents = [];
+            const usedNames = new Set();
+            const names = AI_OPPONENTS[division];
+
+            // 根据玩家积分生成不同难度的对手
+            const baseRating = pvp.rating;
+            const ratingVariance = 200;
+
+            for (let i = 0; i < count; i++) {
+                let name;
+                do {
+                    name = names[Math.floor(Math.random() * names.length)];
+                } while (usedNames.has(name));
+                usedNames.add(name);
+
+                // 随机生成对手积分
+                const variance = Math.floor(Math.random() * ratingVariance * 2) - ratingVariance;
+                const opponentRating = Math.max(800, Math.min(2600, baseRating + variance));
+
+                // 确定对手境界
+                let realmLevel = 0;
+                if (division === 'human') {
+                    realmLevel = Math.floor(Math.random() * 2); // 0-1 (炼气-筑基)
+                } else if (division === 'cultivation') {
+                    realmLevel = 2 + Math.floor(Math.random() * 2); // 2-3 (元婴-化神)
+                } else {
+                    realmLevel = 4 + Math.floor(Math.random() * 2); // 4-5 (大乘-渡劫)
+                }
+
+                const realmNames = ['炼气期', '筑基期', '元婴期', '化神期', '大乘期', '渡劫期'];
+                const stageNames = ['初期', '中期', '后期', '圆满'];
+
+                opponents.push({
+                    id: 'ai_' + Date.now() + '_' + i,
+                    name: name,
+                    avatar: getOpponentAvatar(name),
+                    realm: realmLevel,
+                    realmName: realmNames[realmLevel] || '大乘期',
+                    stage: Math.floor(Math.random() * 4),
+                    stageName: stageNames[Math.floor(Math.random() * 4)],
+                    rating: opponentRating,
+                    wins: Math.floor(Math.random() * 100) + 50,
+                    losses: Math.floor(Math.random() * 50) + 20,
+                    rank: getRankNameFromRating(opponentRating, division)
+                });
+            }
+
+            // 按积分排序
+            opponents.sort((a, b) => b.rating - a.rating);
+            return opponents;
+        }
+
+        // 根据积分获取段位名称
+        function getRankNameFromRating(rating, division) {
+            const ranks = RANK_CONFIG[division].ranks;
+            let rankName = ranks[0].name;
+            for (const rank of ranks) {
+                if (rating >= rank.minRating) {
+                    rankName = rank.name;
+                }
+            }
+            return rankName;
+        }
+
+        // 获取对手头像
+        function getOpponentAvatar(name) {
+            const avatars = ['🧙', '🧛', '🧚', '👨‍🦳', '👩‍🦳', '🦸', '🥷', '🧜', '🧛‍♂️', '🧝', '🧝‍♂️', '👸', '🤴', '🦹', '🦹‍♂️'];
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = ((hash << 5) - hash) + name.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return avatars[Math.abs(hash) % avatars.length];
+        }
+
+        // 打开排行榜PVP界面
+        function openRankingPVP() {
+            // 更新分区
+            const division = getRealmDivision(gameState.realm);
+            if (gameState.rankingPVP.realmDivision !== division) {
+                gameState.rankingPVP.realmDivision = division;
+            }
+            renderRankingPVP('ranking');
+            document.getElementById('rankingPVPModal').classList.add('active');
+        }
+
+        // 关闭排行榜PVP界面
+        function closeRankingPVP() {
+            document.getElementById('rankingPVPModal').classList.remove('active');
+        }
+
+        // 渲染排行榜PVP界面
+        function renderRankingPVP(tab, subTab = null) {
+            const pvp = gameState.rankingPVP;
+            const content = document.getElementById('rankingPVPContent');
+            const rankInfo = getPlayerRankInfo();
+
+            let html = '';
+
+            if (tab === 'ranking') {
+                html = renderRankingTab(rankInfo, pvp);
+            } else if (tab === 'challenge') {
+                html = renderChallengeTab();
+            } else if (tab === 'history') {
+                html = renderHistoryTab();
+            } else if (tab === 'season') {
+                html = renderSeasonTab(rankInfo);
+            }
+
+            content.innerHTML = html;
+        }
+
+        // 渲染排行榜页面
+        function renderRankingTab(rankInfo, pvp) {
+            const division = pvp.realmDivision;
+            const opponents = generateAIOpponents(division, 15);
+            const playerRankIndex = opponents.findIndex(o => o.id === 'player') + 1 || '-';
+
+            return `
+                <div class="ranking-tabs">
+                    <div class="ranking-tab active" onclick="renderRankingPVP('ranking')">📊 排行榜</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('challenge')">⚔️ 挑战</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('history')">📜 战绩</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('season')">🏅 赛季</div>
+                </div>
+
+                <div class="season-info">
+                    <div>第 ${pvp.season} 赛季 · ${RANK_CONFIG[division].icon} ${RANK_CONFIG[division].name}</div>
+                    <div class="season-timer">赛季进度：第 ${gameState.days - pvp.seasonStartDay + 1} 天</div>
+                </div>
+
+                <div class="ranking-realm-title ${division}">
+                    ${rankInfo.division.icon} ${rankInfo.division.name} · ${rankInfo.icon} ${rankInfo.name}
+                </div>
+
+                <div class="ranking-stats-bar">
+                    <div class="ranking-stat-box">
+                        <div class="value">${pvp.rating}</div>
+                        <div class="label">积分</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value">${pvp.wins}胜 ${pvp.losses}负</div>
+                        <div class="label">战绩</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value" style="color:${pvp.currentStreak >= 0 ? '#4caf50' : '#f44336'}">
+                            ${pvp.currentStreak > 0 ? '🔥' : ''}${Math.abs(pvp.currentStreak)}${pvp.currentStreak < 0 ? '💔' : ''}
+                        </div>
+                        <div class="label">连胜/连负</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value">${rankInfo.nextRank ? rankInfo.nextRank.minRating - pvp.rating : 'MAX'}</div>
+                        <div class="label">距上一段位</div>
+                    </div>
+                </div>
+
+                <div class="ranking-list">
+                    ${opponents.map((opp, index) => `
+                        <div class="ranking-item ${index < 3 ? 'top-' + (index + 1) : ''}">
+                            <div class="ranking-rank ${index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : 'rank-other'}">
+                                ${index + 1}
+                            </div>
+                            <div class="ranking-avatar">${opp.avatar}</div>
+                            <div class="ranking-info">
+                                <div class="ranking-name">${opp.name}</div>
+                                <div class="ranking-details">${opp.realmName} · ${opp.rank}</div>
+                            </div>
+                            <div class="ranking-rating">
+                                <div class="ranking-rating-value">${opp.rating}</div>
+                                <div class="ranking-rating-label">积分</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <button class="btn btn-combat" onclick="renderRankingPVP('challenge')" style="margin-top:15px;width:100%;">
+                    ⚔️ 开始挑战 (剩余 ${getDailyChallenges()} 次)
+                </button>
+            `;
+        }
+
+        // 渲染挑战页面
+        function renderChallengeTab() {
+            const pvp = gameState.rankingPVP;
+            const division = pvp.realmDivision;
+            const opponents = generateAIOpponents(division, 8);
+            const challengesLeft = getDailyChallenges();
+
+            return `
+                <div class="ranking-tabs">
+                    <div class="ranking-tab" onclick="renderRankingPVP('ranking')">📊 排行榜</div>
+                    <div class="ranking-tab active" onclick="renderRankingPVP('challenge')">⚔️ 挑战</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('history')">📜 战绩</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('season')">🏅 赛季</div>
+                </div>
+
+                <div class="ranking-realm-title ${division}">
+                    ${RANK_CONFIG[division].icon} 选择挑战对手
+                </div>
+
+                <div style="text-align:center;margin-bottom:15px;">
+                    <span style="color:#ffd700;font-size:1.2em;">剩余挑战次数：${challengesLeft}/3</span>
+                    <div style="color:#888;font-size:0.85em;margin-top:5px;">每日凌晨重置</div>
+                </div>
+
+                <div class="opponent-list">
+                    ${opponents.map((opp, index) => {
+                        const difficulty = opp.rating > pvp.rating + 100 ? '困难' : 
+                                          opp.rating < pvp.rating - 100 ? '简单' : '中等';
+                        const diffClass = difficulty === '困难' ? 'difficulty-hard' : 
+                                         difficulty === '简单' ? 'difficulty-easy' : 'difficulty-normal';
+                        const rewardMultiplier = difficulty === '困难' ? 1.5 : 
+                                               difficulty === '简单' ? 0.7 : 1.0;
+                        const expectedReward = Math.floor(20 * rewardMultiplier);
+
+                        return `
+                            <div class="opponent-card">
+                                <div class="opponent-card-info">
+                                    <div class="opponent-card-avatar">${opp.avatar}</div>
+                                    <div>
+                                        <div class="opponent-card-name">${opp.name}</div>
+                                        <div class="opponent-card-realm">${opp.realmName} · ${opp.stageName}</div>
+                                        <div class="opponent-card-technique">${opp.rank} · 积分: ${opp.rating}</div>
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div class="opponent-card-difficulty ${diffClass}">${difficulty}</div>
+                                    <div style="color:#aaa;font-size:0.8em;margin-top:5px;">预计奖励: +${expectedReward}积分</div>
+                                    <button class="pvp-challenge-btn" 
+                                            onclick="startRankingPVP('${opp.id}', ${opp.rating})"
+                                            ${challengesLeft <= 0 ? 'disabled' : ''}>
+                                        挑战
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <button class="close-btn" onclick="renderRankingPVP('ranking')" style="margin-top:15px;">返回排行榜</button>
+            `;
+        }
+
+        // 渲染战绩页面
+        function renderHistoryTab() {
+            const pvp = gameState.rankingPVP;
+            const history = pvp.battleHistory.slice(0, 20);
+
+            return `
+                <div class="ranking-tabs">
+                    <div class="ranking-tab" onclick="renderRankingPVP('ranking')">📊 排行榜</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('challenge')">⚔️ 挑战</div>
+                    <div class="ranking-tab active" onclick="renderRankingPVP('history')">📜 战绩</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('season')">🏅 赛季</div>
+                </div>
+
+                <div class="ranking-stats-bar">
+                    <div class="ranking-stat-box">
+                        <div class="value" style="color:#4caf50;">${pvp.wins}</div>
+                        <div class="label">总胜场</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value" style="color:#f44336;">${pvp.losses}</div>
+                        <div class="label">总负场</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value">${pvp.wins + pvp.losses > 0 ? Math.round(pvp.wins / (pvp.wins + pvp.losses) * 100) : 0}%</div>
+                        <div class="label">胜率</div>
+                    </div>
+                    <div class="ranking-stat-box">
+                        <div class="value">${pvp.bestStreak}</div>
+                        <div class="label">最高连胜</div>
+                    </div>
+                </div>
+
+                <div class="ranking-list">
+                    ${history.length === 0 ? `
+                        <div style="text-align:center;padding:40px;color:#888;">
+                            暂无战绩记录<br>快去挑战对手吧！
+                        </div>
+                    ` : history.map(record => `
+                        <div class="ranking-item ${record.result === 'win' ? 'player-item' : ''}">
+                            <div class="ranking-rank ${record.result === 'win' ? 'rank-1' : 'rank-other'}" style="color:${record.result === 'win' ? '#4caf50' : '#f44336'}">
+                                ${record.result === 'win' ? '胜' : '负'}
+                            </div>
+                            <div class="ranking-info" style="margin-left:10px;">
+                                <div class="ranking-name">vs ${record.opponentName}</div>
+                                <div class="ranking-details">${record.opponentRank} · 挑战时间: 第${record.day}天</div>
+                            </div>
+                            <div class="ranking-rating">
+                                <div class="ranking-rating-value" style="color:${record.result === 'win' ? '#4caf50' : '#f44336'}">
+                                    ${record.result === 'win' ? '+' : '-'}${record.ratingChange}
+                                </div>
+                                <div class="ranking-rating-label">积分变化</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <button class="close-btn" onclick="renderRankingPVP('ranking')" style="margin-top:15px;">返回排行榜</button>
+            `;
+        }
+
+        // 渲染赛季页面
+        function renderSeasonTab(rankInfo) {
+            const pvp = gameState.rankingPVP;
+
+            const seasonRewards = [
+                { rank: 1, name: '第1名', reward: '2000灵石 + 冠军称号', icon: '🥇' },
+                { rank: 2, name: '第2名', reward: '1500灵石 + 亚军称号', icon: '🥈' },
+                { rank: 3, name: '第3名', reward: '1000灵石 + 季军称号', icon: '🥉' },
+                { rank: 10, name: '前10', reward: '500灵石 + 精英称号', icon: '⭐' },
+                { rank: 50, name: '前50', reward: '200灵石 + 挑战者称号', icon: '🏅' }
+            ];
+
+            return `
+                <div class="ranking-tabs">
+                    <div class="ranking-tab" onclick="renderRankingPVP('ranking')">📊 排行榜</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('challenge')">⚔️ 挑战</div>
+                    <div class="ranking-tab" onclick="renderRankingPVP('history')">📜 战绩</div>
+                    <div class="ranking-tab active" onclick="renderRankingPVP('season')">🏅 赛季</div>
+                </div>
+
+                <div class="season-info">
+                    <div>第 ${pvp.season} 赛季 · ${RANK_CONFIG[pvp.realmDivision].icon} ${RANK_CONFIG[pvp.realmDivision].name}</div>
+                    <div class="season-timer">
+                        赛季时长: 30天 | 剩余: ${Math.max(0, 30 - (gameState.days - pvp.seasonStartDay + 1))} 天
+                    </div>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:15px;">
+                    <div style="color:#ffd700;margin-bottom:10px;">📊 当前赛季战绩</div>
+                    <div style="display:flex;justify-content:space-around;text-align:center;">
+                        <div>
+                            <div style="font-size:1.5em;color:#ffd700;">${pvp.rating}</div>
+                            <div style="font-size:0.8em;color:#888;">当前积分</div>
+                        </div>
+                        <div>
+                            <div style="font-size:1.5em;color:#4caf50;">${pvp.wins}胜</div>
+                            <div style="font-size:0.8em;color:#888;">胜场</div>
+                        </div>
+                        <div>
+                            <div style="font-size:1.5em;color:#f44336;">${pvp.losses}负</div>
+                            <div style="font-size:0.8em;color:#888;">负场</div>
+                        </div>
+                        <div>
+                            <div style="font-size:1.5em;color:#ff9800;">${pvp.bestStreak}</div>
+                            <div style="font-size:0.8em;color:#888;">最高连胜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="color:#ffd700;margin-bottom:10px;">🏆 赛季结束奖励</div>
+                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;">
+                    ${seasonRewards.map(reward => `
+                        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span>${reward.icon} ${reward.name}</span>
+                            <span style="color:#aaa;">${reward.reward}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="margin-top:15px;color:#888;font-size:0.85em;text-align:center;">
+                    赛季结束后，根据排行榜排名发放奖励<br>
+                    当前在榜排名会影响赛季奖励
+                </div>
+
+                <button class="close-btn" onclick="renderRankingPVP('ranking')" style="margin-top:15px;">返回排行榜</button>
+            `;
+        }
+
+        // 开始PVP挑战
+        function startRankingPVP(opponentId, opponentRating) {
+            const pvp = gameState.rankingPVP;
+
+            if (pvp.dailyChallenges <= 0) {
+                alert('今日挑战次数已用完，请明天再来！');
+                return;
+            }
+
+            pvp.dailyChallenges--;
+            saveGame();
+
+            // 计算战斗结果
+            const playerPower = calculatePlayerPVPower();
+            const opponentPower = calculateOpponentPower(opponentRating);
+
+            // 使用战斗系统进行模拟战斗
+            const playerWins = simulatePVPRound(playerPower, opponentPower);
+
+            // 计算积分变化
+            const ratingChange = calculateRatingChange(pvp.rating, opponentRating, playerWins);
+
+            // 更新状态
+            pvp.rating = Math.max(800, Math.min(2600, pvp.rating + ratingChange));
+            updatePlayerRank();
+
+            if (playerWins) {
+                pvp.wins++;
+                pvp.currentStreak = Math.max(0, pvp.currentStreak) + 1;
+                if (pvp.currentStreak > pvp.bestStreak) {
+                    pvp.bestStreak = pvp.currentStreak;
+                }
+            } else {
+                pvp.losses++;
+                pvp.currentStreak = Math.min(0, pvp.currentStreak) - 1;
+            }
+
+            // 获取对手信息
+            const opponents = generateAIOpponents(pvp.realmDivision, 8);
+            const opponent = opponents.find(o => o.id === opponentId) || opponents[0];
+
+            // 记录战斗历史
+            pvp.battleHistory.unshift({
+                day: gameState.days,
+                opponentName: opponent.name,
+                opponentRank: opponent.rank,
+                opponentRating: opponentRating,
+                result: playerWins ? 'win' : 'lose',
+                ratingChange: Math.abs(ratingChange),
+                ratingAfter: pvp.rating
+            });
+
+            // 限制历史记录长度
+            if (pvp.battleHistory.length > 50) {
+                pvp.battleHistory = pvp.battleHistory.slice(0, 50);
+            }
+
+            saveGame();
+
+            // 显示战斗结果
+            showPVPResult(playerWins, opponent, ratingChange);
+        }
+
+        // 计算玩家PVP战力
+        function calculatePlayerPVPower() {
+            const gs = gameState;
+            const basePower = gs.realm * 500 + gs.stage * 100 + gs.cultivationProgress;
+            const attackBonus = gs.activeEffects.attack * 10;
+            const defenseBonus = gs.activeEffects.defense * 10;
+
+            // 装备加成
+            let equipmentBonus = 0;
+            for (const equip of gs.equippedTreasures) {
+                if (equip && equip.effect) {
+                    equipmentBonus += (equip.effect.attack || 0) * 5;
+                    equipmentBonus += (equip.effect.defense || 0) * 5;
+                }
+            }
+
+            // 宠物加成
+            let petBonus = 0;
+            if (gs.summonedPet) {
+                petBonus = 100;
+            }
+
+            return basePower + attackBonus + defenseBonus + equipmentBonus + petBonus;
+        }
+
+        // 计算对手战力
+        function calculateOpponentPower(rating) {
+            return rating * 0.8 + Math.random() * 200;
+        }
+
+        // 模拟PVP一回合
+        function simulatePVPRound(playerPower, opponentPower) {
+            // 玩家战力越高于对手，胜率越高
+            const powerRatio = playerPower / opponentPower;
+            const winChance = Math.min(0.9, Math.max(0.1, 0.5 + (powerRatio - 1) * 0.2));
+            return Math.random() < winChance;
+        }
+
+        // 计算积分变化
+        function calculateRatingChange(playerRating, opponentRating, playerWins) {
+            const K = 32; // 积分系数
+            const expected = 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
+            const actual = playerWins ? 1 : 0;
+            const change = Math.round(K * (actual - expected));
+
+            // 胜利最少+10，失败最多-30
+            if (playerWins && change < 10) return 10;
+            if (!playerWins && change > -5) return -5;
+
+            return change;
+        }
+
+        // 显示PVP结果
+        function showPVPResult(playerWins, opponent, ratingChange) {
+            const resultText = playerWins ? '🎉 胜利！' : '😢 惜败...';
+            const ratingText = playerWins ? `+${ratingChange}` : `${ratingChange}`;
+            const ratingColor = playerWins ? '#4caf50' : '#f44336';
+
+            const html = `
+                <div class="combat-result ${playerWins ? 'win' : 'lose'}">
+                    <h2>${resultText}</h2>
+                    <div style="font-size:3em;margin:20px 0;">${opponent.avatar}</div>
+                    <div style="color:#ffd700;font-size:1.2em;">${opponent.name}</div>
+                    <div style="color:#aaa;">${opponent.realmName} · ${opponent.rank}</div>
+
+                    <div class="combat-result-stats">
+                        <div class="combat-result-stat">
+                            <div class="value" style="color:${ratingColor};">${ratingText}</div>
+                            <div class="label">积分变化</div>
+                        </div>
+                        <div class="combat-result-stat">
+                            <div class="value">${gameState.rankingPVP.rating}</div>
+                            <div class="label">当前积分</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:20px;">
+                        <div style="color:#aaa;">当前段位: ${getPlayerRankInfo().icon} ${getPlayerRankInfo().name}</div>
+                    </div>
+
+                    <button class="btn btn-combat" onclick="closeRankingPVP()" style="margin-top:20px;width:100%;">
+                        返回排行榜
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('rankingPVPContent').innerHTML = html;
+        }
+
+        // 更新每日挑战次数显示
+        function updateRankingPVPButton() {
+            const btn = document.getElementById('rankingPVPBtn');
+            if (btn) {
+                const remaining = getDailyChallenges();
+                btn.textContent = `🏆 排行榜(${remaining}/3)`;
+            }
+        }
+
         // ===== renderCombatHome =====
         function renderCombatHome() {
             const wins = gameState.combat?.wins || 0;
@@ -7837,6 +8640,27 @@
                 // 确保新增字段存在（向后兼容）
                 if (!data.combatLogHistory) data.combatLogHistory = [];
                 if (!data.eventLogHistory) data.eventLogHistory = [];
+                // 确保三界排行榜PVP字段存在（向后兼容）
+                if (!data.rankingPVP) {
+                    data.rankingPVP = {
+                        enabled: true,
+                        rating: 1000,
+                        rank: '凡人',
+                        rankLevel: 0,
+                        wins: 0,
+                        losses: 0,
+                        currentStreak: 0,
+                        bestStreak: 0,
+                        season: 1,
+                        seasonStartDay: data.days || 1,
+                        lastSeasonRewardClaimed: false,
+                        realmDivision: getRealmDivision(data.realm || 0),
+                        battleHistory: [],
+                        dailyChallenges: 3,
+                        lastChallengeDay: data.days || 0,
+                        seasonRewards: { lastSeason: 0, claimed: [] }
+                    };
+                }
                 gameState = data;
                 addLog('good', '加载成功', `存档已加载 (第${gameState.days}天)`);
                 // 重新渲染UI
@@ -17129,6 +17953,9 @@
 
             // 仙界经济显示更新
             updateCelestialEconomyDisplay();
+
+            // 三界排行榜PVP按钮更新
+            updateRankingPVPButton();
         }
 
         // ===== 仙界经济系统函数 =====
