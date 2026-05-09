@@ -1518,6 +1518,169 @@
             color: white;
         }
 
+        /* 天外天探索样式 */
+        .beyond-heaven-header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(180deg, rgba(255,215,0,0.1) 0%, transparent 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .beyond-heaven-title {
+            font-size: 1.8em;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+            margin-bottom: 10px;
+        }
+        .beyond-heaven-subtitle {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .beyond-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .beyond-stat {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        .beyond-stat-label {
+            color: #888;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        .beyond-stat-value {
+            color: #ffd700;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        .beyond-reward {
+            color: #4caf50;
+        }
+        .beyond-danger {
+            color: #f44336;
+        }
+        .beyond-area-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .beyond-area-card {
+            background: linear-gradient(135deg, rgba(26,26,46,0.9), rgba(13,13,26,0.9));
+            border: 2px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .beyond-area-card:hover:not(.locked):not(.explored) {
+            transform: translateY(-5px);
+            border-color: #ffd700;
+            box-shadow: 0 10px 30px rgba(255,215,0,0.2);
+        }
+        .beyond-area-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .beyond-area-card.explored {
+            border-color: rgba(76,175,80,0.5);
+        }
+        .beyond-area-card.selected {
+            border-color: #ffd700;
+            box-shadow: 0 0 30px rgba(255,215,0,0.4);
+            background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(13,13,26,0.9));
+        }
+        .beyond-area-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        .beyond-area-name {
+            color: #ffd700;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .beyond-area-desc {
+            color: #aaa;
+            font-size: 0.8em;
+            margin-bottom: 10px;
+        }
+        .beyond-area-info {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .beyond-area-tag {
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+        }
+        .tag-danger {
+            background: rgba(244,67,54,0.3);
+            color: #f44336;
+        }
+        .tag-reward {
+            background: rgba(76,175,80,0.3);
+            color: #4caf50;
+        }
+        .tag-mystery {
+            background: rgba(156,39,176,0.3);
+            color: #ba68c8;
+        }
+        .beyond-explore-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #ffd700, #ff9800);
+            border: none;
+            border-radius: 10px;
+            color: #1a1a2e;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .beyond-explore-btn:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 5px 20px rgba(255,215,0,0.4);
+        }
+        .beyond-explore-btn:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .beyond-mystery-log {
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .mystery-log-entry {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: rgba(50,50,100,0.3);
+            border-left: 3px solid #9c27b0;
+        }
+        .mystery-log-title {
+            color: #ba68c8;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .mystery-log-text {
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
         /* 战斗模态框 */
         #combatModal .modal-content {
             max-width: 900px;
@@ -3012,6 +3175,8 @@
             <button id="ascensionBtn" class="btn" style="display:none;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;" onclick="showAscensionModal()">🌟 飞升</button>
             <!-- V11 仙界切换按钮 -->
             <button id="realmSwitchBtn" class="btn" style="display:none;" onclick="switchRealm('immortal')">☁️ 仙界</button>
+            <!-- 天外天探索按钮 -->
+            <button id="beyondHeavenBtn" class="btn" style="display:none;background:linear-gradient(135deg,#1a1a2e,#0d0d1a);color:#ffd700;border:2px solid #ffd700;" onclick="openBeyondHeaven()">🌌 天外天</button>
         </div>
         <div id="moreButtons" class="buttons">
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
@@ -3197,6 +3362,15 @@
         </div>
     </div>
 
+    <!-- 天外天探索模态框 -->
+    <div id="beyondHeavenModal" class="modal">
+        <div class="modal-content" style="max-width:700px;background:linear-gradient(135deg,#0a0a15,#1a1a2e,#0d0d1a);border:2px solid rgba(255,215,0,0.5);">
+            <h2 class="modal-title">🌌 天外天探索 🌌</h2>
+            <div id="beyondHeavenContent"></div>
+            <button class="close-btn" onclick="closeBeyondHeaven()">关闭</button>
+        </div>
+    </div>
+
     <!-- 秘境战斗模态框 -->
     <div id="secretRealmModal" class="modal">
         <div class="modal-content">
@@ -3298,7 +3472,7 @@
 
         // --- CONFIG (3-11) ---
         const CONFIG = {
-            realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
+            realms: ['炼气', '筑基', '金丹', '元婴', '化神', '飞升'],
             stages: ['初期', '中期', '后期'],
             stageNames: ['凡人', '修士', '真人', '天君', '大能'],
             apiUrl: 'https://api.minimaxi.com/v1/chat/completions',
@@ -3975,7 +4149,8 @@
             1: { maxQi: 200, stageThreshold: [60, 120, 180], breakthroughQi: 200 },
             2: { maxQi: 400, stageThreshold: [120, 240, 360], breakthroughQi: 400 },
             3: { maxQi: 800, stageThreshold: [240, 480, 720], breakthroughQi: 800 },
-            4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 }
+            4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 },
+            5: { maxQi: 3200, stageThreshold: [960, 1920, 2880], breakthroughQi: 3200 }  // 飞升期
         };
 
         // --- DEFAULT_MINIMAX_CONFIG (1505-1515) ---
@@ -4362,6 +4537,14 @@
                 description: '飞升前最终试炼，蕴含成仙之秘',
                 color: '#9c27b0',
                 regions: ['仙府遗迹', '天劫之渊', '飞升祭坛']
+            },
+            '天外天': {
+                icon: '🌌',
+                requiredRealm: 5, // 飞升后
+                dangerLevel: 5,
+                description: '诸天万界交汇之地，超脱轮回之所',
+                color: '#ffd700',
+                regions: ['天道碎片', '命运长河', '轮回之地', '大道之树', '永恒星域']
             }
         };
 
@@ -4488,6 +4671,41 @@
                 secretRealm: '飞升台',
                 difficulty: 'extreme',
                 description: '最终飞升之地，需要渡劫期才能进入'
+            },
+            // 天外天区域
+            '天道碎片': {
+                type: 'secret',
+                secretRealm: '天道遗迹',
+                difficulty: 'beyond',
+                description: '天道意志碎片，蕴含宇宙本源之力'
+            },
+            '命运长河': {
+                type: 'wild',
+                monsters: ['命运守护者', '时间长河之灵'],
+                monsterLevel: [80, 90],
+                resources: ['命运之水', '时间法则碎片'],
+                description: '过去未来交汇之处，窥探天机'
+            },
+            '轮回之地': {
+                type: 'boss',
+                monsters: ['轮回之主'],
+                monsterLevel: [85],
+                bossName: '六道轮回神',
+                resources: ['轮回法则', '转世金丹'],
+                description: '轮回法则凝聚之地，每7天刷新'
+            },
+            '大道之树': {
+                type: 'secret',
+                secretRealm: '道果秘境',
+                difficulty: 'beyond',
+                description: '万道之根源，藏有证道之机'
+            },
+            '永恒星域': {
+                type: 'wild',
+                monsters: ['星辰守护兽', '虚空邪神'],
+                monsterLevel: [90, 100],
+                resources: ['永恒星核', '虚空法则'],
+                description: '永恒不朽的星海，超脱生死之地'
             }
         };
 
@@ -4522,6 +4740,17 @@
                 duration: 60,
                 reward: '飞升丹',
                 successRate: 0.2
+            },
+            // 天外天秘境
+            '天道遗迹': {
+                duration: 90,
+                reward: '天道法则',
+                successRate: 0.15
+            },
+            '道果秘境': {
+                duration: 120,
+                reward: '大道之果',
+                successRate: 0.1
             }
         };
 
@@ -5042,12 +5271,22 @@
             
             if (Math.random() < chance) {
                 if (gameState.realm >= 4) {
-                    // 飞升！
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
-                    saveGame();
-                    showGameOverScreen();
+                    // 飞升到飞升期！
+                    if (gameState.realm === 4) {
+                        // 突破到飞升期
+                        gameState.realm = 5;
+                        gameState.stage = 0;
+                        gameState.cultivationProgress = 0;
+                        gameState.maxQi = REALM_REQUIREMENTS[5].maxQi;
+                        gameState.qi = Math.floor(gameState.qi * 0.5);
+                        gameState.mindset = Math.max(0, gameState.mindset - 5);
+                        // 解锁天外天
+                        unlockBeyondHeaven();
+                        addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！踏入天外天，探索诸天万界！`);
+                        saveGame();
+                        updateDisplay();
+                    }
+                    // 飞升期继续积累，不需要再突破
                 } else {
                     // 突破成功
                     gameState.realm++;
@@ -5081,10 +5320,22 @@
             document.getElementById('modalDescription').appendChild(descDiv);
             
             if (result.success) {
-                if (gameState.realm >= 4) {
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                if (gameState.realm === 4) {
+                    // 突破到飞升期
+                    gameState.realm = 5;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[5].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.5);
+                    gameState.mindset = Math.max(0, gameState.mindset - 5);
+                    // 解锁天外天
+                    unlockBeyondHeaven();
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！踏入天外天，探索诸天万界！`);
+                    saveGame();
+                    updateDisplay();
+                } else if (gameState.realm >= 5) {
+                    // 飞升期继续
+                    addLog('good', '修为精进', '你的修为在飞升期继续精进！');
                 } else {
                     gameState.realm++;
                     gameState.stage = 0;
@@ -13894,6 +14145,362 @@
             document.getElementById('worldMapModal').classList.remove('active');
         }
 
+        // ===== 天外天探索系统 =====
+
+        // 初始化天外天数据
+        function initBeyondHeaven() {
+            if (!gameState.beyondHeaven) {
+                gameState.beyondHeaven = {
+                    unlocked: false,  // 是否解锁天外天
+                    exploredAreas: [], // 已探索区域
+                    totalMysteries: 0, // 总发现神秘事件
+                    mysteryLogs: [],   // 神秘日志
+                    selectedArea: null,
+                    spiritualPower: 0, // 天外天灵力（飞升后积累）
+                    maxSpiritualPower: 100
+                };
+            }
+        }
+
+        // 检查天外天是否解锁
+        function isBeyondHeavenUnlocked() {
+            // 飞升后（realm=5）自动解锁
+            return gameState.beyondHeaven && gameState.beyondHeaven.unlocked;
+        }
+
+        // 解锁天外天
+        function unlockBeyondHeaven() {
+            if (!gameState.beyondHeaven) {
+                initBeyondHeaven();
+            }
+            gameState.beyondHeaven.unlocked = true;
+            addLog('good', '天外天解锁', '恭喜！你已超脱轮回，进入天外天！诸天万界，任你探索！');
+            saveGame();
+        }
+
+        // 打开天外天界面
+        function openBeyondHeaven() {
+            initBeyondHeaven();
+            renderBeyondHeaven();
+            document.getElementById('beyondHeavenModal').classList.add('active');
+        }
+
+        // 关闭天外天界面
+        function closeBeyondHeaven() {
+            document.getElementById('beyondHeavenModal').classList.remove('active');
+        }
+
+        // 渲染天外天界面
+        function renderBeyondHeaven() {
+            const bh = gameState.beyondHeaven;
+            const beyondAreas = CONTINENTS['天外天'].regions;
+
+            // 计算属性
+            const totalExplored = bh.exploredAreas.length;
+            const mysteryCount = bh.mysteryLogs.length;
+
+            let html = `
+                <div class="beyond-heaven-header">
+                    <div class="beyond-heaven-title">🌌 天外天 🌌</div>
+                    <div class="beyond-heaven-subtitle">诸天万界交汇之地 · 超脱轮回之所</div>
+                </div>
+
+                <div class="beyond-stats">
+                    <div class="beyond-stat">
+                        <div class="beyond-stat-label">探索区域</div>
+                        <div class="beyond-stat-value">${totalExplored}/${beyondAreas.length}</div>
+                    </div>
+                    <div class="beyond-stat">
+                        <div class="beyond-stat-label">天外天灵力</div>
+                        <div class="beyond-stat-value">${bh.spiritualPower}/${bh.maxSpiritualPower}</div>
+                    </div>
+                    <div class="beyond-stat">
+                        <div class="beyond-stat-label">神秘发现</div>
+                        <div class="beyond-stat-value">${mysteryCount}</div>
+                    </div>
+                </div>
+
+                <div class="beyond-area-grid">
+            `;
+
+            // 渲染每个区域
+            const areaData = {
+                '天道碎片': { icon: '⚡', danger: 5, reward: '天道法则', type: '秘境' },
+                '命运长河': { icon: '🌊', danger: 4, reward: '命运之水', type: '野外' },
+                '轮回之地': { icon: '🔄', danger: 5, reward: '轮回法则', type: '首领' },
+                '大道之树': { icon: '🌳', danger: 5, reward: '大道之果', type: '秘境' },
+                '永恒星域': { icon: '⭐', danger: 5, reward: '永恒星核', type: '野外' }
+            };
+
+            for (const areaName of beyondAreas) {
+                const isExplored = bh.exploredAreas.includes(areaName);
+                const isSelected = bh.selectedArea === areaName;
+                const data = areaData[areaName] || { icon: '❓', danger: 5, reward: '未知', type: '未知' };
+                const regionData = REGIONS[areaName] || {};
+                const desc = regionData.description || `天外天神秘区域：${areaName}`;
+
+                html += `
+                    <div class="beyond-area-card ${isExplored ? 'explored' : ''} ${isSelected ? 'selected' : ''}"
+                         onclick="selectBeyondArea('${areaName}')">
+                        <div class="beyond-area-icon">${data.icon}</div>
+                        <div class="beyond-area-name">${areaName}</div>
+                        <div class="beyond-area-desc">${desc}</div>
+                        <div class="beyond-area-info">
+                            <span class="beyond-area-tag tag-danger">危险度 ${'★'.repeat(data.danger)}</span>
+                            <span class="beyond-area-tag tag-reward">${data.reward}</span>
+                            <span class="beyond-area-tag tag-mystery">${data.type}</span>
+                        </div>
+                        ${isExplored ? '<div style="color:#4caf50;margin-top:8px;">✓ 已探索</div>' : ''}
+                    </div>
+                `;
+            }
+
+            html += `
+                </div>
+                <button class="beyond-explore-btn" onclick="exploreBeyondArea()" ${!bh.selectedArea ? 'disabled' : ''}>
+                    ${bh.selectedArea ? `🚀 探索 ${bh.selectedArea}` : '请先选择一个区域'}
+                </button>
+            `;
+
+            // 神秘日志
+            if (bh.mysteryLogs.length > 0) {
+                html += `
+                    <div class="beyond-mystery-log">
+                        <div style="color:#ffd700;font-size:1.1em;margin-bottom:10px;">✨ 神秘发现记录</div>
+                `;
+                for (const log of bh.mysteryLogs.slice(-5).reverse()) {
+                    html += `
+                        <div class="mystery-log-entry">
+                            <div class="mystery-log-title">${log.title}</div>
+                            <div class="mystery-log-text">${log.text}</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            document.getElementById('beyondHeavenContent').innerHTML = html;
+        }
+
+        // 选择天外天区域
+        function selectBeyondArea(areaName) {
+            initBeyondHeaven();
+            gameState.beyondHeaven.selectedArea = areaName;
+            renderBeyondHeaven();
+        }
+
+        // 探索天外天区域
+        function exploreBeyondArea() {
+            const bh = gameState.beyondHeaven;
+            if (!bh.selectedArea) return;
+
+            const areaName = bh.selectedArea;
+            const regionData = REGIONS[areaName];
+            if (!regionData) return;
+
+            // 标记为已探索
+            if (!bh.exploredAreas.includes(areaName)) {
+                bh.exploredAreas.push(areaName);
+            }
+
+            // 根据区域类型生成探索结果
+            let result = generateBeyondExploreResult(areaName, regionData);
+
+            // 添加神秘日志
+            bh.mysteryLogs.push({
+                title: result.title,
+                text: result.description,
+                area: areaName,
+                day: gameState.days
+            });
+            bh.totalMysteries++;
+
+            // 增加天外天灵力
+            bh.spiritualPower = Math.min(bh.maxSpiritualPower, bh.spiritualPower + result.powerGain);
+
+            // 应用奖励/惩罚
+            if (result.qi) {
+                gameState.qi = Math.min(gameState.maxQi, gameState.qi + result.qi);
+            }
+            if (result.spiritStones) {
+                gameState.spiritStones = Math.max(0, gameState.spiritStones + result.spiritStones);
+            }
+            if (result.mindset) {
+                gameState.mindset = Math.max(0, Math.min(100, gameState.mindset + result.mindset));
+            }
+
+            // 添加日志
+            addLog('good', '天外天探索', `${areaName}：${result.description}`);
+
+            // 显示结果
+            showBeyondExploreResult(result);
+
+            saveGame();
+            updateDisplay();
+        }
+
+        // 生成天外天探索结果
+        function generateBeyondExploreResult(areaName, regionData) {
+            const roll = Math.random();
+            const bh = gameState.beyondHeaven;
+
+            // 基础结果
+            let result = {
+                title: '',
+                description: '',
+                qi: 0,
+                spiritStones: 0,
+                mindset: 0,
+                powerGain: 5,
+                item: null,
+                success: true
+            };
+
+            // 秘境类型
+            if (regionData.type === 'secret') {
+                if (roll < 0.15) {
+                    // 大成功
+                    result.title = '✨ 惊天机缘 ✨';
+                    result.description = `在${areaName}中，你意外发现了一处未曾被人触及的秘境核心！`;
+                    result.qi = 500;
+                    result.spiritStones = 5000;
+                    result.mindset = 20;
+                    result.powerGain = 30;
+                    result.item = getBeyondSecretItem(areaName);
+                } else if (roll < 0.5) {
+                    // 成功
+                    result.title = '🌟 有所收获';
+                    result.description = `探索${areaName}，你领悟了宇宙法则的一丝奥秘。`;
+                    result.qi = 200;
+                    result.spiritStones = 1000;
+                    result.powerGain = 15;
+                } else {
+                    // 普通
+                    result.title = '🔍 略有发现';
+                    result.description = `${areaName}的探索让你对天道有了更深的理解。`;
+                    result.qi = 50;
+                    result.powerGain = 5;
+                }
+            }
+            // 野外类型
+            else if (regionData.type === 'wild') {
+                if (roll < 0.2) {
+                    // 遭遇强敌
+                    result.title = '⚔️ 遭遇强敌';
+                    result.description = `${regionData.monsters ? regionData.monsters[0] : '神秘存在'}出现！经历一番激战，你侥幸脱身。`;
+                    result.qi = -100;
+                    result.mindset = -10;
+                    result.powerGain = 10;
+                } else if (roll < 0.6) {
+                    // 收获资源
+                    result.title = '💎 资源发现';
+                    result.description = `在${areaName}发现了珍贵的${regionData.resources ? regionData.resources[0] : '神秘资源'}！`;
+                    result.spiritStones = 2000;
+                    result.powerGain = 15;
+                } else {
+                    // 普通探索
+                    result.title = '🌌 感悟天道';
+                    result.description = `${areaName}的虚空之中，你静心感悟宇宙变化。`;
+                    result.qi = 100;
+                    result.mindset = 5;
+                    result.powerGain = 10;
+                }
+            }
+            // 首领类型
+            else if (regionData.type === 'boss') {
+                if (roll < 0.25) {
+                    // 击败首领
+                    result.title = '🏆 击败首领';
+                    result.description = `你与${regionData.bossName}展开惊天一战，将其击败！`;
+                    result.qi = 800;
+                    result.spiritStones = 10000;
+                    result.mindset = 30;
+                    result.powerGain = 50;
+                    result.item = regionData.resources ? regionData.resources[0] : '轮回法则';
+                } else if (roll < 0.5) {
+                    // 平局撤退
+                    result.title = '⚡ 势均力敌';
+                    result.description = `与${regionData.bossName}的对决中，你认识到自己的不足，选择暂退。`;
+                    result.qi = -50;
+                    result.mindset = 10;
+                    result.powerGain = 15;
+                } else {
+                    // 探索遗迹
+                    result.title = '🏛️ 遗迹探索';
+                    result.description = `虽然未能遇见${regionData.bossName}，但你探索了周围的遗迹。`;
+                    result.qi = 150;
+                    result.powerGain = 10;
+                }
+            }
+
+            return result;
+        }
+
+        // 获取天外天秘宝
+        function getBeyondSecretItem(areaName) {
+            const items = {
+                '天道碎片': '天道法则碎片',
+                '命运长河': '命运之水',
+                '轮回之地': '轮回法则',
+                '大道之树': '大道之果',
+                '永恒星域': '永恒星核'
+            };
+            return items[areaName] || '神秘法则';
+        }
+
+        // 显示探索结果
+        function showBeyondExploreResult(result) {
+            let content = `
+                <div class="result-title" style="color:#ffd700;text-align:center;font-size:1.5em;margin-bottom:15px;">
+                    ${result.title}
+                </div>
+                <div style="background:rgba(0,0,0,0.4);padding:20px;border-radius:10px;margin-bottom:20px;">
+                    <p style="color:#ccc;line-height:1.8;margin-bottom:15px;">${result.description}</p>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+            `;
+
+            if (result.qi !== 0) {
+                const color = result.qi > 0 ? '#4caf50' : '#f44336';
+                content += `<div style="color:${color};text-align:center;">灵气 ${result.qi > 0 ? '+' : ''}${result.qi}</div>`;
+            }
+            if (result.spiritStones !== 0) {
+                const color = result.spiritStones > 0 ? '#4caf50' : '#f44336';
+                content += `<div style="color:${color};text-align:center;">灵石 ${result.spiritStones > 0 ? '+' : ''}${result.spiritStones}</div>`;
+            }
+            if (result.mindset !== 0) {
+                const color = result.mindset > 0 ? '#4caf50' : '#f44336';
+                content += `<div style="color:${color};text-align:center;">心境 ${result.mindset > 0 ? '+' : ''}${result.mindset}</div>`;
+            }
+            if (result.powerGain > 0) {
+                content += `<div style="color:#9c27b0;text-align:center;">天外天灵力 +${result.powerGain}</div>`;
+            }
+            if (result.item) {
+                content += `<div style="color:#ffd700;text-align:center;">获得：${result.item}</div>`;
+            }
+
+            content += `
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeBeyondResult()">继续探索</button>
+            `;
+
+            openModal('🌌 天外天探索结果', content, []);
+        }
+
+        // 关闭探索结果并刷新界面
+        function closeBeyondResult() {
+            closeModal();
+            renderBeyondHeaven();
+        }
+
+        // 更新天外天按钮显示
+        function updateBeyondHeavenButton() {
+            const btn = document.getElementById('beyondHeavenBtn');
+            if (btn && gameState.beyondHeaven && gameState.beyondHeaven.unlocked) {
+                btn.style.display = 'inline-block';
+            }
+        }
+
         // ===== renderWorldMap =====
         function renderWorldMap(selectedContinent = null) {
             const wm = gameState.worldMap;
@@ -14563,6 +15170,16 @@
                     rebirthCultivation: 0,
                     hasReincarnatedBuff: false,
                     reincarnatedFromAchievement: false
+                },
+                // 天外天探索系统
+                beyondHeaven: {
+                    unlocked: false,
+                    exploredAreas: [],
+                    totalMysteries: 0,
+                    mysteryLogs: [],
+                    selectedArea: null,
+                    spiritualPower: 0,
+                    maxSpiritualPower: 100
                 }
             };
             
@@ -14728,6 +15345,18 @@
                 if (!gameState.petEggs) gameState.petEggs = [];
                 if (gameState.selectedBreedingPet1 === undefined) gameState.selectedBreedingPet1 = null;
                 if (gameState.selectedBreedingPet2 === undefined) gameState.selectedBreedingPet2 = null;
+                // 天外天系统向后兼容
+                if (!gameState.beyondHeaven) {
+                    gameState.beyondHeaven = {
+                        unlocked: false,
+                        exploredAreas: [],
+                        totalMysteries: 0,
+                        mysteryLogs: [],
+                        selectedArea: null,
+                        spiritualPower: 0,
+                        maxSpiritualPower: 100
+                    };
+                }
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
@@ -14779,6 +15408,21 @@
             }
             // 检查仙宫按钮显示
             checkPalaceCreation();
+
+            // 天外天按钮显示 - 飞升后自动解锁
+            const beyondHeavenBtn = document.getElementById('beyondHeavenBtn');
+            if (beyondHeavenBtn) {
+                // 飞升后（realm >= 5 或 beyondHeaven.unlocked）显示按钮
+                if (gameState.realm >= 5 || (gameState.beyondHeaven && gameState.beyondHeaven.unlocked)) {
+                    beyondHeavenBtn.style.display = 'inline-block';
+                    // 自动解锁天外天
+                    if (!gameState.beyondHeaven || !gameState.beyondHeaven.unlocked) {
+                        unlockBeyondHeaven();
+                    }
+                } else {
+                    beyondHeavenBtn.style.display = 'none';
+                }
+            }
         }
 
         // ===== updateDisplay =====
