@@ -882,6 +882,105 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
         }
+        /* AI增强渡劫动画样式 */
+        .tribulation-anim-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            min-height: 150px;
+        }
+        .tribulation-lightning {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        .lightning-bolt {
+            position: absolute;
+            background: linear-gradient(180deg, transparent, #ffff00, #ffffff, #ffff00, transparent);
+            animation: lightning-flash 0.3s ease-out;
+            opacity: 0;
+        }
+        @keyframes lightning-flash {
+            0% { opacity: 0; transform: scaleY(0); }
+            20% { opacity: 1; transform: scaleY(1); }
+            40% { opacity: 0.5; }
+            60% { opacity: 1; transform: scaleY(1.1); }
+            100% { opacity: 0; transform: scaleY(0); }
+        }
+        .tribulation-event {
+            animation: tribulation-event-appear 0.8s ease-out;
+        }
+        @keyframes tribulation-event-appear {
+            0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+            50% { opacity: 1; transform: translateY(-5px) scale(1.02); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tribulation-hp-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 4px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        .tribulation-hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+        .tribulation-hp-fill.danger {
+            background: linear-gradient(90deg, #f44336, #ff9800);
+        }
+        .tribulation-progress {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .tribulation-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        .tribulation-dot.completed {
+            background: #4caf50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+        }
+        .tribulation-dot.current {
+            background: #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+            animation: pulse-dot 1s infinite;
+        }
+        .tribulation-dot.failed {
+            background: #f44336;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+        .tribulation-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .tribulation-loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,215,0,0.2);
+            border-top-color: #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         .buff-indicator {
             background: linear-gradient(135deg, rgba(156, 39, 176, 0.3), rgba(233, 30, 99, 0.3));
             border: 1px solid rgba(156, 39, 176, 0.5);
@@ -4961,7 +5060,7 @@
             document.getElementById('modalOptions').classList.add('hidden');
         }
 
-        // ===== showTribulationUI =====
+        // ===== showTribulationUI (AI增强版) =====
         function showTribulationUI() {
             const trib = TRIBULATIONS[gameState.tribulation.tribKey];
             const modal = document.getElementById('tribulationModal');
@@ -4974,7 +5073,43 @@
 
             // 设置场景样式
             scene.className = 'tribulation-scene ' + trib.type;
-            scene.innerHTML = `<p style="color:#aaa;font-size:1.1em">${trib.desc}</p><p style="color:#ffd700;margin-top:10px">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>`;
+            
+            // 显示进度点
+            const progressHtml = `
+                <div class="tribulation-progress" style="margin-bottom:15px;">
+                    ${Array.from({length: trib.stages}, (_, i) => {
+                        let cls = 'tribulation-dot';
+                        if (i < gameState.tribulation.currentStage) {
+                            cls += ' completed';
+                        } else if (i === gameState.tribulation.currentStage) {
+                            cls += ' current';
+                        }
+                        return `<div class="${cls}"></div>`;
+                    }).join('')}
+                </div>
+            `;
+            
+            scene.innerHTML = `
+                ${progressHtml}
+                <p style="color:#ffd700;font-size:1.1em">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>
+                <p style="color:#aaa;font-size:0.95em;margin-top:5px">${trib.desc}</p>
+            `;
+
+            // 尝试AI生成当前重数的天劫事件描述
+            if (miniMaxConfig.apiKey) {
+                const currentStage = gameState.tribulation.currentStage;
+                generateStageEvent(currentStage, trib.type, (eventDesc) => {
+                    if (eventDesc) {
+                        scene.innerHTML = `
+                            ${progressHtml}
+                            <div class="tribulation-event" style="margin:10px 0;">
+                                <p style="color:#ffd700;font-size:1.1em">第 ${currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>
+                                <p style="color:#e1bee7;font-style:italic;margin-top:8px">"${eventDesc}"</p>
+                            </div>
+                        `;
+                    }
+                });
+            }
 
             // 天劫类型
             typeDiv.innerHTML = `【${gameState.tribulation.tribKey}】`;
@@ -5137,45 +5272,298 @@
             return Math.min(0.95, Math.max(0.05, rate));
         }
 
-        // ===== generateTribulationScene =====
+        // ===== generateTribulationScene (AI增强版) =====
         function generateTribulationScene(realm, callback) {
             const model = miniMaxConfig.model || 'MiniMax-M2.7';
-            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
+            const tribKey = gameState.tribulation.tribKey;
+            const trib = TRIBULATIONS[tribKey] || {};
+            const tribTypeNames = { thunder: '九天神雷', fire: '琉璃阴火', wind: '九幽阴风', demon: '心魔入侵', all: '五行天劫' };
+            const tribTypeName = tribTypeNames[trib.type] || '天劫';
+            const stageInfo = trib.stage ? `${trib.stage}期` : '';
             
+            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段沉浸式的独特描述。
+
 当前玩家信息：
-- 境界：${REALMS[realm] || '未知'}
-- 灵石：${gameState.stones}
-- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
+- 境界：${REALMS[realm] || '未知'}${stageInfo}
+- 渡劫类型：${tribTypeName}
+- 已渡过的重数：${gameState.tribulation.currentStage} / ${gameState.tribulation.totalStages}
+- 心境：${gameState.mindset}/100
+- 当前灵气：${gameState.qi}/${gameState.maxQi}
 
 要求：
-1. 生成一段50-100字的渡劫场景描述
-2. 包含天象异变（雷电/乌云/异火等）
-3. 包含内心心境描写
-4. 描述要独特，每次生成都不同
-5. 用中文输出，不要加引号
+1. 生成一段80-150字的渡劫场景描述，要有画面感
+2. 根据渡劫类型描写对应的天象异变：
+   - 雷劫：乌云翻滚、电闪雷鸣、紫雷降世
+   - 火劫：烈焰焚天、阴火缭绕、热浪灼烧
+   - 风劫：狂风大作、飞沙走石、刮骨伐髓
+   - 心魔：心魔入侵、幻象丛生、内心挣扎
+   - 全部：五行交汇、天地变色
+3. 包含角色的内心感受和身体反应
+4. 描述要独特、有创意，体现每一重天劫的不同
+5. 用中文输出，不要加引号或任何标记
 
-直接输出场景描述文字，不要前缀。`;
+直接输出场景描述文字。`;
 
-            callMiniMaxAPI(prompt, model, 200, (reply) => {
+            callMiniMaxAPI(prompt, model, 300, (reply) => {
                 if (reply && reply.trim()) {
                     callback(reply.trim());
                 } else {
-                    callback(getDefaultTribulationScene(realm));
+                    callback(getDefaultTribulationScene(realm, trib.type));
                 }
             }, (err) => {
-                callback(getDefaultTribulationScene(realm));
+                callback(getDefaultTribulationScene(realm, trib.type));
             });
         }
 
-        // ===== getDefaultTribulationScene =====
-        function getDefaultTribulationScene(realm) {
-            const scenes = [
-                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
-                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
-                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
-            ];
-            return scenes[realm % scenes.length];
+        // ===== generateStageEvent (AI生成单重天劫事件) =====
+        function generateStageEvent(stageNum, tribType, callback) {
+            if (!miniMaxConfig.apiKey) {
+                callback(getDefaultStageEvent(stageNum, tribType));
+                return;
+            }
+            
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const tribTypeNames = { thunder: '九天神雷', fire: '琉璃阴火', wind: '九幽阴风', demon: '心魔入侵', all: '五行天劫' };
+            const intensity = Math.min(1, 0.3 + (stageNum / gameState.tribulation.totalStages) * 0.7);
+            
+            const prompt = `你是一个修仙游戏的渡劫事件生成器。请为玩家的第${stageNum + 1}重天劫生成一个独特的事件描述。
+
+天劫信息：
+- 天劫类型：${tribTypeNames[tribType] || '天劫'}
+- 当前第${stageNum + 1}重（共${gameState.tribulation.totalStages}重）
+- 劫难强度：${Math.round(intensity * 100)}%
+
+要求：
+1. 生成一个30-60字的天劫事件描述
+2. 描述这一重天劫的具体表现（如：第X道雷劈下、山崩地裂等）
+3. 根据类型有所不同：
+   - 雷劫：雷电的具体描写
+   - 火劫：火焰的具体形态
+   - 风劫：狂风的猛烈程度
+   - 心魔：出现的幻象内容
+4. 用中文输出，不要加引号
+5. 只需要输出事件描述，不需要其他内容
+
+直接输出事件描述。`;
+
+            callMiniMaxAPI(prompt, model, 150, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim());
+                } else {
+                    callback(getDefaultStageEvent(stageNum, tribType));
+                }
+            }, (err) => {
+                callback(getDefaultStageEvent(stageNum, tribType));
+            });
         }
+
+        // ===== generateResultNarrative (AI生成渡劫结果叙述) =====
+        function generateResultNarrative(result, callback) {
+            if (!miniMaxConfig.apiKey) {
+                callback(null);
+                return;
+            }
+            
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const realmName = REALMS[gameState.realm] || '未知';
+            const nextRealm = REALMS[gameState.realm + 1] || '下一个境界';
+            
+            let prompt = '';
+            if (result === 'great_success') {
+                prompt = `你是一个修仙游戏的叙述生成器。请为玩家的大成功渡劫结果生成一段叙述。
+
+信息：
+- 玩家刚渡过天劫，获得大成功
+- 突破前境界：${realmName}
+- 突破后境界：${nextRealm}
+- 获得天劫洗礼加成：攻击+10%，防御+10%
+- 心境提升
+
+要求：
+1. 生成一段40-80字的叙述
+2. 描述天降祥瑞、灵力暴涨、身体蜕变等
+3. 体现大成功的非凡之处
+4. 用中文输出，不要加引号
+
+直接输出叙述文字。`;
+            } else if (result === 'success') {
+                prompt = `你是一个修仙游戏的叙述生成器。请为玩家的普通成功渡劫结果生成一段叙述。
+
+信息：
+- 玩家成功渡过天劫
+- 突破到${nextRealm}
+- 获得天劫洗礼加成：攻击+5%，防御+5%
+
+要求：
+1. 生成一段40-80字的叙述
+2. 描述天劫消退、境界稳固等
+3. 体现成功的不易
+4. 用中文输出，不要加引号
+
+直接输出叙述文字。`;
+            } else if (result === 'injury') {
+                prompt = `你是一个修仙游戏的叙述生成器。请为玩家的渡劫重伤结果生成一段叙述。
+
+信息：
+- 玩家渡劫失败，身受重伤
+- 当前境界：${realmName}
+- 灵气大幅减少，心境下降
+
+要求：
+1. 生成一段40-80字的叙述
+2. 描述天劫反噬、灵气溃散、身体受损等
+3. 体现重伤的痛苦但保住了性命
+4. 用中文输出，不要加引号
+
+直接输出叙述文字。`;
+            } else if (result === 'death') {
+                prompt = `你是一个修仙游戏的叙述生成器。请为玩家的渡劫陨落结果生成一段叙述。
+
+信息：
+- 玩家渡劫失败，陨落
+- 陨落前境界：${realmName}
+
+要求：
+1. 生成一段40-80字的叙述
+2. 描述天劫毁灭、魂飞魄散等
+3. 体现陨落的悲壮
+4. 用中文输出，不要加引号
+
+直接输出叙述文字。`;
+            }
+
+            callMiniMaxAPI(prompt, model, 150, (reply) => {
+                callback(reply && reply.trim() ? reply.trim() : null);
+            }, (err) => {
+                callback(null);
+            });
+        }
+
+        // ===== getDefaultTribulationScene (优化版) =====
+        function getDefaultTribulationScene(realm, tribType) {
+            const scenes = {
+                thunder: [
+                    '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
+                    '乌云翻滚如潮，雷光如网，天际被撕裂成一片紫白色的光芒海洋。你感到每一根毛发都因这股天威而颤栗。',
+                    '闷雷从远处滚滚而来，紫色的电弧在云层中穿梭，天劫的威压让你的呼吸都变得困难，但你的道心坚定如铁。'
+                ],
+                fire: [
+                    '虚空中燃起幽蓝色的火焰，琉璃色的火舌舔舐着你的肌肤，焚心烧魄的痛楚让你几乎站立不住，但你的意志坚不可摧。',
+                    '阴火从地底渗出，将周围化为一片火海。那火焰看似美丽，却蕴含着足以焚毁一切的毁灭力量，正向你的位置蔓延。',
+                    '天地间一片炽热，琉璃阴火在空中形成各种幻象，试图动摇你的心智。你紧守本心，任凭火焰灼烧。'
+                ],
+                wind: [
+                    '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝。九幽阴风如刀般切割着你的身体，每一缕风都像是在刮骨伐髓。',
+                    '黑色的旋风从天而降，带着刺骨的寒意和毁灭的力量。风声中似乎夹杂着远古的咆哮，试图撕裂你的灵魂。',
+                    '狂风呼啸如鬼哭狼嚎，风刃如雨点般向你袭来。你运转灵力护体，却仍感到阵阵刺痛。'
+                ],
+                demon: [
+                    '心魔滋生，你的眼前出现无数幻象——过去的执念、内心的恐惧、隐藏的欲望，一一浮现，试图动摇你的道心。',
+                    '黑暗中有什么东西在窥视着你，那是来自内心深处的心魔。它化为你最熟悉的人的模样，试图诱惑你放弃抵抗。',
+                    '幻境丛生，你仿佛回到了过去某个难忘的时刻。但你知道这一切都是心魔的伎俩，唯有守住本心才能渡过此劫。'
+                ],
+                all: [
+                    '天地变色，五行紊乱。雷、火、风三劫同时降临，加上心魔入侵，这是飞升前最后的考验。你感到前所未有的压力。',
+                    '五行天劫同时爆发，天地间仿佛陷入了末世浩劫。雷电、阴火、狂风交织在一起，毁灭一切阻挡在前方的障碍。',
+                    '苍穹裂开，无数异象从中倾泻而下。这是化神飞升的最终劫难，成败就在此一举。你的眼中燃烧着不屈的斗志。'
+                ]
+            };
+            const typeScenes = scenes[tribType] || scenes.thunder;
+            return typeScenes[realm % typeScenes.length];
+        }
+
+        // ===== getDefaultStageEvent =====
+        function getDefaultStageEvent(stageNum, tribType) {
+            const events = {
+                thunder: [
+                    `第一道天雷从天而降，带着毁灭一切的力量！`,
+                    `第二道紫雷划破长空，直劈你的天灵盖！`,
+                    `第三道雷劫更加猛烈，电光刺得你睁不开眼！`,
+                    `雷云中降下第四道神雷，你全力运转护体灵光！`,
+                    `第五道天雷蕴含天道意志，你感到骨骼都在颤抖！`,
+                    `第六道雷劫中夹杂着金色电弧，威力倍增！`,
+                    `第七道神雷如瀑布般倾泻而下！`,
+                    `第八道天雷带着天道法则的压制！`,
+                    `最后一道金色雷劫，代表着天道对你最后的考验！`
+                ],
+                fire: [
+                    `琉璃阴火从地底涌出，包围了你的四周！`,
+                    `第二重火劫，火焰颜色变为深蓝，温度骤升！`,
+                    `第三重火海中出现了火焰幻兽！`,
+                    `第四重阴火开始灼烧你的经脉！`,
+                    `第五重火焰中蕴含着焚尽一切的力量！`,
+                    `第六重火浪如潮水般向你涌来！`,
+                    `第七重天火在你头顶凝聚成云！`,
+                    `第八重烈火焚身，你咬牙坚持！`,
+                    `最后一道琉璃圣火，考验你的极限！`
+                ],
+                wind: [
+                    `九幽阴风从虚空中生成，环绕着你！`,
+                    `第二重风劫，狂风开始撕扯你的身体！`,
+                    `第三重风刃如刀，切割着你的皮肤！`,
+                    `第四重风暴中夹杂着冰霜！`,
+                    `第五重狂风让你的灵力护罩开始龟裂！`,
+                    `第六重风劫带着刺骨的寒意！`,
+                    `第七重风暴开始影响你的心智！`,
+                    `第八重狂风如鬼哭狼嚎！`,
+                    `最后一道灭世狂风，考验你的道心！`
+                ],
+                demon: [
+                    `心魔初现，黑暗中有什么在注视着你！`,
+                    `第二重心魔入侵，过去执念浮现！`,
+                    `第三重幻境中，你看到了曾经的自己！`,
+                    `第四重心魔化为你最亲的人试图诱惑！`,
+                    `第五重幻境开始影响你的判断！`,
+                    `第六重心魔试图瓦解你的信念！`,
+                    `第七重最痛苦的回忆开始涌现！`,
+                    `第八重心魔试图让你放弃抵抗！`,
+                    `最后一道心魔，是你最深处的恐惧！`
+                ],
+                all: [
+                    `五行之力开始汇聚，天地变色！`,
+                    `第二重天劫降下，雷火交织！`,
+                    `第三重狂风加入，威力剧增！`,
+                    `第四重心魔开始入侵！`,
+                    `第五重五行紊乱，你勉力支撑！`,
+                    `第六重天地之力压制你！`,
+                    `第七重三劫齐发，危在旦夕！`,
+                    `第八重极限考验，道心动摇！`,
+                    `最后一重，五行合一，渡劫成败在此一举！`
+                ]
+            };
+            const typeEvents = events[tribType] || events.thunder;
+            return typeEvents[Math.min(stageNum, typeEvents.length - 1)];
+        }
+
+        // ===== triggerLightningEffect (触发雷电特效) =====
+        function triggerLightningEffect(container) {
+            const bolt = document.createElement('div');
+            bolt.className = 'lightning-bolt';
+            bolt.style.left = Math.random() * 80 + 10 + '%';
+            bolt.style.top = '0';
+            bolt.style.width = Math.random() * 4 + 2 + 'px';
+            bolt.style.height = container.offsetHeight + 'px';
+            container.appendChild(bolt);
+            setTimeout(() => bolt.remove(), 500);
+        }
+
+        // ===== showTribulationProgressDots (显示进度点) =====
+        function showTribulationProgressDots(container, currentStage, totalStages, results) {
+            let html = '<div class="tribulation-progress">';
+            for (let i = 0; i < totalStages; i++) {
+                let cls = 'tribulation-dot';
+                if (i < currentStage) {
+                    cls += results && results[i] ? ' completed' : ' failed';
+                } else if (i === currentStage) {
+                    cls += ' current';
+                }
+                html += `<div class="${cls}"></div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Old function removed - replaced by AI-enhanced version above
 
         // ===== executeTribulation =====
         function executeTribulation() {
@@ -5230,15 +5618,23 @@
             gameState.tribulation.inProgress = false;
 
             const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result great-success">
-                    <h3>✨ 大成功 ✨</h3>
-                    <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
-                    <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
-                    <p style="color:#ff69b4;margin-top:5px">心境+20</p>
-                </div>
-            `;
+            
+            // 尝试获取AI生成的叙述
+            generateResultNarrative('great_success', (narrative) => {
+                const narrativeHtml = narrative ? `<p style="color:#e1bee7;margin-top:10px;font-style:italic">"${narrative}"</p>` : '';
+                scene.innerHTML = `
+                    <div class="tribulation-event">
+                        <div class="tribulation-result great-success">
+                            <h3>✨ 大成功 ✨</h3>
+                            <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
+                            <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
+                            <p style="color:#ff69b4;margin-top:5px">心境+20</p>
+                            ${narrativeHtml}
+                        </div>
+                    </div>
+                `;
+            });
 
             addLog('good', '渡劫大成功', `历经天劫洗礼，突破到${CONFIG.realms[gameState.realm]}期！获得天劫洗礼加成！`);
             saveGame();
@@ -5247,7 +5643,7 @@
             // 3秒后关闭
             setTimeout(() => {
                 closeTribulationModal();
-            }, 3000);
+            }, 4000);
         }
 
         // ===== handleSuccess =====
@@ -5277,14 +5673,22 @@
             gameState.tribulation.inProgress = false;
 
             const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result success">
-                    <h3>🎉 渡劫成功 🎉</h3>
-                    <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
-                    <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
-                </div>
-            `;
+            
+            // 尝试获取AI生成的叙述
+            generateResultNarrative('success', (narrative) => {
+                const narrativeHtml = narrative ? `<p style="color:#e1bee7;margin-top:10px;font-style:italic">"${narrative}"</p>` : '';
+                scene.innerHTML = `
+                    <div class="tribulation-event">
+                        <div class="tribulation-result success">
+                            <h3>🎉 渡劫成功 🎉</h3>
+                            <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
+                            <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
+                            ${narrativeHtml}
+                        </div>
+                    </div>
+                `;
+            });
 
             addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
             saveGame();
@@ -5292,7 +5696,7 @@
 
             setTimeout(() => {
                 closeTribulationModal();
-            }, 3000);
+            }, 4000);
         }
 
         // ===== handleInjury =====
@@ -5313,14 +5717,22 @@
             gameState.tribulation.inProgress = false;
 
             const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result injury">
-                    <h3>💔 重伤💔</h3>
-                    <p style="color:#aaa">天劫反噬，你身受重伤...</p>
-                    <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
-                    <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
-                </div>
-            `;
+            
+            // 尝试获取AI生成的叙述
+            generateResultNarrative('injury', (narrative) => {
+                const narrativeHtml = narrative ? `<p style="color:#e1bee7;margin-top:10px;font-style:italic">"${narrative}"</p>` : '';
+                scene.innerHTML = `
+                    <div class="tribulation-event">
+                        <div class="tribulation-result injury">
+                            <h3>💔 重伤💔</h3>
+                            <p style="color:#aaa">天劫反噬，你身受重伤...</p>
+                            <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
+                            <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
+                            ${narrativeHtml}
+                        </div>
+                    </div>
+                `;
+            });
 
             addLog('bad', '渡劫重伤', `渡过${trib.desc}失败，身受重伤...`);
             saveGame();
@@ -5328,7 +5740,7 @@
 
             setTimeout(() => {
                 closeTribulationModal();
-            }, 3000);
+            }, 4000);
         }
 
         // ===== handleDeath =====
@@ -5365,15 +5777,23 @@
             });
 
             const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result death">
-                    <h3>💀 陨落 💀</h3>
-                    <p style="color:#f44336">天劫无情，你陨落了...</p>
-                    <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
-                    <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
-                    <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
-                </div>
-            `;
+            
+            // 尝试获取AI生成的叙述
+            generateResultNarrative('death', (narrative) => {
+                const narrativeHtml = narrative ? `<p style="color:#e1bee7;margin-top:10px;font-style:italic">"${narrative}"</p>` : '';
+                scene.innerHTML = `
+                    <div class="tribulation-event">
+                        <div class="tribulation-result death">
+                            <h3>💀 陨落 💀</h3>
+                            <p style="color:#f44336">天劫无情，你陨落了...</p>
+                            <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
+                            <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
+                            <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
+                            ${narrativeHtml}
+                        </div>
+                    </div>
+                `;
+            });
 
             addLog('bad', '渡劫陨落', `渡劫失败，陨落了...但转世重修，获得转世buff！`);
 
@@ -5382,7 +5802,7 @@
                 saveGame();
                 showGameUI();
                 updateDisplay();
-            }, 3000);
+            }, 4000);
         }
 
         // ===== closeTribulationModal =====
@@ -8557,14 +8977,38 @@
                 return;
             }
             const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `<div class="loading" style="color:#ffd700">天劫降临中...</div>`;
+            scene.innerHTML = `
+                <div class="tribulation-loading">
+                    <div class="spinner"></div>
+                    <p style="color:#ffd700;font-size:1.1em">天劫降临中...</p>
+                    <p style="color:#aaa;font-size:0.9em;margin-top:5px">天道感应中</p>
+                </div>
+            `;
+            
+            // 触发闪电效果
+            const animContainer = document.createElement('div');
+            animContainer.className = 'tribulation-anim-container';
+            animContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+            scene.style.position = 'relative';
+            scene.appendChild(animContainer);
+            
+            // 闪电定时器
+            const lightningInterval = setInterval(() => {
+                if (trib.type === 'thunder' || trib.type === 'all') {
+                    triggerLightningEffect(animContainer);
+                }
+            }, 300);
+            
             try {
                 const desc = await generateTribulationDesc(tribKey);
-                scene.innerHTML = `<p style="color:#ffd700;font-size:1.2em">${desc}</p>`;
-                setTimeout(() => executeTribulation(), 2000);
+                clearInterval(lightningInterval);
+                scene.innerHTML = `<div class="tribulation-event"><p style="color:#ffd700;font-size:1.2em;line-height:1.6">${desc}</p></div>`;
+                setTimeout(() => executeTribulation(), 2500);
             } catch (error) {
+                clearInterval(lightningInterval);
                 console.error('生成渡劫描述失败:', error);
-                executeTribulation();
+                scene.innerHTML = `<p style="color:#ffd700;font-size:1.2em">${trib.desc}</p>`;
+                setTimeout(() => executeTribulation(), 2000);
             }
         }
         async function generateTribulationDesc(tribKey) {
@@ -8575,6 +9019,61 @@
                 });
             });
         }
+        
+        // ===== enhanced handleDemonTribulation (AI心魔增强) =====
+        async function enhancedHandleDemonTribulation() {
+            const currentStage = gameState.tribulation.currentStage;
+            const totalStages = gameState.tribulation.totalStages;
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            
+            const scene = document.getElementById('tribulationScene');
+            
+            // 显示加载状态
+            scene.innerHTML = `
+                <div class="tribulation-loading">
+                    <div class="spinner"></div>
+                    <p style="color:#ff00ff;font-size:1.1em">心魔入侵中...</p>
+                </div>
+            `;
+            
+            // 尝试AI生成心魔事件描述
+            const stageEvent = await new Promise((resolve) => {
+                generateStageEvent(currentStage, 'demon', resolve);
+            });
+            
+            const demonDamage = 20 * (currentStage + 1);
+            const preps = gameState.tribulation.preparations;
+            if (preps.includes('定神丹')) {
+                gameState.mindset = Math.max(0, gameState.mindset - Math.floor(demonDamage * 0.5));
+            } else {
+                gameState.mindset = Math.max(0, gameState.mindset - demonDamage);
+            }
+            gameState.tribulation.currentStage++;
+            gameState.tribulation.damageTaken += demonDamage;
+            
+            scene.innerHTML = `
+                <div class="tribulation-event">
+                    <p style="color:#ff00ff;font-size:1.1em">心魔入侵！</p>
+                    <p style="color:#e1bee7;margin-top:10px;font-style:italic">"${stageEvent}"</p>
+                    <p style="color:#aaa;margin-top:15px">心境 -${demonDamage}${preps.includes('定神丹') ? '(定神丹减免)' : ''}</p>
+                    <p style="color:#ffd700;margin-top:10px">当前心境：${gameState.mindset}/100</p>
+                    <div class="tribulation-hp-bar">
+                        <div class="tribulation-hp-fill ${gameState.mindset < 30 ? 'danger' : ''}" style="width:${gameState.mindset}%"></div>
+                    </div>
+                </div>
+            `;
+            
+            saveGame();
+            if (gameState.mindset <= 0) {
+                gameState.mindset = 0;
+                setTimeout(() => handleInjury(), 2000);
+            } else if (gameState.tribulation.currentStage >= gameState.tribulation.totalStages) {
+                setTimeout(() => handleSuccess(), 2000);
+            } else {
+                setTimeout(() => showTribulationUI(), 2000);
+            }
+        }
+        
         async function handleDemonTribulation() {
             const demonDamage = 20 * (gameState.tribulation.currentStage + 1);
             const preps = gameState.tribulation.preparations;
