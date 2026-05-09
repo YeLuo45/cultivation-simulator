@@ -10588,8 +10588,8 @@
                 if (isCurrent) regionClass = 'style="background:rgba(255,215,0,0.3);border:1px solid #ffd700;"';
                 else if (isExplored) regionClass = 'style="background:rgba(76,175,80,0.2);border:1px solid rgba(76,175,80,0.5);"';
 
-                let typeIcon = isSafe ? '🏠' : isBoss ? '👹' : isSecret ? '🌀' : '⚔️';
-                let typeText = isSafe ? '安全' : isBoss ? '首领' : isSecret ? '秘境' : '野外';
+                let typeIcon = isSafe ? '🏠' : isBossRegion ? '👹' : isSecret ? '🌀' : '⚔️';
+                let typeText = isSafe ? '安全' : isBossRegion ? '首领' : isSecret ? '秘境' : '野外';
 
                 html += `
                     <div class="region-item-tag" ${regionClass} onclick="selectRegion('${regionName}')">

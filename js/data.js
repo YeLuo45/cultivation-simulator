@@ -308,14 +308,15 @@
 - effects中的值可以是负数表示减少
 - qi和spiritStones可以是0表示无影响
 - 只返回JSON，不要其他内容`;
-            const response = await fetch(`${CONFIG.apiUrl}`, {
+            const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: miniMaxConfig.model || 'MiniMax-M2.7',
+                    model: miniMaxConfig.model || 'MiniMax-Text-01',
                     max_tokens: 500,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
@@ -457,7 +458,7 @@
                 localBreakthrough(false);
             }
         }
-        async function generateBreakthroughResult() {
+async function generateBreakthroughResult() {
             const nextRealm = CONFIG.realms[Math.min(4, gameState.realm + 1)];
             const currentRealm = CONFIG.realms[gameState.realm];
             const prompt = `你是一个修仙游戏的突破场景描述器。
@@ -476,14 +477,15 @@
     "title": "突破标题",
     "description": "详细描述（80-150字）"
 }`;
-            const response = await fetch(`${CONFIG.apiUrl}`, {
+            const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: miniMaxConfig.model || 'MiniMax-M2.7',
+                    model: miniMaxConfig.model || 'MiniMax-Text-01',
                     max_tokens: 300,
                     temperature: 0.8,
                     messages: [{ role: "user", content: prompt }]
@@ -506,14 +508,15 @@
             try {
                 const realmName = CONFIG.realms[gameState.realm];
                 const prompt = `你是一个修仙世界的商店掌柜。请为"天机阁"生成一段简短的问候语（20-40字），要符合当前境界的修士。掌柜语气要亲切但不啰嗦。当前修士是${realmName}期修士。只返回问候语，不要其他内容。`;
-                const response = await fetch(`${CONFIG.apiUrl}`, {
+                const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                     },
                     body: JSON.stringify({
-                        model: miniMaxConfig.model || 'MiniMax-M2.7',
+                        model: miniMaxConfig.model || 'MiniMax-Text-01',
                         max_tokens: 100,
                         temperature: 0.8,
                         messages: [{ role: "user", content: prompt }]
@@ -557,14 +560,15 @@
             if (miniMaxConfig.apiKey) {
                 try {
                     const prompt = `描述一次${craftType}过程，物品名称是${name}，用50-80字描述${craftType}时的情景，包括火候、灵气变化等。`;
-                    const response = await fetch(`${CONFIG.apiUrl}`, {
+                    const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
+                    const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${miniMaxConfig.apiKey}`
                         },
                         body: JSON.stringify({
-                            model: miniMaxConfig.model || 'MiniMax-M2.7',
+                            model: miniMaxConfig.model || 'MiniMax-Text-01',
                             max_tokens: 150,
                             temperature: 0.8,
                             messages: [{ role: "user", content: prompt }]
