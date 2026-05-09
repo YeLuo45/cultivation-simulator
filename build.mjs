@@ -38,7 +38,7 @@ const jsEndLine = lines.findIndex((l, i) => i > jsStartLine && l === '</script>'
 if (jsEndLine === -1) { console.error('No </script> found'); process.exit(1); }
 
 const header = lines.slice(0, jsStartLine).join('\n') + '\n    <script src="./game.js"></script>\n';
-const footer = lines.slice(jsEndLine).join('\n');
+const footer = lines.slice(jsEndLine + 1).join('\n');
 
 writeFileSync('dist/index.html', header + footer);
 console.log('Generated dist/index.html with bundled JS');
