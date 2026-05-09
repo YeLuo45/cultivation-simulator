@@ -4371,7 +4371,12 @@
                 techniques: [],
                 contributionShop: [],
                 lastShopRefresh: 0,
-                lastResourceCollection: 0
+                lastResourceCollection: 0,
+                // 双轨系统字段
+                dualTrackEnabled: false,
+                syncResources: false,
+                syncInterval: 1,
+                dispatchedToPalace: 0
             },
             // V14 仙宫系统字段
             palace: {
@@ -5168,6 +5173,9 @@
             
             // 仙宠系统每日处理
             processPetDaily();
+            
+            // 双轨系统每日资源同步
+            processDailyDualTrackSync();
 
             // V6: 检查是否触发奇遇
             const serendipityResult = checkSerendipity();
@@ -11638,7 +11646,12 @@
                 techniques: [],
                 contributionShop: [],
                 lastShopRefresh: gameState.days,
-                lastResourceCollection: gameState.days
+                lastResourceCollection: gameState.days,
+                // 双轨系统字段
+                dualTrackEnabled: false,
+                syncResources: false,
+                syncInterval: 1,
+                dispatchedToPalace: 0
             };
             
             // 给宗主添加一个初始弟子
@@ -11926,7 +11939,349 @@
                 </div>
             `;
             
+            // ========== 双轨系统：宗门仙宫互联 ==========
+            html += renderSectPalaceDualTrack();
+            
             return html;
+        }
+
+        // ===== renderSectPalaceDualTrack ===== 宗门仙宫双轨系统
+        function renderSectPalaceDualTrack() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            let html = `
+                <div style="margin-top:20px;padding:15px;background:rgba(100,50,150,0.2);border-radius:15px;border:1px solid rgba(156,39,176,0.4);">
+                    <h4 style="color:#e040fb;margin-bottom:15px;text-align:center;">🔗 宗门仙宫双轨系统</h4>
+            `;
+            
+            // 检查是否已创建仙宫
+            if (!palace.name) {
+                html += `
+                    <div style="text-align:center;padding:20px;color:#888;">
+                        <div style="font-size:2em;margin-bottom:10px;">🏯</div>
+                        <div>创建仙宫后可开启双轨系统</div>
+                        <div style="font-size:0.85em;margin-top:5px;">需要金丹期且消耗30000灵石</div>
+                    </div>
+                `;
+                html += '</div>';
+                return html;
+            }
+            
+            // 双轨状态
+            const dualEnabled = sect.dualTrackEnabled || false;
+            html += `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                    <div>
+                        <div style="color:#ffd700;font-weight:bold;">双轨互联</div>
+                        <div style="color:#aaa;font-size:0.85em;">启用后可共享资源与弟子</div>
+                    </div>
+                    <button onclick="toggleDualTrack()" style="padding:8px 20px;border:none;border-radius:20px;cursor:pointer;font-weight:bold;background:${dualEnabled ? 'linear-gradient(135deg,#4caf50,#81c784)' : 'linear-gradient(135deg,#666,#888)'};color:white;">
+                        ${dualEnabled ? '✅ 已启用' : '❌ 停用'}
+                    </button>
+                </div>
+            `;
+            
+            // 资源同步状态
+            const syncResources = sect.syncResources || false;
+            const syncInterval = sect.syncInterval || 1;
+            html += `
+                <div style="margin-bottom:15px;">
+                    <div style="color:#9c27b0;font-weight:bold;margin-bottom:10px;">📦 资源同步</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                        <div>
+                            <div style="color:#ffd700;">灵石共享</div>
+                            <div style="color:#888;font-size:0.85em;">每日自动同步灵石的10%</div>
+                        </div>
+                        <button onclick="toggleSyncResources()" style="padding:6px 15px;border:none;border-radius:15px;cursor:pointer;background:${syncResources ? '#4caf50' : '#666'};color:white;font-size:0.85em;">
+                            ${syncResources ? '✅ 开启' : '❌ 关闭'}
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 弟子派遣
+            html += `
+                <div style="margin-bottom:15px;">
+                    <div style="color:#9c27b0;font-weight:bold;margin-bottom:10px;">👥 弟子派遣</div>
+                    <div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                            <span style="color:#aaa;">宗门弟子:</span>
+                            <span style="color:#ffd700;">${sect.disciples.length}人</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#aaa;">仙宫弟子:</span>
+                            <span style="color:#ffb300;">${palace.disciples.length}人</span>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <button onclick="dispatchDiscipleToPalace()" style="padding:10px;background:linear-gradient(135deg,#ff6f00,#ffb300);border:none;border-radius:8px;cursor:pointer;color:white;font-size:0.9em;">
+                            🚀 派遣弟子→仙宫
+                        </button>
+                        <button onclick="recallDiscipleFromPalace()" style="padding:10px;background:linear-gradient(135deg,#6a1b9a,#9c27b0);border:none;border-radius:8px;cursor:pointer;color:white;font-size:0.9em;">
+                            🔙 召回弟子←仙宫
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 双轨加成
+            const bonuses = calculateDualTrackBonus();
+            if (bonuses.total > 0) {
+                html += `
+                    <div style="padding:10px;background:rgba(76,175,80,0.2);border-radius:10px;border:1px solid rgba(76,175,80,0.4);">
+                        <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✨ 双轨加成（已启用）</div>
+                        <div style="font-size:0.85em;color:#aaa;">
+                            ${bonuses.sectBonus > 0 ? `<div>• 宗门灵石收益: +${(bonuses.sectBonus * 100).toFixed(0)}%</div>` : ''}
+                            ${bonuses.palaceBonus > 0 ? `<div>• 仙宫产出: +${(bonuses.palaceBonus * 100).toFixed(0)}%</div>` : ''}
+                            ${bonuses.cultivateBonus > 0 ? `<div>• 修炼速度: +${(bonuses.cultivateBonus * 100).toFixed(0)}%</div>` : ''}
+                            <div style="margin-top:5px;color:#ffd700;">总加成: +${(bonuses.total * 100).toFixed(0)}%</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // ===== calculateDualTrackBonus ===== 计算双轨加成
+        function calculateDualTrackBonus() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            let bonuses = { sectBonus: 0, palaceBonus: 0, cultivateBonus: 0, total: 0 };
+            
+            if (!sect.dualTrackEnabled || !palace.name) return bonuses;
+            
+            // 基础双轨加成
+            bonuses.sectBonus = 0.05;  // 宗门灵石+5%
+            bonuses.palaceBonus = 0.05; // 仙宫产出+5%
+            
+            // 弟子派遣加成：每派遣1名弟子，双方各获得+2%加成
+            const dispatchedCount = sect.dispatchedToPalace || 0;
+            bonuses.sectBonus += dispatchedCount * 0.02;
+            bonuses.palaceBonus += dispatchedCount * 0.02;
+            
+            // 资源同步加成
+            if (sect.syncResources) {
+                bonuses.cultivateBonus = 0.03; // 修炼速度+3%
+            }
+            
+            // 等级差加成：宗门等级+仙宫等级 > 6时额外+5%
+            if ((sect.level + palace.level) > 6) {
+                bonuses.sectBonus += 0.05;
+                bonuses.palaceBonus += 0.05;
+            }
+            
+            bonuses.total = bonuses.sectBonus + bonuses.palaceBonus + bonuses.cultivateBonus;
+            return bonuses;
+        }
+
+        // ===== toggleDualTrack =====
+        function toggleDualTrack() {
+            const sect = gameState.sect;
+            sect.dualTrackEnabled = !sect.dualTrackEnabled;
+            if (sect.dualTrackEnabled) {
+                addLog('good', '双轨系统', `宗门与仙宫开启双轨互联！`);
+            } else {
+                addLog('neutral', '双轨系统', `双轨互联已停用`);
+            }
+            saveGame();
+            renderSectHome();
+        }
+
+        // ===== toggleSyncResources =====
+        function toggleSyncResources() {
+            const sect = gameState.sect;
+            sect.syncResources = !sect.syncResources;
+            addLog('good', '资源同步', sect.syncResources ? '灵石共享已开启' : '灵石共享已关闭');
+            saveGame();
+            renderSectHome();
+        }
+
+        // ===== dispatchDiscipleToPalace =====
+        function dispatchDiscipleToPalace() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            if (!sect.disciples || sect.disciples.length === 0) {
+                alert('宗门没有弟子可派遣！');
+                return;
+            }
+            
+            const maxPalaceDisciples = PALACE_CONFIG.maxPalaceDisciples[palace.level];
+            if (palace.disciples.length >= maxPalaceDisciples) {
+                alert(`仙宫弟子已达上限（${maxPalaceDisciples}人）！`);
+                return;
+            }
+            
+            // 打开选择弟子模态框
+            showDiscipleSelectionModal('dispatch');
+        }
+
+        // ===== recallDiscipleFromPalace =====
+        function recallDiscipleFromPalace() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            if (!palace.disciples || palace.disciples.length === 0) {
+                alert('仙宫没有弟子可召回！');
+                return;
+            }
+            
+            const maxDisciples = SECT_CONFIG.maxDisciples[sect.level];
+            if (sect.disciples.length >= maxDisciples) {
+                alert(`宗门弟子已达上限（${maxDisciples}人）！`);
+                return;
+            }
+            
+            // 打开选择弟子模态框
+            showPalaceDiscipleSelectionModal('recall');
+        }
+
+        // ===== showDiscipleSelectionModal =====
+        function showDiscipleSelectionModal(action) {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            const maxPalaceDisciples = PALACE_CONFIG.maxPalaceDisciples[palace.level];
+            
+            let html = `
+                <div style="padding:20px;">
+                    <h4 style="color:#9c27b0;margin-bottom:15px;text-align:center;">${action === 'dispatch' ? '🚀 选择派遣弟子' : '🔙 选择召回弟子'}</h4>
+            `;
+            
+            if (action === 'dispatch') {
+                const availableCount = sect.disciples.filter(d => !d.dispatched).length;
+                const canDispatch = availableCount > 0 && palace.disciples.length < maxPalaceDisciples;
+                html += `<div style="color:#aaa;font-size:0.9em;margin-bottom:15px;text-align:center;">可派遣: ${availableCount}人 | 仙宫空位: ${maxPalaceDisciples - palace.disciples.length}</div>`;
+                
+                html += '<div style="max-height:300px;overflow-y:auto;">';
+                sect.disciples.filter(d => !d.dispatched).forEach((d, idx) => {
+                    const realIdx = sect.disciples.findIndex(dd => dd.uid === d.uid);
+                    html += `
+                        <div onclick="selectDiscipleForDispatch(${realIdx})" style="padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;margin-bottom:8px;cursor:pointer;border:1px solid rgba(255,111,0,0.3);transition:all 0.2s;" onmouseover="this.style.borderColor='#ffb300'" onmouseout="this.style.borderColor='rgba(255,111,0,0.3)'">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <span style="color:#ffd700;font-weight:bold;">${d.name}</span>
+                                    <span style="color:#aaa;font-size:0.85em;margin-left:10px;">${CONFIG.realms[d.realm]}期</span>
+                                </div>
+                                <span class="talent-${['low','mid','mid','high','super'][d.talentIndex || 1]}">${d.talent}资质</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            html += `<button onclick="closeDiscipleSelectionModal()" style="width:100%;padding:10px;margin-top:15px;background:#555;color:white;border:none;border-radius:8px;cursor:pointer;">取消</button>`;
+            html += '</div>';
+            
+            // 创建临时模态框
+            const modal = document.createElement('div');
+            modal.id = 'discipleSelectModal';
+            modal.className = 'modal active';
+            modal.innerHTML = `<div class="modal-content" style="max-width:400px;background:linear-gradient(135deg,#1a0a2e,#2d1b4e);border:2px solid rgba(156,39,176,0.5);">${html}</div>`;
+            document.body.appendChild(modal);
+        }
+
+        // ===== showPalaceDiscipleSelectionModal =====
+        function showPalaceDiscipleSelectionModal(action) {
+            const palace = gameState.palace;
+            
+            let html = `
+                <div style="padding:20px;">
+                    <h4 style="color:#ffb300;margin-bottom:15px;text-align:center;">🔙 选择召回弟子</h4>
+            `;
+            
+            html += `<div style="color:#aaa;font-size:0.9em;margin-bottom:15px;text-align:center;">仙宫弟子: ${palace.disciples.length}人</div>`;
+            
+            html += '<div style="max-height:300px;overflow-y:auto;">';
+            palace.disciples.forEach((d, idx) => {
+                html += `
+                    <div onclick="selectDiscipleForRecall(${idx})" style="padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;margin-bottom:8px;cursor:pointer;border:1px solid rgba(156,39,176,0.3);transition:all 0.2s;" onmouseover="this.style.borderColor='#9c27b0'" onmouseout="this.style.borderColor='rgba(156,39,176,0.3)'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="color:#ffd700;font-weight:bold;">${d.name}</span>
+                                <span style="color:#aaa;font-size:0.85em;margin-left:10px;">${CONFIG.realms[d.realm]}期</span>
+                            </div>
+                            <span style="color:#ff69b4;">${d.talent}资质</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            html += `<button onclick="closeDiscipleSelectionModal()" style="width:100%;padding:10px;margin-top:15px;background:#555;color:white;border:none;border-radius:8px;cursor:pointer;">取消</button>`;
+            html += '</div>';
+            
+            const modal = document.createElement('div');
+            modal.id = 'discipleSelectModal';
+            modal.className = 'modal active';
+            modal.innerHTML = `<div class="modal-content" style="max-width:400px;background:linear-gradient(135deg,#1a0a2e,#2d1b4e);border:2px solid rgba(156,39,176,0.5);">${html}</div>`;
+            document.body.appendChild(modal);
+        }
+
+        // ===== closeDiscipleSelectionModal =====
+        function closeDiscipleSelectionModal() {
+            const modal = document.getElementById('discipleSelectModal');
+            if (modal) {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            }
+        }
+
+        // ===== selectDiscipleForDispatch =====
+        function selectDiscipleForDispatch(discipleIdx) {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            const disciple = sect.disciples[discipleIdx];
+            if (!disciple) return;
+            
+            // 标记为已派遣
+            disciple.dispatched = true;
+            disciple.dispatchedTo = 'palace';
+            
+            // 创建仙宫弟子副本
+            const palaceDisciple = {
+                ...disciple,
+                uid: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                dispatchedFrom: 'sect',
+                originalUid: disciple.uid
+            };
+            
+            palace.disciples.push(palaceDisciple);
+            sect.dispatchedToPalace = (sect.dispatchedToPalace || 0) + 1;
+            
+            addLog('good', '弟子派遣', `${disciple.name}已派遣至仙宫支援！`);
+            saveGame();
+            closeDiscipleSelectionModal();
+            renderSectHome();
+        }
+
+        // ===== selectDiscipleForRecall =====
+        function selectDiscipleForRecall(discipleIdx) {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            const palaceDisciple = palace.disciples[discipleIdx];
+            if (!palaceDisciple) return;
+            
+            // 找到原来的弟子并更新状态
+            const originalDisciple = sect.disciples.find(d => d.uid === palaceDisciple.originalUid);
+            if (originalDisciple) {
+                originalDisciple.dispatched = false;
+                originalDisciple.dispatchedTo = null;
+            }
+            
+            // 从仙宫移除
+            palace.disciples.splice(discipleIdx, 1);
+            sect.dispatchedToPalace = Math.max(0, (sect.dispatchedToPalace || 0) - 1);
+            
+            addLog('good', '弟子召回', `${palaceDisciple.name}已从仙宫召回！`);
+            saveGame();
+            closeDiscipleSelectionModal();
+            renderSectHome();
         }
 
         // ===== recruitDisciple =====
@@ -13067,11 +13422,123 @@
                 </button>
             `;
             
+            // ========== 双轨系统：仙宫宗门互联 ==========
+            html += renderPalaceSectDualTrack();
+            
             return html;
         }
 
-        // ===== calculatePalaceBonus =====
-        function calculatePalaceBonus() {
+        // ===== renderPalaceSectDualTrack ===== 仙宫宗门双轨系统（ reciprocates sect side)
+        function renderPalaceSectDualTrack() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            let html = `
+                <div style="margin-top:20px;padding:15px;background:rgba(100,50,150,0.2);border-radius:15px;border:1px solid rgba(255,111,0,0.4);">
+                    <h4 style="color:#ffb300;margin-bottom:15px;text-align:center;">🔗 双轨系统 - 仙宫端</h4>
+            `;
+            
+            // 检查是否已创建宗门
+            if (!sect.name) {
+                html += `
+                    <div style="text-align:center;padding:20px;color:#888;">
+                        <div style="font-size:2em;margin-bottom:10px;">🏛️</div>
+                        <div>创建宗门后可开启双轨互联</div>
+                        <div style="font-size:0.85em;margin-top:5px;">需要元婴期且消耗50000灵石</div>
+                    </div>
+                `;
+                html += '</div>';
+                return html;
+            }
+            
+            // 双轨状态
+            const dualEnabled = sect.dualTrackEnabled || false;
+            html += `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                    <div>
+                        <div style="color:#ffd700;font-weight:bold;">双轨互联</div>
+                        <div style="color:#aaa;font-size:0.85em;">宗门↔仙宫资源共享</div>
+                    </div>
+                    <div style="padding:6px 15px;border-radius:15px;background:${dualEnabled ? '#4caf50' : '#666'};color:white;font-size:0.85em;">
+                        ${dualEnabled ? '✅ 已启用' : '❌ 停用'}
+                    </div>
+                </div>
+            `;
+            
+            // 弟子状态
+            const dispatchedDisciples = palace.disciples.filter(d => d.dispatchedFrom === 'sect');
+            html += `
+                <div style="margin-bottom:15px;">
+                    <div style="color:#ffb300;font-weight:bold;margin-bottom:10px;">👥 派遣弟子状态</div>
+                    <div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+                            <span style="color:#aaa;">来自宗门:</span>
+                            <span style="color:#9c27b0;">${dispatchedDisciples.length}人</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#aaa;">仙宫自有:</span>
+                            <span style="color:#ffb300;">${palace.disciples.length - dispatchedDisciples.length}人</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 资源同步状态
+            const syncResources = sect.syncResources || false;
+            html += `
+                <div style="margin-bottom:15px;">
+                    <div style="color:#ffb300;font-weight:bold;margin-bottom:10px;">📦 灵石共享</div>
+                    <div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="color:#ffd700;">每日同步10%灵石</div>
+                            <div style="color:#888;font-size:0.85em;">开启后双方灵石互通</div>
+                        </div>
+                        <div style="padding:6px 15px;border-radius:15px;background:${syncResources ? '#4caf50' : '#666'};color:white;font-size:0.85em;">
+                            ${syncResources ? '✅ 开启' : '❌ 关闭'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 双轨加成显示
+            const bonuses = calculateDualTrackBonus();
+            if (bonuses.total > 0) {
+                html += `
+                    <div style="padding:10px;background:rgba(76,175,80,0.2);border-radius:10px;border:1px solid rgba(76,175,80,0.4);">
+                        <div style="color:#4caf50;font-weight:bold;margin-bottom:8px;">✨ 双轨加成（已启用）</div>
+                        <div style="font-size:0.85em;color:#aaa;">
+                            ${bonuses.palaceBonus > 0 ? `<div>• 仙宫产出: +${(bonuses.palaceBonus * 100).toFixed(0)}%</div>` : ''}
+                            ${bonuses.cultivateBonus > 0 ? `<div>• 修炼速度: +${(bonuses.cultivateBonus * 100).toFixed(0)}%</div>` : ''}
+                            <div style="margin-top:5px;color:#ffd700;">总加成: +${(bonuses.total * 100).toFixed(0)}%</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // ===== processDailyDualTrackSync ===== 每日双轨资源同步
+        function processDailyDualTrackSync() {
+            const sect = gameState.sect;
+            const palace = gameState.palace;
+            
+            if (!sect.dualTrackEnabled || !sect.syncResources) return;
+            if (!sect.name || !palace.name) return;
+            
+            // 宗门向仙宫同步灵石（10%）
+            if (gameState.spiritStones > 0 && sect.spiritStones !== undefined) {
+                const syncAmount = Math.floor(Math.min(gameState.spiritStones, sect.spiritStones) * 0.1);
+                if (syncAmount > 0) {
+                    sect.spiritStones -= syncAmount;
+                    palace.spiritStones += syncAmount;
+                }
+            }
+        }
+
+        // ===== collectPalaceProduction =====
+        function collectPalaceProduction() {
             const bonuses = {};
             for (const room of gameState.palace.rooms) {
                 const roomConfig = PALACE_CONFIG.roomTypes[room.type];
