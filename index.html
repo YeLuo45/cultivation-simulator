@@ -990,6 +990,111 @@
             color: #e1bee7;
         }
 
+        /* ========== 仙界经济系统样式 ========== */
+        .celestial-economy-section {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.2), rgba(233, 30, 99, 0.2));
+            border: 1px solid rgba(156, 39, 176, 0.4);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .celestial-economy-title {
+            color: #e1bee7;
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .exchange-rate-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .exchange-btn {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #7b1fa2, #ba68c8);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin: 3px;
+            transition: all 0.2s;
+        }
+        .exchange-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(123, 31, 162, 0.4);
+        }
+        .exchange-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .celestial-market-grid {
+            display: grid;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .celestial-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            border: 1px solid rgba(156, 39, 176, 0.3);
+        }
+        .celestial-item:hover {
+            border-color: rgba(233, 30, 99, 0.6);
+            background: rgba(156, 39, 176, 0.15);
+        }
+        .celestial-item-info { flex: 1; }
+        .celestial-item-name { font-weight: bold; margin-bottom: 3px; }
+        .celestial-item-desc { font-size: 0.8em; color: #888; }
+        .celestial-item-price { color: #e1bee7; font-weight: bold; margin-right: 15px; }
+        .celestial-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .celestial-tab {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid rgba(156, 39, 176, 0.4);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #aaa;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .celestial-tab:hover, .celestial-tab.active {
+            background: rgba(156, 39, 176, 0.3);
+            color: #e1bee7;
+            border-color: #e1bee7;
+        }
+        .celestial-balance {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        .balance-item {
+            text-align: center;
+        }
+        .balance-label { font-size: 0.8em; color: #888; }
+        .balance-value { font-size: 1.2em; font-weight: bold; }
+        .balance-value.stones { color: #87ceeb; }
+        .balance-value.immortal { color: #e1bee7; }
+
         /* ========== V4 斗法战斗系统样式 ========== */
         .btn-combat {
             background: linear-gradient(135deg, #c62828, #ef5350);
@@ -3071,7 +3176,7 @@
             </div>
             <div id="immortalStoneDisplay" class="stat-item" style="display:none;">
                 <div class="stat-label">仙石</div>
-                <div class="stat-value" style="color:#9c27b0;">💎 0</div>
+                <div class="stat-value" id="immortalStonesValue" style="color:#9c27b0;">💎 0</div>
             </div>
             <div id="immortalRegionDisplay" class="stat-item" style="display:none;">
                 <div class="stat-label">当前位置</div>
@@ -3177,6 +3282,8 @@
             <button id="realmSwitchBtn" class="btn" style="display:none;" onclick="switchRealm('immortal')">☁️ 仙界</button>
             <!-- 天外天探索按钮 -->
             <button id="beyondHeavenBtn" class="btn" style="display:none;background:linear-gradient(135deg,#1a1a2e,#0d0d1a);color:#ffd700;border:2px solid #ffd700;" onclick="openBeyondHeaven()">🌌 天外天</button>
+            <!-- 仙界商行按钮 -->
+            <button id="celestialEconomyBtn" class="btn" style="display:none;background:linear-gradient(135deg,#7b1fa2,#ba68c8);color:white;" onclick="openCelestialEconomy()">💎 仙界商行</button>
         </div>
         <div id="moreButtons" class="buttons">
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>
@@ -3368,6 +3475,15 @@
             <h2 class="modal-title">🌌 天外天探索 🌌</h2>
             <div id="beyondHeavenContent"></div>
             <button class="close-btn" onclick="closeBeyondHeaven()">关闭</button>
+        </div>
+    </div>
+
+    <!-- 仙界经济系统模态框 -->
+    <div id="celestialEconomyModal" class="modal">
+        <div class="modal-content" style="max-width:650px;background:linear-gradient(135deg,#1a0a2e,#2d1b4e,#1a0a3e);border:2px solid rgba(156,39,176,0.5);">
+            <h2 class="modal-title">💎 仙界商行 💎</h2>
+            <div id="celestialEconomyContent"></div>
+            <button class="close-btn" onclick="closeCelestialEconomy()">关闭</button>
         </div>
     </div>
 
@@ -3568,6 +3684,43 @@
             { stones: 4000, realmMin: 3 },  // 化形3需要化神
             { stones: 10000, realmMin: 4 }, // 化形4需要渡劫
             { stones: 30000, realmMin: 5 }  // 化形5需要大乘
+        ];
+
+        // --- CELESTIAL_ECONOMY_CONFIG (仙界经济系统配置) ---
+        const CELESTIAL_ITEMS = {
+            // 仙丹类
+            '九转金丹': { icon: '💫', type: 'pill', price: 50, desc: '服用后境界提升一级', effect: { type: 'realm_boost', value: 1 } },
+            '蟠桃': { icon: '🍑', type: 'pill', price: 30, desc: '寿命+100年', effect: { type: 'lifespan', value: 100 } },
+            '人参果': { icon: '🍎', type: 'pill', price: 25, desc: '最大灵气+500', effect: { type: 'max_qi', value: 500 } },
+            '太乙丹': { icon: '✨', type: 'pill', price: 40, desc: '修炼速度+50%，持续7天', effect: { type: 'cultivate_speed_immortal', value: 0.5, duration: 7 } },
+            '琉璃丹': { icon: '🔮', type: 'pill', price: 35, desc: '所有属性+20%', effect: { type: 'all_stats', value: 0.2 } },
+            // 仙宝类
+            '玲珑塔': { icon: '🏰', type: 'treasure', price: 80, desc: '装备后受到伤害-30%', effect: { type: 'defense', value: 0.3 } },
+            '捆仙索': { icon: '🪢', type: 'treasure', price: 75, desc: '斗法中敌人逃跑概率+50%', effect: { type: 'escape', value: 0.5 } },
+            '玄天镜': { icon: '🪞', type: 'treasure', price: 60, desc: '每日首次奇遇必定触发', effect: { type: 'serendipity_boost', value: 1.0 } },
+            '昊天印': { icon: '👑', type: 'treasure', price: 100, desc: '攻击+50%', effect: { type: 'attack', value: 0.5 } },
+            // 投资领域
+            '灵药园': { icon: '🌿', type: 'investment', baseCost: 20, dailyReturn: 3, duration: 30, desc: '种植灵药，每日产出仙石' },
+            '仙丹坊': { icon: '⚗️', type: 'investment', baseCost: 50, dailyReturn: 8, duration: 25, desc: '炼制仙丹，利润丰厚' },
+            '法宝阁': { icon: '⚔️', type: 'investment', baseCost: 80, dailyReturn: 15, duration: 20, desc: '出售法宝，回报极高' },
+            '天机楼': { icon: '🔮', type: 'investment', baseCost: 120, dailyReturn: 25, duration: 15, desc: '情报生意，日进斗金' }
+        };
+
+        const EXCHANGE_TIERS = [
+            { min: 0, rate: 100, name: '凡俗兑换' },
+            { min: 1000, rate: 95, name: '小有所成' },
+            { min: 10000, rate: 90, name: '富甲一方' },
+            { min: 50000, rate: 85, name: '仙家贵宾' },
+            { min: 100000, rate: 80, name: '仙界豪商' }
+        ];
+
+        const CELESTIAL_REPUTATION_LEVELS = [
+            { min: 0, name: '无名之辈', bonus: 0 },
+            { min: 100, name: '初入仙界', bonus: 0.05 },
+            { min: 500, name: '小有名气', bonus: 0.10 },
+            { min: 2000, name: '仙界红人', bonus: 0.15 },
+            { min: 5000, name: '一方巨擘', bonus: 0.20 },
+            { min: 20000, name: '仙界传奇', bonus: 0.30 }
         ];
 
         // --- PET_AWAKENING_CONFIG (技能觉醒配置) ---
@@ -4332,6 +4485,17 @@
                 foresee_event: 0,
                 all_stats: 0,
                 serendipity_boost: 0
+            },
+            // 仙界经济系统字段
+            celestialEconomy: {
+                immortalStones: 0,           // 仙石数量
+                exchangeRate: 100,            // 汇率：1仙石=100灵石
+                totalExchanged: 0,            // 累计兑换金额
+                investments: [],              // 投资记录 [{area, amount, returns, daysLeft}]
+                marketItems: [],              // 仙界市场物品
+                lastMarketRefresh: 0,         // 上次市场刷新
+                totalEarned: 0,               // 累计收益
+                celestialReputation: 0        // 仙界声望
             },
             // V3渡劫系统字段
             tribulation: {
@@ -5176,6 +5340,9 @@
             
             // 双轨系统每日资源同步
             processDailyDualTrackSync();
+
+            // 仙界经济系统每日结算
+            processCelestialEconomyDaily();
 
             // V6: 检查是否触发奇遇
             const serendipityResult = checkSerendipity();
@@ -15521,6 +15688,17 @@
                 },
                 hasTransmigrationBuff: false,
                 tribulationRecord: [],
+                // 仙界经济系统
+                celestialEconomy: {
+                    immortalStones: 0,
+                    exchangeRate: 100,
+                    totalExchanged: 0,
+                    investments: [],
+                    marketItems: [],
+                    lastMarketRefresh: 0,
+                    totalEarned: 0,
+                    celestialReputation: 0
+                },
                 combat: {
                     wins: 0,
                     losses: 0,
@@ -15824,6 +16002,19 @@
                         maxSpiritualPower: 100
                     };
                 }
+                // 仙界经济系统向后兼容
+                if (!gameState.celestialEconomy) {
+                    gameState.celestialEconomy = {
+                        immortalStones: 0,
+                        exchangeRate: 100,
+                        totalExchanged: 0,
+                        investments: [],
+                        marketItems: [],
+                        lastMarketRefresh: 0,
+                        totalEarned: 0,
+                        celestialReputation: 0
+                    };
+                }
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
@@ -15945,7 +16136,454 @@
                     reincarnationDisplay.style.display = 'none';
                 }
             }
+
+            // 仙界经济显示更新
+            updateCelestialEconomyDisplay();
         }
+
+        // ===== 仙界经济系统函数 =====
+
+        // 获取当前兑换汇率
+        function getCurrentExchangeRate() {
+            const total = gameState.celestialEconomy.totalExchanged;
+            let tier = EXCHANGE_TIERS[0];
+            for (const t of EXCHANGE_TIERS) {
+                if (total >= t.min) tier = t;
+            }
+            // 声望加成
+            const repBonus = getCelestialReputationBonus();
+            return Math.floor(tier.rate * (1 - repBonus));
+        }
+
+        // 获取仙界声望加成
+        function getCelestialReputationBonus() {
+            const rep = gameState.celestialEconomy.celestialReputation;
+            let level = CELESTIAL_REPUTATION_LEVELS[0];
+            for (const l of CELESTIAL_REPUTATION_LEVELS) {
+                if (rep >= l.min) level = l;
+            }
+            return level.bonus;
+        }
+
+        // 获取仙界声望等级名称
+        function getCelestialReputationName() {
+            const rep = gameState.celestialEconomy.celestialReputation;
+            let level = CELESTIAL_REPUTATION_LEVELS[0];
+            for (const l of CELESTIAL_REPUTATION_LEVELS) {
+                if (rep >= l.min) level = l;
+            }
+            return level.name;
+        }
+
+        // 灵石兑换仙石
+        function exchangeToImmortalStones(amount) {
+            const rate = getCurrentExchangeRate();
+            const cost = amount * rate;
+            if (gameState.spiritStones < cost) {
+                alert(`灵石不足！需要 ${cost} 灵石兑换 ${amount} 仙石`);
+                return false;
+            }
+            gameState.spiritStones -= cost;
+            gameState.celestialEconomy.immortalStones += amount;
+            gameState.celestialEconomy.totalExchanged += cost;
+            // 声望提升
+            gameState.celestialEconomy.celestialReputation += Math.floor(amount / 2);
+            addLog('good', '灵石兑换', `消耗 ${cost} 灵石，兑换 ${amount} 仙石。当前汇率：1仙石=${rate}灵石`);
+            saveGame();
+            updateDisplay();
+            return true;
+        }
+
+        // 仙石兑换灵石
+        function exchangeToSpiritStones(amount) {
+            const rate = getCurrentExchangeRate();
+            const returnAmount = Math.floor(amount * rate * 0.8); // 仙石换灵石有20%损耗
+            if (gameState.celestialEconomy.immortalStones < amount) {
+                alert(`仙石不足！需要 ${amount} 仙石`);
+                return false;
+            }
+            gameState.celestialEconomy.immortalStones -= amount;
+            gameState.spiritStones += returnAmount;
+            addLog('neutral', '仙石兑换', `消耗 ${amount} 仙石，兑换 ${returnAmount} 灵石（损耗20%）`);
+            saveGame();
+            updateDisplay();
+            return true;
+        }
+
+        // 生成仙界市场物品
+        function generateCelestialMarketItems() {
+            const items = Object.entries(CELESTIAL_ITEMS).filter(([name, data]) => data.type !== 'investment');
+            const count = 5 + Math.floor(Math.random() * 4);
+            const shuffled = items.sort(() => Math.random() - 0.5);
+            gameState.celestialEconomy.marketItems = shuffled.slice(0, Math.min(count, items.length));
+            gameState.celestialEconomy.lastMarketRefresh = gameState.days;
+            saveGame();
+        }
+
+        // 渲染仙界商行界面
+        function renderCelestialEconomy() {
+            const content = document.getElementById('celestialEconomyContent');
+            const ce = gameState.celestialEconomy;
+            const rate = getCurrentExchangeRate();
+            const repName = getCelestialReputationName();
+            const repBonus = getCelestialReputationBonus();
+
+            let html = `
+                <div class="celestial-balance">
+                    <div class="balance-item">
+                        <div class="balance-label">灵石</div>
+                        <div class="balance-value stones">💎 ${gameState.spiritStones.toLocaleString()}</div>
+                    </div>
+                    <div class="balance-item">
+                        <div class="balance-label">仙石</div>
+                        <div class="balance-value immortal">💜 ${ce.immortalStones.toLocaleString()}</div>
+                    </div>
+                    <div class="balance-item">
+                        <div class="balance-label">声望</div>
+                        <div class="balance-value" style="color:#ffd700;">⭐ ${repName}</div>
+                    </div>
+                </div>
+
+                <div class="celestial-economy-section">
+                    <div class="celestial-economy-title">💱 货币兑换</div>
+                    <div class="exchange-rate-display">
+                        当前汇率：<span style="color:#e1bee7;">1 仙石 = ${rate} 灵石</span><br>
+                        <span style="font-size:0.85em;color:#888;">
+                            累计兑换：${ce.totalExchanged.toLocaleString()} 灵石 | 
+                            声望加成：-${Math.round(repBonus * 100)}%
+                        </span>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="margin-bottom:10px;color:#aaa;">灵石 → 仙石</div>
+                        <button class="exchange-btn" onclick="exchangeToImmortalStones(1)" ${gameState.spiritStones < rate ? 'disabled' : ''}>1 仙石</button>
+                        <button class="exchange-btn" onclick="exchangeToImmortalStones(10)" ${gameState.spiritStones < rate * 10 ? 'disabled' : ''}>10 仙石</button>
+                        <button class="exchange-btn" onclick="exchangeToImmortalStones(50)" ${gameState.spiritStones < rate * 50 ? 'disabled' : ''}>50 仙石</button>
+                        <button class="exchange-btn" onclick="exchangeToImmortalStones(100)" ${gameState.spiritStones < rate * 100 ? 'disabled' : ''}>100 仙石</button>
+                        <div style="margin:10px 0 10px;color:#aaa;">仙石 → 灵石 (损耗20%)</div>
+                        <button class="exchange-btn" onclick="exchangeToSpiritStones(1)" ${ce.immortalStones < 1 ? 'disabled' : ''}>1 仙石</button>
+                        <button class="exchange-btn" onclick="exchangeToSpiritStones(10)" ${ce.immortalStones < 10 ? 'disabled' : ''}>10 仙石</button>
+                        <button class="exchange-btn" onclick="exchangeToSpiritStones(50)" ${ce.immortalStones < 50 ? 'disabled' : ''}>50 仙石</button>
+                    </div>
+                </div>
+
+                <div class="celestial-tabs">
+                    <div class="celestial-tab active" onclick="switchCelestialTab('market')">🏪 仙市</div>
+                    <div class="celestial-tab" onclick="switchCelestialTab('invest')">📈 投资</div>
+                    <div class="celestial-tab" onclick="switchCelestialTab('records')">📜 记录</div>
+                </div>
+
+                <div id="celestialTabContent">
+                    ${renderCelestialMarketTab()}
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        // 切换仙界商行标签页
+        function switchCelestialTab(tab) {
+            document.querySelectorAll('.celestial-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('celestialTabContent');
+            if (tab === 'market') {
+                content.innerHTML = renderCelestialMarketTab();
+            } else if (tab === 'invest') {
+                content.innerHTML = renderCelestialInvestTab();
+            } else if (tab === 'records') {
+                content.innerHTML = renderCelestialRecordsTab();
+            }
+        }
+
+        // 渲染仙界市场标签页
+        function renderCelestialMarketTab() {
+            const ce = gameState.celestialEconomy;
+            if (ce.marketItems.length === 0 || ce.lastMarketRefresh < gameState.days) {
+                generateCelestialMarketItems();
+            }
+
+            let html = '<div class="celestial-market-grid">';
+            for (const item of ce.marketItems) {
+                const itemData = CELESTIAL_ITEMS[item[0]];
+                html += `
+                    <div class="celestial-item">
+                        <div class="celestial-item-info">
+                            <div class="celestial-item-name" style="color:#e1bee7;">${itemData.icon} ${item[0]}</div>
+                            <div class="celestial-item-desc">${itemData.desc}</div>
+                        </div>
+                        <div class="celestial-item-price">💜 ${itemData.price}</div>
+                        <button class="exchange-btn" onclick="buyCelestialItem('${item[0]}')" 
+                            ${ce.immortalStones < itemData.price ? 'disabled' : ''}>购买</button>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            html += '<div style="text-align:center;margin-top:15px;">';
+            html += `<button class="exchange-btn" onclick="refreshCelestialMarket()">🔄 刷新市场 (消耗1仙石)</button>`;
+            html += '</div>';
+            return html;
+        }
+
+        // 渲染投资标签页
+        function renderCelestialInvestTab() {
+            const ce = gameState.celestialEconomy;
+            const investments = CELESTIAL_ITEMS;
+
+            let html = '<div style="margin-bottom:15px;color:#aaa;">投资仙界产业，每日获得仙石收益</div>';
+            html += '<div class="celestial-market-grid">';
+
+            for (const [name, data] of Object.entries(investments)) {
+                if (data.type !== 'investment') continue;
+
+                // 检查是否已投资
+                const existingInvest = ce.investments.find(inv => inv.area === name);
+                const maxInvestments = 3;
+                const currentInvestCount = ce.investments.filter(inv => inv.area === name).length;
+
+                html += `
+                    <div class="celestial-item" style="flex-direction:column;align-items:flex-start;">
+                        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
+                            <div class="celestial-item-info">
+                                <div class="celestial-item-name" style="color:#e1bee7;">${data.icon} ${name}</div>
+                                <div class="celestial-item-desc">${data.desc}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="color:#aaa;font-size:0.85em;">投资：${data.baseCost} 💜/份</div>
+                                <div style="color:#4caf50;font-size:0.85em;">日收益：${data.dailyReturn} 💜</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:5px;margin-top:8px;width:100%;justify-content:flex-end;">
+                            ${existingInvest ? 
+                                `<span style="color:#ffd700;">已投 ${currentInvestCount}/${maxInvestments} 份</span>` : 
+                                `<button class="exchange-btn" onclick="investCelestial('${name}')" 
+                                    ${ce.immortalStones < data.baseCost ? 'disabled' : ''}>投资1份</button>`
+                            }
+                        </div>
+                        ${existingInvest ? `
+                            <div style="font-size:0.8em;color:#aaa;margin-top:5px;">
+                                剩余 ${existingInvest.daysLeft} 天 | 预计收益：${existingInvest.returns} 💜
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            html += '</div>';
+
+            // 活跃投资
+            if (ce.investments.length > 0) {
+                html += '<div style="margin-top:15px;border-top:1px solid rgba(156,39,176,0.3);padding-top:15px;">';
+                html += '<div style="color:#ffd700;margin-bottom:10px;">📊 活跃投资</div>';
+                for (const inv of ce.investments) {
+                    html += `
+                        <div style="display:flex;justify-content:space-between;padding:5px;background:rgba(0,0,0,0.2);border-radius:5px;margin-bottom:5px;font-size:0.9em;">
+                            <span>${CELESTIAL_ITEMS[inv.area]?.icon || '📦'} ${inv.area}</span>
+                            <span style="color:#aaa;">剩余 ${inv.daysLeft} 天</span>
+                            <span style="color:#4caf50;">+${inv.dailyReturn} 💜/天</span>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            return html;
+        }
+
+        // 渲染记录标签页
+        function renderCelestialRecordsTab() {
+            const ce = gameState.celestialEconomy;
+            let html = '<div style="color:#aaa;margin-bottom:15px;">仙界商行记录</div>';
+
+            html += '<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-bottom:15px;">';
+            html += `<div style="color:#ffd700;">累计收益：${ce.totalEarned.toLocaleString()} 仙石</div>`;
+            html += `<div style="color:#aaa;font-size:0.9em;">累计兑换：${ce.totalExchanged.toLocaleString()} 灵石</div>`;
+            html += `<div style="color:#e1bee7;font-size:0.9em;">仙界声望：${ce.celestialReputation} (${getCelestialReputationName()})</div>`;
+            html += '</div>';
+
+            html += '<div style="color:#ffd700;margin-bottom:10px;">💰 每日收益计算</div>';
+            let dailyTotal = 0;
+            for (const inv of ce.investments) {
+                dailyTotal += inv.dailyReturn;
+            }
+            if (dailyTotal > 0) {
+                html += `<div style="color:#4caf50;font-size:1.1em;">每日仙石收益：+${dailyTotal} 💜</div>`;
+            } else {
+                html += '<div style="color:#888;">暂无活跃投资</div>';
+            }
+
+            return html;
+        }
+
+        // 购买仙界物品
+        function buyCelestialItem(itemName) {
+            const ce = gameState.celestialEconomy;
+            const itemData = CELESTIAL_ITEMS[itemName];
+            if (!itemData) return;
+
+            if (ce.immortalStones < itemData.price) {
+                alert('仙石不足！');
+                return;
+            }
+
+            if (itemData.type === 'pill') {
+                // 丹药直接使用
+                ce.immortalStones -= itemData.price;
+                applyCelestialEffect(itemData.effect);
+                addLog('good', '仙界购物', `购买了 ${itemData.icon} ${itemName}！${itemData.desc}`);
+            } else if (itemData.type === 'treasure') {
+                // 宝物添加到背包
+                ce.immortalStones -= itemData.price;
+                if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                    alert('背包已满！');
+                    ce.immortalStones += itemData.price;
+                    return;
+                }
+                addToInventory('treasure', itemName, 1, 'legendary', itemData.effect, itemData.desc, itemData.icon);
+                addLog('good', '仙界购物', `购买了 ${itemData.icon} ${itemName}！`);
+            }
+
+            saveGame();
+            updateDisplay();
+            renderCelestialEconomy();
+        }
+
+        // 应用仙界物品效果
+        function applyCelestialEffect(effect) {
+            if (!effect) return;
+            switch (effect.type) {
+                case 'realm_boost':
+                    if (gameState.realm < 5) {
+                        gameState.realm += effect.value;
+                        gameState.qi = 0;
+                        gameState.cultivationProgress = 0;
+                    }
+                    break;
+                case 'lifespan':
+                    // 寿命系统如果有的话
+                    break;
+                case 'max_qi':
+                    gameState.maxQi += effect.value;
+                    gameState.qi += effect.value;
+                    break;
+                case 'cultivate_speed_immortal':
+                    gameState.activeEffects.cultivate_speed += effect.value;
+                    if (!gameState.activeEffects.cultivate_speed_endDay) {
+                        gameState.activeEffects.cultivate_speed_endDay = {};
+                    }
+                    gameState.activeEffects.cultivate_speed_endDay.cultivate_speed_immortal = gameState.days + effect.duration;
+                    break;
+                case 'all_stats':
+                    gameState.activeEffects.all_stats += effect.value;
+                    break;
+            }
+        }
+
+        // 投资仙界产业
+        function investCelestial(areaName) {
+            const ce = gameState.celestialEconomy;
+            const data = CELESTIAL_ITEMS[areaName];
+            if (!data || data.type !== 'investment') return;
+
+            if (ce.immortalStones < data.baseCost) {
+                alert('仙石不足！');
+                return;
+            }
+
+            // 检查是否已达到最大投资数
+            const currentCount = ce.investments.filter(inv => inv.area === areaName).length;
+            if (currentCount >= 3) {
+                alert('该产业投资已达上限！');
+                return;
+            }
+
+            ce.immortalStones -= data.baseCost;
+            const totalReturns = data.dailyReturn * data.duration;
+            ce.investments.push({
+                area: areaName,
+                amount: data.baseCost,
+                dailyReturn: data.dailyReturn,
+                returns: totalReturns,
+                daysLeft: data.duration,
+                startDay: gameState.days
+            });
+
+            addLog('good', '仙界投资', `投资了 ${data.icon} ${areaName}，投资 ${data.baseCost} 仙石，预计总收益 ${totalReturns} 仙石`);
+            saveGame();
+            updateDisplay();
+            renderCelestialEconomy();
+        }
+
+        // 刷新仙界市场
+        function refreshCelestialMarket() {
+            const ce = gameState.celestialEconomy;
+            if (ce.immortalStones < 1) {
+                alert('仙石不足！刷新市场需要 1 仙石');
+                return;
+            }
+            ce.immortalStones -= 1;
+            generateCelestialMarketItems();
+            saveGame();
+            updateDisplay();
+            renderCelestialEconomy();
+            addLog('neutral', '市场刷新', '仙界市场已刷新');
+        }
+
+        // 每日仙界经济结算
+        function processCelestialEconomyDaily() {
+            const ce = gameState.celestialEconomy;
+            if (!ce.investments || ce.investments.length === 0) return 0;
+
+            let dailyEarnings = 0;
+            ce.investments = ce.investments.filter(inv => {
+                inv.daysLeft--;
+                if (inv.daysLeft <= 0) {
+                    // 投资到期，返还收益
+                    ce.immortalStones += inv.returns;
+                    ce.totalEarned += inv.returns;
+                    dailyEarnings += inv.returns;
+                    addLog('good', '投资到期', `${inv.area} 投资到期，获得 ${inv.returns} 仙石！`);
+                    return false;
+                }
+                // 每日收益
+                ce.immortalStones += inv.dailyReturn;
+                ce.totalEarned += inv.dailyReturn;
+                dailyEarnings += inv.dailyReturn;
+                return true;
+            });
+
+            if (dailyEarnings > 0) {
+                addLog('good', '仙界收益', `今日仙界投资收益：+${dailyEarnings} 仙石`);
+            }
+            return dailyEarnings;
+        }
+
+        // 打开仙界商行
+        function openCelestialEconomy() {
+            renderCelestialEconomy();
+            document.getElementById('celestialEconomyModal').classList.add('active');
+        }
+
+        // 关闭仙界商行
+        function closeCelestialEconomy() {
+            document.getElementById('celestialEconomyModal').classList.remove('active');
+        }
+
+        // 更新仙界经济显示
+        function updateCelestialEconomyDisplay() {
+            const ce = gameState.celestialEconomy;
+            const stoneDisplay = document.getElementById('immortalStonesValue');
+            if (stoneDisplay) {
+                stoneDisplay.textContent = `💎 ${ce.immortalStones.toLocaleString()}`;
+            }
+
+            // 仙界商行按钮显示
+            const celestialBtn = document.getElementById('celestialEconomyBtn');
+            if (celestialBtn) {
+                // 飞升后或天外天解锁后显示
+                if (gameState.realm >= 5 || (gameState.beyondHeaven && gameState.beyondHeaven.unlocked)) {
+                    celestialBtn.style.display = 'inline-block';
+                }
+            }
+        }
+
 </script>
     <div class="landscape-warning" style="display:none;">请竖屏体验以获得最佳效果</div>
 </body>
