@@ -484,6 +484,10 @@
             background: linear-gradient(135deg, #455a64, #78909c);
             color: white;
         }
+        .btn-evolution {
+            background: linear-gradient(135deg, #c62828, #ff5252);
+            color: white;
+        }
         
         /* 装备栏 */
         .equipment-bar {
@@ -603,6 +607,27 @@
         .inventory-slot .quality-rare { color: #64b5f6; }
         .inventory-slot .quality-precious { color: #ba68c8; }
         .inventory-slot .quality-legendary { color: #ffd700; }
+        .inventory-slot .quality-ultimate { color: #ff6b6b; text-shadow: 0 0 8px rgba(255, 107, 107, 0.6); }
+        
+        /* 天道法则装备槽样式 */
+        .equipment-slot.heavenly-dao-slot {
+            border-color: rgba(255, 107, 107, 0.6);
+            background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,215,0,0.1));
+            animation: heavenly-pulse 3s infinite;
+        }
+        @keyframes heavenly-pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(255, 107, 107, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(255, 107, 107, 0.6); }
+        }
+        .equipment-slot.heavenly-dao-slot:hover {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+        }
+        .equipment-slot.heavenly-dao-slot.filled {
+            border-style: solid;
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255,107,107,0.3), rgba(255,215,0,0.2));
+        }
         .inventory-detail {
             background: rgba(0, 0, 0, 0.4);
             padding: 15px;
@@ -1078,6 +1103,16 @@
             background: rgba(156, 39, 176, 0.3);
             color: #e1bee7;
             border-color: #e1bee7;
+        }
+        .heavenly-tab {
+            background: linear-gradient(135deg, rgba(198, 40, 40, 0.3), rgba(255, 82, 82, 0.3));
+            border-color: rgba(255, 107, 107, 0.5);
+            color: #ff6b6b;
+        }
+        .heavenly-tab:hover, .heavenly-tab.active {
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+            border-color: #ff6b6b;
         }
         .celestial-balance {
             display: flex;
@@ -3490,6 +3525,10 @@
                 <span class="slot-icon">💍</span>
                 <span class="slot-tooltip">空</span>
             </div>
+            <div class="equipment-slot heavenly-dao-slot" id="equipSlot3" onclick="openHeavenlyDaoSlotMenu()">
+                <span class="slot-icon">👑</span>
+                <span class="slot-tooltip">空</span>
+            </div>
         </div>
 
         <div id="gameButtons" class="buttons hidden">
@@ -3501,6 +3540,7 @@
             <button class="btn btn-alchemy" onclick="openAlchemy()">⚗️ 炼丹</button>
             <button class="btn btn-forge" onclick="openForge()">🔨 炼器</button>
             <button class="btn btn-market" onclick="openMarket()">🏷️ 市场</button>
+            <button class="btn btn-evolution" onclick="openEvolutionUI()" style="background:linear-gradient(135deg,#c62828,#ff5252);color:white;">⬆️ 天道进化</button>
         </div>
         <div id="v11Buttons" style="margin-top:8px;">
             <!-- V11 飞升按钮 -->
@@ -3572,9 +3612,11 @@
                 <div class="inventory-tab" onclick="switchInvTab('pill')">丹药</div>
                 <div class="inventory-tab" onclick="switchInvTab('treasure')">灵宝</div>
                 <div class="inventory-tab" onclick="switchInvTab('material')">材料</div>
+                <div class="inventory-tab heavenly-tab" onclick="switchInvTab('heavenly')">天道</div>
             </div>
             <div class="inventory-grid" id="inventoryGrid"></div>
             <div id="setStatusContainer"></div>
+            <div id="heavenlySetStatusContainer"></div>
             <div class="inventory-detail" id="invDetail" style="display:none;">
                 <div id="invDetailContent"></div>
                 <div class="inventory-actions" id="invActions"></div>
@@ -4097,6 +4139,81 @@
             '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 600, desc: '逃跑成功率+50%', icon: '📜' },
             '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 8000, desc: '预知事件类型', icon: '🔮' },
             '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 40000, desc: '全属性+5%', icon: '珠' }
+        };
+
+        // --- HEAVENLY_DAO_EQUIPMENTS (Ultimate Tier) ---
+        const HEAVENLY_DAO_EQUIPMENTS = {
+            '天道剑·永恒': {
+                type: 'weapon', quality: 'ultimate', slot: 0,
+                baseEffect: { type: 'attack', value: 0.30 },
+                lawEffect: { type: 'time_reversal', desc: '时间法则：战斗中有20%概率回溯一回合' },
+                price: 500000, desc: '攻击+30%', icon: '⚔️',
+                evolutionReq: { item: '青云剑', star: 9, stones: 100000 }
+            },
+            '天盾·不灭': {
+                type: 'armor', quality: 'ultimate', slot: 1,
+                baseEffect: { type: 'defense', value: 0.30 },
+                lawEffect: { type: 'immortal_shield', desc: '不朽法则：受到致命伤害时免疫一次，每场战斗限一次' },
+                price: 500000, desc: '防御+30%', icon: '🛡️',
+                evolutionReq: { item: '玄铁盾', star: 9, stones: 100000 }
+            },
+            '天命珠·轮回': {
+                type: 'accessory', quality: 'ultimate', slot: 2,
+                baseEffect: { type: 'all_stats', value: 0.15 },
+                lawEffect: { type: 'reincarnation_blessing', desc: '轮回法则：死亡时25%概率保留50%修为转世' },
+                price: 800000, desc: '全属性+15%', icon: '🔮',
+                evolutionReq: { item: '混元珠', star: 9, stones: 150000 }
+            },
+            '天罚令': {
+                type: 'heavenly', quality: 'ultimate', slot: 3,
+                baseEffect: { type: 'tribulation_power', value: 0.50 },
+                lawEffect: { type: 'heavenly_blade', desc: '天罚法则：渡劫伤害+50%，渡劫成功率+25%' },
+                price: 1000000, desc: '渡劫之力+50%', icon: '👑',
+                evolutionReq: null // 天罚令只能通过天劫奖励或特殊奇遇获得
+            },
+            '道种': {
+                type: 'heavenly', quality: 'ultimate', slot: 3,
+                baseEffect: { type: 'cultivation_speed', value: 0.30 },
+                lawEffect: { type: 'dao_seed', desc: '道种法则：修炼时有概率触发顿悟，修为翻倍' },
+                price: 800000, desc: '修炼速度+30%', icon: '🌱',
+                evolutionReq: null // 道种只能通过顿悟奇遇获得
+            },
+            '因果镜': {
+                type: 'heavenly', quality: 'ultimate', slot: 3,
+                baseEffect: { type: 'serendipity_rate', value: 0.40 },
+                lawEffect: { type: 'karma_sight', desc: '因果法则：可窥探事件因果，吉凶提前预知' },
+                price: 600000, desc: '奇遇率+40%', icon: '🪞',
+                evolutionReq: null
+            }
+        };
+
+        // --- HEAVENLY_DAO_SET_BONUSES ---
+        const HEAVENLY_DAO_SET_BONUSES = {
+            '天道套装': {
+                pieces: ['天道剑·永恒', '天盾·不灭', '天命珠·轮回'],
+                count: 3,
+                stats: { attackPercent: 0.25, defensePercent: 0.25, all_stats: 0.10 },
+                twoPiece: '攻击+25%，防御+25%',
+                threePiece: '全属性+10%，解锁【天命】被动：每回合恢复1%最大生命',
+                skill: '天命：受到致命伤害时，消耗天道气息复活，恢复30%生命，每日限一次'
+            },
+            '法则套装': {
+                pieces: ['天罚令', '道种', '因果镜'],
+                count: 3,
+                stats: { tribulation_power: 0.30, cultivation_speed: 0.25, serendipity_rate: 0.20 },
+                twoPiece: '渡劫+30%，修炼+25%',
+                threePiece: '奇遇+20%，解锁【道法自然】被动：所有概率加成额外+15%',
+                skill: '道法自然：所有概率触发效果提升15%，包括暴击、闪避、顿悟等'
+            },
+            '终极套装': {
+                pieces: ['天道剑·永恒', '天盾·不灭', '天命珠·轮回', '天罚令', '道种', '因果镜'],
+                count: 6,
+                stats: { attackPercent: 0.30, defensePercent: 0.30, all_stats: 0.20, critPercent: 0.15 },
+                twoPiece: '攻击+30%，防御+30%',
+                threePiece: '全属性+20%，暴击+15%',
+                sixPiece: '解锁【超脱】被动：渡劫必定成功，修炼速度翻倍，寿元无限制',
+                skill: '超脱：免疫一切负面状态，寿元耗尽时自动进入轮回转世，保留全部属性加成'
+            }
         };
 
         // --- COMBAT_TREASURES (39-49) ---
@@ -4788,7 +4905,7 @@
             isVictory: false,
             // V2新增字段
             inventory: [],
-            equippedTreasures: [null, null, null],
+            equippedTreasures: [null, null, null, null],
             maxInventorySlots: 20,
             shopItems: [],
             lastShopDay: 0,
@@ -8928,9 +9045,21 @@
             // 累加装备效果
             for (const treasure of gameState.equippedTreasures) {
                 if (treasure) {
-                    const effectType = treasure.effect.type;
-                    if (gameState.activeEffects.hasOwnProperty(effectType)) {
-                        gameState.activeEffects[effectType] += treasure.effect.value;
+                    // 普通装备效果
+                    if (treasure.effect && treasure.effect.type) {
+                        const effectType = treasure.effect.type;
+                        const effectValue = treasure.effect.value || 0;
+                        if (gameState.activeEffects.hasOwnProperty(effectType)) {
+                            gameState.activeEffects[effectType] += effectValue;
+                        }
+                    }
+                    // 天道法则装备基础效果
+                    if (treasure.baseEffect && treasure.baseEffect.type) {
+                        const effectType = treasure.baseEffect.type;
+                        const effectValue = treasure.baseEffect.value || 0;
+                        if (gameState.activeEffects.hasOwnProperty(effectType)) {
+                            gameState.activeEffects[effectType] += effectValue;
+                        }
                     }
                 }
             }
@@ -8951,22 +9080,61 @@
 
         // ===== updateEquipmentBar =====
         function updateEquipmentBar() {
-            const icons = ['⚔️', '🛡️', '💍'];
-            for (let i = 0; i < 3; i++) {
+            const icons = ['⚔️', '🛡️', '💍', '👑'];
+            for (let i = 0; i < 4; i++) {
                 const slot = document.getElementById(`equipSlot${i}`);
                 const treasure = gameState.equippedTreasures[i];
                 if (treasure) {
                     slot.classList.add('filled');
+                    if (i === 3) slot.classList.add('heavenly-dao-slot');
                     slot.querySelector('.slot-icon').textContent = treasure.icon || icons[i];
                     const star = treasure.star || 1;
                     const starDisplay = getStarDisplay(star);
-                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}${starDisplay}\n${treasure.desc}`;
+                    const desc = treasure.desc || (treasure.lawEffect ? treasure.lawEffect.desc : '');
+                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}${starDisplay}\n${desc}`;
                 } else {
                     slot.classList.remove('filled');
+                    if (i === 3) slot.classList.remove('heavenly-dao-slot');
                     slot.querySelector('.slot-icon').textContent = icons[i];
-                    slot.querySelector('.slot-tooltip').textContent = '空';
+                    slot.querySelector('.slot-tooltip').textContent = i === 3 ? '天道法则装备' : '空';
                 }
             }
+        }
+
+        // ===== renderHeavenlyDaoSetStatus =====
+        function renderHeavenlyDaoSetStatus() {
+            let html = '<div style="margin-top:8px;padding:6px;background:#1a0a2e;border-radius:6px;font-size:11px;border:1px solid rgba(255,107,107,0.3);">';
+            html += '<b style="color:#ff6b6b;">天道法则套装</b><br>';
+            let hasAny = false;
+            for (const setName in HEAVENLY_DAO_SET_BONUSES) {
+                const set = HEAVENLY_DAO_SET_BONUSES[setName];
+                const equipped = [];
+                const treasures = gameState.equippedTreasures;
+                for (const t of treasures) {
+                    if (t && set.pieces.includes(t.name)) equipped.push(t.name);
+                }
+                if (equipped.length > 0) {
+                    hasAny = true;
+                    const count = equipped.length;
+                    const color = count >= set.count ? '#ff6b6b' : '#aaaaaa';
+                    let status;
+                    if (count >= set.count) {
+                        if (set.count === 6) {
+                            status = '✓ ' + set.sixPiece;
+                        } else if (count === set.count) {
+                            status = '✓ ' + set.threePiece;
+                        } else {
+                            status = '✓ ' + set.twoPiece;
+                        }
+                    } else {
+                        status = `(${equipped.length}/${set.count}) ${set.twoPiece}`;
+                    }
+                    html += `<span style="color:${color};">${setName} ${status}</span><br>`;
+                }
+            }
+            if (!hasAny) html += '<span style="color:#666;">无天道套装激活</span>';
+            html += '</div>';
+            return html;
         }
 
         // ===== renderSetStatus =====
@@ -9048,6 +9216,246 @@
                     document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
                 }
             }
+        }
+
+        // ===== openHeavenlyDaoSlotMenu =====
+        function openHeavenlyDaoSlotMenu() {
+            const heavenlyDao = gameState.equippedTreasures[3];
+            // 移除已存在的菜单
+            const existing = document.getElementById('heavenlyDaoMenu');
+            if (existing) existing.remove();
+
+            if (!heavenlyDao) {
+                // 空槽位，显示装备选项
+                let optionsHtml = '<div style="color:#ffd700;margin-bottom:8px;text-align:center;">天道法则装备</div>';
+                
+                // 检查背包中是否有天道法则装备
+                const heavenlyItems = gameState.inventory.filter(i => i.quality === 'ultimate' || HEAVENLY_DAO_EQUIPMENTS[i.name]);
+                if (heavenlyItems.length > 0) {
+                    optionsHtml += '<div style="max-height:200px;overflow-y:auto;">';
+                    for (const item of heavenlyItems) {
+                        const hdEquip = HEAVENLY_DAO_EQUIPMENTS[item.name];
+                        const lawDesc = hdEquip ? hdEquip.lawEffect.desc : (item.lawEffect ? item.lawEffect.desc : '天道法则');
+                        optionsHtml += `
+                            <div onclick="equipHeavenlyDao('${item.name}')" style="padding:8px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:6px;margin-bottom:5px;cursor:pointer;">
+                                <div style="color:#ff6b6b;font-weight:bold;">${item.icon || '👑'} ${item.name}</div>
+                                <div style="color:#aaa;font-size:0.8em;">${lawDesc}</div>
+                            </div>
+                        `;
+                    }
+                    optionsHtml += '</div>';
+                } else {
+                    optionsHtml += '<div style="color:#888;text-align:center;padding:15px;">背包中没有天道法则装备</div>';
+                }
+                
+                optionsHtml += '<button onclick="closeHeavenlyDaoSlotMenu()" style="display:block;width:100%;padding:6px;margin-top:8px;background:rgba(100,100,100,0.2);border:1px solid #666;border-radius:6px;color:#aaa;cursor:pointer;">关闭</button>';
+                
+                const html = `<div id="heavenlyDaoMenu" style="position:fixed;z-index:1002;background:#1a0a2e;border:1px solid #ff6b6b;border-radius:10px;padding:10px;min-width:200px;max-width:280px;box-shadow:0 0 20px rgba(255,107,107,0.3);">${optionsHtml}</div>`;
+                const slot = document.getElementById('equipSlot3');
+                const rect = slot.getBoundingClientRect();
+                document.body.insertAdjacentHTML('beforeend', html);
+                const menu = document.getElementById('heavenlyDaoMenu');
+                menu.style.top = (rect.bottom + 5) + 'px';
+                menu.style.left = rect.left + 'px';
+            } else {
+                // 已有装备，显示详情菜单
+                const lawDesc = heavenlyDao.lawEffect ? heavenlyDao.lawEffect.desc : '天道法则';
+                const html = `<div id="heavenlyDaoMenu" style="position:fixed;z-index:1002;background:#1a0a2e;border:1px solid #ff6b6b;border-radius:10px;padding:10px;min-width:200px;box-shadow:0 0 20px rgba(255,107,107,0.3);">
+                    <div style="color:#ff6b6b;font-weight:bold;text-align:center;margin-bottom:8px;">${heavenlyDao.icon || '👑'} ${heavenlyDao.name}</div>
+                    <div style="color:#ffd700;font-size:0.9em;text-align:center;margin-bottom:5px;">基础: ${heavenlyDao.desc || ''}</div>
+                    <div style="color:#ff6b6b;font-size:0.85em;text-align:center;padding:5px;background:rgba(255,107,107,0.1);border-radius:5px;margin-bottom:8px;">法则: ${lawDesc}</div>
+                    <button onclick="unequipHeavenlyDao();closeHeavenlyDaoSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:rgba(100,100,100,0.2);border:1px solid #888;border-radius:6px;color:#ccc;cursor:pointer;margin-bottom:5px;">卸下</button>
+                    <button onclick="closeHeavenlyDaoSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:transparent;border:none;color:#888;cursor:pointer;">取消</button>
+                </div>`;
+                const slot = document.getElementById('equipSlot3');
+                const rect = slot.getBoundingClientRect();
+                document.body.insertAdjacentHTML('beforeend', html);
+                const menu = document.getElementById('heavenlyDaoMenu');
+                menu.style.top = (rect.bottom + 5) + 'px';
+                menu.style.left = rect.left + 'px';
+            }
+        }
+
+        // ===== closeHeavenlyDaoSlotMenu =====
+        function closeHeavenlyDaoSlotMenu() {
+            const menu = document.getElementById('heavenlyDaoMenu');
+            if (menu) menu.remove();
+        }
+
+        // ===== unequipHeavenlyDao =====
+        function unequipHeavenlyDao() {
+            const heavenlyDao = gameState.equippedTreasures[3];
+            if (heavenlyDao) {
+                const invItem = {
+                    type: 'heavenly',
+                    name: heavenlyDao.name,
+                    quantity: 1,
+                    quality: 'ultimate',
+                    effect: heavenlyDao.baseEffect,
+                    desc: heavenlyDao.desc,
+                    icon: heavenlyDao.icon,
+                    star: heavenlyDao.star || 1,
+                    lawEffect: heavenlyDao.lawEffect
+                };
+                addToInventoryObj(invItem);
+                gameState.equippedTreasures[3] = null;
+                recalculateAllEffects();
+                updateEquipmentBar();
+                saveGame();
+                addLog('neutral', '天道装备', `卸下了${heavenlyDao.name}`);
+            }
+        }
+
+        // ===== equipHeavenlyDao =====
+        function equipHeavenlyDao(name) {
+            const hdEquip = HEAVENLY_DAO_EQUIPMENTS[name];
+            if (!hdEquip) return;
+            
+            // 查找背包中的物品
+            const itemIdx = gameState.inventory.findIndex(i => i.name === name);
+            if (itemIdx === -1) return;
+            
+            const item = gameState.inventory[itemIdx];
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory.splice(itemIdx, 1);
+            }
+            
+            // 装备天道法则装备
+            gameState.equippedTreasures[3] = {
+                name: item.name,
+                type: 'heavenly',
+                quality: 'ultimate',
+                desc: item.desc,
+                icon: item.icon || hdEquip.icon,
+                baseEffect: hdEquip.baseEffect,
+                lawEffect: hdEquip.lawEffect,
+                star: item.star || 1
+            };
+            
+            recalculateAllEffects();
+            updateEquipmentBar();
+            saveGame();
+            addLog('good', '天道装备', `装备了天道法则装备【${name}】`);
+            closeHeavenlyDaoSlotMenu();
+        }
+
+        // ===== canEvolveToHeavenlyDao =====
+        function canEvolveToHeavenlyDao(itemName) {
+            const hdEquip = HEAVENLY_DAO_EQUIPMENTS[itemName];
+            if (!hdEquip || !hdEquip.evolutionReq) return { can: false, reason: '该装备无法进化' };
+            
+            const req = hdEquip.evolutionReq;
+            const hasItem = gameState.inventory.find(i => i.name === req.item && i.star >= req.star);
+            if (!hasItem) return { can: false, reason: `需要${req.item}(${req.star}星)才能进化` };
+            if (gameState.spiritStones < req.stones) return { can: false, reason: `需要${req.stones}灵石` };
+            
+            return { can: true };
+        }
+
+        // ===== openEvolutionUI =====
+        function openEvolutionUI() {
+            const existing = document.getElementById('evolutionModal');
+            if (existing) existing.remove();
+            
+            let html = `<div id="evolutionModal" style="position:fixed;z-index:1003;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;">
+                <div style="background:linear-gradient(135deg,#1a0a2e,#2d1b4e);border:2px solid #ff6b6b;border-radius:15px;padding:25px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 0 40px rgba(255,107,107,0.4);">
+                    <h2 style="color:#ff6b6b;text-align:center;margin-bottom:15px;">⬆️ 天道法则进化</h2>
+                    <p style="color:#aaa;text-align:center;margin-bottom:15px;font-size:0.9em;">将9星传奇装备进化为天道法则终极装备</p>
+                    <div style="max-height:400px;overflow-y:auto;">`;
+            
+            let hasAny = false;
+            for (const [name, hdEquip] of Object.entries(HEAVENLY_DAO_EQUIPMENTS)) {
+                if (!hdEquip.evolutionReq) continue;
+                hasAny = true;
+                const req = hdEquip.evolutionReq;
+                const canEvolve = canEvolveToHeavenlyDao(name);
+                const requiredItem = gameState.inventory.find(i => i.name === req.item && i.star >= req.star);
+                const hasStones = gameState.spiritStones >= req.stones;
+                
+                html += `
+                    <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;margin-bottom:10px;border:1px solid rgba(255,107,107,0.2);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="color:#ff6b6b;font-weight:bold;">${hdEquip.icon} ${name}</span>
+                            <span style="color:#ffd700;">进化消耗: ${req.stones}灵石</span>
+                        </div>
+                        <div style="font-size:0.85em;color:#aaa;margin-bottom:5px;">
+                            需求: ${req.item} ×1 (${req.star}星以上)
+                            ${requiredItem ? `<span style="color:#4caf50;">✓</span>` : `<span style="color:#f44336;">✗</span>`}
+                        </div>
+                        <div style="font-size:0.85em;color:#aaa;margin-bottom:8px;">
+                            基础效果: ${hdEquip.desc}
+                        </div>
+                        <div style="font-size:0.8em;color:#ff6b6b;padding:5px;background:rgba(255,107,107,0.1);border-radius:5px;margin-bottom:10px;">
+                            法则: ${hdEquip.lawEffect.desc}
+                        </div>
+                        <button onclick="doEvolution('${name}')" ${!canEvolve.can ? 'disabled' : ''} style="width:100%;padding:10px;background:${canEvolve.can ? 'linear-gradient(135deg,#ff6b6b,#ff8a8a)' : '#555'};border:none;border-radius:8px;color:white;cursor:${canEvolve.can ? 'pointer' : 'not-allowed'};font-size:1em;">
+                            ${canEvolve.can ? '⬆️ 进化' : canEvolve.reason}
+                        </button>
+                    </div>
+                `;
+            }
+            
+            if (!hasAny) {
+                html += '<div style="color:#888;text-align:center;padding:30px;">暂无可进化装备</div>';
+            }
+            
+            html += `</div>
+                    <button onclick="closeEvolutionUI()" style="display:block;width:100%;padding:12px;margin-top:15px;background:rgba(100,100,100,0.3);border:1px solid #666;border-radius:8px;color:#aaa;cursor:pointer;">关闭</button>
+                </div>
+            </div>`;
+            
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        // ===== closeEvolutionUI =====
+        function closeEvolutionUI() {
+            const modal = document.getElementById('evolutionModal');
+            if (modal) modal.remove();
+        }
+
+        // ===== doEvolution =====
+        function doEvolution(targetName) {
+            const hdEquip = HEAVENLY_DAO_EQUIPMENTS[targetName];
+            if (!hdEquip || !hdEquip.evolutionReq) {
+                alert('该装备无法进化！');
+                return;
+            }
+            
+            const req = hdEquip.evolutionReq;
+            const canEvolve = canEvolveToHeavenlyDao(targetName);
+            if (!canEvolve.can) {
+                alert(canEvolve.reason);
+                return;
+            }
+            
+            // 扣除材料和灵石
+            const itemIdx = gameState.inventory.findIndex(i => i.name === req.item && i.star >= req.star);
+            if (itemIdx !== -1) {
+                gameState.inventory.splice(itemIdx, 1);
+            }
+            gameState.spiritStones -= req.stones;
+            
+            // 添加天道法则装备到背包
+            const newItem = {
+                type: 'heavenly',
+                name: targetName,
+                quantity: 1,
+                quality: 'ultimate',
+                effect: hdEquip.baseEffect,
+                desc: hdEquip.desc,
+                icon: hdEquip.icon,
+                star: 1,
+                lawEffect: hdEquip.lawEffect
+            };
+            addToInventoryObj(newItem);
+            
+            closeEvolutionUI();
+            updateDisplay();
+            saveGame();
+            
+            addLog('good', '天道进化', `成功进化出天道法则装备【${targetName}】！`);
+            alert(`恭喜！成功进化出天道法则装备【${targetName}】！\n\n${hdEquip.lawEffect.desc}`);
         }
 
         // ===== addToInventory =====
@@ -17474,7 +17882,7 @@
                 isGameOver: false,
                 isVictory: false,
                 inventory: [],
-                equippedTreasures: [null, null, null],
+                equippedTreasures: [null, null, null, null],
                 maxInventorySlots: 20,
                 shopItems: [],
                 lastShopDay: 0,
@@ -17697,7 +18105,7 @@
                         foresee_event: 0,
                         all_stats: 0
                     },
-                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
+                    equippedTreasures: loaded.equippedTreasures || [null, null, null, null],
                     inventory: loaded.inventory || [],
                     shopItems: loaded.shopItems || [],
                     lastShopDay: loaded.lastShopDay || 0,
