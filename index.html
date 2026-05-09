@@ -2556,6 +2556,15 @@
         .quality-precious { background: #ba68c8; color: white; }
         .quality-legendary { background: #ffd700; color: #1a1a2e; }
         .pet-stats { display: flex; gap: 15px; margin-top: 5px; font-size: 0.8em; color: #aaa; }
+        .pet-advancement-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: linear-gradient(135deg, #ff6f00, #ffb300);
+            border-radius: 10px;
+            font-size: 0.75em;
+            color: white;
+            margin-top: 5px;
+        }
         .pet-action-btn {
             padding: 8px 15px;
             border: none;
@@ -2567,6 +2576,8 @@
         .btn-feed { background: linear-gradient(135deg, #4caf50, #81c784); color: white; }
         .btn-release { background: linear-gradient(135deg, #f44336, #ef5350); color: white; }
         .btn-evolve { background: linear-gradient(135deg, #9c27b0, #ba68c8); color: white; }
+        .btn-advancement { background: linear-gradient(135deg, #ff6f00, #ffb300); color: white; }
+        .btn-transform { background: linear-gradient(135deg, #00acc1, #26c6da); color: white; }
         .pet-action-btn:hover:not(:disabled) { transform: translateY(-2px); }
         .pet-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .pet-empty { text-align: center; padding: 40px; color: #888; }
@@ -3246,6 +3257,34 @@
             precious: '🥚',
             legendary: '✨'
         };
+
+        // --- PET_ADVANCEMENT_CONFIG (进阶配置) ---
+        const PET_ADVANCEMENT_COSTS = [
+            { stones: 300, exp: 50 },   // 第一次进阶
+            { stones: 600, exp: 100 },  // 第二次
+            { stones: 1200, exp: 200 },  // 第三次
+            { stones: 2500, exp: 400 },  // 第四次
+            { stones: 5000, exp: 800 }   // 第五次（满级）
+        ];
+        const PET_ADVANCEMENT_BONUS_PER_LEVEL = 0.1; // 每级属性提升10%
+        const PET_MAX_ADVANCEMENT = 5; // 最大进阶次数
+
+        // --- PET_TRANSFORMATION_CONFIG (化形配置) ---
+        const PET_TRANSFORMATION_STAGES = {
+            0: { name: '幼体', icon: '🐣', statBonus: 0 },
+            1: { name: '成体', icon: '🐾', statBonus: 0.15 },
+            2: { name: '妖兽', icon: '🦁', statBonus: 0.30 },
+            3: { name: '化形', icon: '🧑', statBonus: 0.50 },
+            4: { name: '人形', icon: '👤', statBonus: 0.75 },
+            5: { name: '真形', icon: '🌟', statBonus: 1.0 }
+        };
+        const PET_TRANSFORMATION_COSTS = [
+            { stones: 500, realmMin: 1 },   // 化形1需要金丹
+            { stones: 1500, realmMin: 2 },  // 化形2需要元婴
+            { stones: 4000, realmMin: 3 },  // 化形3需要化神
+            { stones: 10000, realmMin: 4 }, // 化形4需要渡劫
+            { stones: 30000, realmMin: 5 }  // 化形5需要大乘
+        ];
 
         // --- PILLS (15-23) ---
         const PILLS = {
@@ -9578,15 +9617,16 @@
                 return `
                     <div class="pet-card ${isSummoned ? 'selected' : ''}" onclick="selectPet(${index})">
                         <div class="pet-info">
-                            <div class="pet-avatar">${typeData.icon}</div>
+                            <div class="pet-avatar">${PET_TRANSFORMATION_STAGES[pet.transformation || 0].icon}</div>
                             <div>
                                 <div class="pet-name">${pet.name} <span class="pet-quality ${qualityClass}">Lv.${pet.level}</span></div>
-                                <div class="pet-realm">${pet.quality === 'legendary' ? '神兽' : pet.quality === 'precious' ? '珍兽' : pet.quality === 'rare' ? '灵兽' : '凡兽'} · ${typeData.ability}</div>
+                                <div class="pet-realm">${pet.quality === 'legendary' ? '神兽' : pet.quality === 'precious' ? '珍兽' : pet.quality === 'rare' ? '灵兽' : '凡兽'} · ${PET_TRANSFORMATION_STAGES[pet.transformation || 0].name}</div>
                                 <div class="pet-stats">
                                     <span class="pet-stat">⚔️ ${calculatePetStat(pet, 'attack')}</span>
                                     <span class="pet-stat">🛡️ ${calculatePetStat(pet, 'defense')}</span>
                                     <span class="pet-stat">❤️ ${calculatePetStat(pet, 'hp')}</span>
                                 </div>
+                                ${(pet.advancement || 0) > 0 ? '<div class="pet-advancement-badge">⬆️' + pet.advancement + '阶</div>' : ''}
                             </div>
                         </div>
                         <div class="pet-actions">
@@ -9613,13 +9653,13 @@
                 detailHtml = `
                     <div class="pet-detail">
                         <div class="pet-detail-header">
-                            <div class="pet-detail-avatar">${typeData.icon}</div>
+                            <div class="pet-detail-avatar">${PET_TRANSFORMATION_STAGES[pet.transformation || 0].icon}</div>
                             <div>
                                 <div class="pet-detail-name">
                                     ${pet.name}
                                     <span class="pet-detail-quality quality-${pet.quality}">${pet.quality === 'legendary' ? '神兽' : pet.quality === 'precious' ? '珍兽' : pet.quality === 'rare' ? '灵兽' : '凡兽'}</span>
                                 </div>
-                                <div class="pet-detail-realm">等级 ${pet.level}/${maxLevel} · 品质 ${pet.quality}</div>
+                                <div class="pet-detail-realm">等级 ${pet.level}/${maxLevel} · ${PET_TRANSFORMATION_STAGES[pet.transformation || 0].name}</div>
                             </div>
                         </div>
                         <div class="pet-exp-bar">
@@ -9665,10 +9705,26 @@
                                 <div class="pet-battle-stat-label">生命</div>
                             </div>
                         </div>
+                        <div class="pet-advancement-info" style="margin-top:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:#ffd700;">⬆️ 进阶</span>
+                                <span style="color:#aaa;">${pet.advancement || 0}/${PET_MAX_ADVANCEMENT}级</span>
+                            </div>
+                            <div style="margin-top:5px;font-size:0.85em;color:#888;">属性加成: +${(pet.advancement || 0) * PET_ADVANCEMENT_BONUS_PER_LEVEL * 100}%</div>
+                        </div>
+                        <div class="pet-transformation-info" style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:#ffd700;">✨ 化形</span>
+                                <span style="color:#aaa;">${PET_TRANSFORMATION_STAGES[pet.transformation || 0].icon} ${PET_TRANSFORMATION_STAGES[pet.transformation || 0].name}</span>
+                            </div>
+                            <div style="margin-top:5px;font-size:0.85em;color:#888;">属性加成: +${PET_TRANSFORMATION_STAGES[pet.transformation || 0].statBonus * 100}%</div>
+                        </div>
                     </div>
-                    <div style="display:flex;gap:10px;">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
                         <button class="pet-action-btn btn-feed" onclick="feedPet()" ${gameState.spiritStones < PET_FOOD_COST ? 'disabled' : ''}>🍖 喂养 (${PET_FOOD_COST}灵石)</button>
                         <button class="pet-action-btn btn-evolve" onclick="evolvePet()" ${!canEvolvePet(pet) ? 'disabled' : ''}>⬆️ 进化</button>
+                        <button class="pet-action-btn btn-advancement" onclick="advancePet()" ${!canAdvancePet(pet) ? 'disabled' : ''}>📈 进阶</button>
+                        <button class="pet-action-btn btn-transform" onclick="transformPet()" ${!canTransformPet(pet) ? 'disabled' : ''}>🧑 化形</button>
                         <button class="pet-action-btn btn-release" onclick="releasePet()">释放灵兽</button>
                     </div>
                 `;
@@ -9747,7 +9803,9 @@
             const qualityMult = PET_QUALITY_MULTIPLIERS[pet.quality];
             const levelBonus = 1 + (pet.level - 1) * 0.1;
             const loyaltyBonus = 1 + (pet.loyalty / 500); // 忠诚度最高提供20%加成
-            return Math.floor(baseStat * qualityMult * levelBonus * loyaltyBonus);
+            const advancementBonus = 1 + (pet.advancement || 0) * PET_ADVANCEMENT_BONUS_PER_LEVEL;
+            const transBonus = 1 + (PET_TRANSFORMATION_STAGES[pet.transformation || 0]?.statBonus || 0);
+            return Math.floor(baseStat * qualityMult * levelBonus * loyaltyBonus * advancementBonus * transBonus);
         }
 
         // ===== summonPetByIndex =====
@@ -9819,7 +9877,9 @@
                 level: 1,
                 exp: 0,
                 loyalty: 70,
-                hunger: 80
+                hunger: 80,
+                advancement: 0,
+                transformation: 0
             };
 
             gameState.pets.push(newPet);
@@ -9853,7 +9913,9 @@
                 level: 1,
                 exp: 0,
                 loyalty: 80,
-                hunger: 80
+                hunger: 80,
+                advancement: 0,
+                transformation: 0
             };
 
             gameState.pets.push(newPet);
@@ -9926,6 +9988,87 @@
 
             const typeData = PET_TYPES[pet.type];
             addLog('good', '进化成功', `恭喜！${oldType}进化为${pet.quality === 'legendary' ? '神兽' : pet.quality === 'precious' ? '珍兽' : '灵兽'}${typeData.icon}${pet.type}！属性大幅提升！`);
+            renderPetHome('myPets');
+        }
+
+        // ===== canAdvancePet =====
+        function canAdvancePet(pet) {
+            if (!pet) return false;
+            const currentAdv = pet.advancement || 0;
+            if (currentAdv >= PET_MAX_ADVANCEMENT) return false;
+            const cost = PET_ADVANCEMENT_COSTS[currentAdv];
+            return gameState.spiritStones >= cost.stones && pet.exp >= cost.exp;
+        }
+
+        // ===== advancePet =====
+        function advancePet() {
+            if (gameState.selectedPetIndex === undefined) return;
+            const pet = gameState.pets[gameState.selectedPetIndex];
+            if (!pet) return;
+
+            const currentAdv = pet.advancement || 0;
+            if (currentAdv >= PET_MAX_ADVANCEMENT) {
+                addLog('bad', '进阶失败', '已达到最大进阶等级！');
+                return;
+            }
+
+            const cost = PET_ADVANCEMENT_COSTS[currentAdv];
+            if (gameState.spiritStones < cost.stones) {
+                addLog('bad', '进阶失败', `灵石不足！需要${cost.stones}灵石`);
+                return;
+            }
+            if (pet.exp < cost.exp) {
+                addLog('bad', '进阶失败', `经验不足！需要${cost.exp}经验`);
+                return;
+            }
+
+            gameState.spiritStones -= cost.stones;
+            pet.exp -= cost.exp;
+            pet.advancement = currentAdv + 1;
+
+            addLog('good', '进阶成功', `恭喜！${pet.name}进阶成功！已达到${currentAdv + 1}阶，属性提升${PET_ADVANCEMENT_BONUS_PER_LEVEL * 100}%！`);
+            updateDisplay();
+            renderPetHome('myPets');
+        }
+
+        // ===== canTransformPet =====
+        function canTransformPet(pet) {
+            if (!pet) return false;
+            const currentTrans = pet.transformation || 0;
+            if (currentTrans >= 5) return false; // max is 5 (index 5 = 真形)
+            const cost = PET_TRANSFORMATION_COSTS[currentTrans];
+            return gameState.spiritStones >= cost.stones && gameState.realm >= cost.realmMin;
+        }
+
+        // ===== transformPet =====
+        function transformPet() {
+            if (gameState.selectedPetIndex === undefined) return;
+            const pet = gameState.pets[gameState.selectedPetIndex];
+            if (!pet) return;
+
+            const currentTrans = pet.transformation || 0;
+            if (currentTrans >= 5) {
+                addLog('bad', '化形失败', '已达到最高化形境界！');
+                return;
+            }
+
+            const cost = PET_TRANSFORMATION_COSTS[currentTrans];
+            if (gameState.spiritStones < cost.stones) {
+                addLog('bad', '化形失败', `灵石不足！需要${cost.stones}灵石`);
+                return;
+            }
+            if (gameState.realm < cost.realmMin) {
+                const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神', '渡劫', '大乘'];
+                addLog('bad', '化形失败', `境界不足！需要${realmNames[cost.realmMin]}境界`);
+                return;
+            }
+
+            gameState.spiritStones -= cost.stones;
+            pet.transformation = currentTrans + 1;
+
+            const nextStage = PET_TRANSFORMATION_STAGES[pet.transformation];
+            addLog('good', '化形成功', `恭喜！${pet.name}成功化为${nextStage.icon}${nextStage.name}形态！属性大幅提升！`);
+            updateDisplay();
             renderPetHome('myPets');
         }
 
@@ -10325,7 +10468,9 @@
                 level: 1,
                 exp: 0,
                 loyalty: 80,
-                hunger: 80
+                hunger: 80,
+                advancement: 0,
+                transformation: 0
             };
             
             // 移除蛋
