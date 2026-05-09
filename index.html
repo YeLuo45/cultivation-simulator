@@ -3696,6 +3696,43 @@
             '九转玄天诀': { grade: 3, effect: { type: 'all_stats', value: 0.1 }, desc: '全属性+10%', icon: '🌟' }
         };
 
+        // --- TECHNIQUE_UPGRADE_MATERIALS ---
+        // 功法进阶材料配置：grade -> [材料名称, 数量, 灵石费用]
+        const TECHNIQUE_UPGRADE_MATERIALS = {
+            // 人阶(0) -> 灵阶(1): 天材×3 + 灵石200
+            0: { materials: { '天材': 3 }, stones: 200 },
+            // 灵阶(1) -> 天阶(2): 天材×5 + 混沌石×1 + 灵石500
+            1: { materials: { '天材': 5, '混沌石': 1 }, stones: 500 },
+            // 天阶(2) -> 仙阶(3): 混沌石×3 + 灵石2000
+            2: { materials: { '混沌石': 3 }, stones: 2000 }
+        };
+
+        // --- TECHNIQUE_UPGRADE_EFFECTS ---
+        // 功法进阶后效果提升配置
+        const TECHNIQUE_UPGRADE_EFFECTS = {
+            // 人阶基础效果提升
+            0: { value: 0.05, desc: '修炼速度+5%' },
+            1: { value: 0.10, desc: '灵气获取+10%' },
+            2: { value: 0.10, desc: '突破成功率+10%' },
+            3: { value: 0.15, desc: '防御+15%' },
+            4: { value: 0.15, desc: '攻击+15%' },
+            5: { value: 0.10, desc: '全属性+10%' },
+            // 灵阶效果提升
+            6: { value: 0.10, desc: '修炼速度+10%' },
+            7: { value: 0.20, desc: '灵气获取+20%' },
+            8: { value: 0.20, desc: '突破成功率+20%' },
+            9: { value: 0.25, desc: '防御+25%' },
+            10: { value: 0.25, desc: '攻击+25%' },
+            11: { value: 0.20, desc: '全属性+20%' },
+            // 天阶效果提升
+            12: { value: 0.15, desc: '修炼速度+15%' },
+            13: { value: 0.30, desc: '灵气获取+30%' },
+            14: { value: 0.30, desc: '突破成功率+30%' },
+            15: { value: 0.35, desc: '防御+35%' },
+            16: { value: 0.35, desc: '攻击+35%' },
+            17: { value: 0.30, desc: '全属性+30%' }
+        };
+
 // ===== state.js =====
 
         // --- gameState (1366-1480) ---
@@ -6601,7 +6638,7 @@
         }
 
         // ===== addToInventory =====
-        function addToInventory(type, name, quantity, quality, effect, desc, icon, star) {
+        function addToInventory(type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
             // 查找是否已存在同类型物品
             const existing = gameState.inventory.find(item => item.name === name && item.type === type);
             if (existing) {
@@ -6610,7 +6647,7 @@
                 if (gameState.inventory.length >= gameState.maxInventorySlots) {
                     return false; // 背包满了
                 }
-                gameState.inventory.push({
+                const itemObj = {
                     id: Date.now(),
                     type,
                     name,
@@ -6620,7 +6657,14 @@
                     desc,
                     icon,
                     star: star || 1
-                });
+                };
+                // 功法额外字段
+                if (type === 'technique') {
+                    itemObj.grade = grade !== undefined ? grade : 0;
+                    itemObj.level = level || 1;
+                    itemObj.maxLevel = maxLevel || 5;
+                }
+                gameState.inventory.push(itemObj);
             }
             return true;
         }
@@ -6707,13 +6751,14 @@
             document.getElementById('invDetail').style.display = 'block';
             document.getElementById('invDetailContent').innerHTML = `
                 <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
-                    <span style="font-size:2em">${item.icon || '📦'}</span>
+                    <span style="font-size:2em">${item.icon || '📖'}</span>
                     <div>
                         <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(item.quality)}">${item.name}</div>
                         <div style="color:#888">${item.desc}</div>
                     </div>
                 </div>
                 <div style="color:#aaa">数量: ${item.quantity}</div>
+                ${item.type === 'technique' ? `<div style="color:#ffd700;margin-top:5px;">等级: ${item.level || 1}/${item.maxLevel || 5} ${item.grade !== undefined ? '(' + (SECT_CONFIG.techniqueGrades[item.grade] || '人阶') + ')' : ''}</div>` : ''}
             `;
             
             let actions = '';
@@ -6725,6 +6770,17 @@
                 const starColor = getStarColor(star);
                 actions = `<button class="btn btn-breakthrough" onclick="equipTreasure('${item.name}', ${idx})">装备</button>`;
                 actions += `<button class="btn btn-enhance" onclick="openEnhanceFromInventory(${idx})" style="background:rgba(255,215,0,0.15);border:1px solid #ffd700;color:#ffd700;padding:5px 12px;border-radius:5px;cursor:pointer;margin-left:5px;">强化</button>`;
+            } else if (item.type === 'technique') {
+                const level = item.level || 1;
+                const maxLevel = item.maxLevel || 5;
+                const grade = item.grade !== undefined ? item.grade : 0;
+                const gradeName = SECT_CONFIG.techniqueGrades[grade] || '人阶';
+                if (level < maxLevel) {
+                    const upgradeCost = getTechniqueUpgradeCost(grade, level);
+                    actions = `<button class="btn btn-breakthrough" onclick="openTechniqueUpgrade(${idx})" style="margin-bottom:5px;">进阶</button>`;
+                } else {
+                    actions = `<span style="color:#ffd700;">已满级</span>`;
+                }
             }
             actions += `<button class="btn btn-save" onclick="sellItem(${idx})">出售(${Math.floor(item.quality === 'common' ? 10 : item.quality === 'rare' ? 50 : item.quality === 'precious' ? 200 : 1000)}灵石)</button>`;
             actions += `<button class="btn btn-new" onclick="discardItem(${idx})">丢弃</button>`;
@@ -6867,6 +6923,210 @@
             renderInventoryGrid();
             document.getElementById('invDetail').style.display = 'none';
             addLog('neutral', '丢弃物品', `丢弃了${item.name}`);
+        }
+
+        // ===== getTechniqueUpgradeCost =====
+        function getTechniqueUpgradeCost(grade, level) {
+            // 等级达到上限(5)则无法进阶
+            if (level >= 5) return null;
+            
+            // 获取进阶材料配置
+            const upgradeConfig = TECHNIQUE_UPGRADE_MATERIALS[grade];
+            if (!upgradeConfig) return null;
+            
+            // 根据level计算具体消耗（level 1->2用第1级材料，2->3用第2级，3->4用第3级，4->5用第4级）
+            // 实际上我们只定义了3个进阶阶段（0->1, 1->2, 2->3），等级5是满级
+            const stage = level - 1; // stage 0=1级, 1=2级, 2=3级, 3=4级
+            if (stage >= 3) return null; // 仙阶满级无法继续进阶
+            
+            return {
+                materials: { ...upgradeConfig.materials },
+                stones: upgradeConfig.stones
+            };
+        }
+
+        // ===== getTechniqueEffectKey =====
+        function getTechniqueEffectKey(grade, level) {
+            // 根据等阶和等级计算效果配置索引
+            // 人阶: level 1-5 -> index 0-4
+            // 灵阶: level 1-5 -> index 5-9 (人阶5个 + 灵阶前4个)
+            // 天阶: level 1-5 -> index 10-14
+            // 仙阶: 不进阶，使用天阶满级效果
+            if (grade === 0) return level - 1;
+            if (grade === 1) return 5 + (level - 1);
+            if (grade === 2) return 10 + (level - 1);
+            return 15; // 仙阶用天阶满级效果
+        }
+
+        // ===== openTechniqueUpgrade =====
+        function openTechniqueUpgrade(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item || item.type !== 'technique') return;
+            
+            const level = item.level || 1;
+            const maxLevel = item.maxLevel || 5;
+            const grade = item.grade !== undefined ? item.grade : 0;
+            
+            if (level >= maxLevel) {
+                alert('此功法已达到最高等级！');
+                return;
+            }
+            
+            const upgradeCost = getTechniqueUpgradeCost(grade, level);
+            if (!upgradeCost) {
+                alert('此功法无法继续进阶！');
+                return;
+            }
+            
+            // 检查玩家材料是否足够
+            const materialsNeeded = [];
+            for (const [mat, qty] of Object.entries(upgradeCost.materials)) {
+                const have = getItemCount(mat);
+                materialsNeeded.push({ name: mat, need: qty, have: have });
+            }
+            
+            const canAfford = materialsNeeded.every(m => m.have >= m.need) && gameState.spiritStones >= upgradeCost.stones;
+            
+            // 显示进阶确认模态框
+            const materialList = materialsNeeded.map(m => {
+                const enough = m.have >= m.need;
+                return `<div style="display:flex;justify-content:space-between;padding:5px 0;">
+                    <span>${m.name}</span>
+                    <span style="color:${enough ? '#4caf50' : '#f44336'};">${m.have}/${m.need}</span>
+                </div>`;
+            }).join('');
+            
+            const gradeName = SECT_CONFIG.techniqueGrades[grade] || '人阶';
+            const nextGradeName = SECT_CONFIG.techniqueGrades[grade + 1] || '未知';
+            const currentEffectIdx = getTechniqueEffectKey(grade, level);
+            const nextEffectIdx = getTechniqueEffectKey(grade, level + 1);
+            const currentEffect = TECHNIQUE_UPGRADE_EFFECTS[currentEffectIdx];
+            const nextEffect = TECHNIQUE_UPGRADE_EFFECTS[nextEffectIdx];
+            
+            document.getElementById('techniqueUpgradeModal') && document.getElementById('techniqueUpgradeModal').remove();
+            
+            const modal = document.createElement('div');
+            modal.id = 'techniqueUpgradeModal';
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:450px;">
+                    <h2 class="modal-title">📖 功法进阶</h2>
+                    <div style="text-align:center;margin-bottom:15px;">
+                        <span style="font-size:2em">${item.icon || '📖'}</span>
+                        <div style="font-weight:bold;color:#ffd700;margin-top:5px;">${item.name}</div>
+                        <div style="color:#aaa;">当前: ${gradeName} Lv.${level} → 进阶后: ${nextGradeName} Lv.${level + 1}</div>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.4);padding:15px;border-radius:10px;margin-bottom:15px;">
+                        <div style="color:#888;margin-bottom:5px;">效果提升</div>
+                        <div style="color:#aaa;text-decoration:line-through;">${currentEffect ? currentEffect.desc : item.effect.desc}</div>
+                        <div style="color:#4caf50;">→ ${nextEffect ? nextEffect.desc : item.effect.desc}</div>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.4);padding:15px;border-radius:10px;margin-bottom:15px;">
+                        <div style="color:#888;margin-bottom:5px;">进阶消耗</div>
+                        ${materialList}
+                        <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #333;margin-top:5px;">
+                            <span>灵石</span>
+                            <span style="color:${gameState.spiritStones >= upgradeCost.stones ? '#4caf50' : '#f44336'};">${gameState.spiritStones}/${upgradeCost.stones}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn btn-cultivate" onclick="doTechniqueUpgrade(${idx})" ${!canAfford ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} style="flex:1;">进阶</button>
+                        <button class="btn btn-save" onclick="closeTechniqueUpgradeModal()" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // ===== closeTechniqueUpgradeModal =====
+        function closeTechniqueUpgradeModal() {
+            const modal = document.getElementById('techniqueUpgradeModal');
+            if (modal) {
+                modal.classList.remove('active');
+                setTimeout(() => modal.remove(), 300);
+            }
+        }
+
+        // ===== doTechniqueUpgrade =====
+        function doTechniqueUpgrade(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item || item.type !== 'technique') return;
+            
+            const level = item.level || 1;
+            const maxLevel = item.maxLevel || 5;
+            const grade = item.grade !== undefined ? item.grade : 0;
+            
+            if (level >= maxLevel) return;
+            
+            const upgradeCost = getTechniqueUpgradeCost(grade, level);
+            if (!upgradeCost) return;
+            
+            // 检查材料
+            for (const [mat, qty] of Object.entries(upgradeCost.materials)) {
+                if (getItemCount(mat) < qty) {
+                    alert(`材料不足：需要${mat}×${qty}，拥有${getItemCount(mat)}`);
+                    return;
+                }
+            }
+            
+            // 检查灵石
+            if (gameState.spiritStones < upgradeCost.stones) {
+                alert(`灵石不足：需要${upgradeCost.stones}，拥有${gameState.spiritStones}`);
+                return;
+            }
+            
+            // 扣除材料
+            for (const [mat, qty] of Object.entries(upgradeCost.materials)) {
+                removeItem(mat, qty);
+            }
+            
+            // 扣除灵石
+            gameState.spiritStones -= upgradeCost.stones;
+            
+            // 更新功法属性
+            item.level = level + 1;
+            item.effect = TECHNIQUE_UPGRADE_EFFECTS[getTechniqueEffectKey(grade, level + 1)].desc;
+            
+            // 如果进阶到新阶等（人阶5级升灵阶1级）
+            if (level === 5 && grade < 3) {
+                item.grade = grade + 1;
+                item.maxLevel = 5;
+            }
+            
+            // 更新显示
+            const gradeName = SECT_CONFIG.techniqueGrades[item.grade] || '人阶';
+            addLog('good', '功法进阶', `【${item.name}】进阶成功！当前：${gradeName} Lv.${item.level}`);
+            
+            closeTechniqueUpgradeModal();
+            saveGame();
+            updateDisplay();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        // ===== getItemCount =====
+        function getItemCount(name) {
+            const item = gameState.inventory.find(i => i.name === name);
+            return item ? item.quantity : 0;
+        }
+
+        // ===== removeItem =====
+        function removeItem(name, quantity) {
+            const idx = gameState.inventory.findIndex(i => i.name === name);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity -= quantity;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
         }
 
 // ===== crafting.js =====
@@ -10106,7 +10366,11 @@
             }
             
             gameState.spiritStones -= cost;
-            gameState.techniques.push(tech);
+            gameState.techniques.push({
+                ...tech,
+                level: tech.level || 1,
+                maxLevel: tech.maxLevel || 5
+            });
             
             // 应用功法效果
             if (tech.effect) {
@@ -10162,6 +10426,8 @@
                     gameState.techniques.push({
                         name: item.data,
                         grade: tech.grade,
+                        level: 1,
+                        maxLevel: 5,
                         icon: tech.icon,
                         desc: tech.desc,
                         effect: tech.effect
@@ -11640,9 +11906,9 @@
                 // 成功
                 const reward = realmData.reward;
                 if (reward === '入门功法') {
-                    addToInventory('technique', '青云诀', 1, 'spirit', '修炼速度+10%', '基础功法');
+                    addToInventory('technique', '青云诀', 1, 'spirit', '修炼速度+10%', '基础功法', '📖', 1, 0, 1, 5);
                 } else if (reward === '冰系功法') {
-                    addToInventory('technique', '冰魄心法', 1, 'heaven', '冰系亲和+15', '高阶冰系功法');
+                    addToInventory('technique', '冰魄心法', 1, 'heaven', '冰系亲和+15', '高阶冰系功法', '❄️', 1, 2, 1, 5);
                 } else if (reward === '混沌石') {
                     addToInventory('material', '混沌石', 1, 'legendary');
                 } else if (reward === '龙族材料') {
