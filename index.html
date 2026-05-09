@@ -2662,6 +2662,117 @@
         }
         .pet-battle-stat-value { color: #ffd700; font-size: 1.5em; font-weight: bold; }
         .pet-battle-stat-label { color: #aaa; font-size: 0.85em; margin-top: 5px; }
+        
+        /* ========== 仙宠繁殖孵化系统样式 ========== */
+        .pet-breeding-section { margin-top: 15px; }
+        .pet-breeding-info {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .pet-breeding-parents {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0;
+        }
+        .pet-breeding-parent {
+            flex: 1;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            border: 2px dashed rgba(255,255,255,0.2);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .pet-breeding-parent:hover { border-color: #4db6ac; }
+        .pet-breeding-parent.selected { border-color: #ffd700; background: rgba(255,215,0,0.1); }
+        .pet-breeding-parent .pet-icon { font-size: 2.5em; }
+        .pet-breeding-parent .pet-name { color: #ffd700; margin-top: 5px; }
+        .pet-breeding-parent.empty { opacity: 0.5; }
+        .pet-breeding-arrow { font-size: 2em; color: #ffd700; }
+        .pet-breeding-cost {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #aaa;
+        }
+        .pet-breeding-cost-value { color: #87ceeb; font-weight: bold; }
+        .pet-breeding-result {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .pet-breeding-result-icon { font-size: 4em; }
+        .pet-breeding-result-name { color: #ffd700; font-size: 1.3em; margin-top: 10px; }
+        .pet-breeding-result-quality { margin-top: 5px; }
+        
+        /* 孵化蛋样式 */
+        .pet-egg-section { margin-top: 15px; }
+        .pet-egg-list { display: grid; gap: 10px; }
+        .pet-egg-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .pet-egg-icon { font-size: 3em; }
+        .pet-egg-info { flex: 1; }
+        .pet-egg-name { color: #ffd700; font-weight: bold; }
+        .pet-egg-progress-bar {
+            height: 12px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 6px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .pet-egg-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4db6ac, #ffd700);
+            border-radius: 6px;
+            transition: width 0.3s;
+        }
+        .pet-egg-status { font-size: 0.85em; color: #aaa; margin-top: 5px; }
+        .pet-egg-actions { display: flex; gap: 8px; }
+        .pet-incubate-btn {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #ff9800, #ffb74d);
+            border: none;
+            border-radius: 8px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .pet-incubate-btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .pet-incubate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* 孵化巢穴样式 */
+        .incubation-nest {
+            padding: 15px;
+            background: rgba(139,69,19,0.3);
+            border-radius: 10px;
+            border: 2px solid rgba(139,69,19,0.5);
+            margin-top: 15px;
+        }
+        .incubation-nest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .incubation-nest-title { color: #ffd700; font-weight: bold; }
+        .incubation-nest-count { color: #aaa; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -3111,6 +3222,30 @@
         const PET_HUNGER_DECAY_RATE = 10; // 每天饱食度下降
         const PET_MAX_LOYALTY = 100;
         const PET_MAX_HUNGER = 100;
+        
+        // --- PET_BREEDING_CONSTANTS ---
+        const PET_BREEDING_COST = 200; // 繁殖消耗灵石
+        const PET_BREEDING_MIN_LOYALTY = 70; // 繁殖最低忠诚度
+        const PET_BREEDING_COOLDOWN = 3; // 繁殖冷却天数
+        const PET_INCUBATION_DAYS_BASE = 5; // 基础孵化天数
+        const PET_INCUBATION_DAYS_VAR = 3; // 孵化天数波动
+        const PET_MAX_EGGS = 5; // 最大蛋容量
+        
+        // --- PET_EGG_TYPES ---
+        const PET_EGG_TYPES = {
+            common: { icon: '🥚', name: '灵兽蛋', hatchTime: 5 },
+            rare: { icon: '🥚', name: '稀有灵兽蛋', hatchTime: 7 },
+            precious: { icon: '🥚', name: '珍兽蛋', hatchTime: 10 },
+            legendary: { icon: '🌟', name: '神兽蛋', hatchTime: 15 }
+        };
+        
+        // 稀有灵兽蛋的icons
+        const PET_EGG_ICONS = {
+            common: '🥚',
+            rare: '🥚',
+            precious: '🥚',
+            legendary: '✨'
+        };
 
         // --- PILLS (15-23) ---
         const PILLS = {
@@ -3919,6 +4054,11 @@
             // 仙宠灵兽系统字段
             pets: [],
             summonedPet: null,
+            petBreedingCooldowns: {}, // { petId: daysUntilBreedable }
+            petEggs: [], // [{ id, quality, type, daysLeft, totalDays, isHatching }]
+            selectedBreedingPet1: null,
+            selectedBreedingPet2: null,
+            breedingResult: null,
             // V15 轮回转世系统字段
             reincarnation: {
                 count: 0,              // 转世次数
@@ -9368,10 +9508,13 @@
             const content = document.getElementById('petContent');
             const petCount = gameState.pets.length;
             const maxPets = 5;
+            const eggCount = gameState.petEggs ? gameState.petEggs.length : 0;
 
             let tabsHtml = `
                 <div class="pet-tabs">
                     <div class="pet-tab ${tab === 'myPets' ? 'active' : ''}" onclick="renderPetHome('myPets')">🐉 我的灵兽 (${petCount}/${maxPets})</div>
+                    <div class="pet-tab ${tab === 'breeding' ? 'active' : ''}" onclick="renderPetHome('breeding')">💕 繁殖</div>
+                    <div class="pet-tab ${tab === 'incubation' ? 'active' : ''}" onclick="renderPetHome('incubation')">🥚 孵化 (${eggCount})</div>
                     <div class="pet-tab ${tab === 'summon' ? 'active' : ''}" onclick="renderPetHome('summon')">✨ 召唤灵兽</div>
                     <div class="pet-tab ${tab === 'market' ? 'active' : ''}" onclick="renderPetHome('market')">🏪 灵兽商店</div>
                 </div>
@@ -9381,6 +9524,12 @@
             switch(tab) {
                 case 'myPets':
                     bodyHtml = renderMyPets();
+                    break;
+                case 'breeding':
+                    bodyHtml = renderPetBreeding();
+                    break;
+                case 'incubation':
+                    bodyHtml = renderPetIncubation();
                     break;
                 case 'summon':
                     bodyHtml = renderSummonPet();
@@ -9802,6 +9951,408 @@
             renderPetHome('myPets');
         }
 
+        // ===== renderPetBreeding =====
+        function renderPetBreeding() {
+            const pets = gameState.pets;
+            const pet1Index = gameState.selectedBreedingPet1;
+            const pet2Index = gameState.selectedBreedingPet2;
+            const pet1 = pet1Index !== null ? pets[pet1Index] : null;
+            const pet2 = pet2Index !== null ? pets[pet2Index] : null;
+            const breedingCooldowns = gameState.petBreedingCooldowns || {};
+            
+            // 检查繁殖条件
+            const canBreed = (pet) => {
+                if (!pet) return false;
+                const cooldown = breedingCooldowns[pet.type + pet.name] || 0;
+                return pet.loyalty >= PET_BREEDING_MIN_LOYALTY && cooldown <= 0;
+            };
+            
+            // 渲染父母选择
+            let parentsHtml = `
+                <div class="pet-breeding-section">
+                    <div class="pet-breeding-info">
+                        <h4 style="color:#ffd700;margin-bottom:10px;">💕 灵兽繁殖</h4>
+                        <p style="color:#aaa;font-size:0.85em;">选择两只灵兽进行繁殖，需要双方忠诚度≥${PET_BREEDING_MIN_LOYALTY}，繁殖冷却${PET_BREEDING_COOLDOWN}天</p>
+                    </div>
+                    <div class="pet-breeding-parents">
+                        <div class="pet-breeding-parent ${pet1 ? 'selected' : ''}" onclick="selectBreedingPet(1)">
+                            ${pet1 ? `
+                                <div class="pet-icon">${PET_TYPES[pet1.type].icon}</div>
+                                <div class="pet-name">${pet1.name}</div>
+                                <div style="font-size:0.8em;color:#aaa;">忠诚度: ${pet1.loyalty}</div>
+                                ${(breedingCooldowns[pet1.type + pet1.name] || 0) > 0 ? `<div style="color:#f44336;font-size:0.8em;">冷却中</div>` : '<div style="color:#4caf50;font-size:0.8em;">可繁殖</div>'}
+                            ` : `
+                                <div class="pet-icon">❓</div>
+                                <div class="pet-name">选择灵兽</div>
+                                <div style="font-size:0.8em;color:#888;">点击选择</div>
+                            `}
+                        </div>
+                        <div class="pet-breeding-arrow">❤️</div>
+                        <div class="pet-breeding-parent ${pet2 ? 'selected' : ''}" onclick="selectBreedingPet(2)">
+                            ${pet2 ? `
+                                <div class="pet-icon">${PET_TYPES[pet2.type].icon}</div>
+                                <div class="pet-name">${pet2.name}</div>
+                                <div style="font-size:0.8em;color:#aaa;">忠诚度: ${pet2.loyalty}</div>
+                                ${(breedingCooldowns[pet2.type + pet2.name] || 0) > 0 ? `<div style="color:#f44336;font-size:0.8em;">冷却中</div>` : '<div style="color:#4caf50;font-size:0.8em;">可繁殖</div>'}
+                            ` : `
+                                <div class="pet-icon">❓</div>
+                                <div class="pet-name">选择灵兽</div>
+                                <div style="font-size:0.8em;color:#888;">点击选择</div>
+                            `}
+                        </div>
+                    </div>
+            `;
+            
+            // 宠物选择列表
+            let petSelectHtml = '<div style="margin-top:20px;"><h4 style="color:#ffd700;margin-bottom:10px;">选择繁殖灵兽</h4><div class="pet-list">';
+            pets.forEach((pet, index) => {
+                const cooldown = breedingCooldowns[pet.type + pet.name] || 0;
+                const onCooldown = cooldown > 0;
+                const lowLoyalty = pet.loyalty < PET_BREEDING_MIN_LOYALTY;
+                const isDisabled = onCooldown || lowLoyalty;
+                const isSelected = pet1Index === index || pet2Index === index;
+                petSelectHtml += `
+                    <div class="pet-card ${isSelected ? 'selected' : ''}" onclick="${isDisabled ? '' : `selectBreedingPetFromList(${index})`}" style="${isDisabled ? 'opacity:0.5;' : ''}">
+                        <div class="pet-info">
+                            <div class="pet-avatar">${PET_TYPES[pet.type].icon}</div>
+                            <div>
+                                <div class="pet-name">${pet.name}</div>
+                                <div class="pet-realm">忠诚度: ${pet.loyalty} ${onCooldown ? `| 冷却${cooldown}天` : ''}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:0.85em;color:${isDisabled ? '#f44336' : '#4caf50'};">
+                            ${onCooldown ? '冷却中' : lowLoyalty ? '忠诚度不足' : (isSelected ? '已选择' : '可繁殖')}
+                        </div>
+                    </div>
+                `;
+            });
+            petSelectHtml += '</div></div>';
+            
+            // 繁殖按钮
+            const canStartBreeding = pet1 && pet2 && canBreed(pet1) && canBreed(pet2) && pet1Index !== pet2Index;
+            let breedingBtnHtml = `
+                <div class="pet-breeding-cost">
+                    繁殖消耗: <span class="pet-breeding-cost-value">💎 ${PET_BREEDING_COST} 灵石</span>
+                </div>
+                <button class="pet-incubate-btn" onclick="startBreeding()" ${!canStartBreeding || gameState.spiritStones < PET_BREEDING_COST ? 'disabled' : ''} style="width:100%;padding:15px;font-size:1em;">
+                    开始繁殖
+                </button>
+            `;
+            
+            // 繁殖结果
+            let resultHtml = '';
+            if (gameState.breedingResult) {
+                const result = gameState.breedingResult;
+                resultHtml = `
+                    <div class="pet-breeding-result">
+                        <div class="pet-breeding-result-icon">${PET_EGG_ICONS[result.quality]}</div>
+                        <div class="pet-breeding-result-name">${PET_EGG_TYPES[result.quality].name}</div>
+                        <div class="pet-breeding-result-quality">品质: ${result.quality === 'legendary' ? '神兽' : result.quality === 'precious' ? '珍兽' : result.quality === 'rare' ? '灵兽' : '凡兽'}</div>
+                        <div style="margin-top:10px;color:#aaa;font-size:0.9em;">孵化需要 ${result.hatchDays} 天</div>
+                    </div>
+                `;
+            }
+            
+            return parentsHtml + petSelectHtml + breedingBtnHtml + resultHtml + '</div>';
+        }
+
+        // ===== selectBreedingPet =====
+        function selectBreedingPet(slot) {
+            // 打开宠物选择模式
+            if (slot === 1) {
+                gameState.selectedBreedingPet1 = null;
+            } else {
+                gameState.selectedBreedingPet2 = null;
+            }
+            renderPetBreeding();
+        }
+
+        // ===== selectBreedingPetFromList =====
+        function selectBreedingPetFromList(index) {
+            const pets = gameState.pets;
+            const pet1Index = gameState.selectedBreedingPet1;
+            const pet2Index = gameState.selectedBreedingPet2;
+            
+            if (pet1Index === index) {
+                gameState.selectedBreedingPet1 = null;
+            } else if (pet2Index === index) {
+                gameState.selectedBreedingPet2 = null;
+            } else if (pet1Index === null) {
+                gameState.selectedBreedingPet1 = index;
+            } else if (pet2Index === null) {
+                gameState.selectedBreedingPet2 = index;
+            } else {
+                // 替换pet1
+                gameState.selectedBreedingPet1 = index;
+            }
+            gameState.breedingResult = null;
+            renderPetBreeding();
+        }
+
+        // ===== startBreeding =====
+        function startBreeding() {
+            const pet1Index = gameState.selectedBreedingPet1;
+            const pet2Index = gameState.selectedBreedingPet2;
+            if (pet1Index === null || pet2Index === null) {
+                addLog('bad', '繁殖失败', '请选择两只灵兽！');
+                return;
+            }
+            if (pet1Index === pet2Index) {
+                addLog('bad', '繁殖失败', '不能选择同一只灵兽！');
+                return;
+            }
+            if (gameState.spiritStones < PET_BREEDING_COST) {
+                addLog('bad', '繁殖失败', '灵石不足！');
+                return;
+            }
+            
+            const pet1 = gameState.pets[pet1Index];
+            const pet2 = gameState.pets[pet2Index];
+            const breedingCooldowns = gameState.petBreedingCooldowns || {};
+            
+            // 检查冷却
+            if ((breedingCooldowns[pet1.type + pet1.name] || 0) > 0) {
+                addLog('bad', '繁殖失败', `${pet1.name}还在冷却中！`);
+                return;
+            }
+            if ((breedingCooldowns[pet2.type + pet2.name] || 0) > 0) {
+                addLog('bad', '繁殖失败', `${pet2.name}还在冷却中！`);
+                return;
+            }
+            
+            // 消耗灵石
+            gameState.spiritStones -= PET_BREEDING_COST;
+            
+            // 设置冷却
+            if (!gameState.petBreedingCooldowns) gameState.petBreedingCooldowns = {};
+            gameState.petBreedingCooldowns[pet1.type + pet1.name] = PET_BREEDING_COOLDOWN;
+            gameState.petBreedingCooldowns[pet2.type + pet2.name] = PET_BREEDING_COOLDOWN;
+            
+            // 降低饱食度
+            pet1.hunger = Math.max(0, pet1.hunger - 20);
+            pet2.hunger = Math.max(0, pet2.hunger - 20);
+            
+            // 增加忠诚度
+            pet1.loyalty = Math.min(PET_MAX_LOYALTY, pet1.loyalty + 10);
+            pet2.loyalty = Math.min(PET_MAX_LOYALTY, pet2.loyalty + 10);
+            
+            // 计算后代品质 - 基于父母品质
+            const qualityRand = Math.random();
+            const parentQualityAvg = (PET_QUALITY_MULTIPLIERS[pet1.quality] + PET_QUALITY_MULTIPLIERS[pet2.quality]) / 2;
+            
+            let resultQuality;
+            const roll = Math.random();
+            if (roll < 0.05 * parentQualityAvg) {
+                resultQuality = 'legendary';
+            } else if (roll < 0.15 * parentQualityAvg) {
+                resultQuality = 'precious';
+            } else if (roll < 0.35 * parentQualityAvg) {
+                resultQuality = 'rare';
+            } else {
+                resultQuality = 'common';
+            }
+            
+            // 决定后代类型 - 父母中随机
+            const resultType = Math.random() < 0.5 ? pet1.type : pet2.type;
+            
+            // 计算孵化天数
+            const hatchDays = PET_INCUBATION_DAYS_BASE + Math.floor(Math.random() * PET_INCUBATION_DAYS_VAR) + 1;
+            
+            // 创建蛋
+            const newEgg = {
+                id: Date.now(),
+                quality: resultQuality,
+                type: resultType,
+                daysLeft: hatchDays,
+                totalDays: hatchDays,
+                isHatching: false
+            };
+            
+            if (!gameState.petEggs) gameState.petEggs = [];
+            if (gameState.petEggs.length >= PET_MAX_EGGS) {
+                addLog('bad', '繁殖失败', '孵化巢已满！');
+                return;
+            }
+            gameState.petEggs.push(newEgg);
+            
+            gameState.breedingResult = {
+                quality: resultQuality,
+                type: resultType,
+                hatchDays: hatchDays
+            };
+            
+            const qualityName = resultQuality === 'legendary' ? '神兽' : resultQuality === 'precious' ? '珍兽' : resultQuality === 'rare' ? '灵兽' : '凡兽';
+            addLog('good', '繁殖成功', `恭喜！${pet1.name}与${pet2.name}繁殖获得${qualityName}蛋！`);
+            
+            updateDisplay();
+            renderPetBreeding();
+        }
+
+        // ===== renderPetIncubation =====
+        function renderPetIncubation() {
+            const eggs = gameState.petEggs || [];
+            const maxEggs = PET_MAX_EGGS;
+            
+            if (eggs.length === 0) {
+                return `
+                    <div class="pet-egg-section">
+                        <div class="incubation-nest">
+                            <div class="incubation-nest-header">
+                                <div class="incubation-nest-title">🥚 孵化巢穴</div>
+                                <div class="incubation-nest-count">${eggs.length}/${maxEggs}</div>
+                            </div>
+                            <div style="text-align:center;padding:30px;color:#888;">
+                                <div style="font-size:3em;">🥚</div>
+                                <p style="margin-top:10px;">暂无灵兽蛋</p>
+                                <p style="font-size:0.85em;">前往「繁殖」获得灵兽蛋吧！</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let eggsHtml = eggs.map((egg, index) => {
+                const eggData = PET_EGG_TYPES[egg.quality];
+                const progress = ((egg.totalDays - egg.daysLeft) / egg.totalDays) * 100;
+                const isReady = egg.daysLeft <= 0;
+                
+                return `
+                    <div class="pet-egg-card">
+                        <div class="pet-egg-icon">${PET_EGG_ICONS[egg.quality]}</div>
+                        <div class="pet-egg-info">
+                            <div class="pet-egg-name">${eggData.name}</div>
+                            <div class="pet-egg-progress-bar">
+                                <div class="pet-egg-progress-fill" style="width:${isReady ? 100 : progress}%"></div>
+                            </div>
+                            <div class="pet-egg-status">
+                                ${isReady ? '<span style="color:#4caf50;">✨ 可孵化！</span>' : `孵化进度: ${egg.totalDays - egg.daysLeft}/${egg.totalDays}天`}
+                            </div>
+                        </div>
+                        <div class="pet-egg-actions">
+                            ${isReady ? `
+                                <button class="pet-incubate-btn" onclick="hatchEgg(${index})" ${gameState.pets.length >= 5 ? 'disabled' : ''}>
+                                    孵化
+                                </button>
+                            ` : egg.isHatching ? `
+                                <button class="pet-incubate-btn" onclick="cancelIncubation(${index})" style="background:linear-gradient(135deg,#666,#888);">取消</button>
+                            ` : `
+                                <button class="pet-incubate-btn" onclick="startIncubation(${index})" ${gameState.pets.length >= 5 ? 'disabled' : ''}>催熟</button>
+                            `}
+                            <button class="pet-incubate-btn" onclick="discardEgg(${index})" style="background:linear-gradient(135deg,#c62828,#e53935);">丢弃</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="pet-egg-section">
+                    <div class="incubation-nest">
+                        <div class="incubation-nest-header">
+                            <div class="incubation-nest-title">🥚 孵化巢穴</div>
+                            <div class="incubation-nest-count">${eggs.length}/${maxEggs}</div>
+                        </div>
+                        <div class="pet-egg-list">
+                            ${eggsHtml}
+                        </div>
+                    </div>
+                    <div style="margin-top:15px;padding:15px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                        <h4 style="color:#ffd700;margin-bottom:10px;">孵化说明</h4>
+                        <p style="color:#aaa;font-size:0.85em;line-height:1.6;">
+                            • 灵兽蛋会随时间自动孵化<br>
+                            • 点击「催熟」可加速1天孵化进度<br>
+                            • 催熟消耗50灵石<br>
+                            • 孵化后的灵兽需要手动领取到灵兽栏
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== startIncubation =====
+        function startIncubation(eggIndex) {
+            const egg = gameState.petEggs[eggIndex];
+            if (!egg) return;
+            if (egg.daysLeft <= 0) {
+                addLog('bad', '孵化失败', '这个蛋已经可以孵化了！');
+                return;
+            }
+            if (gameState.spiritStones < 50) {
+                addLog('bad', '孵化失败', '灵石不足！催熟需要50灵石');
+                return;
+            }
+            
+            gameState.spiritStones -= 50;
+            egg.daysLeft = Math.max(0, egg.daysLeft - 1);
+            
+            addLog('good', '催熟成功', `你使用灵石催熟灵兽蛋，距离孵化还有${egg.daysLeft}天`);
+            
+            updateDisplay();
+            renderPetIncubation();
+        }
+
+        // ===== cancelIncubation =====
+        function cancelIncubation(eggIndex) {
+            const egg = gameState.petEggs[eggIndex];
+            if (!egg) return;
+            egg.isHatching = false;
+            addLog('neutral', '取消催熟', '已取消灵兽蛋的催熟');
+            renderPetIncubation();
+        }
+
+        // ===== hatchEgg =====
+        function hatchEgg(eggIndex) {
+            const egg = gameState.petEggs[eggIndex];
+            if (!egg) return;
+            if (egg.daysLeft > 0) {
+                addLog('bad', '孵化失败', '灵兽蛋还未孵化完成！');
+                return;
+            }
+            if (gameState.pets.length >= 5) {
+                addLog('bad', '孵化失败', '灵兽栏已满！');
+                return;
+            }
+            
+            // 创建新灵兽
+            const typeData = PET_TYPES[egg.type];
+            const quality = egg.quality;
+            const petNames = ['小', '青', '灵', '玉', '玄', '白', '紫', '金'];
+            const name = petNames[Math.floor(Math.random() * petNames.length)] + egg.type;
+            
+            const newPet = {
+                type: egg.type,
+                name: name,
+                quality: quality,
+                level: 1,
+                exp: 0,
+                loyalty: 80,
+                hunger: 80
+            };
+            
+            // 移除蛋
+            gameState.petEggs.splice(eggIndex, 1);
+            gameState.pets.push(newPet);
+            gameState.selectedPetIndex = gameState.pets.length - 1;
+            
+            const qualityName = quality === 'legendary' ? '神兽' : quality === 'precious' ? '珍兽' : quality === 'rare' ? '灵兽' : '凡兽';
+            addLog('good', '孵化成功', `恭喜！${typeData.icon}${name}孵化成功！获得了${qualityName}！`);
+            
+            updateDisplay();
+            renderPetIncubation();
+        }
+
+        // ===== discardEgg =====
+        function discardEgg(eggIndex) {
+            const egg = gameState.petEggs[eggIndex];
+            if (!egg) return;
+            
+            const confirmed = confirm('确定要丢弃这个灵兽蛋吗？丢弃后将无法恢复。');
+            if (!confirmed) return;
+            
+            gameState.petEggs.splice(eggIndex, 1);
+            addLog('neutral', '丢弃灵兽蛋', '你丢弃了一个灵兽蛋');
+            renderPetIncubation();
+        }
+
         // ===== getActivePet =====
         function getActivePet() {
             if (gameState.summonedPet !== null && gameState.pets[gameState.summonedPet]) {
@@ -9859,6 +10410,28 @@
                     addLog('good', '玉兔捣药', '玉兔为你捣药，天地灵气+5');
                 }
             });
+            
+            // 处理繁殖冷却
+            if (gameState.petBreedingCooldowns) {
+                Object.keys(gameState.petBreedingCooldowns).forEach(key => {
+                    if (gameState.petBreedingCooldowns[key] > 0) {
+                        gameState.petBreedingCooldowns[key]--;
+                    }
+                });
+            }
+            
+            // 处理灵兽蛋孵化
+            if (gameState.petEggs && gameState.petEggs.length > 0) {
+                gameState.petEggs.forEach(egg => {
+                    if (egg.daysLeft > 0) {
+                        egg.daysLeft--;
+                        if (egg.daysLeft === 0) {
+                            const eggData = PET_EGG_TYPES[egg.quality];
+                            addLog('good', '灵兽蛋孵化', `${eggData.name}已孵化完成，可以前往孵化巢穴领取了！`);
+                        }
+                    }
+                });
+            }
         }
 
 // ===== sect.js =====
@@ -12875,6 +13448,11 @@
                 },
                 pets: [],
                 summonedPet: null,
+                petBreedingCooldowns: {},
+                petEggs: [],
+                selectedBreedingPet1: null,
+                selectedBreedingPet2: null,
+                breedingResult: null,
                 // V15 轮回转世系统
                 reincarnation: reincarnationData ? {
                     count: reincarnationData.count,
@@ -13051,6 +13629,10 @@
                 // 仙宠系统向后兼容
                 if (!gameState.pets) gameState.pets = [];
                 if (!gameState.summonedPet) gameState.summonedPet = null;
+                if (!gameState.petBreedingCooldowns) gameState.petBreedingCooldowns = {};
+                if (!gameState.petEggs) gameState.petEggs = [];
+                if (gameState.selectedBreedingPet1 === undefined) gameState.selectedBreedingPet1 = null;
+                if (gameState.selectedBreedingPet2 === undefined) gameState.selectedBreedingPet2 = null;
                 // 确保activeEffects包含serendipity_boost
                 if (!gameState.activeEffects.serendipity_boost) {
                     gameState.activeEffects.serendipity_boost = 0;
