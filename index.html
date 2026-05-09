@@ -2664,6 +2664,16 @@
             color: white;
             margin-top: 5px;
         }
+        .pet-awakening-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: linear-gradient(135deg, #ec407a, #f48fb1);
+            border-radius: 10px;
+            font-size: 0.75em;
+            color: white;
+            margin-top: 5px;
+            margin-left: 5px;
+        }
         .pet-action-btn {
             padding: 8px 15px;
             border: none;
@@ -2677,6 +2687,7 @@
         .btn-evolve { background: linear-gradient(135deg, #9c27b0, #ba68c8); color: white; }
         .btn-advancement { background: linear-gradient(135deg, #ff6f00, #ffb300); color: white; }
         .btn-transform { background: linear-gradient(135deg, #00acc1, #26c6da); color: white; }
+        .btn-awaken { background: linear-gradient(135deg, #ec407a, #f48fb1); color: white; }
         .pet-action-btn:hover:not(:disabled) { transform: translateY(-2px); }
         .pet-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .pet-empty { text-align: center; padding: 40px; color: #888; }
@@ -3384,6 +3395,41 @@
             { stones: 10000, realmMin: 4 }, // 化形4需要渡劫
             { stones: 30000, realmMin: 5 }  // 化形5需要大乘
         ];
+
+        // --- PET_AWAKENING_CONFIG (技能觉醒配置) ---
+        const PET_AWAKENING_SKILLS = {
+            // 通用觉醒技能 - 所有宠物都可能觉醒
+            common: [
+                { name: '火球术', icon: '🔥', desc: '战斗中使用火系法术攻击', power: 1.2, cost: 30 },
+                { name: '冰霜术', icon: '❄️', desc: '战斗中有概率冻结敌人', power: 1.1, cost: 30 },
+                { name: '疾风术', icon: '💨', desc: '主人速度+15%', power: 1.0, cost: 25 },
+                { name: '护体术', icon: '🛡️', desc: '主人受到伤害-10%', power: 1.0, cost: 25 }
+            ],
+            // 稀有灵兽觉醒技能
+            rare: [
+                { name: '雷击术', icon: '⚡', desc: '战斗中高概率造成雷系暴击', power: 1.5, cost: 50 },
+                { name: '毒雾术', icon: '☠️', desc: '每回合使敌人中毒', power: 1.3, cost: 45 },
+                { name: '治疗术', icon: '💚', desc: '每回合恢复主人5%生命', power: 1.2, cost: 40 },
+                { name: '护盾术', icon: '🔮', desc: '为主人提供伤害护盾', power: 1.3, cost: 45 }
+            ],
+            // 珍兽觉醒技能
+            precious: [
+                { name: '天雷术', icon: '🌩️', desc: '造成大范围雷系伤害', power: 2.0, cost: 80 },
+                { name: '涅槃火', icon: '🦅', desc: '主人死亡时复活并恢复30%生命', power: 2.0, cost: 100 },
+                { name: '通灵术', icon: '👻', desc: '奇遇触发率+25%', power: 1.5, cost: 60 },
+                { name: '龙息术', icon: '🐉', desc: '吐息攻击，造成大量伤害', power: 1.8, cost: 70 }
+            ],
+            // 神兽觉醒技能
+            legendary: [
+                { name: '九天雷劫', icon: '💥', desc: '召唤九天雷劫，造成巨大伤害', power: 3.0, cost: 150 },
+                { name: '时空扭曲', icon: '🌀', desc: '战斗中有概率回避致命伤害', power: 2.5, cost: 120 },
+                { name: '祥瑞之光', icon: '✨', desc: '主人修炼速度+20%', power: 2.0, cost: 100 },
+                { name: '鲲鹏展翅', icon: '🌊', desc: '探索范围+3，逃跑率+30%', power: 2.0, cost: 100 }
+            ]
+        };
+        const PET_AWAKENING_COST = 1000; // 技能觉醒消耗灵石
+        const PET_AWAKENING_EXP_COST = 200; // 技能觉醒需要经验
+        const PET_MAX_AWAKENED_SKILLS = 4; // 最多觉醒技能数
 
         // --- PILLS (15-23) ---
         const PILLS = {
@@ -10143,6 +10189,7 @@
                                     <span class="pet-stat">❤️ ${calculatePetStat(pet, 'hp')}</span>
                                 </div>
                                 ${(pet.advancement || 0) > 0 ? '<div class="pet-advancement-badge">⬆️' + pet.advancement + '阶</div>' : ''}
+                                ${(pet.awakenedSkills && pet.awakenedSkills.length > 0) ? '<div class="pet-awakening-badge">🌟' + pet.awakenedSkills.length + '技</div>' : ''}
                             </div>
                         </div>
                         <div class="pet-actions">
@@ -10235,12 +10282,38 @@
                             </div>
                             <div style="margin-top:5px;font-size:0.85em;color:#888;">属性加成: +${PET_TRANSFORMATION_STAGES[pet.transformation || 0].statBonus * 100}%</div>
                         </div>
+                        ${(pet.awakenedSkills && pet.awakenedSkills.length > 0) ? `
+                        <div class="pet-awakening-info" style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:#ff69b4;">🌟 觉醒技能</span>
+                                <span style="color:#aaa;">${pet.awakenedSkills.length}/${PET_MAX_AWAKENED_SKILLS}</span>
+                            </div>
+                            <div style="margin-top:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+                                ${pet.awakenedSkills.map(skill => `
+                                    <div style="background:rgba(255,105,180,0.15);padding:8px;border-radius:6px;text-align:center;">
+                                        <div style="font-size:1.2em;">${skill.icon}</div>
+                                        <div style="color:#ff69b4;font-size:0.8em;font-weight:bold;">${skill.name}</div>
+                                        <div style="color:#888;font-size:0.7em;">${skill.desc}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : `
+                        <div class="pet-awakening-info" style="margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="color:#ff69b4;">🌟 觉醒技能</span>
+                                <span style="color:#aaa;">0/${PET_MAX_AWAKENED_SKILLS}</span>
+                            </div>
+                            <div style="margin-top:5px;font-size:0.85em;color:#888;">通过技能觉醒解锁强大技能</div>
+                        </div>
+                        `}
                     </div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;">
                         <button class="pet-action-btn btn-feed" onclick="feedPet()" ${gameState.spiritStones < PET_FOOD_COST ? 'disabled' : ''}>🍖 喂养 (${PET_FOOD_COST}灵石)</button>
                         <button class="pet-action-btn btn-evolve" onclick="evolvePet()" ${!canEvolvePet(pet) ? 'disabled' : ''}>⬆️ 进化</button>
                         <button class="pet-action-btn btn-advancement" onclick="advancePet()" ${!canAdvancePet(pet) ? 'disabled' : ''}>📈 进阶</button>
                         <button class="pet-action-btn btn-transform" onclick="transformPet()" ${!canTransformPet(pet) ? 'disabled' : ''}>🧑 化形</button>
+                        <button class="pet-action-btn btn-awaken" onclick="awakenPetSkill()" ${!canAwakenPetSkill(pet) ? 'disabled' : ''}>🌟 觉醒 (${PET_AWAKENING_COST}灵石)</button>
                         <button class="pet-action-btn btn-release" onclick="releasePet()">释放灵兽</button>
                     </div>
                 `;
@@ -10395,7 +10468,8 @@
                 loyalty: 70,
                 hunger: 80,
                 advancement: 0,
-                transformation: 0
+                transformation: 0,
+                awakenedSkills: []
             };
 
             gameState.pets.push(newPet);
@@ -10431,7 +10505,8 @@
                 loyalty: 80,
                 hunger: 80,
                 advancement: 0,
-                transformation: 0
+                transformation: 0,
+                awakenedSkills: []
             };
 
             gameState.pets.push(newPet);
@@ -10584,6 +10659,75 @@
 
             const nextStage = PET_TRANSFORMATION_STAGES[pet.transformation];
             addLog('good', '化形成功', `恭喜！${pet.name}成功化为${nextStage.icon}${nextStage.name}形态！属性大幅提升！`);
+            updateDisplay();
+            renderPetHome('myPets');
+        }
+
+        // ===== canAwakenPetSkill =====
+        function canAwakenPetSkill(pet) {
+            if (!pet) return false;
+            if ((pet.awakenedSkills || []).length >= PET_MAX_AWAKENED_SKILLS) return false;
+            return gameState.spiritStones >= PET_AWAKENING_COST && pet.exp >= PET_AWAKENING_EXP_COST;
+        }
+
+        // ===== awakenPetSkill =====
+        function awakenPetSkill() {
+            if (gameState.selectedPetIndex === undefined) return;
+            const pet = gameState.pets[gameState.selectedPetIndex];
+            if (!pet) return;
+
+            if ((pet.awakenedSkills || []).length >= PET_MAX_AWAKENED_SKILLS) {
+                addLog('bad', '技能觉醒失败', '已达到最大觉醒技能数！');
+                return;
+            }
+
+            if (gameState.spiritStones < PET_AWAKENING_COST) {
+                addLog('bad', '技能觉醒失败', `灵石不足！需要${PET_AWAKENING_COST}灵石`);
+                return;
+            }
+            if (pet.exp < PET_AWAKENING_EXP_COST) {
+                addLog('bad', '技能觉醒失败', `经验不足！需要${PET_AWAKENING_EXP_COST}经验`);
+                return;
+            }
+
+            gameState.spiritStones -= PET_AWAKENING_COST;
+            pet.exp -= PET_AWAKENING_EXP_COST;
+
+            // 获取可觉醒的技能池
+            const quality = pet.quality;
+            const availableSkills = [];
+            // 总是可以觉醒通用技能
+            availableSkills.push(...PET_AWAKENING_SKILLS.common);
+            // 根据品质添加对应级别的技能
+            if (quality !== 'common') {
+                availableSkills.push(...PET_AWAKENING_SKILLS.rare);
+            }
+            if (quality === 'precious' || quality === 'legendary') {
+                availableSkills.push(...PET_AWAKENING_SKILLS.precious);
+            }
+            if (quality === 'legendary') {
+                availableSkills.push(...PET_AWAKENING_SKILLS.legendary);
+            }
+
+            // 过滤掉已经觉醒的技能
+            const currentSkills = pet.awakenedSkills || [];
+            const filteredSkills = availableSkills.filter(s => 
+                !currentSkills.some(cs => cs.name === s.name)
+            );
+
+            if (filteredSkills.length === 0) {
+                // 退还灵石（理论上不应该发生）
+                gameState.spiritStones += PET_AWAKENING_COST;
+                pet.exp += PET_AWAKENING_EXP_COST;
+                addLog('bad', '技能觉醒失败', '没有可觉醒的技能！');
+                return;
+            }
+
+            // 随机选择一个技能觉醒
+            const awakenedSkill = filteredSkills[Math.floor(Math.random() * filteredSkills.length)];
+            pet.awakenedSkills = [...currentSkills, awakenedSkill];
+
+            addLog('good', '技能觉醒成功', `恭喜！${pet.name}觉醒了${awakenedSkill.icon}${awakenedSkill.name}！效果：${awakenedSkill.desc}`);
             updateDisplay();
             renderPetHome('myPets');
         }
