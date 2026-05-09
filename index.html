@@ -3162,6 +3162,108 @@
         }
         .incubation-nest-title { color: #ffd700; font-weight: bold; }
         .incubation-nest-count { color: #aaa; font-size: 0.9em; }
+
+        /* ========== 仙宠融合/基因变异系统样式 ========== */
+        .pet-fusion-section { margin-top: 15px; }
+        .pet-fusion-info {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .pet-fusion-parents {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0;
+        }
+        .pet-fusion-parent {
+            flex: 1;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            border: 2px dashed rgba(255,255,255,0.2);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .pet-fusion-parent:hover { border-color: #9c27b0; }
+        .pet-fusion-parent.selected { border-color: #ffd700; background: rgba(255,215,0,0.1); }
+        .pet-fusion-parent .pet-icon { font-size: 2.5em; }
+        .pet-fusion-parent .pet-name { color: #ffd700; margin-top: 5px; }
+        .pet-fusion-parent.empty { opacity: 0.5; }
+        .pet-fusion-arrow { font-size: 2em; color: #9c27b0; }
+        .pet-fusion-cost {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #aaa;
+        }
+        .pet-fusion-cost-value { color: #9c27b0; font-weight: bold; }
+        .pet-fusion-result {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid rgba(156,39,176,0.3);
+        }
+        .pet-fusion-result-icon { font-size: 4em; }
+        .pet-fusion-result-name { color: #ffd700; font-size: 1.3em; margin-top: 10px; }
+        .pet-fusion-result-quality { margin-top: 5px; }
+        .pet-fusion-result-stats { margin-top: 10px; font-size: 0.85em; color: #aaa; }
+        .pet-mutation-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: linear-gradient(135deg, #9c27b0, #e91e63);
+            border-radius: 10px;
+            font-size: 0.75em;
+            color: white;
+            margin-left: 5px;
+        }
+        .pet-gene-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .pet-gene-item {
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            font-size: 0.8em;
+            text-align: center;
+        }
+        .pet-gene-item.active { background: rgba(156,39,176,0.3); color: #e91e63; }
+        .pet-gene-item.inactive { background: rgba(0,0,0,0.3); color: #666; }
+        .btn-fusion { background: linear-gradient(135deg, #9c27b0, #e91e63); color: white; }
+        .btn-mutate { background: linear-gradient(135deg, #00bcd4, #26c6da); color: white; }
+        .fusion-preview {
+            padding: 15px;
+            background: rgba(156,39,176,0.1);
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid rgba(156,39,176,0.3);
+        }
+        .fusion-preview-title { color: #e91e63; font-weight: bold; margin-bottom: 10px; }
+        .fusion-preview-stats { display: flex; gap: 20px; justify-content: center; margin-top: 10px; }
+        .fusion-preview-stat { text-align: center; }
+        .fusion-preview-stat-value { color: #ffd700; font-size: 1.2em; font-weight: bold; }
+        .fusion-preview-stat-label { color: #aaa; font-size: 0.75em; }
+        .mutation-effect-list {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,188,212,0.1);
+            border-radius: 8px;
+        }
+        .mutation-effect-item {
+            padding: 5px 0;
+            color: #26c6da;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -3789,6 +3891,56 @@
         const PET_AWAKENING_COST = 1000; // 技能觉醒消耗灵石
         const PET_AWAKENING_EXP_COST = 200; // 技能觉醒需要经验
         const PET_MAX_AWAKENED_SKILLS = 4; // 最多觉醒技能数
+
+        // --- PET_FUSION_CONFIG (融合系统配置) ---
+        const PET_FUSION_COST = 500; // 融合消耗灵石
+        const PET_FUSION_MIN_LOYALTY = 60; // 融合最低忠诚度
+        const PET_FUSION_COOLDOWN = 5; // 融合冷却天数
+
+        // --- PET_MUTATION_CONFIG (基因变异配置) ---
+        const PET_MUTATION_COST = 300; // 基因变异消耗灵石
+        const PET_MUTATION_COOLDOWN = 3; // 基因变异冷却天数
+        const PET_MUTATION_BASE_CHANCE = 0.3; // 基础变异概率
+
+        // 基因类型定义
+        const PET_GENE_TYPES = {
+            attack: { name: '攻击基因', icon: '⚔️', color: '#f44336' },
+            defense: { name: '防御基因', icon: '🛡️', color: '#2196f3' },
+            hp: { name: '生命基因', icon: '❤️', color: '#e91e63' },
+            speed: { name: '速度基因', icon: '💨', color: '#4caf50' },
+            crit: { name: '暴击基因', icon: '💥', color: '#ff9800' },
+            lucky: { name: '幸运基因', icon: '🍀', color: '#9c27b0' }
+        };
+
+        // 变异效果类型
+        const PET_MUTATION_EFFECTS = [
+            { id: 'attack_up', name: '攻击力强化', desc: '攻击力+15%', stat: 'attack', value: 0.15, probability: 0.2 },
+            { id: 'defense_up', name: '防御力强化', desc: '防御力+15%', stat: 'defense', value: 0.15, probability: 0.2 },
+            { id: 'hp_up', name: '生命强化', desc: '最大生命+20%', stat: 'hp', value: 0.20, probability: 0.2 },
+            { id: 'speed_up', name: '速度强化', desc: '速度+12%', stat: 'speed', value: 0.12, probability: 0.15 },
+            { id: 'crit_up', name: '暴击强化', desc: '暴击率+10%', stat: 'crit', value: 0.10, probability: 0.1 },
+            { id: 'regen', name: '再生能力', desc: '每天恢复生命+5%', stat: 'hp_regen', value: 0.05, probability: 0.08 },
+            { id: 'resistance', name: '抗性强化', desc: '异常状态抗性+20%', stat: 'resist', value: 0.20, probability: 0.07 },
+            { id: 'ability_boost', name: '天赋强化', desc: '现有技能效果+25%', stat: 'ability', value: 0.25, probability: 0.05 },
+            { id: 'dual_attack', name: '双重打击', desc: '普通攻击有30%概率攻击两次', stat: 'dual_attack', value: 0.30, probability: 0.03 },
+            { id: 'element_fire', name: '火焰基因', desc: '攻击附带10%火焰伤害', stat: 'element_fire', value: 0.10, probability: 0.03 },
+            { id: 'element_ice', name: '寒冰基因', desc: '攻击有10%概率冻结敌人', stat: 'element_ice', value: 0.10, probability: 0.03 },
+            { id: 'element_thunder', name: '雷电基因', desc: '攻击有8%概率造成麻痹', stat: 'element_thunder', value: 0.08, probability: 0.02 }
+        ];
+
+        // 融合后的特殊组合效果
+        const PET_FUSION_COMBINATIONS = {
+            '灵狐+玄蛇': { name: '妖狐蛇君', icon: '🐍', ability: '魅惑毒雾', statBonus: { attack: 1.2, crit: 0.1 } },
+            '玄蛇+灵鹤': { name: '鹤蛇合体', icon: '🦢', ability: '御风毒雾', statBonus: { attack: 1.15, speed: 0.15 } },
+            '灵狐+灵鹤': { name: '狐鹤仙', icon: '🦅', ability: '魅惑御风', statBonus: { attack: 1.1, speed: 0.2 } },
+            '青鸾+白虎': { name: '虎鸾神', icon: '🐯', ability: '虎鸾共鸣', statBonus: { attack: 1.3, defense: 1.2 } },
+            '青龙+朱雀': { name: '龙凤呈祥', icon: '🐉', ability: '龙凤和鸣', statBonus: { attack: 1.4, hp: 1.3 } },
+            '玄武+白虎': { name: '玄武白虎', icon: '🐢', ability: '玄武护盾', statBonus: { defense: 1.5, hp: 1.2 } },
+            '麒麟+白泽': { name: '瑞兽传奇', icon: '🦁', ability: '祥瑞通灵', statBonus: { attack: 1.2, luck: 0.3 } },
+            '鲲鹏+青龙': { name: '鲲龙', icon: '🐋', ability: '鲲龙之怒', statBonus: { attack: 1.5, speed: 1.3 } },
+            '朱雀+白虎': { name: '火虎', icon: '🐯', ability: '烈焰虎啸', statBonus: { attack: 1.4, crit: 0.15 } },
+            '白泽+麒麟': { name: '圣兽', icon: '🦁', ability: '圣兽庇护', statBonus: { all: 1.25 } }
+        };
 
         // --- PILLS (15-23) ---
         const PILLS = {
@@ -4636,6 +4788,13 @@
             selectedBreedingPet1: null,
             selectedBreedingPet2: null,
             breedingResult: null,
+            // 仙宠融合/基因变异系统字段
+            selectedFusionPet1: null,
+            selectedFusionPet2: null,
+            fusionResult: null,
+            fusionCooldowns: {}, // { petId: daysUntilFusable }
+            mutationCooldowns: {}, // { petId: daysUntilMutable }
+            petGeneBank: {}, // { petId: { attack: 0-3, defense: 0-3, ... } } - 基因库，记录每个宠物携带的基因强度
             // V15 轮回转世系统字段
             reincarnation: {
                 count: 0,              // 转世次数
@@ -10783,6 +10942,7 @@
                     <div class="pet-tab ${tab === 'myPets' ? 'active' : ''}" onclick="renderPetHome('myPets')">🐉 我的灵兽 (${petCount}/${maxPets})</div>
                     <div class="pet-tab ${tab === 'breeding' ? 'active' : ''}" onclick="renderPetHome('breeding')">💕 繁殖</div>
                     <div class="pet-tab ${tab === 'incubation' ? 'active' : ''}" onclick="renderPetHome('incubation')">🥚 孵化 (${eggCount})</div>
+                    <div class="pet-tab ${tab === 'fusion' ? 'active' : ''}" onclick="renderPetHome('fusion')">🔮 融合变异</div>
                     <div class="pet-tab ${tab === 'summon' ? 'active' : ''}" onclick="renderPetHome('summon')">✨ 召唤灵兽</div>
                     <div class="pet-tab ${tab === 'market' ? 'active' : ''}" onclick="renderPetHome('market')">🏪 灵兽商店</div>
                 </div>
@@ -10798,6 +10958,9 @@
                     break;
                 case 'incubation':
                     bodyHtml = renderPetIncubation();
+                    break;
+                case 'fusion':
+                    bodyHtml = renderPetFusion();
                     break;
                 case 'summon':
                     bodyHtml = renderSummonPet();
@@ -10857,6 +11020,7 @@
                                 </div>
                                 ${(pet.advancement || 0) > 0 ? '<div class="pet-advancement-badge">⬆️' + pet.advancement + '阶</div>' : ''}
                                 ${(pet.awakenedSkills && pet.awakenedSkills.length > 0) ? '<div class="pet-awakening-badge">🌟' + pet.awakenedSkills.length + '技</div>' : ''}
+                                ${(pet.mutations && pet.mutations.length > 0) ? '<div class="pet-mutation-badge">🧬' + pet.mutations.length + '</div>' : ''}
                             </div>
                         </div>
                         <div class="pet-actions">
@@ -11797,7 +11961,9 @@
                 loyalty: 80,
                 hunger: 80,
                 advancement: 0,
-                transformation: 0
+                transformation: 0,
+                genes: {},
+                mutations: []
             };
             
             // 移除蛋
@@ -11816,13 +11982,565 @@
         function discardEgg(eggIndex) {
             const egg = gameState.petEggs[eggIndex];
             if (!egg) return;
-            
+
             const confirmed = confirm('确定要丢弃这个灵兽蛋吗？丢弃后将无法恢复。');
             if (!confirmed) return;
-            
+
             gameState.petEggs.splice(eggIndex, 1);
             addLog('neutral', '丢弃灵兽蛋', '你丢弃了一个灵兽蛋');
             renderPetIncubation();
+        }
+
+        // ===== renderPetFusion =====
+        function renderPetFusion() {
+            const pets = gameState.pets;
+            const pet1Index = gameState.selectedFusionPet1;
+            const pet2Index = gameState.selectedFusionPet2;
+            const pet1 = pet1Index !== null ? pets[pet1Index] : null;
+            const pet2 = pet2Index !== null ? pets[pet2Index] : null;
+            const fusionCooldowns = gameState.fusionCooldowns || {};
+            const mutationCooldowns = gameState.mutationCooldowns || {};
+
+            // 检查融合条件
+            const canFuse = (pet) => {
+                if (!pet) return false;
+                const cooldown = fusionCooldowns[pet.type + pet.name + pet.id] || 0;
+                return pet.loyalty >= PET_FUSION_MIN_LOYALTY && cooldown <= 0;
+            };
+
+            // 检查变异条件
+            const canMutate = (pet) => {
+                if (!pet) return false;
+                const cooldown = mutationCooldowns[pet.type + pet.name + pet.id] || 0;
+                return cooldown <= 0;
+            };
+
+            // 渲染融合父母选择
+            let fusionHtml = `
+                <div class="pet-fusion-section">
+                    <div class="pet-fusion-info">
+                        <h4 style="color:#e91e63;margin-bottom:10px;">🔮 灵兽融合</h4>
+                        <p style="color:#aaa;font-size:0.85em;">
+                            选择两只灵兽进行融合，融合后生成全新的灵兽个体，保留部分父母基因。<br>
+                            融合需要双方忠诚度≥${PET_FUSION_MIN_LOYALTY}，融合冷却${PET_FUSION_COOLDOWN}天。
+                        </p>
+                    </div>
+                    <div class="pet-fusion-parents">
+                        <div class="pet-fusion-parent ${pet1 ? 'selected' : ''}" onclick="selectFusionPet(1)">
+                            ${pet1 ? `
+                                <div class="pet-icon">${PET_TYPES[pet1.type].icon}</div>
+                                <div class="pet-name">${pet1.name}</div>
+                                <div style="font-size:0.8em;color:#aaa;">忠诚度: ${pet1.loyalty}</div>
+                                ${(fusionCooldowns[pet1.type + pet1.name + pet1.id] || 0) > 0 ? `<div style="color:#f44336;font-size:0.8em;">冷却中</div>` : '<div style="color:#4caf50;font-size:0.8em;">可融合</div>'}
+                            ` : `
+                                <div class="pet-icon">❓</div>
+                                <div class="pet-name">选择灵兽</div>
+                                <div style="font-size:0.8em;color:#888;">点击选择</div>
+                            `}
+                        </div>
+                        <div class="pet-fusion-arrow">⚗️</div>
+                        <div class="pet-fusion-parent ${pet2 ? 'selected' : ''}" onclick="selectFusionPet(2)">
+                            ${pet2 ? `
+                                <div class="pet-icon">${PET_TYPES[pet2.type].icon}</div>
+                                <div class="pet-name">${pet2.name}</div>
+                                <div style="font-size:0.8em;color:#aaa;">忠诚度: ${pet2.loyalty}</div>
+                                ${(fusionCooldowns[pet2.type + pet2.name + pet2.id] || 0) > 0 ? `<div style="color:#f44336;font-size:0.8em;">冷却中</div>` : '<div style="color:#4caf50;font-size:0.8em;">可融合</div>'}
+                            ` : `
+                                <div class="pet-icon">❓</div>
+                                <div class="pet-name">选择灵兽</div>
+                                <div style="font-size:0.8em;color:#888;">点击选择</div>
+                            `}
+                        </div>
+                    </div>
+            `;
+
+            // 宠物选择列表
+            let petSelectHtml = '<div style="margin-top:20px;"><h4 style="color:#ffd700;margin-bottom:10px;">选择融合灵兽</h4><div class="pet-list">';
+            pets.forEach((pet, index) => {
+                const cooldown = fusionCooldowns[pet.type + pet.name + pet.id] || 0;
+                const onCooldown = cooldown > 0;
+                const lowLoyalty = pet.loyalty < PET_FUSION_MIN_LOYALTY;
+                const isDisabled = onCooldown || lowLoyalty;
+                const isSelected = pet1Index === index || pet2Index === index;
+                petSelectHtml += `
+                    <div class="pet-card ${isSelected ? 'selected' : ''}" onclick="${isDisabled ? '' : `selectFusionPetFromList(${index})`}" style="${isDisabled ? 'opacity:0.5;' : ''}">
+                        <div class="pet-info">
+                            <div class="pet-avatar">${PET_TYPES[pet.type].icon}</div>
+                            <div>
+                                <div class="pet-name">${pet.name} <span class="pet-quality quality-${pet.quality}">Lv.${pet.level}</span></div>
+                                <div class="pet-realm">忠诚度: ${pet.loyalty} ${onCooldown ? `| 冷却${cooldown}天` : ''}</div>
+                                <div class="pet-stats">
+                                    <span class="pet-stat">⚔️ ${calculatePetStat(pet, 'attack')}</span>
+                                    <span class="pet-stat">🛡️ ${calculatePetStat(pet, 'defense')}</span>
+                                    <span class="pet-stat">❤️ ${calculatePetStat(pet, 'hp')}</span>
+                                </div>
+                                ${(pet.mutations && pet.mutations.length > 0) ? `<div class="pet-mutation-badge">🧬${pet.mutations.length}</div>` : ''}
+                            </div>
+                        </div>
+                        <div style="font-size:0.85em;color:${isDisabled ? '#f44336' : '#4caf50'};">
+                            ${onCooldown ? '冷却中' : lowLoyalty ? '忠诚度不足' : (isSelected ? '已选择' : '可融合')}
+                        </div>
+                    </div>
+                `;
+            });
+            petSelectHtml += '</div></div>';
+
+            // 融合预览
+            let previewHtml = '';
+            if (pet1 && pet2 && pet1Index !== pet2Index) {
+                const previewStats = calculateFusionPreview(pet1, pet2);
+                previewHtml = `
+                    <div class="fusion-preview">
+                        <div class="fusion-preview-title">⚗️ 融合预览</div>
+                        <div style="color:#aaa;font-size:0.85em;">融合后预计属性：</div>
+                        <div class="fusion-preview-stats">
+                            <div class="fusion-preview-stat">
+                                <div class="fusion-preview-stat-value">⚔️ ${previewStats.attack}</div>
+                                <div class="fusion-preview-stat-label">攻击</div>
+                            </div>
+                            <div class="fusion-preview-stat">
+                                <div class="fusion-preview-stat-value">🛡️ ${previewStats.defense}</div>
+                                <div class="fusion-preview-stat-label">防御</div>
+                            </div>
+                            <div class="fusion-preview-stat">
+                                <div class="fusion-preview-stat-value">❤️ ${previewStats.hp}</div>
+                                <div class="fusion-preview-stat-label">生命</div>
+                            </div>
+                        </div>
+                        ${previewStats.specialCombo ? `<div style="color:#e91e63;font-size:0.85em;margin-top:10px;">🌟 特殊组合: ${previewStats.specialCombo}</div>` : ''}
+                    </div>
+                `;
+            }
+
+            // 融合按钮
+            const canStartFusion = pet1 && pet2 && canFuse(pet1) && canFuse(pet2) && pet1Index !== pet2Index;
+            let fusionBtnHtml = `
+                <div class="pet-fusion-cost">
+                    融合消耗: <span class="pet-fusion-cost-value">💎 ${PET_FUSION_COST} 灵石</span>
+                </div>
+                <button class="pet-action-btn btn-fusion" onclick="startFusion()" ${!canStartFusion || gameState.spiritStones < PET_FUSION_COST ? 'disabled' : ''} style="width:100%;padding:15px;font-size:1em;">
+                    开始融合 ⚗️
+                </button>
+            `;
+
+            // 融合结果
+            let resultHtml = '';
+            if (gameState.fusionResult) {
+                const result = gameState.fusionResult;
+                resultHtml = `
+                    <div class="pet-fusion-result">
+                        <div class="pet-fusion-result-icon">${result.icon}</div>
+                        <div class="pet-fusion-result-name">${result.name}</div>
+                        <div class="pet-fusion-result-quality">
+                            <span class="pet-quality quality-${result.quality}">${result.quality === 'legendary' ? '神兽' : result.quality === 'precious' ? '珍兽' : result.quality === 'rare' ? '灵兽' : '凡兽'}</span>
+                            ${result.isSpecialCombo ? '<span class="pet-mutation-badge">特殊融合</span>' : ''}
+                        </div>
+                        <div class="pet-fusion-result-stats">
+                            攻击: ${result.attack} | 防御: ${result.defense} | 生命: ${result.hp}
+                        </div>
+                        ${result.combinationAbility ? `<div style="color:#e91e63;font-size:0.85em;margin-top:5px;">🌟 组合技能: ${result.combinationAbility}</div>` : ''}
+                        <div style="margin-top:10px;font-size:0.85em;color:#aaa;">融合消耗了两只灵兽，获得了全新的个体！</div>
+                    </div>
+                `;
+            }
+
+            // 基因变异区域
+            let mutationHtml = `
+                <div style="margin-top:30px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);">
+                    <div class="pet-fusion-info">
+                        <h4 style="color:#00bcd4;margin-bottom:10px;">🧬 基因变异</h4>
+                        <p style="color:#aaa;font-size:0.85em;">
+                            对单个灵兽进行基因变异，有概率获得新的变异效果。<br>
+                            基因变异冷却${PET_MUTATION_COOLDOWN}天，变异成功率为${Math.round(PET_MUTATION_BASE_CHANCE * 100)}%+（受灵兽品质影响）。
+                        </p>
+                    </div>
+            `;
+
+            // 变异选择列表
+            let mutationSelectHtml = '<div class="pet-list">';
+            pets.forEach((pet, index) => {
+                const cooldown = mutationCooldowns[pet.type + pet.name + pet.id] || 0;
+                const onCooldown = cooldown > 0;
+                const isDisabled = onCooldown;
+                const currentMutations = pet.mutations || [];
+
+                mutationSelectHtml += `
+                    <div class="pet-card ${isDisabled ? '' : ''}" style="${isDisabled ? 'opacity:0.5;' : ''}">
+                        <div class="pet-info">
+                            <div class="pet-avatar">${PET_TYPES[pet.type].icon}</div>
+                            <div>
+                                <div class="pet-name">${pet.name} <span class="pet-quality quality-${pet.quality}">Lv.${pet.level}</span></div>
+                                <div class="pet-realm">${onCooldown ? `冷却中 (${cooldown}天)` : '可变异'}</div>
+                                <div class="pet-gene-list">
+                                    ${Object.keys(PET_GENE_TYPES).map(geneType => {
+                                        const gene = PET_GENE_TYPES[geneType];
+                                        const geneLevel = getPetGeneLevel(pet, geneType);
+                                        return `<div class="pet-gene-item ${geneLevel > 0 ? 'active' : 'inactive'}">${gene.icon} ${gene.name} ${geneLevel > 0 ? 'Lv.' + geneLevel : ''}</div>`;
+                                    }).join('')}
+                                </div>
+                                ${currentMutations.length > 0 ? `
+                                    <div style="margin-top:8px;">
+                                        ${currentMutations.map(m => `<span class="pet-mutation-badge">${m.name}</span>`).join(' ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <button class="pet-action-btn btn-mutate" onclick="startMutation(${index})" ${isDisabled || gameState.spiritStones < PET_MUTATION_COST ? 'disabled' : ''} style="padding:8px 15px;">
+                            变异 ${PET_MUTATION_COST}💎
+                        </button>
+                    </div>
+                `;
+            });
+            mutationSelectHtml += '</div>';
+
+            mutationHtml += mutationSelectHtml + '</div>';
+
+            return fusionHtml + petSelectHtml + previewHtml + fusionBtnHtml + resultHtml + '</div>' + mutationHtml;
+        }
+
+        // ===== calculateFusionPreview =====
+        function calculateFusionPreview(pet1, pet2) {
+            const type1 = pet1.type;
+            const type2 = pet2.type;
+
+            // 计算基础属性（取平均）
+            const attack1 = calculatePetStat(pet1, 'attack');
+            const attack2 = calculatePetStat(pet2, 'attack');
+            const defense1 = calculatePetStat(pet1, 'defense');
+            const defense2 = calculatePetStat(pet2, 'defense');
+            const hp1 = calculatePetStat(pet1, 'hp');
+            const hp2 = calculatePetStat(pet2, 'hp');
+
+            // 融合属性计算（加权平均 + 随机波动）
+            const qualityBonus1 = PET_QUALITY_MULTIPLIERS[pet1.quality];
+            const qualityBonus2 = PET_QUALITY_MULTIPLIERS[pet2.quality];
+            const avgQuality = (qualityBonus1 + qualityBonus2) / 2;
+
+            const attack = Math.floor((attack1 + attack2) / 2 * (1 + Math.random() * 0.2) * avgQuality / 1.5);
+            const defense = Math.floor((defense1 + defense2) / 2 * (1 + Math.random() * 0.2) * avgQuality / 1.5);
+            const hp = Math.floor((hp1 + hp2) / 2 * (1 + Math.random() * 0.2) * avgQuality / 1.5);
+
+            // 检查特殊组合
+            let specialCombo = null;
+            const combo1 = `${type1}+${type2}`;
+            const combo2 = `${type2}+${type1}`;
+            if (PET_FUSION_COMBINATIONS[combo1]) {
+                specialCombo = PET_FUSION_COMBINATIONS[combo1].name;
+            } else if (PET_FUSION_COMBINATIONS[combo2]) {
+                specialCombo = PET_FUSION_COMBINATIONS[combo2].name;
+            }
+
+            return { attack, defense, hp, specialCombo };
+        }
+
+        // ===== getPetGeneLevel =====
+        function getPetGeneLevel(pet, geneType) {
+            if (!pet.genes) return 0;
+            return pet.genes[geneType] || 0;
+        }
+
+        // ===== selectFusionPet =====
+        function selectFusionPet(slot) {
+            if (slot === 1) {
+                gameState.selectedFusionPet1 = null;
+            } else {
+                gameState.selectedFusionPet2 = null;
+            }
+            gameState.fusionResult = null;
+            renderPetFusion();
+        }
+
+        // ===== selectFusionPetFromList =====
+        function selectFusionPetFromList(index) {
+            const pets = gameState.pets;
+            const pet1Index = gameState.selectedFusionPet1;
+            const pet2Index = gameState.selectedFusionPet2;
+
+            if (pet1Index === index) {
+                gameState.selectedFusionPet1 = null;
+            } else if (pet2Index === index) {
+                gameState.selectedFusionPet2 = null;
+            } else if (pet1Index === null) {
+                gameState.selectedFusionPet1 = index;
+            } else if (pet2Index === null) {
+                gameState.selectedFusionPet2 = index;
+            } else {
+                // 替换pet1
+                gameState.selectedFusionPet1 = index;
+            }
+            gameState.fusionResult = null;
+            renderPetFusion();
+        }
+
+        // ===== startFusion =====
+        function startFusion() {
+            const pet1Index = gameState.selectedFusionPet1;
+            const pet2Index = gameState.selectedFusionPet2;
+            if (pet1Index === null || pet2Index === null) {
+                addLog('bad', '融合失败', '请选择两只灵兽！');
+                return;
+            }
+            if (pet1Index === pet2Index) {
+                addLog('bad', '融合失败', '不能选择同一只灵兽！');
+                return;
+            }
+            if (gameState.spiritStones < PET_FUSION_COST) {
+                addLog('bad', '融合失败', '灵石不足！');
+                return;
+            }
+
+            const pet1 = gameState.pets[pet1Index];
+            const pet2 = gameState.pets[pet2Index];
+            const fusionCooldowns = gameState.fusionCooldowns || {};
+
+            // 检查冷却
+            if ((fusionCooldowns[pet1.type + pet1.name + pet1.id] || 0) > 0) {
+                addLog('bad', '融合失败', `${pet1.name}还在融合冷却中！`);
+                return;
+            }
+            if ((fusionCooldowns[pet2.type + pet2.name + pet2.id] || 0) > 0) {
+                addLog('bad', '融合失败', `${pet2.name}还在融合冷却中！`);
+                return;
+            }
+
+            // 消耗灵石
+            gameState.spiritStones -= PET_FUSION_COST;
+
+            // 设置冷却
+            if (!gameState.fusionCooldowns) gameState.fusionCooldowns = {};
+            gameState.fusionCooldowns[pet1.type + pet1.name + pet1.id] = PET_FUSION_COOLDOWN;
+            gameState.fusionCooldowns[pet2.type + pet2.name + pet2.id] = PET_FUSION_COOLDOWN;
+
+            // 降低饱食度
+            pet1.hunger = Math.max(0, pet1.hunger - 30);
+            pet2.hunger = Math.max(0, pet2.hunger - 30);
+
+            // 计算融合后代
+            const preview = calculateFusionPreview(pet1, pet2);
+            const type1 = pet1.type;
+            const type2 = pet2.type;
+            const combo1 = `${type1}+${type2}`;
+            const combo2 = `${type2}+${type1}`;
+
+            // 检查是否是特殊组合
+            let isSpecialCombo = false;
+            let fusionResultName = '';
+            let fusionResultIcon = '';
+            let fusionResultAbility = '';
+
+            if (PET_FUSION_COMBINATIONS[combo1]) {
+                isSpecialCombo = true;
+                fusionResultName = PET_FUSION_COMBINATIONS[combo1].name;
+                fusionResultIcon = PET_FUSION_COMBINATIONS[combo1].icon;
+                fusionResultAbility = PET_FUSION_COMBINATIONS[combo1].ability;
+            } else if (PET_FUSION_COMBINATIONS[combo2]) {
+                isSpecialCombo = true;
+                fusionResultName = PET_FUSION_COMBINATIONS[combo2].name;
+                fusionResultIcon = PET_FUSION_COMBINATIONS[combo2].icon;
+                fusionResultAbility = PET_FUSION_COMBINATIONS[combo2].ability;
+            }
+
+            // 确定新灵兽类型
+            let resultType;
+            if (isSpecialCombo) {
+                // 特殊组合保留组合名作为类型标识
+                resultType = fusionResultName;
+            } else {
+                // 普通融合随机选择父本类型
+                resultType = Math.random() < 0.5 ? type1 : type2;
+            }
+
+            // 计算品质 - 基于父母品质
+            const qualityRand = Math.random();
+            const parentQualityAvg = (PET_QUALITY_MULTIPLIERS[pet1.quality] + PET_QUALITY_MULTIPLIERS[pet2.quality]) / 2;
+            let resultQuality;
+            const roll = Math.random();
+            if (roll < 0.03 * parentQualityAvg) {
+                resultQuality = 'legendary';
+            } else if (roll < 0.10 * parentQualityAvg) {
+                resultQuality = 'precious';
+            } else if (roll < 0.25 * parentQualityAvg) {
+                resultQuality = 'rare';
+            } else {
+                resultQuality = 'common';
+            }
+
+            // 合并基因
+            const mergedGenes = {};
+            const geneTypes = Object.keys(PET_GENE_TYPES);
+            geneTypes.forEach(geneType => {
+                const gene1 = getPetGeneLevel(pet1, geneType);
+                const gene2 = getPetGeneLevel(pet2, geneType);
+                // 融合基因：取最大值 + 随机增量
+                mergedGenes[geneType] = Math.max(gene1, gene2) + (Math.random() < 0.3 ? 1 : 0);
+                mergedGenes[geneType] = Math.min(mergedGenes[geneType], 3); // 最大3级
+            });
+
+            // 合并变异效果
+            const mergedMutations = [...(pet1.mutations || []), ...(pet2.mutations || [])];
+            // 去重
+            const uniqueMutations = [];
+            const seen = new Set();
+            mergedMutations.forEach(m => {
+                if (!seen.has(m.id)) {
+                    seen.add(m.id);
+                    uniqueMutations.push(m);
+                }
+            });
+
+            // 继承父本等级的一半
+            const inheritedLevel = Math.floor((pet1.level + pet2.level) / 4);
+
+            // 创建新的融合灵兽
+            const newPet = {
+                id: Date.now(),
+                name: isSpecialCombo ? fusionResultName : `${type1}${type2}融合兽`,
+                type: resultType,
+                quality: resultQuality,
+                level: Math.max(1, inheritedLevel),
+                exp: 0,
+                loyalty: Math.floor((pet1.loyalty + pet2.loyalty) / 2),
+                hunger: 100,
+                genes: mergedGenes,
+                mutations: uniqueMutations.slice(0, 3), // 最多保留3个变异
+                inheritedSkills: true
+            };
+
+            // 移除父母灵兽
+            const indicesToRemove = [pet1Index, pet2Index].sort((a, b) => b - a);
+            indicesToRemove.forEach(idx => {
+                gameState.pets.splice(idx, 1);
+            });
+
+            // 添加新灵兽
+            if (gameState.pets.length >= 5) {
+                addLog('bad', '融合失败', '灵兽栏已满，无法获得融合后的灵兽！');
+                return;
+            }
+            gameState.pets.push(newPet);
+
+            // 清除选择状态
+            gameState.selectedFusionPet1 = null;
+            gameState.selectedFusionPet2 = null;
+
+            gameState.fusionResult = {
+                name: newPet.name,
+                type: newPet.type,
+                icon: isSpecialCombo ? fusionResultIcon : PET_TYPES[type1]?.icon || '🐉',
+                quality: newPet.quality,
+                attack: preview.attack,
+                defense: preview.defense,
+                hp: preview.hp,
+                isSpecialCombo: isSpecialCombo,
+                combinationAbility: fusionResultAbility
+            };
+
+            const qualityName = resultQuality === 'legendary' ? '神兽' : resultQuality === 'precious' ? '珍兽' : resultQuality === 'rare' ? '灵兽' : '凡兽';
+            addLog('good', '融合成功', `恭喜！${pet1.name}与${pet2.name}融合生成${fusionResultName}（${qualityName}）！`);
+
+            updateDisplay();
+            renderPetFusion();
+        }
+
+        // ===== startMutation =====
+        function startMutation(petIndex) {
+            const pet = gameState.pets[petIndex];
+            if (!pet) return;
+
+            const mutationCooldowns = gameState.mutationCooldowns || {};
+            if ((mutationCooldowns[pet.type + pet.name + pet.id] || 0) > 0) {
+                addLog('bad', '变异失败', `${pet.name}还在变异冷却中！`);
+                return;
+            }
+
+            if (gameState.spiritStones < PET_MUTATION_COST) {
+                addLog('bad', '变异失败', '灵石不足！');
+                return;
+            }
+
+            gameState.spiritStones -= PET_MUTATION_COST;
+
+            // 设置冷却
+            if (!gameState.mutationCooldowns) gameState.mutationCooldowns = {};
+            gameState.mutationCooldowns[pet.type + pet.name + pet.id] = PET_MUTATION_COOLDOWN;
+
+            // 计算变异概率（受品质影响）
+            const qualityBonus = PET_QUALITY_MULTIPLIERS[pet.quality];
+            const mutationChance = PET_MUTATION_BASE_CHANCE * qualityBonus;
+            const roll = Math.random();
+
+            // 初始化变异和基因数组
+            if (!pet.mutations) pet.mutations = [];
+            if (!pet.genes) pet.genes = {};
+
+            if (roll < mutationChance) {
+                // 变异成功
+                // 选择一个变异效果
+                const possibleEffects = PET_MUTATION_EFFECTS.filter(e => !pet.mutations.find(m => m.id === e.id));
+                if (possibleEffects.length > 0) {
+                    // 按概率加权选择
+                    const totalWeight = possibleEffects.reduce((sum, e) => sum + e.probability, 0);
+                    let random = Math.random() * totalWeight;
+                    let selectedEffect = possibleEffects[0];
+                    for (const effect of possibleEffects) {
+                        random -= effect.probability;
+                        if (random <= 0) {
+                            selectedEffect = effect;
+                            break;
+                        }
+                    }
+
+                    pet.mutations.push({
+                        id: selectedEffect.id,
+                        name: selectedEffect.name,
+                        desc: selectedEffect.desc,
+                        stat: selectedEffect.stat,
+                        value: selectedEffect.value
+                    });
+
+                    // 强化对应基因
+                    const geneType = getGeneTypeFromStat(selectedEffect.stat);
+                    if (geneType && pet.genes[geneType] !== undefined) {
+                        pet.genes[geneType] = Math.min(3, (pet.genes[geneType] || 0) + 1);
+                    } else if (geneType) {
+                        pet.genes[geneType] = 1;
+                    }
+
+                    addLog('good', '基因变异成功', `${pet.name}发生基因变异，获得了「${selectedEffect.name}」！`);
+                } else {
+                    // 所有变异效果都已拥有，随机强化一个基因
+                    const geneTypes = Object.keys(PET_GENE_TYPES);
+                    const randomGene = geneTypes[Math.floor(Math.random() * geneTypes.length)];
+                    pet.genes[randomGene] = Math.min(3, (pet.genes[randomGene] || 0) + 1);
+                    addLog('good', '基因强化', `${pet.name}的「${PET_GENE_TYPES[randomGene].name}」得到强化！`);
+                }
+            } else {
+                // 变异失败，但有概率强化基因
+                if (Math.random() < 0.3) {
+                    const geneTypes = Object.keys(PET_GENE_TYPES);
+                    const randomGene = geneTypes[Math.floor(Math.random() * geneTypes.length)];
+                    pet.genes[randomGene] = Math.min(3, (pet.genes[randomGene] || 0) + 1);
+                    addLog('neutral', '变异尝试', `${pet.name}变异失败，但基因「${PET_GENE_TYPES[randomGene].name}」略有强化。`);
+                } else {
+                    addLog('neutral', '变异尝试', `${pet.name}基因变异未成功，但身体健康无恙。`);
+                }
+            }
+
+            updateDisplay();
+            renderPetFusion();
+        }
+
+        // ===== getGeneTypeFromStat =====
+        function getGeneTypeFromStat(stat) {
+            switch(stat) {
+                case 'attack': return 'attack';
+                case 'defense': return 'defense';
+                case 'hp': return 'hp';
+                case 'speed': return 'speed';
+                case 'crit': return 'crit';
+                case 'luck': return 'lucky';
+                default: return null;
+            }
         }
 
         // ===== getActivePet =====
@@ -11891,7 +12609,37 @@
                     }
                 });
             }
+
+            // 处理融合冷却
+            if (gameState.fusionCooldowns) {
+                Object.keys(gameState.fusionCooldowns).forEach(key => {
+                    if (gameState.fusionCooldowns[key] > 0) {
+                        gameState.fusionCooldowns[key]--;
+                    }
+                });
+            }
+
+            // 处理变异冷却
+            if (gameState.mutationCooldowns) {
+                Object.keys(gameState.mutationCooldowns).forEach(key => {
+                    if (gameState.mutationCooldowns[key] > 0) {
+                        gameState.mutationCooldowns[key]--;
+                    }
+                });
+            }
             
+            // 处理宠物基因变异效果（每天恢复一定生命）
+            gameState.pets.forEach(pet => {
+                if (pet.mutations) {
+                    const regenMutation = pet.mutations.find(m => m.id === 'regen');
+                    if (regenMutation) {
+                        // 再生能力：每天恢复5%生命
+                        const maxHp = calculatePetStat(pet, 'hp');
+                        const healAmount = Math.floor(maxHp * regenMutation.value);
+                    }
+                }
+            });
+
             // 处理灵兽蛋孵化
             if (gameState.petEggs && gameState.petEggs.length > 0) {
                 gameState.petEggs.forEach(egg => {
@@ -11904,6 +12652,7 @@
                     }
                 });
             }
+        }
         }
 
 // ===== sect.js =====
