@@ -1753,6 +1753,206 @@
             border-radius: 8px;
             margin: 15px 0;
         }
+        /* 道祖遗迹系统样式 */
+        .dao-ancestor-container {
+            padding: 15px;
+        }
+        .dao-ancestor-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .dao-ancestor-title {
+            color: #ffd700;
+            font-size: 1.5em;
+            text-shadow: 0 0 10px rgba(255,215,0,0.5);
+        }
+        .dao-ancestor-subtitle {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .dao-ancestor-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .dao-ancestor-stat {
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        .dao-ancestor-stat-label {
+            color: #888;
+            font-size: 0.75em;
+        }
+        .dao-ancestor-stat-value {
+            color: #ffd700;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .dao-ancestor-layers {
+            margin: 15px 0;
+        }
+        .dao-ancestor-layer {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dao-ancestor-layer:hover {
+            background: rgba(255,215,0,0.1);
+            border-color: #ffd700;
+        }
+        .dao-ancestor-layer.explored {
+            opacity: 0.7;
+        }
+        .dao-ancestor-layer.locked {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .dao-ancestor-layer-name {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .dao-ancestor-layer-desc {
+            color: #b0b0b0;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+        .dao-ancestor-layer-reward {
+            color: #4caf50;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        .dao-ancestor-explore-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #4a148c, #7b1fa2);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            color: #ffd700;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dao-ancestor-explore-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #6a148c, #9b2fb2);
+            transform: translateY(-2px);
+        }
+        .dao-ancestor-explore-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* 天道印记样式 */
+        .heavenly-seal {
+            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05));
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .heavenly-seal-icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .heavenly-seal-name {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .heavenly-seal-desc {
+            color: #b0b0b0;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+        .heavenly-seal-count {
+            color: #4caf50;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+        /* 天道法则领悟样式 */
+        .law-comprehension {
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .law-comprehension-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .law-comprehension-title {
+            color: #ffd700;
+            font-size: 1.1em;
+        }
+        .law-comprehension-progress {
+            color: #4caf50;
+        }
+        .law-comprehension-bar {
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .law-comprehension-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s;
+        }
+        .law-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .law-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 5px;
+            padding: 8px;
+            text-align: center;
+            font-size: 0.85em;
+            color: #b0b0b0;
+        }
+        .law-item.comprehended {
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        /* 道祖发现弹窗样式 */
+        .dao-ancestor-discovery {
+            text-align: center;
+            padding: 20px;
+        }
+        .dao-ancestor-portrait {
+            font-size: 4em;
+            margin-bottom: 10px;
+        }
+        .dao-ancestor-name {
+            color: #ffd700;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        .dao-ancestor-quote {
+            color: #e0e0e0;
+            font-style: italic;
+            padding: 15px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .dao-ancestor-blessing {
+            color: #4CAF50;
+            margin-top: 15px;
+        }
         .beyond-heaven-title {
             font-size: 1.8em;
             color: #ffd700;
@@ -5312,7 +5512,10 @@
             { id: 30, name: '第三十重天·天中天', desc: '天外有天', lore: '天中天是三十三天的中心，天道法则在此汇聚...' },
             { id: 31, name: '第三十一重天·定天', desc: '永恒不动之地', lore: '定天是三十三天最稳定之地，时间在此静止...' },
             { id: 32, name: '第三十二重天·镜天', desc: '映照万界之镜', lore: '镜天有一面天道镜，能映照诸天万界的过去与未来...' },
-            { id: 33, name: '第三十三重天·道天', desc: '天道最终奥秘', lore: '道天是三十三天的尽头，也是天道最终奥秘的所在。传闻只有超脱者方能踏入此地，领悟天道最终奥义...' }
+            { id: 33, name: '第三十三重天·道天', desc: '天道最终奥秘', lore: '道天是三十三天的尽头，也是天道最终奥秘的所在。传闻只有超脱者方能踏入此地，领悟天道最终奥义...' },
+            { id: 34, name: '第三十四重天·天外天', desc: '诸天之外之地', lore: '天外天藏于诸天之上，是超脱者方能触及的禁忌领域。此地蕴含打破天道枷锁的秘密...' },
+            { id: 35, name: '第三十五重天·虚道天', desc: '虚空证道之所', lore: '虚道天无天无地，唯有一片混沌虚空。传说在此地可以剥离一切后天之道，回归先天本源...' },
+            { id: 36, name: '第三十六重天·本源天', desc: '天道本源之地', lore: '本源天是天道法则的起源，是一切道法的根源。传闻踏入此地者将与天道合真，成为新的天道化身...' }
         ];
 
         // 主线剧情配置
@@ -5339,6 +5542,12 @@
                 title: '第四幕：真相大白',
                 description: '当你踏足第三十三重天道天时，一切真相终于揭晓...',
                 trigger: '探索完33重三十三天',
+                rewards: []
+            },
+            act5: {
+                title: '第五幕：超脱永恒',
+                description: '道祖遗迹中隐藏着终极奥秘，天道印记指引着你找到通往超脱之路...',
+                trigger: '获得天道印记并探索道祖遗迹',
                 rewards: []
             }
         };
@@ -17953,7 +18162,20 @@
                     plotFlags: {},              // 剧情标志位
                     loreDiscovered: [],         // 已发现的 lore
                     npcDialogues: {},           // NPC对话记录
-                    chaptersCompleted: []       // 已完成的章节
+                    chaptersCompleted: [],       // 已完成的章节
+                    // 道祖遗迹系统
+                    daoAncestorUnlocked: false,  // 道祖遗迹是否解锁
+                    daoAncestorLayers: [],       // 已探索的道祖遗迹层数
+                    daoAncestorCurrentLayer: 0,  // 当前所在层数
+                    daoAncestorDiscovered: [],   // 已发现的道祖
+                    // 天道印记道具
+                    heavenlySeals: [],           // 持有的天道印记
+                    totalSealsCollected: 0,      // 累计收集的印记数
+                    // 天道法则领悟系统
+                    lawsComprehended: [],        // 已领悟的法则
+                    currentLawInsight: 0,        // 当前法则领悟进度
+                    maxLawInsight: 100,         // 最大领悟进度
+                    lawFragmentOffered: 0       // 已献祭的法则碎片
                 };
             }
         }
@@ -17980,12 +18202,40 @@
                     plotFlags: {},
                     loreDiscovered: [],
                     npcDialogues: {},
-                    chaptersCompleted: []
+                    chaptersCompleted: [],
+                    // 道祖遗迹系统
+                    daoAncestorUnlocked: false,
+                    daoAncestorLayers: [],
+                    daoAncestorCurrentLayer: 0,
+                    daoAncestorDiscovered: [],
+                    // 天道印记道具
+                    heavenlySeals: [],
+                    totalSealsCollected: 0,
+                    // 天道法则领悟系统
+                    lawsComprehended: [],
+                    currentLawInsight: 0,
+                    maxLawInsight: 100,
+                    lawFragmentOffered: 0
                 };
                 addLog('story', '三十三天', '【第一幕：迷惘者】你从沉睡中醒来，发现自己身处天外天，却不记得自己的过去...一位神秘老者出现在你面前...');
             }
             addLog('good', '天外天解锁', '恭喜！你已超脱轮回，进入天外天！诸天万界，任你探索！');
             saveGame();
+        }
+
+        // 解锁道祖遗迹
+        function unlockDaoAncestor() {
+            const tth = gameState.thirtyThreeHeavens;
+            if (!tth) return;
+            
+            tth.daoAncestorUnlocked = true;
+            tth.daoAncestorCurrentLayer = 1; // 默认从第一层开始
+            
+            addLog('story', '道祖遗迹', '🏛️ 道祖遗迹已解锁！历代道祖的长眠之地，蕴含天道终极奥秘...');
+            addLog('good', '系统提示', '在道祖遗迹中探索，有机会发现道祖、获得天道印记、领悟天道法则！');
+            
+            saveGame();
+            renderBeyondHeaven();
         }
 
         // 打开天外天界面
@@ -18075,9 +18325,22 @@
             // 三十三天Tab按钮
             html += '<div style="margin:15px 0;text-align:center;">';
             html += '<button class="btn" onclick="showThirtyThreeTab()" style="background:linear-gradient(135deg,#4a148c,#7b1fa2);color:#ffd700;border:2px solid #ffd700;">📜 三十三天</button>';
+            
+            // 如果已解锁第33重天且未解锁道祖遗迹，显示解锁按钮
+            const tth = gameState.thirtyThreeHeavens;
+            if (tth && tth.visitedHeavens.includes(33) && !tth.daoAncestorUnlocked) {
+                html += '<button class="btn" onclick="unlockDaoAncestor()" style="background:linear-gradient(135deg,#ff6f00,#ff8f00);color:#fff;border:2px solid #ffd700;margin-left:10px;">🏛️ 道祖遗迹</button>';
+            } else if (tth && tth.daoAncestorUnlocked) {
+                html += '<button class="btn" onclick="showDaoAncestorTab()" style="background:linear-gradient(135deg,#ff6f00,#ff8f00);color:#fff;border:2px solid #ffd700;margin-left:10px;">🏛️ 道祖遗迹</button>';
+            }
             html += '</div>';
             html += '<div id="thirtyThreeTab" style="display:none;">';
             html += renderThirtyThreeHeavens();
+            html += '</div>';
+            
+            // 道祖遗迹Tab
+            html += '<div id="daoAncestorTab" style="display:none;">';
+            html += renderDaoAncestor();
             html += '</div>';
 
             // 神秘日志
@@ -18118,7 +18381,7 @@
             let html = '<div class="thirty-three-heavens">';
             
             // 当前章节显示
-            if (tth.currentAct > 0 && tth.currentAct <= 4) {
+            if (tth.currentAct > 0 && tth.currentAct <= 5) {
                 const actKey = 'act' + tth.currentAct;
                 const act = MAIN_PLOT[actKey];
                 html += `<div class="plot-banner">
@@ -18192,6 +18455,34 @@
                 addLog('story', '剧情进展', '【第四幕：真相大白】当你踏足第三十三重天道天时，一切真相终于揭晓...');
                 // 解锁21-33重天
                 unlockHeavenRange(21, 33);
+            } else if (visitedCount === 33 && tth.currentAct < 5) {
+                tth.currentAct = 5;
+                addLog('story', '剧情进展', '【第五幕：超脱永恒】三十三天的真相已经揭晓，但还有更深的秘密等待着你...');
+                // 解锁34-36隐藏天境
+                unlockHeavenRange(34, 36);
+                // 解锁道祖遗迹
+                tth.daoAncestorUnlocked = true;
+                tth.daoAncestorCurrentLayer = 1;
+                addLog('story', '道祖遗迹', '🏛️ 道祖遗迹已解锁！历代道祖的长眠之地，蕴含天道终极奥秘...');
+            }
+            
+            // 隐藏天境特殊效果
+            if (heavenId >= 34) {
+                // 隐藏天境探索给予大量奖励
+                const bonusQi = (heavenId - 33) * 500;
+                gameState.qi = Math.min(gameState.maxQi, gameState.qi + bonusQi);
+                addLog('good', '隐藏天境', `你探索了隐藏天境，获得${bonusQi}灵力加持！`);
+                
+                // 概率获得天道印记碎片
+                if (Math.random() < 0.3) {
+                    const unsealed = HEAVENLY_SEALS.filter(s => !tth.heavenlySeals.includes(s.id));
+                    if (unsealed.length > 0) {
+                        const seal = unsealed[Math.floor(Math.random() * unsealed.length)];
+                        tth.heavenlySeals.push(seal.id);
+                        tth.totalSealsCollected++;
+                        addLog('good', '天道印记', `在${heaven.name}发现了一枚${seal.name}！`);
+                    }
+                }
             }
             
             // 显示探索结果
@@ -18230,6 +18521,383 @@
             
             content.innerHTML = html;
             modal.classList.add('active');
+        }
+
+        // ===== 道祖遗迹系统 =====
+
+        // 道祖数据配置
+        const DAO_ANCESTORS = [
+            { id: 1, name: '太上道祖', icon: '👴', quote: '道可道，非常道...', blessing: '领悟力+10%', reward: '天道印记碎片×1' },
+            { id: 2, name: '原始天魔', icon: '😈', quote: '非道非魔，亦道亦魔...', blessing: '心魔抗性+15%', reward: '心魔结晶×1' },
+            { id: 3, name: '命运古神', icon: '🔮', quote: '命运如织，因果循环...', blessing: '运势+20%', reward: '命运之纱×1' },
+            { id: 4, name: '轮回天尊', icon: '⚰️', quote: '生死轮转，永劫不灭...', blessing: '轮回感悟+25%', reward: '轮回法则碎片×1' },
+            { id: 5, name: '时空王者', icon: '⏳', quote: '过去未来，皆在一念...', blessing: '时空法则+15%', reward: '时空道痕×1' },
+            { id: 6, name: '虚无大帝', icon: '🌑', quote: '无中生有，有归于无...', blessing: '虚无之力+20%', reward: '虚无之气×1' }
+        ];
+
+        // 道祖遗迹层配置
+        const DAO_ANCESTOR_LAYERS = [
+            { id: 1, name: '第一层·道祖残影', desc: '历代道祖留下的意志投影', difficulty: 1, reward: '道祖感悟×1', sealChance: 0.1 },
+            { id: 2, name: '第二层·道韵流转', desc: '天道法则流动的秘境', difficulty: 2, reward: '道韵精华×1', sealChance: 0.15 },
+            { id: 3, name: '第三层·祖魂栖息', desc: '道祖残念长眠之地', difficulty: 3, reward: '祖魂结晶×1', sealChance: 0.2 },
+            { id: 4, name: '第四层·法则熔炉', desc: '天道法则交汇之处', difficulty: 4, reward: '法则本源×1', sealChance: 0.25 },
+            { id: 5, name: '第五层·道祖真身', desc: '道祖真正遗迹的核心', difficulty: 5, reward: '道祖传承×1', sealChance: 0.3 }
+        ];
+
+        // 天道印记配置
+        const HEAVENLY_SEALS = [
+            { id: 'destiny', name: '命运印记', icon: '🔮', desc: '蕴含命运法则的天道印记', effect: '运势永久+15%' },
+            { id: 'reincarnation', name: '轮回印记', icon: '⚰️', desc: '蕴含轮回法则的天道印记', effect: '寿元消耗-20%' },
+            { id: 'time', name: '时空印记', icon: '⏳', desc: '蕴含时空法则的天道印记', effect: '修炼速度+15%' },
+            { id: 'void', name: '虚无印记', icon: '🌑', desc: '蕴含虚无法则的天道印记', effect: '心魔抗性+25%' },
+            { id: 'creation', name: '造化印记', icon: '✨', desc: '蕴含造化法则的天道印记', effect: '突破成功率+20%' },
+            { id: 'primordial', name: '混沌印记', icon: '🌌', desc: '蕴含混沌法则的天道印记', effect: '所有属性+10%' }
+        ];
+
+        // 天道法则配置
+        const HEAVENLY_LAWS = [
+            { id: 'destiny', name: '命运法则', desc: '因果循环，命运注定', progressNeeded: 100 },
+            { id: 'reincarnation', name: '轮回法则', desc: '生死轮转，永劫不灭', progressNeeded: 120 },
+            { id: 'time', name: '时空法则', desc: '过去未来，皆在一念', progressNeeded: 150 },
+            { id: 'void', name: '虚无法则', desc: '无中生有，有归于无', progressNeeded: 130 },
+            { id: 'creation', name: '造化法则', desc: '万物生长，造物之主', progressNeeded: 140 },
+            { id: 'primordial', name: '混沌法则', desc: '天地初开，混沌为源', progressNeeded: 200 }
+        ];
+
+        // 切换道祖遗迹Tab显示
+        function showDaoAncestorTab() {
+            const tab = document.getElementById('daoAncestorTab');
+            if (tab) {
+                tab.style.display = tab.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // 渲染道祖遗迹界面
+        function renderDaoAncestor() {
+            const tth = gameState.thirtyThreeHeavens;
+            if (!tth || !tth.daoAncestorUnlocked) {
+                return '<div class="story-locked">道祖遗迹尚未解锁...完成三十三天探索即可解锁</div>';
+            }
+
+            let html = '<div class="dao-ancestor-container">';
+            
+            // 头部信息
+            html += `
+                <div class="dao-ancestor-header">
+                    <div class="dao-ancestor-title">🏛️ 道祖遗迹</div>
+                    <div class="dao-ancestor-subtitle">历代道祖长眠之地 · 蕴含天道终极奥秘</div>
+                </div>
+            `;
+
+            // 统计数据
+            html += `
+                <div class="dao-ancestor-stats">
+                    <div class="dao-ancestor-stat">
+                        <div class="dao-ancestor-stat-label">已探索层数</div>
+                        <div class="dao-ancestor-stat-value">${tth.daoAncestorLayers.length}/5</div>
+                    </div>
+                    <div class="dao-ancestor-stat">
+                        <div class="dao-ancestor-stat-label">发现道祖</div>
+                        <div class="dao-ancestor-stat-value">${tth.daoAncestorDiscovered.length}/${DAO_ANCESTORS.length}</div>
+                    </div>
+                </div>
+            `;
+
+            // 天道印记显示
+            html += '<div class="heavenly-seal-section">';
+            html += '<h4 style="color:#ffd700;margin-bottom:10px;">🔮 天道印记</h4>';
+            if (tth.heavenlySeals.length > 0) {
+                tth.heavenlySeals.forEach(sealId => {
+                    const seal = HEAVENLY_SEALS.find(s => s.id === sealId);
+                    if (seal) {
+                        html += `
+                            <div class="heavenly-seal">
+                                <div class="heavenly-seal-icon">${seal.icon}</div>
+                                <div class="heavenly-seal-name">${seal.name}</div>
+                                <div class="heavenly-seal-desc">${seal.desc}</div>
+                                <div class="heavenly-seal-count">${seal.effect}</div>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                html += '<div style="color:#888;text-align:center;">尚未获得天道印记</div>';
+            }
+            html += `<div style="color:#4caf50;font-size:0.85em;margin-top:5px;">累计获得: ${tth.totalSealsCollected}枚</div>`;
+            html += '</div>';
+
+            // 法则领悟进度
+            html += `
+                <div class="law-comprehension">
+                    <div class="law-comprehension-header">
+                        <span class="law-comprehension-title">📜 天道法则领悟</span>
+                        <span class="law-comprehension-progress">${tth.lawsComprehended.length}/${HEAVENLY_LAWS.length} 已领悟</span>
+                    </div>
+                    <div class="law-comprehension-bar">
+                        <div class="law-comprehension-fill" style="width:${(tth.lawsComprehended.length / HEAVENLY_LAWS.length) * 100}%"></div>
+                    </div>
+            `;
+
+            // 法则列表
+            html += '<div class="law-list">';
+            HEAVENLY_LAWS.forEach(law => {
+                const comprehended = tth.lawsComprehended.includes(law.id);
+                html += `
+                    <div class="law-item ${comprehended ? 'comprehended' : ''}" onclick="comprehendLaw('${law.id}')">
+                        ${law.name}${comprehended ? ' ✓' : ''}
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+
+            // 道祖遗迹层数
+            html += '<div class="dao-ancestor-layers">';
+            html += '<h4 style="color:#ffd700;margin-bottom:10px;">🏛️ 遗迹层数</h4>';
+            DAO_ANCESTOR_LAYERS.forEach((layer, index) => {
+                const isExplored = tth.daoAncestorLayers.includes(layer.id);
+                const isLocked = index > 0 && !tth.daoAncestorLayers.includes(DAO_ANCESTOR_LAYERS[index - 1].id);
+                const isCurrent = tth.daoAncestorCurrentLayer === layer.id;
+
+                let layerClass = 'dao-ancestor-layer';
+                if (isExplored) layerClass += ' explored';
+                if (isLocked) layerClass += ' locked';
+                if (isCurrent) layerClass += ' current';
+
+                html += `
+                    <div class="${layerClass}" onclick="${!isLocked && !isExplored ? `exploreDaoAncestorLayer(${layer.id})` : ''}">
+                        <div class="dao-ancestor-layer-name">${layer.name} ${isCurrent ? '[当前]' : ''}</div>
+                        <div class="dao-ancestor-layer-desc">${layer.desc}</div>
+                        <div class="dao-ancestor-layer-reward">奖励: ${layer.reward} ${isExplored ? '✓' : ''}</div>
+                        ${isLocked ? '<div style="color:#f44336;font-size:0.8em;">需先完成上一层</div>' : ''}
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            // 探索按钮
+            const canExplore = tth.daoAncestorCurrentLayer > 0 && tth.daoAncestorCurrentLayer < 5;
+            html += `
+                <button class="dao-ancestor-explore-btn" onclick="exploreCurrentDaoAncestorLayer()" ${!canExplore ? 'disabled' : ''}>
+                    ${canExplore ? '🚀 探索当前层' : '选择一层开始探索'}
+                </button>
+            `;
+
+            html += '</div>';
+            return html;
+        }
+
+        // 探索道祖遗迹层
+        function exploreDaoAncestorLayer(layerId) {
+            const tth = gameState.thirtyThreeHeavens;
+            const layer = DAO_ANCESTOR_LAYERS.find(l => l.id === layerId);
+            if (!layer) return;
+
+            // 设置当前层
+            tth.daoAncestorCurrentLayer = layerId;
+            
+            // 随机事件判定
+            const roll = Math.random();
+            let event = {};
+            
+            if (roll < 0.3) {
+                // 发现道祖
+                const undiscoveredAncestors = DAO_ANCESTORS.filter(a => !tth.daoAncestorDiscovered.includes(a.id));
+                if (undiscoveredAncestors.length > 0) {
+                    const ancestor = undiscoveredAncestors[Math.floor(Math.random() * undiscoveredAncestors.length)];
+                    tth.daoAncestorDiscovered.push(ancestor.id);
+                    event = {
+                        type: 'ancestor',
+                        title: `🎉 发现道祖: ${ancestor.name}`,
+                        desc: `"${ancestor.quote}"`,
+                        blessing: ancestor.blessing
+                    };
+                    addLog('story', '道祖发现', `在${layer.name}发现了${ancestor.name}！获得祝福: ${ancestor.blessing}`);
+                }
+            } else if (roll < 0.6) {
+                // 获得天道印记
+                if (Math.random() < layer.sealChance) {
+                    const unsealed = HEAVENLY_SEALS.filter(s => !tth.heavenlySeals.includes(s.id));
+                    if (unsealed.length > 0) {
+                        const seal = unsealed[Math.floor(Math.random() * unsealed.length)];
+                        tth.heavenlySeals.push(seal.id);
+                        tth.totalSealsCollected++;
+                        event = {
+                            type: 'seal',
+                            title: `🔮 获得天道印记: ${seal.name}`,
+                            desc: seal.desc,
+                            effect: seal.effect
+                        };
+                        addLog('good', '天道印记', `获得${seal.name}！效果: ${seal.effect}`);
+                        
+                        // 检查是否触发第五幕剧情
+                        if (tth.totalSealsCollected >= 3 && tth.currentAct < 5) {
+                            tth.currentAct = 5;
+                            addLog('story', '剧情进展', '【第五幕：超脱永恒】道祖遗迹中隐藏着终极奥秘，天道印记指引着你找到通往超脱之路...');
+                        }
+                    }
+                }
+            } else if (roll < 0.85) {
+                // 法则领悟进度
+                const progress = Math.floor(Math.random() * 20) + 10;
+                tth.currentLawInsight = Math.min(tth.maxLawInsight, tth.currentLawInsight + progress);
+                event = {
+                    type: 'law_progress',
+                    title: '📜 天道法则领悟',
+                    desc: `对天道法则的领悟加深，进度+${progress}`,
+                    progress: tth.currentLawInsight
+                };
+                addLog('good', '法则领悟', `法则领悟进度+${progress}`);
+            } else {
+                // 战斗/挑战
+                const qiLoss = Math.floor(Math.random() * 100) + 50;
+                gameState.qi = Math.max(1, gameState.qi - qiLoss);
+                event = {
+                    type: 'danger',
+                    title: '⚔️ 遭遇危险',
+                    desc: `遗迹中的守护者发起攻击，消耗灵力${qiLoss}点`,
+                    loss: qiLoss
+                };
+                addLog('danger', '遗迹危险', `遭遇守护者攻击，损失${qiLoss}灵力`);
+            }
+
+            // 标记为已探索
+            if (!tth.daoAncestorLayers.includes(layerId)) {
+                tth.daoAncestorLayers.push(layerId);
+            }
+
+            // 检查是否可以领悟法则
+            checkLawComprehension();
+
+            // 显示探索结果
+            showDaoAncestorDiscoveryModal(event, layer);
+            saveGame();
+        }
+
+        // 探索当前选定的层
+        function exploreCurrentDaoAncestorLayer() {
+            const tth = gameState.thirtyThreeHeavens;
+            if (tth.daoAncestorCurrentLayer > 0) {
+                exploreDaoAncestorLayer(tth.daoAncestorCurrentLayer);
+            }
+        }
+
+        // 显示道祖发现弹窗
+        function showDaoAncestorDiscoveryModal(event, layer) {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+
+            let html = `<div class="dao-ancestor-discovery">`;
+            html += `<h2 style="text-align:center;color:#ffd700;">${layer.name}</h2>`;
+
+            if (event.type === 'ancestor') {
+                const ancestor = DAO_ANCESTORS.find(a => a.name.includes(event.title.replace('🎉 发现道祖: ', '')));
+                html += `
+                    <div class="dao-ancestor-portrait">${ancestor ? ancestor.icon : '👻'}</div>
+                    <div class="dao-ancestor-name">${event.title.replace('🎉 发现道祖: ', '')}</div>
+                    <div class="dao-ancestor-quote">"${event.desc.replace(/"/g, '')}"</div>
+                    <div class="dao-ancestor-blessing">✨ 祝福: ${event.blessing}</div>
+                `;
+            } else if (event.type === 'seal') {
+                const seal = HEAVENLY_SEALS.find(s => s.name === event.title.replace('🔮 获得天道印记: ', ''));
+                html += `
+                    <div class="heavenly-seal-icon" style="font-size:3em;">${seal ? seal.icon : '🔮'}</div>
+                    <div class="heavenly-seal-name">${event.title.replace('🔮 获得天道印记: ', '')}</div>
+                    <div class="heavenly-seal-desc">${event.desc}</div>
+                    <div class="heavenly-seal-count">${event.effect}</div>
+                `;
+            } else if (event.type === 'law_progress') {
+                html += `
+                    <div style="font-size:3em;">📜</div>
+                    <div style="color:#ffd700;font-size:1.2em;">${event.title}</div>
+                    <div style="color:#b0b0b0;margin:15px 0;">${event.desc}</div>
+                    <div style="color:#4caf50;">当前领悟进度: ${event.progress}/${gameState.thirtyThreeHeavens.maxLawInsight}</div>
+                `;
+            } else if (event.type === 'danger') {
+                html += `
+                    <div style="font-size:3em;">⚔️</div>
+                    <div style="color:#f44336;font-size:1.2em;">${event.title}</div>
+                    <div style="color:#b0b0b0;margin:15px 0;">${event.desc}</div>
+                `;
+            }
+
+            html += `
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        // 领悟天道法则
+        function comprehendLaw(lawId) {
+            const tth = gameState.thirtyThreeHeavens;
+            const law = HEAVENLY_LAWS.find(l => l.id === lawId);
+            if (!law) return;
+
+            // 检查是否已领悟
+            if (tth.lawsComprehended.includes(lawId)) {
+                addLog('neutral', '法则领悟', `你已经领悟了${law.name}`);
+                return;
+            }
+
+            // 检查领悟进度
+            if (tth.currentLawInsight < 50) {
+                addLog('neutral', '法则领悟', `对${law.name}的领悟还不够深入，需要更多积累...`);
+                return;
+            }
+
+            // 消耗进度并领悟
+            tth.currentLawInsight = 0;
+            tth.lawsComprehended.push(lawId);
+            
+            // 根据法则类型给予特殊效果
+            switch(lawId) {
+                case 'destiny':
+                    gameState.luck = (gameState.luck || 0) + 15;
+                    break;
+                case 'reincarnation':
+                    gameState.maxLifeSpan = (gameState.maxLifeSpan || 100) * 1.2;
+                    break;
+                case 'time':
+                    gameState.cultivationSpeed = (gameState.cultivationSpeed || 1) * 1.15;
+                    break;
+                case 'void':
+                    gameState.mindControlResistance = (gameState.mindControlResistance || 0) + 25;
+                    break;
+                case 'creation':
+                    gameState.breakthroughBonus = (gameState.breakthroughBonus || 0) + 20;
+                    break;
+                case 'primordial':
+                    // 全属性提升
+                    gameState.qi = (gameState.qi || 0) * 1.1;
+                    gameState.spiritStones = (gameState.spiritStones || 0) * 1.1;
+                    break;
+            }
+
+            addLog('good', '法则领悟', `恭喜！你对${law.name}有了更深的理解！${law.desc}`);
+            
+            // 检查是否全部领悟，触发特殊事件
+            if (tth.lawsComprehended.length === HEAVENLY_LAWS.length) {
+                addLog('story', '终极成就', '你已领悟全部天道法则！距离超脱永恒只差一步之遥...');
+            }
+
+            saveGame();
+            updateDisplay();
+        }
+
+        // 检查是否可以领悟法则
+        function checkLawComprehension() {
+            const tth = gameState.thirtyThreeHeavens;
+            
+            // 每次探索增加领悟进度
+            tth.currentLawInsight = Math.min(tth.maxLawInsight, tth.currentLawInsight + 5);
+            
+            // 如果进度满了，提示可以领悟
+            if (tth.currentLawInsight >= 50) {
+                addLog('neutral', '法则领悟', '你对某条天道法则的领悟已经足够深厚，可以尝试领悟了！');
+            }
         }
 
         // 选择天外天区域
