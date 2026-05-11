@@ -1666,6 +1666,93 @@
             border-radius: 15px;
             margin-bottom: 20px;
         }
+        /* 三十三天剧情样式 */
+        .thirty-three-heavens {
+            padding: 15px;
+        }
+        .plot-banner {
+            background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .plot-banner h3 {
+            color: #ffd700;
+            margin: 0 0 8px 0;
+        }
+        .heavens-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .heaven-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .heaven-card:hover {
+            background: rgba(255,215,0,0.1);
+            border-color: #ffd700;
+            transform: translateY(-2px);
+        }
+        .heaven-card.visited {
+            opacity: 0.7;
+        }
+        .heaven-name {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .heaven-desc {
+            color: #b0b0b0;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .visited-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            color: #4CAF50;
+            font-size: 12px;
+        }
+        .lore-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 12px;
+        }
+        .lore-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,215,0,0.2);
+        }
+        .lore-section h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        .lore-entry {
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #b0b0b0;
+        }
+        .heaven-discovery {
+            padding: 20px;
+        }
+        .discovery-lore {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
         .beyond-heaven-title {
             font-size: 1.8em;
             color: #ffd700;
@@ -5179,6 +5266,71 @@
                 description: '诸天万界交汇之地，超脱轮回之所',
                 color: '#ffd700',
                 regions: ['天道碎片', '命运长河', '轮回之地', '大道之树', '永恒星域']
+            }
+        };
+
+        // ===== 三十三天剧情配置 =====
+        const THIRTY_THREE_HEAVENS = [
+            { id: 1, name: '第一重天·太皇天', desc: '凡界飞升者初至此地', lore: '传闻太皇天是凡界与仙界的中转站，凡是通过飞升的修士都会在此接受天道法则的洗礼...' },
+            { id: 2, name: '第二重天·太明天', desc: '日月交替之光', lore: '太明天的光芒由上古神龙掌控，据说这里的阳光能照见修士的前世今生...' },
+            { id: 3, name: '第三重天·玉明天', desc: '美玉无瑕之境', lore: '玉明天遍地产灵玉，修士在此可净化身心，祛除心魔...' },
+            { id: 4, name: '第四重天·宝明天', desc: '万宝归宗之所', lore: '宝明天藏有上古仙府遗迹，无数宝物等待有缘人...' },
+            { id: 5, name: '第五重天·望天', desc: '登高望远之地', lore: '望天之上可远眺诸天万界，是观测仙界动向的最佳位置...' },
+            { id: 6, name: '第六重天·弧天', desc: '天弧环绕之界', lore: '弧天被神秘天弧环绕，传说弧心处藏有天道残卷...' },
+            { id: 7, name: '第七重天·咸天', desc: '仙凡交汇之处', lore: '咸天是仙界与凡间的连接点，无数位面在此交汇...' },
+            { id: 8, name: '第八重天·太极天', desc: '阴阳初分之地', lore: '太极天蕴含阴阳法则，修士可在此领悟生死轮回之秘...' },
+            { id: 9, name: '第九重天·皓天', desc: '纯净无瑕之天', lore: '皓天终年洁白无瑕，是洗涤罪孽的圣地...' },
+            { id: 10, name: '第十重天·元天', desc: '万物元始之地', lore: '元天是诸天万界的起源，所有法则的起点...' },
+            { id: 11, name: '第十一重天·贞天', desc: '坚定不渝之心', lore: '贞天考验修士的道心，唯有信念坚定者方可通过...' },
+            { id: 12, name: '第十二重天·是天', desc: '天命所归之处', lore: '是天承载天命，是非成败皆由天定...' },
+            { id: 13, name: '第十三重天·遁天', desc: '隐世修行之所', lore: '遁天藏于诸天之外，是隐世大能的道场...' },
+            { id: 14, name: '第十四重天·信天', desc: '信念凝聚之地', lore: '信天能让修士的道心化作实质，信念越强力量越强...' },
+            { id: 15, name: '第十五重天·午天', desc: '天之正中', lore: '午天位于三十三天的正中，是天地交泰之地...' },
+            { id: 16, name: '第十六重天·上升天', desc: '飞升者的圣地', lore: '上升天是历代飞升成功的修士最终归宿...' },
+            { id: 17, name: '第十七重天·释罗天', desc: '佛法东渐之地', lore: '释罗天融汇佛道两家之学，是佛道双修者的圣地...' },
+            { id: 18, name: '第十八重天·牟工天', desc: '天工匠造之所', lore: '牟工天是上古天工匠的遗迹，藏有失传的炼器秘术...' },
+            { id: 19, name: '第十九重天·目 Junction 天', desc: '诸天枢纽', lore: '目 Junction 天连接三十三天，是诸天之间的交通要道...' },
+            { id: 20, name: '第二十重天·静天', desc: '万籁俱寂之地', lore: '静天无声无息，是参悟天道寂灭之法的圣地...' },
+            { id: 21, name: '第二十一重天·冀天', desc: '希望与期盼', lore: '冀天承载着无数修士的希望，是愿望之力的汇聚之地...' },
+            { id: 22, name: '第二十二重天·郡天', desc: '天之疆域', lore: '郡天划分三十三天的疆域，各路势力在此角力...' },
+            { id: 23, name: '第二十三重天·祥天', desc: '瑞气千条之所', lore: '祥天遍布祥瑞之气，是福缘深厚者的洞府...' },
+            { id: 24, name: '第二十四重天·温天', desc: '温和如玉之境', lore: '温天气候宜人，是修身养性的绝佳去处...' },
+            { id: 25, name: '第二十五重天·江天', desc: '大江东去之境', lore: '江天有一条天河支流，传说能洗净世间一切烦恼...' },
+            { id: 26, name: '第二十六重天·辅天', desc: '辅弼天地之所', lore: '辅天辅助天道运转，是天道的左膀右臂...' },
+            { id: 27, name: '第二十七重天·弼天', desc: '天道之臂膀', lore: '弼天与辅天相辅相成，共同维护天道秩序...' },
+            { id: 28, name: '第二十八重天·邪天', desc: '天之暗面', lore: '邪天与诸天对立，是天道的阴暗面，藏有禁忌之力...' },
+            { id: 29, name: '第二十九重天·真天', desc: '返璞归真之地', lore: '真天能让修士返璞归真，回归最纯粹的自我...' },
+            { id: 30, name: '第三十重天·天中天', desc: '天外有天', lore: '天中天是三十三天的中心，天道法则在此汇聚...' },
+            { id: 31, name: '第三十一重天·定天', desc: '永恒不动之地', lore: '定天是三十三天最稳定之地，时间在此静止...' },
+            { id: 32, name: '第三十二重天·镜天', desc: '映照万界之镜', lore: '镜天有一面天道镜，能映照诸天万界的过去与未来...' },
+            { id: 33, name: '第三十三重天·道天', desc: '天道最终奥秘', lore: '道天是三十三天的尽头，也是天道最终奥秘的所在。传闻只有超脱者方能踏入此地，领悟天道最终奥义...' }
+        ];
+
+        // 主线剧情配置
+        const MAIN_PLOT = {
+            act1: {
+                title: '第一幕：迷惘者',
+                description: '你从沉睡中醒来，发现自己身处天外天，却不记得自己的过去...',
+                trigger: '进入天外天且未触发过剧情',
+                rewards: []
+            },
+            act2: {
+                title: '第二幕：三十三天',
+                description: '一位神秘老者告诉你，天外天之上还有三十三天，而你或许是解开天道奥秘的关键...',
+                trigger: '探索天外天区域达到3次',
+                rewards: []
+            },
+            act3: {
+                title: '第三幕：仙界之谜',
+                description: '你在探索中发现，天外天与仙界之间有着不为人知的秘密...',
+                trigger: '探索完10重三十三天',
+                rewards: []
+            },
+            act4: {
+                title: '第四幕：真相大白',
+                description: '当你踏足第三十三重天道天时，一切真相终于揭晓...',
+                trigger: '探索完33重三十三天',
+                rewards: []
             }
         };
 
@@ -17016,6 +17168,19 @@
                     maxSpiritualPower: 100
                 };
             }
+            // 初始化三十三天剧情数据
+            if (!gameState.thirtyThreeHeavens) {
+                gameState.thirtyThreeHeavens = {
+                    unlocked: false,           // 是否解锁三十三天剧情
+                    unlockedHeavens: [],       // 已解锁的天（默认只开放前5重）
+                    visitedHeavens: [],        // 已访问的天
+                    currentAct: 0,             // 当前剧情章节（0=未开始）
+                    plotFlags: {},              // 剧情标志位
+                    loreDiscovered: [],         // 已发现的 lore
+                    npcDialogues: {},           // NPC对话记录
+                    chaptersCompleted: []       // 已完成的章节
+                };
+            }
         }
 
         // 检查天外天是否解锁
@@ -17030,6 +17195,20 @@
                 initBeyondHeaven();
             }
             gameState.beyondHeaven.unlocked = true;
+            // 同时解锁三十三天剧情
+            if (!gameState.thirtyThreeHeavens) {
+                gameState.thirtyThreeHeavens = {
+                    unlocked: true,
+                    unlockedHeavens: [1, 2, 3, 4, 5],  // 前5重天初始解锁
+                    visitedHeavens: [],
+                    currentAct: 1,  // 自动触发第一幕
+                    plotFlags: {},
+                    loreDiscovered: [],
+                    npcDialogues: {},
+                    chaptersCompleted: []
+                };
+                addLog('story', '三十三天', '【第一幕：迷惘者】你从沉睡中醒来，发现自己身处天外天，却不记得自己的过去...一位神秘老者出现在你面前...');
+            }
             addLog('good', '天外天解锁', '恭喜！你已超脱轮回，进入天外天！诸天万界，任你探索！');
             saveGame();
         }
@@ -17118,6 +17297,14 @@
                 </button>
             `;
 
+            // 三十三天Tab按钮
+            html += '<div style="margin:15px 0;text-align:center;">';
+            html += '<button class="btn" onclick="showThirtyThreeTab()" style="background:linear-gradient(135deg,#4a148c,#7b1fa2);color:#ffd700;border:2px solid #ffd700;">📜 三十三天</button>';
+            html += '</div>';
+            html += '<div id="thirtyThreeTab" style="display:none;">';
+            html += renderThirtyThreeHeavens();
+            html += '</div>';
+
             // 神秘日志
             if (bh.mysteryLogs.length > 0) {
                 html += `
@@ -17136,6 +17323,138 @@
             }
 
             document.getElementById('beyondHeavenContent').innerHTML = html;
+        }
+
+        // ===== 三十三天剧情系统 =====
+
+        // 切换三十三天Tab显示
+        function showThirtyThreeTab() {
+            const tab = document.getElementById('thirtyThreeTab');
+            tab.style.display = tab.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // 渲染三十三天界面（作为天外天界面的一个Tab）
+        function renderThirtyThreeHeavens() {
+            const tth = gameState.thirtyThreeHeavens;
+            if (!tth || !tth.unlocked) {
+                return '<div class="story-locked">三十三天尚未解锁...</div>';
+            }
+            
+            let html = '<div class="thirty-three-heavens">';
+            
+            // 当前章节显示
+            if (tth.currentAct > 0 && tth.currentAct <= 4) {
+                const actKey = 'act' + tth.currentAct;
+                const act = MAIN_PLOT[actKey];
+                html += `<div class="plot-banner">
+                    <h3>📜 ${act.title}</h3>
+                    <p style="color:#ffd700;font-size:13px;">${act.description}</p>
+                </div>`;
+            }
+            
+            // 三十三天列表（显示解锁的）
+            html += '<div class="heavens-grid">';
+            tth.unlockedHeavens.forEach(id => {
+                const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === id);
+                const visited = tth.visitedHeavens.includes(id);
+                const loreKnown = tth.loreDiscovered.includes(id);
+                
+                html += `<div class="heaven-card ${visited ? 'visited' : ''}" onclick="exploreHeaven(${id})">
+                    <div class="heaven-name">${heaven.name}</div>
+                    <div class="heaven-desc">${heaven.desc}</div>
+                    ${visited ? '<span class="visited-badge">✓</span>' : ''}
+                    ${loreKnown ? '<span class="lore-badge">📖</span>' : ''}
+                </div>`;
+            });
+            html += '</div>';
+            
+            // 已发现 lore 列表
+            if (tth.loreDiscovered.length > 0) {
+                html += '<div class="lore-section">';
+                html += '<h4>📚 已发现的天道记载</h4>';
+                tth.loreDiscovered.forEach(id => {
+                    const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === id);
+                    html += `<div class="lore-entry">
+                        <strong>${heaven.name}</strong>: ${heaven.lore.substring(0, 60)}...
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // 探索某一重天
+        function exploreHeaven(heavenId) {
+            const tth = gameState.thirtyThreeHeavens;
+            const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === heavenId);
+            
+            // 标记为已访问
+            if (!tth.visitedHeavens.includes(heavenId)) {
+                tth.visitedHeavens.push(heavenId);
+            }
+            
+            // 发现 lore
+            if (!tth.loreDiscovered.includes(heavenId)) {
+                tth.loreDiscovered.push(heavenId);
+            }
+            
+            // 根据探索数量解锁新天
+            const visitedCount = tth.visitedHeavens.length;
+            if (visitedCount === 3 && tth.currentAct < 2) {
+                tth.currentAct = 2;
+                addLog('story', '剧情进展', '【第二幕：三十三天】一位神秘老者告诉你，天外天之上还有三十三天...');
+                // 解锁6-10重天
+                unlockHeavenRange(6, 10);
+            } else if (visitedCount === 10 && tth.currentAct < 3) {
+                tth.currentAct = 3;
+                addLog('story', '剧情进展', '【第三幕：仙界之谜】你在探索中发现，天外天与仙界之间有着不为人知的秘密...');
+                // 解锁11-20重天
+                unlockHeavenRange(11, 20);
+            } else if (visitedCount === 20 && tth.currentAct < 4) {
+                tth.currentAct = 4;
+                addLog('story', '剧情进展', '【第四幕：真相大白】当你踏足第三十三重天道天时，一切真相终于揭晓...');
+                // 解锁21-33重天
+                unlockHeavenRange(21, 33);
+            }
+            
+            // 显示探索结果
+            showHeavenDiscoveryModal(heaven);
+            saveGame();
+        }
+
+        // 解锁指定范围的天
+        function unlockHeavenRange(start, end) {
+            const tth = gameState.thirtyThreeHeavens;
+            for (let i = start; i <= end; i++) {
+                if (!tth.unlockedHeavens.includes(i)) {
+                    tth.unlockedHeavens.push(i);
+                }
+            }
+            addLog('good', '天境解锁', `已解锁第${start}至第${end}重天！`);
+        }
+
+        // 显示天道发现模态框
+        function showHeavenDiscoveryModal(heaven) {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery">
+                <h2 style="text-align:center;color:#ffd700;">✨ ${heaven.name} ✨</h2>
+                <div class="discovery-lore">
+                    <p style="color:#e0e0e0;line-height:1.8;">${heaven.lore}</p>
+                </div>
+                <div class="discovery-reward">
+                    <p>🎁 你对这片天境有了更深的理解...</p>
+                </div>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
         }
 
         // 选择天外天区域
