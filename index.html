@@ -5105,8 +5105,7 @@
                 anvil: { level: 1, type: 'forge' },
                 transactionLog: []
             },
-            // V11 成就/称号系统字段
-            title: '筑基修士',
+            // V28 成就系统大改版字段
             achievements: {
                 unlocked: [],
                 titles: [],
@@ -5117,8 +5116,18 @@
                     treasuresRefined: 0,
                     serendipitiesEncountered: 0,
                     flawlessTribulations: 0
-                }
+                },
+                // V28 新增字段
+                progress: {},        // {成就ID: 当前数值}
+                claimedStages: {},   // {成就ID: [已领取阶段索引]}
+                seasonPoints: 0,     // 赛季积分
+                seasonRewards: []    // 已兑换赛季奖励ID
             },
+            equippedFrame: null,     // V28 当前头像框
+            equippedBubble: null,   // V28 当前气泡
+            currentSeason: 's1',    // V28 当前赛季
+            displaySettings: { showTitle: true, showFrame: true, showBubble: true }, // V28 显示设置
+            title: '筑基修士',       // 当前称号
             // 仙宠灵兽系统字段
             pets: [],
             summonedPet: null,
@@ -5541,8 +5550,28 @@
         };
 
 // ===== achievements.js =====
+// V28 成就系统大改版
 
-        // ===== checkAchievements =====
+        // ===== getRarityWeight =====
+        function getRarityWeight(rarity) {
+            const weights = { common: 1.0, rare: 1.5, legendary: 2.0, mythic: 3.0 };
+            return weights[rarity] || 1.0;
+        }
+
+        // ===== getSeasonMultiplier =====
+        function getSeasonMultiplier() {
+            const season = SEASONS.find(s => s.id === gameState.currentSeason);
+            return season ? season.pointsMultiplier : 1.0;
+        }
+
+        // ===== getAchievementPoints =====
+        function getAchievementPoints(rarity) {
+            const basePoints = { common: 10, rare: 25, legendary: 50, mythic: 100 };
+            const base = basePoints[rarity] || 10;
+            return Math.floor(base * getRarityWeight(rarity) * getSeasonMultiplier());
+        }
+
+        // ===== checkAchievements (V28重写) =====
         function checkAchievements() {
             if (!gameState.achievements) {
                 gameState.achievements = {
@@ -5555,53 +5584,402 @@
                         treasuresRefined: 0,
                         serendipitiesEncountered: 0,
                         flawlessTribulations: 0
-                    }
+                    },
+                    progress: {},
+                    claimedStages: {},
+                    seasonPoints: 0,
+                    seasonRewards: []
                 };
             }
 
             const ach = gameState.achievements;
+            if (!ach.progress) ach.progress = {};
+            if (!ach.claimedStages) ach.claimedStages = {};
 
             for (const achievement of ACHIEVEMENTS) {
-                // 跳过已解锁的
-                if (ach.unlocked.includes(achievement.id)) continue;
+                // 如果是赛季成就，跳过非当前赛季的成就
+                if (achievement.season && achievement.season !== gameState.currentSeason) continue;
 
-                let unlocked = false;
                 const req = achievement.requirement;
+                const progressKey = achievement.id;
+                let currentProgress = ach.progress[progressKey] || 0;
+                let newProgress = currentProgress;
 
-                if (req.type === 'stat') {
-                    const currentValue = ach.stats[req.key] || 0;
-                    if (currentValue >= req.value) {
-                        unlocked = true;
+                // 计算当前进度
+                if (req) {
+                    if (req.type === 'stat') {
+                        const statValue = ach.stats[req.key] || 0;
+                        newProgress = Math.max(currentProgress, statValue);
+                        ach.progress[progressKey] = newProgress;
+                    } else if (req.type === 'realm') {
+                        newProgress = Math.max(currentProgress, gameState.realm);
+                        ach.progress[progressKey] = newProgress;
+                    } else if (req.type === 'set') {
+                        // 套装检查需要特殊处理
+                        const set = SET_BONUSES[req.setName];
+                        if (set) {
+                            const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                            const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                            const allPieces = [...new Set([...equipped, ...owned])];
+                            const collectedCount = set.pieces.filter(p => allPieces.includes(p)).length;
+                            newProgress = Math.max(currentProgress, collectedCount);
+                            ach.progress[progressKey] = newProgress;
+                        }
+                    } else if (req.type === 'allCommon') {
+                        // 检查所有common成就是否解锁
+                        const commonAchs = ACHIEVEMENTS.filter(a => a.rarity === 'common');
+                        const allUnlocked = commonAchs.every(a => ach.unlocked.includes(a.id));
+                        newProgress = allUnlocked ? 1 : 0;
+                        ach.progress[progressKey] = newProgress;
                     }
-                } else if (req.type === 'realm') {
-                    if (gameState.realm >= req.value) {
-                        unlocked = true;
-                    }
-                } else if (req.type === 'set') {
-                    // 检查套装是否收集完成
-                    const set = SET_BONUSES[req.setName];
-                    if (set) {
-                        const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
-                        const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
-                        const allPieces = [...new Set([...equipped, ...owned])];
-                        const hasAll = set.pieces.every(p => allPieces.includes(p));
-                        if (hasAll) unlocked = true;
-                    }
+                } else if (achievement.stages) {
+                    // 有阶段系统的成就，根据阶段目标更新进度
+                    // 进度来源由外部更新（如cultivation_count等）
+                    newProgress = currentProgress;
                 }
 
-                if (unlocked) {
-                    ach.unlocked.push(achievement.id);
-                    if (achievement.title && !ach.titles.includes(achievement.title)) {
-                        ach.titles.push(achievement.title);
-                        // 如果没有装备称号，自动装备新称号
-                        if (!gameState.title || gameState.title === '筑基修士') {
-                            gameState.title = achievement.title;
+                // 处理阶段奖励解锁
+                if (achievement.stages) {
+                    const claimed = ach.claimedStages[progressKey] || [];
+                    for (let i = 0; i < achievement.stages.length; i++) {
+                        if (claimed.includes(i)) continue;
+                        const stage = achievement.stages[i];
+                        if (newProgress >= stage.value) {
+                            // 解锁该阶段奖励
+                            applyAchievementReward(stage.reward);
+                            claimed.push(i);
+                            addLog('good', '🏆 阶段奖励解锁', `【${achievement.name}】阶段${i+1}奖励已发放！`);
                         }
                     }
-                    addLog('good', '🏆 成就解锁', `【${achievement.name}】${achievement.desc}！获得称号：${achievement.title}`);
-                    saveGame();
+                    ach.claimedStages[progressKey] = claimed;
+                }
+
+                // 检查成就是否完全解锁（对于非阶段制成就）
+                const alreadyUnlocked = ach.unlocked.includes(achievement.id);
+                if (!alreadyUnlocked) {
+                    let unlocked = false;
+
+                    if (req) {
+                        if (req.type === 'stat') {
+                            if ((ach.stats[req.key] || 0) >= req.value) unlocked = true;
+                        } else if (req.type === 'realm') {
+                            if (gameState.realm >= req.value) unlocked = true;
+                        } else if (req.type === 'set') {
+                            const set = SET_BONUSES[req.setName];
+                            if (set) {
+                                const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                                const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                                const allPieces = [...new Set([...equipped, ...owned])];
+                                unlocked = set.pieces.every(p => allPieces.includes(p));
+                            }
+                        } else if (req.type === 'allCommon') {
+                            unlocked = newProgress >= 1;
+                        }
+                    } else if (achievement.stages) {
+                        // 阶段制成就：所有阶段都完成才算完全解锁
+                        const lastStage = achievement.stages[achievement.stages.length - 1];
+                        if (newProgress >= lastStage.value) unlocked = true;
+                    }
+
+                    if (unlocked) {
+                        ach.unlocked.push(achievement.id);
+                        
+                        // 应用奖励（阶段制成就的最终奖励）
+                        if (achievement.reward) {
+                            applyAchievementReward(achievement.reward);
+                        }
+                        
+                        // 给予称号
+                        if (achievement.title && !ach.titles.includes(achievement.title)) {
+                            ach.titles.push(achievement.title);
+                            if (!gameState.title || gameState.title === '筑基修士') {
+                                gameState.title = achievement.title;
+                            }
+                        }
+
+                        // 计算并添加赛季积分
+                        const points = getAchievementPoints(achievement.rarity);
+                        ach.seasonPoints += points;
+
+                        // 飘字提示
+                        const rarityIcon = achievement.rarity === 'legendary' ? '⭐' : achievement.rarity === 'mythic' ? '🌟' : '🏆';
+                        addLog('good', `${rarityIcon} 成就解锁`, `【${achievement.name}】${achievement.desc}！+${points}赛季积分`);
+                        
+                        // 保存游戏
+                        saveGame();
+                    }
                 }
             }
+        }
+
+        // ===== applyAchievementReward (V28扩展) =====
+        function applyAchievementReward(reward) {
+            if (!reward) return;
+            switch (reward.type) {
+                case 'attribute':
+                    // 属性加成记录到对应字段（由getTitleBonus处理）
+                    break;
+                case 'title':
+                    if (reward.title && gameState.achievements && !gameState.achievements.titles.includes(reward.title)) {
+                        gameState.achievements.titles.push(reward.title);
+                    }
+                    break;
+                case 'frame':
+                    gameState.equippedFrame = reward.item;
+                    addLog('good', '头像框获得', `获得头像框：${reward.item}`);
+                    break;
+                case 'bubble':
+                    gameState.equippedBubble = reward.item;
+                    addLog('good', '气泡获得', `获得气泡：${reward.item}`);
+                    break;
+                case 'item':
+                    if (reward.item && reward.quantity) {
+                        addToInventory(reward.item, reward.quantity);
+                        addLog('good', '道具获得', `获得 ${reward.item} x${reward.quantity}`);
+                    }
+                    break;
+                case 'pet':
+                    // 宠物解锁逻辑
+                    break;
+            }
+        }
+
+        // ===== getSeasonCountdown =====
+        function getSeasonCountdown() {
+            const season = SEASONS.find(s => s.id === gameState.currentSeason);
+            if (!season) return '无活动赛季';
+            const end = new Date(season.endDate).getTime();
+            const now = Date.now();
+            const days = Math.max(0, Math.floor((end - now) / (1000 * 60 * 60 * 24)));
+            const hours = Math.max(0, Math.floor((end - now) / (1000 * 60 * 60)) % 24);
+            return `剩余 ${days} 天 ${hours} 小时`;
+        }
+
+        // ===== claimAchievementStage =====
+        function claimAchievementStage(achId, stageIdx) {
+            const ach = ACHIEVEMENTS.find(a => a.id === achId);
+            if (!ach || !ach.stages) return;
+            const stage = ach.stages[stageIdx];
+            if (!stage) return;
+            
+            const claimed = gameState.achievements.claimedStages[achId] || [];
+            if (claimed.includes(stageIdx)) {
+                addLog('warn', '阶段奖励', '已领取过该阶段奖励');
+                return;
+            }
+            
+            // 应用奖励
+            applyAchievementReward(stage.reward);
+            
+            // 标记已领取
+            if (!gameState.achievements.claimedStages[achId]) {
+                gameState.achievements.claimedStages[achId] = [];
+            }
+            gameState.achievements.claimedStages[achId].push(stageIdx);
+            
+            addLog('good', '阶段奖励领取', `${ach.name} 阶段${stageIdx + 1}奖励已发放`);
+            updateDisplay();
+            saveGame();
+        }
+
+        // ===== claimSeasonReward =====
+        function claimSeasonReward(rewardIdx) {
+            const season = SEASONS.find(s => s.id === gameState.currentSeason);
+            if (!season) return;
+            const reward = season.rewards[rewardIdx];
+            if (!reward) return;
+            
+            if (gameState.achievements.seasonRewards.includes(rewardIdx)) {
+                addLog('warn', '赛季奖励', '已领取过该奖励');
+                return;
+            }
+            
+            if (gameState.achievements.seasonPoints < reward.points) {
+                addLog('warn', '赛季奖励', `积分不足，需要 ${reward.points} 积分，当前 ${gameState.achievements.seasonPoints}`);
+                return;
+            }
+            
+            gameState.achievements.seasonPoints -= reward.points;
+            gameState.achievements.seasonRewards.push(rewardIdx);
+            
+            if (reward.type === 'frame') gameState.equippedFrame = reward.item;
+            if (reward.type === 'bubble') gameState.equippedBubble = reward.item;
+            if (reward.type === 'title' && reward.item) {
+                if (!gameState.achievements.titles.includes(reward.item)) {
+                    gameState.achievements.titles.push(reward.item);
+                }
+            }
+            
+            addLog('good', '赛季奖励', `已兑换：${reward.item}`);
+            updateDisplay();
+            saveGame();
+        }
+
+        // ===== filterAchievements =====
+        let currentAchievementFilter = 'all';
+        function filterAchievements(category) {
+            currentAchievementFilter = category;
+            renderAchievements();
+        }
+
+        // ===== renderAchievements (V28全新界面) =====
+        function renderAchievements() {
+            const content = document.getElementById('achievementContent');
+            if (!content) return;
+
+            const ach = gameState.achievements || { 
+                unlocked: [], 
+                titles: [], 
+                stats: {},
+                progress: {},
+                claimedStages: {},
+                seasonPoints: 0,
+                seasonRewards: []
+            };
+
+            const rarities = { common: '#9E9E9E', rare: '#2196F3', legendary: '#9C27B0', mythic: '#FFD700' };
+            const categories = ['cultivation', 'combat', 'story', 'collection', 'exploration', 'social', 'special'];
+            const categoryNames = { cultivation: '修炼', combat: '战斗', story: '剧情', collection: '收藏', exploration: '探索', social: '社交', special: '特殊' };
+            
+            // 赛季信息
+            const season = SEASONS.find(s => s.id === gameState.currentSeason);
+            
+            let html = `<div class="achievement-header">
+                <div style="text-align:center;margin-bottom:10px;">
+                    <div style="color:#ffd700;font-size:16px;">🏆 ${season ? season.name : '赛季'}</div>
+                    <div style="color:#aaa;font-size:12px;">⏰ ${getSeasonCountdown()}</div>
+                    <div style="color:#4caf50;font-size:14px;">⭐ 赛季积分: ${ach.seasonPoints}</div>
+                </div>
+            </div>`;
+            
+            // 赛季奖励兑换
+            if (season && season.rewards.length > 0) {
+                html += `<div style="margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">`;
+                html += `<div style="color:#fff;font-size:13px;margin-bottom:8px;">🎁 赛季奖励兑换</div>`;
+                for (let i = 0; i < season.rewards.length; i++) {
+                    const r = season.rewards[i];
+                    const claimed = ach.seasonRewards.includes(i);
+                    const canClaim = ach.seasonPoints >= r.points && !claimed;
+                    const icon = r.type === 'frame' ? '🖼️' : r.type === 'bubble' ? '💬' : '👑';
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:5px 0;padding:5px;background:${claimed ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.05)'};border-radius:4px;">
+                        <span>${icon} ${r.item} (${r.points}积分)</span>
+                        <button onclick="claimSeasonReward(${i})" ${canClaim ? '' : 'disabled'} style="padding:3px 10px;font-size:11px;background:${claimed ? '#666' : '#4caf50'};color:#fff;border:none;border-radius:3px;cursor:${canClaim ? 'pointer' : 'default'};">
+                            ${claimed ? '已兑换' : '兑换'}
+                        </button>
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            // 当前头像框/气泡/称号显示
+            html += `<div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">`;
+            if (ach.titles.length > 0) {
+                html += `<div style="padding:5px 10px;background:rgba(255,215,0,0.2);border-radius:4px;font-size:12px;">👑 ${gameState.title || '无'}</div>`;
+            }
+            if (gameState.equippedFrame) {
+                html += `<div style="padding:5px 10px;background:rgba(33,150,243,0.2);border-radius:4px;font-size:12px;">🖼️ ${gameState.equippedFrame}</div>`;
+            }
+            if (gameState.equippedBubble) {
+                html += `<div style="padding:5px 10px;background:rgba(156,39,176,0.2);border-radius:4px;font-size:12px;">💬 ${gameState.equippedBubble}</div>`;
+            }
+            html += `</div>`;
+
+            // 标签筛选
+            html += `<div class="achievement-tabs" style="display:flex;gap:5px;margin-bottom:15px;flex-wrap:wrap;">`;
+            html += `<button class="tab-btn ${currentAchievementFilter === 'all' ? 'active' : ''}" onclick="filterAchievements('all')" style="padding:5px 12px;font-size:12px;background:${currentAchievementFilter === 'all' ? '#4caf50' : '#333'};color:#fff;border:none;border-radius:4px;cursor:pointer;">全部</button>`;
+            for (const c of categories) {
+                const count = ACHIEVEMENTS.filter(a => a.category === c).length;
+                html += `<button class="tab-btn ${currentAchievementFilter === c ? 'active' : ''}" onclick="filterAchievements('${c}')" style="padding:5px 12px;font-size:12px;background:${currentAchievementFilter === c ? '#4caf50' : '#333'};color:#fff;border:none;border-radius:4px;cursor:pointer;">${categoryNames[c]}(${count})</button>`;
+            }
+            html += `</div>`;
+
+            // 成就列表
+            const filteredAchs = currentAchievementFilter === 'all' 
+                ? ACHIEVEMENTS 
+                : ACHIEVEMENTS.filter(a => a.category === currentAchievementFilter);
+
+            html += `<div class="achievement-list">`;
+            for (const a of filteredAchs) {
+                const unlocked = ach.unlocked.includes(a.id);
+                const progress = ach.progress[a.id] || 0;
+                const rarityColor = rarities[a.rarity] || '#9E9E9E';
+                const rarityName = { common: '普通', rare: '稀有', legendary: '传说', mythic: '神话' }[a.rarity] || '普通';
+                
+                // 计算百分比
+                let targetValue = 100;
+                let hasStages = false;
+                if (a.stages) {
+                    hasStages = true;
+                    targetValue = a.stages[a.stages.length - 1].value;
+                } else if (a.requirement && a.requirement.value) {
+                    targetValue = a.requirement.value;
+                }
+                const pct = Math.min(100, Math.round((progress / targetValue) * 100));
+                
+                // 名称显示（隐藏成就未解锁时显示???）
+                const displayName = (a.secret && !unlocked) ? '???' : a.name;
+                const displayDesc = (a.secret && !unlocked) ? '隐藏成就' : a.desc;
+                
+                // 稀有度图标
+                const rarityIcon = a.rarity === 'legendary' ? '⭐' : a.rarity === 'mythic' ? '🌟' : '•';
+                const points = getAchievementPoints(a.rarity);
+                
+                // 阶段奖励预览
+                let stagePreview = '';
+                let stageButtons = '';
+                if (a.stages) {
+                    const claimed = ach.claimedStages[a.id] || [];
+                    for (let i = 0; i < a.stages.length; i++) {
+                        const stage = a.stages[i];
+                        const isClaimed = claimed.includes(i);
+                        const canClaim = progress >= stage.value && !isClaimed;
+                        const rewardText = stage.reward.type === 'attribute' 
+                            ? `+${Math.round(stage.reward.bonus * 100)}% ${stage.reward.target}` 
+                            : stage.reward.type === 'title' ? stage.reward.title
+                            : stage.reward.type === 'frame' ? stage.reward.item
+                            : stage.reward.type === 'bubble' ? stage.reward.item
+                            : stage.reward.type === 'item' ? `${stage.reward.item} x${stage.reward.quantity}`
+                            : stage.reward.type;
+                        
+                        stageButtons += `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;">
+                            <span style="color:${isClaimed ? '#4caf50' : canClaim ? '#ffd700' : '#666'}">阶段${i + 1}: ${progress}/${stage.value} → ${rewardText}</span>
+                            ${canClaim ? `<button onclick="claimAchievementStage('${a.id}', ${i})" style="padding:2px 8px;font-size:10px;background:#4caf50;color:#fff;border:none;border-radius:3px;cursor:pointer;">领取</button>` : ''}
+                            ${isClaimed ? '<span style="color:#4caf50;">✓</span>' : ''}
+                        </div>`;
+                    }
+                }
+                
+                html += `<div class="achievement-card ${unlocked ? 'unlocked' : ''}" style="border-left: 4px solid ${rarityColor}; margin-bottom: 10px; padding: 10px; background: ${unlocked ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.2)'}; border-radius: 4px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:${rarityColor};font-weight:bold;font-size:13px;">${rarityIcon} [${rarityName}] ${displayName}</span>
+                        <span style="color:#aaa;font-size:11px;">${unlocked ? '✓ 已解锁' : points + '分'}</span>
+                    </div>
+                    <div style="color:#ccc;margin:5px 0;font-size:12px;">${displayDesc}</div>
+                    ${!unlocked ? `
+                        <div style="background:#333;height:6px;border-radius:3px;margin:8px 0;">
+                            <div style="background:${rarityColor};height:6px;border-radius:3px;width:${pct}%;transition:width 0.3s;"></div>
+                        </div>
+                        <div style="color:#888;font-size:11px;">${progress}/${targetValue} (${pct}%)</div>
+                    ` : ''}
+                    ${stageButtons}
+                </div>`;
+            }
+            html += `</div>`;
+
+            // 已获得称号列表
+            if (ach.titles.length > 0) {
+                html += `<div style="margin-top:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;">`;
+                html += `<div style="color:#fff;font-size:13px;margin-bottom:8px;">👑 已获称号</div>`;
+                for (const t of ach.titles) {
+                    const isEquipped = gameState.title === t;
+                    html += `<div class="title-item ${isEquipped ? 'equipped' : ''}" onclick="equipTitle('${t}')" style="padding:5px 10px;margin:3px 0;background:${isEquipped ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.05)'};border-radius:4px;cursor:pointer;font-size:12px;">
+                        【${t}】${isEquipped ? '(已装备)' : '(点击装备)'}
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            content.innerHTML = html;
         }
 
         // ===== getTitleBonus =====
@@ -10733,78 +11111,476 @@
                 skill: null
             }
         };
+        // V28 成就系统大改版 - 30+成就/稀有度/赛季挑战/头像框气泡
         const ACHIEVEMENTS = [
+            // === 修炼类 (cultivation) ===
             {
                 id: 'tribulation_master',
                 name: '渡劫宗师',
                 desc: '渡过10次天劫',
                 category: 'cultivation',
+                rarity: 'rare',
+                secret: false,
                 requirement: { type: 'stat', key: 'tribulationsCompleted', value: 10 },
                 reward: { type: 'attribute', target: 'cultivationSpeed', bonus: 0.05 },
                 title: '渡劫宗师'
             },
             {
-                id: 'dungeon_slayer',
-                name: '秘境杀手',
-                desc: '击杀10个秘境首领',
-                category: 'combat',
-                requirement: { type: 'stat', key: 'dungeonBossesKilled', value: 10 },
-                reward: { type: 'attribute', target: 'attack', bonus: 0.03 },
-                title: '秘境杀手'
-            },
-            {
-                id: 'sect_founder',
-                name: '宗门创始人',
-                desc: '创建宗门',
-                category: 'story',
-                requirement: { type: 'stat', key: 'sectContributions', value: 1 },
-                reward: { type: 'attribute', target: 'sectContribution', bonus: 0.10 },
-                title: '宗门创始人'
-            },
-            {
-                id: 'treasure_master',
-                name: '炼器宗师',
-                desc: '强化9星装备1件',
-                category: 'collection',
-                requirement: { type: 'stat', key: 'treasuresRefined', value: 1 },
-                reward: { type: 'attribute', target: 'craftingSuccess', bonus: 0.05 },
-                title: '炼器宗师'
+                id: 'cultivation_path',
+                name: '修炼之路',
+                desc: '累计修炼1000次',
+                category: 'cultivation',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 100, reward: { type: 'attribute', target: 'cultivationSpeed', bonus: 0.02 } },
+                    { value: 500, reward: { type: 'attribute', target: 'cultivationSpeed', bonus: 0.03 } },
+                    { value: 1000, reward: { type: 'title', title: '修炼狂人' } }
+                ]
             },
             {
                 id: 'serendipity_finder',
                 name: '天选之人',
                 desc: '触发20次奇遇',
                 category: 'cultivation',
+                rarity: 'rare',
+                secret: false,
                 requirement: { type: 'stat', key: 'serendipitiesEncountered', value: 20 },
                 reward: { type: 'attribute', target: 'serendipityRate', bonus: 0.05 },
                 title: '天选之人'
+            },
+            {
+                id: 'realm_ascension',
+                name: '境界突破',
+                desc: '突破到更高境界',
+                category: 'cultivation',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 2, reward: { type: 'attribute', target: 'cultivationBase', bonus: 0.05 } },
+                    { value: 4, reward: { type: 'attribute', target: 'cultivationBase', bonus: 0.10 } },
+                    { value: 6, reward: { type: 'frame', item: '头像框·筑基' } }
+                ]
+            },
+            {
+                id: 'spirit_energy_master',
+                name: '灵气大师',
+                desc: '灵气上限达到10000',
+                category: 'cultivation',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 5000, reward: { type: 'attribute', target: 'maxQi', bonus: 0.10 } },
+                    { value: 10000, reward: { type: 'bubble', item: '气泡·灵气充沛' } }
+                ]
+            },
+            // === 战斗类 (combat) ===
+            {
+                id: 'dungeon_slayer',
+                name: '秘境杀手',
+                desc: '击杀10个秘境首领',
+                category: 'combat',
+                rarity: 'rare',
+                secret: false,
+                requirement: { type: 'stat', key: 'dungeonBossesKilled', value: 10 },
+                reward: { type: 'attribute', target: 'attack', bonus: 0.03 },
+                title: '秘境杀手'
+            },
+            {
+                id: 'pvp_champion',
+                name: ' PVP之王',
+                desc: '在排行榜PVP中获得100场胜利',
+                category: 'combat',
+                rarity: 'legendary',
+                secret: false,
+                stages: [
+                    { value: 10, reward: { type: 'attribute', target: 'pvpBonus', bonus: 0.05 } },
+                    { value: 50, reward: { type: 'attribute', target: 'pvpBonus', bonus: 0.10 } },
+                    { value: 100, reward: { type: 'title', title: 'PVP之王' } }
+                ]
+            },
+            {
+                id: 'combat_veteran',
+                name: '战斗老兵',
+                desc: '参与100场战斗',
+                category: 'combat',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 20, reward: { type: 'attribute', target: 'attack', bonus: 0.02 } },
+                    { value: 50, reward: { type: 'attribute', target: 'defense', bonus: 0.02 } },
+                    { value: 100, reward: { type: 'attribute', target: 'attack', bonus: 0.05 } }
+                ]
+            },
+            {
+                id: 'arena_master',
+                name: '斗法场霸主',
+                desc: '在斗法场中获得50次胜利',
+                category: 'combat',
+                rarity: 'rare',
+                secret: false,
+                requirement: { type: 'stat', key: 'arenaWins', value: 50 },
+                reward: { type: 'attribute', target: 'critPercent', bonus: 0.05 },
+                title: '斗法霸主'
+            },
+            {
+                id: 'boss_hunter',
+                name: 'BOSS猎人',
+                desc: '击杀各路BOSS',
+                category: 'combat',
+                rarity: 'legendary',
+                secret: true,
+                stages: [
+                    { value: 1, reward: { type: 'attribute', target: 'attack', bonus: 0.05 } },
+                    { value: 5, reward: { type: 'item', item: '天材', quantity: 10 } },
+                    { value: 10, reward: { type: 'title', title: 'BOSS克星' } }
+                ]
+            },
+            // === 剧情类 (story) ===
+            {
+                id: 'sect_founder',
+                name: '宗门创始人',
+                desc: '创建宗门',
+                category: 'story',
+                rarity: 'rare',
+                secret: false,
+                requirement: { type: 'stat', key: 'sectContributions', value: 1 },
+                reward: { type: 'attribute', target: 'sectContribution', bonus: 0.10 },
+                title: '宗门创始人'
             },
             {
                 id: 'first_ascension',
                 name: '飞升者',
                 desc: '首次突破化神',
                 category: 'story',
+                rarity: 'legendary',
+                secret: false,
                 requirement: { type: 'realm', value: 4 },
                 reward: { type: 'attribute', target: 'realmSuppression', bonus: 0.10 },
                 title: '飞升者'
+            },
+            {
+                id: 'story_chapter',
+                name: '剧情探索者',
+                desc: '完成剧情章节',
+                category: 'story',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 3, reward: { type: 'attribute', target: 'storyBonus', bonus: 0.05 } },
+                    { value: 10, reward: { type: 'bubble', item: '气泡·剧情达人' } },
+                    { value: 20, reward: { type: 'title', title: '剧情大师' } }
+                ]
+            },
+            {
+                id: 'reincarnation_sage',
+                name: '轮回仙人',
+                desc: '转世重生3次',
+                category: 'story',
+                rarity: 'legendary',
+                secret: false,
+                stages: [
+                    { value: 1, reward: { type: 'attribute', target: 'soulAgeBonus', bonus: 0.10 } },
+                    { value: 2, reward: { type: 'frame', item: '头像框·轮回' } },
+                    { value: 3, reward: { type: 'title', title: '轮回仙人' } }
+                ]
+            },
+            // === 收藏类 (collection) ===
+            {
+                id: 'treasure_master',
+                name: '炼器宗师',
+                desc: '强化9星装备1件',
+                category: 'collection',
+                rarity: 'rare',
+                secret: false,
+                requirement: { type: 'stat', key: 'treasuresRefined', value: 1 },
+                reward: { type: 'attribute', target: 'craftingSuccess', bonus: 0.05 },
+                title: '炼器宗师'
             },
             {
                 id: 'equipment_collector',
                 name: '套装收藏家',
                 desc: '收集全套青云套装',
                 category: 'collection',
+                rarity: 'rare',
+                secret: false,
                 requirement: { type: 'set', setName: '青云套装' },
                 reward: { type: 'attribute', target: 'setBonus', bonus: 0.15 },
                 title: '套装收藏家'
             },
             {
+                id: 'inventory_expand',
+                name: '收藏家',
+                desc: '背包物品达到上限',
+                category: 'collection',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 50, reward: { type: 'attribute', target: 'inventorySize', bonus: 0.10 } },
+                    { value: 100, reward: { type: 'attribute', target: 'inventorySize', bonus: 0.15 } },
+                    { value: 200, reward: { type: 'frame', item: '头像框·收藏家' } }
+                ]
+            },
+            {
+                id: 'constitution_collector',
+                name: '体质收集者',
+                desc: '收集各种体质',
+                category: 'collection',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 3, reward: { type: 'attribute', target: 'constitutionBonus', bonus: 0.05 } },
+                    { value: 6, reward: { type: 'attribute', target: 'constitutionBonus', bonus: 0.10 } },
+                    { value: 10, reward: { type: 'title', title: '体质大师' } }
+                ]
+            },
+            {
+                id: 'pet_collector',
+                name: '灵兽收藏家',
+                desc: '收集5种不同宠物',
+                category: 'collection',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 3, reward: { type: 'attribute', target: 'petBonus', bonus: 0.05 } },
+                    { value: 5, reward: { type: 'bubble', item: '气泡·灵兽相伴' } },
+                    { value: 10, reward: { type: 'title', title: '灵兽宗师' } }
+                ]
+            },
+            // === 探索类 (exploration) ===
+            {
+                id: 'world_explorer',
+                name: '世界探索者',
+                desc: '探索世界地图50次',
+                category: 'exploration',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 10, reward: { type: 'attribute', target: 'explorationBonus', bonus: 0.03 } },
+                    { value: 30, reward: { type: 'item', item: '天材', quantity: 5 } },
+                    { value: 50, reward: { type: 'frame', item: '头像框·探索者' } }
+                ]
+            },
+            {
+                id: 'dungeon_explorer',
+                name: '秘境探索者',
+                desc: '通关秘境20次',
+                category: 'exploration',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 5, reward: { type: 'attribute', target: 'dungeonBonus', bonus: 0.05 } },
+                    { value: 10, reward: { type: 'item', item: '混沌石', quantity: 1 } },
+                    { value: 20, reward: { type: 'title', title: '秘境探索者' } }
+                ]
+            },
+            {
+                id: 'map_revealer',
+                name: '地图测绘师',
+                desc: '解锁地图上50个地点',
+                category: 'exploration',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 20, reward: { type: 'attribute', target: 'mapBonus', bonus: 0.05 } },
+                    { value: 35, reward: { type: 'attribute', target: 'serendipityRate', bonus: 0.05 } },
+                    { value: 50, reward: { type: 'bubble', item: '气泡·测绘师' } }
+                ]
+            },
+            // === 社交类 (social) ===
+            {
+                id: 'social_butterfly',
+                name: '社交达人',
+                desc: '与其他玩家互动100次',
+                category: 'social',
+                rarity: 'common',
+                secret: false,
+                stages: [
+                    { value: 20, reward: { type: 'attribute', target: 'socialBonus', bonus: 0.03 } },
+                    { value: 50, reward: { type: 'attribute', target: 'socialBonus', bonus: 0.05 } },
+                    { value: 100, reward: { type: 'frame', item: '头像框·社交达人' } }
+                ]
+            },
+            {
+                id: 'sect_builder',
+                name: '宗门建设者',
+                desc: '为宗门贡献10000资源',
+                category: 'social',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 1000, reward: { type: 'attribute', target: 'sectBonus', bonus: 0.05 } },
+                    { value: 5000, reward: { type: 'attribute', target: 'sectBonus', bonus: 0.10 } },
+                    { value: 10000, reward: { type: 'title', title: '宗门功臣' } }
+                ]
+            },
+            // === 特殊类 (special) ===
+            {
                 id: 'flawless_tribulation',
                 name: '完美渡劫',
                 desc: '零消耗渡劫成功',
                 category: 'special',
+                rarity: 'legendary',
+                secret: true,
                 requirement: { type: 'stat', key: 'flawlessTribulations', value: 1 },
                 reward: { type: 'attribute', target: 'tribulationCost', bonus: -0.10 },
                 title: '完美渡劫'
+            },
+            {
+                id: 'dedicated_player',
+                name: '坚持不懈',
+                desc: '连续登录游戏30天',
+                category: 'special',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 7, reward: { type: 'item', item: '天材', quantity: 3 } },
+                    { value: 14, reward: { type: 'item', item: '混沌石', quantity: 1 } },
+                    { value: 30, reward: { type: 'title', title: '修仙楷模' } }
+                ]
+            },
+            {
+                id: 'wealthy_cultivator',
+                name: '富甲一方',
+                desc: '累计拥有100000灵石',
+                category: 'special',
+                rarity: 'rare',
+                secret: false,
+                stages: [
+                    { value: 10000, reward: { type: 'attribute', target: 'tradeBonus', bonus: 0.05 } },
+                    { value: 50000, reward: { type: 'bubble', item: '气泡·财大气粗' } },
+                    { value: 100000, reward: { type: 'title', title: '灵石富翁' } }
+                ]
+            },
+            {
+                id: 'mythic_realm',
+                name: '神话境界',
+                desc: '突破到神话境界',
+                category: 'special',
+                rarity: 'mythic',
+                secret: true,
+                requirement: { type: 'realm', value: 10 },
+                reward: { type: 'frame', item: '头像框·神话' },
+                title: '神话仙人'
+            },
+            {
+                id: 'perfectionist',
+                name: '完美主义者',
+                desc: '收集所有普通成就',
+                category: 'special',
+                rarity: 'mythic',
+                secret: true,
+                requirement: { type: 'allCommon', value: 1 },
+                reward: { type: 'title', title: '完美主义者' }
+            },
+            // === 赛季专属成就 (s1) ===
+            {
+                id: 's1_cultivation',
+                name: '赛季修炼者',
+                desc: '第一赛季修炼500次',
+                category: 'special',
+                rarity: 'legendary',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 200, reward: { type: 'item', item: '天材', quantity: 5 } },
+                    { value: 500, reward: { type: 'attribute', target: 'cultivationSpeed', bonus: 0.10 } }
+                ]
+            },
+            {
+                id: 's1_pvp_mvp',
+                name: '赛季MVP',
+                desc: '第一赛季获得50场PVP胜利',
+                category: 'special',
+                rarity: 'legendary',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 20, reward: { type: 'item', item: '混沌石', quantity: 1 } },
+                    { value: 50, reward: { type: 'title', title: '赛季MVP' } }
+                ]
+            },
+            {
+                id: 's1_explorer',
+                name: '赛季探索家',
+                desc: '第一赛季探索30次',
+                category: 'special',
+                rarity: 'rare',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 15, reward: { type: 'item', item: '天材', quantity: 3 } },
+                    { value: 30, reward: { type: 'frame', item: '赛季头像框·探索' } }
+                ]
+            },
+            {
+                id: 's1_collector',
+                name: '赛季收藏家',
+                desc: '第一赛季收集10件套装',
+                category: 'special',
+                rarity: 'rare',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 5, reward: { type: 'attribute', target: 'collectionBonus', bonus: 0.05 } },
+                    { value: 10, reward: { type: 'bubble', item: '赛季气泡·收藏' } }
+                ]
+            },
+            {
+                id: 's1_dedicated',
+                name: '赛季坚持者',
+                desc: '第一赛季登录20天',
+                category: 'special',
+                rarity: 'rare',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 10, reward: { type: 'item', item: '天材', quantity: 2 } },
+                    { value: 20, reward: { type: 'attribute', target: 'loginBonus', bonus: 0.05 } }
+                ]
+            },
+            {
+                id: 's1_legendary',
+                name: '赛季传奇',
+                desc: '第一赛季获得5000赛季积分',
+                category: 'special',
+                rarity: 'mythic',
+                secret: true,
+                season: 's1',
+                stages: [
+                    { value: 2000, reward: { type: 'item', item: '混沌石', quantity: 2 } },
+                    { value: 5000, reward: { type: 'title', title: '第一赛季·传奇' } }
+                ]
+            }
+        ];
+
+        // V28 成就ID兼容性映射
+        const ACHIEVEMENT_ID_MAP = {
+            'tribulation_master': 'tribulation_master',
+            'dungeon_slayer': 'dungeon_slayer',
+            'sect_founder': 'sect_founder',
+            'treasure_master': 'treasure_master',
+            'serendipity_finder': 'serendipity_finder',
+            'first_ascension': 'first_ascension',
+            'equipment_collector': 'equipment_collector',
+            'flawless_tribulation': 'flawless_tribulation'
+        };
+
+        // V28 赛季系统常量
+        const SEASONS = [
+            {
+                id: 's1',
+                name: '第一赛季：青云之路',
+                startDate: '2026-05-12',
+                endDate: '2026-06-12',
+                theme: 'cultivation',
+                achievements: ['s1_cultivation', 's1_pvp_mvp', 's1_explorer', 's1_collector', 's1_dedicated', 's1_legendary'],
+                rewards: [
+                    { points: 1000, item: '赛季头像框·青云', type: 'frame' },
+                    { points: 2000, item: '赛季气泡·青云', type: 'bubble' },
+                    { points: 5000, item: '赛季称号·青云仙人', type: 'title' },
+                ],
+                pointsMultiplier: 2.0,
             }
         ];
         let combatEnergy = 0;
@@ -11004,7 +11780,7 @@
                 gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
                 gameState.qi = Math.floor(gameState.qi / 2);
                 initializeConstitutionEffects();
-                if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+                if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {}, progress: {}, claimedStages: {}, seasonPoints: 0, seasonRewards: [] };
                 gameState.achievements.stats.tribulationsCompleted++;
                 if (gameState.tribulation && gameState.tribulation.damageTaken === 0) {
                     gameState.achievements.stats.flawlessTribulations++;
@@ -11599,7 +12375,7 @@
 
                 // A5 成就检查 - 强化9星装备成功
                 if (star === 9 && newStar === 10) {
-                    if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+                    if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {}, progress: {}, claimedStages: {}, seasonPoints: 0, seasonRewards: [] };
                     gameState.achievements.stats.treasuresRefined++;
                     checkAchievements();
                 }
@@ -14037,7 +14813,6 @@
                 });
             }
         }
-        }
 
 // ===== sect.js =====
 
@@ -14201,7 +14976,7 @@
             addLog('good', '宗门创建', `恭喜！${name}正式成立，你成为开山宗主！`);
 
             // A5 成就检查 - 宗门创建
-            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {}, progress: {}, claimedStages: {}, seasonPoints: 0, seasonRewards: [] };
             gameState.achievements.stats.sectContributions++;
             checkAchievements();
 
@@ -16380,7 +17155,7 @@
             if (serendipity.log.length > 20) serendipity.log.pop();
 
             // A5 成就检查 - 奇遇触发
-            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {}, progress: {}, claimedStages: {}, seasonPoints: 0, seasonRewards: [] };
             gameState.achievements.stats.serendipitiesEncountered++;
             checkAchievements();
 
@@ -18046,7 +18821,7 @@
             addLog('good', '首领击败', `艰难击败${bossName}！获得${expGain}修为！`);
 
             // A5 成就检查 - 秘境首领击杀
-            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {} };
+            if (!gameState.achievements) gameState.achievements = { unlocked: [], titles: [], stats: {}, progress: {}, claimedStages: {}, seasonPoints: 0, seasonRewards: [] };
             gameState.achievements.stats.dungeonBossesKilled++;
             checkAchievements();
 
@@ -18521,9 +19296,22 @@
                             treasuresRefined: 0,
                             serendipitiesEncountered: 0,
                             flawlessTribulations: 0
-                        }
+                        },
+                        progress: {},
+                        claimedStages: {},
+                        seasonPoints: 0,
+                        seasonRewards: []
                     };
                 }
+                // V28 新字段向后兼容
+                if (!gameState.achievements.progress) gameState.achievements.progress = {};
+                if (!gameState.achievements.claimedStages) gameState.achievements.claimedStages = {};
+                if (!gameState.achievements.seasonPoints) gameState.achievements.seasonPoints = 0;
+                if (!gameState.achievements.seasonRewards) gameState.achievements.seasonRewards = [];
+                if (!gameState.equippedFrame) gameState.equippedFrame = null;
+                if (!gameState.equippedBubble) gameState.equippedBubble = null;
+                if (!gameState.currentSeason) gameState.currentSeason = 's1';
+                if (!gameState.displaySettings) gameState.displaySettings = { showTitle: true, showFrame: true, showBubble: true };
                 // 仙宠系统向后兼容
                 if (!gameState.pets) gameState.pets = [];
                 if (!gameState.summonedPet) gameState.summonedPet = null;
