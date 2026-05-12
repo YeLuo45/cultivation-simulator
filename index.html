@@ -5515,7 +5515,9 @@
             { id: 33, name: '第三十三重天·道天', desc: '天道最终奥秘', lore: '道天是三十三天的尽头，也是天道最终奥秘的所在。传闻只有超脱者方能踏入此地，领悟天道最终奥义...' },
             { id: 34, name: '第三十四重天·天外天', desc: '诸天之外之地', lore: '天外天藏于诸天之上，是超脱者方能触及的禁忌领域。此地蕴含打破天道枷锁的秘密...' },
             { id: 35, name: '第三十五重天·虚道天', desc: '虚空证道之所', lore: '虚道天无天无地，唯有一片混沌虚空。传说在此地可以剥离一切后天之道，回归先天本源...' },
-            { id: 36, name: '第三十六重天·本源天', desc: '天道本源之地', lore: '本源天是天道法则的起源，是一切道法的根源。传闻踏入此地者将与天道合真，成为新的天道化身...' }
+            { id: 36, name: '第三十六重天·本源天', desc: '天道本源之地', lore: '本源天是天道法则的起源，是一切道法的根源。传闻踏入此地者将与天道合真，成为新的天道化身...' },
+            { id: 37, name: '第三十七重天·超脱天', desc: '混沌虚无之地', lore: '超脱天藏于天道之外，是一片永恒的混沌虚无。只有集齐三十六枚法则印记的超脱者，方能触及此地...' },
+            { id: 38, name: '第三十八重天·天命天', desc: '最终归宿之地', lore: '天命天是所有超脱者的最终归宿，在此地将面临天道最终的选择：超脱、回归或永恒...' }
         ];
 
         // 主线剧情配置
@@ -18215,7 +18217,22 @@
                     lawsComprehended: [],
                     currentLawInsight: 0,
                     maxLawInsight: 100,
-                    lawFragmentOffered: 0
+                    lawFragmentOffered: 0,
+                    // A3 超脱天扩展
+                    lawImprints: [], // 36个法则印记，每境各一个
+                    hasTranscenderTitle: false, // 是否获得超脱者称号
+                    hasCompletedTranscendence: false, // 是否完成超脱天
+                    hasTitleChoice: false, // 是否面临天命抉择
+                    hiddenEventsTriggered: {}, // 隐藏事件触发记录 {heavenId: timestamp}
+                    // 虚无道祖战斗状态
+                    voidDaoAncestorState: {
+                        phase: 0, // 0未开始 1第一阶段 2第二阶段 3第三阶段
+                        dialoguesShown: [], // 已显示的对话
+                        defeated: false
+                    },
+                    // 天命归宿结局记录
+                    finalDestinyChoice: null, // 'transcend' | 'return' | 'eternal'
+                    newGamePlusUnlocked: false
                 };
                 addLog('story', '三十三天', '【第一幕：迷惘者】你从沉睡中醒来，发现自己身处天外天，却不记得自己的过去...一位神秘老者出现在你面前...');
             }
@@ -18254,10 +18271,17 @@
         function renderBeyondHeaven() {
             const bh = gameState.beyondHeaven;
             const beyondAreas = CONTINENTS['天外天'].regions;
+            const tth = gameState.thirtyThreeHeavens;
 
             // 计算属性
             const totalExplored = bh.exploredAreas.length;
             const mysteryCount = bh.mysteryLogs.length;
+
+            // A3 新增统计
+            const exploredHeavens = tth ? tth.visitedHeavens.length : 0;
+            const totalHeavens = 38; // A3扩展到38重天
+            const lawImprints = tth ? tth.lawImprints.length : 0;
+            const requiredImprints = 36; // 进入超脱天需要36个法则印记
 
             let html = `
                 <div class="beyond-heaven-header">
@@ -18278,6 +18302,19 @@
                         <div class="beyond-stat-label">神秘发现</div>
                         <div class="beyond-stat-value">${mysteryCount}</div>
                     </div>
+                </div>
+
+                <!-- A3 新增天境统计 -->
+                <div class="beyond-stats" style="margin-top:10px;">
+                    <div class="beyond-stat">
+                        <div class="beyond-stat-label">已探索天境</div>
+                        <div class="beyond-stat-value" style="color:#ffd700;">${exploredHeavens}/${totalHeavens}</div>
+                    </div>
+                    <div class="beyond-stat">
+                        <div class="beyond-stat-label">法则印记</div>
+                        <div class="beyond-stat-value" style="color:${lawImprints >= requiredImprints ? '#4caf50' : '#ff9800'};">${lawImprints}/${requiredImprints}</div>
+                    </div>
+                    ${lawImprints >= requiredImprints ? '<div class="beyond-stat"><div class="beyond-stat-label" style="color:#4caf50;">🌟 超脱天已解锁</div></div>' : ''}
                 </div>
 
                 <div class="beyond-area-grid">
@@ -18390,20 +18427,50 @@
                 </div>`;
             }
             
-            // 三十三天列表（显示解锁的）
+            // A3 三十三天列表 - 显示所有已解锁的天境，未解锁的显示为问号
             html += '<div class="heavens-grid">';
+            
+            // 首先显示所有已解锁的天境
             tth.unlockedHeavens.forEach(id => {
                 const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === id);
+                if (!heaven) return;
                 const visited = tth.visitedHeavens.includes(id);
                 const loreKnown = tth.loreDiscovered.includes(id);
+                
+                // 特殊图标 for 37 and 38
+                let specialIcon = '';
+                if (id === 37 && tth.hasTranscenderTitle) {
+                    specialIcon = '<span style="color:#9c27b0;">🌑</span>';
+                } else if (id === 38 && tth.finalDestinyChoice) {
+                    const endingColors = { transcend: '#9c27b0', return: '#4caf50', eternal: '#ffd700' };
+                    specialIcon = `<span style="color:${endingColors[tth.finalDestinyChoice] || '#ffd700'};">⭐</span>`;
+                }
                 
                 html += `<div class="heaven-card ${visited ? 'visited' : ''}" onclick="exploreHeaven(${id})">
                     <div class="heaven-name">${heaven.name}</div>
                     <div class="heaven-desc">${heaven.desc}</div>
                     ${visited ? '<span class="visited-badge">✓</span>' : ''}
                     ${loreKnown ? '<span class="lore-badge">📖</span>' : ''}
+                    ${specialIcon}
                 </div>`;
             });
+            
+            // A3 显示未解锁的天境（问号图标，颜色根据探索进度渐变）
+            const lockedHeavens = THIRTY_THREE_HEAVENS.filter(h => !tth.unlockedHeavens.includes(h.id));
+            if (lockedHeavens.length > 0) {
+                const progress = tth.visitedHeavens.length / 38; // 探索进度
+                const baseColor = progress < 0.5 ? '#666' : progress < 0.9 ? '#9c27b0' : '#ffd700';
+                
+                lockedHeavens.forEach(heaven => {
+                    // 只显示34-38的隐藏天境作为未解锁提示
+                    if (heaven.id >= 34) {
+                        html += `<div class="heaven-card" style="opacity:0.5;cursor:not-allowed;" onclick="showLockedHeavenHint(${heaven.id})">
+                            <div class="heaven-name" style="color:${baseColor};">❓${heaven.name.replace(/第.+重天·/, '')}</div>
+                            <div class="heaven-desc" style="color:#888;">[ 未解锁 ]</div>
+                        </div>`;
+                    }
+                });
+            }
             html += '</div>';
             
             // 已发现 lore 列表
@@ -18423,10 +18490,37 @@
             return html;
         }
 
+        // 显示锁定天境的提示
+        function showLockedHeavenHint(heavenId) {
+            const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === heavenId);
+            const tth = gameState.thirtyThreeHeavens;
+            
+            let hint = '';
+            if (heavenId === 37) {
+                const imprints = tth.lawImprints.length;
+                hint = `需要集齐36枚法则印记（当前${imprints}/36）方可进入超脱天`;
+            } else if (heavenId === 38) {
+                hint = '需要通关第37重天·超脱天方可进入天命归宿';
+            } else {
+                hint = '探索更多天境以解锁此隐藏天境';
+            }
+            
+            addLog('neutral', '天境提示', hint);
+        }
+
         // 探索某一重天
         function exploreHeaven(heavenId) {
             const tth = gameState.thirtyThreeHeavens;
             const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === heavenId);
+            
+            // A3 特殊天境处理
+            if (heavenId === 37) {
+                exploreTranscendenceHeaven();
+                return;
+            } else if (heavenId === 38) {
+                exploreDestinyHeaven();
+                return;
+            }
             
             // 标记为已访问
             if (!tth.visitedHeavens.includes(heavenId)) {
@@ -18466,8 +18560,34 @@
                 addLog('story', '道祖遗迹', '🏛️ 道祖遗迹已解锁！历代道祖的长眠之地，蕴含天道终极奥秘...');
             }
             
+            // 36天境各增加法则印记（每境获得1个）
+            if (heavenId >= 1 && heavenId <= 36 && !tth.lawImprints.includes(heavenId)) {
+                tth.lawImprints.push(heavenId);
+                const imprintCount = tth.lawImprints.length;
+                addLog('good', '法则印记', `你在${heaven.name}领悟了法则，获得第${imprintCount}枚法则印记！`);
+                
+                // 当获得36枚法则印记时，解锁第37超脱天
+                if (imprintCount >= 36 && !tth.unlockedHeavens.includes(37)) {
+                    unlockHeavenRange(37, 37);
+                    addLog('story', '超脱天解锁', '🌌 你已集齐36枚法则印记！第37重天·超脱天已解锁！');
+                }
+            }
+            
+            // A3 隐藏事件系统 - 每个天境5%概率触发
+            if (Math.random() < 0.05 && heavenId <= 36) {
+                // 检查是否已经触发过
+                const lastTriggered = tth.hiddenEventsTriggered[heavenId];
+                const now = Date.now();
+                // 冷却时间24小时（同一秘境）
+                if (!lastTriggered || (now - lastTriggered) > 86400000) {
+                    tth.hiddenEventsTriggered[heavenId] = now;
+                    triggerHiddenEvent(heavenId, heaven);
+                    return; // 隐藏事件会自己显示结果，不走正常流程
+                }
+            }
+            
             // 隐藏天境特殊效果
-            if (heavenId >= 34) {
+            if (heavenId >= 34 && heavenId <= 36) {
                 // 隐藏天境探索给予大量奖励
                 const bonusQi = (heavenId - 33) * 500;
                 gameState.qi = Math.min(gameState.maxQi, gameState.qi + bonusQi);
@@ -18488,6 +18608,686 @@
             // 显示探索结果
             showHeavenDiscoveryModal(heaven);
             saveGame();
+        }
+
+        // ===== A3 隐藏事件系统 =====
+        const HIDDEN_EVENTS = {
+            // 奇遇类
+            mysteriousMerchant: {
+                type: 'serendipity',
+                name: '神秘商人',
+                icon: '🏪',
+                description: '一位神秘的商人出现在你面前...',
+                options: [
+                    { text: '购买天道碎片', effect: () => { addItem('天道碎片', 1); return '获得天道碎片×1'; } },
+                    { text: '婉拒离开', effect: () => '你离开了神秘商人...' }
+                ]
+            },
+            ancientSoul: {
+                type: 'serendipity',
+                name: '上古残魂',
+                icon: '👻',
+                description: '一缕上古残魂向你诉说古老的秘密...',
+                options: [
+                    { text: '倾听并接受传承', effect: () => { gameState.qi += 200; return '获得200灵力加持'; } },
+                    { text: '礼貌告辞', effect: () => '残魂消散于虚空...' }
+                ]
+            },
+            heavenFragment: {
+                type: 'serendipity',
+                name: '天道碎片',
+                icon: '🔮',
+                description: '你发现了一块漂浮的天道碎片...',
+                options: [
+                    { text: '吸收碎片', effect: () => { addItem('天道碎片', 1); return '获得天道碎片×1'; } },
+                    { text: '放置不管', effect: () => '碎片消散于虚空...' }
+                ]
+            },
+            // 战斗类
+            heartDemonInvasion: {
+                type: 'combat',
+                name: '心魔入侵',
+                icon: '😈',
+                description: '心魔趁虚而入，试图侵蚀你的道心！',
+                combat: { hp: 50000, attack: 8000, reward: '心魔结晶×3' }
+            },
+            lawConflict: {
+                type: 'combat',
+                name: '法则冲突',
+                icon: '⚡',
+                description: '两种法则在此交汇，引发激烈冲突！',
+                combat: { hp: 30000, attack: 5000, reward: '法则感悟×5' }
+            },
+            karmaPunishment: {
+                type: 'combat',
+                name: '因果惩罚',
+                icon: '⛓️',
+                description: '你过往的因果孽债在此刻降临！',
+                combat: { hp: 40000, attack: 6000, reward: '因果之珠×2' }
+            },
+            // 剧情类
+            guardianTrial: {
+                type: 'story',
+                name: '天境守护者考验',
+                icon: '🛡️',
+                description: '天境守护者现身，要考验你的实力与心性...',
+                options: [
+                    { text: '接受考验', effect: () => { gameState.activeEffects.cultivate_speed += 0.05; return '考验通过！修炼速度+5%'; } },
+                    { text: '婉言拒绝', effect: () => '守护者消失于虚空...' }
+                ]
+            },
+            pastLifeMemory: {
+                type: 'story',
+                name: '前世记忆',
+                icon: '🔮',
+                description: '你的前世记忆如潮水般涌来...',
+                options: [
+                    { text: '接受记忆', effect: () => { gameState.activeEffects.attack += 0.03; return '领悟攻击+3%'; } },
+                    { text: '封印记忆', effect: () => '记忆重新封印...' }
+                ]
+            },
+            destinyHint: {
+                type: 'story',
+                name: '天命暗示',
+                icon: '✨',
+                description: '冥冥中有什么在暗示你未来的道路...',
+                options: [
+                    { text: '顺其自然', effect: () => { gameState.activeEffects.luck += 0.1; return '运势+10%'; } },
+                    { text: '追问详情', effect: () => '天机不可泄露...' }
+                ]
+            }
+        };
+
+        // 触发隐藏事件
+        function triggerHiddenEvent(heavenId, heaven) {
+            const events = Object.keys(HIDDEN_EVENTS);
+            const randomEvent = events[Math.floor(Math.random() * events.length)];
+            const eventData = HIDDEN_EVENTS[randomEvent];
+            
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#1a0a2e,#2d1b4e);border:2px solid #9c27b0;">
+                <h2 style="text-align:center;color:#e91e63;">✨ 隐藏事件 ✨</h2>
+                <div style="text-align:center;font-size:3em;margin:15px 0;">${eventData.icon}</div>
+                <h3 style="color:#ffd700;text-align:center;">${eventData.name}</h3>
+                <div class="discovery-lore">
+                    <p style="color:#e0e0e0;line-height:1.8;">${eventData.description}</p>
+                </div>`;
+            
+            if (eventData.type === 'combat') {
+                html += `<div style="text-align:center;margin:20px 0;">
+                    <p style="color:#ff5722;">危险战斗！</p>
+                    <p>敌人血量：${eventData.combat.hp.toLocaleString()}</p>
+                    <p>敌人攻击：${eventData.combat.attack.toLocaleString()}</p>
+                    <p style="color:#4caf50;">胜利奖励：${eventData.combat.reward}</p>
+                </div>
+                <div style="text-align:center;">
+                    <button class="btn btn-combat" onclick="startHiddenEventBattle(${heavenId}, '${randomEvent}')">⚔️ 迎战</button>
+                    <button class="btn btn-save" onclick="skipHiddenEvent()">🏃 撤退</button>
+                </div>`;
+            } else if (eventData.options) {
+                html += '<div style="text-align:center;margin-top:20px;">';
+                eventData.options.forEach((opt, idx) => {
+                    html += `<button class="btn" style="margin:5px;" onclick="resolveHiddenEvent(${heavenId}, '${randomEvent}', ${idx})">${opt.text}</button>`;
+                });
+                html += '</div>';
+            }
+            
+            html += `<div style="text-align:center;margin-top:15px;">
+                <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');" style="font-size:0.85em;">返回</button>
+            </div></div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        // 开始隐藏事件战斗
+        function startHiddenEventBattle(heavenId, eventKey) {
+            const eventData = HIDDEN_EVENTS[eventKey];
+            const combat = eventData.combat;
+            
+            // 玩家最大生命值
+            const playerMaxHP = 100 + gameState.realm * 100;
+            secretRealmState = {
+                wave: 0,
+                totalWaves: 1,
+                enemies: [{
+                    name: eventData.name,
+                    icon: eventData.icon,
+                    hp: combat.hp,
+                    maxHP: combat.hp,
+                    attack: combat.attack,
+                    realm: 10
+                }],
+                playerHP: playerMaxHP,
+                playerMaxHP: playerMaxHP,
+                rewards: [],
+                eventName: eventData.name,
+                isNegative: true,
+                realmName: '隐藏事件',
+                hiddenEventReward: combat.reward
+            };
+            
+            showSecretRealmBattleUI();
+        }
+
+        // 解决隐藏事件（非战斗选项）
+        function resolveHiddenEvent(heavenId, eventKey, optionIdx) {
+            const eventData = HIDDEN_EVENTS[eventKey];
+            const option = eventData.options[optionIdx];
+            const result = option.effect();
+            
+            addLog('good', '隐藏事件', `${eventData.name}：${result}`);
+            showHeavenDiscoveryModal(THIRTY_THREE_HEAVENS.find(h => h.id === heavenId));
+            saveGame();
+        }
+
+        // 跳过隐藏事件
+        function skipHiddenEvent() {
+            addLog('neutral', '隐藏事件', '你选择了撤退，隐藏事件消失于虚空...');
+            renderBeyondHeaven();
+            document.getElementById('beyondHeavenModal').classList.add('active');
+        }
+
+        // ===== A3 第37重天·超脱天（混沌虚无之地）=====
+        // 进入条件：天外天36天境全部完成（每境各获得1个法则印记，共36个）
+        // 敌人：虚无道祖（血量800万，攻击120万，超脱伤害无视防御）
+        // 奖励：超脱者称号 + 天道印记×99 + 混沌灵液×50
+        // 剧情对话（3段）
+
+        const VOID_DAO_ANCESTOR = {
+            name: '虚无道祖',
+            icon: '🌑',
+            totalHP: 8000000,
+            attack: 1200000,
+            phases: [
+                { name: '虚无降临', dialogue: '你已超越天道，但超脱之后...是什么？', hpThreshold: 0.7 },
+                { name: '虚空凝视', dialogue: '天道之外，虚无一片，你为何而来？', hpThreshold: 0.3 },
+                { name: '超脱之刻', dialogue: '原来超脱不是消失，而是...成为新的天道。', hpThreshold: 0 }
+            ]
+        };
+
+        function exploreTranscendenceHeaven() {
+            const tth = gameState.thirtyThreeHeavens;
+            const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === 37);
+            
+            // 标记为已访问
+            if (!tth.visitedHeavens.includes(37)) {
+                tth.visitedHeavens.push(37);
+            }
+            
+            // 如果尚未完成超脱天，开始战斗流程
+            if (!tth.hasCompletedTranscendence) {
+                startVoidDaoAncestorBattle();
+            } else {
+                // 已完成，显示完成状态
+                showHeavenDiscoveryModal(heaven);
+            }
+            saveGame();
+        }
+
+        function startVoidDaoAncestorBattle() {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            // 初始化虚无道祖状态
+            const vda = gameState.thirtyThreeHeavens.voidDaoAncestorState;
+            vda.phase = 1;
+            vda.dialoguesShown = [];
+            vda.defeated = false;
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#0a0a15,#1a1a2e,#0d0d1a);border:2px solid #4a148c;">
+                <h2 style="text-align:center;color:#9c27b0;">🌌 第37重天·超脱天 🌌</h2>
+                <div style="text-align:center;font-size:4em;margin:15px 0;">🌑</div>
+                <h3 style="color:#e91e63;text-align:center;font-size:1.5em;">虚无道祖</h3>
+                <div class="discovery-lore">
+                    <p style="color:#e0e0e0;line-height:1.8;font-size:1.1em;text-align:center;">${VOID_DAO_ANCESTOR.phases[0].dialogue}</p>
+                </div>
+                <div style="text-align:center;margin:20px 0;">
+                    <p style="color:#ff5722;font-size:1.2em;">⚠️ 警告：超脱伤害无视防御 ⚠️</p>
+                    <p style="color:#aaa;">敌人血量：${VOID_DAO_ANCESTOR.totalHP.toLocaleString()}</p>
+                    <p style="color:#aaa;">敌人攻击：${VOID_DAO_ANCESTOR.attack.toLocaleString()}</p>
+                </div>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-combat" onclick="startVoidDaoAncestorCombat()" style="background:linear-gradient(135deg,#4a148c,#7b1fa2);font-size:1.1em;padding:15px 40px;">⚔️ 进入战斗</button>
+                </div>
+                <div style="text-align:center;margin-top:15px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');" style="font-size:0.9em;">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function startVoidDaoAncestorCombat() {
+            const playerMaxHP = 100 + gameState.realm * 100;
+            
+            secretRealmState = {
+                wave: 0,
+                totalWaves: 3, // 3阶段战斗
+                enemies: [
+                    { name: '虚无道祖·第一阶段', icon: '🌑', hp: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.4), maxHP: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.4), attack: VOID_DAO_ANCESTOR.attack, realm: 15, ignoreDefense: true },
+                    { name: '虚无道祖·第二阶段', icon: '🌀', hp: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.35), maxHP: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.35), attack: Math.floor(VOID_DAO_ANCESTOR.attack * 1.3), realm: 15, ignoreDefense: true },
+                    { name: '虚无道祖·最终阶段', icon: '✨', hp: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.25), maxHP: Math.floor(VOID_DAO_ANCESTOR.totalHP * 0.25), attack: Math.floor(VOID_DAO_ANCESTOR.attack * 1.6), realm: 15, ignoreDefense: true }
+                ],
+                playerHP: playerMaxHP,
+                playerMaxHP: playerMaxHP,
+                rewards: [],
+                eventName: '虚无道祖',
+                isNegative: true,
+                realmName: '超脱天',
+                phase: 1,
+                dialogueIndex: 0
+            };
+            
+            // 显示第一阶段剧情对话
+            showVoidDaoAncestorDialogue(0);
+        }
+
+        function showVoidDaoAncestorDialogue(dialogueIdx) {
+            const modal = document.getElementById('secretRealmModal');
+            const content = document.getElementById('secretRealmContent');
+            const dialogue = VOID_DAO_ANCESTOR.phases[dialogueIdx];
+            
+            let html = `<div class="secret-realm-arena" style="background:linear-gradient(135deg,#0a0a15,#1a1a2e);">
+                <div class="realm-name" style="color:#9c27b0;font-size:1.5em;margin-bottom:20px;">🌑 虚无道祖 · ${dialogue.name}</div>
+                <div style="text-align:center;font-size:4em;margin:20px 0;">${VOID_DAO_ANCESTOR.icon}</div>
+                <div class="discovery-lore" style="background:rgba(76,0,130,0.3);padding:20px;border-radius:10px;margin:20px 0;">
+                    <p style="color:#e0e0e0;line-height:1.8;font-size:1.2em;text-align:center;">"${dialogue.dialogue}"</p>
+                </div>
+                <div style="text-align:center;margin-top:30px;">
+                    <button class="btn btn-combat" onclick="continueVoidBattle(${dialogueIdx})" style="background:linear-gradient(135deg,#4a148c,#7b1fa2);padding:15px 40px;font-size:1.1em;">继续战斗 ⚔️</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function continueVoidBattle(dialogueIdx) {
+            gameState.thirtyThreeHeavens.voidDaoAncestorState.dialoguesShown.push(dialogueIdx);
+            secretRealmState.dialogueIndex = dialogueIdx;
+            closeSecretRealmModal();
+            showSecretRealmBattleUI();
+        }
+
+        // 覆盖 attackRealmEnemy 以处理虚无道祖的无视防御特殊伤害
+        const originalAttackRealmEnemy = attackRealmEnemy;
+        attackRealmEnemy = function() {
+            const enemy = secretRealmState.enemies[secretRealmState.wave];
+            const playerAttack = Math.floor(20 + gameState.realm * 15 + Math.random() * 20);
+            let totalAttack = playerAttack * (1 + gameState.activeEffects.attack);
+
+            enemy.hp -= Math.floor(totalAttack);
+            addLog('good', '秘境战斗', `对${enemy.name}造成 ${Math.floor(totalAttack)} 点伤害！`);
+
+            if (enemy.hp <= 0) {
+                secretRealmState.wave++;
+                
+                // 每波次奖励
+                const waveRewards = [
+                    { type: 'qi', value: 500 },
+                    { type: 'qi', value: 800 },
+                    { type: 'qi', value: 1200 }
+                ];
+                const reward = waveRewards[secretRealmState.wave - 1] || waveRewards[2];
+                gameState.qi = Math.min(gameState.maxQi, gameState.qi + reward.value);
+                secretRealmState.rewards.push(`${reward.value} 灵力`);
+                addLog('good', '秘境战斗', `击败${enemy.name}！获得 ${secretRealmState.rewards[secretRealmState.rewards.length - 1]}`);
+
+                if (secretRealmState.wave >= secretRealmState.totalWaves) {
+                    // 全部击败！
+                    onVoidDaoAncestorDefeated();
+                } else {
+                    // 显示下一阶段对话
+                    const nextDialogueIdx = secretRealmState.wave;
+                    if (nextDialogueIdx < VOID_DAO_ANCESTOR.phases.length - 1) {
+                        closeSecretRealmModal();
+                        showVoidDaoAncestorDialogue(nextDialogueIdx);
+                    } else {
+                        // 最终阶段直接继续
+                        showSecretRealmBattleUI();
+                    }
+                }
+            } else {
+                // 敌人攻击（虚无伤害无视防御）
+                let damage = enemy.attack;
+                if (enemy.ignoreDefense) {
+                    // 虚无道祖特殊攻击：无视防御直接扣血
+                    damage = Math.floor(damage * (1 + secretRealmState.wave * 0.2));
+                } else {
+                    damage = Math.floor(damage * (1 - gameState.activeEffects.defense));
+                }
+                damage = Math.max(1, damage);
+                secretRealmState.playerHP -= damage;
+                addLog('bad', '秘境战斗', `${enemy.name}对你造成 ${damage} 点超脱伤害！`);
+
+                if (secretRealmState.playerHP <= 0) {
+                    secretRealmState.playerHP = 0;
+                    onVoidBattleDefeat();
+                }
+                showSecretRealmBattleUI();
+            }
+        };
+
+        function onVoidDaoAncestorDefeated() {
+            const tth = gameState.thirtyThreeHeavens;
+            tth.hasCompletedTranscendence = true;
+            tth.voidDaoAncestorState.defeated = true;
+            
+            // 奖励：超脱者称号 + 天道印记×99 + 混沌灵液×50
+            if (!tth.hasTranscenderTitle) {
+                tth.hasTranscenderTitle = true;
+                if (!gameState.achievements.titles.includes('超脱者')) {
+                    gameState.achievements.titles.push('超脱者');
+                }
+                addLog('good', '称号获得', '🏆 你获得了【超脱者】称号！');
+            }
+            
+            // 添加天道印记×99
+            tth.totalSealsCollected += 99;
+            for (let i = 0; i < 99; i++) {
+                const sealTypes = ['destiny', 'reincarnation', 'time', 'void', 'creation', 'primordial'];
+                const randomSeal = sealTypes[Math.floor(Math.random() * sealTypes.length)];
+                if (!tth.heavenlySeals.includes(randomSeal)) {
+                    tth.heavenlySeals.push(randomSeal);
+                }
+            }
+            
+            // 混沌灵液×50
+            addItem('混沌灵液', 50);
+            
+            addLog('good', '超脱天通关', '🎉 你击败了虚无道祖，通关了第37重天·超脱天！');
+            addLog('good', '超脱天奖励', '获得：超脱者称号 + 天道印记×99 + 混沌灵液×50');
+            
+            // 解锁第38天命归宿
+            if (!tth.unlockedHeavens.includes(38)) {
+                unlockHeavenRange(38, 38);
+                addLog('story', '天命归宿', '✨ 第38重天·天命天已解锁！所有超脱者的最终归宿等待着你...');
+            }
+            
+            saveGame();
+            showVoidDaoAncestorVictory();
+        }
+
+        function showVoidDaoAncestorVictory() {
+            const modal = document.getElementById('secretRealmModal');
+            const content = document.getElementById('secretRealmContent');
+            
+            let html = `<div class="secret-realm-arena" style="background:linear-gradient(135deg,#0a0a15,#1a1a2e,#0d0d1a);">
+                <div style="text-align:center;font-size:5em;margin:20px 0;">🏆</div>
+                <h2 style="color:#ffd700;text-align:center;">超脱天通关！</h2>
+                <div style="text-align:center;margin:20px 0;">
+                    <p style="color:#e0e0e0;font-size:1.2em;">你击败了虚无道祖，领悟了超脱的真意...</p>
+                    <p style="color:#9c27b0;font-size:1.1em;margin-top:15px;">"原来超脱不是消失，而是...成为新的天道。"</p>
+                </div>
+                <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:10px;margin:20px 0;text-align:center;">
+                    <p style="color:#4caf50;">🎁 通关奖励</p>
+                    <p style="color:#ffd700;">超脱者称号</p>
+                    <p style="color:#ffd700;">天道印记×99</p>
+                    <p style="color:#ffd700;">混沌灵液×50</p>
+                </div>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="closeSecretRealmModal(); renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');" style="padding:15px 40px;font-size:1.1em;">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function onVoidBattleDefeat() {
+            addLog('bad', '秘境战斗', '你被虚无道祖击败了...');
+            closeSecretRealmModal();
+            
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#1a0a0a,#2d1b1b);border:2px solid #f44336;">
+                <h2 style="text-align:center;color:#f44336;">挑战失败</h2>
+                <div style="text-align:center;font-size:4em;margin:15px 0;">💀</div>
+                <p style="color:#e0e0e0;text-align:center;">你被虚无道祖击败了...</p>
+                <p style="color:#aaa;text-align:center;margin-top:10px;">超脱之路艰难，但道心不灭</p>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        // ===== A3 第38重天·天命归宿（最终隐藏结局）=====
+        // 进入条件：超脱天通关 + 已获得「超脱者」称号
+        // 特殊战斗：天命抉择（无敌人，纯选择）
+        // 三个结局选项：
+        //   选项A「超脱」：化作虚无，永世游离于天道之外（获得「虚无道祖」称号）
+        //   选项B「回归」：重返修仙路，重新开始（解锁二周目模式）
+        //   选项C「永恒」：化为天道本身，永恒守护修仙界（获得「天命道祖」称号 + 特殊头像框）
+
+        function exploreDestinyHeaven() {
+            const tth = gameState.thirtyThreeHeavens;
+            const heaven = THIRTY_THREE_HEAVENS.find(h => h.id === 38);
+            
+            // 标记为已访问
+            if (!tth.visitedHeavens.includes(38)) {
+                tth.visitedHeavens.push(38);
+            }
+            
+            // 检查是否已经有结局
+            if (tth.finalDestinyChoice) {
+                showAlreadyMadeChoice(heaven);
+            } else {
+                showDestinyChoice();
+            }
+            saveGame();
+        }
+
+        function showDestinyChoice() {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#1a0a2e,#2d1b4e,#0d0d1a);border:2px solid #ffd700;">
+                <h2 style="text-align:center;color:#ffd700;">✨ 第38重天·天命归宿 ✨</h2>
+                <div style="text-align:center;font-size:4em;margin:15px 0;">🔮</div>
+                <h3 style="color:#e91e63;text-align:center;">天命抉择</h3>
+                <div class="discovery-lore">
+                    <p style="color:#e0e0e0;line-height:1.8;font-size:1.1em;text-align:center;">
+                        你已超越天道，来到所有超脱者的最终归宿。<br>
+                        在此，你将做出最终的选择...
+                    </p>
+                </div>
+                
+                <div style="margin:30px 0;">
+                    <div style="background:rgba(76,0,130,0.3);padding:20px;border-radius:10px;margin-bottom:15px;text-align:center;">
+                        <h4 style="color:#9c27b0;margin-bottom:10px;">选项A：超脱 🌑</h4>
+                        <p style="color:#aaa;font-size:0.9em;">化作虚无，永世游离于天道之外</p>
+                        <p style="color:#4caf50;font-size:0.85em;">奖励：「虚无道祖」称号</p>
+                        <button class="btn" onclick="makeDestinyChoice('transcend')" style="background:linear-gradient(135deg,#4a148c,#7b1fa2);color:white;margin-top:10px;padding:10px 30px;">选择超脱</button>
+                    </div>
+                    
+                    <div style="background:rgba(0,100,0,0.3);padding:20px;border-radius:10px;margin-bottom:15px;text-align:center;">
+                        <h4 style="color:#4caf50;margin-bottom:10px;">选项B：回归 🔄</h4>
+                        <p style="color:#aaa;font-size:0.9em;">重返修仙路，重新开始</p>
+                        <p style="color:#4caf50;font-size:0.85em;">奖励：解锁二周目模式（New Game+）</p>
+                        <button class="btn" onclick="makeDestinyChoice('return')" style="background:linear-gradient(135deg,#2e7d32,#4caf50);color:white;margin-top:10px;padding:10px 30px;">选择回归</button>
+                    </div>
+                    
+                    <div style="background:rgba(139,69,19,0.3);padding:20px;border-radius:10px;text-align:center;">
+                        <h4 style="color:#ffd700;margin-bottom:10px;">选项C：永恒 ⭐</h4>
+                        <p style="color:#aaa;font-size:0.9em;">化为天道本身，永恒守护修仙界</p>
+                        <p style="color:#4caf50;font-size:0.85em;">奖励：「天命道祖」称号 + 特殊头像框</p>
+                        <button class="btn" onclick="makeDestinyChoice('eternal')" style="background:linear-gradient(135deg,#ff6f00,#ffd700);color:white;margin-top:10px;padding:10px 30px;">选择永恒</button>
+                    </div>
+                </div>
+                
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');" style="font-size:0.9em;">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function makeDestinyChoice(choice) {
+            const tth = gameState.thirtyThreeHeavens;
+            tth.finalDestinyChoice = choice;
+            
+            switch(choice) {
+                case 'transcend':
+                    // 化作虚无，永世游离于天道之外
+                    if (!gameState.achievements.titles.includes('虚无道祖')) {
+                        gameState.achievements.titles.push('虚无道祖');
+                    }
+                    gameState.title = '虚无道祖';
+                    addLog('story', '天命归宿', '🌑 你选择了【超脱】，化作虚无，永世游离于天道之外...');
+                    addLog('good', '称号获得', '🏆 你获得了【虚无道祖】称号！');
+                    showTranscendentEnding();
+                    break;
+                    
+                case 'return':
+                    // 重返修仙路，重新开始
+                    tth.newGamePlusUnlocked = true;
+                    addLog('story', '天命归宿', '🔄 你选择了【回归】，重返修仙路，重新开始...');
+                    addLog('good', '二周目解锁', '🎮 你解锁了二周目模式（New Game+）！');
+                    showReturnEnding();
+                    break;
+                    
+                case 'eternal':
+                    // 化为天道本身，永恒守护修仙界
+                    if (!gameState.achievements.titles.includes('天命道祖')) {
+                        gameState.achievements.titles.push('天命道祖');
+                    }
+                    gameState.title = '天命道祖';
+                    gameState.equippedFrame = '天命道祖头像框';
+                    addLog('story', '天命归宿', '⭐ 你选择了【永恒】，化为天道本身，永恒守护修仙界...');
+                    addLog('good', '称号获得', '🏆 你获得了【天命道祖】称号！');
+                    addLog('good', '头像框获得', '🖼️ 你获得了【天命道祖头像框】！');
+                    showEternalEnding();
+                    break;
+            }
+            
+            saveGame();
+        }
+
+        function showTranscendentEnding() {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#0a0a15,#1a1a2e,#0d0d1a);border:2px solid #4a148c;">
+                <div style="text-align:center;font-size:5em;margin:20px 0;">🌑</div>
+                <h2 style="color:#9c27b0;text-align:center;">【超脱】结局</h2>
+                <div class="discovery-lore" style="margin:20px 0;">
+                    <p style="color:#e0e0e0;line-height:1.8;text-align:center;">
+                        你化作虚无，离开了这个宇宙。<br><br>
+                        天道之外，永恒的虚无中，<br>
+                        你将以另一种形式永存...<br><br>
+                        这不是消亡，而是真正的超脱。
+                    </p>
+                </div>
+                <div style="text-align:center;background:rgba(76,0,130,0.3);padding:15px;border-radius:10px;">
+                    <p style="color:#ffd700;">🏆 获得称号：【虚无道祖】</p>
+                </div>
+                <p style="color:#aaa;text-align:center;margin-top:20px;">感谢你的游玩！</p>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function showReturnEnding() {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#0a1a0a,#1a2e1a,#0d1a0d);border:2px solid #4caf50;">
+                <div style="text-align:center;font-size:5em;margin:20px 0;">🔄</div>
+                <h2 style="color:#4caf50;text-align:center;">【回归】结局</h2>
+                <div class="discovery-lore" style="margin:20px 0;">
+                    <p style="color:#e0e0e0;line-height:1.8;text-align:center;">
+                        你选择重返修仙路，再历红尘。<br><br>
+                        带着前世的记忆与感悟，<br>
+                        你将以全新的身份重新开始...<br><br>
+                        但你获得的道心与智慧，将永远相随。
+                    </p>
+                </div>
+                <div style="text-align:center;background:rgba(0,100,0,0.3);padding:15px;border-radius:10px;">
+                    <p style="color:#4caf50;">🎮 解锁二周目模式（New Game+）</p>
+                    <p style="color:#aaa;font-size:0.9em;margin-top:5px;">下次开始新游戏时可在设置中选择</p>
+                </div>
+                <p style="color:#aaa;text-align:center;margin-top:20px;">感谢你的游玩！</p>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function showEternalEnding() {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#1a1a0a,#2e2e1a,#1a1a0d);border:2px solid #ffd700;">
+                <div style="text-align:center;font-size:5em;margin:20px 0;">⭐</div>
+                <h2 style="color:#ffd700;text-align:center;">【永恒】结局</h2>
+                <div class="discovery-lore" style="margin:20px 0;">
+                    <p style="color:#e0e0e0;line-height:1.8;text-align:center;">
+                        你选择化为天道本身，永恒守护这片天地。<br><br>
+                        亿万年后，<br>
+                        你化身的天道将庇护无数修士，<br>
+                        见证无数飞升与超脱...<br><br>
+                        这是最孤独，却也是最伟大的选择。
+                    </p>
+                </div>
+                <div style="text-align:center;background:rgba(139,69,19,0.3);padding:15px;border-radius:10px;">
+                    <p style="color:#ffd700;">🏆 获得称号：【天命道祖】</p>
+                    <p style="color:#ffd700;margin-top:5px;">🖼️ 获得头像框：天命道祖头像框</p>
+                </div>
+                <p style="color:#aaa;text-align:center;margin-top:20px;">恭喜你达成真结局！感谢你的游玩！</p>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function showAlreadyMadeChoice(heaven) {
+            const modal = document.getElementById('beyondHeavenModal');
+            const content = document.getElementById('beyondHeavenContent');
+            const tth = gameState.thirtyThreeHeavens;
+            
+            const endings = {
+                'transcend': { name: '超脱', icon: '🌑', color: '#9c27b0' },
+                'return': { name: '回归', icon: '🔄', color: '#4caf50' },
+                'eternal': { name: '永恒', icon: '⭐', color: '#ffd700' }
+            };
+            
+            const ending = endings[tth.finalDestinyChoice] || endings.transcend;
+            
+            let html = `<div class="heaven-discovery" style="background:linear-gradient(135deg,#1a0a2e,#2d1b4e,#0d0d1a);border:2px solid ${ending.color};">
+                <h2 style="text-align:center;color:${ending.color};">✨ 第38重天·天命归宿 ✨</h2>
+                <div style="text-align:center;font-size:4em;margin:15px 0;">${ending.icon}</div>
+                <h3 style="color:#e0e0e0;text-align:center;">你已做出选择</h3>
+                <div style="text-align:center;margin:20px 0;">
+                    <p style="color:${ending.color};font-size:1.5em;">【${ending.name}】</p>
+                    <p style="color:#aaa;margin-top:10px;">你已经选择了属于你的命运</p>
+                </div>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn btn-cultivate" onclick="renderBeyondHeaven(); document.getElementById('beyondHeavenModal').classList.add('active');">返回天外天</button>
+                </div>
+            </div>`;
+            
+            content.innerHTML = html;
+            modal.classList.add('active');
         }
 
         // 解锁指定范围的天
