@@ -90,7 +90,21 @@
                     techniques: [],
                     contributionShop: [],
                     lastShopRefresh: 0,
-                    lastResourceCollection: 0
+                    lastResourceCollection: 0,
+                    // V29 NPC AI系统
+                    npcDialogueHistory: [],
+                    npcTasks: [],
+                    npcLastActions: {},
+                    // V30 渡劫审批系统
+                    tribulationRequest: {
+                        status: 'none',
+                        elderScore: 0,
+                        elderComment: '',
+                        leaderDecision: '',
+                        leaderComment: '',
+                        buffApplied: false,
+                        submitDay: 0
+                    }
                 },
                 // V6 奇遇系统字段
                 serendipity: {
@@ -200,7 +214,16 @@
                         injured: false,
                         injuryEndDay: 0
                     },
-                    sect: loaded.sect || {
+                    sect: loaded.sect ? {
+                        ...loaded.sect,
+                        npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
+                        npcTasks: loaded.sect.npcTasks || [],
+                        npcLastActions: loaded.sect.npcLastActions || {},
+                        tribulationRequest: loaded.sect.tribulationRequest || {
+                            status: 'none', elderScore: 0, elderComment: '',
+                            leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
+                        }
+                    } : {
                         name: null,
                         level: 0,
                         spiritStones: 0,

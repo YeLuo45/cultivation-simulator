@@ -192,13 +192,17 @@
                 const statusClass = d.status === 'idle' ? 'status-idle' : d.status === 'training' ? 'status-training' : 'status-elder';
                 const realmName = CONFIG.realms[d.realm] + '期';
                 const isElder = sect.elders.includes(d.uid);
+                // V29 NPC 角色信息
+                const npcRole = d.npcRole || 'disciple';
+                const roleInfo = SECT_NPC_ROLES[npcRole] || SECT_NPC_ROLES['disciple'];
+                const task = getNpcTask(d.uid);
                 
                 html += `
                     <div class="disciple-card">
                         <div class="disciple-info">
-                            <span class="disciple-avatar">${isElder ? '👴' : '🧑‍🎓'}</span>
+                            <span class="disciple-avatar">${roleInfo.icon}</span>
                             <div>
-                                <div class="disciple-name">${d.name}</div>
+                                <div class="disciple-name">${d.name} <span style="color:${roleInfo.color};font-size:11px;">${roleInfo.title}</span></div>
                                 <div class="disciple-realm">${realmName}</div>
                             </div>
                             <span class="disciple-talent ${talentClass}">${d.talent}</span>
@@ -206,6 +210,8 @@
                         <div style="text-align:right;">
                             <div class="disciple-contribution">贡献: ${d.contribution}</div>
                             <span class="disciple-status ${statusClass}">${isElder ? '长老' : d.status}</span>
+                            ${task ? `<div style="color:#888;font-size:11px;">📋${task.type === 'cultivate' ? '修炼' : task.type === 'collect' ? '采集' : '任务'}</div>` : ''}
+                            <button onclick="openNpcDialogue('${d.uid}')" style="background:#333;border:1px solid #555;color:#aaa;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-top:3px;">💬</button>
                         </div>
                     </div>
                 `;
@@ -485,8 +491,13 @@
                 talentIndex: talentIndex,
                 contribution: 0,
                 techniques: [],
-                status: 'idle'
+                status: 'idle',
+                npcRole: 'disciple'  // V29 默认弟子角色
             });
+            
+            // V29 自动分配 NPC 角色
+            const newDisciple = sect.disciples[sect.disciples.length - 1];
+            assignNpcRole(newDisciple);
         }
 
         // ===== weightedRandom =====
@@ -825,5 +836,491 @@
             } else {
                 sectBtn.style.display = 'none';
             }
+        }
+
+        // ===== V29 NPC AI 系统 =====
+
+        // NPC 角色配置
+        const SECT_NPC_ROLES = {
+            'leader': { title: '掌门', icon: '👑', color: '#FFD700', greet: '宗主驾临，有何吩咐？', topics: ['宗门管理', '任务发布', '战略指导'] },
+            'elder':  { title: '长老', icon: '👴', color: '#9c27b0', greet: '师叔祖有何指教？', topics: ['修炼指导', '功法传授', '境界点评'] },
+            'disciple': { title: '弟子', icon: '🧑‍🎓', color: '#4CAF50', greet: '弟子拜见宗主！', topics: ['请求指点', '汇报修炼', '闲聊'] }
+        };
+
+        // 分配 NPC 角色
+        function assignNpcRole(disciple) {
+            if (!disciple) return;
+            // 境界 >= 6 (元婴期) 自动成为长老
+            if (disciple.realm >= 6 && gameState.sect.elders.length < 3) {
+                disciple.npcRole = 'elder';
+                if (!gameState.sect.elders.includes(disciple.uid)) {
+                    gameState.sect.elders.push(disciple.uid);
+                }
+            } else if (gameState.sect.disciples.filter(d => d.npcRole === 'leader').length === 0 && disciple.realm >= 3) {
+                // 第一个境界较高者成为掌门
+                disciple.npcRole = 'leader';
+            } else {
+                disciple.npcRole = 'disciple';
+            }
+        }
+
+        // 打开 NPC 对话框
+        function openNpcDialogue(uid) {
+            const disciple = gameState.sect.disciples.find(d => d.uid === uid);
+            if (!disciple) return;
+            
+            const role = SECT_NPC_ROLES[disciple.npcRole] || SECT_NPC_ROLES['disciple'];
+            const realmName = CONFIG.realms[disciple.realm] || '未知';
+            
+            // 获取该 NPC 的历史对话
+            const npcHistory = gameState.sect.npcDialogueHistory.filter(h => h.uid === uid).slice(-20);
+            
+            let html = `<div id="npcDialogueModal" class="modal active" style="z-index:1001;">
+                <div class="modal-content" style="background:#1a1a2e;max-width:500px;">
+                    <div style="background:${role.color};padding:15px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span style="font-size:24px;">${role.icon}</span>
+                            <div>
+                                <div style="font-weight:bold;color:#fff;">${disciple.name}</div>
+                                <div style="font-size:12px;color:rgba(255,255,255,0.8);">${role.title} · ${realmName}期</div>
+                            </div>
+                        </div>
+                        <button onclick="closeNpcDialogue()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 12px;border-radius:5px;cursor:pointer;">关闭</button>
+                    </div>
+                    <div id="npcDialogueHistory" style="height:250px;overflow-y:auto;padding:15px;background:#16213e;">
+                        <div style="color:#888;text-align:center;margin-bottom:10px;">—— 对话记录 ——</div>
+                        ${npcHistory.length === 0 ? '<div style="color:#666;text-align:center;">暂无对话记录</div>' : ''}
+                        ${npcHistory.map(h => `
+                            <div style="margin-bottom:10px;${h.isPlayer ? 'text-align:right;' : ''}">
+                                <div style="display:inline-block;padding:8px 12px;border-radius:10px;max-width:80%;${h.isPlayer ? 'background:#4a4a6a;color:#fff;' : 'background:#2a2a4a;color:#ddd;'}">
+                                    <div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${h.isPlayer ? '你' : disciple.name}</div>
+                                    ${h.text}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="padding:15px;background:#1a1a2e;border-top:1px solid #333;">
+                        <div style="margin-bottom:10px;display:flex;gap:5px;flex-wrap:wrap;">
+                            ${role.topics.map(t => `<button onclick="sendNpcQuickReply('${uid}', '${t}')" style="background:#333;border:1px solid #555;color:#aaa;padding:5px 10px;border-radius:15px;font-size:12px;cursor:pointer;">${t}</button>`).join('')}
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="npcMessageInput" placeholder="输入对话内容..." style="flex:1;padding:10px;border-radius:8px;border:1px solid #444;background:#252540;color:#fff;" onkeypress="if(event.key==='Enter')sendNpcMessage('${uid}')">
+                            <button onclick="sendNpcMessage('${uid}')" style="background:${role.color};border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            
+            document.body.insertAdjacentHTML('beforeend', html);
+            document.getElementById('npcMessageInput').focus();
+        }
+
+        // 关闭 NPC 对话框
+        function closeNpcDialogue() {
+            const modal = document.getElementById('npcDialogueModal');
+            if (modal) modal.remove();
+        }
+
+        // 发送 NPC 消息
+        function sendNpcMessage(uid) {
+            const input = document.getElementById('npcMessageInput');
+            if (!input || !input.value.trim()) return;
+            const text = input.value.trim();
+            input.value = '';
+            
+            const disciple = gameState.sect.disciples.find(d => d.uid === uid);
+            if (!disciple) return;
+            
+            // 记录玩家消息
+            gameState.sect.npcDialogueHistory.push({ uid, text, isPlayer: true, day: gameState.days });
+            if (gameState.sect.npcDialogueHistory.length > 100) gameState.sect.npcDialogueHistory.shift();
+            
+            // 生成 NPC 回复
+            const response = generateNpcResponse(disciple, text);
+            
+            // 记录 NPC 回复
+            gameState.sect.npcDialogueHistory.push({ uid, text: response, isPlayer: false, day: gameState.days });
+            
+            // 刷新对话 UI
+            const historyDiv = document.getElementById('npcDialogueHistory');
+            if (historyDiv) {
+                const npcHistory = gameState.sect.npcDialogueHistory.filter(h => h.uid === uid).slice(-20);
+                historyDiv.innerHTML = npcHistory.map(h => `
+                    <div style="margin-bottom:10px;${h.isPlayer ? 'text-align:right;' : ''}">
+                        <div style="display:inline-block;padding:8px 12px;border-radius:10px;max-width:80%;${h.isPlayer ? 'background:#4a4a6a;color:#fff;' : 'background:#2a2a4a;color:#ddd;'}">
+                            <div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${h.isPlayer ? '你' : disciple.name}</div>
+                            ${h.text}
+                        </div>
+                    </div>
+                `).join('');
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+            }
+            
+            saveGame();
+        }
+
+        // 快捷回复
+        function sendNpcQuickReply(uid, topic) {
+            const quickReplies = {
+                '宗门管理': '最近宗门运转如何？有哪些需要决策的大事？',
+                '任务发布': '我有一项重要任务要交给宗门弟子。',
+                '战略指导': '关于宗门未来的发展，你有何建议？',
+                '修炼指导': '我近期修炼遇到瓶颈，如何突破？',
+                '功法传授': '可否传授我一门高阶功法？',
+                '境界点评': '以我目前的修为，还有哪些不足？',
+                '请求指点': '长老，我该如何更快提升境界？',
+                '汇报修炼': '弟子近期修炼有所进展，请过目。',
+                '闲聊': '今日天气不错，修炼之余也想放松一下。'
+            };
+            
+            const input = document.getElementById('npcMessageInput');
+            if (input) input.value = quickReplies[topic] || topic;
+            sendNpcMessage(uid);
+        }
+
+        // 生成 NPC 回复
+        function generateNpcResponse(disciple, message) {
+            const role = disciple.npcRole || 'disciple';
+            const realmName = CONFIG.realms[disciple.realm] || '未知';
+            const lowerMsg = message.toLowerCase();
+            
+            if (lowerMsg.includes('任务') || lowerMsg.includes('交给')) {
+                if (role === 'leader') return '宗主放心，我这就安排弟子去办！不知是要紧任务还是日常事务？';
+                if (role === 'elder') return '长老会尽力指导弟子完成任务，请宗主指示具体目标。';
+                return '弟子愿为宗门效力！请宗主吩咐任务内容。';
+            }
+            
+            if (lowerMsg.includes('境界') || lowerMsg.includes('修为') || lowerMsg.includes('突破')) {
+                if (disciple.realm >= 8) return `以${realmName}的修为，我认为您应当尝试进入更深层次的修炼，天道法则已离您不远。`;
+                if (disciple.realm >= 5) return `师叔祖目前处于${realmName}，若能集齐上品丹药和天道装备，突破指日可待。`;
+                return '弟子目前才疏学浅，但若宗主需要，弟子愿潜心研究突破之法。';
+            }
+            
+            if (lowerMsg.includes('功法') || lowerMsg.includes('传授')) {
+                if (gameState.sect.buildings.library && gameState.sect.techniques.length > 0) {
+                    const tech = gameState.sect.techniques[Math.floor(Math.random() * gameState.sect.techniques.length)];
+                    return `本门功法阁藏有「${tech.name}」，师祖若有兴趣，弟子可以为您讲解。`;
+                } else {
+                    return '功法阁尚未建立，无法传授高阶功法。还请宗主先建造功法阁。';
+                }
+            }
+            
+            if (lowerMsg.includes('资源') || lowerMsg.includes('灵石') || lowerMsg.includes('采集')) {
+                return `宗门目前有灵石 ${gameState.sect.spiritStones} 枚，弟子们每日可采集 ${calculateSectIncome()} 灵石。`;
+            }
+            
+            if (lowerMsg.includes('天气') || lowerMsg.includes('放松') || lowerMsg.includes('闲聊')) {
+                const randomChats = [
+                    '是啊，今日灵气充沛，正是修炼的好时机。',
+                    '弟子平日除了修炼，也喜欢研读功法典籍。',
+                    '听闻天外天最近有异象，不知是福是祸。',
+                    '宗主洪福齐天，宗门上下都对您敬佩有加！',
+                    '修行之路漫漫，能与同门共进退，实乃幸事。'
+                ];
+                return randomChats[Math.floor(Math.random() * randomChats.length)];
+            }
+            
+            const defaultReplies = {
+                'leader': ['宗主英明，弟子定当遵从。', '此事需从长计议，请宗主三思。', '宗门事务繁忙，全赖宗主运筹帷幄。'],
+                'elder': ['弟子受教，定当努力修炼。', '多谢宗主指点，弟子明白了。', '师叔祖教训的是，弟子谨记。'],
+                'disciple': ['弟子领命！', '是，宗主！', '弟子这就去办！']
+            };
+            const replies = defaultReplies[role] || defaultReplies['disciple'];
+            return replies[Math.floor(Math.random() * replies.length)];
+        }
+
+        // 分配 NPC 任务
+        function assignNpcTask(uid, taskType, target) {
+            const disciple = gameState.sect.disciples.find(d => d.uid === uid);
+            if (!disciple) return;
+            
+            // 移除旧任务
+            gameState.sect.npcTasks = gameState.sect.npcTasks.filter(t => t.uid !== uid);
+            
+            const taskNames = { cultivate: '闭关修炼', collect: '灵石采集', alchemy: '丹药炼制', forge: '装备炼制' };
+            const endDay = gameState.days + Math.floor(Math.random() * 5) + 3;
+            
+            gameState.sect.npcTasks.push({
+                uid,
+                type: taskType,
+                target: target || (taskType === 'cultivate' ? disciple.realm + 1 : null),
+                startDay: gameState.days,
+                endDay: endDay,
+                completed: false,
+                progress: 0
+            });
+            
+            disciple.status = taskType === 'cultivate' ? 'meditating' : 'training';
+            addLog('good', '任务分配', `${disciple.name}开始执行「${taskNames[taskType]}」任务`);
+            saveGame();
+        }
+
+        // 处理 NPC 任务（每日结算时调用）
+        function processNpcTasks() {
+            if (!gameState.sect || !gameState.sect.name) return;
+            
+            const taskNames = { cultivate: '修炼', collect: '采集', alchemy: '炼丹', forge: '炼器' };
+            
+            gameState.sect.npcTasks.forEach(task => {
+                const disciple = gameState.sect.disciples.find(d => d.uid === task.uid);
+                if (!disciple || task.completed) return;
+                
+                if (task.type === 'cultivate') {
+                    const talentBonus = disciple.talent === '极品' ? 3 : disciple.talent === '上品' ? 2 : 1;
+                    const progress = (Math.random() * 0.5 + 0.5) * talentBonus;
+                    task.progress = Math.min(1, (task.progress || 0) + progress / 10);
+                    
+                    if (task.progress >= 1 && disciple.realm < task.target) {
+                        disciple.realm++;
+                        task.completed = true;
+                        addLog('good', '弟子突破', `${disciple.name}在${taskNames[task.type]}中成功突破到${CONFIG.realms[disciple.realm]}！`);
+                        if (disciple.npcRole === 'disciple' && disciple.realm >= 6) {
+                            disciple.npcRole = 'elder';
+                            if (!gameState.sect.elders.includes(disciple.uid)) {
+                                gameState.sect.elders.push(disciple.uid);
+                            }
+                            addLog('good', '长老晋升', `${disciple.name}晋升为长老！`);
+                        }
+                    }
+                }
+                
+                if (task.type === 'collect') {
+                    const income = Math.floor((Math.random() * 20 + 10) * (1 + disciple.realm * 0.2));
+                    gameState.sect.spiritStones += income;
+                    task.progress = Math.min(1, (task.progress || 0) + 1/5);
+                }
+                
+                if (gameState.days >= task.endDay && !task.completed) {
+                    task.completed = true;
+                    disciple.status = 'idle';
+                    addLog('normal', '任务结束', `${disciple.name}的「${taskNames[task.type]}」任务已结束`);
+                }
+            });
+            
+            gameState.sect.npcTasks = gameState.sect.npcTasks.filter(t => !t.completed || (gameState.days - t.endDay) < 3);
+        }
+
+        // 获取 NPC 当前任务
+        function getNpcTask(uid) {
+            return gameState.sect.npcTasks.find(t => t.uid === uid && !t.completed);
+        }
+
+        // NPC 自动行为
+        function processNpcAutoBehavior() {
+            if (!gameState.sect || !gameState.sect.name) return;
+            
+            gameState.sect.disciples.forEach(d => {
+                const hasTask = getNpcTask(d.uid);
+                if (!hasTask) {
+                    d.status = 'meditating';
+                    const progress = (Math.random() * 0.3 + 0.1) * (d.talent === '极品' ? 2 : d.talent === '上品' ? 1.5 : 1);
+                    d.cultivationProgress = Math.min(100, d.cultivationProgress + progress);
+                    
+                    if (d.cultivationProgress >= 100 && d.realm < 12) {
+                        d.realm++;
+                        d.cultivationProgress = 0;
+                        addLog('good', '弟子突破', `${d.name}闭关修炼，境界提升至${CONFIG.realms[d.realm]}！`);
+                        if (d.npcRole === 'disciple' && d.realm >= 6) {
+                            d.npcRole = 'elder';
+                            if (!gameState.sect.elders.includes(d.uid)) {
+                                gameState.sect.elders.push(d.uid);
+                                addLog('good', '长老晋升', `${d.name}晋升为长老！`);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ===== V30 渡劫审批系统 =====
+
+        // 渡劫审批申请界面
+        function openTribulationRequest() {
+            const req = gameState.sect.tribulationRequest;
+            const realm = gameState.realm;
+            const stage = gameState.stage;
+            const mindset = gameState.mindset;
+            const tribulationsDone = gameState.achievements?.stats?.tribulationsCompleted || 0;
+
+            // 检查装备评分
+            let equipScore = 0;
+            const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
+            for (const equip of gameState.equippedTreasures) {
+                if (equip) equipScore = Math.max(equipScore, qualityOrder[equip.quality] || 0);
+            }
+            for (const item of gameState.inventory) {
+                if (item.type === 'treasure') equipScore = Math.max(equipScore, qualityOrder[item.quality] || 0);
+            }
+
+            // 检查渡劫丹
+            const tribPillCount = gameState.inventory.filter(i => i.name === '渡劫丹').length;
+
+            // 检查是否已有待处理审批
+            if (req.status === 'pending_elder' || req.status === 'pending_leader') {
+                showTribulationRequestStatus(req, equipScore, mindset, tribPillCount, tribulationsDone);
+                return;
+            }
+
+            if (req.status === 'approved') {
+                // 已批准，直接进入渡劫
+                showToast('审批已通过，点击突破进入渡劫');
+                return;
+            }
+
+            // 显示申请界面
+            let html = `<div style="padding:20px;">`;
+            html += `<h3 style="color:#ffd700;margin-bottom:15px;text-align:center;">📜 渡劫审批申请书</h3>`;
+
+            // 当前准备状态
+            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">`;
+            html += `<div style="color:#aaa;font-size:12px;margin-bottom:8px;">【申请人】${gameState.playerName || '修士'}</div>`;
+            html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px;">境界：${CONFIG.realms[realm]}${CONFIG.stages[stage]}</div>`;
+            html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px;">心态：${mindset}/100 ${mindset >= 60 ? '✅' : '❌'}</div>`;
+            html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px;">装备评分：${['普通', '稀有', '珍贵', '传说'][equipScore] || '普通'} ${equipScore >= 1 ? '✅' : '❌'}</div>`;
+            html += `<div style="color:#aaa;font-size:12px;margin-bottom:4px;">渡劫丹：×${tribPillCount} ${tribPillCount >= 1 ? '✅' : '❌'}</div>`;
+            html += `<div style="color:#aaa;font-size:12px;">历史渡劫：${tribulationsDone}次 ${tribulationsDone > 0 ? '✅' : '❌'}</div>`;
+            html += `</div>`;
+
+            // 当前审批状态
+            if (req.status === 'rejected') {
+                html += `<div style="background:#2d1a1a;padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid #e57373;">`;
+                html += `<div style="color:#e57373;font-size:13px;margin-bottom:5px;">❌ 审批驳回</div>`;
+                html += `<div style="color:#aaa;font-size:12px;">长老意见：${req.elderComment}</div>`;
+                html += `<div style="color:#aaa;font-size:12px;">掌门决定：${req.leaderComment}</div>`;
+                html += `</div>`;
+            }
+
+            // 提交按钮
+            const canSubmit = req.status === 'none' || req.status === 'rejected';
+            if (canSubmit) {
+                html += `<button onclick="submitTribulationRequest(${equipScore},${mindset},${tribPillCount},${tribulationsDone})" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">📮 提交审批</button>`;
+            }
+            html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+            html += `</div>`;
+
+            openModal('渡劫审批', html, '');
+        }
+
+        // 显示审批状态
+        function showTribulationRequestStatus(req, equipScore, mindset, tribPillCount, tribulationsDone) {
+            let html = `<div style="padding:20px;">`;
+            html += `<h3 style="color:#ffd700;margin-bottom:15px;text-align:center;">📜 渡劫审批进度</h3>`;
+
+            const statusMap = {
+                'pending_elder': { icon: '👴', text: '长老审核中...', color: '#ff9800' },
+                'pending_leader': { icon: '👑', text: '掌门审批中...', color: '#ff9800' },
+                'approved': { icon: '✅', text: '已批准', color: '#4caf50' },
+                'rejected': { icon: '❌', text: '已驳回', color: '#e57373' }
+            };
+            const s = statusMap[req.status] || statusMap['none'];
+
+            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;text-align:center;">`;
+            html += `<div style="font-size:32px;margin-bottom:8px;">${s.icon}</div>`;
+            html += `<div style="color:${s.color};font-size:14px;">${s.text}</div>`;
+            html += `</div>`;
+
+            if (req.elderComment) {
+                html += `<div style="background:#1a1a2e;padding:10px;border-radius:8px;margin-bottom:8px;">`;
+                html += `<div style="color:#aaa;font-size:11px;">长老评估：</div>`;
+                html += `<div style="color:#ff9800;font-size:12px;">${req.elderComment}</div>`;
+                html += `</div>`;
+            }
+            if (req.leaderComment) {
+                html += `<div style="background:#1a1a2e;padding:10px;border-radius:8px;margin-bottom:8px;">`;
+                html += `<div style="color:#aaa;font-size:11px;">掌门决定：</div>`;
+                html += `<div style="color:#e57373;font-size:12px;">${req.leaderComment}</div>`;
+                html += `</div>`;
+            }
+
+            if (req.status === 'approved') {
+                html += `<div style="background:#1a3a2e;padding:10px;border-radius:8px;margin-bottom:12px;text-align:center;">`;
+                html += `<div style="color:#4caf50;font-size:13px;">✨ 掌门祝福：渡劫成功率+5%</div>`;
+                html += `</div>`;
+            }
+
+            html += `<button onclick="closeModal()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+            html += `</div>`;
+            openModal('渡劫审批', html, '');
+        }
+
+        // 提交审批
+        function submitTribulationRequest(equipScore, mindset, tribPillCount, tribulationsDone) {
+            gameState.sect.tribulationRequest = {
+                status: 'pending_elder',
+                elderScore: 0,
+                elderComment: '',
+                leaderDecision: '',
+                leaderComment: '',
+                buffApplied: false,
+                submitDay: gameState.days
+            };
+
+            // 长老立即审核
+            processElderReview(equipScore, mindset, tribPillCount, tribulationsDone);
+            closeModal();
+            openTribulationRequest(); // 重新打开显示状态
+        }
+
+        // 长老审核
+        function processElderReview(equipScore, mindset, tribPillCount, tribulationsDone) {
+            let score = 0;
+            let comments = [];
+
+            if (equipScore >= 1) { score++; comments.push('装备尚可'); }
+            else comments.push('装备较差');
+
+            if (mindset >= 60) { score++; comments.push('心态稳定'); }
+            else comments.push('心态不足');
+
+            if (tribPillCount >= 1) { score++; comments.push('备有渡劫丹'); }
+            else comments.push('未备渡劫丹');
+
+            if (tribulationsDone > 0) { score++; comments.push('有渡劫经验'); }
+            else comments.push('首次渡劫');
+
+            gameState.sect.tribulationRequest.elderScore = score;
+            gameState.sect.tribulationRequest.elderComment = `评估：${comments.join('，')}。综合评分：${score}/4。`;
+
+            // 根据评分决定
+            if (score >= 3) {
+                gameState.sect.tribulationRequest.status = 'pending_leader';
+                // 掌门审批
+                setTimeout(() => processLeaderDecision(), 500);
+            } else {
+                gameState.sect.tribulationRequest.status = 'rejected';
+                gameState.sect.tribulationRequest.leaderDecision = 'rejected';
+                gameState.sect.tribulationRequest.leaderComment = `条件不足（${score}/4），建议提升后再申请。缺失：${score < 1 ? '装备等级 ' : ''}${score < 2 ? '心态值 ' : ''}${score < 3 ? '渡劫丹 ' : ''}${score < 4 ? '渡劫经验' : ''}`;
+            }
+
+            saveGame();
+        }
+
+        // 掌门审批
+        function processLeaderDecision() {
+            const req = gameState.sect.tribulationRequest;
+            if (req.status !== 'pending_leader') return;
+
+            const score = req.elderScore;
+
+            if (score >= 3) {
+                req.status = 'approved';
+                req.leaderDecision = 'approved';
+                req.leaderComment = '条件具备，批准渡劫。愿你顺利渡过天劫。';
+                req.buffApplied = true;
+                addLog('good', '渡劫批准', '掌门批准了你的渡劫申请，祝福你渡劫成功！');
+            } else {
+                req.status = 'rejected';
+                req.leaderDecision = 'rejected';
+                req.leaderComment = `条件不足（${score}/4），需满足更多条件方可申请渡劫。`;
+            }
+
+            saveGame();
+        }
+
+        // 获取渡劫审批buff（成功率加成）
+        function getTribulationApprovalBuff() {
+            const req = gameState.sect.tribulationRequest;
+            if (req.status === 'approved' && req.buffApplied) return 0.05;
+            return 0;
         }
 

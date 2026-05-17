@@ -363,6 +363,11 @@
             if (effects.spiritStones < 0) resultText += `灵石 ${effects.spiritStones} `;
             if (!resultText) resultText = '没有变化';
             addLog(effects.qi >= 0 && effects.mindset >= 0 ? 'good' : 'bad', option.text, resultText);
+            // V29 NPC AI 每日任务处理
+            if (gameState.sect && gameState.sect.name) {
+                processNpcTasks();
+                processNpcAutoBehavior();
+            }
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
@@ -388,6 +393,9 @@
             }
             survivalChance *= (1 + gameState.activeEffects.渡劫_mindset_protect);
             survivalChance *= (1 + gameState.activeEffects.all_stats);
+            // V30 审批祝福buff
+            const approvalBuff = gameState.activeEffects.tribulation_approval_buff || 0;
+            survivalChance *= (1 + approvalBuff);
             if (Math.random() < survivalChance) {
                 addLog('good', '渡劫成功', '天雷降临，你成功渡过天劫，修为大涨！');
                 gameState.cultivationProgress = 0;
@@ -432,6 +440,19 @@
                 return;
             }
             if (gameState.realm >= 3) {
+                // V30 渡劫审批检查
+                if (gameState.sect && gameState.sect.tribulationRequest) {
+                    const req = gameState.sect.tribulationRequest;
+                    if (req.status !== 'approved') {
+                        openTribulationRequest();
+                        return;
+                    }
+                    // 审批通过，应用buff
+                    const approvalBuff = getTribulationApprovalBuff();
+                    if (approvalBuff > 0) {
+                        gameState.activeEffects.tribulation_approval_buff = approvalBuff;
+                    }
+                }
                 const tribKey = getTribulationKey(gameState.realm, gameState.stage);
                 gameState.tribulation = {
                     inProgress: true,
@@ -550,6 +571,11 @@ async function generateBreakthroughResult() {
                         gameState.inventory = gameState.inventory.filter(i => i !== item);
                     }
                 }
+            }
+            // V29 NPC AI 每日任务处理
+            if (gameState.sect && gameState.sect.name) {
+                processNpcTasks();
+                processNpcAutoBehavior();
             }
             gameState.days++;
             document.getElementById('alchemyDetail').style.display = 'none';

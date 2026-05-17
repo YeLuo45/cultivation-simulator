@@ -73,7 +73,21 @@
                 techniques: [],
                 contributionShop: [],
                 lastShopRefresh: 0,
-                lastResourceCollection: 0
+                lastResourceCollection: 0,
+                // V29 NPC AI系统
+                npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
+                npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
+                npcLastActions: {},        // {uid: {action, day}}
+                // V30 渡劫审批系统
+                tribulationRequest: {
+                    status: 'none',        // none | pending_elder | pending_leader | approved | rejected
+                    elderScore: 0,
+                    elderComment: '',
+                    leaderDecision: '',
+                    leaderComment: '',
+                    buffApplied: false,
+                    submitDay: 0
+                }
             },
             // V6 奇遇系统字段
             serendipity: {
