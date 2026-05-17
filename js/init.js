@@ -283,6 +283,8 @@
                     },
                     immortalFriends: loaded.immortalFriends || [],
                     allyApplications: loaded.allyApplications || [],
+                    // V39 仙宠培养系统
+                    spiritPets: loaded.spiritPets || { pets: [], lastInteractionDay: 0 },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],

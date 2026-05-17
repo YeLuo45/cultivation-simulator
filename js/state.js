@@ -242,7 +242,12 @@
                 lastActivityDay: 0
             },
             immortalFriends: [],   // [{uid, name, realm, intimacy, lastInteraction}]
-            allyApplications: []   // [{allyId, allyName, allyRank, applyDay, status}]
+            allyApplications: [],   // [{allyId, allyName, allyRank, applyDay, status}]
+            // V39 仙宠培养系统
+            spiritPets: {
+                pets: [],           // [{type, quality, growth, nickname, level, exp, nextLevelExp, stats, skills, isHatched, hatchDays, bond, element}]
+                lastInteractionDay: 0
+            }
         };
 
         // --- secretRealmState (7391-7398) ---
