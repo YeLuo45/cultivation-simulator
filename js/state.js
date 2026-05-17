@@ -217,7 +217,17 @@
             lastMissionRefreshDay: 0,   // 上次任务刷新
             // V36 装备打造增强
             equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
-            lastForgeDay: 0            // 上次打造时间
+            lastForgeDay: 0,            // 上次打造时间
+            // V37 天道法则系统
+            celestialLaws: {
+                comprehended: [],          // 已领悟的法则 ['time','space',...]
+                active: [],                // 当前激活的法则（最多3个）
+                comprehending: null,        // 当前领悟中的法则
+                comprehendingProgress: 0,  // 领悟进度 0-100
+                comprehendDays: 0,         // 领悟已进行的天数
+                maxActiveLaws: 3,          // 最大激活数量
+                lawBonus: {}               // 当前激活法则计算后的加成
+            }
         };
 
         // --- secretRealmState (7391-7398) ---

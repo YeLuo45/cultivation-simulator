@@ -115,7 +115,17 @@
                     },
                     // V35 宗门任务链
                     sectMissions: [],
-                    sectMissionCooldown: 0
+                    sectMissionCooldown: 0,
+                    lastMissionRefreshDay: 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: 0,
+                    lastForgeDay: 0,
+                    // V37 天道法则系统
+                    celestialLaws: {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    }
                 },
                 // V6 奇遇系统字段
                 serendipity: {
@@ -260,6 +270,12 @@
                     // V36 装备打造增强
                     equipmentForgeCount: loaded.equipmentForgeCount || 0,
                     lastForgeDay: loaded.lastForgeDay || 0,
+                    // V37 天道法则系统
+                    celestialLaws: loaded.celestialLaws || {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -414,6 +430,11 @@
             const sectBtn = document.getElementById('sectBtn');
             if (sectBtn) {
                 sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
+            }
+            // V37 检查悟道按钮显示
+            const lawBtn = document.getElementById('lawBtn');
+            if (lawBtn) {
+                lawBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

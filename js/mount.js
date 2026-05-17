@@ -261,7 +261,7 @@ function showMountPanel() {
     html += `<button onclick="tryCaptureMount();closeModal();" style="width:100%;padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🔍 捕捉仙兽</button>`;
     
     html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>`;
+    html += '</div>';
     
     openModal('仙兽', html, '');
 }

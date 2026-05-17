@@ -1,775 +1,2260 @@
-// ===== MERGED MODULES =====
+// Auto-generated module: achievements.js
+'use strict';
 
-// ===== js/core.js =====
+        // ===== checkAchievements =====
+        function checkAchievements() {
+            if (!gameState.achievements) {
+                gameState.achievements = {
+                    unlocked: [],
+                    titles: [],
+                    stats: {
+                        tribulationsCompleted: 0,
+                        dungeonBossesKilled: 0,
+                        sectContributions: 0,
+                        treasuresRefined: 0,
+                        serendipitiesEncountered: 0,
+                        flawlessTribulations: 0
+                    }
+                };
+            }
 
-// ===== showModal =====
-        function showModal(html) {
-            const modal = document.getElementById('eventModal');
-            if (!modal) return;
-            document.getElementById('modalTitle').textContent = '⚡ 绝技选择';
-            document.getElementById('modalDescription').innerHTML = html;
-            document.getElementById('modalOptions').innerHTML = '';
-            document.getElementById('modalResult').classList.add('hidden');
-            modal.classList.add('active');
-        }
+            const ach = gameState.achievements;
 
-        // ===== openModal =====
-        function openModal(title, description, options) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalDescription').innerHTML = description;
-            document.getElementById('modalOptions').innerHTML = options;
-            document.getElementById('modalOptions').classList.remove('hidden');
-            document.getElementById('modalResult').classList.add('hidden');
-            document.getElementById('eventModal').classList.add('active');
-        }
+            for (const achievement of ACHIEVEMENTS) {
+                // 跳过已解锁的
+                if (ach.unlocked.includes(achievement.id)) continue;
 
-        // ===== manualSave =====
-        function manualSave() {
-            showSaveLoadModal();
-        }
+                let unlocked = false;
+                const req = achievement.requirement;
 
-        // ===== saveGame =====
-        function saveGame() {
-            localStorage.setItem(CONFIG.storageKey, JSON.stringify(gameState));
-        }
+                if (req.type === 'stat') {
+                    const currentValue = ach.stats[req.key] || 0;
+                    if (currentValue >= req.value) {
+                        unlocked = true;
+                    }
+                } else if (req.type === 'realm') {
+                    if (gameState.realm >= req.value) {
+                        unlocked = true;
+                    }
+                } else if (req.type === 'set') {
+                    // 检查套装是否收集完成
+                    const set = SET_BONUSES[req.setName];
+                    if (set) {
+                        const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
+                        const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
+                        const allPieces = [...new Set([...equipped, ...owned])];
+                        const hasAll = set.pieces.every(p => allPieces.includes(p));
+                        if (hasAll) unlocked = true;
+                    }
+                }
 
-        // ===== showSaveLoadModal =====
-        function showSaveLoadModal() {
-            const saved = localStorage.getItem(CONFIG.storageKey);
-            let saveInfo = '未找到存档';
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
-                    saveInfo = `存档时间: ${new Date(data.days ? data.days : Date.now()).toLocaleString('zh-CN')}`;
-                } catch(e) {
-                    saveInfo = '存档损坏';
+                if (unlocked) {
+                    ach.unlocked.push(achievement.id);
+                    if (achievement.title && !ach.titles.includes(achievement.title)) {
+                        ach.titles.push(achievement.title);
+                        // 如果没有装备称号，自动装备新称号
+                        if (!gameState.title || gameState.title === '筑基修士') {
+                            gameState.title = achievement.title;
+                        }
+                    }
+                    addLog('good', '🏆 成就解锁', `【${achievement.name}】${achievement.desc}！获得称号：${achievement.title}`);
+                    saveGame();
                 }
             }
-            
-            let html = '<div style="padding:16px;background:#1a1a2e;border-radius:8px;min-width:280px;">';
-            html += '<div style="margin-bottom:16px;text-align:center;">';
-            html += '<b style="color:#ffd700;font-size:16px;">📁 存档管理</b>';
-            html += `<div style="color:#888;font-size:11px;margin-top:4px;">${saveInfo}</div>`;
-            html += '</div>';
-            html += '<div style="display:flex;flex-direction:column;gap:10px;">';
-            html += `<button onclick="doSaveGame();closeModal();" style="padding:12px;background:#2e7d32;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">💾 保存游戏</button>`;
-            html += `<button onclick="doLoadGame();closeModal();" style="padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">📂 加载存档</button>`;
-            html += `<button onclick="showAutoSaveInfo()" style="padding:12px;background:#333;color:#aaa;border:1px solid #555;border-radius:6px;cursor:pointer;font-size:14px;">ℹ️ 自动存档</button>`;
-            html += `<button onclick="doResetGame()" style="padding:12px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">⚠️ 重置游戏</button>`;
-            html += '</div>';
-            html += '<button onclick="closeModal()" style="margin-top:16px;width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>';
-            html += '</div>';
-            showModal(html);
         }
 
-        // ===== doSaveGame =====
-        function doSaveGame() {
-            try {
-                saveGame();
-                addLog('good', '存档成功', '游戏已保存到本地存储');
-            } catch (e) {
-                addLog('bad', '存档失败', '保存失败: ' + e.message);
-            }
-        }
+        // ===== getTitleBonus =====
+        function getTitleBonus() {
+            const bonuses = {
+                cultivationSpeed: 0,
+                attack: 0,
+                defense: 0,
+                craftingSuccess: 0,
+                serendipityRate: 0,
+                realmSuppression: 0,
+                setBonus: 0,
+                tribulationCost: 0,
+                sectContribution: 0
+            };
 
-        // ===== doLoadGame =====
-        function doLoadGame() {
-            try {
-                const saved = localStorage.getItem(CONFIG.storageKey);
-                if (!saved) {
-                    addLog('bad', '加载失败', '没有找到存档');
-                    return;
-                }
-                const data = JSON.parse(saved);
-                // 确保新增字段存在（向后兼容）
-                if (!data.combatLogHistory) data.combatLogHistory = [];
-                if (!data.eventLogHistory) data.eventLogHistory = [];
-                gameState = data;
-                addLog('good', '加载成功', `存档已加载 (第${gameState.days}天)`);
-                // 重新渲染UI
-                if (typeof renderGameUI === 'function') renderGameUI();
-                if (typeof refreshInventoryUI === 'function') refreshInventoryUI();
-                if (typeof updateDisplay === 'function') updateDisplay();
-                showGameUI();
-            } catch (e) {
-                addLog('bad', '加载失败', '加载失败: ' + e.message);
-            }
-        }
+            if (!gameState.title || !gameState.achievements) return bonuses;
 
-        // ===== doResetGame =====
-        function doResetGame() {
-            if (!confirm('确定要重置游戏吗？所有进度将丢失！')) return;
-            try {
-                localStorage.removeItem(CONFIG.storageKey);
-                location.reload();
-            } catch (e) {
-                addLog('bad', '重置失败', '重置失败');
-            }
-        }
-
-        // ===== showAutoSaveInfo =====
-        function showAutoSaveInfo() {
-            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;">';
-            html += '<b style="color:#ffd700;">ℹ️ 自动存档说明</b><br><br>';
-            html += '<div style="color:#ccc;font-size:13px;line-height:1.6;">';
-            html += '• 游戏会自动在重要操作后保存到本地<br>';
-            html += '• 点击「保存游戏」可手动保存当前进度<br>';
-            html += '• 存档保存在浏览器本地存储中<br>';
-            html += '• 清除浏览器数据会导致存档丢失<br>';
-            html += '• 建议定期手动保存重要进度</div>';
-            html += '<button onclick="showSaveLoadModal()" style="margin-top:12px;width:100%;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">知道了</button>';
-            html += '</div>';
-            showModal(html);
-        }
-
-        // ===== recalculateAllEffects =====
-        function recalculateAllEffects() {
-            // 保存需要保留的非装备效果（来自奇遇等系统）
-            const savedSerendipityBoost = gameState.activeEffects.serendipity_boost || 0;
-            const savedBreakthroughBoost = gameState.activeEffects.breakthrough_boost || 0;
-            const savedCultivateSpeed = gameState.activeEffects.cultivate_speed || 0;
-            const saved渡劫MindsetProtect = gameState.activeEffects['渡劫_mindset_protect'] || 0;
-            const saved渡劫DamageReduce = gameState.activeEffects['渡劫_damage_reduce'] || 0;
-            const savedAllStats = gameState.activeEffects.all_stats || 0;
-            const savedAttack = gameState.activeEffects.attack || 0;
-            const savedDefense = gameState.activeEffects.defense || 0;
-            const savedCultivateQiRate = gameState.activeEffects.cultivate_qi_rate || 0;
-            const savedEscape = gameState.activeEffects.escape || 0;
-            const savedForeseeEvent = gameState.activeEffects.foresee_event || 0;
-
-            // 重置所有效果
-            for (let key in gameState.activeEffects) {
-                gameState.activeEffects[key] = 0;
-            }
-
-            // 累加装备效果
-            for (const treasure of gameState.equippedTreasures) {
-                if (treasure) {
-                    const effectType = treasure.effect.type;
-                    if (gameState.activeEffects.hasOwnProperty(effectType)) {
-                        gameState.activeEffects[effectType] += treasure.effect.value;
+            // 遍历所有已解锁的成就，找出当前称号对应的加成
+            const ach = gameState.achievements;
+            for (const achievement of ACHIEVEMENTS) {
+                if (ach.unlocked.includes(achievement.id)) {
+                    const reward = achievement.reward;
+                    if (reward.type === 'attribute') {
+                        if (bonuses.hasOwnProperty(reward.target)) {
+                            bonuses[reward.target] += reward.bonus;
+                        }
                     }
                 }
             }
 
-            // 恢复非装备效果（这些效果由奇遇系统或丹药管理，不应被清除）
-            if (savedSerendipityBoost > 0) gameState.activeEffects.serendipity_boost = savedSerendipityBoost;
-            if (savedBreakthroughBoost > 0) gameState.activeEffects.breakthrough_boost = savedBreakthroughBoost;
-            if (savedCultivateSpeed > 0) gameState.activeEffects.cultivate_speed = savedCultivateSpeed;
-            if (saved渡劫MindsetProtect > 0) gameState.activeEffects['渡劫_mindset_protect'] = saved渡劫MindsetProtect;
-            if (saved渡劫DamageReduce > 0) gameState.activeEffects['渡劫_damage_reduce'] = saved渡劫DamageReduce;
-            if (savedAllStats > 0) gameState.activeEffects.all_stats = savedAllStats;
-            if (savedAttack > 0) gameState.activeEffects.attack = savedAttack;
-            if (savedDefense > 0) gameState.activeEffects.defense = savedDefense;
-            if (savedCultivateQiRate > 0) gameState.activeEffects.cultivate_qi_rate = savedCultivateQiRate;
-            if (savedEscape > 0) gameState.activeEffects.escape = savedEscape;
-            if (savedForeseeEvent > 0) gameState.activeEffects.foresee_event = savedForeseeEvent;
+            return bonuses;
         }
 
-        // ===== updateEquipmentBar =====
-        function updateEquipmentBar() {
-            const icons = ['⚔️', '🛡️', '💍'];
-            for (let i = 0; i < 3; i++) {
-                const slot = document.getElementById(`equipSlot${i}`);
-                const treasure = gameState.equippedTreasures[i];
-                if (treasure) {
-                    slot.classList.add('filled');
-                    slot.querySelector('.slot-icon').textContent = treasure.icon || icons[i];
-                    const star = treasure.star || 1;
-                    const starDisplay = getStarDisplay(star);
-                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}${starDisplay}\n${treasure.desc}`;
-                } else {
-                    slot.classList.remove('filled');
-                    slot.querySelector('.slot-icon').textContent = icons[i];
-                    slot.querySelector('.slot-tooltip').textContent = '空';
-                }
+        // ===== equipTitle =====
+        function equipTitle(titleName) {
+            if (!gameState.achievements || !gameState.achievements.titles.includes(titleName)) {
+                addLog('bad', '称号装备', '你还没有获得这个称号！');
+                return;
             }
+            gameState.title = titleName;
+            addLog('good', '称号装备', `已装备称号：【${titleName}】`);
+            updateDisplay();
+            saveGame();
         }
 
-        // ===== renderSetStatus =====
-        function renderSetStatus() {
-            let html = '<div style="margin-top:8px;padding:6px;background:#1a1a2e;border-radius:6px;font-size:11px;">';
-            html += '<b style="color:#ffd700;">套装状态</b><br>';
-            let hasAny = false;
-            for (const setName in SET_BONUSES) {
-                const set = SET_BONUSES[setName];
-                const equipped = [];
-                const treasures = gameState.equippedTreasures;
-                for (const t of treasures) {
-                    if (t && set.pieces.includes(t.name)) equipped.push(t.name);
+        // ===== openAchievements =====
+        function openAchievements() {
+            document.getElementById('achievementModal').classList.add('active');
+            renderAchievements();
+        }
+
+        // ===== closeAchievements =====
+        function closeAchievements() {
+            document.getElementById('achievementModal').classList.remove('active');
+        }
+
+        // ===== renderAchievements =====
+        function renderAchievements() {
+            const content = document.getElementById('achievementContent');
+            if (!content) return;
+
+            const ach = gameState.achievements || { unlocked: [], titles: [], stats: {} };
+
+            let html = `<div class="achievement-header">`;
+            html += `<div class="achievement-title-display">当前称号：<span style="color:#ffd700;">【${gameState.title || '无'}】</span></div>`;
+            html += `</div>`;
+
+            // 分类显示
+            const categories = {
+                cultivation: '修炼',
+                combat: '战斗',
+                collection: '收集',
+                story: '剧情',
+                special: '特殊'
+            };
+
+            for (const [catKey, catName] of Object.entries(categories)) {
+                const catAchievements = ACHIEVEMENTS.filter(a => a.category === catKey);
+                if (catAchievements.length === 0) continue;
+
+                html += `<div class="achievement-category">`;
+                html += `<h4>${catName}</h4>`;
+
+                for (const a of catAchievements) {
+                    const isUnlocked = ach.unlocked.includes(a.id);
+                    const progress = getAchievementProgress(a, ach);
+
+                    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">`;
+                    html += `<div class="achievement-icon">${isUnlocked ? '🏆' : '🔒'}</div>`;
+                    html += `<div class="achievement-info">`;
+                    html += `<div class="achievement-name">${a.name}</div>`;
+                    html += `<div class="achievement-desc">${a.desc}</div>`;
+
+                    if (!isUnlocked && progress > 0) {
+                        html += `<div class="achievement-progress">`;
+                        html += `<div class="progress-bar" style="width:${progress}%"></div>`;
+                        html += `</div>`;
+                        html += `<div class="achievement-progress-text">${getAchievementProgressText(a, ach)}</div>`;
+                    }
+
+                    html += `</div>`;
+                    html += `<div class="achievement-reward">`;
+                    html += `<div style="color:#4caf50;">奖励：${getRewardText(a)}</div>`;
+                    if (a.title) html += `<div style="color:#ffd700;">称号：${a.title}</div>`;
+                    html += `</div>`;
+                    html += `</div>`;
                 }
-                if (equipped.length > 0) {
-                    hasAny = true;
-                    const count = equipped.length;
-                    const color = count >= set.count ? '#00ff88' : '#aaaaaa';
-                    const status = count >= set.count ? '✓ ' + (count === 3 ? set.threePiece : set.twoPiece) : `(${equipped.length}/${set.count}) ${set.twoPiece}`;
-                    html += `<span style="color:${color};">${setName} ${status}</span><br>`;
+
+                html += `</div>`;
+            }
+
+            // 已获得称号列表
+            if (ach.titles.length > 0) {
+                html += `<div class="achievement-category">`;
+                html += `<h4>已获称号</h4>`;
+                html += `<div class="title-list">`;
+                for (const t of ach.titles) {
+                    const isEquipped = gameState.title === t;
+                    html += `<div class="title-item ${isEquipped ? 'equipped' : ''}" onclick="equipTitle('${t}')">`;
+                    html += `【${t}】${isEquipped ? '(已装备)' : '(点击装备)'}`;
+                    html += `</div>`;
                 }
+                html += `</div>`;
+                html += `</div>`;
             }
-            if (!hasAny) html += '<span style="color:#666;">无套装激活</span>';
-            html += '</div>';
-            return html;
+
+            content.innerHTML = html;
         }
 
-        // ===== openEquipSlotMenu =====
-        function openEquipSlotMenu(slotIndex) {
-            const treasure = gameState.equippedTreasures[slotIndex];
-            if (!treasure) return;
-            // 移除已存在的菜单
-            const existing = document.getElementById('equipSlotMenu');
-            if (existing) existing.remove();
-
-            const star = treasure.star || 1;
-            const html = `<div id="equipSlotMenu" style="position:fixed;z-index:1002;background:#1a1a2e;border:1px solid #ffd700;border-radius:10px;padding:10px;min-width:160px;box-shadow:0 0 20px rgba(255,215,0,0.3);">
-                <div style="color:#ffd700;font-weight:bold;text-align:center;margin-bottom:8px;">${treasure.icon || '📦'} ${treasure.name} ${getStarDisplay(star)}</div>
-                <button onclick="openEnhanceFromEquip(${slotIndex})" style="display:block;width:100%;padding:6px 12px;background:rgba(255,215,0,0.15);border:1px solid #ffd700;border-radius:6px;color:#ffd700;cursor:pointer;margin-bottom:5px;">⬆️ 强化</button>
-                <button onclick="unequipTreasure(${slotIndex});closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:rgba(100,100,100,0.2);border:1px solid #888;border-radius:6px;color:#ccc;cursor:pointer;">卸下</button>
-                <button onclick="closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:transparent;border:none;color:#888;cursor:pointer;margin-top:3px;">取消</button>
-            </div>`;
-            const slot = document.getElementById(`equipSlot${slotIndex}`);
-            const rect = slot.getBoundingClientRect();
-            document.body.insertAdjacentHTML('beforeend', html);
-            const menu = document.getElementById('equipSlotMenu');
-            menu.style.top = (rect.bottom + 5) + 'px';
-            menu.style.left = rect.left + 'px';
-        }
-
-        // ===== closeEquipSlotMenu =====
-        function closeEquipSlotMenu() {
-            const menu = document.getElementById('equipSlotMenu');
-            if (menu) menu.remove();
-        }
-
-        // ===== unequipTreasure =====
-        function unequipTreasure(slotIndex) {
-            const treasure = gameState.equippedTreasures[slotIndex];
-            if (treasure) {
-                // 移回背包（保留星级）
-                const invItem = {
-                    type: treasure.type,
-                    name: treasure.name,
-                    quantity: 1,
-                    quality: treasure.quality,
-                    effect: treasure.effect,
-                    desc: treasure.desc,
-                    icon: treasure.icon,
-                    star: treasure.star || 1
-                };
-                addToInventoryObj(invItem);
-                gameState.equippedTreasures[slotIndex] = null;
-                recalculateAllEffects();
-                updateEquipmentBar();
-                saveGame();
-                addLog('neutral', '卸下灵宝', `卸下了${treasure.name}`);
-                if (document.getElementById('setStatusContainer')) {
-                    document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
-                }
-            }
-        }
-
-        // ===== addToInventory =====
-        function addToInventory(type, name, quantity, quality, effect, desc, icon, star) {
-            // 查找是否已存在同类型物品
-            const existing = gameState.inventory.find(item => item.name === name && item.type === type);
-            if (existing) {
-                existing.quantity += quantity;
-            } else {
-                if (gameState.inventory.length >= gameState.maxInventorySlots) {
-                    return false; // 背包满了
-                }
-                gameState.inventory.push({
-                    id: Date.now(),
-                    type,
-                    name,
-                    quantity,
-                    quality,
-                    effect,
-                    desc,
-                    icon,
-                    star: star || 1
-                });
-            }
-            return true;
-        }
-
-        // ===== addToInventoryObj =====
-        function addToInventoryObj(itemObj) {
-            const existing = gameState.inventory.find(i => i.name === itemObj.name && i.type === itemObj.type);
-            if (existing) {
-                existing.quantity += itemObj.quantity;
-            } else {
-                if (gameState.inventory.length >= gameState.maxInventorySlots) {
-                    return false;
-                }
-                gameState.inventory.push({
-                    id: Date.now(),
-                    type: itemObj.type,
-                    name: itemObj.name,
-                    quantity: itemObj.quantity,
-                    quality: itemObj.quality,
-                    effect: itemObj.effect,
-                    desc: itemObj.desc,
-                    icon: itemObj.icon,
-                    star: itemObj.star || 1
-                });
-            }
-            return true;
-        }
-
-        // ===== openInventory =====
-        function openInventory() {
-            currentInvTab = 'all';
-            selectedInvItem = null;
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
-            document.getElementById('inventoryModal').classList.add('active');
-            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
-        }
-
-        // ===== closeInventory =====
-        function closeInventory() {
-            document.getElementById('inventoryModal').classList.remove('active');
-        }
-
-        // ===== switchInvTab =====
-        function switchInvTab(tab) {
-            currentInvTab = tab;
-            selectedInvItem = null;
-            document.querySelectorAll('.inventory-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
-        }
-
-        // ===== renderInventoryGrid =====
-        function renderInventoryGrid() {
-            const grid = document.getElementById('inventoryGrid');
-            let items = gameState.inventory;
-            if (currentInvTab !== 'all') {
-                items = items.filter(item => item.type === currentInvTab);
-            }
+        // ===== renderSpiritRootContent =====
+        function renderSpiritRootContent() {
+            const content = document.getElementById('spiritRootContent');
+            const sr = gameState.spiritRoot;
+            const srData = SPIRIT_ROOT_QUALITIES[sr.quality];
+            const cons = gameState.constitutions;
             
-            document.getElementById('invCapacity').textContent = gameState.inventory.length;
+            const speedBonus = Math.round((srData.speedBonus - 1) * 100);
+            const bottleneckEffect = srData.bottleneckBonus >= 0 ? `+${Math.round(srData.bottleneckBonus * 100)}%` : `${Math.round(srData.bottleneckBonus * 100)}%`;
+            const tribEffect = srData.tribulationBonus >= 0 ? `+${Math.round(srData.tribulationBonus * 100)}%` : `${Math.round(srData.tribulationBonus * 100)}%`;
             
-            grid.innerHTML = items.map((item, idx) => `
-                <div class="inventory-slot ${selectedInvItem === idx ? 'selected' : ''}" 
-                     onclick="selectInvItem(${idx})">
-                    <span style="font-size:1.5em">${item.icon || '📦'}</span>
-                    <span class="item-name quality-${item.quality}">${item.name}</span>
-                    ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+            const highestBonus = getHighestElementBonus();
+            
+            let html = `
+                <div class="sr-header">
+                    <div class="sr-quality">${srData.icon} ${sr.quality}</div>
+                    <div style="color:#aaa;">灵根资质评估</div>
                 </div>
-            `).join('');
-        }
-
-        // ===== selectInvItem =====
-        function selectInvItem(idx) {
-            let items = gameState.inventory;
-            if (currentInvTab !== 'all') {
-                items = items.filter(item => item.type === currentInvTab);
-            }
-            selectedInvItem = idx;
-            const item = items[idx];
-            renderInventoryGrid();
-            
-            document.getElementById('invDetail').style.display = 'block';
-            document.getElementById('invDetailContent').innerHTML = `
-                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
-                    <span style="font-size:2em">${item.icon || '📦'}</span>
-                    <div>
-                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(item.quality)}">${item.name}</div>
-                        <div style="color:#888">${item.desc}</div>
+                
+                <div class="sr-stats">
+                    <div class="sr-stat">
+                        <div class="sr-stat-value" style="color: ${speedBonus >= 0 ? '#4caf50' : '#f44336'}">${speedBonus >= 0 ? '+' : ''}${speedBonus}%</div>
+                        <div class="sr-stat-label">修炼速度</div>
+                        <div class="sr-stat-bonus">${srData.speedBonus >= 1 ? '🌟 超越常人' : '📉 低于常人'}</div>
+                    </div>
+                    <div class="sr-stat">
+                        <div class="sr-stat-value">${bottleneckEffect}</div>
+                        <div class="sr-stat-label">瓶颈概率</div>
+                        <div class="sr-stat-bonus">${srData.bottleneckBonus <= 0 ? '🌟 更易突破' : '📉 较难突破'}</div>
+                    </div>
+                    <div class="sr-stat">
+                        <div class="sr-stat-value" style="color: ${srData.tribulationBonus >= 0 ? '#4caf50' : '#f44336'}">${tribEffect}</div>
+                        <div class="sr-stat-label">渡劫成功率</div>
+                        <div class="sr-stat-bonus">${srData.tribulationBonus >= 0 ? '🌟 天道眷顾' : '📉 渡劫艰难'}</div>
                     </div>
                 </div>
-                <div style="color:#aaa">数量: ${item.quantity}</div>
+                
+                <div class="sr-section">
+                    <div class="sr-section-title">🌈 五行亲和</div>
+                    <div class="five-elements-grid">
+                        <div class="element-card">
+                            <div class="element-icon">⚔️</div>
+                            <div class="element-name">金</div>
+                            <div class="element-value ${sr.affinity.metal >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.metal}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🌿</div>
+                            <div class="element-name">木</div>
+                            <div class="element-value ${sr.affinity.wood >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.wood}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">❄️</div>
+                            <div class="element-name">水</div>
+                            <div class="element-value ${sr.affinity.water >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.water}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🔥</div>
+                            <div class="element-name">火</div>
+                            <div class="element-value ${sr.affinity.fire >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.fire}%</div>
+                        </div>
+                        <div class="element-card">
+                            <div class="element-icon">🛡️</div>
+                            <div class="element-name">土</div>
+                            <div class="element-value ${sr.affinity.earth >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.earth}%</div>
+                        </div>
+                    </div>
+                    ${highestBonus ? `
+                    <div style="text-align:center;margin-top:10px;color:#ffd700;">
+                        当前最高加成：${highestBonus.element} ${highestBonus.technique.icon} ${highestBonus.technique.name} (${highestBonus.affinity}%)
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="sr-section">
+                    <div class="sr-section-title">👼 体质列表</div>
+                    <div class="constitutions-list">
             `;
             
-            let actions = '';
-            if (item.type === 'pill') {
-                actions = `<button class="btn btn-cultivate" onclick="usePill('${item.name}', ${idx})">使用</button>`;
-            } else if (item.type === 'treasure') {
-                const star = item.star || 1;
-                const starDisplay = getStarDisplay(star);
-                const starColor = getStarColor(star);
-                actions = `<button class="btn btn-breakthrough" onclick="equipTreasure('${item.name}', ${idx})">装备</button>`;
-                actions += `<button class="btn btn-enhance" onclick="openEnhanceFromInventory(${idx})" style="background:rgba(255,215,0,0.15);border:1px solid #ffd700;color:#ffd700;padding:5px 12px;border-radius:5px;cursor:pointer;margin-left:5px;">强化</button>`;
+            // 渲染所有体质
+            for (const [name, data] of Object.entries(CONSTITUTIONS)) {
+                const acquired = cons.find(c => c.type === name);
+                const canActivate = data.trigger(gameState);
+                
+                html += `
+                    <div class="constitution-card ${acquired ? 'active' : 'inactive'}">
+                        <div class="icon">${data.icon}</div>
+                        <div class="info">
+                            <div class="name">${name}</div>
+                            <div class="effect">${data.desc}</div>
+                            <div class="source">触发条件：${data.source}</div>
+                        </div>
+                        <div class="status ${acquired ? 'active' : 'inactive'}">
+                            ${acquired ? '已激活' : canActivate ? '可激活' : '未获得'}
+                        </div>
+                    </div>
+                `;
             }
-            actions += `<button class="btn btn-save" onclick="sellItem(${idx})">出售(${Math.floor(item.quality === 'common' ? 10 : item.quality === 'rare' ? 50 : item.quality === 'precious' ? 200 : 1000)}灵石)</button>`;
-            actions += `<button class="btn btn-new" onclick="discardItem(${idx})">丢弃</button>`;
-            document.getElementById('invActions').innerHTML = actions;
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="sr-actions">
+                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(false)" ${gameState.spiritStones < 10000 ? 'disabled' : ''}>
+                        🔄 洗髓丹 (10000灵石)
+                    </button>
+                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(true)" ${gameState.spiritStones < 50000 || gameState.realm < 4 ? 'disabled' : ''}>
+                        🌈 混沌丹 (50000灵石)
+                    </button>
+                </div>
+                
+                <div class="sr-tips">
+                    <h4>💡 小提示</h4>
+                    <ul>
+                        <li>灵根品质影响修炼速度、瓶颈概率和渡劫成功率</li>
+                        <li>五行亲和达到一定数值可激活对应功法加成</li>
+                        <li>部分体质通过奇遇获得，部分通过突破境界激活</li>
+                        <li>最多同时拥有2种体质</li>
+                        <li>混沌丹需要化神期才能使用，100%获得混沌灵根</li>
+                    </ul>
+                </div>
+            `;
+            
+            content.innerHTML = html;
         }
 
-        // ===== usePill =====
-        function usePill(name, idx) {
-            const pill = PILLS[name];
-            if (!pill) return;
-            
-            const item = gameState.inventory.find((i, iidx) => {
-                let items = gameState.inventory;
-                if (currentInvTab !== 'all') items = items.filter(it => it.type === currentInvTab);
-                return iidx === idx;
-            });
-            if (!item || item.quantity <= 0) return;
-            
-            item.quantity--;
-            if (item.quantity <= 0) {
-                gameState.inventory = gameState.inventory.filter(i => i.name !== name || i.type !== 'pill');
+
+
+// Auto-generated module: ascension.js
+'use strict';
+
+// ===== ASCENSION_COSTS =====
+const ASCENSION_COSTS = {
+    spiritStones: 500000,  // 50万灵石
+    equipmentQuality: 'rare' // 需要紫色(rare)或以上装备
+};
+
+// ===== hasOrangeOrHigherEquip =====
+function hasOrangeOrHigherEquip() {
+    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
+    const minQuality = qualityOrder['rare']; // 紫色=rare=1, 橙色=precious=2
+    
+    // 检查背包
+    for (const item of gameState.inventory) {
+        if (item.type === 'treasure') {
+            if ((qualityOrder[item.quality] || 0) >= minQuality) {
+                return true;
             }
-            
-            // 应用丹药效果
-            switch (pill.effect.type) {
-                case 'qi':
-                    gameState.qi = Math.min(gameState.maxQi, gameState.qi + pill.effect.value);
-                    addLog('good', '使用丹药', `服下${name}，灵气+${pill.effect.value}`);
-                    break;
-                case 'mindset':
-                    gameState.mindset = Math.min(100, gameState.mindset + pill.effect.value);
-                    addLog('good', '使用丹药', `服下${name}，心境+${pill.effect.value}`);
-                    break;
-                case 'breakthrough_boost':
-                case 'cultivate_speed':
-                case '渡劫_mindset_protect':
-                    gameState.activeEffects[pill.effect.type] += pill.effect.value;
-                    addLog('good', '使用丹药', `服下${name}，${pill.desc}（永久生效）`);
-                    break;
+        }
+    }
+    
+    // 检查已装备
+    for (const equip of gameState.equippedTreasures) {
+        if (equip && (qualityOrder[equip.quality] || 0) >= minQuality) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// ===== canAscend =====
+function canAscend() {
+    // 检查渡劫是否成功
+    const hasCompletedTribulation = gameState.realm >= 4 && gameState.stage >= 2;
+    if (!hasCompletedTribulation) {
+        return { result: false, reason: '需要渡劫成功（化神后期）' };
+    }
+    
+    // 检查灵石
+    if (gameState.spiritStones < ASCENSION_COSTS.spiritStones) {
+        return { result: false, reason: `需要${ASCENSION_COSTS.spiritStones}灵石，飞升费用` };
+    }
+    
+    // 检查橙色以上装备
+    if (!hasOrangeOrHigherEquip()) {
+        return { result: false, reason: '需要至少1件紫色以上品质的装备' };
+    }
+    
+    // 检查是否已经飞升
+    if (gameState.currentRealm === 'immortal') {
+        return { result: false, reason: '已经飞升' };
+    }
+    
+    return { result: true };
+}
+
+// ===== showAscensionButton =====
+function showAscensionButton() {
+    const check = canAscend();
+    
+    const btn = document.getElementById('ascensionBtn');
+    if (!btn) return;
+    
+    if (check.result) {
+        btn.style.display = 'inline-block';
+        btn.style.background = 'linear-gradient(135deg, #9c27b0, #e91e63)';
+        btn.style.boxShadow = '0 0 20px rgba(233, 30, 99, 0.5)';
+        btn.onclick = showAscensionModal;
+    } else {
+        btn.style.display = 'inline-block';
+        btn.style.background = '#444';
+        btn.style.boxShadow = 'none';
+        btn.onclick = () => showToast(check.reason);
+    }
+}
+
+// ===== showAscensionModal =====
+function showAscensionModal() {
+    const check = canAscend();
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    
+    let html = '<div style="padding:20px;text-align:center;">';
+    html += '<div style="font-size:48px;margin-bottom:10px;">🌟</div>';
+    html += '<h2 style="color:#ffd700;margin-bottom:10px;">飞升成仙</h2>';
+    html += '<p style="color:#aaa;font-size:13px;margin-bottom:20px;">突破凡界桎梏，进入仙界篇章</p>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升消耗：</div>';
+    html += `<div style="color:#f44336;margin-bottom:4px;">💎 500000 灵石（保留50%）</div>`;
+    html += '<div style="color:#ff9800;margin-bottom:4px;">⚔️ 橙色以上装备 → 仙界材料</div>';
+    html += '<div style="color:#4caf50;">✨ 已学功法 → 转换仙界版</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升保留：</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 灵石（扣除50%）</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 已学功法（转换仙界版）</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 宗门归属</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 成就/称号（部分保留）</div>';
+    html += '<div style="color:#aaa;">• 宗门贡献</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">仙界境界：</div>';
+    html += '<div style="color:#4caf50;margin-bottom:4px;">🌱 地仙境 → 天仙境 → 金仙境</div>';
+    html += '<div style="color:#2196f3;">⭐ 大罗金仙 → 混元大罗</div>';
+    html += '</div>';
+    
+    html += `<button onclick="doAscend()" style="width:100%;padding:14px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">🌟 确认飞升</button>`;
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">返回</button>`;
+    html += '</div>';
+    
+    openModal('飞升', html, '');
+}
+
+// ===== doAscend =====
+function doAscend() {
+    const check = canAscend();
+    if (!check.result) {
+        showToast(check.reason);
+        closeModal();
+        return;
+    }
+    
+    // 1. 扣除灵石（保留50%）
+    const keepStones = Math.floor(gameState.spiritStones * 0.5);
+    const spentStones = gameState.spiritStones - keepStones;
+    gameState.spiritStones = keepStones;
+    
+    // 2. 凡界装备 → 材料（只保留橙色以上）
+    const materialsGained = [];
+    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
+    
+    // 背包装备转化
+    const newInventory = [];
+    for (const item of gameState.inventory) {
+        if (item.type === 'treasure' && qualityOrder[item.quality] >= qualityOrder['precious']) {
+            materialsGained.push({ name: item.name, quality: item.quality });
+        } else {
+            newInventory.push(item);
+        }
+    }
+    gameState.inventory = newInventory;
+    
+    // 装备栏转化
+    for (let i = 0; i < gameState.equippedTreasures.length; i++) {
+        const equip = gameState.equippedTreasures[i];
+        if (equip && qualityOrder[equip.quality] >= qualityOrder['precious']) {
+            materialsGained.push({ name: equip.name, quality: equip.quality });
+            gameState.equippedTreasures[i] = null;
+        }
+    }
+    
+    // 3. 初始化仙界状态
+    initializeImmortalState();
+    
+    // 4. 设置初始仙石
+    gameState.immortal.spiritStones = 0; // 仙石独立
+    
+    // 5. 切换到仙界
+    gameState.currentRealm = 'immortal';
+    
+    // 6. 保留一些凡界资源
+    gameState.realm = 1; // 凡界境界回归筑基
+    gameState.stage = 0;
+    gameState.cultivationProgress = 0;
+    
+    // 7. 保存日志
+    addLog('good', '飞升成功', `历经${gameState.days}天的修炼，终于飞升成仙！`);
+    
+    saveGame();
+    
+    // 8. 关闭模态框，显示成功界面
+    closeModal();
+    showAscensionSuccessScreen();
+}
+
+// ===== showAscensionSuccessScreen =====
+function showAscensionSuccessScreen() {
+    let html = '<div style="padding:30px;text-align:center;">';
+    html += '<div style="font-size:64px;animation:pulse 2s infinite;">✨🌟✨</div>';
+    html += '<h2 style="color:#ffd700;font-size:24px;margin:20px 0;">恭喜飞升成仙！</h2>';
+    html += '<p style="color:#aaa;margin-bottom:20px;">你已突破凡界桎梏，进入仙界篇章</p>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
+    html += '<div style="color:#4caf50;margin-bottom:8px;">✅ 保留50%灵石：' + gameState.spiritStones + '</div>';
+    html += '<div style="color:#2196f3;margin-bottom:8px;">✅ 境界：地仙境（重新修炼）</div>';
+    html += '<div style="color:#9c27b0;">✅ 仙界篇章开启</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
+    html += '<div style="color:#ffd700;margin-bottom:8px;">📍 当前区域：仙灵谷</div>';
+    html += '<div style="color:#aaa;font-size:13px;">仙气充沛，适合初入仙界者修炼</div>';
+    html += '</div>';
+    
+    html += `<button onclick="enterImmortalRealm()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">☁️ 进入仙界</button>`;
+    html += '</div>';
+    
+    openModal('飞升', html, '');
+}
+
+// ===== enterImmortalRealm =====
+function enterImmortalRealm() {
+    closeModal();
+    saveGame();
+    updateDisplay();
+    
+    // 显示仙界UI
+    if (typeof showImmortalMainUI === 'function') {
+        showImmortalMainUI();
+    }
+    
+    addLog('good', '进入仙界', '踏入仙界，开始全新的修仙之旅！');
+}
+
+// ===== switchRealm =====
+function switchRealm(targetRealm) {
+    if (targetRealm === gameState.currentRealm) return;
+    
+    if (targetRealm === 'immortal') {
+        if (!gameState.immortal) {
+            showToast('尚未飞升，无法进入仙界');
+            return;
+        }
+        gameState.currentRealm = 'immortal';
+        addLog('neutral', '切换位面', '进入仙界');
+    } else {
+        gameState.currentRealm = 'mortal';
+        addLog('neutral', '切换位面', '返回凡界');
+    }
+    
+    saveGame();
+    updateDisplay();
+    
+    // 重新渲染UI
+    if (typeof renderGameUI === 'function') renderGameUI();
+}
+
+// ===== showRealmSwitchButton =====
+function showRealmSwitchButton() {
+    if (!gameState.immortal) return; // 未飞升不显示
+    
+    const btn = document.getElementById('realmSwitchBtn');
+    if (!btn) return;
+    
+    if (gameState.currentRealm === 'mortal') {
+        btn.textContent = '☁️ 仙界';
+        btn.onclick = () => switchRealm('immortal');
+    } else {
+        btn.textContent = '🏯 凡界';
+        btn.onclick = () => switchRealm('mortal');
+    }
+    
+    btn.style.display = 'inline-block';
+}
+
+// ===== doFateTask =====
+function doFateTask() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('仙缘任务只在仙界可用');
+        return;
+    }
+    
+    const today = Math.floor(gameState.days / 1);
+    if (gameState.immortal.fateTaskRefreshDay === today) {
+        showToast('今日仙缘任务已完成');
+        return;
+    }
+    
+    // 仙缘任务奖励
+    const reward = Math.floor(100 + Math.random() * 400);
+    earnSpiritStones(reward, '每日仙缘任务');
+    
+    // 20%概率额外奖励
+    if (Math.random() < 0.2) {
+        const bonus = Math.floor(50 + Math.random() * 150);
+        earnSpiritStones(bonus, '天赐福缘');
+        showToast(`天赐福缘！额外获得${bonus}仙石`);
+    }
+    
+    gameState.immortal.fateTaskRefreshDay = today;
+    gameState.immortal.lastFateTask = gameState.days;
+    saveGame();
+}
+
+// ===== doCelestialCycle =====
+function doCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('天道轮回只在仙界可用');
+        return;
+    }
+    
+    const cycleDay = 7;
+    const daysSinceCycle = gameState.days - (gameState.immortal.celestialCycleDay || 0);
+    
+    if (daysSinceCycle < cycleDay) {
+        showToast(`天道轮回每7天一次，还需${cycleDay - daysSinceCycle}天`);
+        return;
+    }
+    
+    // 开始天道轮回
+    const survivalChance = 0.7 + (gameState.immortal.realm * 0.05);
+    
+    if (Math.random() < survivalChance) {
+        // 成功
+        const reward = Math.floor(200 + Math.random() * 600);
+        earnSpiritStones(reward, '天道轮回奖励');
+        
+        // 额外奖励
+        if (gameState.immortal.celestialCycleCompleted) {
+            const extra = Math.floor(100 + Math.random() * 200);
+            earnSpiritStones(extra, '轮回福报');
+        }
+        
+        gameState.immortal.celestialCycleCompleted = true;
+        showToast(`天道轮回完成！获得${reward}仙石`);
+    } else {
+        // 失败
+        const loss = Math.floor(gameState.immortal.spiritStones * 0.1);
+        gameState.immortal.spiritStones = Math.max(0, gameState.immortal.spiritStones - loss);
+        showToast(`天道轮回失败！损失${loss}仙石`);
+    }
+    
+    gameState.immortal.celestialCycleDay = gameState.days;
+    saveGame();
+    updateDisplay();
+}
+
+
+// Auto-generated module: combat.js
+'use strict';
+
+        // ===== calculateSetBonuses =====
+        function calculateSetBonuses() {
+            const equipped = [];
+            if (combatState.player.weaponData) equipped.push(combatState.player.weaponData.name);
+            if (combatState.player.armorData) equipped.push(combatState.player.armorData.name);
+            if (combatState.player.accessories) {
+                combatState.player.accessories.forEach(a => { if (a) equipped.push(a.name); });
             }
-            
-            saveGame();
-            updateDisplay();
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
+            const bonuses = {};
+            const skills = [];
+            for (const setName in SET_BONUSES) {
+                const set = SET_BONUSES[setName];
+                const matched = set.pieces.filter(p => equipped.includes(p));
+                if (matched.length >= 2) {
+                    bonuses[setName] = matched.length; // 2 or 3
+                    if (matched.length === set.count && set.skill) skills.push(set.skill);
+                }
+            }
+            combatState.player.setBonuses = bonuses;
+            combatState.player.skills = skills;
+            return bonuses;
         }
 
-        // ===== equipTreasure =====
-        function equipTreasure(name, idx) {
-            const treasure = TREASURES[name];
-            if (!treasure) return;
+        // ===== recalculatePlayerStats =====
+        function recalculatePlayerStats() {
+            let attackBonus = 1.0, critBonus = 0, defenseBonus = 1.0, qiRegenBonus = 0;
+            for (const setName in combatState.player.setBonuses) {
+                const set = SET_BONUSES[setName];
+                const count = combatState.player.setBonuses[setName];
+                if (set.stats.attackPercent) attackBonus += set.stats.attackPercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.critPercent) critBonus += set.stats.critPercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.defensePercent) defenseBonus += set.stats.defensePercent * (count === 3 ? 1 : 0.5);
+                if (set.stats.qiRegenPercent) qiRegenBonus += set.stats.qiRegenPercent * (count === 3 ? 1 : 0.5);
+            }
+            combatState.player.attackPercent = attackBonus;
+            combatState.player.critBonus = critBonus;
+            combatState.player.defensePercent = defenseBonus;
+            combatState.player.qiRegenBonus = qiRegenBonus;
+        }
 
-            // 找到空槽位
-            const emptySlot = gameState.equippedTreasures.findIndex(t => t === null);
-            if (emptySlot === -1) {
-                alert('装备栏已满！');
+        // ===== getCurrentUltimateSkills =====
+        function getCurrentUltimateSkills() {
+            const weaponData = combatState.player.weaponData || { name:'空手' };
+            return ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
+        }
+
+        // ===== getEnergyBar =====
+        function getEnergyBar() {
+            const skills = getCurrentUltimateSkills();
+            // 找到最低cost的技能作为能量条参考
+            const minCost = skills.length > 0 ? Math.min(...skills.map(s => s.cost)) : 50;
+            const pct = Math.min(100, (combatEnergy / minCost) * 100);
+            const ready = combatEnergy >= minCost;
+            return {
+                current: combatEnergy,
+                cost: minCost,
+                pct,
+                ready,
+                skills
+            };
+        }
+
+        // ===== executeUltimateSkill =====
+        function executeUltimateSkill(skill) {
+            const weaponData = combatState.player.weaponData || { name:'空手', star:1 };
+            const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
+            const starMultiplier = ENHANCE_CONFIG && ENHANCE_CONFIG.starMultipliers ? (ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1.0) : 1.0;
+
+            if (combatEnergy < skill.cost) return;
+
+            combatEnergy -= skill.cost;
+            combatState.round++;
+
+            // 计算基础伤害
+            const baseAttack = typeof calculatePlayerAttack === 'function' ? calculatePlayerAttack() : combatState.player.attack;
+            const levelMultiplier = 1 + (level - 1) * 0.2;
+            let damage = Math.floor(baseAttack * skill.damage * levelMultiplier * starMultiplier);
+
+            // 功法克制
+            if (TECHNIQUE_BONUS[combatState.player.technique].beats === combatState.opponent.technique) {
+                damage = Math.floor(damage * 1.5);
+            }
+
+            const isCrit = Math.random() < combatState.player.critRate;
+            if (isCrit) damage = Math.floor(damage * 1.5);
+
+            let finalDamage = damage;
+            if (!combatState.effects.player.ignoreDefense) {
+                finalDamage = Math.max(1, damage - Math.floor(combatState.opponent.defense * 0.3));
+            }
+            combatState.opponent.hp = Math.max(0, combatState.opponent.hp - finalDamage);
+            let logText = `⚡ ${weaponData.name} 发动 ${skill.name} Lv.${level}！造成 ${finalDamage} 伤害！${isCrit ? '（暴击）' : ''}`;
+
+            // 应用效果
+            if (skill.effects) {
+                if (skill.effects.burn) {
+                    const chance = skill.effects.burn * levelMultiplier;
+                    if (Math.random() < chance) {
+                        combatState.opponent.burning = skill.effects.burnTurns || 3;
+                        logText += ` 🔥敌人被灼烧 ${combatState.opponent.burning} 回合！`;
+                    }
+                }
+                if (skill.effects.freeze) {
+                    const chance = skill.effects.freeze * levelMultiplier;
+                    if (Math.random() < chance) {
+                        combatState.opponent.frozen = skill.effects.freezeTurns || 2;
+                        logText += ` ❄️敌人被冻结 ${combatState.opponent.frozen} 回合！`;
+                    }
+                }
+                if (skill.effects.stun) {
+                    if (Math.random() < skill.effects.stun * levelMultiplier) {
+                        combatState.opponent.stunned = 1;
+                        logText += ` 💫敌人被眩晕 1 回合！`;
+                    }
+                }
+                if (skill.effects.defBoost) {
+                    combatState.effects.player.defenseBoost = (combatState.effects.player.defenseBoost || 0) + skill.effects.defBoost * levelMultiplier;
+                    logText += ` 🛡️防御提升 ${Math.round(skill.effects.defBoost * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.critBonus) {
+                    combatState.effects.player.critBoostNext = (combatState.effects.player.critBoostNext || 0) + skill.effects.critBonus * levelMultiplier;
+                    logText += ` 💥暴击率提升 ${Math.round(skill.effects.critBonus * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.drain) {
+                    const drainAmount = Math.floor(finalDamage * skill.effects.drain * levelMultiplier);
+                    combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + drainAmount);
+                    logText += ` 💉吸取 ${drainAmount} HP！`;
+                }
+                if (skill.effects.trueDamage) {
+                    const trueDmg = Math.floor(finalDamage * skill.effects.trueDamage * levelMultiplier);
+                    combatState.opponent.hp = Math.max(0, combatState.opponent.hp - trueDmg);
+                    logText += ` ✨真实伤害 +${trueDmg}！`;
+                }
+                if (skill.effects.healRate) {
+                    const healPerTurn = Math.floor(combatState.player.maxHp * skill.effects.healRate * levelMultiplier);
+                    combatState.effects.player.healRate = (combatState.effects.player.healRate || 0) + healPerTurn;
+                    logText += ` 💚每回合恢复 ${healPerTurn} HP！`;
+                }
+                if (skill.effects.dmgReduce) {
+                    combatState.effects.player.damageReduction = (combatState.effects.player.damageReduction || 0) + skill.effects.dmgReduce * levelMultiplier;
+                    logText += ` 🛡️伤害减免 ${Math.round(skill.effects.dmgReduce * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.counterRate) {
+                    combatState.effects.player.counterRate = (combatState.effects.player.counterRate || 0) + skill.effects.counterRate * levelMultiplier;
+                    logText += ` ⚡反击率提升 ${Math.round(skill.effects.counterRate * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.speedReduce) {
+                    combatState.opponent.speedReduce = (combatState.opponent.speedReduce || 0) + skill.effects.speedReduce * levelMultiplier;
+                    logText += ` 🌪️敌人速度降低！`;
+                }
+                if (skill.effects.armorBreak) {
+                    combatState.opponent.armorBroken = true;
+                    logText += ` 💥敌人护甲破碎！`;
+                }
+                if (skill.effects.chain) {
+                    if (combatState.opponent.hp > 0) {
+                        const chainDmg = Math.floor(finalDamage * skill.effects.chain);
+                        combatState.opponent.hp = Math.max(0, combatState.opponent.hp - chainDmg);
+                        logText += ` ⛓️雷链传导，额外 ${chainDmg} 伤害！`;
+                    }
+                }
+                if (skill.effects.fireResist) {
+                    combatState.effects.player.fireResist = (combatState.effects.player.fireResist || 0) + skill.effects.fireResist;
+                    logText += ` 🔥火抗提升！`;
+                }
+                if (skill.effects.fireDrain) {
+                    combatState.effects.player.fireDrain = (combatState.effects.player.fireDrain || 0) + skill.effects.fireDrain;
+                    logText += ` 🔥火焰吸收！`;
+                }
+                if (skill.effects.reflect) {
+                    combatState.effects.player.reflect = (combatState.effects.player.reflect || 0) + skill.effects.reflect;
+                    logText += ` 🔄伤害反射！`;
+                }
+                if (skill.effects.maxHpBoost) {
+                    combatState.player.maxHP += Math.floor(combatState.player.maxHP * skill.effects.maxHpBoost);
+                    combatState.player.hp = Math.min(combatState.player.hp, combatState.player.maxHP);
+                    logText += ` ❤️最大HP提升！`;
+                }
+                if (skill.effects.cleanse) {
+                    combatState.effects.player.cleanseStacks = (combatState.effects.player.cleanseStacks || 0) + skill.effects.cleanse;
+                    logText += ` ✨净化负面状态！`;
+                }
+                if (skill.effects.invincible) {
+                    combatState.effects.player.invincible = skill.effects.invincible;
+                    logText += ` 👼无敌状态！`;
+                }
+                if (skill.effects.thunder) {
+                    combatState.effects.player.thunderBonus = (combatState.effects.player.thunderBonus || 0) + skill.effects.thunder * levelMultiplier;
+                    logText += ` ⚡雷法伤害+${Math.round(skill.effects.thunder * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.doubleHit) {
+                    combatState.effects.player.doubleHit = (combatState.effects.player.doubleHit || 0) + skill.effects.doubleHit * levelMultiplier;
+                    logText += ` ⚔️连击+${Math.round(skill.effects.doubleHit * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.pierce) {
+                    combatState.effects.player.pierce = (combatState.effects.player.pierce || 0) + skill.effects.pierce * levelMultiplier;
+                    logText += ` 🗡️穿刺+${Math.round(skill.effects.pierce * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.cleave) {
+                    combatState.effects.player.cleave = (combatState.effects.player.cleave || 0) + skill.effects.cleave * levelMultiplier;
+                    logText += ` 🌀顺劈+${Math.round(skill.effects.cleave * levelMultiplier * 100)}%！`;
+                }
+                if (skill.effects.freezeAura) {
+                    combatState.effects.player.freezeAura = (combatState.effects.player.freezeAura || 0) + skill.effects.freezeAura * levelMultiplier;
+                    logText += ` ❄️冰霜光环！`;
+                }
+                if (skill.effects.burnAura) {
+                    combatState.effects.player.burnAura = (combatState.effects.player.burnAura || 0) + skill.effects.burnAura * levelMultiplier;
+                    logText += ` 🔥灼烧光环！`;
+                }
+                if (skill.effects.curse) {
+                    combatState.effects.opponent.curse = (combatState.effects.opponent.curse || 0) + skill.effects.curse * levelMultiplier;
+                    logText += ` 💀诅咒！`;
+                }
+            }
+
+            combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            if (combatState.opponent.hp <= 0) {
+                setTimeout(() => endCombat('win'), 500);
+            } else {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // ===== generateOpponent =====
+        function generateOpponent(difficulty) {
+            const playerRealm = gameState.realm;
+            let targetRealm = playerRealm;
+            if (difficulty === 'easy') targetRealm = Math.max(0, playerRealm - 1);
+            else if (difficulty === 'normal') targetRealm = playerRealm;
+            else if (difficulty === 'hard') targetRealm = Math.min(4, playerRealm + 1);
+
+            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
+            const stages = ['初期', '中期', '后期'];
+            const stage = Math.floor(Math.random() * 3);
+
+            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
+            const baseHp = hpByRealm[targetRealm] || 1000;
+            const baseAttack = 80 + targetRealm * 40;
+            const baseDefense = 40 + targetRealm * 20;
+            const baseSpeed = 80 + targetRealm * 15;
+
+            const technique = TECHNIQUES[Math.floor(Math.random() * 4)];
+            const treasures = Object.keys(COMBAT_TREASURES);
+            const weapon = treasures.filter(t => COMBAT_TREASURES[t].type === 'weapon');
+            const armor = treasures.filter(t => COMBAT_TREASURES[t].type === 'armor');
+
+            const opponentFixed = FIXED_OPPONENTS[Math.floor(Math.random() * FIXED_OPPONENTS.length)];
+            const name = difficulty === 'normal' ? opponentFixed.name : `${opponentFixed.name}（${['初级', '中级', '高级'][difficulty === 'easy' ? 0 : difficulty === 'normal' ? 1 : 2]}）`;
+
+            return {
+                name: name,
+                avatar: opponentFixed.avatar,
+                realm: targetRealm,
+                realmName: realmNames[targetRealm] + '期' + stages[stage],
+                maxHP: baseHp,
+                hp: baseHp,
+                attack: baseAttack,
+                defense: baseDefense,
+                speed: baseSpeed,
+                technique: technique,
+                techniqueColor: TECHNIQUE_COLORS[technique],
+                weapon: weapon[Math.floor(Math.random() * weapon.length)],
+                armor: armor[Math.floor(Math.random() * armor.length)],
+                critRate: 0.1 + targetRealm * 0.03
+            };
+        }
+
+        // ===== openCombat =====
+        function openCombat() {
+            renderCombatHome();
+            document.getElementById('combatModal').classList.add('active');
+        }
+
+        // ===== closeCombat =====
+        function closeCombat() {
+            document.getElementById('combatModal').classList.remove('active');
+            combatState.inProgress = false;
+        }
+
+        // ===== renderCombatHome =====
+        function renderCombatHome() {
+            const wins = gameState.combat?.wins || 0;
+            const losses = gameState.combat?.losses || 0;
+            const honor = gameState.combat?.honor || 0;
+            const fame = gameState.combat?.fame || 0;
+            const total = wins + losses;
+
+            let html = `
+                <div class="honor-display">
+                    <div class="honor-stats">
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${honor}</div>
+                            <div class="honor-stat-label">荣誉点</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${fame}</div>
+                            <div class="honor-stat-label">声望</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${wins}</div>
+                            <div class="honor-stat-label">胜</div>
+                        </div>
+                        <div class="honor-stat">
+                            <div class="honor-stat-value">${losses}</div>
+                            <div class="honor-stat-label">负</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="challenge-cost">
+                    挑战消耗：<span>挑战状 ×1</span> | 当前拥有：<span>${getItemCount('挑战状')}张</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">
+                    <button class="combat-action-btn" onclick="startCombatChallenge('easy')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🟢 初级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界低于你</div>
+                    </button>
+                    <button class="combat-action-btn" onclick="startCombatChallenge('normal')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🟡 中级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界相当</div>
+                    </button>
+                    <button class="combat-action-btn" onclick="startCombatChallenge('hard')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
+                        <div style="font-size:1.2em">🔴 高级挑战</div>
+                        <div style="font-size:0.8em;color:#aaa">境界高于你</div>
+                    </button>
+                </div>
+                <h3 style="color:#ffd700;margin:15px 0 10px;">历史战绩</h3>
+                <div class="battle-history" id="battleHistory">
+            `;
+
+            const history = gameState.combat?.battleHistory || [];
+            if (history.length === 0) {
+                html += '<p style="text-align:center;color:#888;padding:20px;">暂无战绩记录</p>';
+            } else {
+                history.slice(0, 10).forEach(record => {
+                    const resultClass = record.result === 'win' ? 'win' : 'lose';
+                    const resultText = record.result === 'win' ? '胜' : '负';
+                    html += `
+                        <div class="battle-record ${resultClass}">
+                            <div class="battle-record-info">
+                                <span class="battle-record-result ${resultClass}">${resultText}</span>
+                                <span class="battle-record-opponent">vs ${record.opponent}</span>
+                            </div>
+                            <span class="battle-record-reward">${record.result === 'win' ? '+' + record.reward : '-' + record.penalty}灵石</span>
+                        </div>
+                    `;
+                });
+            }
+            html += '</div><button class="close-btn" onclick="closeCombat()">关闭</button>';
+            document.getElementById('combatContent').innerHTML = html;
+        }
+
+        // ===== getItemCount =====
+        function getItemCount(name) {
+            const item = gameState.inventory.find(i => i.name === name);
+            return item ? item.quantity : 0;
+        }
+
+        // ===== startCombatChallenge =====
+        function startCombatChallenge(difficulty) {
+            if (getItemCount('挑战状') < 1) {
+                alert('挑战状不足！请在商店购买。');
                 return;
             }
 
-            // 查找背包中的物品
-            const itemIdx = gameState.inventory.findIndex(i => i.name === name && i.type === 'treasure');
-            if (itemIdx === -1) return;
-
-            const item = gameState.inventory[itemIdx];
-            const star = item.star || 1; // 保留星级
-            item.quantity--;
-            if (item.quantity <= 0) {
-                gameState.inventory.splice(itemIdx, 1);
-            }
-
-            // 装备（携带星级）
-            gameState.equippedTreasures[emptySlot] = {
-                name: item.name,
-                type: item.type,
-                quality: item.quality,
-                effect: item.effect,
-                desc: item.desc,
-                icon: item.icon,
-                star
-            };
-            
-            recalculateAllEffects();
-            updateEquipmentBar();
-            saveGame();
-            addLog('good', '装备灵宝', `装备了${name}`);
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
-            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
-        }
-
-        // ===== sellItem =====
-        function sellItem(idx) {
-            let items = gameState.inventory;
-            if (currentInvTab !== 'all') {
-                items = items.filter(item => item.type === currentInvTab);
-            }
-            const item = items[idx];
-            if (!item) return;
-            
-            // 经济调整：出售价格改为材料原价的30%（原为品质固定值）
-            // 这样更符合经济逻辑：稀有材料出售价格更高
-            let price = 10; // 默认普通物品
-            if (item.type === 'material' && MATERIALS[item.name]) {
-                // 材料出售价格 = basePrice × 0.3（约为原价的三折）
-                price = Math.floor(MATERIALS[item.name].basePrice * 0.3);
-            } else {
-                // 非材料物品仍按品质定价（但略微降低）
-                const prices = { common: 8, rare: 40, precious: 150, legendary: 800 };
-                price = prices[item.quality] || 10;
-            }
-            
-            item.quantity--;
-            if (item.quantity <= 0) {
-                gameState.inventory = gameState.inventory.filter(i => i !== item);
-            }
-            
-            gameState.spiritStones += price;
-            saveGame();
-            updateDisplay();
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
-            addLog('neutral', '出售物品', `出售了${item.name}，获得${price}灵石`);
-        }
-
-        // ===== discardItem =====
-        function discardItem(idx) {
-            let items = gameState.inventory;
-            if (currentInvTab !== 'all') {
-                items = items.filter(item => item.type === currentInvTab);
-            }
-            const item = items[idx];
-            if (!item) return;
-            
-            item.quantity--;
-            if (item.quantity <= 0) {
-                gameState.inventory = gameState.inventory.filter(i => i !== item);
-            }
-            
-            saveGame();
-            renderInventoryGrid();
-            document.getElementById('invDetail').style.display = 'none';
-            addLog('neutral', '丢弃物品', `丢弃了${item.name}`);
-        }
-
-// ===== js/state.js =====
-
-// --- gameState (1366-1480) ---
-        let gameState = {
-            realm: 0,       // 0-4 对应 炼气到化神
-            stage: 0,       // 0-2 对应 初期/中期/后期
-            qi: 0,
-            maxQi: 100,
-            spiritStones: 50,
-            mindset: 50,
-            days: 1,
-            cultivationProgress: 0,
-            eventLog: [],
-            combatLogHistory: [],
-            eventLogHistory: [],
-            isGameOver: false,
-            isVictory: false,
-            // V2新增字段
-            inventory: [],
-            equippedTreasures: [null, null, null],
-            maxInventorySlots: 20,
-            shopItems: [],
-            lastShopDay: 0,
-            activeEffects: {
-                breakthrough_boost: 0,
-                cultivate_speed: 0,
-                渡劫_mindset_protect: 0,
-                attack: 0,
-                defense: 0,
-                cultivate_qi_rate: 0,
-                渡劫_damage_reduce: 0,
-                escape: 0,
-                foresee_event: 0,
-                all_stats: 0,
-                serendipity_boost: 0
-            },
-            // V3渡劫系统字段
-            tribulation: {
-                inProgress: false,
-                currentStage: 0,
-                totalStages: 9,
-                currentType: null,
-                preparations: [],
-                damageTaken: 0,
-                tribKey: null
-            },
-            hasTransmigrationBuff: false,
-            tribulationRecord: [],
-            // V4 战斗系统字段
-            combat: {
-                wins: 0,
-                losses: 0,
-                honor: 0,
-                fame: 0,
-                battleHistory: [],
-                injured: false,
-                injuryEndDay: 0
-            },
-            // V5 宗门系统字段
-            sect: {
-                name: null,
-                level: 0,
-                spiritStones: 0,
-                disciples: [],
-                elders: [],
-                buildings: {
-                    library: false,
-                    alchemy: false,
-                    forge: false,
-                    archive: false
-                },
-                techniques: [],
-                contributionShop: [],
-                lastShopRefresh: 0,
-                lastResourceCollection: 0,
-                // V29 NPC AI系统
-                npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
-                npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
-                npcLastActions: {},        // {uid: {action, day}}
-                // V30 渡劫审批系统
-                tribulationRequest: {
-                    status: 'none',        // none | pending_elder | pending_leader | approved | rejected
-                    elderScore: 0,
-                    elderComment: '',
-                    leaderDecision: '',
-                    leaderComment: '',
-                    buffApplied: false,
-                    submitDay: 0
-                },
-                // V31 天道轮回系统
-                celestialCycle: {
-                    day: 0,                // 距离下次轮回的天数
-                    completed: false,      // 本周期是否已完成
-                    lastResult: null,       // 上次轮回结果 {type, text, effects}
-                    blessingActive: false, // 气运祈福是否激活
-                    cycleInterval: 3        // 轮回间隔天数
-                },
-                // V35 宗门任务链
-                sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
-                sectMissionCooldown: 0    // 任务冷却
-            },
-            // V6 奇遇系统字段
-            serendipity: {
-                lastTriggerDay: 0,
-                todayCount: 0,
-                lastTriggerType: null,
-                cooldownTypes: {},
-                badLuck: 0,
-                currentEvent: null,
-                log: [],
-                luckStatus: null,
-                luckEndDay: 0,
-                serendipityBoostEndDay: 0
-            },
-            // V7 灵根/体质系统字段
-            spiritRoot: {
-                quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
-                affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
-                resonance: 0,
-                lastRefreshDay: 0,
-                awakeningAvailable: false, // V32 是否可以觉醒
-                hasAwakened: false,          // V32 是否已完成觉醒
-                awakenedQuality: null        // V32 觉醒后的品质
-            },
-            // V32 灵根觉醒系统
-            spiritRootAwakening: {
-                status: 'dormant',   // dormant | stage1 | stage2 | stage3 | completed
-                stage: 0,
-                triggerDay: 0,
-                tasks: [],           // [{type, target, current, completed}]
-                rewards: null,
-                lastEventDay: 0,
-                attempts: 0
-            },
-            constitutions: [], // 已获得的体质
-            // V8 丹药炼器系统字段
-            crafting: {
-                furnace: { level: 1, type: 'alchemy' },
-                anvil: { level: 1, type: 'forge' },
-                transactionLog: []
-            },
-            // V11 成就/称号系统字段
-            title: '筑基修士',
-            achievements: {
-                unlocked: [],
-                titles: [],
-                stats: {
-                    tribulationsCompleted: 0,
-                    dungeonBossesKilled: 0,
-                    sectContributions: 0,
-                    treasuresRefined: 0,
-                    serendipitiesEncountered: 0,
-                    flawlessTribulations: 0
+            // 消耗挑战状
+            const idx = gameState.inventory.findIndex(i => i.name === '挑战状');
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
                 }
-            },
-            // V11 飞升系统字段
-            currentRealm: 'mortal',  // 'mortal' | 'immortal'
-            immortal: null,          // 仙界状态，飞升后初始化
-            mounts: [],              // 仙兽列表（最多3只）
-            immortalSkills: [],       // 仙法列表
-            immortalEquipment: {      // 飞升装备栏
-                head: null,
-                body: null,
-                foot: null,
-                weapon: null,
-                shield: null,
-                accessory: null
-            },
-            currentMount: null       // 当前骑乘的仙兽
-        };
+            }
 
-        // --- miniMaxConfig (1492-1502) ---
-        let miniMaxConfig = {
-            apiKey: '',
-            baseUrl: 'https://api.minimaxi.com/v1',
-            model: 'MiniMax-M2.7',
-            groupId: '',
-            features: {
-                aiDialogue: false,
-                aiSerendipity: false,
-                aiTechnique: false
+            const opponent = generateOpponent(difficulty);
+            initCombat(opponent);
+            renderCombatArena();
+        }
+
+        // ===== initCombat =====
+        function initCombat(opponent) {
+            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
+            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
+
+            const playerWeapon = gameState.equippedTreasures[0];
+            const playerArmor = gameState.equippedTreasures[1];
+
+            let playerMaxHP = hpByRealm[gameState.realm] || 1000;
+            let playerAttack = 80 + gameState.realm * 40;
+            let playerDefense = 40 + gameState.realm * 20;
+            let playerSpeed = 80 + gameState.realm * 15;
+            let playerCritRate = 0.1 + gameState.realm * 0.03;
+            let playerTechnique = getPlayerTechnique();
+
+            // 应用装备星级加成
+            if (playerWeapon && COMBAT_TREASURES[playerWeapon.name]) {
+                const weaponData = COMBAT_TREASURES[playerWeapon.name];
+                const star = playerWeapon.star || 1;
+                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
+                const baseVal = weaponData.effect.attackBonus || 0;
+                playerAttack = Math.floor(playerAttack * (1 + baseVal * mult));
+                if (weaponData.effect.critBonus) {
+                    playerCritRate += weaponData.effect.critBonus * mult;
+                }
+            }
+            if (playerArmor && COMBAT_TREASURES[playerArmor.name]) {
+                const armorData = COMBAT_TREASURES[playerArmor.name];
+                const star = playerArmor.star || 1;
+                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
+                const baseDef = armorData.effect.defenseBonus || 0;
+                const baseHP = armorData.effect.hpBonus || 0;
+                if (baseDef > 0) playerDefense = Math.floor(playerDefense * (1 + baseDef * mult));
+                if (baseHP > 0) playerMaxHP = Math.floor(playerMaxHP * (1 + baseHP * mult));
+            }
+            
+            // V7 应用体质战斗效果
+            if (gameState.activeEffects.constitution_bonuses) {
+                const cb = gameState.activeEffects.constitution_bonuses;
+                if (cb.attack) playerAttack = Math.floor(playerAttack * (1 + cb.attack));
+                if (cb.defense) playerDefense = Math.floor(playerDefense * (1 + cb.defense));
+                if (cb.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + cb.hpBonus));
+                if (cb.crit) playerCritRate += cb.crit;
+                if (cb.dodge) playerSpeed += Math.floor(playerSpeed * cb.dodge);
+            }
+            // 应用all_stats加成
+            if (gameState.activeEffects.all_stats) {
+                playerAttack = Math.floor(playerAttack * (1 + gameState.activeEffects.all_stats));
+                playerDefense = Math.floor(playerDefense * (1 + gameState.activeEffects.all_stats));
+                playerMaxHP = Math.floor(playerMaxHP * (1 + gameState.activeEffects.all_stats));
+            }
+
+            combatEnergy = 0; // 重置必杀技能量
+
+            combatState = {
+                inProgress: true,
+                round: 0,
+                turn: playerSpeed >= opponent.speed ? 'player' : 'opponent',
+                player: {
+                    name: '你',
+                    avatar: '🧑‍🎓',
+                    realm: gameState.realm,
+                    realmName: realmNames[gameState.realm] + '期',
+                    maxHP: playerMaxHP,
+                    hp: playerMaxHP,
+                    attack: playerAttack,
+                    defense: playerDefense,
+                    speed: playerSpeed,
+                    technique: playerTechnique,
+                    techniqueColor: TECHNIQUE_COLORS[playerTechnique],
+                    weapon: playerWeapon ? playerWeapon.name : null,
+                    weaponData: playerWeapon, // 完整对象含星级
+                    armor: playerArmor ? playerArmor.name : null,
+                    armorData: playerArmor,
+                    critRate: playerCritRate,
+                    setBonuses: {},
+                    skills: [],
+                    accessories: [],
+                    counterEnergy: 0,
+                    inDefenseStance: false,
+                    skillLevels: {}
+                },
+                opponent: opponent,
+                log: [],
+                effects: {
+                    player: { defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0 },
+                    opponent: { defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
+                }
+            };
+
+            // A4 套装共鸣加成
+            calculateSetBonuses();
+            recalculatePlayerStats();
+
+            combatState.log.push({
+                type: 'system',
+                text: `战斗开始！${opponent.name}（${opponent.realmName}，功法：${opponent.technique}）`,
+                round: 0
+            });
+
+            if (combatState.turn === 'opponent') {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // ===== renderUltimateEnergyBar =====
+        function renderUltimateEnergyBar() {
+            const info = getEnergyBar();
+            const readyClass = info.ready ? 'energy-ready' : '';
+            const skillName = info.skills.length > 0 ? info.skills[0].name.substring(0,3) : '绝技';
+            return `
+                <div class="ultimate-energy-bar" style="margin-top:5px;">
+                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+                        <span style="font-size:0.75em;color:#ffd700;">⚡ ${skillName}</span>
+                        <span style="font-size:0.7em;color:#aaa;margin-left:auto;">${info.current}/${info.cost}</span>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.4);border-radius:4px;height:8px;overflow:hidden;">
+                        <div class="energy-fill ${readyClass}" style="width:${info.pct}%;background:${info.ready ? '#ffd700' : '#555'};height:100%;border-radius:4px;transition:width 0.3s;"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== renderCounterEnergyBar =====
+        function renderCounterEnergyBar() {
+            const energy = combatState.player.counterEnergy || 0;
+            const max = 100;
+            const pct = (energy / max) * 100;
+            const ready = energy >= 50;
+            const color = ready ? '#ffeb3b' : '#888888';
+            const glow = ready ? 'box-shadow: 0 0 8px #ffeb3b;' : '';
+            return `
+                <div style="margin-top:4px;display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:11px;color:#aaa;">⚡反击</span>
+                    <div style="flex:1;height:8px;background:#333;border-radius:4px;overflow:hidden;">
+                        <div style="width:${pct}%;height:100%;background:${color};${glow}transition:width 0.3s,background 0.3s;"></div>
+                    </div>
+                    <span style="font-size:10px;color:#888;">${energy}/${max}</span>
+                </div>
+            `;
+        }
+
+        // ===== addCombatLog =====
+        function addCombatLog(message) {
+            if (!gameState.combatLogHistory) gameState.combatLogHistory = [];
+            const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            gameState.combatLogHistory.push({time, message});
+            if (gameState.combatLogHistory.length > 100) gameState.combatLogHistory.shift();
+        }
+
+        // ===== addEventLog =====
+        function addEventLog(message, type='normal') {
+            const colors = { normal:'#ccc', success:'#00ff88', warning:'#ff9800', danger:'#f44336' };
+            const color = colors[type] || colors.normal;
+            // 通过addLog系统记录
+            addLog(type === 'success' ? 'good' : type === 'danger' ? 'bad' : type, '提示', message);
+        }
+
+        // ===== showCombatLogHistory =====
+        function showCombatLogHistory() {
+            const history = gameState.combatLogHistory || [];
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+            html += '<b style="color:#ffd700;font-size:14px;">⚔️ 战斗日志历史</b>';
+            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
+            html += '</div>';
+            if (history.length === 0) {
+                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
+            } else {
+                history.forEach(entry => {
+                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
+                    html += `<span style="color:#666;font-size:10px;">[${entry.time}]</span> `;
+                    html += `<span style="color:#ccc;">${entry.message}</span>`;
+                    html += '</div>';
+                });
+            }
+            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
+            html += `<button onclick="clearCombatLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
+            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
+            html += '</div></div>';
+            showModal(html);
+        }
+
+        // ===== clearCombatLogHistory =====
+        function clearCombatLogHistory() {
+            gameState.combatLogHistory = [];
+            addEventLog('⚠️ 战斗日志已清空', 'warning');
+            closeModal();
+        }
+
+        // ===== showEventLogHistory =====
+        function showEventLogHistory() {
+            const history = gameState.eventLogHistory || [];
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+            html += '<b style="color:#ffd700;font-size:14px;">📜 事件日志历史</b>';
+            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
+            html += '</div>';
+            if (history.length === 0) {
+                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
+            } else {
+                history.slice().reverse().forEach(entry => {
+                    const colors = { good:'#00ff88', bad:'#f44336', neutral:'#ccc', negative:'#f44336', warning:'#ff9800', welcome:'#ffd700' };
+                    const color = colors[entry.type] || '#ccc';
+                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
+                    html += `<span style="color:#666;font-size:10px;">[${entry.time}] 第${entry.day}天</span> `;
+                    html += `<span style="color:${color};">${entry.title}</span> `;
+                    html += `<span style="color:#aaa;">${entry.text}</span>`;
+                    html += '</div>';
+                });
+            }
+            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
+            html += `<button onclick="clearEventLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
+            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
+            html += '</div></div>';
+            showModal(html);
+        }
+
+        // ===== clearEventLogHistory =====
+        function clearEventLogHistory() {
+            gameState.eventLogHistory = [];
+            addLog('warning', '日志清空', '事件日志已清空');
+            closeModal();
+        }
+
+        // ===== renderCombatArena =====
+        function renderCombatArena() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const pHpPercent = (p.hp / p.maxHP) * 100;
+            const oHpPercent = (o.hp / o.maxHP) * 100;
+            const pHpClass = pHpPercent <= 25 ? 'low' : pHpPercent <= 50 ? 'medium' : '';
+            const oHpClass = oHpPercent <= 25 ? 'low' : oHpPercent <= 50 ? 'medium' : '';
+
+            let html = `
+                <div class="combat-arena">
+                    <div class="combatants">
+                        <div class="combatant player">
+                            <div class="combatant-header">
+                                <span class="combatant-avatar">${p.avatar}</span>
+                                <div class="combatant-info">
+                                    <div class="combatant-name">${p.name}</div>
+                                    <div class="combatant-realm">${p.realmName} | ${p.technique}</div>
+                                </div>
+                            </div>
+                            <div class="combatant-hp-bar">
+                                <div class="combatant-hp-fill ${pHpClass}" style="width:${pHpPercent}%">
+                                    ${p.hp}/${p.maxHP}
+                                </div>
+                            </div>
+                            <div class="combatant-stats">
+                                <span class="combatant-stat"><span class="icon">⚔️</span>${p.attack}</span>
+                                <span class="combatant-stat"><span class="icon">🛡️</span>${p.defense}</span>
+                                <span class="combatant-stat"><span class="icon">💨</span>${p.speed}</span>
+                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div style="flex:1;">${renderUltimateEnergyBar()}</div>
+                                <div style="flex:1;">${renderCounterEnergyBar()}</div>
+                            </div>
+                            <div class="combatant-effects">
+                                ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
+                                ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="combatant opponent">
+                            <div class="combatant-header">
+                                <span class="combatant-avatar">${o.avatar}</span>
+                                <div class="combatant-info">
+                                    <div class="combatant-name">${o.name}</div>
+                                    <div class="combatant-realm">${o.realmName} | ${o.technique}</div>
+                                </div>
+                            </div>
+                            <div class="combatant-hp-bar">
+                                <div class="combatant-hp-fill ${oHpClass}" style="width:${oHpPercent}%">
+                                    ${o.hp}/${o.maxHP}
+                                </div>
+                            </div>
+                            <div class="combatant-stats">
+                                <span class="combatant-stat"><span class="icon">⚔️</span>${o.attack}</span>
+                                <span class="combatant-stat"><span class="icon">🛡️</span>${o.defense}</span>
+                                <span class="combatant-stat"><span class="icon">💨</span>${o.speed}</span>
+                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(o.critRate * 100)}%</span>
+                            </div>
+                            <div class="combatant-effects">
+                                ${o.weapon ? `<span class="combat-effect">${o.weapon}</span>` : ''}
+                                ${o.armor ? `<span class="combat-effect">${o.armor}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="combat-log" style="height:120px;overflow-y:auto;padding:8px;background:#111;border-radius:4px;font-size:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="color:#ffd700;font-size:11px;">⚔️ 战斗日志</span>
+                            <button onclick="showCombatLogHistory()" style="padding:2px 8px;background:#333;color:#888;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:10px;">历史</button>
+                        </div>
+                        ${combatState.log.slice(-8).map(entry => `
+                            <div class="combat-log-entry ${entry.type} ${entry.actionType || ''}">${entry.text}</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            if (combatState.turn === 'player' && combatState.inProgress) {
+                html += renderPlayerActions();
+            } else if (!combatState.inProgress) {
+                html += renderCombatResult();
+            } else {
+                html += '<div style="text-align:center;padding:20px;color:#aaa;">对方行动中...</div>';
+            }
+
+            document.getElementById('combatContent').innerHTML = html;
+        }
+
+        // ===== renderPlayerActions =====
+        function renderPlayerActions() {
+            const info = getEnergyBar();
+            const canUltimate = info.ready;
+            return `
+                <div class="combat-actions">
+                    <button class="combat-action-btn attack" onclick="selectCombatAction('attack')">
+                        ⚔️ 攻击
+                    </button>
+                    <button class="combat-action-btn defend" onclick="selectCombatAction('defend')">
+                        🛡️ 防御
+                    </button>
+                    <button class="combat-action-btn ultimate" onclick="showUltimateSkillPanel()" ${canUltimate ? '' : 'disabled'}>
+                        ⚡ 必杀技 ${canUltimate ? '' : `(${info.current}/${info.cost})`}
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('treasure')">
+                        🔮 法宝
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('pill')">
+                        💊 丹药
+                    </button>
+                    <button class="combat-action-btn escape" onclick="selectCombatAction('escape')">
+                        🏃 逃跑
+                    </button>
+                    <button class="combat-action-btn" onclick="selectCombatAction('technique')">
+                        📖 功法
+                    </button>
+                </div>
+            `;
+        }
+
+        // ===== selectCombatAction =====
+        function selectCombatAction(action) {
+            if (action === 'attack') {
+                executePlayerAttack();
+            } else if (action === 'defend') {
+                executePlayerDefend();
+            } else if (action === 'escape') {
+                executePlayerEscape();
+            } else if (action === 'treasure') {
+                showTreasureMenu();
+            } else if (action === 'pill') {
+                showPillMenu();
+            } else if (action === 'technique') {
+                showTechniqueInfo();
+            }
+        }
+
+        // ===== showTreasureMenu =====
+        function showTreasureMenu() {
+            const availableTreasures = [];
+            for (const item of gameState.inventory) {
+                if (COMBAT_TREASURES[item.name]) {
+                    availableTreasures.push(item);
+                }
+            }
+
+            let html = '<div class="combat-submenu">';
+            if (availableTreasures.length === 0) {
+                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有可用法宝</p>';
+            } else {
+                availableTreasures.forEach(item => {
+                    const treasure = COMBAT_TREASURES[item.name];
+                    html += `
+                        <button class="combat-submenu-btn" onclick="useCombatTreasure('${item.name}')">
+                            ${treasure.icon} ${item.name}
+                            <div style="font-size:0.8em;color:#aaa">${treasure.desc}</div>
+                        </button>
+                    `;
+                });
+            }
+            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // ===== useCombatTreasure =====
+        function useCombatTreasure(name) {
+            const treasure = COMBAT_TREASURES[name];
+            if (!treasure) return;
+
+            const idx = gameState.inventory.findIndex(i => i.name === name);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+
+            const effect = treasure.effect;
+            let effectText = '';
+            if (effect.attackBonus) {
+                combatState.effects.player.attackBoost += effect.attackBonus;
+                effectText = `${name}发动！攻击+${Math.round(effect.attackBonus * 100)}%`;
+            } else if (effect.defenseBonus) {
+                combatState.effects.player.defenseBoost += effect.defenseBonus;
+                effectText = `${name}发动！防御+${Math.round(effect.defenseBonus * 100)}%`;
+            } else if (effect.critBonus) {
+                combatState.player.critRate += effect.critBonus;
+                effectText = `${name}发动！暴击率+${Math.round(effect.critBonus * 100)}%`;
+            } else if (effect.hpBonus) {
+                const heal = Math.floor(combatState.player.maxHP * effect.hpBonus);
+                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
+                effectText = `${name}发动！生命+${heal}`;
+            }
+
+            combatState.log.push({ type: 'player-action', text: `你使用了${name}！${effectText}`, round: combatState.round });
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // ===== showPillMenu =====
+        function showPillMenu() {
+            let html = '<div class="combat-submenu">';
+            let hasPills = false;
+
+            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
+                if (getItemCount(name) > 0) {
+                    hasPills = true;
+                    html += `
+                        <button class="combat-submenu-btn" onclick="useCombatPill('${name}')">
+                            ${pill.icon} ${name}
+                            <div style="font-size:0.8em;color:#aaa">${pill.desc}</div>
+                        </button>
+                    `;
+                }
+            }
+
+            if (!hasPills) {
+                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有战斗丹药</p>';
+            }
+            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // ===== useCombatPill =====
+        function useCombatPill(name) {
+            const pill = COMBAT_PILLS[name];
+            if (!pill) return;
+
+            const idx = gameState.inventory.findIndex(i => i.name === name);
+            if (idx !== -1) {
+                gameState.inventory[idx].quantity--;
+                if (gameState.inventory[idx].quantity <= 0) {
+                    gameState.inventory.splice(idx, 1);
+                }
+            }
+
+            const effect = pill.effect;
+            let effectText = '';
+
+            if (effect.type === 'attackBoost') {
+                combatState.effects.player.attackBoost += effect.value;
+                effectText = `攻击+${Math.round(effect.value * 100)}%`;
+            } else if (effect.type === 'defenseBoost') {
+                combatState.effects.player.defenseBoost += effect.value;
+                effectText = `防御+${Math.round(effect.value * 100)}%`;
+            } else if (effect.type === 'ignoreDefense') {
+                combatState.effects.player.ignoreDefense = true;
+                effectText = '无视对方防御';
+            } else if (effect.type === 'heal') {
+                const heal = Math.floor(combatState.player.maxHP * effect.value);
+                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
+                effectText = `恢复${heal}生命`;
+            }
+
+            combatState.log.push({ type: 'player-action', text: `你服用了${name}！${effectText}`, round: combatState.round });
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // ===== showTechniqueInfo =====
+        function showTechniqueInfo() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const myTechnique = p.technique;
+            const oppTechnique = o.technique;
+
+            let克制关系 = '';
+            if (TECHNIQUE_BONUS[myTechnique].beats === oppTechnique) {
+                克制关系 = `你的${myTechnique}克制对方的${oppTechnique}，伤害+50%`;
+            } else if (TECHNIQUE_BONUS[myTechnique].losesTo === oppTechnique) {
+                克制关系 = `对方的${oppTechnique}克制你的${myTechnique}，伤害-30%`;
+            } else {
+                克制关系 = '功法无克制关系';
+            }
+
+            const html = `
+                <div class="combat-submenu">
+                    <div style="grid-column:span 2;text-align:center;padding:20px;background:rgba(0,0,0,0.3);border-radius:10px;">
+                        <p style="color:${p.techniqueColor};font-size:1.2em;margin-bottom:10px;">你的功法：${myTechnique}</p>
+                        <p style="color:${o.techniqueColor};font-size:1.2em;margin-bottom:10px;">对方功法：${oppTechnique}</p>
+                        <p style="color:#ffd700;margin-top:15px;">${克制关系}</p>
+                    </div>
+                    <button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button>
+                </div>
+            `;
+            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
+        }
+
+        // ===== executePlayerAttack =====
+        function executePlayerAttack() {
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const effects = combatState.effects.player;
+
+            // 清除防御状态
+            effects.defending = false;
+            combatState.player.inDefenseStance = false;
+
+            // 计算伤害
+            let baseDamage = p.attack;
+            baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+
+            // 功法相克
+            let techniqueMultiplier = 1;
+            if (TECHNIQUE_BONUS[p.technique].beats === o.technique) {
+                techniqueMultiplier = 1.5;
+                combatState.log.push({ type: 'system', text: `功法克制！伤害+50%`, round: combatState.round });
+            } else if (TECHNIQUE_BONUS[p.technique].losesTo === o.technique) {
+                techniqueMultiplier = 0.7;
+                combatState.log.push({ type: 'system', text: `被功法克制！伤害-30%`, round: combatState.round });
+            }
+            baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+
+            // A4 套装攻击加成
+            if (p.attackPercent) {
+                baseDamage = Math.floor(baseDamage * p.attackPercent);
+            }
+
+            // 防御减伤
+            let finalDamage = baseDamage;
+            if (!effects.ignoreDefense) {
+                const defReduction = effects.defending ? o.defense * 1.5 : o.defense;
+                finalDamage = Math.max(1, baseDamage - defReduction);
+            }
+
+            // 暴击判定
+            const critRateWithSet = p.critRate + (p.critBonus || 0);
+            const isCrit = Math.random() < critRateWithSet;
+            if (isCrit) {
+                finalDamage = Math.floor(finalDamage * 1.5);
+                combatState.log.push({ type: 'player-action', actionType: 'critical', text: `💥暴击！`, round: combatState.round });
+            }
+
+            o.hp = Math.max(0, o.hp - finalDamage);
+
+            // A4 套装技能触发
+            if (p.skills && p.skills.includes('freezeAura') && Math.random() < 0.25) {
+                combatState.effects.opponent.frozen = 2;
+                combatState.log.push({ type: 'system', text: `❄️ 玄冰领域生效！敌人被冻结2回合！`, round: combatState.round });
+            }
+            if (p.skills && p.skills.includes('burnAura') && Math.random() < 0.30) {
+                combatState.effects.opponent.burning = 3;
+                combatState.log.push({ type: 'system', text: `🔥 烈焰领域生效！敌人被灼烧3回合！`, round: combatState.round });
+            }
+            if (p.skills && p.skills.includes('angelJudgment') && Math.random() < 0.20) {
+                const healAmount = Math.floor(p.maxHP * 0.15);
+                p.hp = Math.min(p.maxHP, p.hp + healAmount);
+                combatState.log.push({ type: 'system', text: `👼 天使审判生效！恢复${healAmount}点生命！`, round: combatState.round });
+            }
+
+            const techniqueColor = TECHNIQUE_COLORS[p.technique];
+            combatState.log.push({
+                type: 'player-action',
+                actionType: 'damage',
+                text: `你施展<span style="color:${techniqueColor}">${p.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
+                round: combatState.round
+            });
+
+            addEnergy(20); // 攻击积蓄能量
+            combatState.turn = 'opponent';
+            renderCombatArena();
+
+            if (o.hp <= 0) {
+                setTimeout(() => endCombat('win'), 500);
+            } else {
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // ===== executePlayerDefend =====
+        function executePlayerDefend() {
+            combatState.effects.player.defending = true;
+            combatState.player.inDefenseStance = true;
+            if (typeof combatState.player.counterEnergy === 'undefined') combatState.player.counterEnergy = 0;
+            combatState.player.counterEnergy = Math.min(100, combatState.player.counterEnergy + 35);
+            combatState.log.push({
+                type: 'player-action',
+                text: `🛡️ 防御姿态！反击能量+35（${combatState.player.counterEnergy}/100）`,
+                round: combatState.round
+            });
+
+            combatState.turn = 'opponent';
+            renderCombatArena();
+            setTimeout(() => executeOpponentTurn(), 1000);
+        }
+
+        // ===== executePlayerEscape =====
+        function executePlayerEscape() {
+            const escapeChance = 0.4 + gameState.activeEffects.escape;
+            const success = Math.random() < escapeChance;
+
+            if (success) {
+                const cost = Math.floor(gameState.spiritStones * 0.5);
+                gameState.spiritStones -= cost;
+                combatState.log.push({
+                    type: 'system',
+                    text: `逃跑成功！损失${cost}灵石`,
+                    round: combatState.round
+                });
+                combatState.turn = 'opponent';
+                renderCombatArena();
+                setTimeout(() => endCombat('escape'), 500);
+            } else {
+                combatState.log.push({
+                    type: 'system',
+                    text: '逃跑失败！被对方追击',
+                    round: combatState.round
+                });
+                const extraCost = Math.floor(gameState.spiritStones * 0.2);
+                gameState.spiritStones -= extraCost;
+                combatState.log.push({
+                    type: 'system',
+                    text: `被追击！额外损失${extraCost}灵石`,
+                    round: combatState.round
+                });
+                combatState.turn = 'opponent';
+                renderCombatArena();
+                setTimeout(() => executeOpponentTurn(), 1000);
+            }
+        }
+
+        // ===== executeOpponentTurn =====
+
+        // ===== V33 战斗AI学习系统 =====
+
+        // AI工具注册表（类似ruflo hooks模式）
+        const COMBAT_AI_TOOLS = {
+            // 攻击工具
+            heavyAttack: {
+                name: '重击',
+                weight: 1.0,
+                trigger: 'player_defending',
+                description: '对防御中的玩家造成更多伤害'
+            },
+            quickAttack: {
+                name: '快攻',
+                weight: 1.0,
+                trigger: 'player_low_hp',
+                description: '玩家血量低时快速结束战斗'
+            },
+            spellAttack: {
+                name: '技法攻击',
+                weight: 1.0,
+                trigger: 'player_spell_cooldown',
+                description: '趁玩家技能冷却时攻击'
+            },
+            ultimateSkill: {
+                name: '大招',
+                weight: 0.5,
+                trigger: 'energy_full',
+                description: '能量充足时释放大招'
+            },
+            // 防守工具
+            heal: {
+                name: '使用丹药',
+                weight: 1.0,
+                trigger: 'hp_below_50',
+                description: '血量低于50%时使用丹药'
+            },
+            defend: {
+                name: '防御',
+                weight: 1.0,
+                trigger: 'player_high_aggression',
+                description: '玩家进攻强烈时防御'
+            },
+            counter: {
+                name: '反击',
+                weight: 1.0,
+                trigger: 'player_attack_pattern',
+                description: '识破玩家攻击规律后反击'
+            },
+            // 破防工具
+            techniqueBreak: {
+                name: '破功',
+                weight: 1.0,
+                trigger: 'player_technique_active',
+                description: '破除玩家功法加成'
+            },
+            armorBreak: {
+                name: '破甲',
+                weight: 1.2,
+                trigger: 'player_defense_high',
+                description: '针对高防御玩家'
             }
         };
 
-        // --- combatState (5037-5051) ---
-        let combatState = {
-            inProgress: false,
-            player: null,
-            opponent: null,
-            round: 0,
-            turn: 'player',
-            playerAction: null,
-            playerSubAction: null,
-            log: [],
-            effects: {
-                player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
-                opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
-            },
-            battleRecord: [],
-            // V33 战斗AI学习系统
-            combatProfile: {
-                playerPatterns: [],     // [{action, count, lastUsed}]
-                totalBattles: 0,
-                winsAgainst: 0,
-                currentEnemy: null,
-                learningData: {},       // {enemyId: {adaptationLevel, observedPatterns}}
-                preferredDistance: null,
-                spellUsageRate: 0,
-                defenseFrequency: 0,
-                attackTiming: []
-            },
-            lastCombatDay: 0,           // V33 上次战斗天数（用于触发学习）
-            // V35 宗门互动增强
-            sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
-            sectMissionCooldown: 0,    // 任务冷却
-            lastMissionRefreshDay: 0,   // 上次任务刷新
-            // V36 装备打造增强
-            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
-            lastForgeDay: 0            // 上次打造时间
-        };
+        // ===== recordPlayerAction =====
+        function recordPlayerAction(actionType, detail = {}) {
+            if (!gameState.combatProfile) return;
+            
+            const profile = gameState.combatProfile;
+            profile.totalBattles++;
+            profile.lastCombatDay = gameState.days;
+            
+            // 记录行动模式
+            const existing = profile.playerPatterns.find(p => p.action === actionType);
+            if (existing) {
+                existing.count++;
+                existing.lastUsed = gameState.days;
+            } else {
+                profile.playerPatterns.push({
+                    action: actionType,
+                    count: 1,
+                    lastUsed: gameState.days,
+                    detail: detail
+                });
+            }
+            
+            // 记录特殊模式
+            if (actionType === 'defend') {
+                profile.defenseFrequency = (profile.defenseFrequency * (profile.totalBattles - 1) + 1) / profile.totalBattles;
+            }
+            if (actionType === 'ultimate') {
+                profile.attackTiming.push('ultimate');
+            }
+            if (actionType === 'attack' && detail.weaponType) {
+                profile.preferredDistance = detail.weaponType;
+            }
+        }
 
-        // --- secretRealmState (7391-7398) ---
-        let secretRealmState = {
-            wave: 0,
-            totalWaves: 3,
-            enemies: [],
-            playerHP: 0,
-            playerMaxHP: 0,
-            rewards: []
-        };
+        // ===== analyzePlayerProfile =====
+        function analyzePlayerProfile() {
+            const profile = gameState.combatProfile;
+            if (!profile || profile.totalBattles < 3) return null;
+            
+            // 计算各模式占比
+            const total = profile.playerPatterns.reduce((sum, p) => sum + p.count, 0);
+            const patterns = profile.playerPatterns.map(p => ({
+                ...p,
+                ratio: p.count / total
+            }));
+            
+            // 判断玩家风格
+            const defenseRatio = profile.defenseFrequency;
+            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
+            
+            let style = 'balanced';
+            if (defenseRatio > 0.6) style = 'defensive';
+            else if (defenseRatio < 0.2 && ultimateCount > profile.totalBattles * 0.4) style = 'aggressive';
+            
+            // 检测弱点
+            const weaknesses = [];
+            const attackPatterns = patterns.filter(p => p.action === 'attack');
+            if (attackPatterns.length > 0) {
+                // 玩家经常使用某种攻击
+                const commonAttack = attackPatterns.reduce((a, b) => a.count > b.count ? a : b);
+                if (commonAttack.ratio > 0.4) {
+                    weaknesses.push('attack_predictable'); // 攻击可预测
+                }
+            }
+            
+            return {
+                style: style,
+                patterns: patterns,
+                weaknesses: weaknesses,
+                defenseRatio: defenseRatio,
+                spellUsageRate: profile.spellUsageRate
+            };
+        }
 
-// ===== js/config.js =====
+        // ===== getAdjustedToolWeights =====
+        function getAdjustedToolWeights() {
+            const profile = gameState.combatProfile;
+            const analysis = analyzePlayerProfile();
+            
+            // 复制基础权重
+            const weights = {};
+            for (const tool in COMBAT_AI_TOOLS) {
+                weights[tool] = COMBAT_AI_TOOLS[tool].weight;
+            }
+            
+            if (!analysis) return weights;
+            
+            // 根据玩家风格调整权重
+            if (analysis.defenseRatio > 0.5) {
+                // 玩家爱防御 → 提高破防工具权重
+                weights.heavyAttack *= 1.4;
+                weights.armorBreak *= 1.3;
+                weights.techniqueBreak *= 1.2;
+            }
+            
+            if (analysis.weaknesses.includes('attack_predictable')) {
+                // 玩家攻击可预测 → 提高反击权重
+                weights.counter *= 1.5;
+                weights.defend *= 0.7; // 少防御，多等反击机会
+            }
+            
+            // 检查玩家使用大招的时机
+            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
+            if (ultimateCount > profile.totalBattles * 0.3) {
+                // 玩家爱用大招 → 提高打断能力
+                weights.techniqueBreak *= 1.3;
+            }
+            
+            return weights;
+        }
 
-// --- CONFIG (3-11) ---
+        // ===== selectBestAI tool =====
+        function selectBestAITool(opponentHp, playerHp, playerDefending, playerEffects) {
+            const weights = getAdjustedToolWeights();
+            const tools = Object.keys(weights);
+            
+            // 计算每个工具的适用度
+            const scores = tools.map(tool => {
+                let score = weights[tool];
+                const toolDef = COMBAT_AI_TOOLS[tool];
+                
+                // 根据触发条件调整
+                if (toolDef.trigger === 'player_defending' && playerDefending) {
+                    score *= 2;
+                }
+                if (toolDef.trigger === 'hp_below_50' && opponentHp < opponent.maxHP * 0.5) {
+                    score *= 1.8;
+                }
+                if (toolDef.trigger === 'player_high_aggression' && playerEffects.attacking) {
+                    score *= 1.5;
+                }
+                if (toolDef.trigger === 'energy_full' && combatEnergy >= 80) {
+                    score *= 1.3;
+                }
+                
+                return { tool, score, name: toolDef.name };
+            });
+            
+            // 按分数排序
+            scores.sort((a, b) => b.score - a.score);
+            
+            return scores[0];
+        }
+
+        // ===== executeOpponentTurn with AI Learning =====
+        const originalExecuteOpponentTurn = executeOpponentTurn;
+        function executeOpponentTurn() {
+            if (!combatState.inProgress || combatState.opponent.hp <= 0) return;
+            
+            combatState.round++;
+            const p = combatState.player;
+            const o = combatState.opponent;
+            const effects = combatState.effects.opponent;
+            
+            // 显示AI思考状态
+            showAIThinking();
+            
+            // 清除防御状态
+            effects.defending = false;
+            
+            // V33: AI工具选择（基于玩家画像）
+            const aiDecision = selectBestAITool(o.hp, p.hp, p.defending, p.effects || {});
+            
+            // 记录玩家行动（事后学习）
+            if (combatState.turn === 'player') {
+                // 玩家刚行动过，记录该行动
+                const lastAction = combatState.log[combatState.log.length - 1];
+                if (lastAction && lastAction.type === 'player-action') {
+                    if (lastAction.actionType === 'attack') {
+                        recordPlayerAction('attack', { damage: lastAction.damage });
+                    } else if (lastAction.actionType === 'defend') {
+                        recordPlayerAction('defend');
+                    } else if (lastAction.actionType === 'ultimate') {
+                        recordPlayerAction('ultimate');
+                    }
+                }
+            }
+            
+            // 根据AI决策选择行动
+            let action = 'attack';
+            let actionDetail = '';
+            
+            if (aiDecision && aiDecision.tool === 'heal') {
+                action = 'heal';
+                actionDetail = '使用丹药';
+            } else if (aiDecision && aiDecision.tool === 'defend') {
+                action = 'defend';
+                actionDetail = '防御';
+            } else if (aiDecision && aiDecision.tool === 'counter') {
+                action = 'counter';
+                actionDetail = '反击';
+            }
+            
+            // 如果hp低且有回春丹，优先治疗
+            if (o.hp < o.maxHP * 0.4 && getItemCount('回春丹') > 0 && Math.random() < 0.6) {
+                action = 'heal';
+                actionDetail = '紧急治疗';
+            }
+            
+            if (action === 'heal') {
+                // 使用回春丹
+                const idx = gameState.inventory.findIndex(i => i.name === '回春丹');
+                if (idx !== -1) {
+                    gameState.inventory[idx].quantity--;
+                    if (gameState.inventory[idx].quantity <= 0) {
+                        gameState.inventory.splice(idx, 1);
+                    }
+                }
+                const heal = Math.floor(o.maxHP * 0.3);
+                o.hp = Math.min(o.maxHP, o.hp + heal);
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'heal',
+                    text: `${o.name}使用了回春丹，恢复${heal}生命 (AI分析:${aiDecision?.name || '攻击'})`,
+                    round: combatState.round
+                });
+            } else if (action === 'defend') {
+                effects.defending = true;
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'defend',
+                    text: `${o.name}进入防御姿态 (AI识破玩家进攻模式)`,
+                    round: combatState.round
+                });
+            } else if (action === 'counter') {
+                // 反击 - 先记录，等玩家攻击后触发
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'counter_setup',
+                    text: `${o.name}识破玩家攻击规律，准备反击`,
+                    round: combatState.round
+                });
+                // 直接攻击，但标记为反击
+                let baseDamage = o.attack;
+                baseDamage = Math.floor(baseDamage * 1.3); // 反击加成
+                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+                
+                let techniqueMultiplier = 1;
+                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
+                    techniqueMultiplier = 1.5;
+                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
+                    techniqueMultiplier = 0.7;
+                }
+                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+                
+                let finalDamage = baseDamage;
+                if (combatState.effects.player.defending) {
+                    finalDamage = Math.floor(baseDamage * 0.5);
+                }
+                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * 0.5));
+                
+                p.hp = Math.max(0, p.hp - finalDamage);
+                combatState.effects.player.defending = false;
+                
+                const techniqueColor = TECHNIQUE_COLORS[o.technique];
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'damage',
+                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害（反击）`,
+                    round: combatState.round
+                });
+            } else {
+                // 普通攻击
+                let baseDamage = o.attack;
+                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+                
+                let techniqueMultiplier = 1;
+                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
+                    techniqueMultiplier = 1.5;
+                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
+                    techniqueMultiplier = 0.7;
+                }
+                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+                
+                let finalDamage = baseDamage;
+                if (combatState.effects.player.defending) {
+                    finalDamage = Math.floor(baseDamage * 0.5);
+                }
+                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * (1 + combatState.effects.player.defenseBoost)));
+                
+                const isCrit = Math.random() < o.critRate;
+                if (isCrit) {
+                    finalDamage = Math.floor(finalDamage * 1.5);
+                }
+                
+                p.hp = Math.max(0, p.hp - finalDamage);
+                combatState.effects.player.defending = false;
+                
+                const techniqueColor = TECHNIQUE_COLORS[o.technique];
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'damage',
+                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
+                    round: combatState.round
+                });
+            }
+            
+            // 检查玩家是否死亡
+            if (p.hp <= 0) {
+                setTimeout(() => endCombat('lose'), 500);
+            } else {
+                combatState.turn = 'player';
+                renderCombatArena();
+            }
+        }
+
+        // ===== showAIThinking =====
+        function showAIThinking() {
+            const analysis = analyzePlayerProfile();
+            if (!analysis) return;
+            
+            // 在对手血条附近显示AI状态
+            const aiStatusEl = document.getElementById('aiThinkingStatus');
+            if (aiStatusEl) {
+                let statusText = '';
+                if (analysis.style === 'defensive') {
+                    statusText = '📊 分析中: 玩家偏防守，启用破防策略...';
+                } else if (analysis.style === 'aggressive') {
+                    statusText = '📊 分析中: 玩家进攻猛烈，等待反击时机...';
+                } else {
+                    statusText = '📊 分析中: 玩家风格均衡，保持平衡策略...';
+                }
+                aiStatusEl.textContent = statusText;
+                aiStatusEl.style.display = 'block';
+                
+                // 3秒后隐藏
+                setTimeout(() => {
+                    if (aiStatusEl) aiStatusEl.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // ===== learnFromCombat =====
+        function learnFromCombat(result) {
+            const profile = gameState.combatProfile;
+            if (!profile) return;
+            
+            if (result === 'win') {
+                profile.winsAgainst++;
+            }
+            
+            // 战后分析
+            const analysis = analyzePlayerProfile();
+            if (analysis) {
+                // 显示学习报告
+                setTimeout(() => {
+                    showLearningReport(analysis);
+                }, 1000);
+            }
+        }
+
+        // ===== showLearningReport =====
+        function showLearningReport(analysis) {
+            const report = `
+                <div style="padding:20px;text-align:center">
+                    <div style="font-size:24px;color:#2196f3;margin-bottom:15px">🧠 AI对战报告</div>
+                    <div style="background:rgba(33,150,243,0.1);padding:15px;border-radius:8px;text-align:left;margin-bottom:15px">
+                        <div style="color:#ffd700">📈 观察到的玩家风格:</div>
+                        <div style="color:#fff;margin-top:8px">战斗风格: <span style="color:${
+                            analysis.style === 'defensive' ? '#4caf50' : 
+                            analysis.style === 'aggressive' ? '#f44336' : '#2196f3'
+                        }">${analysis.style === 'defensive' ? '防守型' : analysis.style === 'aggressive' ? '进攻型' : '平衡型'}</span></div>
+                        <div style="color:#fff">防御频率: ${(analysis.defenseRatio * 100).toFixed(0)}%</div>
+                        <div style="color:#fff">弱点检测: ${analysis.weaknesses.length > 0 ? '攻击可预测' : '无明显弱点'}</div>
+                    </div>
+                    <div style="color:#aaa;font-size:12px">AI已根据您的风格调整策略</div>
+                    <button onclick="closeModal('modalNormal')" style="margin-top:15px;padding:8px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">确定</button>
+                </div>
+            `;
+            
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = report;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        // ===== endCombat =====
+        function endCombat(result) {
+            combatState.inProgress = false;
+            const p = combatState.player;
+            const o = combatState.opponent;
+
+            let reward = 0;
+            let penalty = 0;
+            let honorChange = 0;
+            let fameChange = 0;
+            let realmDropChance = 0;
+
+            if (result === 'win') {
+                reward = Math.floor(o.maxHP * 0.5);
+                gameState.spiritStones += reward;
+                honorChange = 10;
+                fameChange = 5;
+                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
+                gameState.combat.wins++;
+                gameState.combat.honor += honorChange;
+                gameState.combat.fame += fameChange;
+                combatState.log.push({
+                    type: 'system',
+                    text: `🎉 胜利！获得${reward}灵石，荣誉+${honorChange}，声望+${fameChange}`,
+                    round: combatState.round
+                });
+            } else if (result === 'lose') {
+                penalty = Math.floor(gameState.spiritStones * 0.3);
+                gameState.spiritStones -= penalty;
+                honorChange = -5;
+                fameChange = -3;
+                realmDropChance = 0.1;
+                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
+                gameState.combat.losses++;
+                gameState.combat.honor = Math.max(0, gameState.combat.honor + honorChange);
+                gameState.combat.fame = Math.max(0, gameState.combat.fame + fameChange);
+
+                // 境界跌落
+                if (Math.random() < realmDropChance) {
+                    const oldRealm = gameState.realm;
+                    gameState.realm = Math.max(0, gameState.realm - 1);
+                    combatState.log.push({
+                        type: 'system',
+                        text: `💔 境界跌落！从${CONFIG.realms[oldRealm]}期跌落到${CONFIG.realms[gameState.realm]}期`,
+                        round: combatState.round
+                    });
+                }
+
+                // 重伤debuff：3场内属性-20%
+                gameState.combat.injured = true;
+                gameState.combat.injuryEndDay = gameState.days + 3;
+                combatState.log.push({
+                    type: 'system',
+                    text: `💔 重伤！未来3场战斗属性降低20%`,
+                    round: combatState.round
+                });
+
+                combatState.log.push({
+                    type: 'system',
+                    text: `😢 战败！损失${penalty}灵石，荣誉${honorChange}，声望${fameChange}`,
+                    round: combatState.round
+                });
+            }
+
+            // 记录战斗历史
+            gameState.combat.battleHistory = gameState.combat.battleHistory || [];
+            gameState.combat.battleHistory.unshift({
+                opponent: o.name,
+                result: result,
+                reward: reward,
+                penalty: penalty,
+                day: gameState.days
+            });
+            if (gameState.combat.battleHistory.length > 50) {
+                gameState.combat.battleHistory.pop();
+            }
+
+            // V33: 触发AI学习
+            learnFromCombat(result);
+
+            saveGame();
+            renderCombatArena();
+        }
+
+        // ===== renderCombatResult =====
+        function renderCombatResult() {
+            const result = combatState.opponent.hp <= 0 ? 'win' : (combatState.player.hp <= 0 ? 'lose' : 'escape');
+            const o = combatState.opponent;
+            let reward = 0;
+            let penalty = 0;
+
+            if (result === 'win') {
+                reward = Math.floor(o.maxHP * 0.5);
+            } else if (result === 'lose') {
+                penalty = Math.floor(gameState.spiritStones / 0.7 * 0.3) || Math.floor(gameState.spiritStones * 0.3);
+            }
+
+            const resultTitle = result === 'win' ? '🎉 胜利！' : result === 'lose' ? '💔 战败' : '🏃 逃跑';
+            const resultClass = result === 'win' ? 'win' : result === 'lose' ? 'lose' : 'escape';
+
+            return `
+                <div class="combat-result ${resultClass}">
+                    <h2>${resultTitle}</h2>
+                    <div class="combat-result-stats">
+                        <div class="combat-result-stat">
+                            <div class="value">${combatState.round}</div>
+                            <div class="label">回合数</div>
+                        </div>
+                        <div class="combat-result-stat">
+                            <div class="value" style="color:${result === 'win' ? '#4caf50' : '#ff6666'}">${result === 'win' ? '+' + reward : '-' + penalty}</div>
+                            <div class="label">灵石</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-combat" onclick="renderCombatHome()" style="margin-top:20px;">返回斗法界面</button>
+                    <button class="close-btn" onclick="closeCombat()">关闭</button>
+                </div>
+            `;
+        }
+
+
+
+// Auto-generated module: config.js
+'use strict';
+
+        // --- CONFIG (3-11) ---
         const CONFIG = {
             realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
             stages: ['初期', '中期', '后期'],
@@ -1384,9 +2869,1743 @@
             '九转玄天诀': { grade: 3, effect: { type: 'all_stats', value: 0.1 }, desc: '全属性+10%', icon: '🌟' }
         };
 
-// ===== js/data.js =====
 
-let selectedEnhanceItem = null; // 背包中选中的待强化灵宝
+
+// Auto-generated module: core.js
+'use strict';
+
+        // ===== showModal =====
+        function showModal(html) {
+            const modal = document.getElementById('eventModal');
+            if (!modal) return;
+            document.getElementById('modalTitle').textContent = '⚡ 绝技选择';
+            document.getElementById('modalDescription').innerHTML = html;
+            document.getElementById('modalOptions').innerHTML = '';
+            document.getElementById('modalResult').classList.add('hidden');
+            modal.classList.add('active');
+        }
+
+        // ===== openModal =====
+        function openModal(title, description, options) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalDescription').innerHTML = description;
+            document.getElementById('modalOptions').innerHTML = options;
+            document.getElementById('modalOptions').classList.remove('hidden');
+            document.getElementById('modalResult').classList.add('hidden');
+            document.getElementById('eventModal').classList.add('active');
+        }
+
+        // ===== manualSave =====
+        function manualSave() {
+            showSaveLoadModal();
+        }
+
+        // ===== saveGame =====
+        function saveGame() {
+            localStorage.setItem(CONFIG.storageKey, JSON.stringify(gameState));
+        }
+
+        // ===== showSaveLoadModal =====
+        function showSaveLoadModal() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            let saveInfo = '未找到存档';
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    saveInfo = `存档时间: ${new Date(data.days ? data.days : Date.now()).toLocaleString('zh-CN')}`;
+                } catch(e) {
+                    saveInfo = '存档损坏';
+                }
+            }
+            
+            let html = '<div style="padding:16px;background:#1a1a2e;border-radius:8px;min-width:280px;">';
+            html += '<div style="margin-bottom:16px;text-align:center;">';
+            html += '<b style="color:#ffd700;font-size:16px;">📁 存档管理</b>';
+            html += `<div style="color:#888;font-size:11px;margin-top:4px;">${saveInfo}</div>`;
+            html += '</div>';
+            html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+            html += `<button onclick="doSaveGame();closeModal();" style="padding:12px;background:#2e7d32;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">💾 保存游戏</button>`;
+            html += `<button onclick="doLoadGame();closeModal();" style="padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">📂 加载存档</button>`;
+            html += `<button onclick="showAutoSaveInfo()" style="padding:12px;background:#333;color:#aaa;border:1px solid #555;border-radius:6px;cursor:pointer;font-size:14px;">ℹ️ 自动存档</button>`;
+            html += `<button onclick="doResetGame()" style="padding:12px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">⚠️ 重置游戏</button>`;
+            html += '</div>';
+            html += '<button onclick="closeModal()" style="margin-top:16px;width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>';
+            html += '</div>';
+            showModal(html);
+        }
+
+        // ===== doSaveGame =====
+        function doSaveGame() {
+            try {
+                saveGame();
+                addLog('good', '存档成功', '游戏已保存到本地存储');
+            } catch (e) {
+                addLog('bad', '存档失败', '保存失败: ' + e.message);
+            }
+        }
+
+        // ===== doLoadGame =====
+        function doLoadGame() {
+            try {
+                const saved = localStorage.getItem(CONFIG.storageKey);
+                if (!saved) {
+                    addLog('bad', '加载失败', '没有找到存档');
+                    return;
+                }
+                const data = JSON.parse(saved);
+                // 确保新增字段存在（向后兼容）
+                if (!data.combatLogHistory) data.combatLogHistory = [];
+                if (!data.eventLogHistory) data.eventLogHistory = [];
+                gameState = data;
+                addLog('good', '加载成功', `存档已加载 (第${gameState.days}天)`);
+                // 重新渲染UI
+                if (typeof renderGameUI === 'function') renderGameUI();
+                if (typeof refreshInventoryUI === 'function') refreshInventoryUI();
+                if (typeof updateDisplay === 'function') updateDisplay();
+                showGameUI();
+            } catch (e) {
+                addLog('bad', '加载失败', '加载失败: ' + e.message);
+            }
+        }
+
+        // ===== doResetGame =====
+        function doResetGame() {
+            if (!confirm('确定要重置游戏吗？所有进度将丢失！')) return;
+            try {
+                localStorage.removeItem(CONFIG.storageKey);
+                location.reload();
+            } catch (e) {
+                addLog('bad', '重置失败', '重置失败');
+            }
+        }
+
+        // ===== showAutoSaveInfo =====
+        function showAutoSaveInfo() {
+            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;">';
+            html += '<b style="color:#ffd700;">ℹ️ 自动存档说明</b><br><br>';
+            html += '<div style="color:#ccc;font-size:13px;line-height:1.6;">';
+            html += '• 游戏会自动在重要操作后保存到本地<br>';
+            html += '• 点击「保存游戏」可手动保存当前进度<br>';
+            html += '• 存档保存在浏览器本地存储中<br>';
+            html += '• 清除浏览器数据会导致存档丢失<br>';
+            html += '• 建议定期手动保存重要进度</div>';
+            html += '<button onclick="showSaveLoadModal()" style="margin-top:12px;width:100%;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">知道了</button>';
+            html += '</div>';
+            showModal(html);
+        }
+
+        // ===== recalculateAllEffects =====
+        function recalculateAllEffects() {
+            // 保存需要保留的非装备效果（来自奇遇等系统）
+            const savedSerendipityBoost = gameState.activeEffects.serendipity_boost || 0;
+            const savedBreakthroughBoost = gameState.activeEffects.breakthrough_boost || 0;
+            const savedCultivateSpeed = gameState.activeEffects.cultivate_speed || 0;
+            const saved渡劫MindsetProtect = gameState.activeEffects['渡劫_mindset_protect'] || 0;
+            const saved渡劫DamageReduce = gameState.activeEffects['渡劫_damage_reduce'] || 0;
+            const savedAllStats = gameState.activeEffects.all_stats || 0;
+            const savedAttack = gameState.activeEffects.attack || 0;
+            const savedDefense = gameState.activeEffects.defense || 0;
+            const savedCultivateQiRate = gameState.activeEffects.cultivate_qi_rate || 0;
+            const savedEscape = gameState.activeEffects.escape || 0;
+            const savedForeseeEvent = gameState.activeEffects.foresee_event || 0;
+
+            // 重置所有效果
+            for (let key in gameState.activeEffects) {
+                gameState.activeEffects[key] = 0;
+            }
+
+            // 累加装备效果
+            for (const treasure of gameState.equippedTreasures) {
+                if (treasure) {
+                    const effectType = treasure.effect.type;
+                    if (gameState.activeEffects.hasOwnProperty(effectType)) {
+                        gameState.activeEffects[effectType] += treasure.effect.value;
+                    }
+                }
+            }
+
+            // 恢复非装备效果（这些效果由奇遇系统或丹药管理，不应被清除）
+            if (savedSerendipityBoost > 0) gameState.activeEffects.serendipity_boost = savedSerendipityBoost;
+            if (savedBreakthroughBoost > 0) gameState.activeEffects.breakthrough_boost = savedBreakthroughBoost;
+            if (savedCultivateSpeed > 0) gameState.activeEffects.cultivate_speed = savedCultivateSpeed;
+            if (saved渡劫MindsetProtect > 0) gameState.activeEffects['渡劫_mindset_protect'] = saved渡劫MindsetProtect;
+            if (saved渡劫DamageReduce > 0) gameState.activeEffects['渡劫_damage_reduce'] = saved渡劫DamageReduce;
+            if (savedAllStats > 0) gameState.activeEffects.all_stats = savedAllStats;
+            if (savedAttack > 0) gameState.activeEffects.attack = savedAttack;
+            if (savedDefense > 0) gameState.activeEffects.defense = savedDefense;
+            if (savedCultivateQiRate > 0) gameState.activeEffects.cultivate_qi_rate = savedCultivateQiRate;
+            if (savedEscape > 0) gameState.activeEffects.escape = savedEscape;
+            if (savedForeseeEvent > 0) gameState.activeEffects.foresee_event = savedForeseeEvent;
+        }
+
+        // ===== updateEquipmentBar =====
+        function updateEquipmentBar() {
+            const icons = ['⚔️', '🛡️', '💍'];
+            for (let i = 0; i < 3; i++) {
+                const slot = document.getElementById(`equipSlot${i}`);
+                const treasure = gameState.equippedTreasures[i];
+                if (treasure) {
+                    slot.classList.add('filled');
+                    slot.querySelector('.slot-icon').textContent = treasure.icon || icons[i];
+                    const star = treasure.star || 1;
+                    const starDisplay = getStarDisplay(star);
+                    slot.querySelector('.slot-tooltip').textContent = `${treasure.name}${starDisplay}\n${treasure.desc}`;
+                } else {
+                    slot.classList.remove('filled');
+                    slot.querySelector('.slot-icon').textContent = icons[i];
+                    slot.querySelector('.slot-tooltip').textContent = '空';
+                }
+            }
+        }
+
+        // ===== renderSetStatus =====
+        function renderSetStatus() {
+            let html = '<div style="margin-top:8px;padding:6px;background:#1a1a2e;border-radius:6px;font-size:11px;">';
+            html += '<b style="color:#ffd700;">套装状态</b><br>';
+            let hasAny = false;
+            for (const setName in SET_BONUSES) {
+                const set = SET_BONUSES[setName];
+                const equipped = [];
+                const treasures = gameState.equippedTreasures;
+                for (const t of treasures) {
+                    if (t && set.pieces.includes(t.name)) equipped.push(t.name);
+                }
+                if (equipped.length > 0) {
+                    hasAny = true;
+                    const count = equipped.length;
+                    const color = count >= set.count ? '#00ff88' : '#aaaaaa';
+                    const status = count >= set.count ? '✓ ' + (count === 3 ? set.threePiece : set.twoPiece) : `(${equipped.length}/${set.count}) ${set.twoPiece}`;
+                    html += `<span style="color:${color};">${setName} ${status}</span><br>`;
+                }
+            }
+            if (!hasAny) html += '<span style="color:#666;">无套装激活</span>';
+            html += '</div>';
+            return html;
+        }
+
+        // ===== openEquipSlotMenu =====
+        function openEquipSlotMenu(slotIndex) {
+            const treasure = gameState.equippedTreasures[slotIndex];
+            if (!treasure) return;
+            // 移除已存在的菜单
+            const existing = document.getElementById('equipSlotMenu');
+            if (existing) existing.remove();
+
+            const star = treasure.star || 1;
+            const html = `<div id="equipSlotMenu" style="position:fixed;z-index:1002;background:#1a1a2e;border:1px solid #ffd700;border-radius:10px;padding:10px;min-width:160px;box-shadow:0 0 20px rgba(255,215,0,0.3);">
+                <div style="color:#ffd700;font-weight:bold;text-align:center;margin-bottom:8px;">${treasure.icon || '📦'} ${treasure.name} ${getStarDisplay(star)}</div>
+                <button onclick="openEnhanceFromEquip(${slotIndex})" style="display:block;width:100%;padding:6px 12px;background:rgba(255,215,0,0.15);border:1px solid #ffd700;border-radius:6px;color:#ffd700;cursor:pointer;margin-bottom:5px;">⬆️ 强化</button>
+                <button onclick="unequipTreasure(${slotIndex});closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:rgba(100,100,100,0.2);border:1px solid #888;border-radius:6px;color:#ccc;cursor:pointer;">卸下</button>
+                <button onclick="closeEquipSlotMenu()" style="display:block;width:100%;padding:6px 12px;background:transparent;border:none;color:#888;cursor:pointer;margin-top:3px;">取消</button>
+            </div>`;
+            const slot = document.getElementById(`equipSlot${slotIndex}`);
+            const rect = slot.getBoundingClientRect();
+            document.body.insertAdjacentHTML('beforeend', html);
+            const menu = document.getElementById('equipSlotMenu');
+            menu.style.top = (rect.bottom + 5) + 'px';
+            menu.style.left = rect.left + 'px';
+        }
+
+        // ===== closeEquipSlotMenu =====
+        function closeEquipSlotMenu() {
+            const menu = document.getElementById('equipSlotMenu');
+            if (menu) menu.remove();
+        }
+
+        // ===== unequipTreasure =====
+        function unequipTreasure(slotIndex) {
+            const treasure = gameState.equippedTreasures[slotIndex];
+            if (treasure) {
+                // 移回背包（保留星级）
+                const invItem = {
+                    type: treasure.type,
+                    name: treasure.name,
+                    quantity: 1,
+                    quality: treasure.quality,
+                    effect: treasure.effect,
+                    desc: treasure.desc,
+                    icon: treasure.icon,
+                    star: treasure.star || 1
+                };
+                addToInventoryObj(invItem);
+                gameState.equippedTreasures[slotIndex] = null;
+                recalculateAllEffects();
+                updateEquipmentBar();
+                saveGame();
+                addLog('neutral', '卸下灵宝', `卸下了${treasure.name}`);
+                if (document.getElementById('setStatusContainer')) {
+                    document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
+                }
+            }
+        }
+
+        // ===== addToInventory =====
+        function addToInventory(type, name, quantity, quality, effect, desc, icon, star) {
+            // 查找是否已存在同类型物品
+            const existing = gameState.inventory.find(item => item.name === name && item.type === type);
+            if (existing) {
+                existing.quantity += quantity;
+            } else {
+                if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                    return false; // 背包满了
+                }
+                gameState.inventory.push({
+                    id: Date.now(),
+                    type,
+                    name,
+                    quantity,
+                    quality,
+                    effect,
+                    desc,
+                    icon,
+                    star: star || 1
+                });
+            }
+            return true;
+        }
+
+        // ===== addToInventoryObj =====
+        function addToInventoryObj(itemObj) {
+            const existing = gameState.inventory.find(i => i.name === itemObj.name && i.type === itemObj.type);
+            if (existing) {
+                existing.quantity += itemObj.quantity;
+            } else {
+                if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                    return false;
+                }
+                gameState.inventory.push({
+                    id: Date.now(),
+                    type: itemObj.type,
+                    name: itemObj.name,
+                    quantity: itemObj.quantity,
+                    quality: itemObj.quality,
+                    effect: itemObj.effect,
+                    desc: itemObj.desc,
+                    icon: itemObj.icon,
+                    star: itemObj.star || 1
+                });
+            }
+            return true;
+        }
+
+        // ===== openInventory =====
+        function openInventory() {
+            currentInvTab = 'all';
+            selectedInvItem = null;
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            document.getElementById('inventoryModal').classList.add('active');
+            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
+        }
+
+        // ===== closeInventory =====
+        function closeInventory() {
+            document.getElementById('inventoryModal').classList.remove('active');
+        }
+
+        // ===== switchInvTab =====
+        function switchInvTab(tab) {
+            currentInvTab = tab;
+            selectedInvItem = null;
+            document.querySelectorAll('.inventory-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        // ===== renderInventoryGrid =====
+        function renderInventoryGrid() {
+            const grid = document.getElementById('inventoryGrid');
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            
+            document.getElementById('invCapacity').textContent = gameState.inventory.length;
+            
+            grid.innerHTML = items.map((item, idx) => `
+                <div class="inventory-slot ${selectedInvItem === idx ? 'selected' : ''}" 
+                     onclick="selectInvItem(${idx})">
+                    <span style="font-size:1.5em">${item.icon || '📦'}</span>
+                    <span class="item-name quality-${item.quality}">${item.name}</span>
+                    ${item.quantity > 1 ? `<span class="item-quantity">x${item.quantity}</span>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // ===== selectInvItem =====
+        function selectInvItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            selectedInvItem = idx;
+            const item = items[idx];
+            renderInventoryGrid();
+            
+            document.getElementById('invDetail').style.display = 'block';
+            document.getElementById('invDetailContent').innerHTML = `
+                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
+                    <span style="font-size:2em">${item.icon || '📦'}</span>
+                    <div>
+                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(item.quality)}">${item.name}</div>
+                        <div style="color:#888">${item.desc}</div>
+                    </div>
+                </div>
+                <div style="color:#aaa">数量: ${item.quantity}</div>
+            `;
+            
+            let actions = '';
+            if (item.type === 'pill') {
+                actions = `<button class="btn btn-cultivate" onclick="usePill('${item.name}', ${idx})">使用</button>`;
+            } else if (item.type === 'treasure') {
+                const star = item.star || 1;
+                const starDisplay = getStarDisplay(star);
+                const starColor = getStarColor(star);
+                actions = `<button class="btn btn-breakthrough" onclick="equipTreasure('${item.name}', ${idx})">装备</button>`;
+                actions += `<button class="btn btn-enhance" onclick="openEnhanceFromInventory(${idx})" style="background:rgba(255,215,0,0.15);border:1px solid #ffd700;color:#ffd700;padding:5px 12px;border-radius:5px;cursor:pointer;margin-left:5px;">强化</button>`;
+            }
+            actions += `<button class="btn btn-save" onclick="sellItem(${idx})">出售(${Math.floor(item.quality === 'common' ? 10 : item.quality === 'rare' ? 50 : item.quality === 'precious' ? 200 : 1000)}灵石)</button>`;
+            actions += `<button class="btn btn-new" onclick="discardItem(${idx})">丢弃</button>`;
+            document.getElementById('invActions').innerHTML = actions;
+        }
+
+        // ===== usePill =====
+        function usePill(name, idx) {
+            const pill = PILLS[name];
+            if (!pill) return;
+            
+            const item = gameState.inventory.find((i, iidx) => {
+                let items = gameState.inventory;
+                if (currentInvTab !== 'all') items = items.filter(it => it.type === currentInvTab);
+                return iidx === idx;
+            });
+            if (!item || item.quantity <= 0) return;
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i.name !== name || i.type !== 'pill');
+            }
+            
+            // 应用丹药效果
+            switch (pill.effect.type) {
+                case 'qi':
+                    gameState.qi = Math.min(gameState.maxQi, gameState.qi + pill.effect.value);
+                    addLog('good', '使用丹药', `服下${name}，灵气+${pill.effect.value}`);
+                    break;
+                case 'mindset':
+                    gameState.mindset = Math.min(100, gameState.mindset + pill.effect.value);
+                    addLog('good', '使用丹药', `服下${name}，心境+${pill.effect.value}`);
+                    break;
+                case 'breakthrough_boost':
+                case 'cultivate_speed':
+                case '渡劫_mindset_protect':
+                    gameState.activeEffects[pill.effect.type] += pill.effect.value;
+                    addLog('good', '使用丹药', `服下${name}，${pill.desc}（永久生效）`);
+                    break;
+            }
+            
+            saveGame();
+            updateDisplay();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+        }
+
+        // ===== equipTreasure =====
+        function equipTreasure(name, idx) {
+            const treasure = TREASURES[name];
+            if (!treasure) return;
+
+            // 找到空槽位
+            const emptySlot = gameState.equippedTreasures.findIndex(t => t === null);
+            if (emptySlot === -1) {
+                alert('装备栏已满！');
+                return;
+            }
+
+            // 查找背包中的物品
+            const itemIdx = gameState.inventory.findIndex(i => i.name === name && i.type === 'treasure');
+            if (itemIdx === -1) return;
+
+            const item = gameState.inventory[itemIdx];
+            const star = item.star || 1; // 保留星级
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory.splice(itemIdx, 1);
+            }
+
+            // 装备（携带星级）
+            gameState.equippedTreasures[emptySlot] = {
+                name: item.name,
+                type: item.type,
+                quality: item.quality,
+                effect: item.effect,
+                desc: item.desc,
+                icon: item.icon,
+                star
+            };
+            
+            recalculateAllEffects();
+            updateEquipmentBar();
+            saveGame();
+            addLog('good', '装备灵宝', `装备了${name}`);
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            document.getElementById('setStatusContainer').innerHTML = renderSetStatus();
+        }
+
+        // ===== sellItem =====
+        function sellItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item) return;
+            
+            // 经济调整：出售价格改为材料原价的30%（原为品质固定值）
+            // 这样更符合经济逻辑：稀有材料出售价格更高
+            let price = 10; // 默认普通物品
+            if (item.type === 'material' && MATERIALS[item.name]) {
+                // 材料出售价格 = basePrice × 0.3（约为原价的三折）
+                price = Math.floor(MATERIALS[item.name].basePrice * 0.3);
+            } else {
+                // 非材料物品仍按品质定价（但略微降低）
+                const prices = { common: 8, rare: 40, precious: 150, legendary: 800 };
+                price = prices[item.quality] || 10;
+            }
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i !== item);
+            }
+            
+            gameState.spiritStones += price;
+            saveGame();
+            updateDisplay();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            addLog('neutral', '出售物品', `出售了${item.name}，获得${price}灵石`);
+        }
+
+        // ===== discardItem =====
+        function discardItem(idx) {
+            let items = gameState.inventory;
+            if (currentInvTab !== 'all') {
+                items = items.filter(item => item.type === currentInvTab);
+            }
+            const item = items[idx];
+            if (!item) return;
+            
+            item.quantity--;
+            if (item.quantity <= 0) {
+                gameState.inventory = gameState.inventory.filter(i => i !== item);
+            }
+            
+            saveGame();
+            renderInventoryGrid();
+            document.getElementById('invDetail').style.display = 'none';
+            addLog('neutral', '丢弃物品', `丢弃了${item.name}`);
+        }
+
+
+
+// Auto-generated module: crafting.js
+'use strict';
+
+        // ===== openShop =====
+        function openShop() {
+            if (gameState.shopItems.length === 0) {
+                generateShopItems();
+            }
+            renderShopItems();
+            document.getElementById('shopModal').classList.add('active');
+            if (miniMaxConfig.apiKey) {
+                generateShopIntro();
+            }
+        }
+
+        // ===== closeShop =====
+        function closeShop() {
+            document.getElementById('shopModal').classList.remove('active');
+        }
+
+        // ===== generateShopItems =====
+        function generateShopItems() {
+            const allItems = [];
+            // 收集所有丹药和灵宝
+            for (const [name, pill] of Object.entries(PILLS)) {
+                allItems.push({ type: 'pill', name, ...pill });
+            }
+            for (const [name, treasure] of Object.entries(TREASURES)) {
+                allItems.push({ type: 'treasure', name, ...treasure });
+            }
+            // V4战斗道具
+            for (const [name, treasure] of Object.entries(COMBAT_TREASURES)) {
+                allItems.push({ type: 'treasure', name, ...treasure });
+            }
+            // 挑战状
+            allItems.push({ type: 'special', name: '挑战状', quality: 'common', price: 500, desc: '用于发起斗法挑战', icon: '📜' });
+            // 战斗丹药
+            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
+                allItems.push({ type: 'pill', name, ...pill, price: pill.price || 1000 });
+            }
+
+            // 随机选8-12个
+            const count = 8 + Math.floor(Math.random() * 5);
+            const shuffled = allItems.sort(() => Math.random() - 0.5);
+            gameState.shopItems = shuffled.slice(0, Math.min(count, allItems.length));
+            gameState.lastShopDay = gameState.days;
+            saveGame();
+        }
+
+        // ===== renderShopItems =====
+        function renderShopItems() {
+            const grid = document.getElementById('shopGrid');
+            grid.innerHTML = gameState.shopItems.map((item, idx) => `
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-name" style="color:${getQualityColor(item.quality)}">${item.icon || '📦'} ${item.name}</div>
+                        <div class="shop-item-desc">${item.desc}</div>
+                    </div>
+                    <div class="shop-item-price">💎 ${item.price}</div>
+                    <button class="btn-buy" onclick="buyItem(${idx})" ${gameState.spiritStones < item.price ? 'disabled' : ''}>购买</button>
+                </div>
+            `).join('');
+        }
+
+        // ===== buyItem =====
+        function buyItem(idx) {
+            const item = gameState.shopItems[idx];
+            if (!item || gameState.spiritStones < item.price) {
+                alert('灵石不足！');
+                return;
+            }
+            
+            if (gameState.inventory.length >= gameState.maxInventorySlots) {
+                alert('背包已满！');
+                return;
+            }
+            
+            gameState.spiritStones -= item.price;
+            addToInventory(item.type, item.name, 1, item.quality, item.effect, item.desc, item.icon);
+            saveGame();
+            updateDisplay();
+            renderShopItems();
+            addLog('good', '购买物品', `购买了${item.name}`);
+        }
+
+        // ===== refreshShop =====
+        function refreshShop(isAuto = false) {
+            // 经济调整：商店刷新费用递增，防止玩家无限制刷新刷出稀有物品
+            if (!isAuto) {
+                const refreshCost = Math.floor(100 * (1 + (gameState.shopRefreshCount || 0) * 0.5));
+                if (gameState.spiritStones < refreshCost) {
+                    alert(`灵石不足！刷新商店需要 ${refreshCost} 灵石`);
+                    return;
+                }
+                gameState.spiritStones -= refreshCost;
+                gameState.shopRefreshCount++;
+                
+                gameState.days++;
+                saveGame();
+                updateDisplay();
+            }
+            generateShopItems();
+            renderShopItems();
+            if (!isAuto) {
+                addLog('neutral', '刷新商店', `商店已刷新，花费${refreshCost}灵石`);
+            }
+        }
+
+        // ===== openCrafting =====
+        function openCrafting(type) {
+            selectedCraftType = type;
+            selectedRecipeName = null;
+            document.getElementById('alchemyDetail').style.display = 'none';
+            document.getElementById('alchemyResult').style.display = 'none';
+            renderCraftingRecipes();
+            document.getElementById('alchemyModal').classList.add('active');
+        }
+
+        // ===== openAlchemy =====
+        function openAlchemy() {
+            openCrafting('alchemy');
+        }
+
+        // ===== openForge =====
+        function openForge() {
+            openCrafting('forge');
+        }
+
+        // ===== closeAlchemy =====
+        function closeAlchemy() {
+            document.getElementById('alchemyModal').classList.remove('active');
+        }
+
+        // ===== renderCraftingRecipes =====
+        function renderCraftingRecipes() {
+            const container = document.getElementById('alchemyRecipes');
+            const modalTitle = document.querySelector('#alchemyModal .modal-title');
+            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
+
+            modalTitle.textContent = selectedCraftType === 'alchemy' ? '⚗️ 炼丹系统' : '🔨 炼器系统';
+
+            // 渲染炉子选择和升级
+            let furnaceHtml = '<div style="margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">';
+            furnaceHtml += '<div style="color:#aaa;margin-bottom:8px;">当前炉/台:</div>';
+            furnaceHtml += '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
+
+            for (const [name, data] of Object.entries(furnace)) {
+                const isOwned = data.level <= currentLevel;
+                const isEquipped = data.level === currentLevel;
+                const canBuy = data.cost > 0 && !isOwned;
+                const canAfford = gameState.spiritStones >= data.cost;
+
+                if (isEquipped) {
+                    furnaceHtml += `<span style="padding:5px 12px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;border-radius:5px;color:#ffd700;">${name} ${data.level === 1 ? '(免费)' : data.level === 2 ? '+15%' : '+30%'}</span>`;
+                } else if (isOwned) {
+                    furnaceHtml += `<button onclick="selectFurnace('${name}')" style="padding:5px 12px;background:rgba(0,0,0,0.4);border:1px solid #aaa;border-radius:5px;color:#aaa;cursor:pointer;">${name}</button>`;
+                } else if (canBuy) {
+                    furnaceHtml += `<button onclick="upgradeFurnace('${name}')" ${!canAfford ? 'disabled title="灵石不足"' : ''} style="padding:5px 12px;background:rgba(76,175,80,0.2);border:1px solid #4caf50;border-radius:5px;color:#4caf50;cursor:${canAfford ? 'pointer' : 'not-allowed'};">升级 ${name}(${data.cost}灵石)</button>`;
+                }
+            }
+            furnaceHtml += '</div></div>';
+
+            // 渲染配方列表
+            let recipesHtml = '<div style="max-height:250px;overflow-y:auto;">';
+            for (const [name, recipe] of Object.entries(recipes)) {
+                const materialsStr = Object.entries(recipe.materials)
+                    .map(([m, q]) => `${m}×${q}`)
+                    .join(' + ');
+                const canCraft = checkMaterialsForRecipe(recipe);
+                const isSelected = selectedRecipeName === name;
+
+                recipesHtml += `
+                    <div class="alchemy-recipe ${isSelected ? 'selected' : ''}" onclick="selectCraftRecipe('${name}')">
+                        <div class="recipe-info">
+                            <div class="recipe-name" style="color:${getQualityColor(getRecipeQuality(name))}">${recipe.icon || '📦'} ${name}</div>
+                            <div class="recipe-materials">材料: ${materialsStr}</div>
+                            <div class="recipe-success">成功率: ${Math.round(recipe.successRate * 100)}% + 炉加成</div>
+                        </div>
+                        <button class="btn-craft">炼制</button>
+                    </div>
+                `;
+            }
+            recipesHtml += '</div>';
+
+            container.innerHTML = furnaceHtml + recipesHtml;
+        }
+
+        // ===== getRecipeQuality =====
+        function getRecipeQuality(name) {
+            const recipe = ALCHEMY_RECIPES[name] || FORGE_RECIPES[name];
+            if (!recipe) return 'common';
+            const rate = recipe.successRate;
+            if (rate >= 0.7) return 'common';
+            if (rate >= 0.5) return 'rare';
+            if (rate >= 0.35) return 'precious';
+            return 'legendary';
+        }
+
+        // ===== selectFurnace =====
+        function selectFurnace(name) {
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            if (furnace[name]) {
+                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = furnace[name].level;
+                saveGame();
+                renderCraftingRecipes();
+            }
+        }
+
+        // ===== upgradeFurnace =====
+        function upgradeFurnace(name) {
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const data = furnace[name];
+            if (data && gameState.spiritStones >= data.cost) {
+                gameState.spiritStones -= data.cost;
+                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = data.level;
+                addLog('good', '升级成功', `升级${selectedCraftType === 'alchemy' ? '炼丹炉' : '炼器台'}到${name}`);
+                saveGame();
+                updateDisplay();
+                renderCraftingRecipes();
+            }
+        }
+
+        // ===== selectCraftRecipe =====
+        function selectCraftRecipe(name) {
+            selectedRecipeName = name;
+            renderCraftingRecipes();
+
+            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
+            const recipe = recipes[name];
+            if (!recipe) return;
+
+            const materialsStr = Object.entries(recipe.materials)
+                .map(([m, q]) => `${m}×${q}`)
+                .join(' + ');
+
+            // 计算实际成功率
+            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
+            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
+            const furnaceData = Object.values(furnace).find(f => f.level === currentLevel);
+            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
+            const totalSuccessRate = Math.min(0.95, recipe.successRate + furnaceBonus);
+
+            // 检查材料
+            const canCraft = checkMaterialsForRecipe(recipe);
+
+            // 检查燃料费
+            const hasFuel = gameState.spiritStones >= recipe.fuelCost;
+
+            document.getElementById('alchemyDetail').style.display = 'block';
+            document.getElementById('alchemyDetailContent').innerHTML = `
+                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
+                    <span style="font-size:2em">${recipe.icon || '📦'}</span>
+                    <div>
+                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(getRecipeQuality(name))}">${name}</div>
+                        <div style="color:#aaa">${recipe.desc}</div>
+                    </div>
+                </div>
+                <div style="margin:10px 0;">材料: ${materialsStr}</div>
+                <div style="color:#aaa;">燃料费: ${recipe.fuelCost}灵石</div>
+                <div style="color:#4caf50;">基础成功率: ${Math.round(recipe.successRate * 100)}%</div>
+                <div style="color:#ffd700;">炉/台加成: +${Math.round(furnaceBonus * 100)}%</div>
+                <div style="color:#00ff88;">总计成功率: ${Math.round(totalSuccessRate * 100)}%</div>
+                <div style="margin-top:15px;">
+                    <button class="btn-craft" onclick="doCraft('${name}')" ${!canCraft || !hasFuel ? 'disabled' : ''}>
+                        ${!canCraft ? '材料不足' : !hasFuel ? '灵石不足(燃料)' : '开始炼制(消耗1天)'}
+                    </button>
+                </div>
+            `;
+        }
+
+        // ===== checkMaterialsForRecipe =====
+        function checkMaterialsForRecipe(recipe) {
+            for (const [mat, qty] of Object.entries(recipe.materials)) {
+                if (mat === '灵石') {
+                    if (gameState.spiritStones < qty) return false;
+                } else {
+                    const hasItem = gameState.inventory.some(item =>
+                        item.name === mat && item.quantity >= qty
+                    );
+                    if (!hasItem) return false;
+                }
+            }
+            return true;
+        }
+
+        // ===== getPillEffect =====
+        function getPillEffect(name) {
+            const effects = {
+                '回气丹': { type: 'qi', value: 0.2 },
+                '疗伤丹': { type: 'health', value: 0.3 },
+                '聚灵丹': { type: 'cultivate_speed', value: 0.2 },
+                '破境丹': { type: 'breakthrough_boost', value: 0.15 },
+                '渡劫丹': { type: '渡劫_success', value: 0.1 },
+                '洗髓丹': { type: 'spiritRoot_refresh', value: 1 },
+                '混沌丹': { type: '混沌灵根', value: 1 }
+            };
+            return effects[name] || {};
+        }
+
+        // ===== returnCraftMaterials =====
+        function returnCraftMaterials(materials, rate) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    gameState.spiritStones += Math.floor(qty * rate);
+                } else {
+                    const item = gameState.inventory.find(i => i.name === mat);
+                    if (item) {
+                        item.quantity += Math.floor(qty * rate);
+                    } else if (Math.floor(qty * rate) > 0) {
+                        const matData = MATERIALS[mat] || { icon: '📦', type: 'material' };
+                        gameState.inventory.push({
+                            id: Date.now() + Math.random(),
+                            type: 'material',
+                            name: mat,
+                            quantity: Math.floor(qty * rate),
+                            quality: 'common',
+                            effect: {},
+                            desc: `回收的${mat}`,
+                            icon: matData.icon
+                        });
+                    }
+                }
+            }
+        }
+
+        // ===== openMarket =====
+        function openMarket() {
+            renderMarketItems();
+            document.getElementById('alchemyModal').classList.add('active');
+            document.querySelector('#alchemyModal .modal-title').textContent = '🏪 交易市场';
+        }
+
+        // ===== renderMarketItems =====
+        function renderMarketItems() {
+            const container = document.getElementById('alchemyRecipes');
+            const logs = gameState.crafting.transactionLog || [];
+
+            let html = '<div style="margin-bottom:15px;">';
+            html += '<div style="color:#aaa;margin-bottom:10px;">上架你的物品出售(定价5%手续费)</div>';
+
+            // 玩家可上架的物品
+            const sellableItems = gameState.inventory.filter(item =>
+                item.type === 'pill' || item.type === 'treasure'
+            );
+
+            if (sellableItems.length > 0) {
+                html += '<div style="max-height:150px;overflow-y:auto;">';
+                for (const item of sellableItems) {
+                    const price = item.price || MATERIALS[item.name]?.basePrice || 100;
+                    html += `
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:5px;margin-bottom:5px;">
+                            <span>${item.icon} ${item.name} ×${item.quantity}</span>
+                            <button onclick="listItem('${item.name}', ${price})" style="padding:3px 10px;background:#4caf50;border:none;border-radius:5px;color:white;cursor:pointer;">上架</button>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="color:#888;text-align:center;padding:20px;">背包中没有可出售的物品</div>';
+            }
+            html += '</div>';
+
+            // 交易记录
+            html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:15px;">';
+            html += '<div style="color:#ffd700;margin-bottom:10px;">最近交易记录</div>';
+            if (logs.length > 0) {
+                html += '<div style="max-height:150px;overflow-y:auto;">';
+                for (const log of logs.slice(-10).reverse()) {
+                    html += `
+                        <div style="padding:5px;background:rgba(0,0,0,0.2);border-radius:3px;margin-bottom:3px;font-size:0.9em;">
+                            <span style="color:${log.type === 'sell' ? '#4caf50' : '#ff9800'}">[${log.type === 'sell' ? '售出' : '购买'}]</span>
+                            ${log.itemName} ×${log.quantity} @ ${log.price}灵石
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="color:#888;text-align:center;padding:10px;">暂无交易记录</div>';
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // ===== listItem =====
+        function listItem(name, basePrice) {
+            const price = prompt(`请输入${name}的售价:`, basePrice);
+            if (!price) return;
+            const finalPrice = parseInt(price);
+            if (isNaN(finalPrice) || finalPrice <= 0) {
+                alert('请输入有效的价格');
+                return;
+            }
+
+            // 扣除上架费(5%)
+            const fee = Math.floor(finalPrice * 0.05);
+            if (gameState.spiritStones < fee) {
+                alert(`上架费${fee}灵石，你的灵石不足`);
+                return;
+            }
+
+            gameState.spiritStones -= fee;
+
+            // 消耗物品
+            const item = gameState.inventory.find(i => i.name === name);
+            if (item) {
+                item.quantity -= 1;
+                if (item.quantity <= 0) {
+                    gameState.inventory = gameState.inventory.filter(i => i !== item);
+                }
+            }
+
+            // 记录上架
+            if (!gameState.crafting.listedItems) {
+                gameState.crafting.listedItems = [];
+            }
+            gameState.crafting.listedItems.push({
+                name,
+                price: finalPrice,
+                seller: '玩家',
+                day: gameState.days
+            });
+
+            addLog('neutral', '物品上架', `${name}已上架，售价${finalPrice}灵石(手续费${fee})`);
+            saveGame();
+            updateDisplay();
+            renderMarketItems();
+        }
+
+        // ===== buyFromMarket =====
+        function buyFromMarket(listingIndex) {
+            const listing = gameState.crafting.listedItems[listingIndex];
+            if (!listing) return;
+
+            if (gameState.spiritStones < listing.price) {
+                alert('灵石不足');
+                return;
+            }
+
+            gameState.spiritStones -= listing.price;
+            addToInventory('pill', listing.name, 1, 'common', {}, '购买的物品', '📦');
+
+            // 记录交易
+            gameState.crafting.transactionLog.push({
+                type: 'buy',
+                itemName: listing.name,
+                quantity: 1,
+                price: listing.price,
+                day: gameState.days
+            });
+
+            // 从上架列表移除
+            gameState.crafting.listedItems.splice(listingIndex, 1);
+
+            addLog('good', '购买成功', `购买了${listing.name}`);
+            saveGame();
+            updateDisplay();
+            renderMarketItems();
+        }
+
+        // ===== selectRecipe =====
+        function selectRecipe(name) {
+            selectCraftRecipe(name);
+        }
+
+        // ===== craftPill =====
+        function craftPill(name) {
+            doCraft(name);
+        }
+
+        // ===== checkMaterials =====
+        function checkMaterials(materials) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    if (gameState.spiritStones < qty) return false;
+                } else {
+                    if (!gameState.inventory.some(item => item.name === mat && item.quantity >= qty)) return false;
+                }
+            }
+            return true;
+        }
+
+        // ===== consumeMaterials =====
+        function consumeMaterials(materials) {
+            for (const [mat, qty] of Object.entries(materials)) {
+                if (mat === '灵石') {
+                    gameState.spiritStones -= qty;
+                } else {
+                    const item = gameState.inventory.find(i => i.name === mat);
+                    if (item) {
+                        item.quantity -= qty;
+                        if (item.quantity <= 0) {
+                            gameState.inventory = gameState.inventory.filter(i => i !== item);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ===== returnMaterials =====
+        function returnMaterials(materials, rate) {
+            returnCraftMaterials(materials, rate);
+        }
+
+
+
+// Auto-generated module: cultivation.js
+'use strict';
+
+        // ===== renderLog =====
+        function renderLog() {
+            const container = document.getElementById('logEntries');
+            const recentLogs = gameState.eventLog.slice(0, 5);
+            container.innerHTML = recentLogs.map(log => `
+                <div class="log-entry ${log.type}">
+                    <div class="log-entry-title">第${log.day}天 - ${log.title}</div>
+                    <div class="log-entry-text">${log.text}</div>
+                </div>
+            `).join('');
+        }
+
+        // ===== doCultivate =====
+        function doCultivate() {
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
+            // V7 应用灵根速度加成
+            baseGain *= getSpiritRootSpeedBonus();
+            // 应用体质修炼速度加成
+            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.cultivateSpeed) {
+                baseGain *= (1 + gameState.activeEffects.constitution_bonuses.cultivateSpeed);
+            }
+            // 应用装备和丹药效果
+            baseGain *= (1 + gameState.activeEffects.cultivate_speed);
+            baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
+            baseGain *= (1 + gameState.activeEffects.all_stats);
+            const gain = Math.floor(baseGain);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.cultivationProgress += gain;
+            
+            let logType = 'good';
+            let logText = `修炼${gain}点灵气，感觉体内的灵力更加充沛。`;
+            
+            // 检查是否需要晋级
+            if (gameState.cultivationProgress >= req.stageThreshold[gameState.stage] && gameState.stage < 2) {
+                gameState.stage++;
+                logText = `修炼${gain}点灵气，境界突破到${CONFIG.stages[gameState.stage]}！`;
+                addLog(logType, '境界突破', logText);
+            } else if (gameState.cultivationProgress >= req.stageThreshold[2]) {
+                logText = `修炼${gain}点灵气，${CONFIG.realms[gameState.realm]}期修炼圆满，可以尝试突破到下一个境界！`;
+                addLog('neutral', '境界圆满', logText);
+            } else {
+                addLog(logType, '修炼', logText);
+            }
+            
+            gameState.days++;
+            saveGame();
+            updateDisplay();
+            doMorningExercise();
+        }
+
+        // ===== doMorningExercise =====
+        function doMorningExercise() {
+            const gain = Math.floor(2 + Math.random() * 5);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.mindset = Math.min(100, gameState.mindset + 1);
+            updateDisplay();
+
+            // V6: 处理每日奇遇结算
+            processEndOfDaySerendipity();
+
+            // V6: 检查是否触发奇遇
+            const serendipityResult = checkSerendipity();
+            if (serendipityResult) {
+                showSerendipityModal(serendipityResult);
+            }
+        }
+
+        // ===== getLocalRandomEvent =====
+        function getLocalRandomEvent() {
+            const events = [
+                {
+                    title: '🌿 发现灵草',
+                    description: '在山林间发现一株散发幽香的灵草，似乎可以服用增强灵气。',
+                    options: [
+                        { text: '小心采摘', risk: 'low', effects: { qi: 15, mindset: 0, spiritStones: 0 } },
+                        { text: '直接服用', risk: 'medium', effects: { qi: 35, mindset: -5, spiritStones: 0 } },
+                        { text: '连根拔起研究', risk: 'high', effects: { qi: 60, mindset: -15, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '⚔️ 遇到妖兽',
+                    description: '一只妖兽从林中窜出，眼中闪烁着凶光，似乎把你当成了猎物。',
+                    options: [
+                        { text: '悄悄绕行', risk: 'low', effects: { qi: 0, mindset: 5, spiritStones: 0 } },
+                        { text: '与之搏斗', risk: 'medium', effects: { qi: -20, mindset: -10, spiritStones: 30 } },
+                        { text: '全力击杀', risk: 'high', effects: { qi: -40, mindset: -25, spiritStones: 80 } }
+                    ]
+                },
+                {
+                    title: '🏯 废弃洞府',
+                    description: '前方有一座废弃的修士洞府，门口的石碑上刻着模糊的文字。',
+                    options: [
+                        { text: '礼貌叩门', risk: 'low', effects: { qi: 10, mindset: 5, spiritStones: 0 } },
+                        { text: '尝试破阵', risk: 'medium', effects: { qi: 30, mindset: -10, spiritStones: 50 } },
+                        { text: '强行闯入', risk: 'high', effects: { qi: -30, mindset: -30, spiritStones: 150 } }
+                    ]
+                },
+                {
+                    title: '☁️ 灵气潮汐',
+                    description: '天地灵气突然变得躁动，形成一股灵气潮汐，正是修炼的好时机。',
+                    options: [
+                        { text: '静心吸收', risk: 'low', effects: { qi: 25, mindset: 10, spiritStones: 0 } },
+                        { text: '引导入体', risk: 'medium', effects: { qi: 50, mindset: 0, spiritStones: 0 } },
+                        { text: '强行吞噬', risk: 'high', effects: { qi: 100, mindset: -20, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '🧘 偶遇前辈',
+                    description: '一位神秘的前辈高人出现在你面前，似乎对你有所指点。',
+                    options: [
+                        { text: '恭敬请教', risk: 'low', effects: { qi: 20, mindset: 15, spiritStones: 0 } },
+                        { text: '交流心得', risk: 'medium', effects: { qi: 40, mindset: 5, spiritStones: 0 } },
+                        { text: '请求收徒', risk: 'high', effects: { qi: 80, mindset: -10, spiritStones: -50 } }
+                    ]
+                }
+            ];
+            return events[Math.floor(Math.random() * events.length)];
+        }
+
+        // ===== displayEventModal =====
+        function displayEventModal(event) {
+            document.getElementById('modalTitle').textContent = event.title;
+            document.getElementById('modalDescription').textContent = event.description;
+            
+            const optionsContainer = document.getElementById('modalOptions');
+            optionsContainer.innerHTML = event.options.map((opt, idx) => `
+                <button class="option-btn" onclick="handleOption(${idx}, ${JSON.stringify(event.options[idx]).replace(/"/g, '&quot;')})">
+                    ${opt.text}
+                    <span class="option-risk ${opt.risk}">${opt.risk === 'low' ? '低风险' : opt.risk === 'medium' ? '中风险' : '高风险'}</span>
+                </button>
+            `).join('');
+            
+            // 保存当前事件
+            window.currentEvent = event;
+        }
+
+        // ===== getTribulationKey =====
+        function getTribulationKey(realm, stage) {
+            if (realm === 3) {
+                if (stage === 0) return '金丹初期雷劫';
+                if (stage === 1) return '金丹中期阴火';
+                return '金丹后期风劫';
+            }
+            if (realm === 4) return '元婴心魔';
+            return '化神飞升';
+        }
+
+        // ===== localBreakthrough =====
+        function localBreakthrough(isTribulation = false) {
+            if (isTribulation) {
+                executeTribulation();
+                return;
+            }
+            
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            let chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
+            // 应用突破加成效果
+            chance *= (1 + gameState.activeEffects.breakthrough_boost);
+            chance *= (1 + gameState.activeEffects.all_stats);
+            
+            if (Math.random() < chance) {
+                if (gameState.realm >= 4) {
+                    // 飞升！
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                    saveGame();
+                    showGameOverScreen();
+                } else {
+                    // 突破成功
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                    // V7 检查体质激活
+                    initializeConstitutionEffects();
+                    saveGame();
+                    updateDisplay();
+                }
+            } else {
+                // 突破失败
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+                saveGame();
+                updateDisplay();
+            }
+        }
+
+        // ===== displayBreakthroughResult =====
+        function displayBreakthroughResult(result) {
+            document.getElementById('modalDescription').innerHTML = '';
+            const descDiv = document.createElement('div');
+            descDiv.className = 'modal-description';
+            descDiv.innerHTML = `<strong>${result.title}</strong><br><br>${result.description}`;
+            document.getElementById('modalDescription').appendChild(descDiv);
+            
+            if (result.success) {
+                if (gameState.realm >= 4) {
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                } else {
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                }
+            } else {
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+            }
+            
+            saveGame();
+            updateDisplay();
+            
+            document.getElementById('modalOptions').classList.add('hidden');
+        }
+
+        // ===== showTribulationUI =====
+        function showTribulationUI() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            const modal = document.getElementById('tribulationModal');
+            const scene = document.getElementById('tribulationScene');
+            const typeDiv = document.getElementById('tribType');
+            const rateSpan = document.getElementById('successRate');
+            const prepDiv = document.getElementById('tribulationPreparations');
+            const actionsDiv = document.getElementById('tribulationActions');
+            const prepList = document.getElementById('prepList');
+
+            // 设置场景样式
+            scene.className = 'tribulation-scene ' + trib.type;
+            scene.innerHTML = `<p style="color:#aaa;font-size:1.1em">${trib.desc}</p><p style="color:#ffd700;margin-top:10px">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>`;
+
+            // 天劫类型
+            typeDiv.innerHTML = `【${gameState.tribulation.tribKey}】`;
+
+            // 计算并显示成功率
+            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
+            rateSpan.textContent = Math.round(rate * 100) + '%';
+
+            // 准备加成列表
+            updatePrepList();
+
+            // 生成准备选项
+            prepDiv.innerHTML = '';
+            
+            // 阵法选项
+            const hasArray = gameState.tribulation.preparations.includes('阵法');
+            const arrayBtn = document.createElement('button');
+            arrayBtn.innerHTML = hasArray ? '✓ 阵法已布置' : '📿 布置阵法 (-2000灵石)';
+            arrayBtn.className = hasArray ? 'active' : '';
+            arrayBtn.disabled = hasArray || gameState.spiritStones < 2000;
+            arrayBtn.onclick = () => addPreparation('阵法');
+            prepDiv.appendChild(arrayBtn);
+
+            // 定神丹选项
+            const hasPill = gameState.tribulation.preparations.includes('定神丹');
+            const hasDingShen = gameState.inventory.some(item => item.name === '定神丹');
+            const pillBtn = document.createElement('button');
+            pillBtn.innerHTML = hasPill ? '✓ 已服用定神丹' : '💊 服用定神丹';
+            pillBtn.className = hasPill ? 'active' : '';
+            pillBtn.disabled = hasPill || !hasDingShen;
+            pillBtn.onclick = () => addPreparation('定神丹');
+            prepDiv.appendChild(pillBtn);
+
+            // 祈祷选项
+            const hasPray = gameState.tribulation.preparations.includes('祈祷');
+            const prayBtn = document.createElement('button');
+            prayBtn.innerHTML = hasPray ? '✓ 祈祷已完成' : '🙏 祈祷先祖 (-10000灵石)';
+            prayBtn.className = hasPray ? 'active' : '';
+            prayBtn.disabled = hasPray || gameState.spiritStones < 10000;
+            prayBtn.onclick = () => addPreparation('祈祷');
+            prepDiv.appendChild(prayBtn);
+
+            // 装备检查
+            const equipped = gameState.equippedTreasures.filter(t => t);
+            if (equipped.length > 0) {
+                const equipInfo = equipped.map(t => `${t.icon||'📦'}${t.name}`).join(', ');
+                const equipDiv = document.createElement('div');
+                equipDiv.style.cssText = 'font-size:0.85em;color:#aaa;margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;';
+                equipDiv.innerHTML = `当前装备：${equipInfo}`;
+                prepDiv.appendChild(equipDiv);
+            }
+
+            // 转世buff提示
+            if (gameState.hasTransmigrationBuff) {
+                const buffDiv = document.createElement('div');
+                buffDiv.className = 'buff-indicator';
+                buffDiv.style.cssText = 'margin-top:10px;display:inline-block;';
+                buffDiv.innerHTML = '✨ 转世重修加成：成功率+10%';
+                prepDiv.appendChild(buffDiv);
+            }
+
+            // 操作按钮
+            actionsDiv.innerHTML = '';
+            const startBtn = document.createElement('button');
+            startBtn.className = 'btn-tribulation start';
+            startBtn.textContent = '🔥 开始渡劫';
+            startBtn.onclick = () => startTribulation();
+            actionsDiv.appendChild(startBtn);
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn-tribulation cancel';
+            cancelBtn.textContent = '⏸ 暂缓突破';
+            cancelBtn.onclick = () => cancelTribulation();
+            actionsDiv.appendChild(cancelBtn);
+
+            modal.classList.add('active');
+        }
+
+        // ===== updatePrepList =====
+        function updatePrepList() {
+            const prepList = document.getElementById('prepList');
+            const preps = gameState.tribulation.preparations;
+            if (preps.length === 0) {
+                prepList.innerHTML = '';
+                return;
+            }
+            prepList.innerHTML = '准备加成：' + preps.map(p => {
+                let bonus = '';
+                if (p === '阵法') bonus = '(伤害-30%)';
+                if (p === '定神丹') bonus = '(心境消耗-50%)';
+                if (p === '祈祷') bonus = '(成功率+10%)';
+                return p + bonus;
+            }).join('、');
+        }
+
+        // ===== addPreparation =====
+        function addPreparation(type) {
+            if (gameState.tribulation.preparations.includes(type)) return;
+
+            if (type === '阵法') {
+                if (gameState.spiritStones < 2000) {
+                    alert('灵石不足！布置阵法需要2000灵石');
+                    return;
+                }
+                gameState.spiritStones -= 2000;
+            } else if (type === '定神丹') {
+                const idx = gameState.inventory.findIndex(item => item.name === '定神丹');
+                if (idx === -1) {
+                    alert('背包中没有定神丹！');
+                    return;
+                }
+                gameState.inventory.splice(idx, 1);
+            } else if (type === '祈祷') {
+                if (gameState.spiritStones < 10000) {
+                    alert('灵石不足！祈祷先祖需要10000灵石');
+                    return;
+                }
+                gameState.spiritStones -= 10000;
+            }
+
+            gameState.tribulation.preparations.push(type);
+            saveGame();
+            showTribulationUI();
+            updateDisplay();
+        }
+
+        // ===== calculateTribulationSuccess =====
+        function calculateTribulationSuccess(tribKey) {
+            const trib = TRIBULATIONS[tribKey];
+            let rate = trib.baseRate;
+
+            // 心境加成
+            rate += (gameState.mindset / 100) * 0.2;
+
+            // 转世重修buff
+            if (gameState.hasTransmigrationBuff) {
+                rate += 0.1;
+            }
+
+            // 装备加成
+            const equipped = gameState.equippedTreasures.filter(t => t);
+            equipped.forEach(t => {
+                if (t.effects) {
+                    t.effects.forEach(e => {
+                        if (e.type === '渡劫_damage_reduce') rate += e.value * 0.1;
+                        if (e.type === 'all_stats') rate += e.value * 0.5;
+                    });
+                }
+            });
+
+            // 准备加成
+            if (gameState.tribulation.preparations.includes('阵法')) rate += 0.15;
+            if (gameState.tribulation.preparations.includes('定神丹')) rate += 0.1;
+            if (gameState.tribulation.preparations.includes('祈祷')) rate += 0.1;
+
+            // 境界惩罚
+            if (gameState.realm === 4) rate -= 0.1;
+            if (gameState.realm === 5) rate -= 0.2;
+
+            return Math.min(0.95, Math.max(0.05, rate));
+        }
+
+        // ===== generateTribulationScene =====
+        function generateTribulationScene(realm, callback) {
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
+            
+当前玩家信息：
+- 境界：${REALMS[realm] || '未知'}
+- 灵石：${gameState.stones}
+- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
+
+要求：
+1. 生成一段50-100字的渡劫场景描述
+2. 包含天象异变（雷电/乌云/异火等）
+3. 包含内心心境描写
+4. 描述要独特，每次生成都不同
+5. 用中文输出，不要加引号
+
+直接输出场景描述文字，不要前缀。`;
+
+            callMiniMaxAPI(prompt, model, 200, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim());
+                } else {
+                    callback(getDefaultTribulationScene(realm));
+                }
+            }, (err) => {
+                callback(getDefaultTribulationScene(realm));
+            });
+        }
+
+        // ===== getDefaultTribulationScene =====
+        function getDefaultTribulationScene(realm) {
+            const scenes = [
+                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
+                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
+                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
+            ];
+            return scenes[realm % scenes.length];
+        }
+
+        // ===== executeTribulation =====
+        function executeTribulation() {
+            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
+            const roll = Math.random();
+
+            if (roll < rate) {
+                // 成功
+                if (roll < rate * 0.5) {
+                    // 大成功
+                    handleGreatSuccess();
+                } else {
+                    // 普通成功
+                    handleSuccess();
+                }
+            } else {
+                // 失败
+                if (roll < 0.3) {
+                    // 陨落
+                    handleDeath();
+                } else {
+                    // 重伤
+                    handleInjury();
+                }
+            }
+        }
+
+        // ===== handleGreatSuccess =====
+        function handleGreatSuccess() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 突破成功
+            gameState.realm++;
+            gameState.stage = 0;
+            gameState.cultivationProgress = 0;
+            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+            gameState.qi = Math.floor(gameState.qi * 0.5); // 大成功保留50%
+            gameState.mindset = Math.min(100, gameState.mindset + 20); // 心境提升
+            gameState.hasTransmigrationBuff = false; // 清除转世buff
+
+            // 天劫洗礼加成
+            gameState.activeEffects.attack += 0.1;
+            gameState.activeEffects.defense += 0.1;
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '大成功',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result great-success">
+                    <h3>✨ 大成功 ✨</h3>
+                    <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
+                    <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
+                    <p style="color:#ff69b4;margin-top:5px">心境+20</p>
+                </div>
+            `;
+
+            addLog('good', '渡劫大成功', `历经天劫洗礼，突破到${CONFIG.realms[gameState.realm]}期！获得天劫洗礼加成！`);
+            saveGame();
+            updateDisplay();
+
+            // 3秒后关闭
+            setTimeout(() => {
+                closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
+            }, 3000);
+        }
+
+        // ===== handleSuccess =====
+        function handleSuccess() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            const wasTranscending = gameState.realm >= 4; // V11: 记录是否在渡劫期
+
+            // 突破成功
+            gameState.realm++;
+            gameState.stage = 0;
+            gameState.cultivationProgress = 0;
+            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+            gameState.qi = Math.floor(gameState.qi * 0.3);
+            gameState.mindset = Math.max(0, gameState.mindset - 5);
+            gameState.hasTransmigrationBuff = false;
+
+            // 天劫洗礼加成（较小）
+            gameState.activeEffects.attack += 0.05;
+            gameState.activeEffects.defense += 0.05;
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '成功',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result success">
+                    <h3>🎉 渡劫成功 🎉</h3>
+                    <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
+                    <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
+                    ${wasTranscending ? '<p style="color:#e91e63;margin-top:15px;font-size:16px;">✨ 可以准备飞升了！ ✨</p>' : ''}
+                </div>
+            `;
+
+            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
+            saveGame();
+            updateDisplay();
+
+            setTimeout(() => {
+                closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
+            }, 3000);
+        }
+
+        // ===== handleInjury =====
+        function handleInjury() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 渡劫失败但保命
+            gameState.qi = Math.floor(gameState.qi * 0.1);
+            gameState.mindset = Math.max(0, gameState.mindset - 30);
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '重伤',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result injury">
+                    <h3>💔 重伤💔</h3>
+                    <p style="color:#aaa">天劫反噬，你身受重伤...</p>
+                    <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
+                    <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
+                </div>
+            `;
+
+            addLog('bad', '渡劫重伤', `渡过${trib.desc}失败，身受重伤...`);
+            saveGame();
+            updateDisplay();
+
+            setTimeout(() => {
+                closeTribulationModal();
+            }, 3000);
+        }
+
+        // ===== handleDeath =====
+        function handleDeath() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 保留10%资源
+            const keepStones = Math.floor(gameState.spiritStones * 0.1);
+            const keepPills = gameState.inventory.filter(item =>
+                item.name === '聚灵丹'
+            ).slice(0, 2);
+
+            // 重置状态
+            gameState.realm = 1;
+            gameState.stage = 0;
+            gameState.qi = 50;
+            gameState.maxQi = 100;
+            gameState.spiritStones = keepStones;
+            gameState.inventory = keepPills;
+            gameState.mindset = 50;
+            gameState.days = 1;
+            gameState.cultivationProgress = 0;
+            gameState.hasTransmigrationBuff = true; // 转世buff
+            gameState.tribulation.inProgress = false;
+
+            // 清空装备效果
+            recalculateAllEffects();
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '陨落',
+                day: gameState.days
+            });
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result death">
+                    <h3>💀 陨落 💀</h3>
+                    <p style="color:#f44336">天劫无情，你陨落了...</p>
+                    <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
+                    <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
+                    <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
+                </div>
+            `;
+
+            addLog('bad', '渡劫陨落', `渡劫失败，陨落了...但转世重修，获得转世buff！`);
+
+            setTimeout(() => {
+                closeTribulationModal();
+                saveGame();
+                showGameUI();
+                updateDisplay();
+            }, 3000);
+        }
+
+        // ===== closeTribulationModal =====
+        function closeTribulationModal() {
+            document.getElementById('tribulationModal').classList.remove('active');
+            gameState.tribulation.inProgress = false;
+        }
+
+        // ===== cancelTribulation =====
+        function cancelTribulation() {
+            gameState.tribulation.inProgress = false;
+            gameState.tribulation.preparations = [];
+            closeTribulationModal();
+            addLog('neutral', '暂缓突破', '你决定暂缓突破，继续积累实力...');
+            saveGame();
+        }
+
+        // ===== getPlayerTechnique =====
+        function getPlayerTechnique() {
+            if (gameState.realm <= 1) return '体术';
+            if (gameState.realm === 2) return ['雷法', '火法', '水法'][Math.floor(Math.random() * 3)];
+            return TECHNIQUES[Math.floor(Math.random() * 4)];
+        }
+
+
+
+// Auto-generated module: data.js
+'use strict';
+
+        let selectedEnhanceItem = null; // 背包中选中的待强化灵宝
         let selectedEnhanceSlot = null; // 装备栏中选中的槽位（0/1/2）
         const ULTIMATE_SKILLS = {
             '凡铁剑': [
@@ -1763,6 +4982,8 @@ let selectedEnhanceItem = null; // 背包中选中的待强化灵宝
             if (gameState.sect && gameState.sect.name) {
                 processDailySectMissions();
             }
+            // V37 天道法则领悟进度处理
+            processLawComprehension();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
@@ -3400,1603 +6621,2919 @@ async function generateBreakthroughResult() {
             triggerSpiritRootAwakening();
         }
 
-// ===== js/combat.js =====
 
-// ===== calculateSetBonuses =====
-        function calculateSetBonuses() {
-            const equipped = [];
-            if (combatState.player.weaponData) equipped.push(combatState.player.weaponData.name);
-            if (combatState.player.armorData) equipped.push(combatState.player.armorData.name);
-            if (combatState.player.accessories) {
-                combatState.player.accessories.forEach(a => { if (a) equipped.push(a.name); });
-            }
-            const bonuses = {};
-            const skills = [];
-            for (const setName in SET_BONUSES) {
-                const set = SET_BONUSES[setName];
-                const matched = set.pieces.filter(p => equipped.includes(p));
-                if (matched.length >= 2) {
-                    bonuses[setName] = matched.length; // 2 or 3
-                    if (matched.length === set.count && set.skill) skills.push(set.skill);
-                }
-            }
-            combatState.player.setBonuses = bonuses;
-            combatState.player.skills = skills;
-            return bonuses;
-        }
 
-        // ===== recalculatePlayerStats =====
-        function recalculatePlayerStats() {
-            let attackBonus = 1.0, critBonus = 0, defenseBonus = 1.0, qiRegenBonus = 0;
-            for (const setName in combatState.player.setBonuses) {
-                const set = SET_BONUSES[setName];
-                const count = combatState.player.setBonuses[setName];
-                if (set.stats.attackPercent) attackBonus += set.stats.attackPercent * (count === 3 ? 1 : 0.5);
-                if (set.stats.critPercent) critBonus += set.stats.critPercent * (count === 3 ? 1 : 0.5);
-                if (set.stats.defensePercent) defenseBonus += set.stats.defensePercent * (count === 3 ? 1 : 0.5);
-                if (set.stats.qiRegenPercent) qiRegenBonus += set.stats.qiRegenPercent * (count === 3 ? 1 : 0.5);
-            }
-            combatState.player.attackPercent = attackBonus;
-            combatState.player.critBonus = critBonus;
-            combatState.player.defensePercent = defenseBonus;
-            combatState.player.qiRegenBonus = qiRegenBonus;
-        }
-
-        // ===== getCurrentUltimateSkills =====
-        function getCurrentUltimateSkills() {
-            const weaponData = combatState.player.weaponData || { name:'空手' };
-            return ULTIMATE_SKILLS[weaponData.name] || ULTIMATE_SKILLS['空手'] || [];
-        }
-
-        // ===== getEnergyBar =====
-        function getEnergyBar() {
-            const skills = getCurrentUltimateSkills();
-            // 找到最低cost的技能作为能量条参考
-            const minCost = skills.length > 0 ? Math.min(...skills.map(s => s.cost)) : 50;
-            const pct = Math.min(100, (combatEnergy / minCost) * 100);
-            const ready = combatEnergy >= minCost;
-            return {
-                current: combatEnergy,
-                cost: minCost,
-                pct,
-                ready,
-                skills
-            };
-        }
-
-        // ===== executeUltimateSkill =====
-        function executeUltimateSkill(skill) {
-            const weaponData = combatState.player.weaponData || { name:'空手', star:1 };
-            const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
-            const starMultiplier = ENHANCE_CONFIG && ENHANCE_CONFIG.starMultipliers ? (ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1.0) : 1.0;
-
-            if (combatEnergy < skill.cost) return;
-
-            combatEnergy -= skill.cost;
-            combatState.round++;
-
-            // 计算基础伤害
-            const baseAttack = typeof calculatePlayerAttack === 'function' ? calculatePlayerAttack() : combatState.player.attack;
-            const levelMultiplier = 1 + (level - 1) * 0.2;
-            let damage = Math.floor(baseAttack * skill.damage * levelMultiplier * starMultiplier);
-
-            // 功法克制
-            if (TECHNIQUE_BONUS[combatState.player.technique].beats === combatState.opponent.technique) {
-                damage = Math.floor(damage * 1.5);
-            }
-
-            const isCrit = Math.random() < combatState.player.critRate;
-            if (isCrit) damage = Math.floor(damage * 1.5);
-
-            let finalDamage = damage;
-            if (!combatState.effects.player.ignoreDefense) {
-                finalDamage = Math.max(1, damage - Math.floor(combatState.opponent.defense * 0.3));
-            }
-            combatState.opponent.hp = Math.max(0, combatState.opponent.hp - finalDamage);
-            let logText = `⚡ ${weaponData.name} 发动 ${skill.name} Lv.${level}！造成 ${finalDamage} 伤害！${isCrit ? '（暴击）' : ''}`;
-
-            // 应用效果
-            if (skill.effects) {
-                if (skill.effects.burn) {
-                    const chance = skill.effects.burn * levelMultiplier;
-                    if (Math.random() < chance) {
-                        combatState.opponent.burning = skill.effects.burnTurns || 3;
-                        logText += ` 🔥敌人被灼烧 ${combatState.opponent.burning} 回合！`;
-                    }
-                }
-                if (skill.effects.freeze) {
-                    const chance = skill.effects.freeze * levelMultiplier;
-                    if (Math.random() < chance) {
-                        combatState.opponent.frozen = skill.effects.freezeTurns || 2;
-                        logText += ` ❄️敌人被冻结 ${combatState.opponent.frozen} 回合！`;
-                    }
-                }
-                if (skill.effects.stun) {
-                    if (Math.random() < skill.effects.stun * levelMultiplier) {
-                        combatState.opponent.stunned = 1;
-                        logText += ` 💫敌人被眩晕 1 回合！`;
-                    }
-                }
-                if (skill.effects.defBoost) {
-                    combatState.effects.player.defenseBoost = (combatState.effects.player.defenseBoost || 0) + skill.effects.defBoost * levelMultiplier;
-                    logText += ` 🛡️防御提升 ${Math.round(skill.effects.defBoost * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.critBonus) {
-                    combatState.effects.player.critBoostNext = (combatState.effects.player.critBoostNext || 0) + skill.effects.critBonus * levelMultiplier;
-                    logText += ` 💥暴击率提升 ${Math.round(skill.effects.critBonus * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.drain) {
-                    const drainAmount = Math.floor(finalDamage * skill.effects.drain * levelMultiplier);
-                    combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + drainAmount);
-                    logText += ` 💉吸取 ${drainAmount} HP！`;
-                }
-                if (skill.effects.trueDamage) {
-                    const trueDmg = Math.floor(finalDamage * skill.effects.trueDamage * levelMultiplier);
-                    combatState.opponent.hp = Math.max(0, combatState.opponent.hp - trueDmg);
-                    logText += ` ✨真实伤害 +${trueDmg}！`;
-                }
-                if (skill.effects.healRate) {
-                    const healPerTurn = Math.floor(combatState.player.maxHp * skill.effects.healRate * levelMultiplier);
-                    combatState.effects.player.healRate = (combatState.effects.player.healRate || 0) + healPerTurn;
-                    logText += ` 💚每回合恢复 ${healPerTurn} HP！`;
-                }
-                if (skill.effects.dmgReduce) {
-                    combatState.effects.player.damageReduction = (combatState.effects.player.damageReduction || 0) + skill.effects.dmgReduce * levelMultiplier;
-                    logText += ` 🛡️伤害减免 ${Math.round(skill.effects.dmgReduce * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.counterRate) {
-                    combatState.effects.player.counterRate = (combatState.effects.player.counterRate || 0) + skill.effects.counterRate * levelMultiplier;
-                    logText += ` ⚡反击率提升 ${Math.round(skill.effects.counterRate * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.speedReduce) {
-                    combatState.opponent.speedReduce = (combatState.opponent.speedReduce || 0) + skill.effects.speedReduce * levelMultiplier;
-                    logText += ` 🌪️敌人速度降低！`;
-                }
-                if (skill.effects.armorBreak) {
-                    combatState.opponent.armorBroken = true;
-                    logText += ` 💥敌人护甲破碎！`;
-                }
-                if (skill.effects.chain) {
-                    if (combatState.opponent.hp > 0) {
-                        const chainDmg = Math.floor(finalDamage * skill.effects.chain);
-                        combatState.opponent.hp = Math.max(0, combatState.opponent.hp - chainDmg);
-                        logText += ` ⛓️雷链传导，额外 ${chainDmg} 伤害！`;
-                    }
-                }
-                if (skill.effects.fireResist) {
-                    combatState.effects.player.fireResist = (combatState.effects.player.fireResist || 0) + skill.effects.fireResist;
-                    logText += ` 🔥火抗提升！`;
-                }
-                if (skill.effects.fireDrain) {
-                    combatState.effects.player.fireDrain = (combatState.effects.player.fireDrain || 0) + skill.effects.fireDrain;
-                    logText += ` 🔥火焰吸收！`;
-                }
-                if (skill.effects.reflect) {
-                    combatState.effects.player.reflect = (combatState.effects.player.reflect || 0) + skill.effects.reflect;
-                    logText += ` 🔄伤害反射！`;
-                }
-                if (skill.effects.maxHpBoost) {
-                    combatState.player.maxHP += Math.floor(combatState.player.maxHP * skill.effects.maxHpBoost);
-                    combatState.player.hp = Math.min(combatState.player.hp, combatState.player.maxHP);
-                    logText += ` ❤️最大HP提升！`;
-                }
-                if (skill.effects.cleanse) {
-                    combatState.effects.player.cleanseStacks = (combatState.effects.player.cleanseStacks || 0) + skill.effects.cleanse;
-                    logText += ` ✨净化负面状态！`;
-                }
-                if (skill.effects.invincible) {
-                    combatState.effects.player.invincible = skill.effects.invincible;
-                    logText += ` 👼无敌状态！`;
-                }
-                if (skill.effects.thunder) {
-                    combatState.effects.player.thunderBonus = (combatState.effects.player.thunderBonus || 0) + skill.effects.thunder * levelMultiplier;
-                    logText += ` ⚡雷法伤害+${Math.round(skill.effects.thunder * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.doubleHit) {
-                    combatState.effects.player.doubleHit = (combatState.effects.player.doubleHit || 0) + skill.effects.doubleHit * levelMultiplier;
-                    logText += ` ⚔️连击+${Math.round(skill.effects.doubleHit * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.pierce) {
-                    combatState.effects.player.pierce = (combatState.effects.player.pierce || 0) + skill.effects.pierce * levelMultiplier;
-                    logText += ` 🗡️穿刺+${Math.round(skill.effects.pierce * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.cleave) {
-                    combatState.effects.player.cleave = (combatState.effects.player.cleave || 0) + skill.effects.cleave * levelMultiplier;
-                    logText += ` 🌀顺劈+${Math.round(skill.effects.cleave * levelMultiplier * 100)}%！`;
-                }
-                if (skill.effects.freezeAura) {
-                    combatState.effects.player.freezeAura = (combatState.effects.player.freezeAura || 0) + skill.effects.freezeAura * levelMultiplier;
-                    logText += ` ❄️冰霜光环！`;
-                }
-                if (skill.effects.burnAura) {
-                    combatState.effects.player.burnAura = (combatState.effects.player.burnAura || 0) + skill.effects.burnAura * levelMultiplier;
-                    logText += ` 🔥灼烧光环！`;
-                }
-                if (skill.effects.curse) {
-                    combatState.effects.opponent.curse = (combatState.effects.opponent.curse || 0) + skill.effects.curse * levelMultiplier;
-                    logText += ` 💀诅咒！`;
-                }
-            }
-
-            combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
-            combatState.turn = 'opponent';
-            renderCombatArena();
-
-            if (combatState.opponent.hp <= 0) {
-                setTimeout(() => endCombat('win'), 500);
-            } else {
-                setTimeout(() => executeOpponentTurn(), 1000);
-            }
-        }
-
-        // ===== generateOpponent =====
-        function generateOpponent(difficulty) {
-            const playerRealm = gameState.realm;
-            let targetRealm = playerRealm;
-            if (difficulty === 'easy') targetRealm = Math.max(0, playerRealm - 1);
-            else if (difficulty === 'normal') targetRealm = playerRealm;
-            else if (difficulty === 'hard') targetRealm = Math.min(4, playerRealm + 1);
-
-            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
-            const stages = ['初期', '中期', '后期'];
-            const stage = Math.floor(Math.random() * 3);
-
-            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
-            const baseHp = hpByRealm[targetRealm] || 1000;
-            const baseAttack = 80 + targetRealm * 40;
-            const baseDefense = 40 + targetRealm * 20;
-            const baseSpeed = 80 + targetRealm * 15;
-
-            const technique = TECHNIQUES[Math.floor(Math.random() * 4)];
-            const treasures = Object.keys(COMBAT_TREASURES);
-            const weapon = treasures.filter(t => COMBAT_TREASURES[t].type === 'weapon');
-            const armor = treasures.filter(t => COMBAT_TREASURES[t].type === 'armor');
-
-            const opponentFixed = FIXED_OPPONENTS[Math.floor(Math.random() * FIXED_OPPONENTS.length)];
-            const name = difficulty === 'normal' ? opponentFixed.name : `${opponentFixed.name}（${['初级', '中级', '高级'][difficulty === 'easy' ? 0 : difficulty === 'normal' ? 1 : 2]}）`;
-
-            return {
-                name: name,
-                avatar: opponentFixed.avatar,
-                realm: targetRealm,
-                realmName: realmNames[targetRealm] + '期' + stages[stage],
-                maxHP: baseHp,
-                hp: baseHp,
-                attack: baseAttack,
-                defense: baseDefense,
-                speed: baseSpeed,
-                technique: technique,
-                techniqueColor: TECHNIQUE_COLORS[technique],
-                weapon: weapon[Math.floor(Math.random() * weapon.length)],
-                armor: armor[Math.floor(Math.random() * armor.length)],
-                critRate: 0.1 + targetRealm * 0.03
-            };
-        }
-
-        // ===== openCombat =====
-        function openCombat() {
-            renderCombatHome();
-            document.getElementById('combatModal').classList.add('active');
-        }
-
-        // ===== closeCombat =====
-        function closeCombat() {
-            document.getElementById('combatModal').classList.remove('active');
-            combatState.inProgress = false;
-        }
-
-        // ===== renderCombatHome =====
-        function renderCombatHome() {
-            const wins = gameState.combat?.wins || 0;
-            const losses = gameState.combat?.losses || 0;
-            const honor = gameState.combat?.honor || 0;
-            const fame = gameState.combat?.fame || 0;
-            const total = wins + losses;
-
-            let html = `
-                <div class="honor-display">
-                    <div class="honor-stats">
-                        <div class="honor-stat">
-                            <div class="honor-stat-value">${honor}</div>
-                            <div class="honor-stat-label">荣誉点</div>
-                        </div>
-                        <div class="honor-stat">
-                            <div class="honor-stat-value">${fame}</div>
-                            <div class="honor-stat-label">声望</div>
-                        </div>
-                        <div class="honor-stat">
-                            <div class="honor-stat-value">${wins}</div>
-                            <div class="honor-stat-label">胜</div>
-                        </div>
-                        <div class="honor-stat">
-                            <div class="honor-stat-value">${losses}</div>
-                            <div class="honor-stat-label">负</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="challenge-cost">
-                    挑战消耗：<span>挑战状 ×1</span> | 当前拥有：<span>${getItemCount('挑战状')}张</span>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">
-                    <button class="combat-action-btn" onclick="startCombatChallenge('easy')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
-                        <div style="font-size:1.2em">🟢 初级挑战</div>
-                        <div style="font-size:0.8em;color:#aaa">境界低于你</div>
-                    </button>
-                    <button class="combat-action-btn" onclick="startCombatChallenge('normal')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
-                        <div style="font-size:1.2em">🟡 中级挑战</div>
-                        <div style="font-size:0.8em;color:#aaa">境界相当</div>
-                    </button>
-                    <button class="combat-action-btn" onclick="startCombatChallenge('hard')" ${getItemCount('挑战状') < 1 ? 'disabled' : ''}>
-                        <div style="font-size:1.2em">🔴 高级挑战</div>
-                        <div style="font-size:0.8em;color:#aaa">境界高于你</div>
-                    </button>
-                </div>
-                <h3 style="color:#ffd700;margin:15px 0 10px;">历史战绩</h3>
-                <div class="battle-history" id="battleHistory">
-            `;
-
-            const history = gameState.combat?.battleHistory || [];
-            if (history.length === 0) {
-                html += '<p style="text-align:center;color:#888;padding:20px;">暂无战绩记录</p>';
-            } else {
-                history.slice(0, 10).forEach(record => {
-                    const resultClass = record.result === 'win' ? 'win' : 'lose';
-                    const resultText = record.result === 'win' ? '胜' : '负';
-                    html += `
-                        <div class="battle-record ${resultClass}">
-                            <div class="battle-record-info">
-                                <span class="battle-record-result ${resultClass}">${resultText}</span>
-                                <span class="battle-record-opponent">vs ${record.opponent}</span>
-                            </div>
-                            <span class="battle-record-reward">${record.result === 'win' ? '+' + record.reward : '-' + record.penalty}灵石</span>
-                        </div>
-                    `;
-                });
-            }
-            html += '</div><button class="close-btn" onclick="closeCombat()">关闭</button>';
-            document.getElementById('combatContent').innerHTML = html;
-        }
-
-        // ===== getItemCount =====
-        function getItemCount(name) {
-            const item = gameState.inventory.find(i => i.name === name);
-            return item ? item.quantity : 0;
-        }
-
-        // ===== startCombatChallenge =====
-        function startCombatChallenge(difficulty) {
-            if (getItemCount('挑战状') < 1) {
-                alert('挑战状不足！请在商店购买。');
-                return;
-            }
-
-            // 消耗挑战状
-            const idx = gameState.inventory.findIndex(i => i.name === '挑战状');
-            if (idx !== -1) {
-                gameState.inventory[idx].quantity--;
-                if (gameState.inventory[idx].quantity <= 0) {
-                    gameState.inventory.splice(idx, 1);
-                }
-            }
-
-            const opponent = generateOpponent(difficulty);
-            initCombat(opponent);
-            renderCombatArena();
-        }
-
-        // ===== initCombat =====
-        function initCombat(opponent) {
-            const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神'];
-            const hpByRealm = { 0: 500, 1: 800, 2: 1000, 3: 2000, 4: 5000 };
-
-            const playerWeapon = gameState.equippedTreasures[0];
-            const playerArmor = gameState.equippedTreasures[1];
-
-            let playerMaxHP = hpByRealm[gameState.realm] || 1000;
-            let playerAttack = 80 + gameState.realm * 40;
-            let playerDefense = 40 + gameState.realm * 20;
-            let playerSpeed = 80 + gameState.realm * 15;
-            let playerCritRate = 0.1 + gameState.realm * 0.03;
-            let playerTechnique = getPlayerTechnique();
-
-            // 应用装备星级加成
-            if (playerWeapon && COMBAT_TREASURES[playerWeapon.name]) {
-                const weaponData = COMBAT_TREASURES[playerWeapon.name];
-                const star = playerWeapon.star || 1;
-                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
-                const baseVal = weaponData.effect.attackBonus || 0;
-                playerAttack = Math.floor(playerAttack * (1 + baseVal * mult));
-                if (weaponData.effect.critBonus) {
-                    playerCritRate += weaponData.effect.critBonus * mult;
-                }
-            }
-            if (playerArmor && COMBAT_TREASURES[playerArmor.name]) {
-                const armorData = COMBAT_TREASURES[playerArmor.name];
-                const star = playerArmor.star || 1;
-                const mult = ENHANCE_CONFIG.starMultipliers[star] || 1.0;
-                const baseDef = armorData.effect.defenseBonus || 0;
-                const baseHP = armorData.effect.hpBonus || 0;
-                if (baseDef > 0) playerDefense = Math.floor(playerDefense * (1 + baseDef * mult));
-                if (baseHP > 0) playerMaxHP = Math.floor(playerMaxHP * (1 + baseHP * mult));
-            }
-            
-            // V7 应用体质战斗效果
-            if (gameState.activeEffects.constitution_bonuses) {
-                const cb = gameState.activeEffects.constitution_bonuses;
-                if (cb.attack) playerAttack = Math.floor(playerAttack * (1 + cb.attack));
-                if (cb.defense) playerDefense = Math.floor(playerDefense * (1 + cb.defense));
-                if (cb.hpBonus) playerMaxHP = Math.floor(playerMaxHP * (1 + cb.hpBonus));
-                if (cb.crit) playerCritRate += cb.crit;
-                if (cb.dodge) playerSpeed += Math.floor(playerSpeed * cb.dodge);
-            }
-            // 应用all_stats加成
-            if (gameState.activeEffects.all_stats) {
-                playerAttack = Math.floor(playerAttack * (1 + gameState.activeEffects.all_stats));
-                playerDefense = Math.floor(playerDefense * (1 + gameState.activeEffects.all_stats));
-                playerMaxHP = Math.floor(playerMaxHP * (1 + gameState.activeEffects.all_stats));
-            }
-
-            combatEnergy = 0; // 重置必杀技能量
-
-            combatState = {
-                inProgress: true,
-                round: 0,
-                turn: playerSpeed >= opponent.speed ? 'player' : 'opponent',
-                player: {
-                    name: '你',
-                    avatar: '🧑‍🎓',
-                    realm: gameState.realm,
-                    realmName: realmNames[gameState.realm] + '期',
-                    maxHP: playerMaxHP,
-                    hp: playerMaxHP,
-                    attack: playerAttack,
-                    defense: playerDefense,
-                    speed: playerSpeed,
-                    technique: playerTechnique,
-                    techniqueColor: TECHNIQUE_COLORS[playerTechnique],
-                    weapon: playerWeapon ? playerWeapon.name : null,
-                    weaponData: playerWeapon, // 完整对象含星级
-                    armor: playerArmor ? playerArmor.name : null,
-                    armorData: playerArmor,
-                    critRate: playerCritRate,
-                    setBonuses: {},
-                    skills: [],
-                    accessories: [],
-                    counterEnergy: 0,
-                    inDefenseStance: false,
-                    skillLevels: {}
-                },
-                opponent: opponent,
-                log: [],
-                effects: {
-                    player: { defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0 },
-                    opponent: { defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
-                }
-            };
-
-            // A4 套装共鸣加成
-            calculateSetBonuses();
-            recalculatePlayerStats();
-
-            combatState.log.push({
-                type: 'system',
-                text: `战斗开始！${opponent.name}（${opponent.realmName}，功法：${opponent.technique}）`,
-                round: 0
-            });
-
-            if (combatState.turn === 'opponent') {
-                setTimeout(() => executeOpponentTurn(), 1000);
-            }
-        }
-
-        // ===== renderUltimateEnergyBar =====
-        function renderUltimateEnergyBar() {
-            const info = getEnergyBar();
-            const readyClass = info.ready ? 'energy-ready' : '';
-            const skillName = info.skills.length > 0 ? info.skills[0].name.substring(0,3) : '绝技';
-            return `
-                <div class="ultimate-energy-bar" style="margin-top:5px;">
-                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-                        <span style="font-size:0.75em;color:#ffd700;">⚡ ${skillName}</span>
-                        <span style="font-size:0.7em;color:#aaa;margin-left:auto;">${info.current}/${info.cost}</span>
-                    </div>
-                    <div style="background:rgba(0,0,0,0.4);border-radius:4px;height:8px;overflow:hidden;">
-                        <div class="energy-fill ${readyClass}" style="width:${info.pct}%;background:${info.ready ? '#ffd700' : '#555'};height:100%;border-radius:4px;transition:width 0.3s;"></div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // ===== renderCounterEnergyBar =====
-        function renderCounterEnergyBar() {
-            const energy = combatState.player.counterEnergy || 0;
-            const max = 100;
-            const pct = (energy / max) * 100;
-            const ready = energy >= 50;
-            const color = ready ? '#ffeb3b' : '#888888';
-            const glow = ready ? 'box-shadow: 0 0 8px #ffeb3b;' : '';
-            return `
-                <div style="margin-top:4px;display:flex;align-items:center;gap:6px;">
-                    <span style="font-size:11px;color:#aaa;">⚡反击</span>
-                    <div style="flex:1;height:8px;background:#333;border-radius:4px;overflow:hidden;">
-                        <div style="width:${pct}%;height:100%;background:${color};${glow}transition:width 0.3s,background 0.3s;"></div>
-                    </div>
-                    <span style="font-size:10px;color:#888;">${energy}/${max}</span>
-                </div>
-            `;
-        }
-
-        // ===== addCombatLog =====
-        function addCombatLog(message) {
-            if (!gameState.combatLogHistory) gameState.combatLogHistory = [];
-            const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-            gameState.combatLogHistory.push({time, message});
-            if (gameState.combatLogHistory.length > 100) gameState.combatLogHistory.shift();
-        }
-
-        // ===== addEventLog =====
-        function addEventLog(message, type='normal') {
-            const colors = { normal:'#ccc', success:'#00ff88', warning:'#ff9800', danger:'#f44336' };
-            const color = colors[type] || colors.normal;
-            // 通过addLog系统记录
-            addLog(type === 'success' ? 'good' : type === 'danger' ? 'bad' : type, '提示', message);
-        }
-
-        // ===== showCombatLogHistory =====
-        function showCombatLogHistory() {
-            const history = gameState.combatLogHistory || [];
-            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
-            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-            html += '<b style="color:#ffd700;font-size:14px;">⚔️ 战斗日志历史</b>';
-            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
-            html += '</div>';
-            if (history.length === 0) {
-                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
-            } else {
-                history.forEach(entry => {
-                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
-                    html += `<span style="color:#666;font-size:10px;">[${entry.time}]</span> `;
-                    html += `<span style="color:#ccc;">${entry.message}</span>`;
-                    html += '</div>';
-                });
-            }
-            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
-            html += `<button onclick="clearCombatLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
-            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
-            html += '</div></div>';
-            showModal(html);
-        }
-
-        // ===== clearCombatLogHistory =====
-        function clearCombatLogHistory() {
-            gameState.combatLogHistory = [];
-            addEventLog('⚠️ 战斗日志已清空', 'warning');
-            closeModal();
-        }
-
-        // ===== showEventLogHistory =====
-        function showEventLogHistory() {
-            const history = gameState.eventLogHistory || [];
-            let html = '<div style="padding:12px;background:#1a1a2e;border-radius:8px;max-height:400px;overflow-y:auto;">';
-            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-            html += '<b style="color:#ffd700;font-size:14px;">📜 事件日志历史</b>';
-            html += `<span style="color:#888;font-size:11px;">${history.length}条记录</span>`;
-            html += '</div>';
-            if (history.length === 0) {
-                html += '<div style="color:#666;text-align:center;padding:20px;">暂无记录</div>';
-            } else {
-                history.slice().reverse().forEach(entry => {
-                    const colors = { good:'#00ff88', bad:'#f44336', neutral:'#ccc', negative:'#f44336', warning:'#ff9800', welcome:'#ffd700' };
-                    const color = colors[entry.type] || '#ccc';
-                    html += `<div style="margin-bottom:6px;padding:6px;background:#252540;border-radius:4px;font-size:12px;">`;
-                    html += `<span style="color:#666;font-size:10px;">[${entry.time}] 第${entry.day}天</span> `;
-                    html += `<span style="color:${color};">${entry.title}</span> `;
-                    html += `<span style="color:#aaa;">${entry.text}</span>`;
-                    html += '</div>';
-                });
-            }
-            html += '<div style="margin-top:10px;display:flex;gap:8px;">';
-            html += `<button onclick="clearEventLogHistory()" style="flex:1;padding:8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">清空</button>`;
-            html += `<button onclick="closeModal()" style="flex:1;padding:8px;background:#444;color:#ccc;border:none;border-radius:4px;cursor:pointer;">关闭</button>`;
-            html += '</div></div>';
-            showModal(html);
-        }
-
-        // ===== clearEventLogHistory =====
-        function clearEventLogHistory() {
-            gameState.eventLogHistory = [];
-            addLog('warning', '日志清空', '事件日志已清空');
-            closeModal();
-        }
-
-        // ===== renderCombatArena =====
-        function renderCombatArena() {
-            const p = combatState.player;
-            const o = combatState.opponent;
-            const pHpPercent = (p.hp / p.maxHP) * 100;
-            const oHpPercent = (o.hp / o.maxHP) * 100;
-            const pHpClass = pHpPercent <= 25 ? 'low' : pHpPercent <= 50 ? 'medium' : '';
-            const oHpClass = oHpPercent <= 25 ? 'low' : oHpPercent <= 50 ? 'medium' : '';
-
-            let html = `
-                <div class="combat-arena">
-                    <div class="combatants">
-                        <div class="combatant player">
-                            <div class="combatant-header">
-                                <span class="combatant-avatar">${p.avatar}</span>
-                                <div class="combatant-info">
-                                    <div class="combatant-name">${p.name}</div>
-                                    <div class="combatant-realm">${p.realmName} | ${p.technique}</div>
-                                </div>
-                            </div>
-                            <div class="combatant-hp-bar">
-                                <div class="combatant-hp-fill ${pHpClass}" style="width:${pHpPercent}%">
-                                    ${p.hp}/${p.maxHP}
-                                </div>
-                            </div>
-                            <div class="combatant-stats">
-                                <span class="combatant-stat"><span class="icon">⚔️</span>${p.attack}</span>
-                                <span class="combatant-stat"><span class="icon">🛡️</span>${p.defense}</span>
-                                <span class="combatant-stat"><span class="icon">💨</span>${p.speed}</span>
-                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(p.critRate * 100)}%</span>
-                            </div>
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <div style="flex:1;">${renderUltimateEnergyBar()}</div>
-                                <div style="flex:1;">${renderCounterEnergyBar()}</div>
-                            </div>
-                            <div class="combatant-effects">
-                                ${p.weapon ? `<span class="combat-effect">${p.weapon}</span>` : ''}
-                                ${p.armor ? `<span class="combat-effect">${p.armor}</span>` : ''}
-                            </div>
-                        </div>
-                        <div class="combatant opponent">
-                            <div class="combatant-header">
-                                <span class="combatant-avatar">${o.avatar}</span>
-                                <div class="combatant-info">
-                                    <div class="combatant-name">${o.name}</div>
-                                    <div class="combatant-realm">${o.realmName} | ${o.technique}</div>
-                                </div>
-                            </div>
-                            <div class="combatant-hp-bar">
-                                <div class="combatant-hp-fill ${oHpClass}" style="width:${oHpPercent}%">
-                                    ${o.hp}/${o.maxHP}
-                                </div>
-                            </div>
-                            <div class="combatant-stats">
-                                <span class="combatant-stat"><span class="icon">⚔️</span>${o.attack}</span>
-                                <span class="combatant-stat"><span class="icon">🛡️</span>${o.defense}</span>
-                                <span class="combatant-stat"><span class="icon">💨</span>${o.speed}</span>
-                                <span class="combatant-stat"><span class="icon">💥</span>${Math.round(o.critRate * 100)}%</span>
-                            </div>
-                            <div class="combatant-effects">
-                                ${o.weapon ? `<span class="combat-effect">${o.weapon}</span>` : ''}
-                                ${o.armor ? `<span class="combat-effect">${o.armor}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="combat-log" style="height:120px;overflow-y:auto;padding:8px;background:#111;border-radius:4px;font-size:12px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <span style="color:#ffd700;font-size:11px;">⚔️ 战斗日志</span>
-                            <button onclick="showCombatLogHistory()" style="padding:2px 8px;background:#333;color:#888;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:10px;">历史</button>
-                        </div>
-                        ${combatState.log.slice(-8).map(entry => `
-                            <div class="combat-log-entry ${entry.type} ${entry.actionType || ''}">${entry.text}</div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-
-            if (combatState.turn === 'player' && combatState.inProgress) {
-                html += renderPlayerActions();
-            } else if (!combatState.inProgress) {
-                html += renderCombatResult();
-            } else {
-                html += '<div style="text-align:center;padding:20px;color:#aaa;">对方行动中...</div>';
-            }
-
-            document.getElementById('combatContent').innerHTML = html;
-        }
-
-        // ===== renderPlayerActions =====
-        function renderPlayerActions() {
-            const info = getEnergyBar();
-            const canUltimate = info.ready;
-            return `
-                <div class="combat-actions">
-                    <button class="combat-action-btn attack" onclick="selectCombatAction('attack')">
-                        ⚔️ 攻击
-                    </button>
-                    <button class="combat-action-btn defend" onclick="selectCombatAction('defend')">
-                        🛡️ 防御
-                    </button>
-                    <button class="combat-action-btn ultimate" onclick="showUltimateSkillPanel()" ${canUltimate ? '' : 'disabled'}>
-                        ⚡ 必杀技 ${canUltimate ? '' : `(${info.current}/${info.cost})`}
-                    </button>
-                    <button class="combat-action-btn" onclick="selectCombatAction('treasure')">
-                        🔮 法宝
-                    </button>
-                    <button class="combat-action-btn" onclick="selectCombatAction('pill')">
-                        💊 丹药
-                    </button>
-                    <button class="combat-action-btn escape" onclick="selectCombatAction('escape')">
-                        🏃 逃跑
-                    </button>
-                    <button class="combat-action-btn" onclick="selectCombatAction('technique')">
-                        📖 功法
-                    </button>
-                </div>
-            `;
-        }
-
-        // ===== selectCombatAction =====
-        function selectCombatAction(action) {
-            if (action === 'attack') {
-                executePlayerAttack();
-            } else if (action === 'defend') {
-                executePlayerDefend();
-            } else if (action === 'escape') {
-                executePlayerEscape();
-            } else if (action === 'treasure') {
-                showTreasureMenu();
-            } else if (action === 'pill') {
-                showPillMenu();
-            } else if (action === 'technique') {
-                showTechniqueInfo();
-            }
-        }
-
-        // ===== showTreasureMenu =====
-        function showTreasureMenu() {
-            const availableTreasures = [];
-            for (const item of gameState.inventory) {
-                if (COMBAT_TREASURES[item.name]) {
-                    availableTreasures.push(item);
-                }
-            }
-
-            let html = '<div class="combat-submenu">';
-            if (availableTreasures.length === 0) {
-                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有可用法宝</p>';
-            } else {
-                availableTreasures.forEach(item => {
-                    const treasure = COMBAT_TREASURES[item.name];
-                    html += `
-                        <button class="combat-submenu-btn" onclick="useCombatTreasure('${item.name}')">
-                            ${treasure.icon} ${item.name}
-                            <div style="font-size:0.8em;color:#aaa">${treasure.desc}</div>
-                        </button>
-                    `;
-                });
-            }
-            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
-            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
-        }
-
-        // ===== useCombatTreasure =====
-        function useCombatTreasure(name) {
-            const treasure = COMBAT_TREASURES[name];
-            if (!treasure) return;
-
-            const idx = gameState.inventory.findIndex(i => i.name === name);
-            if (idx !== -1) {
-                gameState.inventory[idx].quantity--;
-                if (gameState.inventory[idx].quantity <= 0) {
-                    gameState.inventory.splice(idx, 1);
-                }
-            }
-
-            const effect = treasure.effect;
-            let effectText = '';
-            if (effect.attackBonus) {
-                combatState.effects.player.attackBoost += effect.attackBonus;
-                effectText = `${name}发动！攻击+${Math.round(effect.attackBonus * 100)}%`;
-            } else if (effect.defenseBonus) {
-                combatState.effects.player.defenseBoost += effect.defenseBonus;
-                effectText = `${name}发动！防御+${Math.round(effect.defenseBonus * 100)}%`;
-            } else if (effect.critBonus) {
-                combatState.player.critRate += effect.critBonus;
-                effectText = `${name}发动！暴击率+${Math.round(effect.critBonus * 100)}%`;
-            } else if (effect.hpBonus) {
-                const heal = Math.floor(combatState.player.maxHP * effect.hpBonus);
-                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
-                effectText = `${name}发动！生命+${heal}`;
-            }
-
-            combatState.log.push({ type: 'player-action', text: `你使用了${name}！${effectText}`, round: combatState.round });
-            combatState.turn = 'opponent';
-            renderCombatArena();
-
-            setTimeout(() => executeOpponentTurn(), 1000);
-        }
-
-        // ===== showPillMenu =====
-        function showPillMenu() {
-            let html = '<div class="combat-submenu">';
-            let hasPills = false;
-
-            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
-                if (getItemCount(name) > 0) {
-                    hasPills = true;
-                    html += `
-                        <button class="combat-submenu-btn" onclick="useCombatPill('${name}')">
-                            ${pill.icon} ${name}
-                            <div style="font-size:0.8em;color:#aaa">${pill.desc}</div>
-                        </button>
-                    `;
-                }
-            }
-
-            if (!hasPills) {
-                html += '<p style="grid-column:span 2;text-align:center;color:#888;padding:20px;">背包中没有战斗丹药</p>';
-            }
-            html += '<button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button></div>';
-            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
-        }
-
-        // ===== useCombatPill =====
-        function useCombatPill(name) {
-            const pill = COMBAT_PILLS[name];
-            if (!pill) return;
-
-            const idx = gameState.inventory.findIndex(i => i.name === name);
-            if (idx !== -1) {
-                gameState.inventory[idx].quantity--;
-                if (gameState.inventory[idx].quantity <= 0) {
-                    gameState.inventory.splice(idx, 1);
-                }
-            }
-
-            const effect = pill.effect;
-            let effectText = '';
-
-            if (effect.type === 'attackBoost') {
-                combatState.effects.player.attackBoost += effect.value;
-                effectText = `攻击+${Math.round(effect.value * 100)}%`;
-            } else if (effect.type === 'defenseBoost') {
-                combatState.effects.player.defenseBoost += effect.value;
-                effectText = `防御+${Math.round(effect.value * 100)}%`;
-            } else if (effect.type === 'ignoreDefense') {
-                combatState.effects.player.ignoreDefense = true;
-                effectText = '无视对方防御';
-            } else if (effect.type === 'heal') {
-                const heal = Math.floor(combatState.player.maxHP * effect.value);
-                combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + heal);
-                effectText = `恢复${heal}生命`;
-            }
-
-            combatState.log.push({ type: 'player-action', text: `你服用了${name}！${effectText}`, round: combatState.round });
-            combatState.turn = 'opponent';
-            renderCombatArena();
-
-            setTimeout(() => executeOpponentTurn(), 1000);
-        }
-
-        // ===== showTechniqueInfo =====
-        function showTechniqueInfo() {
-            const p = combatState.player;
-            const o = combatState.opponent;
-            const myTechnique = p.technique;
-            const oppTechnique = o.technique;
-
-            let克制关系 = '';
-            if (TECHNIQUE_BONUS[myTechnique].beats === oppTechnique) {
-                克制关系 = `你的${myTechnique}克制对方的${oppTechnique}，伤害+50%`;
-            } else if (TECHNIQUE_BONUS[myTechnique].losesTo === oppTechnique) {
-                克制关系 = `对方的${oppTechnique}克制你的${myTechnique}，伤害-30%`;
-            } else {
-                克制关系 = '功法无克制关系';
-            }
-
-            const html = `
-                <div class="combat-submenu">
-                    <div style="grid-column:span 2;text-align:center;padding:20px;background:rgba(0,0,0,0.3);border-radius:10px;">
-                        <p style="color:${p.techniqueColor};font-size:1.2em;margin-bottom:10px;">你的功法：${myTechnique}</p>
-                        <p style="color:${o.techniqueColor};font-size:1.2em;margin-bottom:10px;">对方功法：${oppTechnique}</p>
-                        <p style="color:#ffd700;margin-top:15px;">${克制关系}</p>
-                    </div>
-                    <button class="combat-submenu-btn" onclick="renderCombatArena()" style="grid-column:span 2;">返回</button>
-                </div>
-            `;
-            document.getElementById('combatContent').innerHTML = document.getElementById('combatContent').innerHTML.replace(renderPlayerActions(), html);
-        }
-
-        // ===== executePlayerAttack =====
-        function executePlayerAttack() {
-            const p = combatState.player;
-            const o = combatState.opponent;
-            const effects = combatState.effects.player;
-
-            // 清除防御状态
-            effects.defending = false;
-            combatState.player.inDefenseStance = false;
-
-            // 计算伤害
-            let baseDamage = p.attack;
-            baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
-
-            // 功法相克
-            let techniqueMultiplier = 1;
-            if (TECHNIQUE_BONUS[p.technique].beats === o.technique) {
-                techniqueMultiplier = 1.5;
-                combatState.log.push({ type: 'system', text: `功法克制！伤害+50%`, round: combatState.round });
-            } else if (TECHNIQUE_BONUS[p.technique].losesTo === o.technique) {
-                techniqueMultiplier = 0.7;
-                combatState.log.push({ type: 'system', text: `被功法克制！伤害-30%`, round: combatState.round });
-            }
-            baseDamage = Math.floor(baseDamage * techniqueMultiplier);
-
-            // A4 套装攻击加成
-            if (p.attackPercent) {
-                baseDamage = Math.floor(baseDamage * p.attackPercent);
-            }
-
-            // 防御减伤
-            let finalDamage = baseDamage;
-            if (!effects.ignoreDefense) {
-                const defReduction = effects.defending ? o.defense * 1.5 : o.defense;
-                finalDamage = Math.max(1, baseDamage - defReduction);
-            }
-
-            // 暴击判定
-            const critRateWithSet = p.critRate + (p.critBonus || 0);
-            const isCrit = Math.random() < critRateWithSet;
-            if (isCrit) {
-                finalDamage = Math.floor(finalDamage * 1.5);
-                combatState.log.push({ type: 'player-action', actionType: 'critical', text: `💥暴击！`, round: combatState.round });
-            }
-
-            o.hp = Math.max(0, o.hp - finalDamage);
-
-            // A4 套装技能触发
-            if (p.skills && p.skills.includes('freezeAura') && Math.random() < 0.25) {
-                combatState.effects.opponent.frozen = 2;
-                combatState.log.push({ type: 'system', text: `❄️ 玄冰领域生效！敌人被冻结2回合！`, round: combatState.round });
-            }
-            if (p.skills && p.skills.includes('burnAura') && Math.random() < 0.30) {
-                combatState.effects.opponent.burning = 3;
-                combatState.log.push({ type: 'system', text: `🔥 烈焰领域生效！敌人被灼烧3回合！`, round: combatState.round });
-            }
-            if (p.skills && p.skills.includes('angelJudgment') && Math.random() < 0.20) {
-                const healAmount = Math.floor(p.maxHP * 0.15);
-                p.hp = Math.min(p.maxHP, p.hp + healAmount);
-                combatState.log.push({ type: 'system', text: `👼 天使审判生效！恢复${healAmount}点生命！`, round: combatState.round });
-            }
-
-            const techniqueColor = TECHNIQUE_COLORS[p.technique];
-            combatState.log.push({
-                type: 'player-action',
-                actionType: 'damage',
-                text: `你施展<span style="color:${techniqueColor}">${p.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
-                round: combatState.round
-            });
-
-            addEnergy(20); // 攻击积蓄能量
-            combatState.turn = 'opponent';
-            renderCombatArena();
-
-            if (o.hp <= 0) {
-                setTimeout(() => endCombat('win'), 500);
-            } else {
-                setTimeout(() => executeOpponentTurn(), 1000);
-            }
-        }
-
-        // ===== executePlayerDefend =====
-        function executePlayerDefend() {
-            combatState.effects.player.defending = true;
-            combatState.player.inDefenseStance = true;
-            if (typeof combatState.player.counterEnergy === 'undefined') combatState.player.counterEnergy = 0;
-            combatState.player.counterEnergy = Math.min(100, combatState.player.counterEnergy + 35);
-            combatState.log.push({
-                type: 'player-action',
-                text: `🛡️ 防御姿态！反击能量+35（${combatState.player.counterEnergy}/100）`,
-                round: combatState.round
-            });
-
-            combatState.turn = 'opponent';
-            renderCombatArena();
-            setTimeout(() => executeOpponentTurn(), 1000);
-        }
-
-        // ===== executePlayerEscape =====
-        function executePlayerEscape() {
-            const escapeChance = 0.4 + gameState.activeEffects.escape;
-            const success = Math.random() < escapeChance;
-
-            if (success) {
-                const cost = Math.floor(gameState.spiritStones * 0.5);
-                gameState.spiritStones -= cost;
-                combatState.log.push({
-                    type: 'system',
-                    text: `逃跑成功！损失${cost}灵石`,
-                    round: combatState.round
-                });
-                combatState.turn = 'opponent';
-                renderCombatArena();
-                setTimeout(() => endCombat('escape'), 500);
-            } else {
-                combatState.log.push({
-                    type: 'system',
-                    text: '逃跑失败！被对方追击',
-                    round: combatState.round
-                });
-                const extraCost = Math.floor(gameState.spiritStones * 0.2);
-                gameState.spiritStones -= extraCost;
-                combatState.log.push({
-                    type: 'system',
-                    text: `被追击！额外损失${extraCost}灵石`,
-                    round: combatState.round
-                });
-                combatState.turn = 'opponent';
-                renderCombatArena();
-                setTimeout(() => executeOpponentTurn(), 1000);
-            }
-        }
-
-        // ===== executeOpponentTurn =====
-
-        // ===== V33 战斗AI学习系统 =====
-
-        // AI工具注册表（类似ruflo hooks模式）
-        const COMBAT_AI_TOOLS = {
-            // 攻击工具
-            heavyAttack: {
-                name: '重击',
-                weight: 1.0,
-                trigger: 'player_defending',
-                description: '对防御中的玩家造成更多伤害'
+// Auto-generated module: immortal.js
+'use strict';
+
+// ===== IMMORTAL_REALMS =====
+const IMMORTAL_REALMS = {
+    1: { name: '地仙境', icon: '🌱', description: '仙界最低境界，相当于凡界筑基~金丹', cultivationBase: 100 },
+    2: { name: '天仙境', icon: '☁️', description: '中级仙人，相当于凡界元婴', cultivationBase: 200 },
+    3: { name: '金仙境', icon: '⭐', description: '高级仙人，相当于凡界化神', cultivationBase: 400 },
+    4: { name: '大罗金仙', icon: '🌟', description: '顶级强者，相当于凡界渡劫', cultivationBase: 800 },
+    5: { name: '混元大罗', icon: '💫', description: '飞升目标，超越凡界一切', cultivationBase: 1600 }
+};
+
+// ===== SECRET_REALMS_IMMORTAL =====
+const SECRET_REALMS_IMMORTAL = {
+    '太虚遗迹': {
+        type: 'ruins',
+        realmRequired: 1,
+        dangerLevel: 2,
+        waves: 3,
+        rewards: ['太虚仙法残卷', '上古丹药', '仙灵泉水'],
+        npc: { type: 'guardian', name: '太虚守护者' }
+    },
+    '九天瑶池': {
+        type: 'resource',
+        realmRequired: 2,
+        dangerLevel: 1,
+        waves: 2,
+        rewards: ['九天仙草', '瑶池圣水', '万年灵芝'],
+        npc: { type: 'merchant', name: '瑶池仙子' }
+    },
+    '混沌战场': {
+        type: 'combat',
+        realmRequired: 3,
+        dangerLevel: 4,
+        waves: 4,
+        rewards: ['混沌至宝', '神魔精血', '混沌丹'],
+        boss: { name: '混沌魔神' }
+    },
+    '星辰海洋': {
+        type: 'serendipity',
+        realmRequired: 2,
+        dangerLevel: 2,
+        waves: 1,
+        rewards: ['星辰精华', '星君传承'],
+        special: true
+    }
+};
+
+// ===== IMMORTAL_REGIONS =====
+const IMMORTAL_REGIONS = {
+    '仙灵谷': {
+        realmRequired: 1,
+        dangerLevel: 1,
+        icon: '🌿',
+        description: '新手区域，仙气充沛，适合初入仙界者',
+        resources: ['仙草', '仙兽蛋'],
+        color: '#4caf50'
+    },
+    '天庭': {
+        realmRequired: 2,
+        dangerLevel: 2,
+        icon: '🏯',
+        description: '仙界中心，天道法则汇聚之地',
+        resources: ['天庭令牌', '仙官赐福'],
+        color: '#ffd700'
+    },
+    '万妖山': {
+        realmRequired: 2,
+        dangerLevel: 2,
+        icon: '🏔️',
+        description: '妖修领地，妖族强者云集',
+        resources: ['妖修功法', '妖族坐骑'],
+        color: '#ff5722'
+    },
+    '神魔战场': {
+        realmRequired: 3,
+        dangerLevel: 4,
+        icon: '⚔️',
+        description: '上古神魔大战遗迹，蕴含无穷奥秘',
+        resources: ['神魔装备', '混沌碎片'],
+        color: '#9c27b0'
+    },
+    '三十三天': {
+        realmRequired: 4,
+        dangerLevel: 5,
+        icon: '🔮',
+        description: '极高危险区域，突破混元大罗的必经之地',
+        resources: ['混沌碎片', '飞升道具'],
+        color: '#e91e63'
+    },
+    '混沌海': {
+        realmRequired: 5,
+        dangerLevel: 5,
+        icon: '🌀',
+        description: '最终区域，传说中混元大罗的诞生之地',
+        resources: ['混沌神石', '位面法则'],
+        color: '#00bcd4'
+    }
+};
+
+// ===== initializeImmortalState =====
+function initializeImmortalState() {
+    if (!gameState.immortal) {
+        gameState.immortal = {
+            realm: 1,
+            spiritStones: 0,
+            currentRegion: '仙灵谷',
+            exploredRegions: ['仙灵谷'],
+            cultivationProgress: 0,
+            map: {
+                '仙灵谷': { unlocked: true, explored: [] },
+                '天庭': { unlocked: false, realmRequired: 2 },
+                '万妖山': { unlocked: false, realmRequired: 2 },
+                '神魔战场': { unlocked: false, realmRequired: 3 },
+                '三十三天': { unlocked: false, realmRequired: 4 },
+                '混沌海': { unlocked: false, realmRequired: 5 }
             },
-            quickAttack: {
-                name: '快攻',
-                weight: 1.0,
-                trigger: 'player_low_hp',
-                description: '玩家血量低时快速结束战斗'
-            },
-            spellAttack: {
-                name: '技法攻击',
-                weight: 1.0,
-                trigger: 'player_spell_cooldown',
-                description: '趁玩家技能冷却时攻击'
-            },
-            ultimateSkill: {
-                name: '大招',
-                weight: 0.5,
-                trigger: 'energy_full',
-                description: '能量充足时释放大招'
-            },
-            // 防守工具
-            heal: {
-                name: '使用丹药',
-                weight: 1.0,
-                trigger: 'hp_below_50',
-                description: '血量低于50%时使用丹药'
-            },
-            defend: {
-                name: '防御',
-                weight: 1.0,
-                trigger: 'player_high_aggression',
-                description: '玩家进攻强烈时防御'
-            },
-            counter: {
-                name: '反击',
-                weight: 1.0,
-                trigger: 'player_attack_pattern',
-                description: '识破玩家攻击规律后反击'
-            },
-            // 破防工具
-            techniqueBreak: {
-                name: '破功',
-                weight: 1.0,
-                trigger: 'player_technique_active',
-                description: '破除玩家功法加成'
-            },
-            armorBreak: {
-                name: '破甲',
-                weight: 1.2,
-                trigger: 'player_defense_high',
-                description: '针对高防御玩家'
+            lastAerialCooldown: 0,
+            lastFateTask: 0,
+            fateTaskRefreshDay: 0,
+            celestialCycleDay: 0,
+            celestialCycleCompleted: false,
+            // V34 仙界秘境探索系统
+            secretRealm: {
+                inSecretRealm: false,
+                currentRealm: null,
+                currentType: null,
+                wave: 0,
+                totalWaves: 0,
+                enemies: [],
+                rewards: [],
+                npc: null,
+                jade: 0,  // 仙玉
+                tokens: 1,  // 秘境令牌（每日重置）
+                lastTokenRefresh: 0,
+                explored: []  // 已探索秘境记录
             }
         };
+    }
+    // V34 秘境令牌每日重置
+    if (gameState.immortal && gameState.immortal.secretRealm) {
+        const today = Math.floor(gameState.days / 10) * 10;  // 简化：每10天重置
+        if (gameState.immortal.secretRealm.lastTokenRefresh < today) {
+            gameState.immortal.secretRealm.tokens = 3;
+            gameState.immortal.secretRealm.lastTokenRefresh = today;
+        }
+    }
+    if (!gameState.mounts) gameState.mounts = [];
+    if (!gameState.immortalSkills) gameState.immortalSkills = [];
+    if (!gameState.immortalEquipment) {
+        gameState.immortalEquipment = {
+            head: null,
+            body: null,
+            foot: null,
+            weapon: null,
+            shield: null,
+            accessory: null
+        };
+    }
+    if (!gameState.currentRealm) gameState.currentRealm = 'mortal';
+    if (gameState.currentMount === undefined) gameState.currentMount = null;
+}
 
-        // ===== recordPlayerAction =====
-        function recordPlayerAction(actionType, detail = {}) {
-            if (!gameState.combatProfile) return;
-            
-            const profile = gameState.combatProfile;
-            profile.totalBattles++;
-            profile.lastCombatDay = gameState.days;
-            
-            // 记录行动模式
-            const existing = profile.playerPatterns.find(p => p.action === actionType);
-            if (existing) {
-                existing.count++;
-                existing.lastUsed = gameState.days;
-            } else {
-                profile.playerPatterns.push({
-                    action: actionType,
-                    count: 1,
-                    lastUsed: gameState.days,
-                    detail: detail
-                });
-            }
-            
-            // 记录特殊模式
-            if (actionType === 'defend') {
-                profile.defenseFrequency = (profile.defenseFrequency * (profile.totalBattles - 1) + 1) / profile.totalBattles;
-            }
-            if (actionType === 'ultimate') {
-                profile.attackTiming.push('ultimate');
-            }
-            if (actionType === 'attack' && detail.weaponType) {
-                profile.preferredDistance = detail.weaponType;
+// ===== canEnterRegion =====
+function canEnterRegion(region) {
+    const req = IMMORTAL_REGIONS[region].realmRequired;
+    return gameState.immortal.realm >= req;
+}
+
+// ===== doAerialTravel =====
+function doAerialTravel(targetRegion) {
+    if (!gameState.immortal || gameState.immortal.currentRegion === targetRegion) return;
+    
+    const cooldown = getAerialCooldown();
+    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
+    
+    if (timeSinceLast < cooldown) {
+        const remaining = Math.ceil((cooldown - timeSinceLast) / 1000);
+        showToast(`御空术冷却中，还需${remaining}秒`);
+        return;
+    }
+    
+    if (!canEnterRegion(targetRegion)) {
+        showToast('境界不足，无法进入该区域');
+        return;
+    }
+    
+    gameState.immortal.currentRegion = targetRegion;
+    gameState.immortal.lastAerialCooldown = Date.now();
+    
+    // 添加到已探索
+    if (!gameState.immortal.exploredRegions.includes(targetRegion)) {
+        gameState.immortal.exploredRegions.push(targetRegion);
+    }
+    
+    // 触发区域事件
+    triggerRegionEvent(targetRegion);
+    saveGame();
+    updateDisplay();
+    
+    // 更新UI
+    if (typeof renderImmortalUI === 'function') renderImmortalUI();
+}
+
+// ===== getAerialCooldown =====
+function getAerialCooldown() {
+    const baseCooldown = 10000; // 10秒基础冷却
+    const mountBonus = getMountSpeedBonus();
+    return Math.max(1000, baseCooldown * (1 - mountBonus));
+}
+
+// ===== getMountSpeedBonus =====
+function getMountSpeedBonus() {
+    const mount = gameState.currentMount;
+    if (!mount) return 0;
+    // 成熟度越高加速越多
+    return (mount.maturity / 100) * (mount.stats.speed / 100) * 0.5;
+}
+
+// ===== triggerRegionEvent =====
+function triggerRegionEvent(region) {
+    const rand = Math.random();
+    if (rand < 0.3) {
+        // 30%概率触发仙缘任务
+        if (gameState.immortal.currentRegion !== '天庭') {
+            showToast(`在${region}遇到神秘机缘...`);
+        }
+    }
+}
+
+// ===== earnSpiritStones =====
+function earnSpiritStones(amount, source) {
+    gameState.immortal.spiritStones += amount;
+    addLog('good', '获得仙石', `获得 ${amount} 仙石（${source}）`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== spendSpiritStones =====
+function spendSpiritStones(amount, reason) {
+    if (gameState.immortal.spiritStones < amount) {
+        showToast('仙石不足');
+        return false;
+    }
+    gameState.immortal.spiritStones -= amount;
+    saveGame();
+    return true;
+}
+
+// ===== doImmortalCultivation =====
+function doImmortalCultivation() {
+    const realm = gameState.immortal.realm;
+    const realmData = IMMORTAL_REALMS[realm];
+    let baseGain = realmData.cultivationBase * (1 + Math.random() * 0.5);
+    
+    // 应用装备加成
+    baseGain *= (1 + getImmortalEquipBonus());
+    
+    // 应用仙兽加成
+    if (gameState.currentMount) {
+        baseGain *= (1 + gameState.currentMount.stats.speed / 200);
+    }
+    
+    const gain = Math.floor(baseGain);
+    gameState.immortal.cultivationProgress += gain;
+    
+    // 检查境界突破
+    const nextRealm = realm + 1;
+    if (nextRealm <= 5 && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
+        gameState.immortal.realm = nextRealm;
+        gameState.immortal.cultivationProgress = 0;
+        // 解锁新区域
+        unlockRegionForRealm(nextRealm);
+        addLog('good', '境界突破', `突破到${IMMORTAL_REALMS[nextRealm].name}！`);
+        showToast(`恭喜突破到${IMMORTAL_REALMS[nextRealm].name}！`);
+    } else {
+        addLog('neutral', '仙气修炼', `修炼${gain}点仙气，感觉体内的仙力更加充沛。`);
+    }
+    
+    gameState.days++;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== unlockRegionForRealm =====
+function unlockRegionForRealm(realm) {
+    for (const region in gameState.immortal.map) {
+        if (gameState.immortal.map[region].realmRequired === realm) {
+            gameState.immortal.map[region].unlocked = true;
+        }
+    }
+}
+
+// ===== getImmortalEquipBonus =====
+function getImmortalEquipBonus() {
+    let bonus = 0;
+    const equip = gameState.immortalEquipment;
+    for (const slot in equip) {
+        if (equip[slot]) {
+            bonus += equip[slot].quality * 0.1;
+        }
+    }
+    return bonus;
+}
+
+// ===== showImmortalMap =====
+function showImmortalMap() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">☁️ 仙界地图 ☁️</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
+    
+    for (const region in IMMORTAL_REGIONS) {
+        const data = IMMORTAL_REGIONS[region];
+        const isUnlocked = canEnterRegion(region);
+        const isCurrent = gameState.immortal.currentRegion === region;
+        const isExplored = gameState.immortal.exploredRegions.includes(region);
+        
+        let style = 'padding:12px;border-radius:8px;text-align:center;cursor:pointer;';
+        style += isUnlocked ? `background:${data.color}33;border:2px solid ${data.color};` : 'background:#333;border:2px solid #555;';
+        style += isCurrent ? 'box-shadow:0 0 15px #ffd700;' : '';
+        
+        html += `<div style="${style}" onclick="${isUnlocked ? `doAerialTravel('${region}')` : ''}">`;
+        html += `<div style="font-size:24px;">${data.icon}</div>`;
+        html += `<div style="color:${isUnlocked ? '#fff' : '#666'};font-weight:bold;">${region}</div>`;
+        html += `<div style="font-size:11px;color:${isUnlocked ? '#aaa' : '#444'};">需要${data.realmRequired}重天</div>`;
+        html += isCurrent ? '<div style="color:#ffd700;font-size:11px;">当前位置</div>' : '';
+        html += '</div>';
+    }
+    
+    html += '</div></div>';
+    
+    // 冷却显示
+    const cooldown = getAerialCooldown();
+    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
+    const remaining = Math.max(0, cooldown - timeSinceLast);
+    
+    html += `<div style="text-align:center;margin-top:16px;padding:10px;background:#1a1a2e;border-radius:8px;">`;
+    html += `<div style="color:#aaa;font-size:12px;">御空术冷却: ${Math.ceil(remaining / 1000)}秒</div>`;
+    if (gameState.currentMount) {
+        html += `<div style="color:#4caf50;font-size:12px;">🐎 骑乘${gameState.currentMount.name}，冷却缩短50%</div>`;
+    }
+    html += '</div>';
+    
+    openModal('仙界地图', html, '');
+}
+
+// ===== getImmortalDailyIncome =====
+function getImmortalDailyIncome() {
+    if (gameState.currentRealm !== 'immortal') return { qi: 0, stones: 0 };
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const baseQi = realmData.cultivationBase * 0.1;
+    const regionBonus = (regionData.dangerLevel || 1) * 0.05;
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.2 : 0;
+    return {
+        qi: Math.floor(baseQi * (1 + regionBonus + blessingBonus)),
+        stones: Math.floor((regionData.dangerLevel || 1) * 10 * Math.random())
+    };
+}
+
+// ===== processCelestialCycle =====
+function processCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const cc = gameState.celestialCycle;
+    const interval = cc.cycleInterval || 3;
+    
+    // 每日仙界修炼结算（自动主路径）
+    const income = getImmortalDailyIncome();
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const progressGain = Math.floor(income.qi * spiritRootBonus);
+    
+    // 更新修炼进度
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+        gameState.immortal.spiritStones += income.stones;
+        
+        // 检查境界突破
+        const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+        if (realmData && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
+            const nextRealm = gameState.immortal.realm + 1;
+            if (nextRealm <= 5) {
+                gameState.immortal.realm = nextRealm;
+                gameState.immortal.cultivationProgress = 0;
+                addLog('good', '境界突破', `天道轮回中，突破至${IMMORTAL_REALMS[nextRealm].name}！`);
             }
         }
+    }
+    
+    // 天道轮回日结算
+    cc.day++;
+    if (cc.day >= interval && !cc.completed) {
+        executeCelestialCycle();
+        cc.day = 0;
+        cc.completed = true;
+    }
+    
+    // 新周期开始
+    if (cc.day === 0) {
+        cc.completed = false;
+    }
+}
 
-        // ===== analyzePlayerProfile =====
-        function analyzePlayerProfile() {
-            const profile = gameState.combatProfile;
-            if (!profile || profile.totalBattles < 3) return null;
+// ===== executeCelestialCycle =====
+function executeCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    
+    // 主路径：修炼结算
+    let resultText = `【天道轮回·第${gameState.days}天】\n`;
+    let eventType = 'neutral';
+    let effects = { qi: 0, stones: 0, mindset: 0 };
+    
+    const baseProgress = realmData.cultivationBase;
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const regionBonus = (regionData.dangerLevel || 1) * 0.1;
+    const progressGain = Math.floor(baseProgress * (1 + regionBonus) * spiritRootBonus);
+    
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+    }
+    resultText += `修炼进度 +${progressGain}\n`;
+    effects.qi = progressGain;
+    
+    // 次路径：气运波动触发器
+    const roll = Math.random();
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.15 : 0;
+    
+    if (roll < 0.4 + blessingBonus) {
+        // 正面事件 40%
+        eventType = 'positive';
+        const positiveEvents = [
+            { text: '✨ 顿悟时刻', effect: () => { 
+                if (gameState.immortal) gameState.immortal.cultivationProgress += Math.floor(progressGain * 0.5);
+                effects.qi += Math.floor(progressGain * 0.5);
+                return '修炼进度额外 +50%';
+            }},
+            { text: '🌟 天赐灵物', effect: () => {
+                const stoneGain = Math.floor(500 * Math.random()) + 100;
+                if (gameState.immortal) gameState.immortal.spiritStones += stoneGain;
+                effects.stones = stoneGain;
+                return `获得 ${stoneGain} 灵石`;
+            }},
+            { text: '☁️ 祥瑞降临', effect: () => {
+                effects.mindset = 10;
+                return '心态 +10';
+            }}
+        ];
+        const event = positiveEvents[Math.floor(Math.random() * positiveEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else if (roll < 0.7 + blessingBonus) {
+        // 负面事件 30%
+        eventType = 'negative';
+        const negativeEvents = [
+            { text: '👹 心魔入侵', effect: () => {
+                effects.mindset = -20;
+                return '心态 -20，修炼受阻';
+            }},
+            { text: '⚡ 天道压制', effect: () => {
+                effects.qi = -Math.floor(progressGain * 0.3);
+                if (gameState.immortal) gameState.immortal.cultivationProgress -= Math.floor(progressGain * 0.3);
+                return '当日修炼效率 -30%';
+            }},
+            { text: '💔 灵气紊乱', effect: () => {
+                const stoneLoss = Math.floor((gameState.immortal?.spiritStones || 0) * 0.05);
+                if (gameState.immortal && stoneLoss > 0) gameState.immortal.spiritStones -= stoneLoss;
+                effects.stones = -stoneLoss;
+                return `损失 ${stoneLoss} 灵石`;
+            }}
+        ];
+        const event = negativeEvents[Math.floor(Math.random() * negativeEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else {
+        // 中性事件 30%
+        eventType = 'neutral';
+        const neutralEvents = [
+            { text: '🧙 仙人指路', effect: () => {
+                return '天道启示：继续保持当前修炼节奏';
+            }},
+            { text: '🔮 奇遇发现', effect: () => {
+                // 解锁新区域线索
+                return '隐约感知到未知区域的召唤';
+            }},
+            { text: '⏳ 平静期', effect: () => {
+                return '天道运行平稳，无特殊事件';
+            }}
+        ];
+        const event = neutralEvents[Math.floor(Math.random() * neutralEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+    }
+    
+    // 清除祈福状态
+    gameState.celestialCycle.blessingActive = false;
+    
+    // 保存结果
+    const result = { type: eventType, text: resultText, effects: effects, day: gameState.days };
+    gameState.celestialCycle.lastResult = result;
+    
+    showCelestialCycleResult(result);
+    
+    addLog(eventType === 'positive' ? 'good' : eventType === 'negative' ? 'bad' : 'normal', 
+           '天道轮回', resultText.replace(/\n/g, ' '));
+}
+
+// ===== showCelestialCycleResult =====
+function showCelestialCycleResult(result) {
+    const icon = result.type === 'positive' ? '🌟' : result.type === 'negative' ? '💥' : '🔮';
+    const color = result.type === 'positive' ? '#4caf50' : result.type === 'negative' ? '#f44336' : '#2196f3';
+    
+    const modal = document.getElementById('modalNormal');
+    if (!modal) return;
+    
+    let effectsText = '';
+    if (result.effects.qi !== 0) effectsText += ` 灵气 ${result.effects.qi > 0 ? '+' : ''}${result.effects.qi}`;
+    if (result.effects.stones !== 0) effectsText += ` 灵石 ${result.effects.stones > 0 ? '+' : ''}${result.effects.stones}`;
+    if (result.effects.mindset !== 0) effectsText += ` 心态 ${result.effects.mindset > 0 ? '+' : ''}${result.effects.mindset}`;
+    
+    modal.innerHTML = `
+        <div class="result-title" style="color:${color}">${icon} 天道轮回结算 ${icon}</div>
+        <div style="margin:15px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;text-align:left">
+            ${result.text.replace(/\n/g, '<br/>')}
+        </div>
+        <div style="color:#aaa;font-size:12px">${effectsText}</div>
+        <div style="margin-top:15px">
+            <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">确定</button>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+}
+
+// ===== requestExtraCycle =====
+function requestExtraCycle() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能请求天道轮回');
+        return;
+    }
+    const cost = 100;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石请求额外轮回`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.day = gameState.celestialCycle.cycleInterval || 3;
+    showToast(`消耗 ${cost} 灵石，请求天道轮回`);
+    addLog('normal', '主动干预', `消耗 ${cost} 灵石请求额外天道轮回`);
+}
+
+// ===== requestFortuneBlessing =====
+function requestFortuneBlessing() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行气运祈福');
+        return;
+    }
+    const cost = 200;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石进行气运祈福`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.blessingActive = true;
+    showToast(`消耗 ${cost} 灵石，气运祈福生效（下次轮回正面事件概率+15%）`);
+    addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
+}
+
+// ===== V34 仙界秘境探索系统 =====
+
+// ===== canEnterSecretRealm =====
+function canEnterSecretRealm(realmName) {
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    if (!realm) return { result: false, reason: '秘境不存在' };
+    if (gameState.immortal.realm < realm.realmRequired) {
+        return { result: false, reason: `需要${IMMORTAL_REALMS[realm.realmRequired].name}才能进入` };
+    }
+    if (!gameState.immortal.secretRealm || gameState.immortal.secretRealm.tokens <= 0) {
+        return { result: false, reason: '秘境令牌不足' };
+    }
+    return { result: true };
+}
+
+// ===== enterSecretRealm =====
+function enterSecretRealm(realmName) {
+    const check = canEnterSecretRealm(realmName);
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    gameState.immortal.secretRealm.tokens--;
+    gameState.immortal.secretRealm.inSecretRealm = true;
+    gameState.immortal.secretRealm.currentRealm = realmName;
+    gameState.immortal.secretRealm.currentType = realm.type;
+    gameState.immortal.secretRealm.wave = 0;
+    gameState.immortal.secretRealm.totalWaves = realm.waves;
+    gameState.immortal.secretRealm.enemies = [];
+    gameState.immortal.secretRealm.rewards = [];
+    gameState.immortal.secretRealm.npc = realm.npc ? { ...realm.npc } : null;
+    
+    showToast(`进入【${realmName}】`);
+    renderSecretRealmUI();
+}
+
+// ===== renderSecretRealmUI =====
+function renderSecretRealmUI() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr || !sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+    const typeNames = { ruins: '遗迹秘境', resource: '资源秘境', combat: '战斗秘境', serendipity: '奇遇秘境' };
+    
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:24px">${typeIcons[realm.type] || '🏛️'} ${sr.currentRealm}</div>
+                <div style="color:#aaa;font-size:12px">${typeNames[realm.type]} - 第${sr.wave}/${sr.totalWaves}波</div>
+            </div>
+    `;
+    
+    // 类型特定UI
+    if (realm.type === 'resource') {
+        content += `
+            <div style="background:rgba(76,175,80,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#4caf50;font-size:14px">🌿 资源秘境 - 收集仙草和灵材</div>
+            </div>
+            <button onclick="collectResource()" style="width:100%;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">采集资源</button>
+        `;
+    } else if (realm.type === 'ruins') {
+        content += `
+            <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#9c27b0;font-size:14px">🏛️ 遗迹秘境 - 探索上古仙人洞府</div>
+                ${sr.npc && sr.npc.type === 'guardian' ? `<div style="color:#ff5722;margin-top:8px">⚠️ 守护者: ${sr.npc.name}</div>` : ''}
+            </div>
+            <button onclick="exploreRuins()" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">探索遗迹</button>
+        `;
+    } else if (realm.type === 'combat') {
+        content += `
+            <div style="background:rgba(244,67,54,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#f44336;font-size:14px">⚔️ 战斗秘境 - 击败守护者获取混沌至宝</div>
+                ${realm.boss ? `<div style="color:#ff5722;margin-top:8px">💀 Boss: ${realm.boss.name}</div>` : ''}
+            </div>
+            <button onclick="fightSecretRealmBoss()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">挑战Boss</button>
+        `;
+    } else if (realm.type === 'serendipity') {
+        content += `
+            <div style="background:rgba(255,215,0,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#ffd700;font-size:14px">✨ 奇遇秘境 - 随机触发特殊事件</div>
+            </div>
+            <button onclick="triggerSerendipityEvent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#333;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">触发奇遇</button>
+        `;
+    }
+    
+    // 奖励展示
+    if (sr.rewards.length > 0) {
+        content += `
+            <div style="margin-top:15px">
+                <div style="color:#ffd700;margin-bottom:8px">已获得奖励:</div>
+                ${sr.rewards.map(r => `<div style="color:#4caf50;font-size:12px">✧ ${r}</div>`).join('')}
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="exitSecretRealm()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:15px">返回仙界</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
+}
+
+// ===== collectResource =====
+function collectResource() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+    sr.rewards.push(reward);
+    
+    showToast(`获得: ${reward}`);
+    addLog('good', '秘境收获', `在${sr.currentRealm}获得${reward}`);
+    
+    if (sr.wave >= sr.totalWaves) {
+        completeImmortalSecretRealm();
+    } else {
+        renderSecretRealmUI();
+    }
+}
+
+// ===== exploreRuins =====
+function exploreRuins() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    
+    // 遗迹探索可能遇到敌人或奖励
+    if (Math.random() < 0.4 && sr.wave < sr.totalWaves) {
+        // 遇到守护者战斗
+        showToast(`遭遇${sr.npc?.name || '守护者'}！`);
+        startImmortalRealmBattle(sr.npc);
+    } else {
+        // 获得奖励
+        const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+        sr.rewards.push(reward);
+        showToast(`探索获得: ${reward}`);
+        addLog('good', '秘境收获', `在${sr.currentRealm}探索获得${reward}`);
+        
+        if (sr.wave >= sr.totalWaves) {
+            completeImmortalSecretRealm();
+        } else {
+            renderSecretRealmUI();
+        }
+    }
+}
+
+// ===== fightSecretRealmBoss =====
+function fightSecretRealmBoss() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const bossName = realm.boss?.name || '秘境守卫';
+    const bossHP = 5000 + (gameState.immortal.realm * 2000);
+    
+    showToast(`挑战 ${bossName}！`);
+    startImmortalRealmBattle({ name: bossName, hp: bossHP, maxHP: bossHP });
+}
+
+// ===== startImmortalRealmBattle =====
+function startImmortalRealmBattle(enemy) {
+    const sr = gameState.immortal.secretRealm;
+    
+    // 使用通用战斗系统
+    const playerMaxHP = gameState.maxHP || 1000;
+    const playerAttack = gameState.attack || 100;
+    const playerDefense = gameState.defense || 50;
+    
+    combatState.inProgress = true;
+    combatState.player = {
+        hp: playerMaxHP,
+        maxHP: playerMaxHP,
+        attack: playerAttack,
+        defense: playerDefense,
+        technique: gameState.technique || '金刚诀'
+    };
+    combatState.opponent = {
+        name: enemy.name || '秘境守卫',
+        hp: enemy.hp || 3000,
+        maxHP: enemy.maxHP || enemy.hp || 3000,
+        attack: 80 + (gameState.immortal?.realm || 1) * 30,
+        defense: 40 + (gameState.immortal?.realm || 1) * 15,
+        technique: '混沌诀',
+        critRate: 0.1,
+        level: 1
+    };
+    combatState.round = 0;
+    combatState.turn = 'player';
+    combatState.log = [];
+    combatState.effects = {
+        player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 },
+        opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 }
+    };
+    
+    // 设置战斗结束回调
+    window.secretRealmBattleEnd = function(result) {
+        if (result === 'win') {
+            const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+            const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+            sr.rewards.push(reward);
+            showToast(`战斗胜利！获得: ${reward}`);
+            addLog('good', '秘境战斗', `在${sr.currentRealm}击败${enemy.name}获得${reward}`);
             
-            // 计算各模式占比
-            const total = profile.playerPatterns.reduce((sum, p) => sum + p.count, 0);
-            const patterns = profile.playerPatterns.map(p => ({
-                ...p,
-                ratio: p.count / total
-            }));
-            
-            // 判断玩家风格
-            const defenseRatio = profile.defenseFrequency;
-            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
-            
-            let style = 'balanced';
-            if (defenseRatio > 0.6) style = 'defensive';
-            else if (defenseRatio < 0.2 && ultimateCount > profile.totalBattles * 0.4) style = 'aggressive';
-            
-            // 检测弱点
-            const weaknesses = [];
-            const attackPatterns = patterns.filter(p => p.action === 'attack');
-            if (attackPatterns.length > 0) {
-                // 玩家经常使用某种攻击
-                const commonAttack = attackPatterns.reduce((a, b) => a.count > b.count ? a : b);
-                if (commonAttack.ratio > 0.4) {
-                    weaknesses.push('attack_predictable'); // 攻击可预测
+            sr.wave++;
+            if (sr.wave >= sr.totalWaves) {
+                completeImmortalSecretRealm();
+            } else {
+                renderSecretRealmUI();
+            }
+        } else {
+            showToast('战斗失败，秘境探索结束');
+            exitSecretRealm();
+        }
+        delete window.secretRealmBattleEnd;
+    };
+    
+    renderCombatArena();
+}
+
+// ===== triggerSerendipityEvent =====
+function triggerSerendipityEvent() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const events = [
+        { type: 'epiphany', text: '💡 顿悟！境界提升！', effect: () => { gameState.immortal.realm = Math.min(5, gameState.immortal.realm + 1); } },
+        { type: 'treasure', text: '💎 发现上古宝藏！', effect: () => { sr.rewards.push('上古宝藏'); } },
+        { type: 'technique', text: '📜 获得仙人传承！', effect: () => { sr.rewards.push('星君传承'); } },
+        { type: 'jade', text: '💰 发现仙玉矿脉！', effect: () => { sr.rewards.push('仙玉x100'); } }
+    ];
+    
+    const event = events[Math.floor(Math.random() * events.length)];
+    event.effect();
+    
+    showToast(event.text);
+    addLog('good', '奇遇秘境', `${event.text} - ${sr.currentRealm}`);
+    
+    completeImmortalSecretRealm();
+}
+
+// ===== completeImmortalSecretRealm =====
+function completeImmortalSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    
+    showToast(`秘境探索完成！获得${sr.rewards.length}个奖励`);
+    addLog('good', '秘境完成', `完成${sr.currentRealm}，获得: ${sr.rewards.join(', ')}`);
+    
+    // 添加探索记录
+    if (!sr.explored) sr.explored = [];
+    if (!sr.explored.includes(sr.currentRealm)) {
+        sr.explored.push(sr.currentRealm);
+    }
+    
+    setTimeout(() => exitSecretRealm(), 1500);
+}
+
+// ===== exitSecretRealm =====
+function exitSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    const rewards = [...(sr.rewards || [])];
+    
+    sr.inSecretRealm = false;
+    sr.currentRealm = null;
+    sr.currentType = null;
+    sr.wave = 0;
+    sr.enemies = [];
+    sr.npc = null;
+    
+    closeModal('modalNormal');
+    showToast(`秘境奖励: ${rewards.length > 0 ? rewards.join(', ') : '无'}`);
+    renderImmortalUI();
+}
+
+// ===== renderImmortalUI =====
+function renderImmortalUI() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    // 更新仙界状态显示
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    
+    // 更新境界显示
+    const realmDisplay = document.getElementById('immortalRealmDisplay');
+    if (realmDisplay) {
+        realmDisplay.innerHTML = `${realmData.icon} ${realmData.name}`;
+    }
+    
+    // 更新仙石显示
+    const stoneDisplay = document.getElementById('immortalStoneDisplay');
+    if (stoneDisplay) {
+        stoneDisplay.textContent = `💎 ${gameState.immortal.spiritStones}`;
+    }
+    
+    // 更新区域显示
+    const regionDisplay = document.getElementById('immortalRegionDisplay');
+    if (regionDisplay) {
+        regionDisplay.innerHTML = `${regionData.icon} ${gameState.immortal.currentRegion}`;
+    }
+    
+    // V34 添加秘境探索入口
+    const secretBtn = document.getElementById('secretRealmBtn');
+    if (secretBtn && gameState.immortal.secretRealm) {
+        secretBtn.textContent = `🏛️ 秘境探索 (令牌:${gameState.immortal.secretRealm.tokens})`;
+    }
+}
+
+// ===== V34 renderSecretRealmList =====
+function renderSecretRealmList() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行秘境探索');
+        return;
+    }
+    
+    const sr = gameState.immortal.secretRealm;
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:20px;color:#ffd700">🏛️ 仙界秘境</div>
+                <div style="color:#aaa;font-size:12px">秘境令牌: ${sr?.tokens || 0}</div>
+            </div>
+    `;
+    
+    // 列出所有秘境
+    for (const [name, realm] of Object.entries(SECRET_REALMS_IMMORTAL)) {
+        const canEnter = gameState.immortal.realm >= realm.realmRequired;
+        const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+        const typeNames = { ruins: '遗迹', resource: '资源', combat: '战斗', serendipity: '奇遇' };
+        
+        content += `
+            <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-bottom:10px;${!canEnter ? 'opacity:0.5' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-size:16px">${typeIcons[realm.type]} ${name}</div>
+                        <div style="color:#aaa;font-size:11px">${typeNames[realm.type]} | 危险${'⚠️'.repeat(realm.dangerLevel)} | 需要: ${IMMORTAL_REALMS[realm.realmRequired]?.name || '未知'}</div>
+                    </div>
+                    ${canEnter ? `<button onclick="enterSecretRealm('${name}')" style="padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">进入</button>` : '<span style="color:#f44336;font-size:11px">境界不足</span>'}
+                </div>
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="closeModal('modalNormal')" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:10px">返回</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
+}
+
+
+// Auto-generated module: immortalEquip.js
+'use strict';
+
+// ===== IMMORTAL_EQUIP_QUALITIES =====
+const IMMORTAL_EQUIP_QUALITIES = {
+    1: { name: '仙器', color: '#2196f3', multiplier: 1.5, colorHex: '蓝色' },
+    2: { name: '灵仙器', color: '#9c27b0', multiplier: 2.0, colorHex: '紫色' },
+    3: { name: '神仙器', color: '#ff9800', multiplier: 3.0, colorHex: '橙色' },
+    4: { name: '混沌器', color: '#ffd700', multiplier: 5.0, colorHex: '金色' }
+};
+
+// ===== IMMORTAL_EQUIP_SLOTS =====
+const IMMORTAL_EQUIP_SLOTS = {
+    head: { name: '仙冠', icon: '👑', pos: 0 },
+    body: { name: '仙袍', icon: '👘', pos: 1 },
+    foot: { name: '仙履', icon: '👟', pos: 2 },
+    weapon: { name: '仙剑', icon: '⚔️', pos: 3 },
+    shield: { name: '仙盾', icon: '🛡️', pos: 4 },
+    accessory: { name: '仙佩', icon: '📿', pos: 5 }
+};
+
+// ===== IMMORTAL_EQUIP_SETS =====
+const IMMORTAL_EQUIP_SETS = {
+    '仙灵套装': {
+        pieces: ['仙冠-仙灵', '仙袍-仙灵', '仙履-仙灵'],
+        setBonus: { effect: 'cultivationSpeed', value: 0.2 },
+        description: '2件：仙气修炼效率+20%'
+    },
+    '战神套装': {
+        pieces: ['仙剑-战神', '仙盾-战神', '仙冠-战神', '仙袍-战神'],
+        setBonus: { effect: 'attack', value: 0.5 },
+        description: '4件：攻击+50%，仙兽参战伤害+30%'
+    },
+    '不死套装': {
+        pieces: ['仙冠-不死', '仙袍-不死', '仙履-不死', '仙佩-不死'],
+        setBonus: { effect: 'invincible', value: 3, cooldown: 60 },
+        description: '4件：致命伤害时无敌3秒，CD60秒'
+    },
+    '混沌套装': {
+        pieces: ['仙冠-混沌', '仙袍-混沌', '仙履-混沌', '仙剑-混沌', '仙盾-混沌', '仙佩-混沌'],
+        setBonus: { effect: 'allStats', value: 1.0 },
+        description: '6件：全属性+100%，仙法伤害+100%'
+    }
+};
+
+// ===== EQUIPMENT_BASE_STATS =====
+const EQUIPMENT_BASE_STATS = {
+    attack: 100,
+    defense: 80,
+    hp: 500,
+    speed: 50,
+    crit: 10,
+    resist: 15
+};
+
+// ===== EQUIPMENT_AFFIX_TYPES =====
+const EQUIPMENT_AFFIX_TYPES = [
+    { name: 'attack', display: '攻击', min: 5, max: 30, rarity: 'common' },
+    { name: 'defense', display: '防御', min: 5, max: 25, rarity: 'common' },
+    { name: 'hp', display: '生命', min: 20, max: 100, rarity: 'common' },
+    { name: 'crit', display: '暴击', min: 3, max: 15, rarity: 'uncommon' },
+    { name: 'resist', display: '抗性', min: 3, max: 12, rarity: 'uncommon' },
+    { name: 'speed', display: '速度', min: 2, max: 10, rarity: 'uncommon' },
+    { name: 'cultivate_qi_rate', display: '灵气效率', min: 0.05, max: 0.15, rarity: 'rare', isPercent: true },
+    { name: 'breakthrough_boost', display: '突破加成', min: 0.05, max: 0.10, rarity: 'rare', isPercent: true },
+    { name: 'tribulation_damage_reduce', display: '渡劫减伤', min: 0.05, max: 0.15, rarity: 'epic', isPercent: true },
+    { name: 'all_stats', display: '全属性', min: 0.03, max: 0.08, rarity: 'legendary', isPercent: true }
+];
+
+const AFFIX_RARITY_COLORS = {
+    common: '#aaa',
+    uncommon: '#4CAF50',
+    rare: '#2196f3',
+    epic: '#9c27b0',
+    legendary: '#ff9800'
+};
+
+// ===== generateAffix =====
+function generateAffix(quality, tier) {
+    // 根据品质和难度等级筛选可用词条
+    const availableAffixes = EQUIPMENT_AFFIX_TYPES.filter(a => {
+        if (tier === 0) return a.rarity === 'common' || a.rarity === 'uncommon';
+        if (tier === 1) return a.rarity !== 'legendary';
+        return true;  // tier >= 2 所有词条
+    });
+    
+    const affix = availableAffixes[Math.floor(Math.random() * availableAffixes.length)];
+    const value = affix.min + Math.random() * (affix.max - affix.min);
+    
+    return {
+        name: affix.name,
+        display: affix.display,
+        value: affix.isPercent ? parseFloat(value.toFixed(2)) : Math.floor(value),
+        rarity: affix.rarity,
+        isPercent: affix.isPercent || false,
+        icon: affix.isPercent ? '%' : ''
+    };
+}
+
+// ===== calculateEquipScore =====
+function calculateEquipScore(equip) {
+    if (!equip) return 0;
+    let score = 0;
+    
+    // 基础属性评分
+    const statWeights = { attack: 2, defense: 1.5, hp: 0.5, speed: 1, crit: 1.5, resist: 1 };
+    for (const stat in equip.stats) {
+        score += (equip.stats[stat] || 0) * (statWeights[stat] || 1);
+    }
+    
+    // 词条加成评分
+    if (equip.affixes) {
+        equip.affixes.forEach(affix => {
+            const rarityMultiplier = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 5 };
+            score += affix.value * (rarityMultiplier[affix.rarity] || 1);
+        });
+    }
+    
+    // 强化等级加成
+    if (equip.enhancementLevel > 0) {
+        score *= (1 + equip.enhancementLevel * 0.1);
+    }
+    
+    // 精炼等级加成
+    if (equip.refinementLevel > 0) {
+        score *= (1 + equip.refinementLevel * 0.05);
+    }
+    
+    return Math.floor(score);
+}
+
+// ===== generateImmortalEquip =====
+function generateImmortalEquip(slot, quality) {
+    const qualityData = IMMORTAL_EQUIP_QUALITIES[quality];
+    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+    
+    const equip = {
+        uid: 'equip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        slot: slot,
+        name: `${slotData.name}-${qualityData.name}`,
+        quality: quality,
+        qualityName: qualityData.name,
+        icon: slotData.icon,
+        stats: {},
+        setName: null, // 套装名
+        refinationLevel: 0,  // V36 精炼等级 0-12
+        enhancementLevel: 0,  // V36 强化等级 0-15
+        affixes: []           // V36 随机词条
+    };
+    
+    // 根据品质生成属性
+    const multiplier = qualityData.multiplier;
+    for (const stat in EQUIPMENT_BASE_STATS) {
+        equip.stats[stat] = Math.floor(EQUIPMENT_BASE_STATS[stat] * multiplier * (0.8 + Math.random() * 0.4));
+    }
+    
+    // V36 根据品质生成1-3条随机词条
+    const affixCount = quality + Math.floor(Math.random() * quality);
+    const tier = Math.min(2, Math.floor(quality / 2));
+    for (let i = 0; i < affixCount; i++) {
+        equip.affixes.push(generateAffix(quality, tier));
+    }
+    
+    // 30%概率生成套装
+    if (Math.random() < 0.3) {
+        const setNames = Object.keys(IMMORTAL_EQUIP_SETS);
+        equip.setName = setNames[Math.floor(Math.random() * setNames.length)];
+    }
+    
+    return equip;
+}
+
+// ===== enhanceEquipment =====
+function enhanceEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.enhancementLevel >= 15) {
+        showToast('已达强化上限+15');
+        return;
+    }
+    
+    const level = equip.enhancementLevel;
+    const baseCost = 500 * Math.pow(1.8, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`强化需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    
+    // 成功率：+1:100%, +5:80%, +10:50%, +15:20%
+    const successRates = [100, 100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30, 25, 20, 15];
+    const successRate = successRates[level + 1] || 20;
+    const roll = Math.random() * 100;
+    
+    if (roll < successRate) {
+        equip.enhancementLevel++;
+        addLog('good', '装备强化', `强化成功！${equip.name}强化到+${equip.enhancementLevel}`);
+        showToast(`强化成功！+${equip.enhancementLevel}`);
+    } else {
+        equip.enhancementLevel = Math.max(0, equip.enhancementLevel - 1);
+        addLog('warn', '装备强化', `强化失败，${equip.name}降为+${equip.enhancementLevel}`);
+        showToast(`强化失败，降为+${equip.enhancementLevel}`);
+    }
+    
+    saveGame();
+    showImmortalEquipPanel();
+}
+
+// ===== refineEquipment =====
+function refineEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.refinementLevel >= 12) {
+        showToast('已达精炼上限+12');
+        return;
+    }
+    
+    const level = equip.refinementLevel;
+    const baseCost = 1000 * Math.pow(2, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`精炼需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    equip.refinementLevel++;
+    
+    // 精炼必定成功（消耗同名装备可以100%成功，这里简化处理）
+    addLog('good', '装备精炼', `精炼成功！${equip.name}精炼到+${equip.refinementLevel}`);
+    showToast(`精炼成功！+${equip.refinementLevel}`);
+    
+    saveGame();
+    showImmortalEquipPanel();
+}
+
+// ===== equipImmortalItem =====
+function equipImmortalItem(equip) {
+    const slot = equip.slot;
+    const oldEquip = gameState.immortalEquipment[slot];
+    
+    gameState.immortalEquipment[slot] = equip;
+    
+    addLog('good', '装备仙器', `装备【${equip.name}】`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== unequipImmortalItem =====
+function unequipImmortalItem(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) return;
+    
+    // 卸下到背包（暂时不实现背包系统，这里直接消失）
+    addLog('neutral', '卸下仙器', `卸下了${equip.name}`);
+    gameState.immortalEquipment[slot] = null;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== calculateEquipSetBonus =====
+function calculateEquipSetBonus() {
+    const equipped = gameState.immortalEquipment;
+    const bonuses = {};
+    
+    // 统计各套装件数
+    const setCounts = {};
+    for (const slot in equipped) {
+        if (equipped[slot] && equipped[slot].setName) {
+            setCounts[equipped[slot].setName] = (setCounts[equipped[slot].setName] || 0) + 1;
+        }
+    }
+    
+    // 计算套装效果
+    for (const setName in setCounts) {
+        const setData = IMMORTAL_EQUIP_SETS[setName];
+        if (setData) {
+            const count = setCounts[setName];
+            // 检查是否满足套装条件
+            for (let i = 0; i < setData.pieces.length; i++) {
+                const requiredPieces = i + 2; // 2件起效
+                if (count >= requiredPieces) {
+                    bonuses[setName] = setData.setBonus;
                 }
             }
+        }
+    }
+    
+    return bonuses;
+}
+
+// ===== getImmortalEquipStats =====
+function getImmortalEquipStats() {
+    let stats = { attack: 0, defense: 0, hp: 0, speed: 0, crit: 0, resist: 0 };
+    const equip = gameState.immortalEquipment;
+    
+    for (const slot in equip) {
+        if (equip[slot]) {
+            for (const stat in equip[slot].stats) {
+                stats[stat] += equip[slot].stats[stat];
+            }
+        }
+    }
+    
+    // 应用套装加成
+    const setBonuses = calculateEquipSetBonus();
+    for (const setName in setBonuses) {
+        const bonus = setBonuses[setName];
+        if (bonus.effect === 'allStats') {
+            stats.attack *= (1 + bonus.value);
+            stats.defense *= (1 + bonus.value);
+            stats.hp *= (1 + bonus.value);
+        }
+    }
+    
+    return stats;
+}
+
+// ===== showImmortalEquipPanel =====
+function showImmortalEquipPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">⚔️ 飞升装备</h3>';
+    
+    // 装备栏
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
+    
+    for (const slot in IMMORTAL_EQUIP_SLOTS) {
+        const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+        const equip = gameState.immortalEquipment[slot];
+        
+        let bgColor = '#252540';
+        let borderColor = '#444';
+        
+        if (equip) {
+            const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
+            bgColor = qualityData.color + '22';
+            borderColor = qualityData.color;
+        }
+        
+        html += `<div style="background:${bgColor};border:2px solid ${borderColor};border-radius:8px;padding:10px;text-align:center;cursor:pointer;" onclick="showEquipSlotDetail('${slot}')">`;
+        html += `<div style="font-size:24px;">${slotData.icon}</div>`;
+        
+        if (equip) {
+            html += `<div style="color:#fff;font-size:11px;">${equip.name}</div>`;
+            html += `<div style="color:${IMMORTAL_EQUIP_QUALITIES[equip.quality].color};font-size:10px;">${equip.qualityName}</div>`;
+        } else {
+            html += `<div style="color:#666;font-size:11px;">${slotData.name}</div>`;
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    // 当前属性
+    const stats = getImmortalEquipStats();
+    html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">装备加成</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">';
+    html += `<div><div style="color:#f44336;">${stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
+    html += `<div><div style="color:#2196f3;">${stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
+    html += `<div><div style="color:#4caf50;">${stats.hp}</div><div style="color:#666;font-size:10px;">生命</div></div>`;
+    html += `<div><div style="color:#ff9800;">${stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
+    html += `<div><div style="color:#9c27b0;">${stats.crit}%</div><div style="color:#666;font-size:10px;">暴击</div></div>`;
+    html += `<div><div style="color:#00bcd4;">${stats.resist}%</div><div style="color:#666;font-size:10px;">抗性</div></div>`;
+    html += '</div></div>';
+    
+    // 套装效果
+    const setBonuses = calculateEquipSetBonus();
+    if (Object.keys(setBonuses).length > 0) {
+        html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
+        html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">套装效果</div>';
+        
+        for (const setName in setBonuses) {
+            const setData = IMMORTAL_EQUIP_SETS[setName];
+            const bonus = setBonuses[setName];
+            html += `<div style="color:#aaa;font-size:11px;margin-bottom:4px;">【${setName}】${setData.description}</div>`;
+        }
+        html += '</div>';
+    }
+    
+    // 购买装备（仙界商店）
+    html += '<div style="border-top:1px solid #333;padding-top:12px;margin-top:8px;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙界商店</div>';
+    
+    const buyOptions = [
+        { slot: 'weapon', quality: 1, price: 1000, name: '仙器' },
+        { slot: 'weapon', quality: 2, price: 5000, name: '灵仙器' },
+        { slot: 'weapon', quality: 3, price: 20000, name: '神仙器' }
+    ];
+    
+    for (const opt of buyOptions) {
+        const qualityData = IMMORTAL_EQUIP_QUALITIES[opt.quality];
+        const slotData = IMMORTAL_EQUIP_SLOTS[opt.slot];
+        
+        html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">`;
+        html += `<div style="display:flex;align-items:center;gap:10px;">`;
+        html += `<span style="font-size:20px;">${slotData.icon}</span>`;
+        html += `<div><div style="color:${qualityData.color};">${qualityData.name}${slotData.name}</div><div style="color:#888;font-size:10px;">${opt.price}💎</div></div>`;
+        html += '</div>';
+        
+        const canBuy = gameState.immortal.spiritStones >= opt.price;
+        html += `<button onclick="buyImmortalEquip('${opt.slot}', ${opt.quality}, ${opt.price})" ${canBuy ? '' : 'disabled'} style="padding:4px 10px;background:${canBuy ? '#2e7d32' : '#444'};color:${canBuy ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canBuy ? 'pointer' : 'not-allowed'};font-size:11px;">购买</button>`;
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('飞升装备', html, '');
+}
+
+// ===== buyImmortalEquip =====
+function buyImmortalEquip(slot, quality, price) {
+    if (!spendSpiritStones(price, '购买飞升装备')) {
+        return;
+    }
+    
+    const equip = generateImmortalEquip(slot, quality);
+    equipImmortalItem(equip);
+    showToast(`购买成功！获得【${equip.name}】`);
+    closeModal();
+    showImmortalEquipPanel();
+}
+
+// ===== showEquipSlotDetail =====
+function showEquipSlotDetail(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位暂无装备');
+        return;
+    }
+    
+    const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
+    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+    const score = calculateEquipScore(equip);
+    
+    let html = '<div style="padding:16px;">';
+    html += `<div style="text-align:center;">`;
+    html += `<div style="font-size:48px;">${equip.icon}</div>`;
+    html += `<div style="color:${qualityData.color};font-size:18px;font-weight:bold;margin-top:8px;">${equip.name}</div>`;
+    html += `<div style="color:#888;font-size:12px;">${slotData.name}位</div>`;
+    if (equip.setName) {
+        html += `<div style="color:#ffd700;font-size:12px;margin-top:4px;">套装：${equip.setName}</div>`;
+    }
+    html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">评分：${score}</div>`;
+    html += '</div>';
+    
+    // V36 强化和精炼等级
+    html += '<div style="display:flex;gap:10px;margin-top:12px;">';
+    if (equip.enhancementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#ff9800;font-size:11px;">强化+${equip.enhancementLevel}</span>`;
+    }
+    if (equip.refinementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#9c27b0;font-size:11px;">精炼+${equip.refinementLevel}</span>`;
+    }
+    html += '</div>';
+    
+    html += '<div style="margin-top:16px;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">基础属性：</div>';
+    for (const stat in equip.stats) {
+        const statNames = { attack: '攻击', defense: '防御', hp: '生命', speed: '速度', crit: '暴击', resist: '抗性' };
+        let value = equip.stats[stat];
+        // 精炼加成
+        if (equip.refinementLevel > 0) {
+            value = Math.floor(value * (1 + equip.refinementLevel * 0.05));
+        }
+        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">`;
+        html += `<span style="color:#888;">${statNames[stat]}</span>`;
+        html += `<span style="color:#fff;">+${value}</span>`;
+        html += '</div>';
+    }
+    html += '</div>';
+    
+    // V36 词条显示
+    if (equip.affixes && equip.affixes.length > 0) {
+        html += '<div style="margin-top:16px;">';
+        html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">词条：</div>';
+        equip.affixes.forEach(affix => {
+            const color = AFFIX_RARITY_COLORS[affix.rarity] || '#aaa';
+            const valueStr = affix.isPercent ? `${(affix.value * 100).toFixed(0)}%` : affix.value;
+            html += `<div style="display:flex;justify-content:space-between;padding:3px 0;">`;
+            html += `<span style="color:${color};font-size:11px;">◆ ${affix.display}</span>`;
+            html += `<span style="color:${color};font-size:11px;">+${valueStr}</span>`;
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    
+    // V36 强化和精炼按钮
+    const enhanceCost = Math.floor(500 * Math.pow(1.8, equip.enhancementLevel));
+    const refineCost = Math.floor(1000 * Math.pow(2, equip.refinementLevel));
+    
+    html += '<div style="margin-top:16px;display:flex;gap:8px;">';
+    if (equip.enhancementLevel < 15) {
+        html += `<button onclick="enhanceEquipment('${slot}')" ${gameState.immortal.spiritStones >= enhanceCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= enhanceCost ? '#e65100' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= enhanceCost ? 'pointer' : 'not-allowed'};font-size:12px;">强化+${equip.enhancementLevel + 1}(${enhanceCost}💎)</button>`;
+    }
+    if (equip.refinementLevel < 12) {
+        html += `<button onclick="refineEquipment('${slot}')" ${gameState.immortal.spiritStones >= refineCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= refineCost ? '#6a1b9a' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= refineCost ? 'pointer' : 'not-allowed'};font-size:12px;">精炼+${equip.refinementLevel + 1}(${refineCost}💎)</button>`;
+    }
+    html += '</div>';
+    
+    html += `<button onclick="unequipImmortalItem('${slot}');closeModal();" style="width:100%;margin-top:16px;padding:10px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;">卸下</button>`;
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('装备详情', html, '');
+}
+
+
+// Auto-generated module: immortalSkill.js
+'use strict';
+
+// ===== IMMORTAL_SKILLS_DATA =====
+const IMMORTAL_SKILLS_DATA = {
+    '万剑归宗': {
+        type: '剑仙法',
+        icon: '⚔️',
+        baseDamage: 200,
+        cooldown: 5,
+        maxLevel: 10,
+        description: '召唤万剑攻击目标，造成大量伤害',
+        upgradeCost: { spiritStones: 500, herbs: 5 },
+        damageType: 'attack'
+    },
+    '金刚不坏': {
+        type: '体仙法',
+        icon: '🛡️',
+        baseDamage: 0,
+        cooldown: 8,
+        maxLevel: 10,
+        description: '进入金刚不坏状态，防御大幅提升，免疫控制',
+        upgradeCost: { spiritStones: 500, herbs: 5 },
+        damageType: 'defense'
+    },
+    '天地大同': {
+        type: '法仙法',
+        icon: '🌍',
+        baseDamage: 150,
+        cooldown: 6,
+        maxLevel: 10,
+        description: '仙法伤害+150%，范围攻击',
+        upgradeCost: { spiritStones: 600, herbs: 6 },
+        damageType: 'AoE'
+    },
+    '撒豆成兵': {
+        type: '召唤仙法',
+        icon: '👥',
+        baseDamage: 80,
+        cooldown: 10,
+        maxLevel: 10,
+        description: '召唤仙兵助战，仙兵继承部分属性',
+        upgradeCost: { spiritStones: 700, herbs: 8 },
+        damageType: 'summon'
+    },
+    '周天星斗': {
+        type: '阵法仙法',
+        icon: '⭐',
+        baseDamage: 0,
+        cooldown: 15,
+        maxLevel: 10,
+        description: '布置周天星斗阵，阵内队友属性+50%',
+        upgradeCost: { spiritStones: 800, herbs: 10 },
+        damageType: 'buff'
+    }
+};
+
+// ===== IMMORTAL_SKILL_TYPES =====
+const IMMORTAL_SKILL_TYPES = {
+    '剑仙法': { color: '#f44336', bonusType: 'attack', bonusValue: 0.2 },
+    '体仙法': { color: '#4caf50', bonusType: 'defense', bonusValue: 0.2 },
+    '法仙法': { color: '#2196f3', bonusType: 'spellDamage', bonusValue: 0.15 },
+    '召唤仙法': { color: '#9c27b0', bonusType: 'summon', bonusValue: 0.1 },
+    '阵法仙法': { color: '#ff9800', bonusType: 'teamBuff', bonusValue: 0.05 }
+};
+
+// ===== learnImmortalSkill =====
+function learnImmortalSkill(skillName) {
+    const skillData = IMMORTAL_SKILLS_DATA[skillName];
+    if (!skillData) return false;
+    
+    // 检查是否已学会
+    if (gameState.immortalSkills.find(s => s.name === skillName)) {
+        showToast('已学会此仙法');
+        return false;
+    }
+    
+    const skill = {
+        uid: 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: skillName,
+        type: skillData.type,
+        level: 1,
+        maxLevel: skillData.maxLevel,
+        cooldown: skillData.cooldown,
+        currentCooldown: 0,
+        damage: skillData.baseDamage,
+        description: skillData.description
+    };
+    
+    gameState.immortalSkills.push(skill);
+    addLog('good', '学会仙法', `学会【${skillName}】！`);
+    saveGame();
+    return true;
+}
+
+// ===== upgradeImmortalSkill =====
+function upgradeImmortalSkill(skillIndex) {
+    if (gameState.immortalSkills.length <= skillIndex) return;
+    
+    const skill = gameState.immortalSkills[skillIndex];
+    const skillData = IMMORTAL_SKILLS_DATA[skill.name];
+    
+    if (skill.level >= skill.maxLevel) {
+        showToast('仙法已达最大等级');
+        return;
+    }
+    
+    const cost = {
+        spiritStones: skillData.upgradeCost.spiritStones * skill.level,
+        herbs: skillData.upgradeCost.herbs * skill.level
+    };
+    
+    if (gameState.immortal.spiritStones < cost.spiritStones) {
+        showToast('仙石不足');
+        return;
+    }
+    
+    // 扣除仙石
+    gameState.immortal.spiritStones -= cost.spiritStones;
+    
+    // 升级
+    skill.level++;
+    skill.damage = Math.floor(skillData.baseDamage * (1 + skill.level * 0.1));
+    
+    addLog('good', '仙法升级', `${skill.name}升级到Lv.${skill.level}！`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== useImmortalSkill =====
+function useImmortalSkill(skillIndex, target) {
+    if (gameState.immortalSkills.length <= skillIndex) return;
+    
+    const skill = gameState.immortalSkills[skillIndex];
+    
+    if (skill.currentCooldown > 0) {
+        showToast(`${skill.name}冷却中，还需${skill.currentCooldown}秒`);
+        return;
+    }
+    
+    // 应用技能效果
+    const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
+    let effectDescription = '';
+    
+    switch (skill.damageType) {
+        case 'attack':
+            effectDescription = `对目标造成${skill.damage}%伤害`;
+            // 直接应用伤害（战斗系统会在此处接入）
+            break;
+        case 'defense':
+            effectDescription = '防御大幅提升，免疫控制3秒';
+            break;
+        case 'AoE':
+            effectDescription = `对范围内敌人造成${skill.damage}%伤害`;
+            break;
+        case 'summon':
+            effectDescription = '召唤仙兵助战';
+            break;
+        case 'buff':
+            effectDescription = '阵内队友属性+50%';
+            break;
+    }
+    
+    // 设置冷却
+    skill.currentCooldown = skill.cooldown;
+    
+    addLog('good', '施展仙法', `施展【${skill.name}】：${effectDescription}`);
+    saveGame();
+    
+    // 启动冷却计时
+    startSkillCooldownTimer(skillIndex);
+    
+    return true;
+}
+
+// ===== startSkillCooldownTimer =====
+function startSkillCooldownTimer(skillIndex) {
+    const interval = setInterval(() => {
+        if (gameState.immortalSkills.length <= skillIndex) {
+            clearInterval(interval);
+            return;
+        }
+        
+        const skill = gameState.immortalSkills[skillIndex];
+        if (skill.currentCooldown > 0) {
+            skill.currentCooldown--;
+            updateDisplay();
+        } else {
+            clearInterval(interval);
+        }
+    }, 1000);
+}
+
+// ===== showImmortalSkillPanel =====
+function showImmortalSkillPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">✨ 仙法面板</h3>';
+    
+    // 技能列表
+    if (gameState.immortalSkills.length === 0) {
+        html += '<div style="text-align:center;color:#666;padding:30px;">尚未学会任何仙法</div>';
+    } else {
+        for (let i = 0; i < gameState.immortalSkills.length; i++) {
+            const skill = gameState.immortalSkills[i];
+            const skillData = IMMORTAL_SKILLS_DATA[skill.name];
+            const typeData = IMMORTAL_SKILL_TYPES[skill.type];
             
-            return {
-                style: style,
-                patterns: patterns,
-                weaknesses: weaknesses,
-                defenseRatio: defenseRatio,
-                spellUsageRate: profile.spellUsageRate
+            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:10px;border-left:4px solid ${typeData.color};">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:28px;">${skillData.icon}</span>`;
+            html += `<div style="flex:1;">`;
+            html += `<div style="color:#fff;font-weight:bold;">${skill.name} <span style="color:${typeData.color};font-size:12px;">[${skill.type}]</span></div>`;
+            html += `<div style="color:#888;font-size:11px;">Lv.${skill.level}/${skill.maxLevel}</div>`;
+            html += '</div>';
+            
+            // 冷却显示
+            if (skill.currentCooldown > 0) {
+                html += `<div style="color:#f44336;font-size:12px;">冷却:${skill.currentCooldown}秒</div>`;
+            } else {
+                html += `<button onclick="useImmortalSkill(${i});closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">施展</button>`;
+            }
+            
+            html += '</div>';
+            
+            // 升级按钮
+            const upgradeCost = {
+                spiritStones: skillData.upgradeCost.spiritStones * skill.level,
+                herbs: skillData.upgradeCost.herbs * skill.level
             };
+            
+            html += `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">`;
+            html += `<div style="color:#aaa;font-size:11px;">${skill.description}</div>`;
+            
+            if (skill.level < skill.maxLevel) {
+                const canUpgrade = gameState.immortal.spiritStones >= upgradeCost.spiritStones;
+                html += `<button onclick="upgradeImmortalSkill(${i});closeModal();" ${canUpgrade ? '' : 'disabled'} style="padding:4px 8px;background:${canUpgrade ? '#1565c0' : '#444'};color:${canUpgrade ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canUpgrade ? 'pointer' : 'not-allowed'};font-size:11px;">升级 ${upgradeCost.spiritStones}💎</button>`;
+            } else {
+                html += `<span style="color:#ffd700;font-size:11px;">已满级</span>`;
+            }
+            
+            html += '</div></div>';
+        }
+    }
+    
+    // 学习新仙法
+    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #333;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">可学习仙法：</div>';
+    
+    const availableSkills = Object.keys(IMMORTAL_SKILLS_DATA).filter(
+        name => !gameState.immortalSkills.find(s => s.name === name)
+    );
+    
+    if (availableSkills.length === 0) {
+        html += '<div style="color:#666;text-align:center;">已学会所有仙法</div>';
+    } else {
+        for (const skillName of availableSkills) {
+            const skillData = IMMORTAL_SKILLS_DATA[skillName];
+            const typeData = IMMORTAL_SKILL_TYPES[skillData.type];
+            
+            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:20px;">${skillData.icon}</span>`;
+            html += `<div><div style="color:#fff;font-size:13px;">${skillName}</div><div style="color:${typeData.color};font-size:11px;">${skillData.type}</div></div>`;
+            html += '</div>';
+            html += `<button onclick="learnImmortalSkill('${skillName}');closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">学习</button>`;
+            html += '</div>';
+        }
+    }
+    html += '</div>';
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('仙法', html, '');
+}
+
+// ===== getImmortalSkillBonus =====
+function getImmortalSkillBonus(type) {
+    let bonus = 0;
+    for (const skill of gameState.immortalSkills) {
+        const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
+        if (skillTypeData.bonusType === type) {
+            bonus += skillTypeData.bonusValue * skill.level;
+        }
+    }
+    return bonus;
+}
+
+
+// Auto-generated module: init.js
+'use strict';
+
+        // ===== init =====
+        function init() {
+            loadMiniMaxConfig();
+            updateDisplay();
         }
 
-        // ===== getAdjustedToolWeights =====
-        function getAdjustedToolWeights() {
-            const profile = gameState.combatProfile;
-            const analysis = analyzePlayerProfile();
-            
-            // 复制基础权重
-            const weights = {};
-            for (const tool in COMBAT_AI_TOOLS) {
-                weights[tool] = COMBAT_AI_TOOLS[tool].weight;
+        // ===== loadMiniMaxConfig =====
+        function loadMiniMaxConfig() {
+            const saved = localStorage.getItem(CONFIG.miniMaxConfigKey);
+            if (saved) {
+                try {
+                    miniMaxConfig = JSON.parse(saved);
+                    // 确保features结构完整
+                    if (!miniMaxConfig.features) {
+                        miniMaxConfig.features = { ...DEFAULT_MINIMAX_CONFIG.features };
+                    }
+                } catch (e) {
+                    miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
+                }
             }
-            
-            if (!analysis) return weights;
-            
-            // 根据玩家风格调整权重
-            if (analysis.defenseRatio > 0.5) {
-                // 玩家爱防御 → 提高破防工具权重
-                weights.heavyAttack *= 1.4;
-                weights.armorBreak *= 1.3;
-                weights.techniqueBreak *= 1.2;
-            }
-            
-            if (analysis.weaknesses.includes('attack_predictable')) {
-                // 玩家攻击可预测 → 提高反击权重
-                weights.counter *= 1.5;
-                weights.defend *= 0.7; // 少防御，多等反击机会
-            }
-            
-            // 检查玩家使用大招的时机
-            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
-            if (ultimateCount > profile.totalBattles * 0.3) {
-                // 玩家爱用大招 → 提高打断能力
-                weights.techniqueBreak *= 1.3;
-            }
-            
-            return weights;
         }
 
-        // ===== selectBestAI tool =====
-        function selectBestAITool(opponentHp, playerHp, playerDefending, playerEffects) {
-            const weights = getAdjustedToolWeights();
-            const tools = Object.keys(weights);
-            
-            // 计算每个工具的适用度
-            const scores = tools.map(tool => {
-                let score = weights[tool];
-                const toolDef = COMBAT_AI_TOOLS[tool];
-                
-                // 根据触发条件调整
-                if (toolDef.trigger === 'player_defending' && playerDefending) {
-                    score *= 2;
-                }
-                if (toolDef.trigger === 'hp_below_50' && opponentHp < opponent.maxHP * 0.5) {
-                    score *= 1.8;
-                }
-                if (toolDef.trigger === 'player_high_aggression' && playerEffects.attacking) {
-                    score *= 1.5;
-                }
-                if (toolDef.trigger === 'energy_full' && combatEnergy >= 80) {
-                    score *= 1.3;
-                }
-                
-                return { tool, score, name: toolDef.name };
-            });
-            
-            // 按分数排序
-            scores.sort((a, b) => b.score - a.score);
-            
-            return scores[0];
-        }
-
-        // ===== executeOpponentTurn with AI Learning =====
-        const originalExecuteOpponentTurn = executeOpponentTurn;
-        function executeOpponentTurn() {
-            if (!combatState.inProgress || combatState.opponent.hp <= 0) return;
-            
-            combatState.round++;
-            const p = combatState.player;
-            const o = combatState.opponent;
-            const effects = combatState.effects.opponent;
-            
-            // 显示AI思考状态
-            showAIThinking();
-            
-            // 清除防御状态
-            effects.defending = false;
-            
-            // V33: AI工具选择（基于玩家画像）
-            const aiDecision = selectBestAITool(o.hp, p.hp, p.defending, p.effects || {});
-            
-            // 记录玩家行动（事后学习）
-            if (combatState.turn === 'player') {
-                // 玩家刚行动过，记录该行动
-                const lastAction = combatState.log[combatState.log.length - 1];
-                if (lastAction && lastAction.type === 'player-action') {
-                    if (lastAction.actionType === 'attack') {
-                        recordPlayerAction('attack', { damage: lastAction.damage });
-                    } else if (lastAction.actionType === 'defend') {
-                        recordPlayerAction('defend');
-                    } else if (lastAction.actionType === 'ultimate') {
-                        recordPlayerAction('ultimate');
+        // ===== startNewGame =====
+        function startNewGame() {
+            gameState = {
+                realm: 0,
+                stage: 0,
+                qi: 20,
+                maxQi: 100,
+                spiritStones: 50,
+                mindset: 50,
+                days: 1,
+                cultivationProgress: 0,
+                eventLog: [],
+                isGameOver: false,
+                isVictory: false,
+                inventory: [],
+                equippedTreasures: [null, null, null],
+                maxInventorySlots: 20,
+                shopItems: [],
+                lastShopDay: 0,
+                shopRefreshCount: 0, // 经济调整：商店刷新次数计数器，用于递增刷新费用
+                activeEffects: {
+                    breakthrough_boost: 0,
+                    cultivate_speed: 0,
+                    渡劫_mindset_protect: 0,
+                    attack: 0,
+                    defense: 0,
+                    cultivate_qi_rate: 0,
+                    渡劫_damage_reduce: 0,
+                    escape: 0,
+                    foresee_event: 0,
+                    all_stats: 0
+                },
+                tribulation: {
+                    inProgress: false,
+                    currentStage: 0,
+                    totalStages: 9,
+                    currentType: null,
+                    preparations: [],
+                    damageTaken: 0,
+                    tribKey: null
+                },
+                hasTransmigrationBuff: false,
+                tribulationRecord: [],
+                combat: {
+                    wins: 0,
+                    losses: 0,
+                    honor: 0,
+                    fame: 0,
+                    battleHistory: [],
+                    injured: false,
+                    injuryEndDay: 0
+                },
+                sect: {
+                    name: null,
+                    level: 0,
+                    spiritStones: 0,
+                    disciples: [],
+                    elders: [],
+                    buildings: {
+                        library: false,
+                        alchemy: false,
+                        forge: false,
+                        archive: false
+                    },
+                    techniques: [],
+                    contributionShop: [],
+                    lastShopRefresh: 0,
+                    lastResourceCollection: 0,
+                    // V29 NPC AI系统
+                    npcDialogueHistory: [],
+                    npcTasks: [],
+                    npcLastActions: {},
+                    // V30 渡劫审批系统
+                    tribulationRequest: {
+                        status: 'none',
+                        elderScore: 0,
+                        elderComment: '',
+                        leaderDecision: '',
+                        leaderComment: '',
+                        buffApplied: false,
+                        submitDay: 0
+                    },
+                    // V31 天道轮回系统
+                    celestialCycle: {
+                        day: 0,
+                        completed: false,
+                        lastResult: null,
+                        blessingActive: false,
+                        cycleInterval: 3
+                    },
+                    // V35 宗门任务链
+                    sectMissions: [],
+                    sectMissionCooldown: 0,
+                    lastMissionRefreshDay: 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: 0,
+                    lastForgeDay: 0,
+                    // V37 天道法则系统
+                    celestialLaws: {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    }
+                },
+                // V6 奇遇系统字段
+                serendipity: {
+                    lastTriggerDay: 0,
+                    todayCount: 0,
+                    lastTriggerType: null,
+                    cooldownTypes: {},
+                    badLuck: 0,
+                    currentEvent: null,
+                    log: [],
+                    luckStatus: null,
+                    luckEndDay: 0,
+                    serendipityBoostEndDay: 0
+                },
+                // V7 灵根/体质系统
+                spiritRoot: {
+                    ...generateRandomSpiritRoot(),
+                    awakeningAvailable: false,
+                    hasAwakened: false,
+                    awakenedQuality: null
+                },
+                // V32 灵根觉醒系统
+                spiritRootAwakening: {
+                    status: 'dormant',
+                    stage: 0,
+                    triggerDay: 0,
+                    tasks: [],
+                    rewards: null,
+                    lastEventDay: 0,
+                    attempts: 0
+                },
+                constitutions: [],
+                // V8 丹药炼器系统
+                crafting: {
+                    furnace: { level: 1, type: 'alchemy' },
+                    anvil: { level: 1, type: 'forge' },
+                    transactionLog: []
+                },
+                // V9 世界地图系统
+                worldMap: {
+                    currentContinent: '中州',
+                    currentRegion: '中州城',
+                    exploredContinents: ['中州'],
+                    exploredRegions: ['中州城', '中州野外'],
+                    actionPower: 10,
+                    maxActionPower: 10,
+                    continentUnlocks: {
+                        '中州': 0,
+                        '南疆': 1,
+                        '北域': 2,
+                        '西域': 3,
+                        '东海': 2,
+                        '仙界碎片': 4
+                    },
+                    bossRefreshDays: {},
+                    lastTravelDay: 0
+                },
+                // E1 NPC对话记忆
+                npcMemory: [],
+                // B 成就/称号系统
+                title: '筑基修士',
+                achievements: {
+                    unlocked: [],
+                    titles: [],
+                    stats: {
+                        tribulationsCompleted: 0,
+                        dungeonBossesKilled: 0,
+                        sectContributions: 0,
+                        treasuresRefined: 0,
+                        serendipitiesEncountered: 0,
+                        flawlessTribulations: 0
                     }
                 }
-            }
-            
-            // 根据AI决策选择行动
-            let action = 'attack';
-            let actionDetail = '';
-            
-            if (aiDecision && aiDecision.tool === 'heal') {
-                action = 'heal';
-                actionDetail = '使用丹药';
-            } else if (aiDecision && aiDecision.tool === 'defend') {
-                action = 'defend';
-                actionDetail = '防御';
-            } else if (aiDecision && aiDecision.tool === 'counter') {
-                action = 'counter';
-                actionDetail = '反击';
-            }
-            
-            // 如果hp低且有回春丹，优先治疗
-            if (o.hp < o.maxHP * 0.4 && getItemCount('回春丹') > 0 && Math.random() < 0.6) {
-                action = 'heal';
-                actionDetail = '紧急治疗';
-            }
-            
-            if (action === 'heal') {
-                // 使用回春丹
-                const idx = gameState.inventory.findIndex(i => i.name === '回春丹');
-                if (idx !== -1) {
-                    gameState.inventory[idx].quantity--;
-                    if (gameState.inventory[idx].quantity <= 0) {
-                        gameState.inventory.splice(idx, 1);
-                    }
-                }
-                const heal = Math.floor(o.maxHP * 0.3);
-                o.hp = Math.min(o.maxHP, o.hp + heal);
-                combatState.log.push({
-                    type: 'opponent-action',
-                    actionType: 'heal',
-                    text: `${o.name}使用了回春丹，恢复${heal}生命 (AI分析:${aiDecision?.name || '攻击'})`,
-                    round: combatState.round
-                });
-            } else if (action === 'defend') {
-                effects.defending = true;
-                combatState.log.push({
-                    type: 'opponent-action',
-                    actionType: 'defend',
-                    text: `${o.name}进入防御姿态 (AI识破玩家进攻模式)`,
-                    round: combatState.round
-                });
-            } else if (action === 'counter') {
-                // 反击 - 先记录，等玩家攻击后触发
-                combatState.log.push({
-                    type: 'opponent-action',
-                    actionType: 'counter_setup',
-                    text: `${o.name}识破玩家攻击规律，准备反击`,
-                    round: combatState.round
-                });
-                // 直接攻击，但标记为反击
-                let baseDamage = o.attack;
-                baseDamage = Math.floor(baseDamage * 1.3); // 反击加成
-                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
-                
-                let techniqueMultiplier = 1;
-                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
-                    techniqueMultiplier = 1.5;
-                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
-                    techniqueMultiplier = 0.7;
-                }
-                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
-                
-                let finalDamage = baseDamage;
-                if (combatState.effects.player.defending) {
-                    finalDamage = Math.floor(baseDamage * 0.5);
-                }
-                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * 0.5));
-                
-                p.hp = Math.max(0, p.hp - finalDamage);
-                combatState.effects.player.defending = false;
-                
-                const techniqueColor = TECHNIQUE_COLORS[o.technique];
-                combatState.log.push({
-                    type: 'opponent-action',
-                    actionType: 'damage',
-                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害（反击）`,
-                    round: combatState.round
-                });
-            } else {
-                // 普通攻击
-                let baseDamage = o.attack;
-                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
-                
-                let techniqueMultiplier = 1;
-                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
-                    techniqueMultiplier = 1.5;
-                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
-                    techniqueMultiplier = 0.7;
-                }
-                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
-                
-                let finalDamage = baseDamage;
-                if (combatState.effects.player.defending) {
-                    finalDamage = Math.floor(baseDamage * 0.5);
-                }
-                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * (1 + combatState.effects.player.defenseBoost)));
-                
-                const isCrit = Math.random() < o.critRate;
-                if (isCrit) {
-                    finalDamage = Math.floor(finalDamage * 1.5);
-                }
-                
-                p.hp = Math.max(0, p.hp - finalDamage);
-                combatState.effects.player.defending = false;
-                
-                const techniqueColor = TECHNIQUE_COLORS[o.technique];
-                combatState.log.push({
-                    type: 'opponent-action',
-                    actionType: 'damage',
-                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
-                    round: combatState.round
-                });
-            }
-            
-            // 检查玩家是否死亡
-            if (p.hp <= 0) {
-                setTimeout(() => endCombat('lose'), 500);
-            } else {
-                combatState.turn = 'player';
-                renderCombatArena();
-            }
-        }
-
-        // ===== showAIThinking =====
-        function showAIThinking() {
-            const analysis = analyzePlayerProfile();
-            if (!analysis) return;
-            
-            // 在对手血条附近显示AI状态
-            const aiStatusEl = document.getElementById('aiThinkingStatus');
-            if (aiStatusEl) {
-                let statusText = '';
-                if (analysis.style === 'defensive') {
-                    statusText = '📊 分析中: 玩家偏防守，启用破防策略...';
-                } else if (analysis.style === 'aggressive') {
-                    statusText = '📊 分析中: 玩家进攻猛烈，等待反击时机...';
-                } else {
-                    statusText = '📊 分析中: 玩家风格均衡，保持平衡策略...';
-                }
-                aiStatusEl.textContent = statusText;
-                aiStatusEl.style.display = 'block';
-                
-                // 3秒后隐藏
-                setTimeout(() => {
-                    if (aiStatusEl) aiStatusEl.style.display = 'none';
-                }, 3000);
-            }
-        }
-
-        // ===== learnFromCombat =====
-        function learnFromCombat(result) {
-            const profile = gameState.combatProfile;
-            if (!profile) return;
-            
-            if (result === 'win') {
-                profile.winsAgainst++;
-            }
-            
-            // 战后分析
-            const analysis = analyzePlayerProfile();
-            if (analysis) {
-                // 显示学习报告
-                setTimeout(() => {
-                    showLearningReport(analysis);
-                }, 1000);
-            }
-        }
-
-        // ===== showLearningReport =====
-        function showLearningReport(analysis) {
-            const report = `
-                <div style="padding:20px;text-align:center">
-                    <div style="font-size:24px;color:#2196f3;margin-bottom:15px">🧠 AI对战报告</div>
-                    <div style="background:rgba(33,150,243,0.1);padding:15px;border-radius:8px;text-align:left;margin-bottom:15px">
-                        <div style="color:#ffd700">📈 观察到的玩家风格:</div>
-                        <div style="color:#fff;margin-top:8px">战斗风格: <span style="color:${
-                            analysis.style === 'defensive' ? '#4caf50' : 
-                            analysis.style === 'aggressive' ? '#f44336' : '#2196f3'
-                        }">${analysis.style === 'defensive' ? '防守型' : analysis.style === 'aggressive' ? '进攻型' : '平衡型'}</span></div>
-                        <div style="color:#fff">防御频率: ${(analysis.defenseRatio * 100).toFixed(0)}%</div>
-                        <div style="color:#fff">弱点检测: ${analysis.weaknesses.length > 0 ? '攻击可预测' : '无明显弱点'}</div>
-                    </div>
-                    <div style="color:#aaa;font-size:12px">AI已根据您的风格调整策略</div>
-                    <button onclick="closeModal('modalNormal')" style="margin-top:15px;padding:8px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">确定</button>
-                </div>
-            `;
-            
-            const modal = document.getElementById('modalNormal');
-            if (modal) {
-                modal.innerHTML = report;
-                modal.classList.remove('hidden');
-            }
-        }
-
-        // ===== endCombat =====
-        function endCombat(result) {
-            combatState.inProgress = false;
-            const p = combatState.player;
-            const o = combatState.opponent;
-
-            let reward = 0;
-            let penalty = 0;
-            let honorChange = 0;
-            let fameChange = 0;
-            let realmDropChance = 0;
-
-            if (result === 'win') {
-                reward = Math.floor(o.maxHP * 0.5);
-                gameState.spiritStones += reward;
-                honorChange = 10;
-                fameChange = 5;
-                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
-                gameState.combat.wins++;
-                gameState.combat.honor += honorChange;
-                gameState.combat.fame += fameChange;
-                combatState.log.push({
-                    type: 'system',
-                    text: `🎉 胜利！获得${reward}灵石，荣誉+${honorChange}，声望+${fameChange}`,
-                    round: combatState.round
-                });
-            } else if (result === 'lose') {
-                penalty = Math.floor(gameState.spiritStones * 0.3);
-                gameState.spiritStones -= penalty;
-                honorChange = -5;
-                fameChange = -3;
-                realmDropChance = 0.1;
-                gameState.combat = gameState.combat || { wins: 0, losses: 0, honor: 0, fame: 0, battleHistory: [] };
-                gameState.combat.losses++;
-                gameState.combat.honor = Math.max(0, gameState.combat.honor + honorChange);
-                gameState.combat.fame = Math.max(0, gameState.combat.fame + fameChange);
-
-                // 境界跌落
-                if (Math.random() < realmDropChance) {
-                    const oldRealm = gameState.realm;
-                    gameState.realm = Math.max(0, gameState.realm - 1);
-                    combatState.log.push({
-                        type: 'system',
-                        text: `💔 境界跌落！从${CONFIG.realms[oldRealm]}期跌落到${CONFIG.realms[gameState.realm]}期`,
-                        round: combatState.round
-                    });
-                }
-
-                // 重伤debuff：3场内属性-20%
-                gameState.combat.injured = true;
-                gameState.combat.injuryEndDay = gameState.days + 3;
-                combatState.log.push({
-                    type: 'system',
-                    text: `💔 重伤！未来3场战斗属性降低20%`,
-                    round: combatState.round
-                });
-
-                combatState.log.push({
-                    type: 'system',
-                    text: `😢 战败！损失${penalty}灵石，荣誉${honorChange}，声望${fameChange}`,
-                    round: combatState.round
-                });
-            }
-
-            // 记录战斗历史
-            gameState.combat.battleHistory = gameState.combat.battleHistory || [];
-            gameState.combat.battleHistory.unshift({
-                opponent: o.name,
-                result: result,
-                reward: reward,
-                penalty: penalty,
-                day: gameState.days
-            });
-            if (gameState.combat.battleHistory.length > 50) {
-                gameState.combat.battleHistory.pop();
-            }
-
-            // V33: 触发AI学习
-            learnFromCombat(result);
-
+            };
             saveGame();
-            renderCombatArena();
+            showGameUI();
+            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
         }
 
-        // ===== renderCombatResult =====
-        function renderCombatResult() {
-            const result = combatState.opponent.hp <= 0 ? 'win' : (combatState.player.hp <= 0 ? 'lose' : 'escape');
-            const o = combatState.opponent;
-            let reward = 0;
-            let penalty = 0;
+        // ===== loadGame =====
+        function loadGame() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                // 确保V2新增字段存在（向后兼容）
+                gameState = {
+                    ...gameState,
+                    ...loaded,
+                    activeEffects: loaded.activeEffects || {
+                        breakthrough_boost: 0,
+                        cultivate_speed: 0,
+                        渡劫_mindset_protect: 0,
+                        attack: 0,
+                        defense: 0,
+                        cultivate_qi_rate: 0,
+                        渡劫_damage_reduce: 0,
+                        escape: 0,
+                        foresee_event: 0,
+                        all_stats: 0
+                    },
+                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
+                    inventory: loaded.inventory || [],
+                    shopItems: loaded.shopItems || [],
+                    lastShopDay: loaded.lastShopDay || 0,
+                    tribulation: loaded.tribulation || {
+                        inProgress: false,
+                        currentStage: 0,
+                        totalStages: 9,
+                        currentType: null,
+                        preparations: [],
+                        damageTaken: 0,
+                        tribKey: null
+                    },
+                    hasTransmigrationBuff: loaded.hasTransmigrationBuff || false,
+                    tribulationRecord: loaded.tribulationRecord || [],
+                    combat: loaded.combat || {
+                        wins: 0,
+                        losses: 0,
+                        honor: 0,
+                        fame: 0,
+                        battleHistory: [],
+                        injured: false,
+                        injuryEndDay: 0
+                    },
+                    // V33 战斗AI学习系统
+                    combatProfile: loaded.combatProfile || {
+                        playerPatterns: [],
+                        totalBattles: 0,
+                        winsAgainst: 0,
+                        currentEnemy: null,
+                        learningData: {},
+                        preferredDistance: null,
+                        spellUsageRate: 0,
+                        defenseFrequency: 0,
+                        attackTiming: []
+                    },
+                    lastCombatDay: loaded.lastCombatDay || 0,
+                    // V35 宗门互动增强
+                    sectMissions: loaded.sectMissions || [],
+                    sectMissionCooldown: loaded.sectMissionCooldown || 0,
+                    lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
+                    lastForgeDay: loaded.lastForgeDay || 0,
+                    // V37 天道法则系统
+                    celestialLaws: loaded.celestialLaws || {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    },
+                    sect: loaded.sect ? {
+                        ...loaded.sect,
+                        npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
+                        npcTasks: loaded.sect.npcTasks || [],
+                        npcLastActions: loaded.sect.npcLastActions || {},
+                        tribulationRequest: loaded.sect.tribulationRequest || {
+                            status: 'none', elderScore: 0, elderComment: '',
+                            leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
+                        },
+                        celestialCycle: loaded.sect.celestialCycle || {
+                            day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
+                        },
+                        // V35 宗门任务链
+                        sectMissions: loaded.sect.sectMissions || [],
+                        sectMissionCooldown: loaded.sect.sectMissionCooldown || 0
+                    } : {
+                        name: null,
+                        level: 0,
+                        spiritStones: 0,
+                        disciples: [],
+                        elders: [],
+                        buildings: {
+                            library: false,
+                            alchemy: false,
+                            forge: false,
+                            archive: false
+                        },
+                        techniques: [],
+                        contributionShop: [],
+                        lastShopRefresh: 0,
+                        lastResourceCollection: 0
+                    },
+                    serendipity: loaded.serendipity || {
+                        lastTriggerDay: 0,
+                        todayCount: 0,
+                        lastTriggerType: null,
+                        cooldownTypes: {},
+                        badLuck: 0,
+                        currentEvent: null,
+                        log: [],
+                        luckStatus: null,
+                        luckEndDay: 0,
+                        serendipityBoostEndDay: 0
+                    },
+                    // V7 灵根/体质系统
+                    spiritRoot: loaded.spiritRoot ? {
+                        ...loaded.spiritRoot,
+                        awakeningAvailable: loaded.spiritRoot.awakeningAvailable || false,
+                        hasAwakened: loaded.spiritRoot.hasAwakened || false,
+                        awakenedQuality: loaded.spiritRoot.awakenedQuality || null
+                    } : { ...generateRandomSpiritRoot(), awakeningAvailable: false, hasAwakened: false, awakenedQuality: null },
+                    // V32 灵根觉醒系统
+                    spiritRootAwakening: loaded.spiritRootAwakening || {
+                        status: 'dormant',
+                        stage: 0,
+                        triggerDay: 0,
+                        tasks: [],
+                        rewards: null,
+                        lastEventDay: 0,
+                        attempts: 0
+                    },
+                    constitutions: loaded.constitutions || [],
+                    // V8 丹药炼器系统
+                    crafting: loaded.crafting || {
+                        furnace: { level: 1, type: 'alchemy' },
+                        anvil: { level: 1, type: 'forge' },
+                        transactionLog: []
+                    },
+                    // V9 世界地图系统
+                    worldMap: loaded.worldMap || {
+                        currentContinent: '中州',
+                        currentRegion: '中州城',
+                        exploredContinents: ['中州'],
+                        exploredRegions: ['中州城', '中州野外'],
+                        actionPower: 10,
+                        maxActionPower: 10,
+                        continentUnlocks: {
+                            '中州': 0,
+                            '南疆': 1,
+                            '北域': 2,
+                            '西域': 3,
+                            '东海': 2,
+                            '仙界碎片': 4
+                        },
+                        bossRefreshDays: {},
+                        lastTravelDay: 0
+                    }
+                };
+                // E1 确保npcMemory字段存在（向后兼容）
+                if (!gameState.npcMemory) gameState.npcMemory = [];
+                // B 成就/称号系统向后兼容
+                if (!gameState.title) gameState.title = '筑基修士';
+                if (!gameState.achievements) {
+                    gameState.achievements = {
+                        unlocked: [],
+                        titles: [],
+                        stats: {
+                            tribulationsCompleted: 0,
+                            dungeonBossesKilled: 0,
+                            sectContributions: 0,
+                            treasuresRefined: 0,
+                            serendipitiesEncountered: 0,
+                            flawlessTribulations: 0
+                        }
+                    };
+                }
+                // 确保activeEffects包含serendipity_boost
+                if (!gameState.activeEffects.serendipity_boost) {
+                    gameState.activeEffects.serendipity_boost = 0;
+                }
+                // 初始化体质效果
+                initializeConstitutionEffects();
+                // 重新计算装备效果
+                recalculateAllEffects();
+                // 初始化世界地图
+                initWorldMap();
+                if (gameState.isGameOver) {
+                    showGameOverScreen();
+                } else {
+                    showGameUI();
+                }
+            } else {
+                alert('没有找到存档！');
+            }
+        }
 
-            if (result === 'win') {
-                reward = Math.floor(o.maxHP * 0.5);
-            } else if (result === 'lose') {
-                penalty = Math.floor(gameState.spiritStones / 0.7 * 0.3) || Math.floor(gameState.spiritStones * 0.3);
+        // ===== showGameUI =====
+        function showGameUI() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('apiConfig').classList.add('hidden');
+            document.getElementById('gameStats').classList.remove('hidden');
+            document.getElementById('cultivationProgress').classList.remove('hidden');
+            document.getElementById('equipmentBar').classList.remove('hidden');
+            document.getElementById('gameButtons').classList.remove('hidden');
+            document.getElementById('eventLog').classList.remove('hidden');
+            updateDisplay();
+            renderLog();
+            updateEquipmentBar();
+            // 检查商店刷新
+            if (gameState.lastShopDay < gameState.days) {
+                refreshShop(true);
+            }
+            // 重置每日行动力
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                if (wm.lastTravelDay < gameState.days) {
+                    wm.actionPower = wm.maxActionPower;
+                    wm.lastTravelDay = 0;
+                }
+            }
+            // 检查宗门按钮显示
+            const sectBtn = document.getElementById('sectBtn');
+            if (sectBtn) {
+                sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
+            }
+            // V37 检查悟道按钮显示
+            const lawBtn = document.getElementById('lawBtn');
+            if (lawBtn) {
+                lawBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+        }
+
+        // ===== updateDisplay =====
+        function updateDisplay() {
+            const realmName = CONFIG.realms[gameState.realm];
+            const stageName = CONFIG.stages[gameState.stage];
+            
+            document.getElementById('realmDisplay').textContent = `${realmName}期`;
+            document.getElementById('qiDisplay').textContent = `${gameState.qi}/${gameState.maxQi}`;
+            document.getElementById('stonesDisplay').textContent = gameState.spiritStones;
+            document.getElementById('mindsetDisplay').textContent = gameState.mindset;
+            document.getElementById('daysDisplay').textContent = gameState.days;
+            
+            document.getElementById('realmName').textContent = `${realmName}期`;
+            document.getElementById('realmStage').textContent = stageName;
+
+            // A5 更新称号显示
+            const titleDisplay = document.getElementById('titleDisplay');
+            if (titleDisplay) {
+                titleDisplay.textContent = `【${gameState.title || '筑基修士'}】`;
             }
 
-            const resultTitle = result === 'win' ? '🎉 胜利！' : result === 'lose' ? '💔 战败' : '🏃 逃跑';
-            const resultClass = result === 'win' ? 'win' : result === 'lose' ? 'lose' : 'escape';
-
-            return `
-                <div class="combat-result ${resultClass}">
-                    <h2>${resultTitle}</h2>
-                    <div class="combat-result-stats">
-                        <div class="combat-result-stat">
-                            <div class="value">${combatState.round}</div>
-                            <div class="label">回合数</div>
-                        </div>
-                        <div class="combat-result-stat">
-                            <div class="value" style="color:${result === 'win' ? '#4caf50' : '#ff6666'}">${result === 'win' ? '+' + reward : '-' + penalty}</div>
-                            <div class="label">灵石</div>
-                        </div>
-                    </div>
-                    <button class="btn btn-combat" onclick="renderCombatHome()" style="margin-top:20px;">返回斗法界面</button>
-                    <button class="close-btn" onclick="closeCombat()">关闭</button>
-                </div>
-            `;
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            const progressInStage = gameState.stage === 0 ? 
+                gameState.cultivationProgress : 
+                gameState.cultivationProgress - req.stageThreshold[gameState.stage - 1];
+            const stageSize = gameState.stage === 0 ? 
+                req.stageThreshold[0] : 
+                (req.stageThreshold[gameState.stage] - req.stageThreshold[gameState.stage - 1]);
+            const percentage = Math.min(100, (progressInStage / stageSize) * 100);
+            
+            document.getElementById('cultivationBar').style.width = `${percentage}%`;
+            document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
+            
+            // V7 更新灵根显示
+            updateSpiritRootDisplay();
+            
+            // V9 更新世界地图显示
+            updateMinimapDisplay();
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
+            }
         }
 
-// ===== js/sect.js =====
 
-// ===== openSect =====
+
+// Auto-generated module: laws.js
+'use strict';
+
+// ===== CELESTIAL LAWS CONSTANTS (V37) =====
+const CELESTIAL_LAWS = {
+    time: {
+        name: '时间法则', icon: '⏳', attr: 'cultivate_speed', value: 0.15,
+        realm: '大乘', synergy: 'space', conflict: 'space',
+        desc: '修炼速度+15%', cost: 5000, comprehendDays: 30
+    },
+    space: {
+        name: '空间法则', icon: '🌀', attr: 'escape', value: 0.20,
+        realm: '大乘', synergy: 'time', conflict: 'time',
+        desc: '躲避率+20%', cost: 5000, comprehendDays: 30
+    },
+    wuxing: {
+        name: '五行法则', icon: '🌈', attr: 'all_stats', value: 0.10,
+        realm: '大乘', synergy: 'yinyang', conflict: 'chaos',
+        desc: '全属性+10%', cost: 5000, comprehendDays: 30
+    },
+    yinyang: {
+        name: '阴阳法则', icon: '☯️', attr: 'attack_defense_balance', value: 0.12,
+        realm: '大乘', synergy: 'wuxing', conflict: 'destiny',
+        desc: '攻防均衡+12%', cost: 5000, comprehendDays: 30
+    },
+    cause: {
+        name: '因果法则', icon: '🔮', attr: 'crit', value: 0.18,
+        realm: '地仙', synergy: 'destiny', conflict: 'reincarnation',
+        desc: '暴击率+18%', cost: 8000, comprehendDays: 45
+    },
+    destiny: {
+        name: '命运法则', icon: '⭐', attr: 'serendipity', value: 0.25,
+        realm: '地仙', synergy: 'cause', conflict: 'yinyang',
+        desc: '奇遇概率+25%', cost: 8000, comprehendDays: 45
+    },
+    destruction: {
+        name: '毁灭法则', icon: '💥', attr: 'attack', value: 0.20,
+        realm: '地仙', synergy: 'creation', conflict: 'creation',
+        desc: '伤害+20%', cost: 8000, comprehendDays: 45
+    },
+    creation: {
+        name: '创造法则', icon: '✨', attr: 'heal', value: 0.25,
+        realm: '地仙', synergy: 'destruction', conflict: 'destruction',
+        desc: '治疗效果+25%', cost: 8000, comprehendDays: 45
+    },
+    reincarnation: {
+        name: '轮回法则', icon: '🔄', attr: 'cooldown_reduce', value: 0.20,
+        realm: '太乙', synergy: 'chaos', conflict: 'cause',
+        desc: '冷却缩减-20%', cost: 12000, comprehendDays: 60
+    },
+    chaos: {
+        name: '混沌法则', icon: '🌌', attr: 'all_stats', value: 0.15,
+        realm: '太乙', synergy: 'reincarnation', conflict: 'wuxing',
+        desc: '全属性+15%，受伤+10%', cost: 12000, comprehendDays: 60,
+        debuff: 'damage_taken', debuffValue: 0.10
+    }
+};
+
+const LAW_RELM_REQUIREMENTS = { '大乘': 8, '地仙': 9, '太乙': 10 };
+
+// ===== CORE FUNCTIONS =====
+
+// 检查是否可以领悟法则
+function canComprehendLaw(lawId) {
+    const law = CELESTIAL_LAWS[lawId];
+    if (!law) return { result: false, reason: '未知法则' };
+    if (gameState.celestialLaws.comprehended.includes(lawId)) {
+        return { result: false, reason: '已领悟此法则' };
+    }
+    if (gameState.celestialLaws.comprehending === lawId) {
+        return { result: false, reason: '正在领悟此法则' };
+    }
+    if (gameState.celestialLaws.active.length >= gameState.celestialLaws.maxActiveLaws) {
+        return { result: false, reason: `最多激活${gameState.celestialLaws.maxActiveLaws}条法则` };
+    }
+    const realmReq = LAW_RELM_REQUIREMENTS[law.realm];
+    if (gameState.realm < realmReq) {
+        return { result: false, reason: `需要境界达到${law.realm}` };
+    }
+    return { result: true };
+}
+
+// 开始领悟法则
+function startComprehendLaw(lawId) {
+    const check = canComprehendLaw(lawId);
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    const law = CELESTIAL_LAWS[lawId];
+    if (gameState.spiritStones < law.cost) {
+        showToast('灵石不足');
+        return;
+    }
+    gameState.spiritStones -= law.cost;
+    gameState.celestialLaws.comprehending = lawId;
+    gameState.celestialLaws.comprehendingProgress = 0;
+    gameState.celestialLaws.comprehendDays = 0;
+    addLog('good', '悟道开始', `开始领悟【${law.name}】`);
+    showToast(`开始领悟【${law.name}】`);
+    renderGameUI();
+}
+
+// 处理每日领悟进度
+function processLawComprehension() {
+    const cl = gameState.celestialLaws;
+    if (!cl.comprehending) return;
+
+    const law = CELESTIAL_LAWS[cl.comprehending];
+    cl.comprehendDays++;
+    // 每天进度 = 100 / 总天数
+    cl.comprehendingProgress = Math.min(100, (cl.comprehendDays / law.comprehendDays) * 100);
+
+    if (cl.comprehendingProgress >= 100) {
+        // 领悟完成
+        cl.comprehended.push(cl.comprehending);
+        const completedLaw = cl.comprehending;
+        cl.comprehending = null;
+        cl.comprehendingProgress = 0;
+        cl.comprehendDays = 0;
+
+        // 自动激活（如有空位）
+        if (cl.active.length < cl.maxActiveLaws) {
+            cl.active.push(completedLaw);
+        }
+        addLog('good', '法则领悟', `【${CELESTIAL_LAWS[completedLaw].name}】领悟完成！`);
+        showToast(`【${CELESTIAL_LAWS[completedLaw].name}】领悟成功！`);
+        calculateLawBonus();
+    }
+}
+
+// 计算法则加成
+function calculateLawBonus() {
+    const cl = gameState.celestialLaws;
+    const bonus = {
+        attack: 0, defense: 0, maxHp: 0, crit: 0, escape: 0,
+        cultivate_speed: 0, serendipity: 0, cooldown_reduce: 0,
+        all_stats: 0, heal: 0, damage_taken: 0, tribulation_boost: 0
+    };
+
+    if (cl.active.length === 0) {
+        cl.lawBonus = bonus;
+        applyLawBonus(bonus);
+        return;
+    }
+
+    let hasConflict = false;
+    let hasSynergy = false;
+
+    // 计算每条激活法则的加成
+    for (const lawId of cl.active) {
+        const law = CELESTIAL_LAWS[lawId];
+        if (!law) continue;
+
+        let value = law.value;
+
+        // 检测相克
+        if (cl.active.includes(law.conflict)) {
+            value *= 0.7; // 相克降低30%
+            hasConflict = true;
+        }
+
+        // 检测相助（额外+15%）
+        if (cl.active.includes(law.synergy)) {
+            value *= 1.15;
+            hasSynergy = true;
+        }
+
+        // 应用到对应属性
+        if (law.attr === 'all_stats') {
+            bonus.attack += value;
+            bonus.defense += value;
+            bonus.maxHp += value;
+        } else if (law.attr === 'attack_defense_balance') {
+            bonus.attack += value * 0.5;
+            bonus.defense += value * 0.5;
+        } else if (bonus.hasOwnProperty(law.attr)) {
+            bonus[law.attr] += value;
+        }
+
+        // 混沌法则的减益
+        if (law.debuff && bonus.hasOwnProperty(law.debuff)) {
+            bonus[law.debuff] += law.debuffValue;
+        }
+    }
+
+    // 渡劫加成：每条激活法则+5%，相克时取消
+    bonus.tribulation_boost = hasConflict ? 0 : cl.active.length * 0.05;
+
+    cl.lawBonus = bonus;
+    applyLawBonus(bonus);
+
+    // 记录日志（仅在状态变化时）
+    if (hasConflict || hasSynergy) {
+        const conflictLaws = cl.active.filter(id => cl.active.includes(CELESTIAL_LAWS[id].conflict));
+        const synergyPairs = [];
+        for (const lawId of cl.active) {
+            const law = CELESTIAL_LAWS[lawId];
+            if (cl.active.includes(law.synergy)) {
+                synergyPairs.push(`${law.icon}${CELESTIAL_LAWS[law.synergy].icon}`);
+            }
+        }
+        if (hasConflict) {
+            addLog('warn', '法则相克', `激活的相克法则效果降低30%`);
+        }
+        if (hasSynergy && synergyPairs.length > 0) {
+            addLog('good', '法则相助', `激活相助法则，额外+15%效果: ${synergyPairs.join(', ')}`);
+        }
+    }
+}
+
+// 应用法则加成到activeEffects
+function applyLawBonus(bonus) {
+    const ae = gameState.activeEffects;
+    ae.attack = bonus.attack;
+    ae.defense = bonus.defense;
+    ae.all_stats = bonus.all_stats;
+    ae.serendipity_boost = bonus.serendipity;
+    ae.cultivate_speed = bonus.cultivate_speed;
+    // 渡劫加成特殊处理
+    if (bonus.tribulation_boost > 0) {
+        ae.tribulation_boost_law = bonus.tribulation_boost;
+    } else {
+        delete ae.tribulation_boost_law;
+    }
+}
+
+// 激活/停用法则
+function toggleLawActive(lawId) {
+    const cl = gameState.celestialLaws;
+    if (!cl.comprehended.includes(lawId)) {
+        showToast('请先领悟此法则');
+        return;
+    }
+
+    const idx = cl.active.indexOf(lawId);
+    if (idx >= 0) {
+        // 停用
+        cl.active.splice(idx, 1);
+        calculateLawBonus();
+        showToast(`【${CELESTIAL_LAWS[lawId].name}】已停用`);
+    } else {
+        // 激活
+        if (cl.active.length >= cl.maxActiveLaws) {
+            showToast(`最多激活${cl.maxActiveLaws}条法则`);
+            return;
+        }
+        cl.active.push(lawId);
+        calculateLawBonus();
+        showToast(`【${CELESTIAL_LAWS[lawId].name}】已激活`);
+    }
+    renderGameUI();
+}
+
+// 获取法则状态
+function getLawStatus(lawId) {
+    const cl = gameState.celestialLaws;
+    if (cl.active.includes(lawId)) return 'active';
+    if (cl.comprehending === lawId) return 'comprehending';
+    if (cl.comprehended.includes(lawId)) return 'comprehended';
+    return 'locked';
+}
+
+// 获取法则颜色
+function getLawColor(status) {
+    switch (status) {
+        case 'active': return '#ffd700';
+        case 'comprehending': return '#ff6b35';
+        case 'comprehended': return '#4ecdc4';
+        default: return '#666';
+    }
+}
+
+// 显示悟道台界面
+function showLawComprehension() {
+    const cl = gameState.celestialLaws;
+    const realm = gameState.realm >= 8 ? '大乘' : gameState.realm >= 9 ? '地仙' : gameState.realm >= 10 ? '太乙' : null;
+
+    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
+        <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
+            <h2 style="color:#ffd700;text-align:center;margin-bottom:15px;">⏳ 悟道台 - 天道法则</h2>`;
+
+    // 当前加成显示
+    if (cl.active.length > 0) {
+        html += `<div style="background:#16213e;border-radius:8px;padding:12px;margin-bottom:15px;">`;
+        html += `<div style="color:#4ecdc4;font-size:12px;margin-bottom:5px;">当前激活法则效果：</div>`;
+        const bonus = cl.lawBonus || {};
+        const parts = [];
+        if (bonus.attack > 0) parts.push(`攻击+${(bonus.attack*100).toFixed(0)}%`);
+        if (bonus.defense > 0) parts.push(`防御+${(bonus.defense*100).toFixed(0)}%`);
+        if (bonus.cultivate_speed > 0) parts.push(`修炼+${(bonus.cultivate_speed*100).toFixed(0)}%`);
+        if (bonus.crit > 0) parts.push(`暴击+${(bonus.crit*100).toFixed(0)}%`);
+        if (bonus.escape > 0) parts.push(`躲避+${(bonus.escape*100).toFixed(0)}%`);
+        if (bonus.serendipity > 0) parts.push(`奇遇+${(bonus.serendipity*100).toFixed(0)}%`);
+        if (bonus.tribulation_boost > 0) parts.push(`渡劫+${(bonus.tribulation_boost*100).toFixed(0)}%`);
+        html += `<div style="color:#fff;">${parts.join(' | ') || '无'}</div></div>`;
+    }
+
+    // 悟道路径提示
+    if (!realm) {
+        html += `<div style="text-align:center;color:#888;margin:30px 0;">
+            悟道需境界达到【大乘】，当前境界不足<br>
+            <span style="color:#aaa;font-size:12px;">境界达到大乘后可解锁悟道台</span>
+        </div>`;
+    } else {
+        // 法则列表
+        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:15px;">`;
+        for (const [lawId, law] of Object.entries(CELESTIAL_LAWS)) {
+            const status = getLawStatus(lawId);
+            const isAvailable = !realm || LAW_RELM_REQUIREMENTS[law.realm] <= gameState.realm;
+            const color = getLawColor(status);
+            const borderColor = status === 'active' ? '#ffd700' : status === 'comprehending' ? '#ff6b35' : '#333';
+
+            let stateLabel = '';
+            let progressBar = '';
+            if (status === 'comprehending') {
+                stateLabel = '领悟中';
+                progressBar = `<div style="background:#333;border-radius:4px;height:6px;margin-top:5px;">
+                    <div style="background:linear-gradient(90deg,#ff6b35,#ffd700);height:100%;width:${cl.comprehendingProgress}%;border-radius:4px;transition:width 0.3s;"></div>
+                </div>`;
+            } else if (status === 'comprehended') {
+                stateLabel = '已领悟';
+            } else if (status === 'active') {
+                stateLabel = '已激活';
+            } else if (!isAvailable) {
+                stateLabel = `需要${law.realm}`;
+            }
+
+            const synergyLaw = law.synergy ? CELESTIAL_LAWS[law.synergy] : null;
+            const conflictLaw = law.conflict ? CELESTIAL_LAWS[law.conflict] : null;
+
+            html += `<div style="background:#0f0f23;border:1px solid ${borderColor};border-radius:8px;padding:12px;opacity:${isAvailable ? 1 : 0.5};">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="font-size:20px;">${law.icon}</span>
+                    <div>
+                        <div style="color:${color};font-weight:bold;">${law.name}</div>
+                        <div style="color:#888;font-size:11px;">${stateLabel}</div>
+                    </div>
+                </div>
+                <div style="color:#aaa;font-size:11px;margin-bottom:5px;">${law.desc}</div>
+                ${progressBar}
+                <div style="color:#666;font-size:10px;margin-top:5px;">
+                    ${synergyLaw ? `<span style="color:#4ecdc4;">相助: ${synergyLaw.icon}${synergyLaw.name}</span>` : ''}
+                    ${conflictLaw ? `<span style="color:#ff6b6b;"> | 相克: ${conflictLaw.icon}${conflictLaw.name}</span>` : ''}
+                </div>
+                <div style="color:#888;font-size:10px;margin-top:3px;">消耗: ${law.cost}灵石 | ${law.comprehendDays}天</div>`;
+
+            // 按钮
+            if (realm && isAvailable) {
+                if (status === 'locked') {
+                    const check = canComprehendLaw(lawId);
+                    html += `<button class="btn" style="margin-top:8px;width:100%;font-size:11px;padding:5px 8px;"
+                        onclick="startComprehendLaw('${lawId}')" ${check.result ? '' : 'disabled'}>
+                        ${check.result ? '开始领悟' : check.reason}
+                    </button>`;
+                } else if (status === 'comprehended') {
+                    html += `<button class="btn" style="margin-top:8px;width:100%;font-size:11px;padding:5px 8px;"
+                        onclick="toggleLawActive('${lawId}')">
+                        ${cl.active.includes(lawId) ? '停用' : '激活'}
+                    </button>`;
+                } else if (status === 'comprehending') {
+                    html += `<div style="margin-top:8px;text-align:center;color:#ff6b35;font-size:11px;">
+                        领悟中... ${Math.floor(cl.comprehendingProgress)}%
+                    </div>`;
+                }
+            }
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
+
+    html += `<div style="text-align:center;margin-top:15px;">
+        <button class="btn" onclick="closeModal('lawComprehension')">关闭</button>
+    </div></div></div>`;
+
+    setModalContent('lawComprehension', html);
+    document.getElementById('modal-lawComprehension').style.display = 'block';
+}
+
+// 检查悟道台是否可用
+function isLawComprehensionAvailable() {
+    return gameState.realm >= 8; // 大乘
+}
+
+// Auto-generated module: mount.js
+'use strict';
+
+// ===== MOUNT_TYPES =====
+const MOUNT_TYPES = {
+    '仙鹤': {
+        icon: '🦅',
+        baseStats: { speed: 30, attack: 10, defense: 5, luck: 15 },
+        skills: ['御空加速'],
+        growthRate: 1.0,
+        maturityMax: 100,
+        price: 1000
+    },
+    '凤凰': {
+        icon: '🦅',
+        baseStats: { speed: 25, attack: 20, defense: 15, luck: 25 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.2,
+        maturityMax: 120,
+        price: 5000
+    },
+    '麒麟': {
+        icon: '🦄',
+        baseStats: { speed: 20, attack: 25, defense: 20, luck: 20 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.1,
+        maturityMax: 110,
+        price: 8000
+    },
+    '白虎': {
+        icon: '🐯',
+        baseStats: { speed: 25, attack: 30, defense: 10, luck: 10 },
+        skills: ['御空加速', '坐骑融合'],
+        growthRate: 1.15,
+        maturityMax: 105,
+        price: 6000
+    },
+    '青龙': {
+        icon: '🐉',
+        baseStats: { speed: 35, attack: 15, defense: 15, luck: 20 },
+        skills: ['御空加速', '仙缘感应'],
+        growthRate: 1.25,
+        maturityMax: 130,
+        price: 10000
+    },
+    '玄武': {
+        icon: '🐢',
+        baseStats: { speed: 15, attack: 10, defense: 35, luck: 15 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.0,
+        maturityMax: 140,
+        price: 7000
+    },
+    '九尾狐': {
+        icon: '🦊',
+        baseStats: { speed: 30, attack: 20, defense: 10, luck: 30 },
+        skills: ['御空加速', '仙缘感应'],
+        growthRate: 1.3,
+        maturityMax: 100,
+        price: 12000
+    },
+    '鲲鹏': {
+        icon: '🐋',
+        baseStats: { speed: 40, attack: 15, defense: 10, luck: 20 },
+        skills: ['御空加速', '坐骑融合', '仙缘感应'],
+        growthRate: 1.4,
+        maturityMax: 150,
+        price: 20000
+    }
+};
+
+// ===== MOUNT_GROWTH_TYPES =====
+const MOUNT_GROWTH_TYPES = {
+    '普通': { multiplier: 0.8, color: '#aaaaaa', price: 0 },
+    '优秀': { multiplier: 1.0, color: '#4caf50', price: 1000 },
+    '稀有': { multiplier: 1.2, color: '#2196f3', price: 5000 },
+    '神话': { multiplier: 1.5, color: '#9c27b0', price: 20000 }
+};
+
+// ===== getRandomMountType =====
+function getRandomMountType() {
+    const types = Object.keys(MOUNT_TYPES);
+    return types[Math.floor(Math.random() * types.length)];
+}
+
+// ===== getRandomGrowthType =====
+function getRandomGrowthType() {
+    const rand = Math.random();
+    if (rand < 0.5) return '普通';
+    if (rand < 0.8) return '优秀';
+    if (rand < 0.95) return '稀有';
+    return '神话';
+}
+
+// ===== createMount =====
+function createMount(type, growth) {
+    const template = MOUNT_TYPES[type];
+    const growthData = MOUNT_GROWTH_TYPES[growth];
+    
+    return {
+        uid: 'mount_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: type,
+        type: type,
+        level: 1,
+        growth: growth,
+        stats: {
+            speed: Math.floor(template.baseStats.speed * growthData.multiplier),
+            attack: Math.floor(template.baseStats.attack * growthData.multiplier),
+            defense: Math.floor(template.baseStats.defense * growthData.multiplier),
+            luck: Math.floor(template.baseStats.luck * growthData.multiplier)
+        },
+        skills: [...template.skills],
+        maturity: 0,
+        matureMax: template.maturityMax,
+        exp: 0,
+        expToLevel: 100
+    };
+}
+
+// ===== acquireMount =====
+function acquireMount(mount) {
+    if (gameState.mounts.length >= 3) {
+        showToast('仙兽栏已满（最多3只）');
+        return false;
+    }
+    
+    gameState.mounts.push(mount);
+    addLog('good', '获得仙兽', `获得${mount.growth}级仙兽【${mount.name}】！`);
+    saveGame();
+    return true;
+}
+
+// ===== tryCaptureMount =====
+function tryCaptureMount() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('仙兽只可在仙界捕捉');
+        return;
+    }
+    
+    const mountType = getRandomMountType();
+    const growth = getRandomGrowthType();
+    const mount = createMount(mountType, growth);
+    
+    // 稀有度影响成功率
+    const successRates = { '普通': 0.8, '优秀': 0.5, '稀有': 0.3, '神话': 0.1 };
+    const luckBonus = gameState.currentMount ? gameState.currentMount.stats.luck / 200 : 0;
+    
+    if (Math.random() < successRates[growth] + luckBonus) {
+        acquireMount(mount);
+        showToast(`捕捉成功！获得${growth}仙兽【${mountType}】`);
+    } else {
+        showToast('捕捉失败，仙兽逃走了...');
+    }
+    
+    saveGame();
+}
+
+// ===== feedMount =====
+function feedMount(mountIndex, herbCount) {
+    if (gameState.mounts.length <= mountIndex) return;
+    
+    const mount = gameState.mounts[mountIndex];
+    if (mount.maturity >= mount.matureMax) {
+        showToast('仙兽已完全成熟');
+        return;
+    }
+    
+    // 仙草喂养，每个仙草+5成熟度
+    const gain = Math.min(herbCount * 5, mount.matureMax - mount.maturity);
+    mount.maturity += gain;
+    
+    // 检查是否成熟
+    if (mount.maturity >= mount.matureMax) {
+        mount.level = Math.min(10, mount.level + 1);
+        mount.maturity = mount.matureMax;
+        showToast(`${mount.name}已完全成熟，等级提升！`);
+    }
+    
+    saveGame();
+    updateDisplay();
+}
+
+// ===== rideMount =====
+function rideMount(mountIndex) {
+    if (gameState.mounts.length <= mountIndex) return;
+    
+    gameState.currentMount = gameState.mounts[mountIndex];
+    addLog('good', '骑乘仙兽', `骑乘【${gameState.currentMount.name}】飞行`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== dismountMount =====
+function dismountMount() {
+    if (!gameState.currentMount) return;
+    addLog('neutral', '解除骑乘', `解除【${gameState.currentMount.name}】骑乘状态`);
+    gameState.currentMount = null;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== showMountPanel =====
+function showMountPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">🐎 仙兽面板</h3>';
+    
+    // 当前骑乘
+    if (gameState.currentMount) {
+        const m = gameState.currentMount;
+        html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid #ffd700;">`;
+        html += `<div style="display:flex;align-items:center;gap:10px;">`;
+        html += `<span style="font-size:32px;">${MOUNT_TYPES[m.type].icon}</span>`;
+        html += `<div><div style="color:#ffd700;font-weight:bold;">${m.name}</div>`;
+        html += `<div style="color:#aaa;font-size:12px;">${m.growth}级 | Lv.${m.level}</div></div>`;
+        html += `<button onclick="dismountMount();closeModal();" style="margin-left:auto;padding:6px 12px;background:#c62828;color:white;border:none;border-radius:4px;cursor:pointer;">解除骑乘</button>`;
+        html += '</div>';
+        
+        // 成熟度条
+        const progress = (m.maturity / m.matureMax * 100).toFixed(0);
+        html += `<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;color:#aaa;font-size:11px;"><span>成熟度</span><span>${progress}%</span></div>`;
+        html += `<div style="height:6px;background:#333;border-radius:3px;margin-top:4px;"><div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:3px;"></div></div></div>`;
+        
+        // 属性
+        html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;text-align:center;">`;
+        html += `<div><div style="color:#4caf50;font-size:14px;">${m.stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
+        html += `<div><div style="color:#f44336;font-size:14px;">${m.stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
+        html += `<div><div style="color:#2196f3;font-size:14px;">${m.stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
+        html += `<div><div style="color:#ff9800;font-size:14px;">${m.stats.luck}</div><div style="color:#666;font-size:10px;">幸运</div></div>`;
+        html += '</div></div>';
+    }
+    
+    // 仙兽列表
+    html += '<div style="margin-bottom:12px;"><div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙兽栏 (' + gameState.mounts.length + '/3)</div>';
+    
+    if (gameState.mounts.length === 0) {
+        html += '<div style="text-align:center;color:#666;padding:20px;">暂无仙兽</div>';
+    } else {
+        for (let i = 0; i < gameState.mounts.length; i++) {
+            const m = gameState.mounts[i];
+            const isRiding = gameState.currentMount && gameState.currentMount.uid === m.uid;
+            const growthColor = MOUNT_GROWTH_TYPES[m.growth].color;
+            
+            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;" onclick="toggleMountDetails(${i})">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:24px;">${MOUNT_TYPES[m.type].icon}</span>`;
+            html += `<div style="flex:1;">`;
+            html += `<div style="color:${growthColor};font-weight:bold;">${m.name} <span style="color:#666;font-size:11px;">(${m.growth})</span></div>`;
+            html += `<div style="color:#888;font-size:11px;">Lv.${m.level} | 成熟度${(m.maturity/m.matureMax*100).toFixed(0)}%</div>`;
+            html += '</div>';
+            if (!isRiding) {
+                html += `<button onclick="event.stopPropagation();rideMount(${i});closeModal();" style="padding:4px 8px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">骑乘</button>`;
+            } else {
+                html += `<span style="color:#ffd700;font-size:11px;">已骑乘</span>`;
+            }
+            html += '</div></div>';
+        }
+    }
+    html += '</div>';
+    
+    // 捕捉按钮
+    html += `<button onclick="tryCaptureMount();closeModal();" style="width:100%;padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🔍 捕捉仙兽</button>`;
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('仙兽', html, '');
+}
+
+// ===== MOUNT_SKILLS =====
+const MOUNT_SKILLS = {
+    '御空加速': {
+        icon: '💨',
+        effect: '移动冷却-50%',
+        description: '骑乘时御空术冷却时间减半'
+    },
+    '仙兽护主': {
+        icon: '🛡️',
+        effect: '战斗加成',
+        description: '战斗时仙兽协助攻击，伤害+20%'
+    },
+    '仙缘感应': {
+        icon: '✨',
+        effect: '仙缘任务+20%',
+        description: '仙缘任务刷新概率+20%'
+    },
+    '坐骑融合': {
+        icon: '🔗',
+        effect: '属性翻倍',
+        description: '骑乘时仙兽属性加成翻倍'
+    }
+};
+
+
+// Auto-generated module: sect.js
+'use strict';
+
+        // ===== openSect =====
         function openSect() {
             document.getElementById('sectModal').classList.add('active');
             renderSectHome();
@@ -6663,1270 +11200,12 @@ async function generateBreakthroughResult() {
             }
         }
 
-// ===== js/ascension.js =====
 
-// ===== ASCENSION_COSTS =====
-const ASCENSION_COSTS = {
-    spiritStones: 500000,  // 50万灵石
-    equipmentQuality: 'rare' // 需要紫色(rare)或以上装备
-};
 
-// ===== hasOrangeOrHigherEquip =====
-function hasOrangeOrHigherEquip() {
-    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
-    const minQuality = qualityOrder['rare']; // 紫色=rare=1, 橙色=precious=2
-    
-    // 检查背包
-    for (const item of gameState.inventory) {
-        if (item.type === 'treasure') {
-            if ((qualityOrder[item.quality] || 0) >= minQuality) {
-                return true;
-            }
-        }
-    }
-    
-    // 检查已装备
-    for (const equip of gameState.equippedTreasures) {
-        if (equip && (qualityOrder[equip.quality] || 0) >= minQuality) {
-            return true;
-        }
-    }
-    
-    return false;
-}
+// Auto-generated module: serendipity.js
+'use strict';
 
-// ===== canAscend =====
-function canAscend() {
-    // 检查渡劫是否成功
-    const hasCompletedTribulation = gameState.realm >= 4 && gameState.stage >= 2;
-    if (!hasCompletedTribulation) {
-        return { result: false, reason: '需要渡劫成功（化神后期）' };
-    }
-    
-    // 检查灵石
-    if (gameState.spiritStones < ASCENSION_COSTS.spiritStones) {
-        return { result: false, reason: `需要${ASCENSION_COSTS.spiritStones}灵石，飞升费用` };
-    }
-    
-    // 检查橙色以上装备
-    if (!hasOrangeOrHigherEquip()) {
-        return { result: false, reason: '需要至少1件紫色以上品质的装备' };
-    }
-    
-    // 检查是否已经飞升
-    if (gameState.currentRealm === 'immortal') {
-        return { result: false, reason: '已经飞升' };
-    }
-    
-    return { result: true };
-}
-
-// ===== showAscensionButton =====
-function showAscensionButton() {
-    const check = canAscend();
-    
-    const btn = document.getElementById('ascensionBtn');
-    if (!btn) return;
-    
-    if (check.result) {
-        btn.style.display = 'inline-block';
-        btn.style.background = 'linear-gradient(135deg, #9c27b0, #e91e63)';
-        btn.style.boxShadow = '0 0 20px rgba(233, 30, 99, 0.5)';
-        btn.onclick = showAscensionModal;
-    } else {
-        btn.style.display = 'inline-block';
-        btn.style.background = '#444';
-        btn.style.boxShadow = 'none';
-        btn.onclick = () => showToast(check.reason);
-    }
-}
-
-// ===== showAscensionModal =====
-function showAscensionModal() {
-    const check = canAscend();
-    if (!check.result) {
-        showToast(check.reason);
-        return;
-    }
-    
-    let html = '<div style="padding:20px;text-align:center;">';
-    html += '<div style="font-size:48px;margin-bottom:10px;">🌟</div>';
-    html += '<h2 style="color:#ffd700;margin-bottom:10px;">飞升成仙</h2>';
-    html += '<p style="color:#aaa;font-size:13px;margin-bottom:20px;">突破凡界桎梏，进入仙界篇章</p>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升消耗：</div>';
-    html += `<div style="color:#f44336;margin-bottom:4px;">💎 500000 灵石（保留50%）</div>`;
-    html += '<div style="color:#ff9800;margin-bottom:4px;">⚔️ 橙色以上装备 → 仙界材料</div>';
-    html += '<div style="color:#4caf50;">✨ 已学功法 → 转换仙界版</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升保留：</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 灵石（扣除50%）</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 已学功法（转换仙界版）</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 宗门归属</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 成就/称号（部分保留）</div>';
-    html += '<div style="color:#aaa;">• 宗门贡献</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">仙界境界：</div>';
-    html += '<div style="color:#4caf50;margin-bottom:4px;">🌱 地仙境 → 天仙境 → 金仙境</div>';
-    html += '<div style="color:#2196f3;">⭐ 大罗金仙 → 混元大罗</div>';
-    html += '</div>';
-    
-    html += `<button onclick="doAscend()" style="width:100%;padding:14px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">🌟 确认飞升</button>`;
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">返回</button>`;
-    html += '</div>';
-    
-    openModal('飞升', html, '');
-}
-
-// ===== doAscend =====
-function doAscend() {
-    const check = canAscend();
-    if (!check.result) {
-        showToast(check.reason);
-        closeModal();
-        return;
-    }
-    
-    // 1. 扣除灵石（保留50%）
-    const keepStones = Math.floor(gameState.spiritStones * 0.5);
-    const spentStones = gameState.spiritStones - keepStones;
-    gameState.spiritStones = keepStones;
-    
-    // 2. 凡界装备 → 材料（只保留橙色以上）
-    const materialsGained = [];
-    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
-    
-    // 背包装备转化
-    const newInventory = [];
-    for (const item of gameState.inventory) {
-        if (item.type === 'treasure' && qualityOrder[item.quality] >= qualityOrder['precious']) {
-            materialsGained.push({ name: item.name, quality: item.quality });
-        } else {
-            newInventory.push(item);
-        }
-    }
-    gameState.inventory = newInventory;
-    
-    // 装备栏转化
-    for (let i = 0; i < gameState.equippedTreasures.length; i++) {
-        const equip = gameState.equippedTreasures[i];
-        if (equip && qualityOrder[equip.quality] >= qualityOrder['precious']) {
-            materialsGained.push({ name: equip.name, quality: equip.quality });
-            gameState.equippedTreasures[i] = null;
-        }
-    }
-    
-    // 3. 初始化仙界状态
-    initializeImmortalState();
-    
-    // 4. 设置初始仙石
-    gameState.immortal.spiritStones = 0; // 仙石独立
-    
-    // 5. 切换到仙界
-    gameState.currentRealm = 'immortal';
-    
-    // 6. 保留一些凡界资源
-    gameState.realm = 1; // 凡界境界回归筑基
-    gameState.stage = 0;
-    gameState.cultivationProgress = 0;
-    
-    // 7. 保存日志
-    addLog('good', '飞升成功', `历经${gameState.days}天的修炼，终于飞升成仙！`);
-    
-    saveGame();
-    
-    // 8. 关闭模态框，显示成功界面
-    closeModal();
-    showAscensionSuccessScreen();
-}
-
-// ===== showAscensionSuccessScreen =====
-function showAscensionSuccessScreen() {
-    let html = '<div style="padding:30px;text-align:center;">';
-    html += '<div style="font-size:64px;animation:pulse 2s infinite;">✨🌟✨</div>';
-    html += '<h2 style="color:#ffd700;font-size:24px;margin:20px 0;">恭喜飞升成仙！</h2>';
-    html += '<p style="color:#aaa;margin-bottom:20px;">你已突破凡界桎梏，进入仙界篇章</p>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
-    html += '<div style="color:#4caf50;margin-bottom:8px;">✅ 保留50%灵石：' + gameState.spiritStones + '</div>';
-    html += '<div style="color:#2196f3;margin-bottom:8px;">✅ 境界：地仙境（重新修炼）</div>';
-    html += '<div style="color:#9c27b0;">✅ 仙界篇章开启</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
-    html += '<div style="color:#ffd700;margin-bottom:8px;">📍 当前区域：仙灵谷</div>';
-    html += '<div style="color:#aaa;font-size:13px;">仙气充沛，适合初入仙界者修炼</div>';
-    html += '</div>';
-    
-    html += `<button onclick="enterImmortalRealm()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">☁️ 进入仙界</button>`;
-    html += '</div>';
-    
-    openModal('飞升', html, '');
-}
-
-// ===== enterImmortalRealm =====
-function enterImmortalRealm() {
-    closeModal();
-    saveGame();
-    updateDisplay();
-    
-    // 显示仙界UI
-    if (typeof showImmortalMainUI === 'function') {
-        showImmortalMainUI();
-    }
-    
-    addLog('good', '进入仙界', '踏入仙界，开始全新的修仙之旅！');
-}
-
-// ===== switchRealm =====
-function switchRealm(targetRealm) {
-    if (targetRealm === gameState.currentRealm) return;
-    
-    if (targetRealm === 'immortal') {
-        if (!gameState.immortal) {
-            showToast('尚未飞升，无法进入仙界');
-            return;
-        }
-        gameState.currentRealm = 'immortal';
-        addLog('neutral', '切换位面', '进入仙界');
-    } else {
-        gameState.currentRealm = 'mortal';
-        addLog('neutral', '切换位面', '返回凡界');
-    }
-    
-    saveGame();
-    updateDisplay();
-    
-    // 重新渲染UI
-    if (typeof renderGameUI === 'function') renderGameUI();
-}
-
-// ===== showRealmSwitchButton =====
-function showRealmSwitchButton() {
-    if (!gameState.immortal) return; // 未飞升不显示
-    
-    const btn = document.getElementById('realmSwitchBtn');
-    if (!btn) return;
-    
-    if (gameState.currentRealm === 'mortal') {
-        btn.textContent = '☁️ 仙界';
-        btn.onclick = () => switchRealm('immortal');
-    } else {
-        btn.textContent = '🏯 凡界';
-        btn.onclick = () => switchRealm('mortal');
-    }
-    
-    btn.style.display = 'inline-block';
-}
-
-// ===== doFateTask =====
-function doFateTask() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('仙缘任务只在仙界可用');
-        return;
-    }
-    
-    const today = Math.floor(gameState.days / 1);
-    if (gameState.immortal.fateTaskRefreshDay === today) {
-        showToast('今日仙缘任务已完成');
-        return;
-    }
-    
-    // 仙缘任务奖励
-    const reward = Math.floor(100 + Math.random() * 400);
-    earnSpiritStones(reward, '每日仙缘任务');
-    
-    // 20%概率额外奖励
-    if (Math.random() < 0.2) {
-        const bonus = Math.floor(50 + Math.random() * 150);
-        earnSpiritStones(bonus, '天赐福缘');
-        showToast(`天赐福缘！额外获得${bonus}仙石`);
-    }
-    
-    gameState.immortal.fateTaskRefreshDay = today;
-    gameState.immortal.lastFateTask = gameState.days;
-    saveGame();
-}
-
-// ===== doCelestialCycle =====
-function doCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('天道轮回只在仙界可用');
-        return;
-    }
-    
-    const cycleDay = 7;
-    const daysSinceCycle = gameState.days - (gameState.immortal.celestialCycleDay || 0);
-    
-    if (daysSinceCycle < cycleDay) {
-        showToast(`天道轮回每7天一次，还需${cycleDay - daysSinceCycle}天`);
-        return;
-    }
-    
-    // 开始天道轮回
-    const survivalChance = 0.7 + (gameState.immortal.realm * 0.05);
-    
-    if (Math.random() < survivalChance) {
-        // 成功
-        const reward = Math.floor(200 + Math.random() * 600);
-        earnSpiritStones(reward, '天道轮回奖励');
-        
-        // 额外奖励
-        if (gameState.immortal.celestialCycleCompleted) {
-            const extra = Math.floor(100 + Math.random() * 200);
-            earnSpiritStones(extra, '轮回福报');
-        }
-        
-        gameState.immortal.celestialCycleCompleted = true;
-        showToast(`天道轮回完成！获得${reward}仙石`);
-    } else {
-        // 失败
-        const loss = Math.floor(gameState.immortal.spiritStones * 0.1);
-        gameState.immortal.spiritStones = Math.max(0, gameState.immortal.spiritStones - loss);
-        showToast(`天道轮回失败！损失${loss}仙石`);
-    }
-    
-    gameState.immortal.celestialCycleDay = gameState.days;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== js/immortal.js =====
-
-// ===== IMMORTAL_REALMS =====
-const IMMORTAL_REALMS = {
-    1: { name: '地仙境', icon: '🌱', description: '仙界最低境界，相当于凡界筑基~金丹', cultivationBase: 100 },
-    2: { name: '天仙境', icon: '☁️', description: '中级仙人，相当于凡界元婴', cultivationBase: 200 },
-    3: { name: '金仙境', icon: '⭐', description: '高级仙人，相当于凡界化神', cultivationBase: 400 },
-    4: { name: '大罗金仙', icon: '🌟', description: '顶级强者，相当于凡界渡劫', cultivationBase: 800 },
-    5: { name: '混元大罗', icon: '💫', description: '飞升目标，超越凡界一切', cultivationBase: 1600 }
-};
-
-// ===== SECRET_REALMS_IMMORTAL =====
-const SECRET_REALMS_IMMORTAL = {
-    '太虚遗迹': {
-        type: 'ruins',
-        realmRequired: 1,
-        dangerLevel: 2,
-        waves: 3,
-        rewards: ['太虚仙法残卷', '上古丹药', '仙灵泉水'],
-        npc: { type: 'guardian', name: '太虚守护者' }
-    },
-    '九天瑶池': {
-        type: 'resource',
-        realmRequired: 2,
-        dangerLevel: 1,
-        waves: 2,
-        rewards: ['九天仙草', '瑶池圣水', '万年灵芝'],
-        npc: { type: 'merchant', name: '瑶池仙子' }
-    },
-    '混沌战场': {
-        type: 'combat',
-        realmRequired: 3,
-        dangerLevel: 4,
-        waves: 4,
-        rewards: ['混沌至宝', '神魔精血', '混沌丹'],
-        boss: { name: '混沌魔神' }
-    },
-    '星辰海洋': {
-        type: 'serendipity',
-        realmRequired: 2,
-        dangerLevel: 2,
-        waves: 1,
-        rewards: ['星辰精华', '星君传承'],
-        special: true
-    }
-};
-
-// ===== IMMORTAL_REGIONS =====
-const IMMORTAL_REGIONS = {
-    '仙灵谷': {
-        realmRequired: 1,
-        dangerLevel: 1,
-        icon: '🌿',
-        description: '新手区域，仙气充沛，适合初入仙界者',
-        resources: ['仙草', '仙兽蛋'],
-        color: '#4caf50'
-    },
-    '天庭': {
-        realmRequired: 2,
-        dangerLevel: 2,
-        icon: '🏯',
-        description: '仙界中心，天道法则汇聚之地',
-        resources: ['天庭令牌', '仙官赐福'],
-        color: '#ffd700'
-    },
-    '万妖山': {
-        realmRequired: 2,
-        dangerLevel: 2,
-        icon: '🏔️',
-        description: '妖修领地，妖族强者云集',
-        resources: ['妖修功法', '妖族坐骑'],
-        color: '#ff5722'
-    },
-    '神魔战场': {
-        realmRequired: 3,
-        dangerLevel: 4,
-        icon: '⚔️',
-        description: '上古神魔大战遗迹，蕴含无穷奥秘',
-        resources: ['神魔装备', '混沌碎片'],
-        color: '#9c27b0'
-    },
-    '三十三天': {
-        realmRequired: 4,
-        dangerLevel: 5,
-        icon: '🔮',
-        description: '极高危险区域，突破混元大罗的必经之地',
-        resources: ['混沌碎片', '飞升道具'],
-        color: '#e91e63'
-    },
-    '混沌海': {
-        realmRequired: 5,
-        dangerLevel: 5,
-        icon: '🌀',
-        description: '最终区域，传说中混元大罗的诞生之地',
-        resources: ['混沌神石', '位面法则'],
-        color: '#00bcd4'
-    }
-};
-
-// ===== initializeImmortalState =====
-function initializeImmortalState() {
-    if (!gameState.immortal) {
-        gameState.immortal = {
-            realm: 1,
-            spiritStones: 0,
-            currentRegion: '仙灵谷',
-            exploredRegions: ['仙灵谷'],
-            cultivationProgress: 0,
-            map: {
-                '仙灵谷': { unlocked: true, explored: [] },
-                '天庭': { unlocked: false, realmRequired: 2 },
-                '万妖山': { unlocked: false, realmRequired: 2 },
-                '神魔战场': { unlocked: false, realmRequired: 3 },
-                '三十三天': { unlocked: false, realmRequired: 4 },
-                '混沌海': { unlocked: false, realmRequired: 5 }
-            },
-            lastAerialCooldown: 0,
-            lastFateTask: 0,
-            fateTaskRefreshDay: 0,
-            celestialCycleDay: 0,
-            celestialCycleCompleted: false,
-            // V34 仙界秘境探索系统
-            secretRealm: {
-                inSecretRealm: false,
-                currentRealm: null,
-                currentType: null,
-                wave: 0,
-                totalWaves: 0,
-                enemies: [],
-                rewards: [],
-                npc: null,
-                jade: 0,  // 仙玉
-                tokens: 1,  // 秘境令牌（每日重置）
-                lastTokenRefresh: 0,
-                explored: []  // 已探索秘境记录
-            }
-        };
-    }
-    // V34 秘境令牌每日重置
-    if (gameState.immortal && gameState.immortal.secretRealm) {
-        const today = Math.floor(gameState.days / 10) * 10;  // 简化：每10天重置
-        if (gameState.immortal.secretRealm.lastTokenRefresh < today) {
-            gameState.immortal.secretRealm.tokens = 3;
-            gameState.immortal.secretRealm.lastTokenRefresh = today;
-        }
-    }
-    if (!gameState.mounts) gameState.mounts = [];
-    if (!gameState.immortalSkills) gameState.immortalSkills = [];
-    if (!gameState.immortalEquipment) {
-        gameState.immortalEquipment = {
-            head: null,
-            body: null,
-            foot: null,
-            weapon: null,
-            shield: null,
-            accessory: null
-        };
-    }
-    if (!gameState.currentRealm) gameState.currentRealm = 'mortal';
-    if (gameState.currentMount === undefined) gameState.currentMount = null;
-}
-
-// ===== canEnterRegion =====
-function canEnterRegion(region) {
-    const req = IMMORTAL_REGIONS[region].realmRequired;
-    return gameState.immortal.realm >= req;
-}
-
-// ===== doAerialTravel =====
-function doAerialTravel(targetRegion) {
-    if (!gameState.immortal || gameState.immortal.currentRegion === targetRegion) return;
-    
-    const cooldown = getAerialCooldown();
-    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
-    
-    if (timeSinceLast < cooldown) {
-        const remaining = Math.ceil((cooldown - timeSinceLast) / 1000);
-        showToast(`御空术冷却中，还需${remaining}秒`);
-        return;
-    }
-    
-    if (!canEnterRegion(targetRegion)) {
-        showToast('境界不足，无法进入该区域');
-        return;
-    }
-    
-    gameState.immortal.currentRegion = targetRegion;
-    gameState.immortal.lastAerialCooldown = Date.now();
-    
-    // 添加到已探索
-    if (!gameState.immortal.exploredRegions.includes(targetRegion)) {
-        gameState.immortal.exploredRegions.push(targetRegion);
-    }
-    
-    // 触发区域事件
-    triggerRegionEvent(targetRegion);
-    saveGame();
-    updateDisplay();
-    
-    // 更新UI
-    if (typeof renderImmortalUI === 'function') renderImmortalUI();
-}
-
-// ===== getAerialCooldown =====
-function getAerialCooldown() {
-    const baseCooldown = 10000; // 10秒基础冷却
-    const mountBonus = getMountSpeedBonus();
-    return Math.max(1000, baseCooldown * (1 - mountBonus));
-}
-
-// ===== getMountSpeedBonus =====
-function getMountSpeedBonus() {
-    const mount = gameState.currentMount;
-    if (!mount) return 0;
-    // 成熟度越高加速越多
-    return (mount.maturity / 100) * (mount.stats.speed / 100) * 0.5;
-}
-
-// ===== triggerRegionEvent =====
-function triggerRegionEvent(region) {
-    const rand = Math.random();
-    if (rand < 0.3) {
-        // 30%概率触发仙缘任务
-        if (gameState.immortal.currentRegion !== '天庭') {
-            showToast(`在${region}遇到神秘机缘...`);
-        }
-    }
-}
-
-// ===== earnSpiritStones =====
-function earnSpiritStones(amount, source) {
-    gameState.immortal.spiritStones += amount;
-    addLog('good', '获得仙石', `获得 ${amount} 仙石（${source}）`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== spendSpiritStones =====
-function spendSpiritStones(amount, reason) {
-    if (gameState.immortal.spiritStones < amount) {
-        showToast('仙石不足');
-        return false;
-    }
-    gameState.immortal.spiritStones -= amount;
-    saveGame();
-    return true;
-}
-
-// ===== doImmortalCultivation =====
-function doImmortalCultivation() {
-    const realm = gameState.immortal.realm;
-    const realmData = IMMORTAL_REALMS[realm];
-    let baseGain = realmData.cultivationBase * (1 + Math.random() * 0.5);
-    
-    // 应用装备加成
-    baseGain *= (1 + getImmortalEquipBonus());
-    
-    // 应用仙兽加成
-    if (gameState.currentMount) {
-        baseGain *= (1 + gameState.currentMount.stats.speed / 200);
-    }
-    
-    const gain = Math.floor(baseGain);
-    gameState.immortal.cultivationProgress += gain;
-    
-    // 检查境界突破
-    const nextRealm = realm + 1;
-    if (nextRealm <= 5 && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
-        gameState.immortal.realm = nextRealm;
-        gameState.immortal.cultivationProgress = 0;
-        // 解锁新区域
-        unlockRegionForRealm(nextRealm);
-        addLog('good', '境界突破', `突破到${IMMORTAL_REALMS[nextRealm].name}！`);
-        showToast(`恭喜突破到${IMMORTAL_REALMS[nextRealm].name}！`);
-    } else {
-        addLog('neutral', '仙气修炼', `修炼${gain}点仙气，感觉体内的仙力更加充沛。`);
-    }
-    
-    gameState.days++;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== unlockRegionForRealm =====
-function unlockRegionForRealm(realm) {
-    for (const region in gameState.immortal.map) {
-        if (gameState.immortal.map[region].realmRequired === realm) {
-            gameState.immortal.map[region].unlocked = true;
-        }
-    }
-}
-
-// ===== getImmortalEquipBonus =====
-function getImmortalEquipBonus() {
-    let bonus = 0;
-    const equip = gameState.immortalEquipment;
-    for (const slot in equip) {
-        if (equip[slot]) {
-            bonus += equip[slot].quality * 0.1;
-        }
-    }
-    return bonus;
-}
-
-// ===== showImmortalMap =====
-function showImmortalMap() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">☁️ 仙界地图 ☁️</h3>';
-    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
-    
-    for (const region in IMMORTAL_REGIONS) {
-        const data = IMMORTAL_REGIONS[region];
-        const isUnlocked = canEnterRegion(region);
-        const isCurrent = gameState.immortal.currentRegion === region;
-        const isExplored = gameState.immortal.exploredRegions.includes(region);
-        
-        let style = 'padding:12px;border-radius:8px;text-align:center;cursor:pointer;';
-        style += isUnlocked ? `background:${data.color}33;border:2px solid ${data.color};` : 'background:#333;border:2px solid #555;';
-        style += isCurrent ? 'box-shadow:0 0 15px #ffd700;' : '';
-        
-        html += `<div style="${style}" onclick="${isUnlocked ? `doAerialTravel('${region}')` : ''}">`;
-        html += `<div style="font-size:24px;">${data.icon}</div>`;
-        html += `<div style="color:${isUnlocked ? '#fff' : '#666'};font-weight:bold;">${region}</div>`;
-        html += `<div style="font-size:11px;color:${isUnlocked ? '#aaa' : '#444'};">需要${data.realmRequired}重天</div>`;
-        html += isCurrent ? '<div style="color:#ffd700;font-size:11px;">当前位置</div>' : '';
-        html += '</div>';
-    }
-    
-    html += '</div></div>';
-    
-    // 冷却显示
-    const cooldown = getAerialCooldown();
-    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
-    const remaining = Math.max(0, cooldown - timeSinceLast);
-    
-    html += `<div style="text-align:center;margin-top:16px;padding:10px;background:#1a1a2e;border-radius:8px;">`;
-    html += `<div style="color:#aaa;font-size:12px;">御空术冷却: ${Math.ceil(remaining / 1000)}秒</div>`;
-    if (gameState.currentMount) {
-        html += `<div style="color:#4caf50;font-size:12px;">🐎 骑乘${gameState.currentMount.name}，冷却缩短50%</div>`;
-    }
-    html += '</div>';
-    
-    openModal('仙界地图', html, '');
-}
-
-// ===== getImmortalDailyIncome =====
-function getImmortalDailyIncome() {
-    if (gameState.currentRealm !== 'immortal') return { qi: 0, stones: 0 };
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const baseQi = realmData.cultivationBase * 0.1;
-    const regionBonus = (regionData.dangerLevel || 1) * 0.05;
-    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.2 : 0;
-    return {
-        qi: Math.floor(baseQi * (1 + regionBonus + blessingBonus)),
-        stones: Math.floor((regionData.dangerLevel || 1) * 10 * Math.random())
-    };
-}
-
-// ===== processCelestialCycle =====
-function processCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    const cc = gameState.celestialCycle;
-    const interval = cc.cycleInterval || 3;
-    
-    // 每日仙界修炼结算（自动主路径）
-    const income = getImmortalDailyIncome();
-    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
-    const progressGain = Math.floor(income.qi * spiritRootBonus);
-    
-    // 更新修炼进度
-    if (gameState.immortal) {
-        gameState.immortal.cultivationProgress += progressGain;
-        gameState.immortal.spiritStones += income.stones;
-        
-        // 检查境界突破
-        const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-        if (realmData && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
-            const nextRealm = gameState.immortal.realm + 1;
-            if (nextRealm <= 5) {
-                gameState.immortal.realm = nextRealm;
-                gameState.immortal.cultivationProgress = 0;
-                addLog('good', '境界突破', `天道轮回中，突破至${IMMORTAL_REALMS[nextRealm].name}！`);
-            }
-        }
-    }
-    
-    // 天道轮回日结算
-    cc.day++;
-    if (cc.day >= interval && !cc.completed) {
-        executeCelestialCycle();
-        cc.day = 0;
-        cc.completed = true;
-    }
-    
-    // 新周期开始
-    if (cc.day === 0) {
-        cc.completed = false;
-    }
-}
-
-// ===== executeCelestialCycle =====
-function executeCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    
-    // 主路径：修炼结算
-    let resultText = `【天道轮回·第${gameState.days}天】\n`;
-    let eventType = 'neutral';
-    let effects = { qi: 0, stones: 0, mindset: 0 };
-    
-    const baseProgress = realmData.cultivationBase;
-    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
-    const regionBonus = (regionData.dangerLevel || 1) * 0.1;
-    const progressGain = Math.floor(baseProgress * (1 + regionBonus) * spiritRootBonus);
-    
-    if (gameState.immortal) {
-        gameState.immortal.cultivationProgress += progressGain;
-    }
-    resultText += `修炼进度 +${progressGain}\n`;
-    effects.qi = progressGain;
-    
-    // 次路径：气运波动触发器
-    const roll = Math.random();
-    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.15 : 0;
-    
-    if (roll < 0.4 + blessingBonus) {
-        // 正面事件 40%
-        eventType = 'positive';
-        const positiveEvents = [
-            { text: '✨ 顿悟时刻', effect: () => { 
-                if (gameState.immortal) gameState.immortal.cultivationProgress += Math.floor(progressGain * 0.5);
-                effects.qi += Math.floor(progressGain * 0.5);
-                return '修炼进度额外 +50%';
-            }},
-            { text: '🌟 天赐灵物', effect: () => {
-                const stoneGain = Math.floor(500 * Math.random()) + 100;
-                if (gameState.immortal) gameState.immortal.spiritStones += stoneGain;
-                effects.stones = stoneGain;
-                return `获得 ${stoneGain} 灵石`;
-            }},
-            { text: '☁️ 祥瑞降临', effect: () => {
-                effects.mindset = 10;
-                return '心态 +10';
-            }}
-        ];
-        const event = positiveEvents[Math.floor(Math.random() * positiveEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-        
-    } else if (roll < 0.7 + blessingBonus) {
-        // 负面事件 30%
-        eventType = 'negative';
-        const negativeEvents = [
-            { text: '👹 心魔入侵', effect: () => {
-                effects.mindset = -20;
-                return '心态 -20，修炼受阻';
-            }},
-            { text: '⚡ 天道压制', effect: () => {
-                effects.qi = -Math.floor(progressGain * 0.3);
-                if (gameState.immortal) gameState.immortal.cultivationProgress -= Math.floor(progressGain * 0.3);
-                return '当日修炼效率 -30%';
-            }},
-            { text: '💔 灵气紊乱', effect: () => {
-                const stoneLoss = Math.floor((gameState.immortal?.spiritStones || 0) * 0.05);
-                if (gameState.immortal && stoneLoss > 0) gameState.immortal.spiritStones -= stoneLoss;
-                effects.stones = -stoneLoss;
-                return `损失 ${stoneLoss} 灵石`;
-            }}
-        ];
-        const event = negativeEvents[Math.floor(Math.random() * negativeEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-        
-    } else {
-        // 中性事件 30%
-        eventType = 'neutral';
-        const neutralEvents = [
-            { text: '🧙 仙人指路', effect: () => {
-                return '天道启示：继续保持当前修炼节奏';
-            }},
-            { text: '🔮 奇遇发现', effect: () => {
-                // 解锁新区域线索
-                return '隐约感知到未知区域的召唤';
-            }},
-            { text: '⏳ 平静期', effect: () => {
-                return '天道运行平稳，无特殊事件';
-            }}
-        ];
-        const event = neutralEvents[Math.floor(Math.random() * neutralEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-    }
-    
-    // 清除祈福状态
-    gameState.celestialCycle.blessingActive = false;
-    
-    // 保存结果
-    const result = { type: eventType, text: resultText, effects: effects, day: gameState.days };
-    gameState.celestialCycle.lastResult = result;
-    
-    showCelestialCycleResult(result);
-    
-    addLog(eventType === 'positive' ? 'good' : eventType === 'negative' ? 'bad' : 'normal', 
-           '天道轮回', resultText.replace(/\n/g, ' '));
-}
-
-// ===== showCelestialCycleResult =====
-function showCelestialCycleResult(result) {
-    const icon = result.type === 'positive' ? '🌟' : result.type === 'negative' ? '💥' : '🔮';
-    const color = result.type === 'positive' ? '#4caf50' : result.type === 'negative' ? '#f44336' : '#2196f3';
-    
-    const modal = document.getElementById('modalNormal');
-    if (!modal) return;
-    
-    let effectsText = '';
-    if (result.effects.qi !== 0) effectsText += ` 灵气 ${result.effects.qi > 0 ? '+' : ''}${result.effects.qi}`;
-    if (result.effects.stones !== 0) effectsText += ` 灵石 ${result.effects.stones > 0 ? '+' : ''}${result.effects.stones}`;
-    if (result.effects.mindset !== 0) effectsText += ` 心态 ${result.effects.mindset > 0 ? '+' : ''}${result.effects.mindset}`;
-    
-    modal.innerHTML = `
-        <div class="result-title" style="color:${color}">${icon} 天道轮回结算 ${icon}</div>
-        <div style="margin:15px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;text-align:left">
-            ${result.text.replace(/\n/g, '<br/>')}
-        </div>
-        <div style="color:#aaa;font-size:12px">${effectsText}</div>
-        <div style="margin-top:15px">
-            <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">确定</button>
-        </div>
-    `;
-    modal.classList.remove('hidden');
-}
-
-// ===== requestExtraCycle =====
-function requestExtraCycle() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能请求天道轮回');
-        return;
-    }
-    const cost = 100;
-    if ((gameState.immortal?.spiritStones || 0) < cost) {
-        showToast(`需要 ${cost} 灵石请求额外轮回`);
-        return;
-    }
-    if (gameState.immortal) {
-        gameState.immortal.spiritStones -= cost;
-    }
-    gameState.celestialCycle.day = gameState.celestialCycle.cycleInterval || 3;
-    showToast(`消耗 ${cost} 灵石，请求天道轮回`);
-    addLog('normal', '主动干预', `消耗 ${cost} 灵石请求额外天道轮回`);
-}
-
-// ===== requestFortuneBlessing =====
-function requestFortuneBlessing() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能进行气运祈福');
-        return;
-    }
-    const cost = 200;
-    if ((gameState.immortal?.spiritStones || 0) < cost) {
-        showToast(`需要 ${cost} 灵石进行气运祈福`);
-        return;
-    }
-    if (gameState.immortal) {
-        gameState.immortal.spiritStones -= cost;
-    }
-    gameState.celestialCycle.blessingActive = true;
-    showToast(`消耗 ${cost} 灵石，气运祈福生效（下次轮回正面事件概率+15%）`);
-    addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
-}
-
-// ===== V34 仙界秘境探索系统 =====
-
-// ===== canEnterSecretRealm =====
-function canEnterSecretRealm(realmName) {
-    const realm = SECRET_REALMS_IMMORTAL[realmName];
-    if (!realm) return { result: false, reason: '秘境不存在' };
-    if (gameState.immortal.realm < realm.realmRequired) {
-        return { result: false, reason: `需要${IMMORTAL_REALMS[realm.realmRequired].name}才能进入` };
-    }
-    if (!gameState.immortal.secretRealm || gameState.immortal.secretRealm.tokens <= 0) {
-        return { result: false, reason: '秘境令牌不足' };
-    }
-    return { result: true };
-}
-
-// ===== enterSecretRealm =====
-function enterSecretRealm(realmName) {
-    const check = canEnterSecretRealm(realmName);
-    if (!check.result) {
-        showToast(check.reason);
-        return;
-    }
-    
-    const realm = SECRET_REALMS_IMMORTAL[realmName];
-    gameState.immortal.secretRealm.tokens--;
-    gameState.immortal.secretRealm.inSecretRealm = true;
-    gameState.immortal.secretRealm.currentRealm = realmName;
-    gameState.immortal.secretRealm.currentType = realm.type;
-    gameState.immortal.secretRealm.wave = 0;
-    gameState.immortal.secretRealm.totalWaves = realm.waves;
-    gameState.immortal.secretRealm.enemies = [];
-    gameState.immortal.secretRealm.rewards = [];
-    gameState.immortal.secretRealm.npc = realm.npc ? { ...realm.npc } : null;
-    
-    showToast(`进入【${realmName}】`);
-    renderSecretRealmUI();
-}
-
-// ===== renderSecretRealmUI =====
-function renderSecretRealmUI() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr || !sr.inSecretRealm) return;
-    
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
-    const typeNames = { ruins: '遗迹秘境', resource: '资源秘境', combat: '战斗秘境', serendipity: '奇遇秘境' };
-    
-    let content = `
-        <div style="padding:20px;color:#fff">
-            <div style="text-align:center;margin-bottom:20px">
-                <div style="font-size:24px">${typeIcons[realm.type] || '🏛️'} ${sr.currentRealm}</div>
-                <div style="color:#aaa;font-size:12px">${typeNames[realm.type]} - 第${sr.wave}/${sr.totalWaves}波</div>
-            </div>
-    `;
-    
-    // 类型特定UI
-    if (realm.type === 'resource') {
-        content += `
-            <div style="background:rgba(76,175,80,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#4caf50;font-size:14px">🌿 资源秘境 - 收集仙草和灵材</div>
-            </div>
-            <button onclick="collectResource()" style="width:100%;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">采集资源</button>
-        `;
-    } else if (realm.type === 'ruins') {
-        content += `
-            <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#9c27b0;font-size:14px">🏛️ 遗迹秘境 - 探索上古仙人洞府</div>
-                ${sr.npc && sr.npc.type === 'guardian' ? `<div style="color:#ff5722;margin-top:8px">⚠️ 守护者: ${sr.npc.name}</div>` : ''}
-            </div>
-            <button onclick="exploreRuins()" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">探索遗迹</button>
-        `;
-    } else if (realm.type === 'combat') {
-        content += `
-            <div style="background:rgba(244,67,54,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#f44336;font-size:14px">⚔️ 战斗秘境 - 击败守护者获取混沌至宝</div>
-                ${realm.boss ? `<div style="color:#ff5722;margin-top:8px">💀 Boss: ${realm.boss.name}</div>` : ''}
-            </div>
-            <button onclick="fightSecretRealmBoss()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">挑战Boss</button>
-        `;
-    } else if (realm.type === 'serendipity') {
-        content += `
-            <div style="background:rgba(255,215,0,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#ffd700;font-size:14px">✨ 奇遇秘境 - 随机触发特殊事件</div>
-            </div>
-            <button onclick="triggerSerendipityEvent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#333;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">触发奇遇</button>
-        `;
-    }
-    
-    // 奖励展示
-    if (sr.rewards.length > 0) {
-        content += `
-            <div style="margin-top:15px">
-                <div style="color:#ffd700;margin-bottom:8px">已获得奖励:</div>
-                ${sr.rewards.map(r => `<div style="color:#4caf50;font-size:12px">✧ ${r}</div>`).join('')}
-            </div>
-        `;
-    }
-    
-    content += `
-            <button onclick="exitSecretRealm()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:15px">返回仙界</button>
-        </div>
-    `;
-    
-    openModal('秘境探索', content, '');
-}
-
-// ===== collectResource =====
-function collectResource() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    sr.wave++;
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-    sr.rewards.push(reward);
-    
-    showToast(`获得: ${reward}`);
-    addLog('good', '秘境收获', `在${sr.currentRealm}获得${reward}`);
-    
-    if (sr.wave >= sr.totalWaves) {
-        completeImmortalSecretRealm();
-    } else {
-        renderSecretRealmUI();
-    }
-}
-
-// ===== exploreRuins =====
-function exploreRuins() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    sr.wave++;
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    
-    // 遗迹探索可能遇到敌人或奖励
-    if (Math.random() < 0.4 && sr.wave < sr.totalWaves) {
-        // 遇到守护者战斗
-        showToast(`遭遇${sr.npc?.name || '守护者'}！`);
-        startImmortalRealmBattle(sr.npc);
-    } else {
-        // 获得奖励
-        const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-        sr.rewards.push(reward);
-        showToast(`探索获得: ${reward}`);
-        addLog('good', '秘境收获', `在${sr.currentRealm}探索获得${reward}`);
-        
-        if (sr.wave >= sr.totalWaves) {
-            completeImmortalSecretRealm();
-        } else {
-            renderSecretRealmUI();
-        }
-    }
-}
-
-// ===== fightSecretRealmBoss =====
-function fightSecretRealmBoss() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const bossName = realm.boss?.name || '秘境守卫';
-    const bossHP = 5000 + (gameState.immortal.realm * 2000);
-    
-    showToast(`挑战 ${bossName}！`);
-    startImmortalRealmBattle({ name: bossName, hp: bossHP, maxHP: bossHP });
-}
-
-// ===== startImmortalRealmBattle =====
-function startImmortalRealmBattle(enemy) {
-    const sr = gameState.immortal.secretRealm;
-    
-    // 使用通用战斗系统
-    const playerMaxHP = gameState.maxHP || 1000;
-    const playerAttack = gameState.attack || 100;
-    const playerDefense = gameState.defense || 50;
-    
-    combatState.inProgress = true;
-    combatState.player = {
-        hp: playerMaxHP,
-        maxHP: playerMaxHP,
-        attack: playerAttack,
-        defense: playerDefense,
-        technique: gameState.technique || '金刚诀'
-    };
-    combatState.opponent = {
-        name: enemy.name || '秘境守卫',
-        hp: enemy.hp || 3000,
-        maxHP: enemy.maxHP || enemy.hp || 3000,
-        attack: 80 + (gameState.immortal?.realm || 1) * 30,
-        defense: 40 + (gameState.immortal?.realm || 1) * 15,
-        technique: '混沌诀',
-        critRate: 0.1,
-        level: 1
-    };
-    combatState.round = 0;
-    combatState.turn = 'player';
-    combatState.log = [];
-    combatState.effects = {
-        player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 },
-        opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 }
-    };
-    
-    // 设置战斗结束回调
-    window.secretRealmBattleEnd = function(result) {
-        if (result === 'win') {
-            const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-            const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-            sr.rewards.push(reward);
-            showToast(`战斗胜利！获得: ${reward}`);
-            addLog('good', '秘境战斗', `在${sr.currentRealm}击败${enemy.name}获得${reward}`);
-            
-            sr.wave++;
-            if (sr.wave >= sr.totalWaves) {
-                completeImmortalSecretRealm();
-            } else {
-                renderSecretRealmUI();
-            }
-        } else {
-            showToast('战斗失败，秘境探索结束');
-            exitSecretRealm();
-        }
-        delete window.secretRealmBattleEnd;
-    };
-    
-    renderCombatArena();
-}
-
-// ===== triggerSerendipityEvent =====
-function triggerSerendipityEvent() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    const events = [
-        { type: 'epiphany', text: '💡 顿悟！境界提升！', effect: () => { gameState.immortal.realm = Math.min(5, gameState.immortal.realm + 1); } },
-        { type: 'treasure', text: '💎 发现上古宝藏！', effect: () => { sr.rewards.push('上古宝藏'); } },
-        { type: 'technique', text: '📜 获得仙人传承！', effect: () => { sr.rewards.push('星君传承'); } },
-        { type: 'jade', text: '💰 发现仙玉矿脉！', effect: () => { sr.rewards.push('仙玉x100'); } }
-    ];
-    
-    const event = events[Math.floor(Math.random() * events.length)];
-    event.effect();
-    
-    showToast(event.text);
-    addLog('good', '奇遇秘境', `${event.text} - ${sr.currentRealm}`);
-    
-    completeImmortalSecretRealm();
-}
-
-// ===== completeImmortalSecretRealm =====
-function completeImmortalSecretRealm() {
-    const sr = gameState.immortal.secretRealm;
-    
-    showToast(`秘境探索完成！获得${sr.rewards.length}个奖励`);
-    addLog('good', '秘境完成', `完成${sr.currentRealm}，获得: ${sr.rewards.join(', ')}`);
-    
-    // 添加探索记录
-    if (!sr.explored) sr.explored = [];
-    if (!sr.explored.includes(sr.currentRealm)) {
-        sr.explored.push(sr.currentRealm);
-    }
-    
-    setTimeout(() => exitSecretRealm(), 1500);
-}
-
-// ===== exitSecretRealm =====
-function exitSecretRealm() {
-    const sr = gameState.immortal.secretRealm;
-    const rewards = [...(sr.rewards || [])];
-    
-    sr.inSecretRealm = false;
-    sr.currentRealm = null;
-    sr.currentType = null;
-    sr.wave = 0;
-    sr.enemies = [];
-    sr.npc = null;
-    
-    closeModal('modalNormal');
-    showToast(`秘境奖励: ${rewards.length > 0 ? rewards.join(', ') : '无'}`);
-    renderImmortalUI();
-}
-
-// ===== renderImmortalUI =====
-function renderImmortalUI() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    // 更新仙界状态显示
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    
-    // 更新境界显示
-    const realmDisplay = document.getElementById('immortalRealmDisplay');
-    if (realmDisplay) {
-        realmDisplay.innerHTML = `${realmData.icon} ${realmData.name}`;
-    }
-    
-    // 更新仙石显示
-    const stoneDisplay = document.getElementById('immortalStoneDisplay');
-    if (stoneDisplay) {
-        stoneDisplay.textContent = `💎 ${gameState.immortal.spiritStones}`;
-    }
-    
-    // 更新区域显示
-    const regionDisplay = document.getElementById('immortalRegionDisplay');
-    if (regionDisplay) {
-        regionDisplay.innerHTML = `${regionData.icon} ${gameState.immortal.currentRegion}`;
-    }
-    
-    // V34 添加秘境探索入口
-    const secretBtn = document.getElementById('secretRealmBtn');
-    if (secretBtn && gameState.immortal.secretRealm) {
-        secretBtn.textContent = `🏛️ 秘境探索 (令牌:${gameState.immortal.secretRealm.tokens})`;
-    }
-}
-
-// ===== V34 renderSecretRealmList =====
-function renderSecretRealmList() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能进行秘境探索');
-        return;
-    }
-    
-    const sr = gameState.immortal.secretRealm;
-    let content = `
-        <div style="padding:20px;color:#fff">
-            <div style="text-align:center;margin-bottom:20px">
-                <div style="font-size:20px;color:#ffd700">🏛️ 仙界秘境</div>
-                <div style="color:#aaa;font-size:12px">秘境令牌: ${sr?.tokens || 0}</div>
-            </div>
-    `;
-    
-    // 列出所有秘境
-    for (const [name, realm] of Object.entries(SECRET_REALMS_IMMORTAL)) {
-        const canEnter = gameState.immortal.realm >= realm.realmRequired;
-        const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
-        const typeNames = { ruins: '遗迹', resource: '资源', combat: '战斗', serendipity: '奇遇' };
-        
-        content += `
-            <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-bottom:10px;${!canEnter ? 'opacity:0.5' : ''}">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                        <div style="font-size:16px">${typeIcons[realm.type]} ${name}</div>
-                        <div style="color:#aaa;font-size:11px">${typeNames[realm.type]} | 危险${'⚠️'.repeat(realm.dangerLevel)} | 需要: ${IMMORTAL_REALMS[realm.realmRequired]?.name || '未知'}</div>
-                    </div>
-                    ${canEnter ? `<button onclick="enterSecretRealm('${name}')" style="padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">进入</button>` : '<span style="color:#f44336;font-size:11px">境界不足</span>'}
-                </div>
-            </div>
-        `;
-    }
-    
-    content += `
-            <button onclick="closeModal('modalNormal')" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:10px">返回</button>
-        </div>
-    `;
-    
-    openModal('秘境探索', content, '');
-}
-
-// ===== js/serendipity.js =====
-
-// ===== calculateSerendipityChance =====
+        // ===== calculateSerendipityChance =====
         function calculateSerendipityChance() {
             let chance = 0.15; // 基础15%
 
@@ -8842,1293 +12121,256 @@ function renderSecretRealmList() {
             updateDisplay();
         }
 
-// ===== js/crafting.js =====
 
-// ===== openShop =====
-        function openShop() {
-            if (gameState.shopItems.length === 0) {
-                generateShopItems();
-            }
-            renderShopItems();
-            document.getElementById('shopModal').classList.add('active');
-            if (miniMaxConfig.apiKey) {
-                generateShopIntro();
-            }
-        }
 
-        // ===== closeShop =====
-        function closeShop() {
-            document.getElementById('shopModal').classList.remove('active');
-        }
-
-        // ===== generateShopItems =====
-        function generateShopItems() {
-            const allItems = [];
-            // 收集所有丹药和灵宝
-            for (const [name, pill] of Object.entries(PILLS)) {
-                allItems.push({ type: 'pill', name, ...pill });
-            }
-            for (const [name, treasure] of Object.entries(TREASURES)) {
-                allItems.push({ type: 'treasure', name, ...treasure });
-            }
-            // V4战斗道具
-            for (const [name, treasure] of Object.entries(COMBAT_TREASURES)) {
-                allItems.push({ type: 'treasure', name, ...treasure });
-            }
-            // 挑战状
-            allItems.push({ type: 'special', name: '挑战状', quality: 'common', price: 500, desc: '用于发起斗法挑战', icon: '📜' });
-            // 战斗丹药
-            for (const [name, pill] of Object.entries(COMBAT_PILLS)) {
-                allItems.push({ type: 'pill', name, ...pill, price: pill.price || 1000 });
-            }
-
-            // 随机选8-12个
-            const count = 8 + Math.floor(Math.random() * 5);
-            const shuffled = allItems.sort(() => Math.random() - 0.5);
-            gameState.shopItems = shuffled.slice(0, Math.min(count, allItems.length));
-            gameState.lastShopDay = gameState.days;
-            saveGame();
-        }
-
-        // ===== renderShopItems =====
-        function renderShopItems() {
-            const grid = document.getElementById('shopGrid');
-            grid.innerHTML = gameState.shopItems.map((item, idx) => `
-                <div class="shop-item">
-                    <div class="shop-item-info">
-                        <div class="shop-item-name" style="color:${getQualityColor(item.quality)}">${item.icon || '📦'} ${item.name}</div>
-                        <div class="shop-item-desc">${item.desc}</div>
-                    </div>
-                    <div class="shop-item-price">💎 ${item.price}</div>
-                    <button class="btn-buy" onclick="buyItem(${idx})" ${gameState.spiritStones < item.price ? 'disabled' : ''}>购买</button>
-                </div>
-            `).join('');
-        }
-
-        // ===== buyItem =====
-        function buyItem(idx) {
-            const item = gameState.shopItems[idx];
-            if (!item || gameState.spiritStones < item.price) {
-                alert('灵石不足！');
-                return;
-            }
-            
-            if (gameState.inventory.length >= gameState.maxInventorySlots) {
-                alert('背包已满！');
-                return;
-            }
-            
-            gameState.spiritStones -= item.price;
-            addToInventory(item.type, item.name, 1, item.quality, item.effect, item.desc, item.icon);
-            saveGame();
-            updateDisplay();
-            renderShopItems();
-            addLog('good', '购买物品', `购买了${item.name}`);
-        }
-
-        // ===== refreshShop =====
-        function refreshShop(isAuto = false) {
-            // 经济调整：商店刷新费用递增，防止玩家无限制刷新刷出稀有物品
-            if (!isAuto) {
-                const refreshCost = Math.floor(100 * (1 + (gameState.shopRefreshCount || 0) * 0.5));
-                if (gameState.spiritStones < refreshCost) {
-                    alert(`灵石不足！刷新商店需要 ${refreshCost} 灵石`);
-                    return;
-                }
-                gameState.spiritStones -= refreshCost;
-                gameState.shopRefreshCount++;
-                
-                gameState.days++;
-                saveGame();
-                updateDisplay();
-            }
-            generateShopItems();
-            renderShopItems();
-            if (!isAuto) {
-                addLog('neutral', '刷新商店', `商店已刷新，花费${refreshCost}灵石`);
-            }
-        }
-
-        // ===== openCrafting =====
-        function openCrafting(type) {
-            selectedCraftType = type;
-            selectedRecipeName = null;
-            document.getElementById('alchemyDetail').style.display = 'none';
-            document.getElementById('alchemyResult').style.display = 'none';
-            renderCraftingRecipes();
-            document.getElementById('alchemyModal').classList.add('active');
-        }
-
-        // ===== openAlchemy =====
-        function openAlchemy() {
-            openCrafting('alchemy');
-        }
-
-        // ===== openForge =====
-        function openForge() {
-            openCrafting('forge');
-        }
-
-        // ===== closeAlchemy =====
-        function closeAlchemy() {
-            document.getElementById('alchemyModal').classList.remove('active');
-        }
-
-        // ===== renderCraftingRecipes =====
-        function renderCraftingRecipes() {
-            const container = document.getElementById('alchemyRecipes');
-            const modalTitle = document.querySelector('#alchemyModal .modal-title');
-            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
-            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
-            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
-
-            modalTitle.textContent = selectedCraftType === 'alchemy' ? '⚗️ 炼丹系统' : '🔨 炼器系统';
-
-            // 渲染炉子选择和升级
-            let furnaceHtml = '<div style="margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:10px;">';
-            furnaceHtml += '<div style="color:#aaa;margin-bottom:8px;">当前炉/台:</div>';
-            furnaceHtml += '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
-
-            for (const [name, data] of Object.entries(furnace)) {
-                const isOwned = data.level <= currentLevel;
-                const isEquipped = data.level === currentLevel;
-                const canBuy = data.cost > 0 && !isOwned;
-                const canAfford = gameState.spiritStones >= data.cost;
-
-                if (isEquipped) {
-                    furnaceHtml += `<span style="padding:5px 12px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;border-radius:5px;color:#ffd700;">${name} ${data.level === 1 ? '(免费)' : data.level === 2 ? '+15%' : '+30%'}</span>`;
-                } else if (isOwned) {
-                    furnaceHtml += `<button onclick="selectFurnace('${name}')" style="padding:5px 12px;background:rgba(0,0,0,0.4);border:1px solid #aaa;border-radius:5px;color:#aaa;cursor:pointer;">${name}</button>`;
-                } else if (canBuy) {
-                    furnaceHtml += `<button onclick="upgradeFurnace('${name}')" ${!canAfford ? 'disabled title="灵石不足"' : ''} style="padding:5px 12px;background:rgba(76,175,80,0.2);border:1px solid #4caf50;border-radius:5px;color:#4caf50;cursor:${canAfford ? 'pointer' : 'not-allowed'};">升级 ${name}(${data.cost}灵石)</button>`;
-                }
-            }
-            furnaceHtml += '</div></div>';
-
-            // 渲染配方列表
-            let recipesHtml = '<div style="max-height:250px;overflow-y:auto;">';
-            for (const [name, recipe] of Object.entries(recipes)) {
-                const materialsStr = Object.entries(recipe.materials)
-                    .map(([m, q]) => `${m}×${q}`)
-                    .join(' + ');
-                const canCraft = checkMaterialsForRecipe(recipe);
-                const isSelected = selectedRecipeName === name;
-
-                recipesHtml += `
-                    <div class="alchemy-recipe ${isSelected ? 'selected' : ''}" onclick="selectCraftRecipe('${name}')">
-                        <div class="recipe-info">
-                            <div class="recipe-name" style="color:${getQualityColor(getRecipeQuality(name))}">${recipe.icon || '📦'} ${name}</div>
-                            <div class="recipe-materials">材料: ${materialsStr}</div>
-                            <div class="recipe-success">成功率: ${Math.round(recipe.successRate * 100)}% + 炉加成</div>
-                        </div>
-                        <button class="btn-craft">炼制</button>
-                    </div>
-                `;
-            }
-            recipesHtml += '</div>';
-
-            container.innerHTML = furnaceHtml + recipesHtml;
-        }
-
-        // ===== getRecipeQuality =====
-        function getRecipeQuality(name) {
-            const recipe = ALCHEMY_RECIPES[name] || FORGE_RECIPES[name];
-            if (!recipe) return 'common';
-            const rate = recipe.successRate;
-            if (rate >= 0.7) return 'common';
-            if (rate >= 0.5) return 'rare';
-            if (rate >= 0.35) return 'precious';
-            return 'legendary';
-        }
-
-        // ===== selectFurnace =====
-        function selectFurnace(name) {
-            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
-            if (furnace[name]) {
-                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = furnace[name].level;
-                saveGame();
-                renderCraftingRecipes();
-            }
-        }
-
-        // ===== upgradeFurnace =====
-        function upgradeFurnace(name) {
-            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
-            const data = furnace[name];
-            if (data && gameState.spiritStones >= data.cost) {
-                gameState.spiritStones -= data.cost;
-                gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level = data.level;
-                addLog('good', '升级成功', `升级${selectedCraftType === 'alchemy' ? '炼丹炉' : '炼器台'}到${name}`);
-                saveGame();
-                updateDisplay();
-                renderCraftingRecipes();
-            }
-        }
-
-        // ===== selectCraftRecipe =====
-        function selectCraftRecipe(name) {
-            selectedRecipeName = name;
-            renderCraftingRecipes();
-
-            const recipes = selectedCraftType === 'alchemy' ? ALCHEMY_RECIPES : FORGE_RECIPES;
-            const recipe = recipes[name];
-            if (!recipe) return;
-
-            const materialsStr = Object.entries(recipe.materials)
-                .map(([m, q]) => `${m}×${q}`)
-                .join(' + ');
-
-            // 计算实际成功率
-            const furnace = selectedCraftType === 'alchemy' ? FURNACES : ANVILS;
-            const currentLevel = gameState.crafting[selectedCraftType === 'alchemy' ? 'furnace' : 'anvil'].level;
-            const furnaceData = Object.values(furnace).find(f => f.level === currentLevel);
-            const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
-            const totalSuccessRate = Math.min(0.95, recipe.successRate + furnaceBonus);
-
-            // 检查材料
-            const canCraft = checkMaterialsForRecipe(recipe);
-
-            // 检查燃料费
-            const hasFuel = gameState.spiritStones >= recipe.fuelCost;
-
-            document.getElementById('alchemyDetail').style.display = 'block';
-            document.getElementById('alchemyDetailContent').innerHTML = `
-                <div style="display:flex;align-items:center;gap:15px;margin-bottom:10px;">
-                    <span style="font-size:2em">${recipe.icon || '📦'}</span>
-                    <div>
-                        <div style="font-weight:bold;font-size:1.2em;color:${getQualityColor(getRecipeQuality(name))}">${name}</div>
-                        <div style="color:#aaa">${recipe.desc}</div>
-                    </div>
-                </div>
-                <div style="margin:10px 0;">材料: ${materialsStr}</div>
-                <div style="color:#aaa;">燃料费: ${recipe.fuelCost}灵石</div>
-                <div style="color:#4caf50;">基础成功率: ${Math.round(recipe.successRate * 100)}%</div>
-                <div style="color:#ffd700;">炉/台加成: +${Math.round(furnaceBonus * 100)}%</div>
-                <div style="color:#00ff88;">总计成功率: ${Math.round(totalSuccessRate * 100)}%</div>
-                <div style="margin-top:15px;">
-                    <button class="btn-craft" onclick="doCraft('${name}')" ${!canCraft || !hasFuel ? 'disabled' : ''}>
-                        ${!canCraft ? '材料不足' : !hasFuel ? '灵石不足(燃料)' : '开始炼制(消耗1天)'}
-                    </button>
-                </div>
-            `;
-        }
-
-        // ===== checkMaterialsForRecipe =====
-        function checkMaterialsForRecipe(recipe) {
-            for (const [mat, qty] of Object.entries(recipe.materials)) {
-                if (mat === '灵石') {
-                    if (gameState.spiritStones < qty) return false;
-                } else {
-                    const hasItem = gameState.inventory.some(item =>
-                        item.name === mat && item.quantity >= qty
-                    );
-                    if (!hasItem) return false;
-                }
-            }
-            return true;
-        }
-
-        // ===== getPillEffect =====
-        function getPillEffect(name) {
-            const effects = {
-                '回气丹': { type: 'qi', value: 0.2 },
-                '疗伤丹': { type: 'health', value: 0.3 },
-                '聚灵丹': { type: 'cultivate_speed', value: 0.2 },
-                '破境丹': { type: 'breakthrough_boost', value: 0.15 },
-                '渡劫丹': { type: '渡劫_success', value: 0.1 },
-                '洗髓丹': { type: 'spiritRoot_refresh', value: 1 },
-                '混沌丹': { type: '混沌灵根', value: 1 }
-            };
-            return effects[name] || {};
-        }
-
-        // ===== returnCraftMaterials =====
-        function returnCraftMaterials(materials, rate) {
-            for (const [mat, qty] of Object.entries(materials)) {
-                if (mat === '灵石') {
-                    gameState.spiritStones += Math.floor(qty * rate);
-                } else {
-                    const item = gameState.inventory.find(i => i.name === mat);
-                    if (item) {
-                        item.quantity += Math.floor(qty * rate);
-                    } else if (Math.floor(qty * rate) > 0) {
-                        const matData = MATERIALS[mat] || { icon: '📦', type: 'material' };
-                        gameState.inventory.push({
-                            id: Date.now() + Math.random(),
-                            type: 'material',
-                            name: mat,
-                            quantity: Math.floor(qty * rate),
-                            quality: 'common',
-                            effect: {},
-                            desc: `回收的${mat}`,
-                            icon: matData.icon
-                        });
-                    }
-                }
-            }
-        }
-
-        // ===== openMarket =====
-        function openMarket() {
-            renderMarketItems();
-            document.getElementById('alchemyModal').classList.add('active');
-            document.querySelector('#alchemyModal .modal-title').textContent = '🏪 交易市场';
-        }
-
-        // ===== renderMarketItems =====
-        function renderMarketItems() {
-            const container = document.getElementById('alchemyRecipes');
-            const logs = gameState.crafting.transactionLog || [];
-
-            let html = '<div style="margin-bottom:15px;">';
-            html += '<div style="color:#aaa;margin-bottom:10px;">上架你的物品出售(定价5%手续费)</div>';
-
-            // 玩家可上架的物品
-            const sellableItems = gameState.inventory.filter(item =>
-                item.type === 'pill' || item.type === 'treasure'
-            );
-
-            if (sellableItems.length > 0) {
-                html += '<div style="max-height:150px;overflow-y:auto;">';
-                for (const item of sellableItems) {
-                    const price = item.price || MATERIALS[item.name]?.basePrice || 100;
-                    html += `
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.3);border-radius:5px;margin-bottom:5px;">
-                            <span>${item.icon} ${item.name} ×${item.quantity}</span>
-                            <button onclick="listItem('${item.name}', ${price})" style="padding:3px 10px;background:#4caf50;border:none;border-radius:5px;color:white;cursor:pointer;">上架</button>
-                        </div>
-                    `;
-                }
-                html += '</div>';
-            } else {
-                html += '<div style="color:#888;text-align:center;padding:20px;">背包中没有可出售的物品</div>';
-            }
-            html += '</div>';
-
-            // 交易记录
-            html += '<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:15px;">';
-            html += '<div style="color:#ffd700;margin-bottom:10px;">最近交易记录</div>';
-            if (logs.length > 0) {
-                html += '<div style="max-height:150px;overflow-y:auto;">';
-                for (const log of logs.slice(-10).reverse()) {
-                    html += `
-                        <div style="padding:5px;background:rgba(0,0,0,0.2);border-radius:3px;margin-bottom:3px;font-size:0.9em;">
-                            <span style="color:${log.type === 'sell' ? '#4caf50' : '#ff9800'}">[${log.type === 'sell' ? '售出' : '购买'}]</span>
-                            ${log.itemName} ×${log.quantity} @ ${log.price}灵石
-                        </div>
-                    `;
-                }
-                html += '</div>';
-            } else {
-                html += '<div style="color:#888;text-align:center;padding:10px;">暂无交易记录</div>';
-            }
-            html += '</div>';
-
-            container.innerHTML = html;
-        }
-
-        // ===== listItem =====
-        function listItem(name, basePrice) {
-            const price = prompt(`请输入${name}的售价:`, basePrice);
-            if (!price) return;
-            const finalPrice = parseInt(price);
-            if (isNaN(finalPrice) || finalPrice <= 0) {
-                alert('请输入有效的价格');
-                return;
-            }
-
-            // 扣除上架费(5%)
-            const fee = Math.floor(finalPrice * 0.05);
-            if (gameState.spiritStones < fee) {
-                alert(`上架费${fee}灵石，你的灵石不足`);
-                return;
-            }
-
-            gameState.spiritStones -= fee;
-
-            // 消耗物品
-            const item = gameState.inventory.find(i => i.name === name);
-            if (item) {
-                item.quantity -= 1;
-                if (item.quantity <= 0) {
-                    gameState.inventory = gameState.inventory.filter(i => i !== item);
-                }
-            }
-
-            // 记录上架
-            if (!gameState.crafting.listedItems) {
-                gameState.crafting.listedItems = [];
-            }
-            gameState.crafting.listedItems.push({
-                name,
-                price: finalPrice,
-                seller: '玩家',
-                day: gameState.days
-            });
-
-            addLog('neutral', '物品上架', `${name}已上架，售价${finalPrice}灵石(手续费${fee})`);
-            saveGame();
-            updateDisplay();
-            renderMarketItems();
-        }
-
-        // ===== buyFromMarket =====
-        function buyFromMarket(listingIndex) {
-            const listing = gameState.crafting.listedItems[listingIndex];
-            if (!listing) return;
-
-            if (gameState.spiritStones < listing.price) {
-                alert('灵石不足');
-                return;
-            }
-
-            gameState.spiritStones -= listing.price;
-            addToInventory('pill', listing.name, 1, 'common', {}, '购买的物品', '📦');
-
-            // 记录交易
-            gameState.crafting.transactionLog.push({
-                type: 'buy',
-                itemName: listing.name,
-                quantity: 1,
-                price: listing.price,
-                day: gameState.days
-            });
-
-            // 从上架列表移除
-            gameState.crafting.listedItems.splice(listingIndex, 1);
-
-            addLog('good', '购买成功', `购买了${listing.name}`);
-            saveGame();
-            updateDisplay();
-            renderMarketItems();
-        }
-
-        // ===== selectRecipe =====
-        function selectRecipe(name) {
-            selectCraftRecipe(name);
-        }
-
-        // ===== craftPill =====
-        function craftPill(name) {
-            doCraft(name);
-        }
-
-        // ===== checkMaterials =====
-        function checkMaterials(materials) {
-            for (const [mat, qty] of Object.entries(materials)) {
-                if (mat === '灵石') {
-                    if (gameState.spiritStones < qty) return false;
-                } else {
-                    if (!gameState.inventory.some(item => item.name === mat && item.quantity >= qty)) return false;
-                }
-            }
-            return true;
-        }
-
-        // ===== consumeMaterials =====
-        function consumeMaterials(materials) {
-            for (const [mat, qty] of Object.entries(materials)) {
-                if (mat === '灵石') {
-                    gameState.spiritStones -= qty;
-                } else {
-                    const item = gameState.inventory.find(i => i.name === mat);
-                    if (item) {
-                        item.quantity -= qty;
-                        if (item.quantity <= 0) {
-                            gameState.inventory = gameState.inventory.filter(i => i !== item);
-                        }
-                    }
-                }
-            }
-        }
-
-        // ===== returnMaterials =====
-        function returnMaterials(materials, rate) {
-            returnCraftMaterials(materials, rate);
-        }
-
-// ===== js/achievements.js =====
-
-// ===== checkAchievements =====
-        function checkAchievements() {
-            if (!gameState.achievements) {
-                gameState.achievements = {
-                    unlocked: [],
-                    titles: [],
-                    stats: {
-                        tribulationsCompleted: 0,
-                        dungeonBossesKilled: 0,
-                        sectContributions: 0,
-                        treasuresRefined: 0,
-                        serendipitiesEncountered: 0,
-                        flawlessTribulations: 0
-                    }
-                };
-            }
-
-            const ach = gameState.achievements;
-
-            for (const achievement of ACHIEVEMENTS) {
-                // 跳过已解锁的
-                if (ach.unlocked.includes(achievement.id)) continue;
-
-                let unlocked = false;
-                const req = achievement.requirement;
-
-                if (req.type === 'stat') {
-                    const currentValue = ach.stats[req.key] || 0;
-                    if (currentValue >= req.value) {
-                        unlocked = true;
-                    }
-                } else if (req.type === 'realm') {
-                    if (gameState.realm >= req.value) {
-                        unlocked = true;
-                    }
-                } else if (req.type === 'set') {
-                    // 检查套装是否收集完成
-                    const set = SET_BONUSES[req.setName];
-                    if (set) {
-                        const equipped = gameState.equippedTreasures.map(t => t ? t.name : null);
-                        const owned = gameState.inventory.filter(i => set.pieces.includes(i.name)).map(i => i.name);
-                        const allPieces = [...new Set([...equipped, ...owned])];
-                        const hasAll = set.pieces.every(p => allPieces.includes(p));
-                        if (hasAll) unlocked = true;
-                    }
-                }
-
-                if (unlocked) {
-                    ach.unlocked.push(achievement.id);
-                    if (achievement.title && !ach.titles.includes(achievement.title)) {
-                        ach.titles.push(achievement.title);
-                        // 如果没有装备称号，自动装备新称号
-                        if (!gameState.title || gameState.title === '筑基修士') {
-                            gameState.title = achievement.title;
-                        }
-                    }
-                    addLog('good', '🏆 成就解锁', `【${achievement.name}】${achievement.desc}！获得称号：${achievement.title}`);
-                    saveGame();
-                }
-            }
-        }
-
-        // ===== getTitleBonus =====
-        function getTitleBonus() {
-            const bonuses = {
-                cultivationSpeed: 0,
+// Auto-generated module: state.js
+'use strict';
+
+        // --- gameState (1366-1480) ---
+        let gameState = {
+            realm: 0,       // 0-4 对应 炼气到化神
+            stage: 0,       // 0-2 对应 初期/中期/后期
+            qi: 0,
+            maxQi: 100,
+            spiritStones: 50,
+            mindset: 50,
+            days: 1,
+            cultivationProgress: 0,
+            eventLog: [],
+            combatLogHistory: [],
+            eventLogHistory: [],
+            isGameOver: false,
+            isVictory: false,
+            // V2新增字段
+            inventory: [],
+            equippedTreasures: [null, null, null],
+            maxInventorySlots: 20,
+            shopItems: [],
+            lastShopDay: 0,
+            activeEffects: {
+                breakthrough_boost: 0,
+                cultivate_speed: 0,
+                渡劫_mindset_protect: 0,
                 attack: 0,
                 defense: 0,
-                craftingSuccess: 0,
-                serendipityRate: 0,
-                realmSuppression: 0,
-                setBonus: 0,
-                tribulationCost: 0,
-                sectContribution: 0
-            };
-
-            if (!gameState.title || !gameState.achievements) return bonuses;
-
-            // 遍历所有已解锁的成就，找出当前称号对应的加成
-            const ach = gameState.achievements;
-            for (const achievement of ACHIEVEMENTS) {
-                if (ach.unlocked.includes(achievement.id)) {
-                    const reward = achievement.reward;
-                    if (reward.type === 'attribute') {
-                        if (bonuses.hasOwnProperty(reward.target)) {
-                            bonuses[reward.target] += reward.bonus;
-                        }
-                    }
-                }
-            }
-
-            return bonuses;
-        }
-
-        // ===== equipTitle =====
-        function equipTitle(titleName) {
-            if (!gameState.achievements || !gameState.achievements.titles.includes(titleName)) {
-                addLog('bad', '称号装备', '你还没有获得这个称号！');
-                return;
-            }
-            gameState.title = titleName;
-            addLog('good', '称号装备', `已装备称号：【${titleName}】`);
-            updateDisplay();
-            saveGame();
-        }
-
-        // ===== openAchievements =====
-        function openAchievements() {
-            document.getElementById('achievementModal').classList.add('active');
-            renderAchievements();
-        }
-
-        // ===== closeAchievements =====
-        function closeAchievements() {
-            document.getElementById('achievementModal').classList.remove('active');
-        }
-
-        // ===== renderAchievements =====
-        function renderAchievements() {
-            const content = document.getElementById('achievementContent');
-            if (!content) return;
-
-            const ach = gameState.achievements || { unlocked: [], titles: [], stats: {} };
-
-            let html = `<div class="achievement-header">`;
-            html += `<div class="achievement-title-display">当前称号：<span style="color:#ffd700;">【${gameState.title || '无'}】</span></div>`;
-            html += `</div>`;
-
-            // 分类显示
-            const categories = {
-                cultivation: '修炼',
-                combat: '战斗',
-                collection: '收集',
-                story: '剧情',
-                special: '特殊'
-            };
-
-            for (const [catKey, catName] of Object.entries(categories)) {
-                const catAchievements = ACHIEVEMENTS.filter(a => a.category === catKey);
-                if (catAchievements.length === 0) continue;
-
-                html += `<div class="achievement-category">`;
-                html += `<h4>${catName}</h4>`;
-
-                for (const a of catAchievements) {
-                    const isUnlocked = ach.unlocked.includes(a.id);
-                    const progress = getAchievementProgress(a, ach);
-
-                    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">`;
-                    html += `<div class="achievement-icon">${isUnlocked ? '🏆' : '🔒'}</div>`;
-                    html += `<div class="achievement-info">`;
-                    html += `<div class="achievement-name">${a.name}</div>`;
-                    html += `<div class="achievement-desc">${a.desc}</div>`;
-
-                    if (!isUnlocked && progress > 0) {
-                        html += `<div class="achievement-progress">`;
-                        html += `<div class="progress-bar" style="width:${progress}%"></div>`;
-                        html += `</div>`;
-                        html += `<div class="achievement-progress-text">${getAchievementProgressText(a, ach)}</div>`;
-                    }
-
-                    html += `</div>`;
-                    html += `<div class="achievement-reward">`;
-                    html += `<div style="color:#4caf50;">奖励：${getRewardText(a)}</div>`;
-                    if (a.title) html += `<div style="color:#ffd700;">称号：${a.title}</div>`;
-                    html += `</div>`;
-                    html += `</div>`;
-                }
-
-                html += `</div>`;
-            }
-
-            // 已获得称号列表
-            if (ach.titles.length > 0) {
-                html += `<div class="achievement-category">`;
-                html += `<h4>已获称号</h4>`;
-                html += `<div class="title-list">`;
-                for (const t of ach.titles) {
-                    const isEquipped = gameState.title === t;
-                    html += `<div class="title-item ${isEquipped ? 'equipped' : ''}" onclick="equipTitle('${t}')">`;
-                    html += `【${t}】${isEquipped ? '(已装备)' : '(点击装备)'}`;
-                    html += `</div>`;
-                }
-                html += `</div>`;
-                html += `</div>`;
-            }
-
-            content.innerHTML = html;
-        }
-
-        // ===== renderSpiritRootContent =====
-        function renderSpiritRootContent() {
-            const content = document.getElementById('spiritRootContent');
-            const sr = gameState.spiritRoot;
-            const srData = SPIRIT_ROOT_QUALITIES[sr.quality];
-            const cons = gameState.constitutions;
-            
-            const speedBonus = Math.round((srData.speedBonus - 1) * 100);
-            const bottleneckEffect = srData.bottleneckBonus >= 0 ? `+${Math.round(srData.bottleneckBonus * 100)}%` : `${Math.round(srData.bottleneckBonus * 100)}%`;
-            const tribEffect = srData.tribulationBonus >= 0 ? `+${Math.round(srData.tribulationBonus * 100)}%` : `${Math.round(srData.tribulationBonus * 100)}%`;
-            
-            const highestBonus = getHighestElementBonus();
-            
-            let html = `
-                <div class="sr-header">
-                    <div class="sr-quality">${srData.icon} ${sr.quality}</div>
-                    <div style="color:#aaa;">灵根资质评估</div>
-                </div>
-                
-                <div class="sr-stats">
-                    <div class="sr-stat">
-                        <div class="sr-stat-value" style="color: ${speedBonus >= 0 ? '#4caf50' : '#f44336'}">${speedBonus >= 0 ? '+' : ''}${speedBonus}%</div>
-                        <div class="sr-stat-label">修炼速度</div>
-                        <div class="sr-stat-bonus">${srData.speedBonus >= 1 ? '🌟 超越常人' : '📉 低于常人'}</div>
-                    </div>
-                    <div class="sr-stat">
-                        <div class="sr-stat-value">${bottleneckEffect}</div>
-                        <div class="sr-stat-label">瓶颈概率</div>
-                        <div class="sr-stat-bonus">${srData.bottleneckBonus <= 0 ? '🌟 更易突破' : '📉 较难突破'}</div>
-                    </div>
-                    <div class="sr-stat">
-                        <div class="sr-stat-value" style="color: ${srData.tribulationBonus >= 0 ? '#4caf50' : '#f44336'}">${tribEffect}</div>
-                        <div class="sr-stat-label">渡劫成功率</div>
-                        <div class="sr-stat-bonus">${srData.tribulationBonus >= 0 ? '🌟 天道眷顾' : '📉 渡劫艰难'}</div>
-                    </div>
-                </div>
-                
-                <div class="sr-section">
-                    <div class="sr-section-title">🌈 五行亲和</div>
-                    <div class="five-elements-grid">
-                        <div class="element-card">
-                            <div class="element-icon">⚔️</div>
-                            <div class="element-name">金</div>
-                            <div class="element-value ${sr.affinity.metal >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.metal}%</div>
-                        </div>
-                        <div class="element-card">
-                            <div class="element-icon">🌿</div>
-                            <div class="element-name">木</div>
-                            <div class="element-value ${sr.affinity.wood >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.wood}%</div>
-                        </div>
-                        <div class="element-card">
-                            <div class="element-icon">❄️</div>
-                            <div class="element-name">水</div>
-                            <div class="element-value ${sr.affinity.water >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.water}%</div>
-                        </div>
-                        <div class="element-card">
-                            <div class="element-icon">🔥</div>
-                            <div class="element-name">火</div>
-                            <div class="element-value ${sr.affinity.fire >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.fire}%</div>
-                        </div>
-                        <div class="element-card">
-                            <div class="element-icon">🛡️</div>
-                            <div class="element-name">土</div>
-                            <div class="element-value ${sr.affinity.earth >= ELEMENT_HIGH_THRESHOLD ? 'high' : ''}">${sr.affinity.earth}%</div>
-                        </div>
-                    </div>
-                    ${highestBonus ? `
-                    <div style="text-align:center;margin-top:10px;color:#ffd700;">
-                        当前最高加成：${highestBonus.element} ${highestBonus.technique.icon} ${highestBonus.technique.name} (${highestBonus.affinity}%)
-                    </div>
-                    ` : ''}
-                </div>
-                
-                <div class="sr-section">
-                    <div class="sr-section-title">👼 体质列表</div>
-                    <div class="constitutions-list">
-            `;
-            
-            // 渲染所有体质
-            for (const [name, data] of Object.entries(CONSTITUTIONS)) {
-                const acquired = cons.find(c => c.type === name);
-                const canActivate = data.trigger(gameState);
-                
-                html += `
-                    <div class="constitution-card ${acquired ? 'active' : 'inactive'}">
-                        <div class="icon">${data.icon}</div>
-                        <div class="info">
-                            <div class="name">${name}</div>
-                            <div class="effect">${data.desc}</div>
-                            <div class="source">触发条件：${data.source}</div>
-                        </div>
-                        <div class="status ${acquired ? 'active' : 'inactive'}">
-                            ${acquired ? '已激活' : canActivate ? '可激活' : '未获得'}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            html += `
-                    </div>
-                </div>
-                
-                <div class="sr-actions">
-                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(false)" ${gameState.spiritStones < 10000 ? 'disabled' : ''}>
-                        🔄 洗髓丹 (10000灵石)
-                    </button>
-                    <button class="btn-refresh-sr" onclick="refreshSpiritRoot(true)" ${gameState.spiritStones < 50000 || gameState.realm < 4 ? 'disabled' : ''}>
-                        🌈 混沌丹 (50000灵石)
-                    </button>
-                </div>
-                
-                <div class="sr-tips">
-                    <h4>💡 小提示</h4>
-                    <ul>
-                        <li>灵根品质影响修炼速度、瓶颈概率和渡劫成功率</li>
-                        <li>五行亲和达到一定数值可激活对应功法加成</li>
-                        <li>部分体质通过奇遇获得，部分通过突破境界激活</li>
-                        <li>最多同时拥有2种体质</li>
-                        <li>混沌丹需要化神期才能使用，100%获得混沌灵根</li>
-                    </ul>
-                </div>
-            `;
-            
-            content.innerHTML = html;
-        }
-
-// ===== js/init.js =====
-
-// ===== init =====
-        function init() {
-            loadMiniMaxConfig();
-            updateDisplay();
-        }
-
-        // ===== loadMiniMaxConfig =====
-        function loadMiniMaxConfig() {
-            const saved = localStorage.getItem(CONFIG.miniMaxConfigKey);
-            if (saved) {
-                try {
-                    miniMaxConfig = JSON.parse(saved);
-                    // 确保features结构完整
-                    if (!miniMaxConfig.features) {
-                        miniMaxConfig.features = { ...DEFAULT_MINIMAX_CONFIG.features };
-                    }
-                } catch (e) {
-                    miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
-                }
-            }
-        }
-
-        // ===== startNewGame =====
-        function startNewGame() {
-            gameState = {
-                realm: 0,
+                cultivate_qi_rate: 0,
+                渡劫_damage_reduce: 0,
+                escape: 0,
+                foresee_event: 0,
+                all_stats: 0,
+                serendipity_boost: 0
+            },
+            // V3渡劫系统字段
+            tribulation: {
+                inProgress: false,
+                currentStage: 0,
+                totalStages: 9,
+                currentType: null,
+                preparations: [],
+                damageTaken: 0,
+                tribKey: null
+            },
+            hasTransmigrationBuff: false,
+            tribulationRecord: [],
+            // V4 战斗系统字段
+            combat: {
+                wins: 0,
+                losses: 0,
+                honor: 0,
+                fame: 0,
+                battleHistory: [],
+                injured: false,
+                injuryEndDay: 0
+            },
+            // V5 宗门系统字段
+            sect: {
+                name: null,
+                level: 0,
+                spiritStones: 0,
+                disciples: [],
+                elders: [],
+                buildings: {
+                    library: false,
+                    alchemy: false,
+                    forge: false,
+                    archive: false
+                },
+                techniques: [],
+                contributionShop: [],
+                lastShopRefresh: 0,
+                lastResourceCollection: 0,
+                // V29 NPC AI系统
+                npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
+                npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
+                npcLastActions: {},        // {uid: {action, day}}
+                // V30 渡劫审批系统
+                tribulationRequest: {
+                    status: 'none',        // none | pending_elder | pending_leader | approved | rejected
+                    elderScore: 0,
+                    elderComment: '',
+                    leaderDecision: '',
+                    leaderComment: '',
+                    buffApplied: false,
+                    submitDay: 0
+                },
+                // V31 天道轮回系统
+                celestialCycle: {
+                    day: 0,                // 距离下次轮回的天数
+                    completed: false,      // 本周期是否已完成
+                    lastResult: null,       // 上次轮回结果 {type, text, effects}
+                    blessingActive: false, // 气运祈福是否激活
+                    cycleInterval: 3        // 轮回间隔天数
+                },
+                // V35 宗门任务链
+                sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+                sectMissionCooldown: 0    // 任务冷却
+            },
+            // V6 奇遇系统字段
+            serendipity: {
+                lastTriggerDay: 0,
+                todayCount: 0,
+                lastTriggerType: null,
+                cooldownTypes: {},
+                badLuck: 0,
+                currentEvent: null,
+                log: [],
+                luckStatus: null,
+                luckEndDay: 0,
+                serendipityBoostEndDay: 0
+            },
+            // V7 灵根/体质系统字段
+            spiritRoot: {
+                quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
+                affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+                resonance: 0,
+                lastRefreshDay: 0,
+                awakeningAvailable: false, // V32 是否可以觉醒
+                hasAwakened: false,          // V32 是否已完成觉醒
+                awakenedQuality: null        // V32 觉醒后的品质
+            },
+            // V32 灵根觉醒系统
+            spiritRootAwakening: {
+                status: 'dormant',   // dormant | stage1 | stage2 | stage3 | completed
                 stage: 0,
-                qi: 20,
-                maxQi: 100,
-                spiritStones: 50,
-                mindset: 50,
-                days: 1,
-                cultivationProgress: 0,
-                eventLog: [],
-                isGameOver: false,
-                isVictory: false,
-                inventory: [],
-                equippedTreasures: [null, null, null],
-                maxInventorySlots: 20,
-                shopItems: [],
-                lastShopDay: 0,
-                shopRefreshCount: 0, // 经济调整：商店刷新次数计数器，用于递增刷新费用
-                activeEffects: {
-                    breakthrough_boost: 0,
-                    cultivate_speed: 0,
-                    渡劫_mindset_protect: 0,
-                    attack: 0,
-                    defense: 0,
-                    cultivate_qi_rate: 0,
-                    渡劫_damage_reduce: 0,
-                    escape: 0,
-                    foresee_event: 0,
-                    all_stats: 0
-                },
-                tribulation: {
-                    inProgress: false,
-                    currentStage: 0,
-                    totalStages: 9,
-                    currentType: null,
-                    preparations: [],
-                    damageTaken: 0,
-                    tribKey: null
-                },
-                hasTransmigrationBuff: false,
-                tribulationRecord: [],
-                combat: {
-                    wins: 0,
-                    losses: 0,
-                    honor: 0,
-                    fame: 0,
-                    battleHistory: [],
-                    injured: false,
-                    injuryEndDay: 0
-                },
-                sect: {
-                    name: null,
-                    level: 0,
-                    spiritStones: 0,
-                    disciples: [],
-                    elders: [],
-                    buildings: {
-                        library: false,
-                        alchemy: false,
-                        forge: false,
-                        archive: false
-                    },
-                    techniques: [],
-                    contributionShop: [],
-                    lastShopRefresh: 0,
-                    lastResourceCollection: 0,
-                    // V29 NPC AI系统
-                    npcDialogueHistory: [],
-                    npcTasks: [],
-                    npcLastActions: {},
-                    // V30 渡劫审批系统
-                    tribulationRequest: {
-                        status: 'none',
-                        elderScore: 0,
-                        elderComment: '',
-                        leaderDecision: '',
-                        leaderComment: '',
-                        buffApplied: false,
-                        submitDay: 0
-                    },
-                    // V31 天道轮回系统
-                    celestialCycle: {
-                        day: 0,
-                        completed: false,
-                        lastResult: null,
-                        blessingActive: false,
-                        cycleInterval: 3
-                    },
-                    // V35 宗门任务链
-                    sectMissions: [],
-                    sectMissionCooldown: 0
-                },
-                // V6 奇遇系统字段
-                serendipity: {
-                    lastTriggerDay: 0,
-                    todayCount: 0,
-                    lastTriggerType: null,
-                    cooldownTypes: {},
-                    badLuck: 0,
-                    currentEvent: null,
-                    log: [],
-                    luckStatus: null,
-                    luckEndDay: 0,
-                    serendipityBoostEndDay: 0
-                },
-                // V7 灵根/体质系统
-                spiritRoot: {
-                    ...generateRandomSpiritRoot(),
-                    awakeningAvailable: false,
-                    hasAwakened: false,
-                    awakenedQuality: null
-                },
-                // V32 灵根觉醒系统
-                spiritRootAwakening: {
-                    status: 'dormant',
-                    stage: 0,
-                    triggerDay: 0,
-                    tasks: [],
-                    rewards: null,
-                    lastEventDay: 0,
-                    attempts: 0
-                },
-                constitutions: [],
-                // V8 丹药炼器系统
-                crafting: {
-                    furnace: { level: 1, type: 'alchemy' },
-                    anvil: { level: 1, type: 'forge' },
-                    transactionLog: []
-                },
-                // V9 世界地图系统
-                worldMap: {
-                    currentContinent: '中州',
-                    currentRegion: '中州城',
-                    exploredContinents: ['中州'],
-                    exploredRegions: ['中州城', '中州野外'],
-                    actionPower: 10,
-                    maxActionPower: 10,
-                    continentUnlocks: {
-                        '中州': 0,
-                        '南疆': 1,
-                        '北域': 2,
-                        '西域': 3,
-                        '东海': 2,
-                        '仙界碎片': 4
-                    },
-                    bossRefreshDays: {},
-                    lastTravelDay: 0
-                },
-                // E1 NPC对话记忆
-                npcMemory: [],
-                // B 成就/称号系统
-                title: '筑基修士',
-                achievements: {
-                    unlocked: [],
-                    titles: [],
-                    stats: {
-                        tribulationsCompleted: 0,
-                        dungeonBossesKilled: 0,
-                        sectContributions: 0,
-                        treasuresRefined: 0,
-                        serendipitiesEncountered: 0,
-                        flawlessTribulations: 0
-                    }
+                triggerDay: 0,
+                tasks: [],           // [{type, target, current, completed}]
+                rewards: null,
+                lastEventDay: 0,
+                attempts: 0
+            },
+            constitutions: [], // 已获得的体质
+            // V8 丹药炼器系统字段
+            crafting: {
+                furnace: { level: 1, type: 'alchemy' },
+                anvil: { level: 1, type: 'forge' },
+                transactionLog: []
+            },
+            // V11 成就/称号系统字段
+            title: '筑基修士',
+            achievements: {
+                unlocked: [],
+                titles: [],
+                stats: {
+                    tribulationsCompleted: 0,
+                    dungeonBossesKilled: 0,
+                    sectContributions: 0,
+                    treasuresRefined: 0,
+                    serendipitiesEncountered: 0,
+                    flawlessTribulations: 0
                 }
-            };
-            saveGame();
-            showGameUI();
-            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
-        }
+            },
+            // V11 飞升系统字段
+            currentRealm: 'mortal',  // 'mortal' | 'immortal'
+            immortal: null,          // 仙界状态，飞升后初始化
+            mounts: [],              // 仙兽列表（最多3只）
+            immortalSkills: [],       // 仙法列表
+            immortalEquipment: {      // 飞升装备栏
+                head: null,
+                body: null,
+                foot: null,
+                weapon: null,
+                shield: null,
+                accessory: null
+            },
+            currentMount: null       // 当前骑乘的仙兽
+        };
 
-        // ===== loadGame =====
-        function loadGame() {
-            const saved = localStorage.getItem(CONFIG.storageKey);
-            if (saved) {
-                const loaded = JSON.parse(saved);
-                // 确保V2新增字段存在（向后兼容）
-                gameState = {
-                    ...gameState,
-                    ...loaded,
-                    activeEffects: loaded.activeEffects || {
-                        breakthrough_boost: 0,
-                        cultivate_speed: 0,
-                        渡劫_mindset_protect: 0,
-                        attack: 0,
-                        defense: 0,
-                        cultivate_qi_rate: 0,
-                        渡劫_damage_reduce: 0,
-                        escape: 0,
-                        foresee_event: 0,
-                        all_stats: 0
-                    },
-                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
-                    inventory: loaded.inventory || [],
-                    shopItems: loaded.shopItems || [],
-                    lastShopDay: loaded.lastShopDay || 0,
-                    tribulation: loaded.tribulation || {
-                        inProgress: false,
-                        currentStage: 0,
-                        totalStages: 9,
-                        currentType: null,
-                        preparations: [],
-                        damageTaken: 0,
-                        tribKey: null
-                    },
-                    hasTransmigrationBuff: loaded.hasTransmigrationBuff || false,
-                    tribulationRecord: loaded.tribulationRecord || [],
-                    combat: loaded.combat || {
-                        wins: 0,
-                        losses: 0,
-                        honor: 0,
-                        fame: 0,
-                        battleHistory: [],
-                        injured: false,
-                        injuryEndDay: 0
-                    },
-                    // V33 战斗AI学习系统
-                    combatProfile: loaded.combatProfile || {
-                        playerPatterns: [],
-                        totalBattles: 0,
-                        winsAgainst: 0,
-                        currentEnemy: null,
-                        learningData: {},
-                        preferredDistance: null,
-                        spellUsageRate: 0,
-                        defenseFrequency: 0,
-                        attackTiming: []
-                    },
-                    lastCombatDay: loaded.lastCombatDay || 0,
-                    // V35 宗门互动增强
-                    sectMissions: loaded.sectMissions || [],
-                    sectMissionCooldown: loaded.sectMissionCooldown || 0,
-                    lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
-                    // V36 装备打造增强
-                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
-                    lastForgeDay: loaded.lastForgeDay || 0,
-                    sect: loaded.sect ? {
-                        ...loaded.sect,
-                        npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
-                        npcTasks: loaded.sect.npcTasks || [],
-                        npcLastActions: loaded.sect.npcLastActions || {},
-                        tribulationRequest: loaded.sect.tribulationRequest || {
-                            status: 'none', elderScore: 0, elderComment: '',
-                            leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
-                        },
-                        celestialCycle: loaded.sect.celestialCycle || {
-                            day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
-                        },
-                        // V35 宗门任务链
-                        sectMissions: loaded.sect.sectMissions || [],
-                        sectMissionCooldown: loaded.sect.sectMissionCooldown || 0
-                    } : {
-                        name: null,
-                        level: 0,
-                        spiritStones: 0,
-                        disciples: [],
-                        elders: [],
-                        buildings: {
-                            library: false,
-                            alchemy: false,
-                            forge: false,
-                            archive: false
-                        },
-                        techniques: [],
-                        contributionShop: [],
-                        lastShopRefresh: 0,
-                        lastResourceCollection: 0
-                    },
-                    serendipity: loaded.serendipity || {
-                        lastTriggerDay: 0,
-                        todayCount: 0,
-                        lastTriggerType: null,
-                        cooldownTypes: {},
-                        badLuck: 0,
-                        currentEvent: null,
-                        log: [],
-                        luckStatus: null,
-                        luckEndDay: 0,
-                        serendipityBoostEndDay: 0
-                    },
-                    // V7 灵根/体质系统
-                    spiritRoot: loaded.spiritRoot ? {
-                        ...loaded.spiritRoot,
-                        awakeningAvailable: loaded.spiritRoot.awakeningAvailable || false,
-                        hasAwakened: loaded.spiritRoot.hasAwakened || false,
-                        awakenedQuality: loaded.spiritRoot.awakenedQuality || null
-                    } : { ...generateRandomSpiritRoot(), awakeningAvailable: false, hasAwakened: false, awakenedQuality: null },
-                    // V32 灵根觉醒系统
-                    spiritRootAwakening: loaded.spiritRootAwakening || {
-                        status: 'dormant',
-                        stage: 0,
-                        triggerDay: 0,
-                        tasks: [],
-                        rewards: null,
-                        lastEventDay: 0,
-                        attempts: 0
-                    },
-                    constitutions: loaded.constitutions || [],
-                    // V8 丹药炼器系统
-                    crafting: loaded.crafting || {
-                        furnace: { level: 1, type: 'alchemy' },
-                        anvil: { level: 1, type: 'forge' },
-                        transactionLog: []
-                    },
-                    // V9 世界地图系统
-                    worldMap: loaded.worldMap || {
-                        currentContinent: '中州',
-                        currentRegion: '中州城',
-                        exploredContinents: ['中州'],
-                        exploredRegions: ['中州城', '中州野外'],
-                        actionPower: 10,
-                        maxActionPower: 10,
-                        continentUnlocks: {
-                            '中州': 0,
-                            '南疆': 1,
-                            '北域': 2,
-                            '西域': 3,
-                            '东海': 2,
-                            '仙界碎片': 4
-                        },
-                        bossRefreshDays: {},
-                        lastTravelDay: 0
-                    }
-                };
-                // E1 确保npcMemory字段存在（向后兼容）
-                if (!gameState.npcMemory) gameState.npcMemory = [];
-                // B 成就/称号系统向后兼容
-                if (!gameState.title) gameState.title = '筑基修士';
-                if (!gameState.achievements) {
-                    gameState.achievements = {
-                        unlocked: [],
-                        titles: [],
-                        stats: {
-                            tribulationsCompleted: 0,
-                            dungeonBossesKilled: 0,
-                            sectContributions: 0,
-                            treasuresRefined: 0,
-                            serendipitiesEncountered: 0,
-                            flawlessTribulations: 0
-                        }
-                    };
-                }
-                // 确保activeEffects包含serendipity_boost
-                if (!gameState.activeEffects.serendipity_boost) {
-                    gameState.activeEffects.serendipity_boost = 0;
-                }
-                // 初始化体质效果
-                initializeConstitutionEffects();
-                // 重新计算装备效果
-                recalculateAllEffects();
-                // 初始化世界地图
-                initWorldMap();
-                if (gameState.isGameOver) {
-                    showGameOverScreen();
-                } else {
-                    showGameUI();
-                }
-            } else {
-                alert('没有找到存档！');
+        // --- miniMaxConfig (1492-1502) ---
+        let miniMaxConfig = {
+            apiKey: '',
+            baseUrl: 'https://api.minimaxi.com/v1',
+            model: 'MiniMax-M2.7',
+            groupId: '',
+            features: {
+                aiDialogue: false,
+                aiSerendipity: false,
+                aiTechnique: false
             }
-        }
+        };
 
-        // ===== showGameUI =====
-        function showGameUI() {
-            document.getElementById('startScreen').classList.add('hidden');
-            document.getElementById('apiConfig').classList.add('hidden');
-            document.getElementById('gameStats').classList.remove('hidden');
-            document.getElementById('cultivationProgress').classList.remove('hidden');
-            document.getElementById('equipmentBar').classList.remove('hidden');
-            document.getElementById('gameButtons').classList.remove('hidden');
-            document.getElementById('eventLog').classList.remove('hidden');
-            updateDisplay();
-            renderLog();
-            updateEquipmentBar();
-            // 检查商店刷新
-            if (gameState.lastShopDay < gameState.days) {
-                refreshShop(true);
+        // --- combatState (5037-5051) ---
+        let combatState = {
+            inProgress: false,
+            player: null,
+            opponent: null,
+            round: 0,
+            turn: 'player',
+            playerAction: null,
+            playerSubAction: null,
+            log: [],
+            effects: {
+                player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
+                opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
+            },
+            battleRecord: [],
+            // V33 战斗AI学习系统
+            combatProfile: {
+                playerPatterns: [],     // [{action, count, lastUsed}]
+                totalBattles: 0,
+                winsAgainst: 0,
+                currentEnemy: null,
+                learningData: {},       // {enemyId: {adaptationLevel, observedPatterns}}
+                preferredDistance: null,
+                spellUsageRate: 0,
+                defenseFrequency: 0,
+                attackTiming: []
+            },
+            lastCombatDay: 0,           // V33 上次战斗天数（用于触发学习）
+            // V35 宗门互动增强
+            sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+            sectMissionCooldown: 0,    // 任务冷却
+            lastMissionRefreshDay: 0,   // 上次任务刷新
+            // V36 装备打造增强
+            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
+            lastForgeDay: 0,            // 上次打造时间
+            // V37 天道法则系统
+            celestialLaws: {
+                comprehended: [],          // 已领悟的法则 ['time','space',...]
+                active: [],                // 当前激活的法则（最多3个）
+                comprehending: null,        // 当前领悟中的法则
+                comprehendingProgress: 0,  // 领悟进度 0-100
+                comprehendDays: 0,         // 领悟已进行的天数
+                maxActiveLaws: 3,          // 最大激活数量
+                lawBonus: {}               // 当前激活法则计算后的加成
             }
-            // 重置每日行动力
-            if (gameState.worldMap) {
-                const wm = gameState.worldMap;
-                if (wm.lastTravelDay < gameState.days) {
-                    wm.actionPower = wm.maxActionPower;
-                    wm.lastTravelDay = 0;
-                }
-            }
-            // 检查宗门按钮显示
-            const sectBtn = document.getElementById('sectBtn');
-            if (sectBtn) {
-                sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
-            }
-        }
+        };
 
-        // ===== updateDisplay =====
-        function updateDisplay() {
-            const realmName = CONFIG.realms[gameState.realm];
-            const stageName = CONFIG.stages[gameState.stage];
-            
-            document.getElementById('realmDisplay').textContent = `${realmName}期`;
-            document.getElementById('qiDisplay').textContent = `${gameState.qi}/${gameState.maxQi}`;
-            document.getElementById('stonesDisplay').textContent = gameState.spiritStones;
-            document.getElementById('mindsetDisplay').textContent = gameState.mindset;
-            document.getElementById('daysDisplay').textContent = gameState.days;
-            
-            document.getElementById('realmName').textContent = `${realmName}期`;
-            document.getElementById('realmStage').textContent = stageName;
+        // --- secretRealmState (7391-7398) ---
+        let secretRealmState = {
+            wave: 0,
+            totalWaves: 3,
+            enemies: [],
+            playerHP: 0,
+            playerMaxHP: 0,
+            rewards: []
+        };
 
-            // A5 更新称号显示
-            const titleDisplay = document.getElementById('titleDisplay');
-            if (titleDisplay) {
-                titleDisplay.textContent = `【${gameState.title || '筑基修士'}】`;
-            }
 
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            const progressInStage = gameState.stage === 0 ? 
-                gameState.cultivationProgress : 
-                gameState.cultivationProgress - req.stageThreshold[gameState.stage - 1];
-            const stageSize = gameState.stage === 0 ? 
-                req.stageThreshold[0] : 
-                (req.stageThreshold[gameState.stage] - req.stageThreshold[gameState.stage - 1]);
-            const percentage = Math.min(100, (progressInStage / stageSize) * 100);
-            
-            document.getElementById('cultivationBar').style.width = `${percentage}%`;
-            document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
-            
-            // V7 更新灵根显示
-            updateSpiritRootDisplay();
-            
-            // V9 更新世界地图显示
-            updateMinimapDisplay();
-            if (gameState.worldMap) {
-                const wm = gameState.worldMap;
-                document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
-            }
-        }
 
-// ===== js/ui.js =====
+// Auto-generated module: ui.js
+'use strict';
 
-// --- CONTINENTS (7877-7926) ---
+        // --- CONTINENTS (7877-7926) ---
         const CONTINENTS = {
             '中州': {
                 icon: '🏯',
@@ -10340,1792 +12582,12 @@ function renderSecretRealmList() {
             }
         };
 
-// ===== js/cultivation.js =====
 
-// ===== renderLog =====
-        function renderLog() {
-            const container = document.getElementById('logEntries');
-            const recentLogs = gameState.eventLog.slice(0, 5);
-            container.innerHTML = recentLogs.map(log => `
-                <div class="log-entry ${log.type}">
-                    <div class="log-entry-title">第${log.day}天 - ${log.title}</div>
-                    <div class="log-entry-text">${log.text}</div>
-                </div>
-            `).join('');
-        }
 
-        // ===== doCultivate =====
-        function doCultivate() {
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
-            // V7 应用灵根速度加成
-            baseGain *= getSpiritRootSpeedBonus();
-            // 应用体质修炼速度加成
-            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.cultivateSpeed) {
-                baseGain *= (1 + gameState.activeEffects.constitution_bonuses.cultivateSpeed);
-            }
-            // 应用装备和丹药效果
-            baseGain *= (1 + gameState.activeEffects.cultivate_speed);
-            baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
-            baseGain *= (1 + gameState.activeEffects.all_stats);
-            const gain = Math.floor(baseGain);
-            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
-            gameState.cultivationProgress += gain;
-            
-            let logType = 'good';
-            let logText = `修炼${gain}点灵气，感觉体内的灵力更加充沛。`;
-            
-            // 检查是否需要晋级
-            if (gameState.cultivationProgress >= req.stageThreshold[gameState.stage] && gameState.stage < 2) {
-                gameState.stage++;
-                logText = `修炼${gain}点灵气，境界突破到${CONFIG.stages[gameState.stage]}！`;
-                addLog(logType, '境界突破', logText);
-            } else if (gameState.cultivationProgress >= req.stageThreshold[2]) {
-                logText = `修炼${gain}点灵气，${CONFIG.realms[gameState.realm]}期修炼圆满，可以尝试突破到下一个境界！`;
-                addLog('neutral', '境界圆满', logText);
-            } else {
-                addLog(logType, '修炼', logText);
-            }
-            
-            gameState.days++;
-            saveGame();
-            updateDisplay();
-            doMorningExercise();
-        }
+// Auto-generated module: worldmap.js
+'use strict';
 
-        // ===== doMorningExercise =====
-        function doMorningExercise() {
-            const gain = Math.floor(2 + Math.random() * 5);
-            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
-            gameState.mindset = Math.min(100, gameState.mindset + 1);
-            updateDisplay();
-
-            // V6: 处理每日奇遇结算
-            processEndOfDaySerendipity();
-
-            // V6: 检查是否触发奇遇
-            const serendipityResult = checkSerendipity();
-            if (serendipityResult) {
-                showSerendipityModal(serendipityResult);
-            }
-        }
-
-        // ===== getLocalRandomEvent =====
-        function getLocalRandomEvent() {
-            const events = [
-                {
-                    title: '🌿 发现灵草',
-                    description: '在山林间发现一株散发幽香的灵草，似乎可以服用增强灵气。',
-                    options: [
-                        { text: '小心采摘', risk: 'low', effects: { qi: 15, mindset: 0, spiritStones: 0 } },
-                        { text: '直接服用', risk: 'medium', effects: { qi: 35, mindset: -5, spiritStones: 0 } },
-                        { text: '连根拔起研究', risk: 'high', effects: { qi: 60, mindset: -15, spiritStones: 0 } }
-                    ]
-                },
-                {
-                    title: '⚔️ 遇到妖兽',
-                    description: '一只妖兽从林中窜出，眼中闪烁着凶光，似乎把你当成了猎物。',
-                    options: [
-                        { text: '悄悄绕行', risk: 'low', effects: { qi: 0, mindset: 5, spiritStones: 0 } },
-                        { text: '与之搏斗', risk: 'medium', effects: { qi: -20, mindset: -10, spiritStones: 30 } },
-                        { text: '全力击杀', risk: 'high', effects: { qi: -40, mindset: -25, spiritStones: 80 } }
-                    ]
-                },
-                {
-                    title: '🏯 废弃洞府',
-                    description: '前方有一座废弃的修士洞府，门口的石碑上刻着模糊的文字。',
-                    options: [
-                        { text: '礼貌叩门', risk: 'low', effects: { qi: 10, mindset: 5, spiritStones: 0 } },
-                        { text: '尝试破阵', risk: 'medium', effects: { qi: 30, mindset: -10, spiritStones: 50 } },
-                        { text: '强行闯入', risk: 'high', effects: { qi: -30, mindset: -30, spiritStones: 150 } }
-                    ]
-                },
-                {
-                    title: '☁️ 灵气潮汐',
-                    description: '天地灵气突然变得躁动，形成一股灵气潮汐，正是修炼的好时机。',
-                    options: [
-                        { text: '静心吸收', risk: 'low', effects: { qi: 25, mindset: 10, spiritStones: 0 } },
-                        { text: '引导入体', risk: 'medium', effects: { qi: 50, mindset: 0, spiritStones: 0 } },
-                        { text: '强行吞噬', risk: 'high', effects: { qi: 100, mindset: -20, spiritStones: 0 } }
-                    ]
-                },
-                {
-                    title: '🧘 偶遇前辈',
-                    description: '一位神秘的前辈高人出现在你面前，似乎对你有所指点。',
-                    options: [
-                        { text: '恭敬请教', risk: 'low', effects: { qi: 20, mindset: 15, spiritStones: 0 } },
-                        { text: '交流心得', risk: 'medium', effects: { qi: 40, mindset: 5, spiritStones: 0 } },
-                        { text: '请求收徒', risk: 'high', effects: { qi: 80, mindset: -10, spiritStones: -50 } }
-                    ]
-                }
-            ];
-            return events[Math.floor(Math.random() * events.length)];
-        }
-
-        // ===== displayEventModal =====
-        function displayEventModal(event) {
-            document.getElementById('modalTitle').textContent = event.title;
-            document.getElementById('modalDescription').textContent = event.description;
-            
-            const optionsContainer = document.getElementById('modalOptions');
-            optionsContainer.innerHTML = event.options.map((opt, idx) => `
-                <button class="option-btn" onclick="handleOption(${idx}, ${JSON.stringify(event.options[idx]).replace(/"/g, '&quot;')})">
-                    ${opt.text}
-                    <span class="option-risk ${opt.risk}">${opt.risk === 'low' ? '低风险' : opt.risk === 'medium' ? '中风险' : '高风险'}</span>
-                </button>
-            `).join('');
-            
-            // 保存当前事件
-            window.currentEvent = event;
-        }
-
-        // ===== getTribulationKey =====
-        function getTribulationKey(realm, stage) {
-            if (realm === 3) {
-                if (stage === 0) return '金丹初期雷劫';
-                if (stage === 1) return '金丹中期阴火';
-                return '金丹后期风劫';
-            }
-            if (realm === 4) return '元婴心魔';
-            return '化神飞升';
-        }
-
-        // ===== localBreakthrough =====
-        function localBreakthrough(isTribulation = false) {
-            if (isTribulation) {
-                executeTribulation();
-                return;
-            }
-            
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            let chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
-            // 应用突破加成效果
-            chance *= (1 + gameState.activeEffects.breakthrough_boost);
-            chance *= (1 + gameState.activeEffects.all_stats);
-            
-            if (Math.random() < chance) {
-                if (gameState.realm >= 4) {
-                    // 飞升！
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
-                    saveGame();
-                    showGameOverScreen();
-                } else {
-                    // 突破成功
-                    gameState.realm++;
-                    gameState.stage = 0;
-                    gameState.cultivationProgress = 0;
-                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-                    gameState.qi = Math.floor(gameState.qi * 0.3);
-                    gameState.mindset = Math.max(0, gameState.mindset - 10);
-                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
-                    // V7 检查体质激活
-                    initializeConstitutionEffects();
-                    saveGame();
-                    updateDisplay();
-                }
-            } else {
-                // 突破失败
-                gameState.qi = Math.floor(gameState.qi * 0.3);
-                gameState.mindset = Math.max(0, gameState.mindset - 20);
-                addLog('bad', '突破失败', '突破失败，灵气反噬...');
-                saveGame();
-                updateDisplay();
-            }
-        }
-
-        // ===== displayBreakthroughResult =====
-        function displayBreakthroughResult(result) {
-            document.getElementById('modalDescription').innerHTML = '';
-            const descDiv = document.createElement('div');
-            descDiv.className = 'modal-description';
-            descDiv.innerHTML = `<strong>${result.title}</strong><br><br>${result.description}`;
-            document.getElementById('modalDescription').appendChild(descDiv);
-            
-            if (result.success) {
-                if (gameState.realm >= 4) {
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
-                } else {
-                    gameState.realm++;
-                    gameState.stage = 0;
-                    gameState.cultivationProgress = 0;
-                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-                    gameState.qi = Math.floor(gameState.qi * 0.3);
-                    gameState.mindset = Math.max(0, gameState.mindset - 10);
-                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
-                }
-            } else {
-                gameState.qi = Math.floor(gameState.qi * 0.3);
-                gameState.mindset = Math.max(0, gameState.mindset - 20);
-                addLog('bad', '突破失败', '突破失败，灵气反噬...');
-            }
-            
-            saveGame();
-            updateDisplay();
-            
-            document.getElementById('modalOptions').classList.add('hidden');
-        }
-
-        // ===== showTribulationUI =====
-        function showTribulationUI() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-            const modal = document.getElementById('tribulationModal');
-            const scene = document.getElementById('tribulationScene');
-            const typeDiv = document.getElementById('tribType');
-            const rateSpan = document.getElementById('successRate');
-            const prepDiv = document.getElementById('tribulationPreparations');
-            const actionsDiv = document.getElementById('tribulationActions');
-            const prepList = document.getElementById('prepList');
-
-            // 设置场景样式
-            scene.className = 'tribulation-scene ' + trib.type;
-            scene.innerHTML = `<p style="color:#aaa;font-size:1.1em">${trib.desc}</p><p style="color:#ffd700;margin-top:10px">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>`;
-
-            // 天劫类型
-            typeDiv.innerHTML = `【${gameState.tribulation.tribKey}】`;
-
-            // 计算并显示成功率
-            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
-            rateSpan.textContent = Math.round(rate * 100) + '%';
-
-            // 准备加成列表
-            updatePrepList();
-
-            // 生成准备选项
-            prepDiv.innerHTML = '';
-            
-            // 阵法选项
-            const hasArray = gameState.tribulation.preparations.includes('阵法');
-            const arrayBtn = document.createElement('button');
-            arrayBtn.innerHTML = hasArray ? '✓ 阵法已布置' : '📿 布置阵法 (-2000灵石)';
-            arrayBtn.className = hasArray ? 'active' : '';
-            arrayBtn.disabled = hasArray || gameState.spiritStones < 2000;
-            arrayBtn.onclick = () => addPreparation('阵法');
-            prepDiv.appendChild(arrayBtn);
-
-            // 定神丹选项
-            const hasPill = gameState.tribulation.preparations.includes('定神丹');
-            const hasDingShen = gameState.inventory.some(item => item.name === '定神丹');
-            const pillBtn = document.createElement('button');
-            pillBtn.innerHTML = hasPill ? '✓ 已服用定神丹' : '💊 服用定神丹';
-            pillBtn.className = hasPill ? 'active' : '';
-            pillBtn.disabled = hasPill || !hasDingShen;
-            pillBtn.onclick = () => addPreparation('定神丹');
-            prepDiv.appendChild(pillBtn);
-
-            // 祈祷选项
-            const hasPray = gameState.tribulation.preparations.includes('祈祷');
-            const prayBtn = document.createElement('button');
-            prayBtn.innerHTML = hasPray ? '✓ 祈祷已完成' : '🙏 祈祷先祖 (-10000灵石)';
-            prayBtn.className = hasPray ? 'active' : '';
-            prayBtn.disabled = hasPray || gameState.spiritStones < 10000;
-            prayBtn.onclick = () => addPreparation('祈祷');
-            prepDiv.appendChild(prayBtn);
-
-            // 装备检查
-            const equipped = gameState.equippedTreasures.filter(t => t);
-            if (equipped.length > 0) {
-                const equipInfo = equipped.map(t => `${t.icon||'📦'}${t.name}`).join(', ');
-                const equipDiv = document.createElement('div');
-                equipDiv.style.cssText = 'font-size:0.85em;color:#aaa;margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;';
-                equipDiv.innerHTML = `当前装备：${equipInfo}`;
-                prepDiv.appendChild(equipDiv);
-            }
-
-            // 转世buff提示
-            if (gameState.hasTransmigrationBuff) {
-                const buffDiv = document.createElement('div');
-                buffDiv.className = 'buff-indicator';
-                buffDiv.style.cssText = 'margin-top:10px;display:inline-block;';
-                buffDiv.innerHTML = '✨ 转世重修加成：成功率+10%';
-                prepDiv.appendChild(buffDiv);
-            }
-
-            // 操作按钮
-            actionsDiv.innerHTML = '';
-            const startBtn = document.createElement('button');
-            startBtn.className = 'btn-tribulation start';
-            startBtn.textContent = '🔥 开始渡劫';
-            startBtn.onclick = () => startTribulation();
-            actionsDiv.appendChild(startBtn);
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'btn-tribulation cancel';
-            cancelBtn.textContent = '⏸ 暂缓突破';
-            cancelBtn.onclick = () => cancelTribulation();
-            actionsDiv.appendChild(cancelBtn);
-
-            modal.classList.add('active');
-        }
-
-        // ===== updatePrepList =====
-        function updatePrepList() {
-            const prepList = document.getElementById('prepList');
-            const preps = gameState.tribulation.preparations;
-            if (preps.length === 0) {
-                prepList.innerHTML = '';
-                return;
-            }
-            prepList.innerHTML = '准备加成：' + preps.map(p => {
-                let bonus = '';
-                if (p === '阵法') bonus = '(伤害-30%)';
-                if (p === '定神丹') bonus = '(心境消耗-50%)';
-                if (p === '祈祷') bonus = '(成功率+10%)';
-                return p + bonus;
-            }).join('、');
-        }
-
-        // ===== addPreparation =====
-        function addPreparation(type) {
-            if (gameState.tribulation.preparations.includes(type)) return;
-
-            if (type === '阵法') {
-                if (gameState.spiritStones < 2000) {
-                    alert('灵石不足！布置阵法需要2000灵石');
-                    return;
-                }
-                gameState.spiritStones -= 2000;
-            } else if (type === '定神丹') {
-                const idx = gameState.inventory.findIndex(item => item.name === '定神丹');
-                if (idx === -1) {
-                    alert('背包中没有定神丹！');
-                    return;
-                }
-                gameState.inventory.splice(idx, 1);
-            } else if (type === '祈祷') {
-                if (gameState.spiritStones < 10000) {
-                    alert('灵石不足！祈祷先祖需要10000灵石');
-                    return;
-                }
-                gameState.spiritStones -= 10000;
-            }
-
-            gameState.tribulation.preparations.push(type);
-            saveGame();
-            showTribulationUI();
-            updateDisplay();
-        }
-
-        // ===== calculateTribulationSuccess =====
-        function calculateTribulationSuccess(tribKey) {
-            const trib = TRIBULATIONS[tribKey];
-            let rate = trib.baseRate;
-
-            // 心境加成
-            rate += (gameState.mindset / 100) * 0.2;
-
-            // 转世重修buff
-            if (gameState.hasTransmigrationBuff) {
-                rate += 0.1;
-            }
-
-            // 装备加成
-            const equipped = gameState.equippedTreasures.filter(t => t);
-            equipped.forEach(t => {
-                if (t.effects) {
-                    t.effects.forEach(e => {
-                        if (e.type === '渡劫_damage_reduce') rate += e.value * 0.1;
-                        if (e.type === 'all_stats') rate += e.value * 0.5;
-                    });
-                }
-            });
-
-            // 准备加成
-            if (gameState.tribulation.preparations.includes('阵法')) rate += 0.15;
-            if (gameState.tribulation.preparations.includes('定神丹')) rate += 0.1;
-            if (gameState.tribulation.preparations.includes('祈祷')) rate += 0.1;
-
-            // 境界惩罚
-            if (gameState.realm === 4) rate -= 0.1;
-            if (gameState.realm === 5) rate -= 0.2;
-
-            return Math.min(0.95, Math.max(0.05, rate));
-        }
-
-        // ===== generateTribulationScene =====
-        function generateTribulationScene(realm, callback) {
-            const model = miniMaxConfig.model || 'MiniMax-M2.7';
-            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
-            
-当前玩家信息：
-- 境界：${REALMS[realm] || '未知'}
-- 灵石：${gameState.stones}
-- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
-
-要求：
-1. 生成一段50-100字的渡劫场景描述
-2. 包含天象异变（雷电/乌云/异火等）
-3. 包含内心心境描写
-4. 描述要独特，每次生成都不同
-5. 用中文输出，不要加引号
-
-直接输出场景描述文字，不要前缀。`;
-
-            callMiniMaxAPI(prompt, model, 200, (reply) => {
-                if (reply && reply.trim()) {
-                    callback(reply.trim());
-                } else {
-                    callback(getDefaultTribulationScene(realm));
-                }
-            }, (err) => {
-                callback(getDefaultTribulationScene(realm));
-            });
-        }
-
-        // ===== getDefaultTribulationScene =====
-        function getDefaultTribulationScene(realm) {
-            const scenes = [
-                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
-                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
-                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
-            ];
-            return scenes[realm % scenes.length];
-        }
-
-        // ===== executeTribulation =====
-        function executeTribulation() {
-            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
-            const roll = Math.random();
-
-            if (roll < rate) {
-                // 成功
-                if (roll < rate * 0.5) {
-                    // 大成功
-                    handleGreatSuccess();
-                } else {
-                    // 普通成功
-                    handleSuccess();
-                }
-            } else {
-                // 失败
-                if (roll < 0.3) {
-                    // 陨落
-                    handleDeath();
-                } else {
-                    // 重伤
-                    handleInjury();
-                }
-            }
-        }
-
-        // ===== handleGreatSuccess =====
-        function handleGreatSuccess() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 突破成功
-            gameState.realm++;
-            gameState.stage = 0;
-            gameState.cultivationProgress = 0;
-            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-            gameState.qi = Math.floor(gameState.qi * 0.5); // 大成功保留50%
-            gameState.mindset = Math.min(100, gameState.mindset + 20); // 心境提升
-            gameState.hasTransmigrationBuff = false; // 清除转世buff
-
-            // 天劫洗礼加成
-            gameState.activeEffects.attack += 0.1;
-            gameState.activeEffects.defense += 0.1;
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '大成功',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result great-success">
-                    <h3>✨ 大成功 ✨</h3>
-                    <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
-                    <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
-                    <p style="color:#ff69b4;margin-top:5px">心境+20</p>
-                </div>
-            `;
-
-            addLog('good', '渡劫大成功', `历经天劫洗礼，突破到${CONFIG.realms[gameState.realm]}期！获得天劫洗礼加成！`);
-            saveGame();
-            updateDisplay();
-
-            // 3秒后关闭
-            setTimeout(() => {
-                closeTribulationModal();
-                // V11: 渡劫成功后显示飞升按钮
-                showAscensionButton();
-            }, 3000);
-        }
-
-        // ===== handleSuccess =====
-        function handleSuccess() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-            const wasTranscending = gameState.realm >= 4; // V11: 记录是否在渡劫期
-
-            // 突破成功
-            gameState.realm++;
-            gameState.stage = 0;
-            gameState.cultivationProgress = 0;
-            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-            gameState.qi = Math.floor(gameState.qi * 0.3);
-            gameState.mindset = Math.max(0, gameState.mindset - 5);
-            gameState.hasTransmigrationBuff = false;
-
-            // 天劫洗礼加成（较小）
-            gameState.activeEffects.attack += 0.05;
-            gameState.activeEffects.defense += 0.05;
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '成功',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result success">
-                    <h3>🎉 渡劫成功 🎉</h3>
-                    <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
-                    <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
-                    ${wasTranscending ? '<p style="color:#e91e63;margin-top:15px;font-size:16px;">✨ 可以准备飞升了！ ✨</p>' : ''}
-                </div>
-            `;
-
-            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
-            saveGame();
-            updateDisplay();
-
-            setTimeout(() => {
-                closeTribulationModal();
-                // V11: 渡劫成功后显示飞升按钮
-                showAscensionButton();
-            }, 3000);
-        }
-
-        // ===== handleInjury =====
-        function handleInjury() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 渡劫失败但保命
-            gameState.qi = Math.floor(gameState.qi * 0.1);
-            gameState.mindset = Math.max(0, gameState.mindset - 30);
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '重伤',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result injury">
-                    <h3>💔 重伤💔</h3>
-                    <p style="color:#aaa">天劫反噬，你身受重伤...</p>
-                    <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
-                    <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
-                </div>
-            `;
-
-            addLog('bad', '渡劫重伤', `渡过${trib.desc}失败，身受重伤...`);
-            saveGame();
-            updateDisplay();
-
-            setTimeout(() => {
-                closeTribulationModal();
-            }, 3000);
-        }
-
-        // ===== handleDeath =====
-        function handleDeath() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 保留10%资源
-            const keepStones = Math.floor(gameState.spiritStones * 0.1);
-            const keepPills = gameState.inventory.filter(item =>
-                item.name === '聚灵丹'
-            ).slice(0, 2);
-
-            // 重置状态
-            gameState.realm = 1;
-            gameState.stage = 0;
-            gameState.qi = 50;
-            gameState.maxQi = 100;
-            gameState.spiritStones = keepStones;
-            gameState.inventory = keepPills;
-            gameState.mindset = 50;
-            gameState.days = 1;
-            gameState.cultivationProgress = 0;
-            gameState.hasTransmigrationBuff = true; // 转世buff
-            gameState.tribulation.inProgress = false;
-
-            // 清空装备效果
-            recalculateAllEffects();
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '陨落',
-                day: gameState.days
-            });
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result death">
-                    <h3>💀 陨落 💀</h3>
-                    <p style="color:#f44336">天劫无情，你陨落了...</p>
-                    <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
-                    <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
-                    <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
-                </div>
-            `;
-
-            addLog('bad', '渡劫陨落', `渡劫失败，陨落了...但转世重修，获得转世buff！`);
-
-            setTimeout(() => {
-                closeTribulationModal();
-                saveGame();
-                showGameUI();
-                updateDisplay();
-            }, 3000);
-        }
-
-        // ===== closeTribulationModal =====
-        function closeTribulationModal() {
-            document.getElementById('tribulationModal').classList.remove('active');
-            gameState.tribulation.inProgress = false;
-        }
-
-        // ===== cancelTribulation =====
-        function cancelTribulation() {
-            gameState.tribulation.inProgress = false;
-            gameState.tribulation.preparations = [];
-            closeTribulationModal();
-            addLog('neutral', '暂缓突破', '你决定暂缓突破，继续积累实力...');
-            saveGame();
-        }
-
-        // ===== getPlayerTechnique =====
-        function getPlayerTechnique() {
-            if (gameState.realm <= 1) return '体术';
-            if (gameState.realm === 2) return ['雷法', '火法', '水法'][Math.floor(Math.random() * 3)];
-            return TECHNIQUES[Math.floor(Math.random() * 4)];
-        }
-
-// ===== js/immortalEquip.js =====
-
-// ===== IMMORTAL_EQUIP_QUALITIES =====
-const IMMORTAL_EQUIP_QUALITIES = {
-    1: { name: '仙器', color: '#2196f3', multiplier: 1.5, colorHex: '蓝色' },
-    2: { name: '灵仙器', color: '#9c27b0', multiplier: 2.0, colorHex: '紫色' },
-    3: { name: '神仙器', color: '#ff9800', multiplier: 3.0, colorHex: '橙色' },
-    4: { name: '混沌器', color: '#ffd700', multiplier: 5.0, colorHex: '金色' }
-};
-
-// ===== IMMORTAL_EQUIP_SLOTS =====
-const IMMORTAL_EQUIP_SLOTS = {
-    head: { name: '仙冠', icon: '👑', pos: 0 },
-    body: { name: '仙袍', icon: '👘', pos: 1 },
-    foot: { name: '仙履', icon: '👟', pos: 2 },
-    weapon: { name: '仙剑', icon: '⚔️', pos: 3 },
-    shield: { name: '仙盾', icon: '🛡️', pos: 4 },
-    accessory: { name: '仙佩', icon: '📿', pos: 5 }
-};
-
-// ===== IMMORTAL_EQUIP_SETS =====
-const IMMORTAL_EQUIP_SETS = {
-    '仙灵套装': {
-        pieces: ['仙冠-仙灵', '仙袍-仙灵', '仙履-仙灵'],
-        setBonus: { effect: 'cultivationSpeed', value: 0.2 },
-        description: '2件：仙气修炼效率+20%'
-    },
-    '战神套装': {
-        pieces: ['仙剑-战神', '仙盾-战神', '仙冠-战神', '仙袍-战神'],
-        setBonus: { effect: 'attack', value: 0.5 },
-        description: '4件：攻击+50%，仙兽参战伤害+30%'
-    },
-    '不死套装': {
-        pieces: ['仙冠-不死', '仙袍-不死', '仙履-不死', '仙佩-不死'],
-        setBonus: { effect: 'invincible', value: 3, cooldown: 60 },
-        description: '4件：致命伤害时无敌3秒，CD60秒'
-    },
-    '混沌套装': {
-        pieces: ['仙冠-混沌', '仙袍-混沌', '仙履-混沌', '仙剑-混沌', '仙盾-混沌', '仙佩-混沌'],
-        setBonus: { effect: 'allStats', value: 1.0 },
-        description: '6件：全属性+100%，仙法伤害+100%'
-    }
-};
-
-// ===== EQUIPMENT_BASE_STATS =====
-const EQUIPMENT_BASE_STATS = {
-    attack: 100,
-    defense: 80,
-    hp: 500,
-    speed: 50,
-    crit: 10,
-    resist: 15
-};
-
-// ===== EQUIPMENT_AFFIX_TYPES =====
-const EQUIPMENT_AFFIX_TYPES = [
-    { name: 'attack', display: '攻击', min: 5, max: 30, rarity: 'common' },
-    { name: 'defense', display: '防御', min: 5, max: 25, rarity: 'common' },
-    { name: 'hp', display: '生命', min: 20, max: 100, rarity: 'common' },
-    { name: 'crit', display: '暴击', min: 3, max: 15, rarity: 'uncommon' },
-    { name: 'resist', display: '抗性', min: 3, max: 12, rarity: 'uncommon' },
-    { name: 'speed', display: '速度', min: 2, max: 10, rarity: 'uncommon' },
-    { name: 'cultivate_qi_rate', display: '灵气效率', min: 0.05, max: 0.15, rarity: 'rare', isPercent: true },
-    { name: 'breakthrough_boost', display: '突破加成', min: 0.05, max: 0.10, rarity: 'rare', isPercent: true },
-    { name: 'tribulation_damage_reduce', display: '渡劫减伤', min: 0.05, max: 0.15, rarity: 'epic', isPercent: true },
-    { name: 'all_stats', display: '全属性', min: 0.03, max: 0.08, rarity: 'legendary', isPercent: true }
-];
-
-const AFFIX_RARITY_COLORS = {
-    common: '#aaa',
-    uncommon: '#4CAF50',
-    rare: '#2196f3',
-    epic: '#9c27b0',
-    legendary: '#ff9800'
-};
-
-// ===== generateAffix =====
-function generateAffix(quality, tier) {
-    // 根据品质和难度等级筛选可用词条
-    const availableAffixes = EQUIPMENT_AFFIX_TYPES.filter(a => {
-        if (tier === 0) return a.rarity === 'common' || a.rarity === 'uncommon';
-        if (tier === 1) return a.rarity !== 'legendary';
-        return true;  // tier >= 2 所有词条
-    });
-    
-    const affix = availableAffixes[Math.floor(Math.random() * availableAffixes.length)];
-    const value = affix.min + Math.random() * (affix.max - affix.min);
-    
-    return {
-        name: affix.name,
-        display: affix.display,
-        value: affix.isPercent ? parseFloat(value.toFixed(2)) : Math.floor(value),
-        rarity: affix.rarity,
-        isPercent: affix.isPercent || false,
-        icon: affix.isPercent ? '%' : ''
-    };
-}
-
-// ===== calculateEquipScore =====
-function calculateEquipScore(equip) {
-    if (!equip) return 0;
-    let score = 0;
-    
-    // 基础属性评分
-    const statWeights = { attack: 2, defense: 1.5, hp: 0.5, speed: 1, crit: 1.5, resist: 1 };
-    for (const stat in equip.stats) {
-        score += (equip.stats[stat] || 0) * (statWeights[stat] || 1);
-    }
-    
-    // 词条加成评分
-    if (equip.affixes) {
-        equip.affixes.forEach(affix => {
-            const rarityMultiplier = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 5 };
-            score += affix.value * (rarityMultiplier[affix.rarity] || 1);
-        });
-    }
-    
-    // 强化等级加成
-    if (equip.enhancementLevel > 0) {
-        score *= (1 + equip.enhancementLevel * 0.1);
-    }
-    
-    // 精炼等级加成
-    if (equip.refinementLevel > 0) {
-        score *= (1 + equip.refinementLevel * 0.05);
-    }
-    
-    return Math.floor(score);
-}
-
-// ===== generateImmortalEquip =====
-function generateImmortalEquip(slot, quality) {
-    const qualityData = IMMORTAL_EQUIP_QUALITIES[quality];
-    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-    
-    const equip = {
-        uid: 'equip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        slot: slot,
-        name: `${slotData.name}-${qualityData.name}`,
-        quality: quality,
-        qualityName: qualityData.name,
-        icon: slotData.icon,
-        stats: {},
-        setName: null, // 套装名
-        refinationLevel: 0,  // V36 精炼等级 0-12
-        enhancementLevel: 0,  // V36 强化等级 0-15
-        affixes: []           // V36 随机词条
-    };
-    
-    // 根据品质生成属性
-    const multiplier = qualityData.multiplier;
-    for (const stat in EQUIPMENT_BASE_STATS) {
-        equip.stats[stat] = Math.floor(EQUIPMENT_BASE_STATS[stat] * multiplier * (0.8 + Math.random() * 0.4));
-    }
-    
-    // V36 根据品质生成1-3条随机词条
-    const affixCount = quality + Math.floor(Math.random() * quality);
-    const tier = Math.min(2, Math.floor(quality / 2));
-    for (let i = 0; i < affixCount; i++) {
-        equip.affixes.push(generateAffix(quality, tier));
-    }
-    
-    // 30%概率生成套装
-    if (Math.random() < 0.3) {
-        const setNames = Object.keys(IMMORTAL_EQUIP_SETS);
-        equip.setName = setNames[Math.floor(Math.random() * setNames.length)];
-    }
-    
-    return equip;
-}
-
-// ===== enhanceEquipment =====
-function enhanceEquipment(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位没有装备');
-        return;
-    }
-    
-    if (equip.enhancementLevel >= 15) {
-        showToast('已达强化上限+15');
-        return;
-    }
-    
-    const level = equip.enhancementLevel;
-    const baseCost = 500 * Math.pow(1.8, level);
-    const cost = Math.floor(baseCost);
-    
-    if (gameState.immortal.spiritStones < cost) {
-        showToast(`强化需要${cost}灵石`);
-        return;
-    }
-    
-    gameState.immortal.spiritStones -= cost;
-    gameState.equipmentForgeCount++;
-    
-    // 成功率：+1:100%, +5:80%, +10:50%, +15:20%
-    const successRates = [100, 100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30, 25, 20, 15];
-    const successRate = successRates[level + 1] || 20;
-    const roll = Math.random() * 100;
-    
-    if (roll < successRate) {
-        equip.enhancementLevel++;
-        addLog('good', '装备强化', `强化成功！${equip.name}强化到+${equip.enhancementLevel}`);
-        showToast(`强化成功！+${equip.enhancementLevel}`);
-    } else {
-        equip.enhancementLevel = Math.max(0, equip.enhancementLevel - 1);
-        addLog('warn', '装备强化', `强化失败，${equip.name}降为+${equip.enhancementLevel}`);
-        showToast(`强化失败，降为+${equip.enhancementLevel}`);
-    }
-    
-    saveGame();
-    showImmortalEquipPanel();
-}
-
-// ===== refineEquipment =====
-function refineEquipment(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位没有装备');
-        return;
-    }
-    
-    if (equip.refinementLevel >= 12) {
-        showToast('已达精炼上限+12');
-        return;
-    }
-    
-    const level = equip.refinementLevel;
-    const baseCost = 1000 * Math.pow(2, level);
-    const cost = Math.floor(baseCost);
-    
-    if (gameState.immortal.spiritStones < cost) {
-        showToast(`精炼需要${cost}灵石`);
-        return;
-    }
-    
-    gameState.immortal.spiritStones -= cost;
-    gameState.equipmentForgeCount++;
-    equip.refinementLevel++;
-    
-    // 精炼必定成功（消耗同名装备可以100%成功，这里简化处理）
-    addLog('good', '装备精炼', `精炼成功！${equip.name}精炼到+${equip.refinementLevel}`);
-    showToast(`精炼成功！+${equip.refinementLevel}`);
-    
-    saveGame();
-    showImmortalEquipPanel();
-}
-
-// ===== equipImmortalItem =====
-function equipImmortalItem(equip) {
-    const slot = equip.slot;
-    const oldEquip = gameState.immortalEquipment[slot];
-    
-    gameState.immortalEquipment[slot] = equip;
-    
-    addLog('good', '装备仙器', `装备【${equip.name}】`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== unequipImmortalItem =====
-function unequipImmortalItem(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) return;
-    
-    // 卸下到背包（暂时不实现背包系统，这里直接消失）
-    addLog('neutral', '卸下仙器', `卸下了${equip.name}`);
-    gameState.immortalEquipment[slot] = null;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== calculateEquipSetBonus =====
-function calculateEquipSetBonus() {
-    const equipped = gameState.immortalEquipment;
-    const bonuses = {};
-    
-    // 统计各套装件数
-    const setCounts = {};
-    for (const slot in equipped) {
-        if (equipped[slot] && equipped[slot].setName) {
-            setCounts[equipped[slot].setName] = (setCounts[equipped[slot].setName] || 0) + 1;
-        }
-    }
-    
-    // 计算套装效果
-    for (const setName in setCounts) {
-        const setData = IMMORTAL_EQUIP_SETS[setName];
-        if (setData) {
-            const count = setCounts[setName];
-            // 检查是否满足套装条件
-            for (let i = 0; i < setData.pieces.length; i++) {
-                const requiredPieces = i + 2; // 2件起效
-                if (count >= requiredPieces) {
-                    bonuses[setName] = setData.setBonus;
-                }
-            }
-        }
-    }
-    
-    return bonuses;
-}
-
-// ===== getImmortalEquipStats =====
-function getImmortalEquipStats() {
-    let stats = { attack: 0, defense: 0, hp: 0, speed: 0, crit: 0, resist: 0 };
-    const equip = gameState.immortalEquipment;
-    
-    for (const slot in equip) {
-        if (equip[slot]) {
-            for (const stat in equip[slot].stats) {
-                stats[stat] += equip[slot].stats[stat];
-            }
-        }
-    }
-    
-    // 应用套装加成
-    const setBonuses = calculateEquipSetBonus();
-    for (const setName in setBonuses) {
-        const bonus = setBonuses[setName];
-        if (bonus.effect === 'allStats') {
-            stats.attack *= (1 + bonus.value);
-            stats.defense *= (1 + bonus.value);
-            stats.hp *= (1 + bonus.value);
-        }
-    }
-    
-    return stats;
-}
-
-// ===== showImmortalEquipPanel =====
-function showImmortalEquipPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">⚔️ 飞升装备</h3>';
-    
-    // 装备栏
-    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
-    
-    for (const slot in IMMORTAL_EQUIP_SLOTS) {
-        const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-        const equip = gameState.immortalEquipment[slot];
-        
-        let bgColor = '#252540';
-        let borderColor = '#444';
-        
-        if (equip) {
-            const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
-            bgColor = qualityData.color + '22';
-            borderColor = qualityData.color;
-        }
-        
-        html += `<div style="background:${bgColor};border:2px solid ${borderColor};border-radius:8px;padding:10px;text-align:center;cursor:pointer;" onclick="showEquipSlotDetail('${slot}')">`;
-        html += `<div style="font-size:24px;">${slotData.icon}</div>`;
-        
-        if (equip) {
-            html += `<div style="color:#fff;font-size:11px;">${equip.name}</div>`;
-            html += `<div style="color:${IMMORTAL_EQUIP_QUALITIES[equip.quality].color};font-size:10px;">${equip.qualityName}</div>`;
-        } else {
-            html += `<div style="color:#666;font-size:11px;">${slotData.name}</div>`;
-        }
-        
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    
-    // 当前属性
-    const stats = getImmortalEquipStats();
-    html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">装备加成</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">';
-    html += `<div><div style="color:#f44336;">${stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
-    html += `<div><div style="color:#2196f3;">${stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
-    html += `<div><div style="color:#4caf50;">${stats.hp}</div><div style="color:#666;font-size:10px;">生命</div></div>`;
-    html += `<div><div style="color:#ff9800;">${stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
-    html += `<div><div style="color:#9c27b0;">${stats.crit}%</div><div style="color:#666;font-size:10px;">暴击</div></div>`;
-    html += `<div><div style="color:#00bcd4;">${stats.resist}%</div><div style="color:#666;font-size:10px;">抗性</div></div>`;
-    html += '</div></div>';
-    
-    // 套装效果
-    const setBonuses = calculateEquipSetBonus();
-    if (Object.keys(setBonuses).length > 0) {
-        html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
-        html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">套装效果</div>';
-        
-        for (const setName in setBonuses) {
-            const setData = IMMORTAL_EQUIP_SETS[setName];
-            const bonus = setBonuses[setName];
-            html += `<div style="color:#aaa;font-size:11px;margin-bottom:4px;">【${setName}】${setData.description}</div>`;
-        }
-        html += '</div>';
-    }
-    
-    // 购买装备（仙界商店）
-    html += '<div style="border-top:1px solid #333;padding-top:12px;margin-top:8px;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙界商店</div>';
-    
-    const buyOptions = [
-        { slot: 'weapon', quality: 1, price: 1000, name: '仙器' },
-        { slot: 'weapon', quality: 2, price: 5000, name: '灵仙器' },
-        { slot: 'weapon', quality: 3, price: 20000, name: '神仙器' }
-    ];
-    
-    for (const opt of buyOptions) {
-        const qualityData = IMMORTAL_EQUIP_QUALITIES[opt.quality];
-        const slotData = IMMORTAL_EQUIP_SLOTS[opt.slot];
-        
-        html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">`;
-        html += `<div style="display:flex;align-items:center;gap:10px;">`;
-        html += `<span style="font-size:20px;">${slotData.icon}</span>`;
-        html += `<div><div style="color:${qualityData.color};">${qualityData.name}${slotData.name}</div><div style="color:#888;font-size:10px;">${opt.price}💎</div></div>`;
-        html += '</div>';
-        
-        const canBuy = gameState.immortal.spiritStones >= opt.price;
-        html += `<button onclick="buyImmortalEquip('${opt.slot}', ${opt.quality}, ${opt.price})" ${canBuy ? '' : 'disabled'} style="padding:4px 10px;background:${canBuy ? '#2e7d32' : '#444'};color:${canBuy ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canBuy ? 'pointer' : 'not-allowed'};font-size:11px;">购买</button>`;
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('飞升装备', html, '');
-}
-
-// ===== buyImmortalEquip =====
-function buyImmortalEquip(slot, quality, price) {
-    if (!spendSpiritStones(price, '购买飞升装备')) {
-        return;
-    }
-    
-    const equip = generateImmortalEquip(slot, quality);
-    equipImmortalItem(equip);
-    showToast(`购买成功！获得【${equip.name}】`);
-    closeModal();
-    showImmortalEquipPanel();
-}
-
-// ===== showEquipSlotDetail =====
-function showEquipSlotDetail(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位暂无装备');
-        return;
-    }
-    
-    const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
-    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-    const score = calculateEquipScore(equip);
-    
-    let html = '<div style="padding:16px;">';
-    html += `<div style="text-align:center;">`;
-    html += `<div style="font-size:48px;">${equip.icon}</div>`;
-    html += `<div style="color:${qualityData.color};font-size:18px;font-weight:bold;margin-top:8px;">${equip.name}</div>`;
-    html += `<div style="color:#888;font-size:12px;">${slotData.name}位</div>`;
-    if (equip.setName) {
-        html += `<div style="color:#ffd700;font-size:12px;margin-top:4px;">套装：${equip.setName}</div>`;
-    }
-    html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">评分：${score}</div>`;
-    html += '</div>';
-    
-    // V36 强化和精炼等级
-    html += '<div style="display:flex;gap:10px;margin-top:12px;">';
-    if (equip.enhancementLevel > 0) {
-        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#ff9800;font-size:11px;">强化+${equip.enhancementLevel}</span>`;
-    }
-    if (equip.refinementLevel > 0) {
-        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#9c27b0;font-size:11px;">精炼+${equip.refinementLevel}</span>`;
-    }
-    html += '</div>';
-    
-    html += '<div style="margin-top:16px;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">基础属性：</div>';
-    for (const stat in equip.stats) {
-        const statNames = { attack: '攻击', defense: '防御', hp: '生命', speed: '速度', crit: '暴击', resist: '抗性' };
-        let value = equip.stats[stat];
-        // 精炼加成
-        if (equip.refinementLevel > 0) {
-            value = Math.floor(value * (1 + equip.refinementLevel * 0.05));
-        }
-        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">`;
-        html += `<span style="color:#888;">${statNames[stat]}</span>`;
-        html += `<span style="color:#fff;">+${value}</span>`;
-        html += '</div>';
-    }
-    html += '</div>';
-    
-    // V36 词条显示
-    if (equip.affixes && equip.affixes.length > 0) {
-        html += '<div style="margin-top:16px;">';
-        html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">词条：</div>';
-        equip.affixes.forEach(affix => {
-            const color = AFFIX_RARITY_COLORS[affix.rarity] || '#aaa';
-            const valueStr = affix.isPercent ? `${(affix.value * 100).toFixed(0)}%` : affix.value;
-            html += `<div style="display:flex;justify-content:space-between;padding:3px 0;">`;
-            html += `<span style="color:${color};font-size:11px;">◆ ${affix.display}</span>`;
-            html += `<span style="color:${color};font-size:11px;">+${valueStr}</span>`;
-            html += '</div>';
-        });
-        html += '</div>';
-    }
-    
-    // V36 强化和精炼按钮
-    const enhanceCost = Math.floor(500 * Math.pow(1.8, equip.enhancementLevel));
-    const refineCost = Math.floor(1000 * Math.pow(2, equip.refinementLevel));
-    
-    html += '<div style="margin-top:16px;display:flex;gap:8px;">';
-    if (equip.enhancementLevel < 15) {
-        html += `<button onclick="enhanceEquipment('${slot}')" ${gameState.immortal.spiritStones >= enhanceCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= enhanceCost ? '#e65100' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= enhanceCost ? 'pointer' : 'not-allowed'};font-size:12px;">强化+${equip.enhancementLevel + 1}(${enhanceCost}💎)</button>`;
-    }
-    if (equip.refinementLevel < 12) {
-        html += `<button onclick="refineEquipment('${slot}')" ${gameState.immortal.spiritStones >= refineCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= refineCost ? '#6a1b9a' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= refineCost ? 'pointer' : 'not-allowed'};font-size:12px;">精炼+${equip.refinementLevel + 1}(${refineCost}💎)</button>`;
-    }
-    html += '</div>';
-    
-    html += `<button onclick="unequipImmortalItem('${slot}');closeModal();" style="width:100%;margin-top:16px;padding:10px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;">卸下</button>`;
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('装备详情', html, '');
-}
-
-// ===== js/immortalSkill.js =====
-
-// ===== IMMORTAL_SKILLS_DATA =====
-const IMMORTAL_SKILLS_DATA = {
-    '万剑归宗': {
-        type: '剑仙法',
-        icon: '⚔️',
-        baseDamage: 200,
-        cooldown: 5,
-        maxLevel: 10,
-        description: '召唤万剑攻击目标，造成大量伤害',
-        upgradeCost: { spiritStones: 500, herbs: 5 },
-        damageType: 'attack'
-    },
-    '金刚不坏': {
-        type: '体仙法',
-        icon: '🛡️',
-        baseDamage: 0,
-        cooldown: 8,
-        maxLevel: 10,
-        description: '进入金刚不坏状态，防御大幅提升，免疫控制',
-        upgradeCost: { spiritStones: 500, herbs: 5 },
-        damageType: 'defense'
-    },
-    '天地大同': {
-        type: '法仙法',
-        icon: '🌍',
-        baseDamage: 150,
-        cooldown: 6,
-        maxLevel: 10,
-        description: '仙法伤害+150%，范围攻击',
-        upgradeCost: { spiritStones: 600, herbs: 6 },
-        damageType: 'AoE'
-    },
-    '撒豆成兵': {
-        type: '召唤仙法',
-        icon: '👥',
-        baseDamage: 80,
-        cooldown: 10,
-        maxLevel: 10,
-        description: '召唤仙兵助战，仙兵继承部分属性',
-        upgradeCost: { spiritStones: 700, herbs: 8 },
-        damageType: 'summon'
-    },
-    '周天星斗': {
-        type: '阵法仙法',
-        icon: '⭐',
-        baseDamage: 0,
-        cooldown: 15,
-        maxLevel: 10,
-        description: '布置周天星斗阵，阵内队友属性+50%',
-        upgradeCost: { spiritStones: 800, herbs: 10 },
-        damageType: 'buff'
-    }
-};
-
-// ===== IMMORTAL_SKILL_TYPES =====
-const IMMORTAL_SKILL_TYPES = {
-    '剑仙法': { color: '#f44336', bonusType: 'attack', bonusValue: 0.2 },
-    '体仙法': { color: '#4caf50', bonusType: 'defense', bonusValue: 0.2 },
-    '法仙法': { color: '#2196f3', bonusType: 'spellDamage', bonusValue: 0.15 },
-    '召唤仙法': { color: '#9c27b0', bonusType: 'summon', bonusValue: 0.1 },
-    '阵法仙法': { color: '#ff9800', bonusType: 'teamBuff', bonusValue: 0.05 }
-};
-
-// ===== learnImmortalSkill =====
-function learnImmortalSkill(skillName) {
-    const skillData = IMMORTAL_SKILLS_DATA[skillName];
-    if (!skillData) return false;
-    
-    // 检查是否已学会
-    if (gameState.immortalSkills.find(s => s.name === skillName)) {
-        showToast('已学会此仙法');
-        return false;
-    }
-    
-    const skill = {
-        uid: 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        name: skillName,
-        type: skillData.type,
-        level: 1,
-        maxLevel: skillData.maxLevel,
-        cooldown: skillData.cooldown,
-        currentCooldown: 0,
-        damage: skillData.baseDamage,
-        description: skillData.description
-    };
-    
-    gameState.immortalSkills.push(skill);
-    addLog('good', '学会仙法', `学会【${skillName}】！`);
-    saveGame();
-    return true;
-}
-
-// ===== upgradeImmortalSkill =====
-function upgradeImmortalSkill(skillIndex) {
-    if (gameState.immortalSkills.length <= skillIndex) return;
-    
-    const skill = gameState.immortalSkills[skillIndex];
-    const skillData = IMMORTAL_SKILLS_DATA[skill.name];
-    
-    if (skill.level >= skill.maxLevel) {
-        showToast('仙法已达最大等级');
-        return;
-    }
-    
-    const cost = {
-        spiritStones: skillData.upgradeCost.spiritStones * skill.level,
-        herbs: skillData.upgradeCost.herbs * skill.level
-    };
-    
-    if (gameState.immortal.spiritStones < cost.spiritStones) {
-        showToast('仙石不足');
-        return;
-    }
-    
-    // 扣除仙石
-    gameState.immortal.spiritStones -= cost.spiritStones;
-    
-    // 升级
-    skill.level++;
-    skill.damage = Math.floor(skillData.baseDamage * (1 + skill.level * 0.1));
-    
-    addLog('good', '仙法升级', `${skill.name}升级到Lv.${skill.level}！`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== useImmortalSkill =====
-function useImmortalSkill(skillIndex, target) {
-    if (gameState.immortalSkills.length <= skillIndex) return;
-    
-    const skill = gameState.immortalSkills[skillIndex];
-    
-    if (skill.currentCooldown > 0) {
-        showToast(`${skill.name}冷却中，还需${skill.currentCooldown}秒`);
-        return;
-    }
-    
-    // 应用技能效果
-    const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
-    let effectDescription = '';
-    
-    switch (skill.damageType) {
-        case 'attack':
-            effectDescription = `对目标造成${skill.damage}%伤害`;
-            // 直接应用伤害（战斗系统会在此处接入）
-            break;
-        case 'defense':
-            effectDescription = '防御大幅提升，免疫控制3秒';
-            break;
-        case 'AoE':
-            effectDescription = `对范围内敌人造成${skill.damage}%伤害`;
-            break;
-        case 'summon':
-            effectDescription = '召唤仙兵助战';
-            break;
-        case 'buff':
-            effectDescription = '阵内队友属性+50%';
-            break;
-    }
-    
-    // 设置冷却
-    skill.currentCooldown = skill.cooldown;
-    
-    addLog('good', '施展仙法', `施展【${skill.name}】：${effectDescription}`);
-    saveGame();
-    
-    // 启动冷却计时
-    startSkillCooldownTimer(skillIndex);
-    
-    return true;
-}
-
-// ===== startSkillCooldownTimer =====
-function startSkillCooldownTimer(skillIndex) {
-    const interval = setInterval(() => {
-        if (gameState.immortalSkills.length <= skillIndex) {
-            clearInterval(interval);
-            return;
-        }
-        
-        const skill = gameState.immortalSkills[skillIndex];
-        if (skill.currentCooldown > 0) {
-            skill.currentCooldown--;
-            updateDisplay();
-        } else {
-            clearInterval(interval);
-        }
-    }, 1000);
-}
-
-// ===== showImmortalSkillPanel =====
-function showImmortalSkillPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">✨ 仙法面板</h3>';
-    
-    // 技能列表
-    if (gameState.immortalSkills.length === 0) {
-        html += '<div style="text-align:center;color:#666;padding:30px;">尚未学会任何仙法</div>';
-    } else {
-        for (let i = 0; i < gameState.immortalSkills.length; i++) {
-            const skill = gameState.immortalSkills[i];
-            const skillData = IMMORTAL_SKILLS_DATA[skill.name];
-            const typeData = IMMORTAL_SKILL_TYPES[skill.type];
-            
-            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:10px;border-left:4px solid ${typeData.color};">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:28px;">${skillData.icon}</span>`;
-            html += `<div style="flex:1;">`;
-            html += `<div style="color:#fff;font-weight:bold;">${skill.name} <span style="color:${typeData.color};font-size:12px;">[${skill.type}]</span></div>`;
-            html += `<div style="color:#888;font-size:11px;">Lv.${skill.level}/${skill.maxLevel}</div>`;
-            html += '</div>';
-            
-            // 冷却显示
-            if (skill.currentCooldown > 0) {
-                html += `<div style="color:#f44336;font-size:12px;">冷却:${skill.currentCooldown}秒</div>`;
-            } else {
-                html += `<button onclick="useImmortalSkill(${i});closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">施展</button>`;
-            }
-            
-            html += '</div>';
-            
-            // 升级按钮
-            const upgradeCost = {
-                spiritStones: skillData.upgradeCost.spiritStones * skill.level,
-                herbs: skillData.upgradeCost.herbs * skill.level
-            };
-            
-            html += `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">`;
-            html += `<div style="color:#aaa;font-size:11px;">${skill.description}</div>`;
-            
-            if (skill.level < skill.maxLevel) {
-                const canUpgrade = gameState.immortal.spiritStones >= upgradeCost.spiritStones;
-                html += `<button onclick="upgradeImmortalSkill(${i});closeModal();" ${canUpgrade ? '' : 'disabled'} style="padding:4px 8px;background:${canUpgrade ? '#1565c0' : '#444'};color:${canUpgrade ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canUpgrade ? 'pointer' : 'not-allowed'};font-size:11px;">升级 ${upgradeCost.spiritStones}💎</button>`;
-            } else {
-                html += `<span style="color:#ffd700;font-size:11px;">已满级</span>`;
-            }
-            
-            html += '</div></div>';
-        }
-    }
-    
-    // 学习新仙法
-    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #333;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">可学习仙法：</div>';
-    
-    const availableSkills = Object.keys(IMMORTAL_SKILLS_DATA).filter(
-        name => !gameState.immortalSkills.find(s => s.name === name)
-    );
-    
-    if (availableSkills.length === 0) {
-        html += '<div style="color:#666;text-align:center;">已学会所有仙法</div>';
-    } else {
-        for (const skillName of availableSkills) {
-            const skillData = IMMORTAL_SKILLS_DATA[skillName];
-            const typeData = IMMORTAL_SKILL_TYPES[skillData.type];
-            
-            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:20px;">${skillData.icon}</span>`;
-            html += `<div><div style="color:#fff;font-size:13px;">${skillName}</div><div style="color:${typeData.color};font-size:11px;">${skillData.type}</div></div>`;
-            html += '</div>';
-            html += `<button onclick="learnImmortalSkill('${skillName}');closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">学习</button>`;
-            html += '</div>';
-        }
-    }
-    html += '</div>';
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('仙法', html, '');
-}
-
-// ===== getImmortalSkillBonus =====
-function getImmortalSkillBonus(type) {
-    let bonus = 0;
-    for (const skill of gameState.immortalSkills) {
-        const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
-        if (skillTypeData.bonusType === type) {
-            bonus += skillTypeData.bonusValue * skill.level;
-        }
-    }
-    return bonus;
-}
-
-// ===== js/mount.js =====
-
-// ===== MOUNT_TYPES =====
-const MOUNT_TYPES = {
-    '仙鹤': {
-        icon: '🦅',
-        baseStats: { speed: 30, attack: 10, defense: 5, luck: 15 },
-        skills: ['御空加速'],
-        growthRate: 1.0,
-        maturityMax: 100,
-        price: 1000
-    },
-    '凤凰': {
-        icon: '🦅',
-        baseStats: { speed: 25, attack: 20, defense: 15, luck: 25 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.2,
-        maturityMax: 120,
-        price: 5000
-    },
-    '麒麟': {
-        icon: '🦄',
-        baseStats: { speed: 20, attack: 25, defense: 20, luck: 20 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.1,
-        maturityMax: 110,
-        price: 8000
-    },
-    '白虎': {
-        icon: '🐯',
-        baseStats: { speed: 25, attack: 30, defense: 10, luck: 10 },
-        skills: ['御空加速', '坐骑融合'],
-        growthRate: 1.15,
-        maturityMax: 105,
-        price: 6000
-    },
-    '青龙': {
-        icon: '🐉',
-        baseStats: { speed: 35, attack: 15, defense: 15, luck: 20 },
-        skills: ['御空加速', '仙缘感应'],
-        growthRate: 1.25,
-        maturityMax: 130,
-        price: 10000
-    },
-    '玄武': {
-        icon: '🐢',
-        baseStats: { speed: 15, attack: 10, defense: 35, luck: 15 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.0,
-        maturityMax: 140,
-        price: 7000
-    },
-    '九尾狐': {
-        icon: '🦊',
-        baseStats: { speed: 30, attack: 20, defense: 10, luck: 30 },
-        skills: ['御空加速', '仙缘感应'],
-        growthRate: 1.3,
-        maturityMax: 100,
-        price: 12000
-    },
-    '鲲鹏': {
-        icon: '🐋',
-        baseStats: { speed: 40, attack: 15, defense: 10, luck: 20 },
-        skills: ['御空加速', '坐骑融合', '仙缘感应'],
-        growthRate: 1.4,
-        maturityMax: 150,
-        price: 20000
-    }
-};
-
-// ===== MOUNT_GROWTH_TYPES =====
-const MOUNT_GROWTH_TYPES = {
-    '普通': { multiplier: 0.8, color: '#aaaaaa', price: 0 },
-    '优秀': { multiplier: 1.0, color: '#4caf50', price: 1000 },
-    '稀有': { multiplier: 1.2, color: '#2196f3', price: 5000 },
-    '神话': { multiplier: 1.5, color: '#9c27b0', price: 20000 }
-};
-
-// ===== getRandomMountType =====
-function getRandomMountType() {
-    const types = Object.keys(MOUNT_TYPES);
-    return types[Math.floor(Math.random() * types.length)];
-}
-
-// ===== getRandomGrowthType =====
-function getRandomGrowthType() {
-    const rand = Math.random();
-    if (rand < 0.5) return '普通';
-    if (rand < 0.8) return '优秀';
-    if (rand < 0.95) return '稀有';
-    return '神话';
-}
-
-// ===== createMount =====
-function createMount(type, growth) {
-    const template = MOUNT_TYPES[type];
-    const growthData = MOUNT_GROWTH_TYPES[growth];
-    
-    return {
-        uid: 'mount_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        name: type,
-        type: type,
-        level: 1,
-        growth: growth,
-        stats: {
-            speed: Math.floor(template.baseStats.speed * growthData.multiplier),
-            attack: Math.floor(template.baseStats.attack * growthData.multiplier),
-            defense: Math.floor(template.baseStats.defense * growthData.multiplier),
-            luck: Math.floor(template.baseStats.luck * growthData.multiplier)
-        },
-        skills: [...template.skills],
-        maturity: 0,
-        matureMax: template.maturityMax,
-        exp: 0,
-        expToLevel: 100
-    };
-}
-
-// ===== acquireMount =====
-function acquireMount(mount) {
-    if (gameState.mounts.length >= 3) {
-        showToast('仙兽栏已满（最多3只）');
-        return false;
-    }
-    
-    gameState.mounts.push(mount);
-    addLog('good', '获得仙兽', `获得${mount.growth}级仙兽【${mount.name}】！`);
-    saveGame();
-    return true;
-}
-
-// ===== tryCaptureMount =====
-function tryCaptureMount() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('仙兽只可在仙界捕捉');
-        return;
-    }
-    
-    const mountType = getRandomMountType();
-    const growth = getRandomGrowthType();
-    const mount = createMount(mountType, growth);
-    
-    // 稀有度影响成功率
-    const successRates = { '普通': 0.8, '优秀': 0.5, '稀有': 0.3, '神话': 0.1 };
-    const luckBonus = gameState.currentMount ? gameState.currentMount.stats.luck / 200 : 0;
-    
-    if (Math.random() < successRates[growth] + luckBonus) {
-        acquireMount(mount);
-        showToast(`捕捉成功！获得${growth}仙兽【${mountType}】`);
-    } else {
-        showToast('捕捉失败，仙兽逃走了...');
-    }
-    
-    saveGame();
-}
-
-// ===== feedMount =====
-function feedMount(mountIndex, herbCount) {
-    if (gameState.mounts.length <= mountIndex) return;
-    
-    const mount = gameState.mounts[mountIndex];
-    if (mount.maturity >= mount.matureMax) {
-        showToast('仙兽已完全成熟');
-        return;
-    }
-    
-    // 仙草喂养，每个仙草+5成熟度
-    const gain = Math.min(herbCount * 5, mount.matureMax - mount.maturity);
-    mount.maturity += gain;
-    
-    // 检查是否成熟
-    if (mount.maturity >= mount.matureMax) {
-        mount.level = Math.min(10, mount.level + 1);
-        mount.maturity = mount.matureMax;
-        showToast(`${mount.name}已完全成熟，等级提升！`);
-    }
-    
-    saveGame();
-    updateDisplay();
-}
-
-// ===== rideMount =====
-function rideMount(mountIndex) {
-    if (gameState.mounts.length <= mountIndex) return;
-    
-    gameState.currentMount = gameState.mounts[mountIndex];
-    addLog('good', '骑乘仙兽', `骑乘【${gameState.currentMount.name}】飞行`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== dismountMount =====
-function dismountMount() {
-    if (!gameState.currentMount) return;
-    addLog('neutral', '解除骑乘', `解除【${gameState.currentMount.name}】骑乘状态`);
-    gameState.currentMount = null;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== showMountPanel =====
-function showMountPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">🐎 仙兽面板</h3>';
-    
-    // 当前骑乘
-    if (gameState.currentMount) {
-        const m = gameState.currentMount;
-        html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid #ffd700;">`;
-        html += `<div style="display:flex;align-items:center;gap:10px;">`;
-        html += `<span style="font-size:32px;">${MOUNT_TYPES[m.type].icon}</span>`;
-        html += `<div><div style="color:#ffd700;font-weight:bold;">${m.name}</div>`;
-        html += `<div style="color:#aaa;font-size:12px;">${m.growth}级 | Lv.${m.level}</div></div>`;
-        html += `<button onclick="dismountMount();closeModal();" style="margin-left:auto;padding:6px 12px;background:#c62828;color:white;border:none;border-radius:4px;cursor:pointer;">解除骑乘</button>`;
-        html += '</div>';
-        
-        // 成熟度条
-        const progress = (m.maturity / m.matureMax * 100).toFixed(0);
-        html += `<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;color:#aaa;font-size:11px;"><span>成熟度</span><span>${progress}%</span></div>`;
-        html += `<div style="height:6px;background:#333;border-radius:3px;margin-top:4px;"><div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:3px;"></div></div></div>`;
-        
-        // 属性
-        html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;text-align:center;">`;
-        html += `<div><div style="color:#4caf50;font-size:14px;">${m.stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
-        html += `<div><div style="color:#f44336;font-size:14px;">${m.stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
-        html += `<div><div style="color:#2196f3;font-size:14px;">${m.stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
-        html += `<div><div style="color:#ff9800;font-size:14px;">${m.stats.luck}</div><div style="color:#666;font-size:10px;">幸运</div></div>`;
-        html += '</div></div>';
-    }
-    
-    // 仙兽列表
-    html += '<div style="margin-bottom:12px;"><div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙兽栏 (' + gameState.mounts.length + '/3)</div>';
-    
-    if (gameState.mounts.length === 0) {
-        html += '<div style="text-align:center;color:#666;padding:20px;">暂无仙兽</div>';
-    } else {
-        for (let i = 0; i < gameState.mounts.length; i++) {
-            const m = gameState.mounts[i];
-            const isRiding = gameState.currentMount && gameState.currentMount.uid === m.uid;
-            const growthColor = MOUNT_GROWTH_TYPES[m.growth].color;
-            
-            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;" onclick="toggleMountDetails(${i})">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:24px;">${MOUNT_TYPES[m.type].icon}</span>`;
-            html += `<div style="flex:1;">`;
-            html += `<div style="color:${growthColor};font-weight:bold;">${m.name} <span style="color:#666;font-size:11px;">(${m.growth})</span></div>`;
-            html += `<div style="color:#888;font-size:11px;">Lv.${m.level} | 成熟度${(m.maturity/m.matureMax*100).toFixed(0)}%</div>`;
-            html += '</div>';
-            if (!isRiding) {
-                html += `<button onclick="event.stopPropagation();rideMount(${i});closeModal();" style="padding:4px 8px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">骑乘</button>`;
-            } else {
-                html += `<span style="color:#ffd700;font-size:11px;">已骑乘</span>`;
-            }
-            html += '</div></div>';
-        }
-    }
-    html += '</div>';
-    
-    // 捕捉按钮
-    html += `<button onclick="tryCaptureMount();closeModal();" style="width:100%;padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🔍 捕捉仙兽</button>`;
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('仙兽', html, '');
-}
-
-// ===== MOUNT_SKILLS =====
-const MOUNT_SKILLS = {
-    '御空加速': {
-        icon: '💨',
-        effect: '移动冷却-50%',
-        description: '骑乘时御空术冷却时间减半'
-    },
-    '仙兽护主': {
-        icon: '🛡️',
-        effect: '战斗加成',
-        description: '战斗时仙兽协助攻击，伤害+20%'
-    },
-    '仙缘感应': {
-        icon: '✨',
-        effect: '仙缘任务+20%',
-        description: '仙缘任务刷新概率+20%'
-    },
-    '坐骑融合': {
-        icon: '🔗',
-        effect: '属性翻倍',
-        description: '骑乘时仙兽属性加成翻倍'
-    }
-};
-
-// ===== js/worldmap.js =====
-
-// ===== initWorldMap =====
+        // ===== initWorldMap =====
         function initWorldMap() {
             if (!gameState.worldMap) {
                 gameState.worldMap = {
@@ -12636,3 +13098,4 @@ const MOUNT_SKILLS = {
                 minimapEl.innerHTML = `<span class="minimap-icon">${continentIcon}</span><span class="minimap-text">${wm.currentContinent}</span>`;
             }
         }
+

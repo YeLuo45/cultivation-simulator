@@ -114,7 +114,7 @@ function showAscensionModal() {
     
     html += `<button onclick="doAscend()" style="width:100%;padding:14px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">🌟 确认飞升</button>`;
     html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">返回</button>`;
-    html += '</div>`;
+    html += '</div>';
     
     openModal('飞升', html, '');
 }
@@ -200,7 +200,7 @@ function showAscensionSuccessScreen() {
     html += '</div>';
     
     html += `<button onclick="enterImmortalRealm()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">☁️ 进入仙界</button>`;
-    html += '</div>`;
+    html += '</div>';
     
     openModal('飞升', html, '');
 }

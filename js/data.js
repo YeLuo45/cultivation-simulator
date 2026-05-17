@@ -378,6 +378,8 @@
             if (gameState.sect && gameState.sect.name) {
                 processDailySectMissions();
             }
+            // V37 天道法则领悟进度处理
+            processLawComprehension();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
