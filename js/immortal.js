@@ -10,6 +10,42 @@ const IMMORTAL_REALMS = {
     5: { name: '混元大罗', icon: '💫', description: '飞升目标，超越凡界一切', cultivationBase: 1600 }
 };
 
+// ===== SECRET_REALMS_IMMORTAL =====
+const SECRET_REALMS_IMMORTAL = {
+    '太虚遗迹': {
+        type: 'ruins',
+        realmRequired: 1,
+        dangerLevel: 2,
+        waves: 3,
+        rewards: ['太虚仙法残卷', '上古丹药', '仙灵泉水'],
+        npc: { type: 'guardian', name: '太虚守护者' }
+    },
+    '九天瑶池': {
+        type: 'resource',
+        realmRequired: 2,
+        dangerLevel: 1,
+        waves: 2,
+        rewards: ['九天仙草', '瑶池圣水', '万年灵芝'],
+        npc: { type: 'merchant', name: '瑶池仙子' }
+    },
+    '混沌战场': {
+        type: 'combat',
+        realmRequired: 3,
+        dangerLevel: 4,
+        waves: 4,
+        rewards: ['混沌至宝', '神魔精血', '混沌丹'],
+        boss: { name: '混沌魔神' }
+    },
+    '星辰海洋': {
+        type: 'serendipity',
+        realmRequired: 2,
+        dangerLevel: 2,
+        waves: 1,
+        rewards: ['星辰精华', '星君传承'],
+        special: true
+    }
+};
+
 // ===== IMMORTAL_REGIONS =====
 const IMMORTAL_REGIONS = {
     '仙灵谷': {
@@ -83,8 +119,31 @@ function initializeImmortalState() {
             lastFateTask: 0,
             fateTaskRefreshDay: 0,
             celestialCycleDay: 0,
-            celestialCycleCompleted: false
+            celestialCycleCompleted: false,
+            // V34 仙界秘境探索系统
+            secretRealm: {
+                inSecretRealm: false,
+                currentRealm: null,
+                currentType: null,
+                wave: 0,
+                totalWaves: 0,
+                enemies: [],
+                rewards: [],
+                npc: null,
+                jade: 0,  // 仙玉
+                tokens: 1,  // 秘境令牌（每日重置）
+                lastTokenRefresh: 0,
+                explored: []  // 已探索秘境记录
+            }
         };
+    }
+    // V34 秘境令牌每日重置
+    if (gameState.immortal && gameState.immortal.secretRealm) {
+        const today = Math.floor(gameState.days / 10) * 10;  // 简化：每10天重置
+        if (gameState.immortal.secretRealm.lastTokenRefresh < today) {
+            gameState.immortal.secretRealm.tokens = 3;
+            gameState.immortal.secretRealm.lastTokenRefresh = today;
+        }
     }
     if (!gameState.mounts) gameState.mounts = [];
     if (!gameState.immortalSkills) gameState.immortalSkills = [];
@@ -511,6 +570,287 @@ function requestFortuneBlessing() {
     addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
 }
 
+// ===== V34 仙界秘境探索系统 =====
+
+// ===== canEnterSecretRealm =====
+function canEnterSecretRealm(realmName) {
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    if (!realm) return { result: false, reason: '秘境不存在' };
+    if (gameState.immortal.realm < realm.realmRequired) {
+        return { result: false, reason: `需要${IMMORTAL_REALMS[realm.realmRequired].name}才能进入` };
+    }
+    if (!gameState.immortal.secretRealm || gameState.immortal.secretRealm.tokens <= 0) {
+        return { result: false, reason: '秘境令牌不足' };
+    }
+    return { result: true };
+}
+
+// ===== enterSecretRealm =====
+function enterSecretRealm(realmName) {
+    const check = canEnterSecretRealm(realmName);
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    gameState.immortal.secretRealm.tokens--;
+    gameState.immortal.secretRealm.inSecretRealm = true;
+    gameState.immortal.secretRealm.currentRealm = realmName;
+    gameState.immortal.secretRealm.currentType = realm.type;
+    gameState.immortal.secretRealm.wave = 0;
+    gameState.immortal.secretRealm.totalWaves = realm.waves;
+    gameState.immortal.secretRealm.enemies = [];
+    gameState.immortal.secretRealm.rewards = [];
+    gameState.immortal.secretRealm.npc = realm.npc ? { ...realm.npc } : null;
+    
+    showToast(`进入【${realmName}】`);
+    renderSecretRealmUI();
+}
+
+// ===== renderSecretRealmUI =====
+function renderSecretRealmUI() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr || !sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+    const typeNames = { ruins: '遗迹秘境', resource: '资源秘境', combat: '战斗秘境', serendipity: '奇遇秘境' };
+    
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:24px">${typeIcons[realm.type] || '🏛️'} ${sr.currentRealm}</div>
+                <div style="color:#aaa;font-size:12px">${typeNames[realm.type]} - 第${sr.wave}/${sr.totalWaves}波</div>
+            </div>
+    `;
+    
+    // 类型特定UI
+    if (realm.type === 'resource') {
+        content += `
+            <div style="background:rgba(76,175,80,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#4caf50;font-size:14px">🌿 资源秘境 - 收集仙草和灵材</div>
+            </div>
+            <button onclick="collectResource()" style="width:100%;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">采集资源</button>
+        `;
+    } else if (realm.type === 'ruins') {
+        content += `
+            <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#9c27b0;font-size:14px">🏛️ 遗迹秘境 - 探索上古仙人洞府</div>
+                ${sr.npc && sr.npc.type === 'guardian' ? `<div style="color:#ff5722;margin-top:8px">⚠️ 守护者: ${sr.npc.name}</div>` : ''}
+            </div>
+            <button onclick="exploreRuins()" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">探索遗迹</button>
+        `;
+    } else if (realm.type === 'combat') {
+        content += `
+            <div style="background:rgba(244,67,54,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#f44336;font-size:14px">⚔️ 战斗秘境 - 击败守护者获取混沌至宝</div>
+                ${realm.boss ? `<div style="color:#ff5722;margin-top:8px">💀 Boss: ${realm.boss.name}</div>` : ''}
+            </div>
+            <button onclick="fightSecretRealmBoss()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">挑战Boss</button>
+        `;
+    } else if (realm.type === 'serendipity') {
+        content += `
+            <div style="background:rgba(255,215,0,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#ffd700;font-size:14px">✨ 奇遇秘境 - 随机触发特殊事件</div>
+            </div>
+            <button onclick="triggerSerendipityEvent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#333;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">触发奇遇</button>
+        `;
+    }
+    
+    // 奖励展示
+    if (sr.rewards.length > 0) {
+        content += `
+            <div style="margin-top:15px">
+                <div style="color:#ffd700;margin-bottom:8px">已获得奖励:</div>
+                ${sr.rewards.map(r => `<div style="color:#4caf50;font-size:12px">✧ ${r}</div>`).join('')}
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="exitSecretRealm()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:15px">返回仙界</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
+}
+
+// ===== collectResource =====
+function collectResource() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+    sr.rewards.push(reward);
+    
+    showToast(`获得: ${reward}`);
+    addLog('good', '秘境收获', `在${sr.currentRealm}获得${reward}`);
+    
+    if (sr.wave >= sr.totalWaves) {
+        completeImmortalSecretRealm();
+    } else {
+        renderSecretRealmUI();
+    }
+}
+
+// ===== exploreRuins =====
+function exploreRuins() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    
+    // 遗迹探索可能遇到敌人或奖励
+    if (Math.random() < 0.4 && sr.wave < sr.totalWaves) {
+        // 遇到守护者战斗
+        showToast(`遭遇${sr.npc?.name || '守护者'}！`);
+        startImmortalRealmBattle(sr.npc);
+    } else {
+        // 获得奖励
+        const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+        sr.rewards.push(reward);
+        showToast(`探索获得: ${reward}`);
+        addLog('good', '秘境收获', `在${sr.currentRealm}探索获得${reward}`);
+        
+        if (sr.wave >= sr.totalWaves) {
+            completeImmortalSecretRealm();
+        } else {
+            renderSecretRealmUI();
+        }
+    }
+}
+
+// ===== fightSecretRealmBoss =====
+function fightSecretRealmBoss() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const bossName = realm.boss?.name || '秘境守卫';
+    const bossHP = 5000 + (gameState.immortal.realm * 2000);
+    
+    showToast(`挑战 ${bossName}！`);
+    startImmortalRealmBattle({ name: bossName, hp: bossHP, maxHP: bossHP });
+}
+
+// ===== startImmortalRealmBattle =====
+function startImmortalRealmBattle(enemy) {
+    const sr = gameState.immortal.secretRealm;
+    
+    // 使用通用战斗系统
+    const playerMaxHP = gameState.maxHP || 1000;
+    const playerAttack = gameState.attack || 100;
+    const playerDefense = gameState.defense || 50;
+    
+    combatState.inProgress = true;
+    combatState.player = {
+        hp: playerMaxHP,
+        maxHP: playerMaxHP,
+        attack: playerAttack,
+        defense: playerDefense,
+        technique: gameState.technique || '金刚诀'
+    };
+    combatState.opponent = {
+        name: enemy.name || '秘境守卫',
+        hp: enemy.hp || 3000,
+        maxHP: enemy.maxHP || enemy.hp || 3000,
+        attack: 80 + (gameState.immortal?.realm || 1) * 30,
+        defense: 40 + (gameState.immortal?.realm || 1) * 15,
+        technique: '混沌诀',
+        critRate: 0.1,
+        level: 1
+    };
+    combatState.round = 0;
+    combatState.turn = 'player';
+    combatState.log = [];
+    combatState.effects = {
+        player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 },
+        opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 }
+    };
+    
+    // 设置战斗结束回调
+    window.secretRealmBattleEnd = function(result) {
+        if (result === 'win') {
+            const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+            const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+            sr.rewards.push(reward);
+            showToast(`战斗胜利！获得: ${reward}`);
+            addLog('good', '秘境战斗', `在${sr.currentRealm}击败${enemy.name}获得${reward}`);
+            
+            sr.wave++;
+            if (sr.wave >= sr.totalWaves) {
+                completeImmortalSecretRealm();
+            } else {
+                renderSecretRealmUI();
+            }
+        } else {
+            showToast('战斗失败，秘境探索结束');
+            exitSecretRealm();
+        }
+        delete window.secretRealmBattleEnd;
+    };
+    
+    renderCombatArena();
+}
+
+// ===== triggerSerendipityEvent =====
+function triggerSerendipityEvent() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const events = [
+        { type: 'epiphany', text: '💡 顿悟！境界提升！', effect: () => { gameState.immortal.realm = Math.min(5, gameState.immortal.realm + 1); } },
+        { type: 'treasure', text: '💎 发现上古宝藏！', effect: () => { sr.rewards.push('上古宝藏'); } },
+        { type: 'technique', text: '📜 获得仙人传承！', effect: () => { sr.rewards.push('星君传承'); } },
+        { type: 'jade', text: '💰 发现仙玉矿脉！', effect: () => { sr.rewards.push('仙玉x100'); } }
+    ];
+    
+    const event = events[Math.floor(Math.random() * events.length)];
+    event.effect();
+    
+    showToast(event.text);
+    addLog('good', '奇遇秘境', `${event.text} - ${sr.currentRealm}`);
+    
+    completeImmortalSecretRealm();
+}
+
+// ===== completeImmortalSecretRealm =====
+function completeImmortalSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    
+    showToast(`秘境探索完成！获得${sr.rewards.length}个奖励`);
+    addLog('good', '秘境完成', `完成${sr.currentRealm}，获得: ${sr.rewards.join(', ')}`);
+    
+    // 添加探索记录
+    if (!sr.explored) sr.explored = [];
+    if (!sr.explored.includes(sr.currentRealm)) {
+        sr.explored.push(sr.currentRealm);
+    }
+    
+    setTimeout(() => exitSecretRealm(), 1500);
+}
+
+// ===== exitSecretRealm =====
+function exitSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    const rewards = [...(sr.rewards || [])];
+    
+    sr.inSecretRealm = false;
+    sr.currentRealm = null;
+    sr.currentType = null;
+    sr.wave = 0;
+    sr.enemies = [];
+    sr.npc = null;
+    
+    closeModal('modalNormal');
+    showToast(`秘境奖励: ${rewards.length > 0 ? rewards.join(', ') : '无'}`);
+    renderImmortalUI();
+}
+
 // ===== renderImmortalUI =====
 function renderImmortalUI() {
     if (gameState.currentRealm !== 'immortal') return;
@@ -536,4 +876,53 @@ function renderImmortalUI() {
     if (regionDisplay) {
         regionDisplay.innerHTML = `${regionData.icon} ${gameState.immortal.currentRegion}`;
     }
+    
+    // V34 添加秘境探索入口
+    const secretBtn = document.getElementById('secretRealmBtn');
+    if (secretBtn && gameState.immortal.secretRealm) {
+        secretBtn.textContent = `🏛️ 秘境探索 (令牌:${gameState.immortal.secretRealm.tokens})`;
+    }
+}
+
+// ===== V34 renderSecretRealmList =====
+function renderSecretRealmList() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行秘境探索');
+        return;
+    }
+    
+    const sr = gameState.immortal.secretRealm;
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:20px;color:#ffd700">🏛️ 仙界秘境</div>
+                <div style="color:#aaa;font-size:12px">秘境令牌: ${sr?.tokens || 0}</div>
+            </div>
+    `;
+    
+    // 列出所有秘境
+    for (const [name, realm] of Object.entries(SECRET_REALMS_IMMORTAL)) {
+        const canEnter = gameState.immortal.realm >= realm.realmRequired;
+        const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+        const typeNames = { ruins: '遗迹', resource: '资源', combat: '战斗', serendipity: '奇遇' };
+        
+        content += `
+            <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-bottom:10px;${!canEnter ? 'opacity:0.5' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-size:16px">${typeIcons[realm.type]} ${name}</div>
+                        <div style="color:#aaa;font-size:11px">${typeNames[realm.type]} | 危险${'⚠️'.repeat(realm.dangerLevel)} | 需要: ${IMMORTAL_REALMS[realm.realmRequired]?.name || '未知'}</div>
+                    </div>
+                    ${canEnter ? `<button onclick="enterSecretRealm('${name}')" style="padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">进入</button>` : '<span style="color:#f44336;font-size:11px">境界不足</span>'}
+                </div>
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="closeModal('modalNormal')" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:10px">返回</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
 }
