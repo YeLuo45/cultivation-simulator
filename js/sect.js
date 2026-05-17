@@ -50,6 +50,7 @@
                     <div class="sect-tab" onclick="switchSectTab('buildings')">🏗️ 建筑</div>
                     <div class="sect-tab" onclick="switchSectTab('techniques')">📚 功法</div>
                     <div class="sect-tab" onclick="switchSectTab('shop')">🏪 贡献商店</div>
+                    <div class="sect-tab" onclick="switchSectTab('missions')">📋 任务</div>
                     <div class="sect-tab" onclick="switchSectTab('manage')">⚙️ 管理</div>
                 </div>
                 <div class="sect-content" id="sectTabContent">
@@ -79,6 +80,9 @@
                     break;
                 case 'shop':
                     tabContent.innerHTML = renderContributionShop();
+                    break;
+                case 'missions':
+                    tabContent.innerHTML = renderSectMissionsTab();
                     break;
                 case 'manage':
                     tabContent.innerHTML = renderManageTab();
@@ -196,14 +200,21 @@
                 const npcRole = d.npcRole || 'disciple';
                 const roleInfo = SECT_NPC_ROLES[npcRole] || SECT_NPC_ROLES['disciple'];
                 const task = getNpcTask(d.uid);
-                
+                // V35 弟子成长信息
+                const level = d.level || 1;
+                const exp = d.experience || 0;
+                const expNeeded = level * 50;
+                const expPercent = Math.min(100, Math.floor((exp / expNeeded) * 100));
+                const moodIcon = d.mood === 'happy' ? '😊' : d.mood === 'upset' ? '😔' : '😐';
+                const mission = d.assignment ? sect.sectMissions.find(m => m.id === d.assignment) : null;
+
                 html += `
                     <div class="disciple-card">
                         <div class="disciple-info">
                             <span class="disciple-avatar">${roleInfo.icon}</span>
                             <div>
-                                <div class="disciple-name">${d.name} <span style="color:${roleInfo.color};font-size:11px;">${roleInfo.title}</span></div>
-                                <div class="disciple-realm">${realmName}</div>
+                                <div class="disciple-name">${d.name} <span style="color:${roleInfo.color};font-size:11px;">${roleInfo.title}</span> ${mission ? '📋' : ''}</div>
+                                <div class="disciple-realm">${realmName} <span style="color:#888;font-size:11px;">Lv.${level} ${moodIcon}</span></div>
                             </div>
                             <span class="disciple-talent ${talentClass}">${d.talent}</span>
                         </div>
@@ -211,6 +222,8 @@
                             <div class="disciple-contribution">贡献: ${d.contribution}</div>
                             <span class="disciple-status ${statusClass}">${isElder ? '长老' : d.status}</span>
                             ${task ? `<div style="color:#888;font-size:11px;">📋${task.type === 'cultivate' ? '修炼' : task.type === 'collect' ? '采集' : '任务'}</div>` : ''}
+                            <div style="color:#888;font-size:10px;margin-top:2px;">经验: ${exp}/${expNeeded}</div>
+                            ${mission ? `<div style="color:#ff9800;font-size:10px;">任务: ${mission.description.substring(0,8)}...</div>` : ''}
                             <button onclick="openNpcDialogue('${d.uid}')" style="background:#333;border:1px solid #555;color:#aaa;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;margin-top:3px;">💬</button>
                         </div>
                     </div>
@@ -1322,5 +1335,336 @@
             const req = gameState.sect.tribulationRequest;
             if (req.status === 'approved' && req.buffApplied) return 0.05;
             return 0;
+        }
+
+        // ===== V35 宗门任务系统 =====
+
+        // 宗门任务类型配置
+        const SECT_MISSION_TYPES = {
+            cultivate: {
+                name: '修炼任务',
+                icon: '🧘',
+                desc: '完成指定修炼次数',
+                baseReward: { contribution: 20, exp: 15 },
+                difficulty: [5, 10, 15]  // 不同难度目标
+            },
+            collect: {
+                name: '采集任务',
+                icon: '💎',
+                desc: '采集指定数量灵石',
+                baseReward: { contribution: 15, exp: 10, spiritStone: 30 },
+                difficulty: [50, 100, 200]
+            },
+            battle: {
+                name: '战斗任务',
+                icon: '⚔️',
+                desc: '击败指定数量敌人',
+                baseReward: { contribution: 25, exp: 20 },
+                difficulty: [3, 5, 8]
+            },
+            deliver: {
+                name: '跑腿任务',
+                icon: '📦',
+                desc: '在宗门间传递物品',
+                baseReward: { contribution: 30, exp: 15, spiritStone: 20 },
+                difficulty: [1, 2, 3]
+            },
+            special: {
+                name: '特殊任务',
+                icon: '🌟',
+                desc: '完成宗门特殊事件',
+                baseReward: { contribution: 50, exp: 40, spiritStone: 100 },
+                difficulty: [1, 1, 1]
+            }
+        };
+
+        // 生成宗门任务
+        function generateSectMissions() {
+            const sect = gameState.sect;
+            const daysSinceRefresh = gameState.days - (gameState.lastMissionRefreshDay || 0);
+
+            // 每3天刷新一次任务
+            if (daysSinceRefresh < 3 && sect.sectMissions.length >= 3) {
+                return; // 未到刷新时间且已有任务
+            }
+
+            // 最多3个进行中的任务
+            const activeCount = sect.sectMissions.filter(m => m.status === 'active').length;
+            if (activeCount >= 3) return;
+
+            const toGenerate = 3 - activeCount;
+            const types = Object.keys(SECT_MISSION_TYPES);
+
+            for (let i = 0; i < toGenerate; i++) {
+                const typeRoll = Math.random();
+                let type;
+                if (typeRoll < 0.35) type = 'cultivate';
+                else if (typeRoll < 0.6) type = 'collect';
+                else if (typeRoll < 0.8) type = 'battle';
+                else if (typeRoll < 0.95) type = 'deliver';
+                else type = 'special';
+
+                const missionType = SECT_MISSION_TYPES[type];
+                const difficultyIdx = Math.min(Math.floor(sect.level / 2), 2);
+                const target = missionType.difficulty[difficultyIdx];
+                const rewardMultiplier = 1 + difficultyIdx * 0.5;
+
+                const mission = {
+                    id: 'm_' + Date.now() + '_' + i,
+                    type: type,
+                    description: missionType.desc,
+                    target: target,
+                    progress: 0,
+                    reward: {
+                        contribution: Math.floor(missionType.baseReward.contribution * rewardMultiplier),
+                        exp: Math.floor(missionType.baseReward.exp * rewardMultiplier),
+                        spiritStone: missionType.baseReward.spiritStone ? Math.floor(missionType.baseReward.spiritStone * rewardMultiplier) : 0
+                    },
+                    assignedUid: null,  // 未分配
+                    status: 'available',  // available | active | completed | failed
+                    createdDay: gameState.days,
+                    expireDay: gameState.days + 7  // 7天后过期
+                };
+
+                sect.sectMissions.push(mission);
+            }
+
+            gameState.lastMissionRefreshDay = gameState.days;
+            saveGame();
+        }
+
+        // 分配弟子到任务
+        function assignMission(missionId, discipleUid) {
+            const sect = gameState.sect;
+            const mission = sect.sectMissions.find(m => m.id === missionId);
+            if (!mission || mission.status !== 'available') return false;
+
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple) return false;
+
+            // 检查弟子是否已在其他任务中
+            sect.sectMissions.forEach(m => {
+                if (m.assignedUid === discipleUid && m.status === 'active') {
+                    m.status = 'available';
+                    m.assignedUid = null;
+                    m.progress = 0;
+                }
+            });
+
+            mission.assignedUid = discipleUid;
+            mission.status = 'active';
+            disciple.assignment = missionId;
+
+            addLog('good', '任务分配', `${disciple.name}开始执行「${mission.description}」`);
+            saveGame();
+            return true;
+        }
+
+        // 处理每日任务进度
+        function processDailySectMissions() {
+            const sect = gameState.sect;
+            const today = gameState.days;
+
+            sect.sectMissions.forEach(mission => {
+                if (mission.status !== 'active' || !mission.assignedUid) return;
+
+                const disciple = sect.disciples.find(d => d.uid === mission.assignedUid);
+                if (!disciple) {
+                    mission.status = 'available';
+                    mission.assignedUid = null;
+                    mission.progress = 0;
+                    return;
+                }
+
+                // 根据任务类型增加进度
+                let progressGain = 0;
+                switch (mission.type) {
+                    case 'cultivate':
+                        // 修炼任务：根据弟子境界和资质
+                        progressGain = 1 + Math.floor(disciple.talentIndex * 0.5);
+                        break;
+                    case 'collect':
+                        progressGain = 10 + disciple.level * 2;
+                        break;
+                    case 'battle':
+                        progressGain = 1;
+                        break;
+                    case 'deliver':
+                        progressGain = 1;
+                        break;
+                    case 'special':
+                        progressGain = 0;  // 特殊任务需要手动触发
+                        break;
+                }
+
+                mission.progress = Math.min(mission.target, mission.progress + progressGain);
+
+                // 任务完成检查
+                if (mission.progress >= mission.target) {
+                    mission.status = 'completed';
+
+                    // 发放奖励
+                    disciple.contribution += mission.reward.contribution;
+                    disciple.experience = (disciple.experience || 0) + mission.reward.exp;
+                    if (mission.reward.spiritStone) {
+                        sect.spiritStones += mission.reward.spiritStone;
+                    }
+
+                    // 检查升级
+                    checkDiscipleLevelUp(disciple);
+
+                    // 重置弟子任务状态
+                    disciple.assignment = null;
+
+                    addLog('good', '任务完成', `${disciple.name}完成了「${mission.description}」，获得${mission.reward.contribution}贡献和${mission.reward.exp}经验！`);
+                }
+
+                // 过期检查
+                if (today > mission.expireDay) {
+                    mission.status = 'failed';
+                    disciple.assignment = null;
+                    disciple.mood = disciple.mood === 'happy' ? 'normal' : 'upset';
+                    addLog('warn', '任务失败', `${disciple.name}未能完成任务「${mission.description}」，心情低落`);
+                }
+            });
+
+            // 清理过期任务
+            sect.sectMissions = sect.sectMissions.filter(m => m.status !== 'failed' || m.createdDay > today - 30);
+
+            saveGame();
+        }
+
+        // 检查弟子升级
+        function checkDiscipleLevelUp(disciple) {
+            if (!disciple.experience) disciple.experience = 0;
+            if (!disciple.level) disciple.level = 1;
+
+            const expNeeded = disciple.level * 50;  // 每级需要 level * 50 经验
+
+            if (disciple.experience >= expNeeded) {
+                disciple.experience -= expNeeded;
+                disciple.level++;
+
+                // 升级时有机会提升境界
+                const realmChance = 0.1 + disciple.talentIndex * 0.05;
+                if (Math.random() < realmChance && disciple.realm < gameState.realm) {
+                    disciple.realm = Math.min(gameState.realm, disciple.realm + 1);
+                    addLog('good', '弟子突破', `${disciple.name}升到${disciple.level}级，并突破到${CONFIG.realms[disciple.realm]}期！`);
+                } else {
+                    addLog('good', '弟子升级', `${disciple.name}升到${disciple.level}级！`);
+                }
+
+                // 递归检查是否还能升级
+                checkDiscipleLevelUp(disciple);
+            }
+        }
+
+        // 渲染宗门任务标签页
+        function renderSectMissionsTab() {
+            const sect = gameState.sect;
+            const missions = sect.sectMissions.filter(m => m.status !== 'failed');
+            const activeMissions = missions.filter(m => m.status === 'active');
+            const availableMissions = missions.filter(m => m.status === 'available');
+
+            let html = `
+                <div style="margin-bottom:15px;display:flex;gap:10px;">
+                    <button class="btn btn-sect" onclick="generateSectMissions()" style="padding:10px 20px;">
+                        🎲 刷新任务
+                    </button>
+                    <span style="color:#888;font-size:12px;align-self:center;">
+                        每3天自动刷新 | ${activeMissions.length}/3进行中
+                    </span>
+                </div>
+            `;
+
+            if (missions.length === 0) {
+                html += '<p style="text-align:center;color:#666;padding:30px;">暂无任务，点击刷新获取</p>';
+                return html;
+            }
+
+            // 进行中的任务
+            if (activeMissions.length > 0) {
+                html += '<h4 style="color:#ff9800;margin:10px 0;">🔄 进行中</h4>';
+                activeMissions.forEach(m => {
+                    const missionType = SECT_MISSION_TYPES[m.type];
+                    const disciple = sect.disciples.find(d => d.uid === m.assignedUid);
+                    const progressPercent = Math.floor((m.progress / m.target) * 100);
+                    const isOverdue = gameState.days > m.expireDay;
+
+                    html += `
+                        <div class="disciple-card" style="border-left:3px solid #ff9800;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <span style="font-size:20px;">${missionType.icon}</span>
+                                    <span style="font-weight:bold;">${m.description}</span>
+                                    ${isOverdue ? '<span style="color:#f44336;font-size:11px;">⚠️已过期</span>' : ''}
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="color:#4CAF50;font-size:12px;">${m.progress}/${m.target} (${progressPercent}%)</div>
+                                    <div style="color:#888;font-size:11px;">
+                                        执行者: ${disciple ? disciple.name : '未知'}
+                                    </div>
+                                    <div style="color:#888;font-size:11px;">
+                                        奖励: ${m.reward.contribution}贡献 | ${m.reward.exp}经验
+                                        ${m.reward.spiritStone ? ` | ${m.reward.spiritStone}灵石` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background:#333;border-radius:4px;height:6px;margin-top:8px;">
+                                <div style="background:#ff9800;height:100%;border-radius:4px;width:${progressPercent}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // 可用任务
+            if (availableMissions.length > 0) {
+                html += '<h4 style="color:#9c27b0;margin:15px 0 10px;">📋 可接取</h4>';
+                availableMissions.forEach(m => {
+                    const missionType = SECT_MISSION_TYPES[m.type];
+
+                    html += `
+                        <div class="disciple-card" style="border-left:3px solid #9c27b0;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <span style="font-size:20px;">${missionType.icon}</span>
+                                    <span style="font-weight:bold;">${m.description}</span>
+                                    <span style="color:#888;font-size:11px;"> 目标: ${m.target}</span>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="color:#888;font-size:11px;">
+                                        奖励: ${m.reward.contribution}贡献 | ${m.reward.exp}经验
+                                        ${m.reward.spiritStone ? ` | ${m.reward.spiritStone}灵石` : ''}
+                                    </div>
+                                    <div style="margin-top:5px;">
+                                        <select id="mission_assign_${m.id}" style="background:#333;color:#fff;border:1px solid #555;padding:3px 8px;border-radius:4px;font-size:12px;">
+                                            <option value="">分配弟子</option>
+                                            ${sect.disciples.map(d => `<option value="${d.uid}">${d.name}(Lvl.${d.level || 1})</option>`).join('')}
+                                        </select>
+                                        <button onclick="confirmMissionAssign('${m.id}')" style="background:#4CAF50;border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;cursor:pointer;margin-left:5px;">确认</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            return html;
+        }
+
+        // 确认任务分配
+        function confirmMissionAssign(missionId) {
+            const select = document.getElementById('mission_assign_' + missionId);
+            const discipleUid = select.value;
+            if (!discipleUid) {
+                alert('请选择要分配执行的弟子');
+                return;
+            }
+
+            if (assignMission(missionId, discipleUid)) {
+                renderSectHome();  // 刷新宗门界面
+            }
         }
 

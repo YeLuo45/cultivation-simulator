@@ -78,7 +78,7 @@
                 npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
                 npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
                 npcLastActions: {},        // {uid: {action, day}}
-// V30 渡劫审批系统
+                // V30 渡劫审批系统
                 tribulationRequest: {
                     status: 'none',        // none | pending_elder | pending_leader | approved | rejected
                     elderScore: 0,
@@ -96,6 +96,9 @@
                     blessingActive: false, // 气运祈福是否激活
                     cycleInterval: 3        // 轮回间隔天数
                 },
+                // V35 宗门任务链
+                sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+                sectMissionCooldown: 0    // 任务冷却
             },
             // V6 奇遇系统字段
             serendipity: {
@@ -207,7 +210,11 @@
                 defenseFrequency: 0,
                 attackTiming: []
             },
-            lastCombatDay: 0           // V33 上次战斗天数（用于触发学习）
+            lastCombatDay: 0,           // V33 上次战斗天数（用于触发学习）
+            // V35 宗门互动增强
+            sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+            sectMissionCooldown: 0,    // 任务冷却
+            lastMissionRefreshDay: 0   // 上次任务刷新
         };
 
         // --- secretRealmState (7391-7398) ---

@@ -374,6 +374,10 @@
             }
             // V32 灵根觉醒触发检测
             checkSpiritRootAwakening();
+            // V35 宗门任务进度处理
+            if (gameState.sect && gameState.sect.name) {
+                processDailySectMissions();
+            }
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());

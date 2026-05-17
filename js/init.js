@@ -112,7 +112,10 @@
                         lastResult: null,
                         blessingActive: false,
                         cycleInterval: 3
-                    }
+                    },
+                    // V35 宗门任务链
+                    sectMissions: [],
+                    sectMissionCooldown: 0
                 },
                 // V6 奇遇系统字段
                 serendipity: {
@@ -250,6 +253,10 @@
                         attackTiming: []
                     },
                     lastCombatDay: loaded.lastCombatDay || 0,
+                    // V35 宗门互动增强
+                    sectMissions: loaded.sectMissions || [],
+                    sectMissionCooldown: loaded.sectMissionCooldown || 0,
+                    lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -261,7 +268,10 @@
                         },
                         celestialCycle: loaded.sect.celestialCycle || {
                             day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
-                        }
+                        },
+                        // V35 宗门任务链
+                        sectMissions: loaded.sect.sectMissions || [],
+                        sectMissionCooldown: loaded.sect.sectMissionCooldown || 0
                     } : {
                         name: null,
                         level: 0,
