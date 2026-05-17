@@ -227,7 +227,22 @@
                 comprehendDays: 0,         // 领悟已进行的天数
                 maxActiveLaws: 3,          // 最大激活数量
                 lawBonus: {}               // 当前激活法则计算后的加成
-            }
+            },
+            // V38 仙界社交系统
+            immortalAlly: {
+                id: null,
+                name: '',
+                rank: 1,
+                role: 'none',     // none|member|elder|vice_leader|leader
+                contribution: 0,
+                joinedDay: 0,
+                allies: [],
+                skillLevel: 0,
+                dailyActivity: 0,
+                lastActivityDay: 0
+            },
+            immortalFriends: [],   // [{uid, name, realm, intimacy, lastInteraction}]
+            allyApplications: []   // [{allyId, allyName, allyRank, applyDay, status}]
         };
 
         // --- secretRealmState (7391-7398) ---

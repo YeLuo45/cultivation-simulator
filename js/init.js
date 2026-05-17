@@ -276,6 +276,13 @@
                         comprehendingProgress: 0, comprehendDays: 0,
                         maxActiveLaws: 3, lawBonus: {}
                     },
+                    // V38 仙界社交系统
+                    immortalAlly: loaded.immortalAlly || {
+                        id: null, name: '', rank: 1, role: 'none', contribution: 0,
+                        joinedDay: 0, allies: [], skillLevel: 0, dailyActivity: 0, lastActivityDay: 0
+                    },
+                    immortalFriends: loaded.immortalFriends || [],
+                    allyApplications: loaded.allyApplications || [],
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -435,6 +442,19 @@
             const lawBtn = document.getElementById('lawBtn');
             if (lawBtn) {
                 lawBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V38 检查仙界社交按钮显示（境界≥地仙=realm 8）
+            const allyBtn = document.getElementById('allyBtn');
+            if (allyBtn) {
+                allyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            const friendsBtn = document.getElementById('friendsBtn');
+            if (friendsBtn) {
+                friendsBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            const tradingBtn = document.getElementById('tradingBtn');
+            if (tradingBtn) {
+                tradingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

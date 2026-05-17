@@ -380,6 +380,8 @@
             }
             // V37 天道法则领悟进度处理
             processLawComprehension();
+            // V38 仙界社交系统每日处理
+            processDailySocial();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
