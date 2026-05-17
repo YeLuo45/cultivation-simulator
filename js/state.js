@@ -214,7 +214,10 @@
             // V35 宗门互动增强
             sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
             sectMissionCooldown: 0,    // 任务冷却
-            lastMissionRefreshDay: 0   // 上次任务刷新
+            lastMissionRefreshDay: 0,   // 上次任务刷新
+            // V36 装备打造增强
+            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
+            lastForgeDay: 0            // 上次打造时间
         };
 
         // --- secretRealmState (7391-7398) ---

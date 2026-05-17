@@ -257,6 +257,9 @@
                     sectMissions: loaded.sectMissions || [],
                     sectMissionCooldown: loaded.sectMissionCooldown || 0,
                     lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
+                    lastForgeDay: loaded.lastForgeDay || 0,
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
