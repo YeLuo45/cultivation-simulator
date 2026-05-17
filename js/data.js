@@ -372,6 +372,8 @@
             if (gameState.currentRealm === 'immortal') {
                 processCelestialCycle();
             }
+            // V32 灵根觉醒触发检测
+            checkSpiritRootAwakening();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
@@ -1587,5 +1589,425 @@ async function generateBreakthroughResult() {
                 legendary: '#ffd700'
             };
             return colors[quality] || colors.common;
+        }
+
+        // ===== V32 灵根觉醒系统 =====
+
+        // 灵根品质升级映射
+        const SPIRIT_ROOT_AWAKENING_MAP = {
+            '伪灵根': '下品灵根',
+            '下品灵根': '中品灵根',
+            '中品灵根': '上品灵根',
+            '上品灵根': '天灵根',
+            '天灵根': '混沌灵根',
+            '混沌灵根': null  // 最高，无法继续觉醒
+        };
+
+        // 觉醒任务类型定义
+        const AWAKENING_TASKS = {
+            collect: {
+                name: '收集天材地宝',
+                description: '收集指定数量的觉醒材料',
+                icon: '📦'
+            },
+            battle: {
+                name: '击败守关者',
+                description: '击败心魔试炼的守护者',
+                icon: '⚔️'
+            },
+            cultivate: {
+                name: '连续修炼',
+                description: '在指定区域连续修炼N天',
+                icon: '🧘'
+            },
+            quiz: {
+                name: '悟道答题',
+                description: '回答修仙知识问题',
+                icon: '📚'
+            }
+        };
+
+        // ===== checkSpiritRootAwakening =====
+        function checkSpiritRootAwakening() {
+            const sr = gameState.spiritRoot;
+            const sra = gameState.spiritRootAwakening;
+
+            // 已完成觉醒或已激活则不再触发
+            if (sra.status === 'completed' || sra.status !== 'dormant') return;
+            // 已完成觉醒的灵根不再触发
+            if (sr.hasAwakened && sr.quality === sr.awakenedQuality) return;
+
+            // 检查触发条件
+            let canTrigger = false;
+
+            // 条件1：境界达到化神（realm>=3）+ 连续修炼30天
+            if (gameState.realm >= 3 && gameState.days - (sra.triggerDay || 0) >= 30) {
+                canTrigger = true;
+            }
+
+            // 条件2：灵根共鸣度>=8
+            if (sr.resonance >= 8) {
+                canTrigger = true;
+            }
+
+            // 条件3：服用灵根觉醒丹（通过道具触发）
+            // 条件4：特殊奇遇触发（在 serendipity 系统中设置）
+
+            if (canTrigger && !sr.awakeningAvailable) {
+                triggerSpiritRootAwakening();
+            }
+        }
+
+        // ===== triggerSpiritRootAwakening =====
+        function triggerSpiritRootAwakening() {
+            const sr = gameState.spiritRoot;
+            const sra = gameState.spiritRootAwakening;
+
+            // 检查是否可以觉醒
+            const nextQuality = SPIRIT_ROOT_AWAKENING_MAP[sr.quality];
+            if (!nextQuality) {
+                // 已达最高品质
+                return;
+            }
+
+            sr.awakeningAvailable = true;
+            sra.status = 'stage1';
+            sra.stage = 1;
+            sra.triggerDay = gameState.days;
+            sra.tasks = [];
+            sra.lastEventDay = gameState.days;
+            sra.attempts = 0;
+
+            // 生成任务
+            generateAwakeningTasks();
+
+            // 弹出觉醒界面
+            showSpiritRootAwakeningUI();
+        }
+
+        // ===== generateAwakeningTasks =====
+        function generateAwakeningTasks() {
+            const sra = gameState.spiritRootAwakening;
+            const sr = gameState.spiritRoot;
+
+            // 根据灵根品质决定任务难度
+            const qualityGrade = {
+                '伪灵根': 0, '下品灵根': 1, '中品灵根': 2,
+                '上品灵根': 3, '天灵根': 4, '混沌灵根': 5
+            };
+            const grade = qualityGrade[sr.quality] || 0;
+
+            // 生成4个任务
+            sra.tasks = [
+                {
+                    type: 'collect',
+                    target: '灵根觉醒石',
+                    targetCount: 3 + grade,
+                    current: 0,
+                    completed: false,
+                    icon: '📦'
+                },
+                {
+                    type: 'battle',
+                    target: '心魔试炼·守关者',
+                    targetCount: 1,
+                    current: 0,
+                    completed: false,
+                    icon: '⚔️'
+                },
+                {
+                    type: 'cultivate',
+                    target: gameState.currentRealm === 'immortal' ? '仙灵谷' : '中州城',
+                    targetCount: 3 + Math.floor(grade / 2),
+                    current: 0,
+                    completed: false,
+                    icon: '🧘'
+                },
+                {
+                    type: 'quiz',
+                    target: '修仙基础知识',
+                    targetCount: 3 + grade,
+                    current: 0,
+                    completed: false,
+                    icon: '📚'
+                }
+            ];
+        }
+
+        // ===== showSpiritRootAwakeningUI =====
+        function showSpiritRootAwakeningUI() {
+            const sr = gameState.spiritRoot;
+            const sra = gameState.spiritRootAwakening;
+            const qualityData = SPIRIT_ROOT_QUALITIES[sr.quality];
+            const nextQuality = SPIRIT_ROOT_AWAKENING_MAP[sr.quality];
+
+            if (!nextQuality) {
+                showToast('灵根已达最高品质，无需觉醒');
+                return;
+            }
+
+            let taskHtml = sra.tasks.map((task, i) => {
+                const taskDef = AWAKENING_TASKS[task.type];
+                const progress = `${task.current}/${task.targetCount}`;
+                const doneClass = task.completed ? ' style="color:#4caf50"' : '';
+                return `
+                    <div class="awakening-task" style="margin:8px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px">
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span style="font-size:20px">${task.icon}</span>
+                            <div style="flex:1">
+                                <div${doneClass}>${taskDef.name}：${task.target}</div>
+                                <div style="color:#aaa;font-size:12px">${taskDef.description}</div>
+                            </div>
+                            <div style="color:${task.completed ? '#4caf50' : '#ffd700'}">${progress}</div>
+                        </div>
+                        ${task.completed ? '<div style="color:#4caf50;margin-top:5px">✓ 已完成</div>' : ''}
+                    </div>
+                `;
+            }).join('');
+
+            const html = `
+                <div style="text-align:center;padding:20px">
+                    <div style="font-size:48px;margin-bottom:10px">🌟</div>
+                    <div style="font-size:24px;color:#ffd700;margin-bottom:5px">灵根觉醒</div>
+                    <div style="color:#aaa;margin-bottom:20px">${qualityData.icon} ${sr.quality} → ${nextQuality}</div>
+                    <div style="background:linear-gradient(90deg,#1a1a2e 0%,#16213e 100%);padding:15px;border-radius:12px;margin-bottom:20px">
+                        <div style="color:#ffd700;font-size:14px;margin-bottom:5px">觉醒进度</div>
+                        <div style="font-size:12px;color:#aaa">完成全部任务后可进行觉醒试炼</div>
+                    </div>
+                    <div style="text-align:left;margin-bottom:20px">
+                        ${taskHtml}
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:center">
+                        <button onclick="closeModal('modalNormal')" style="padding:10px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">稍后</button>
+                        <button onclick="showAwakeningHelp()" style="padding:10px 20px;background:#2196f3;color:#fff;border:none;border-radius:6px;cursor:pointer">获取帮助</button>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = html;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        // ===== showAwakeningHelp =====
+        function showAwakeningHelp() {
+            const sra = gameState.spiritRootAwakening;
+            const helpText = `
+                <div style="padding:15px">
+                    <div style="color:#ffd700;font-size:16px;margin-bottom:10px">📖 灵根觉醒帮助</div>
+                    <div style="color:#aaa;font-size:13px;line-height:1.8">
+                        <p><strong>收集任务</strong>：通过探索、奇遇或商店购买收集材料</p>
+                        <p><strong>战斗任务</strong>：在心魔试炼中击败守关者</p>
+                        <p><strong>修炼任务</strong>：在指定区域连续修炼达到天数要求</p>
+                        <p><strong>答题任务</strong>：回答修仙问题，答对计入进度</p>
+                        <p style="margin-top:10px">完成后进入试炼阶段，通过即可觉醒！</p>
+                    </div>
+                    <button onclick="closeModal('modalNormal')" style="margin-top:15px;padding:8px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">知道了</button>
+                </div>
+            `;
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = helpText;
+            }
+        }
+
+        // ===== updateAwakeningTaskProgress =====
+        function updateAwakeningTaskProgress(type, target, amount = 1) {
+            const sra = gameState.spiritRootAwakening;
+            if (sra.status === 'completed' || sra.status === 'dormant') return;
+
+            for (const task of sra.tasks) {
+                if (task.type === type && task.target === target && !task.completed) {
+                    task.current = Math.min(task.targetCount, task.current + amount);
+                    if (task.current >= task.targetCount) {
+                        task.completed = true;
+                        addLog('good', '觉醒任务完成', `${AWAKENING_TASKS[type].name}：${target}`);
+                    }
+                    // 检查是否所有任务完成
+                    if (sra.tasks.every(t => t.completed)) {
+                        // 进入试炼阶段
+                        sra.status = 'stage2';
+                        sra.stage = 2;
+                        showAwakeningTrial();
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ===== showAwakeningTrial =====
+        function showAwakeningTrial() {
+            const sra = gameState.spiritRootAwakening;
+
+            const html = `
+                <div style="text-align:center;padding:20px">
+                    <div style="font-size:48px;margin-bottom:10px">⚡</div>
+                    <div style="font-size:24px;color:#e91e63;margin-bottom:15px">觉醒试炼</div>
+                    <div style="color:#aaa;margin-bottom:20px">完成试炼即可突破灵根品质！</div>
+                    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+                        <button onclick="startAwakeningTrial('heart_demon')" style="padding:12px;background:linear-gradient(135deg,#9c27b0,#673ab7);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">
+                            👹 心魔试炼（战斗类）
+                        </button>
+                        <button onclick="startAwakeningTrial('celestial_thunder')" style="padding:12px;background:linear-gradient(135deg,#3f51b5,#2196f3);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">
+                            ⚡ 天雷试炼（反应类）
+                        </button>
+                        <button onclick="startAwakeningTrial('enlightenment')" style="padding:12px;background:linear-gradient(135deg,#00695c,#009688);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">
+                            💫 悟道试炼（答题类）
+                        </button>
+                    </div>
+                    <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">取消</button>
+                </div>
+            `;
+
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = html;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        // ===== startAwakeningTrial =====
+        function startAwakeningTrial(trialType) {
+            const sra = gameState.spiritRootAwakening;
+            sra.trialType = trialType;
+            sra.trialProgress = 0;
+            sra.attempts = (sra.attempts || 0) + 1;
+
+            if (trialType === 'heart_demon') {
+                // 心魔试炼 - 简化为直接判定
+                const chance = 0.5 + (gameState.spiritRoot.resonance / 20);
+                if (Math.random() < chance) {
+                    completeAwakeningTrial(true);
+                } else {
+                    failAwakeningTrial('心魔反噬');
+                }
+            } else if (trialType === 'celestial_thunder') {
+                // 天雷试炼 - 简化为直接判定
+                const chance = 0.4 + (gameState.mindset / 200);
+                if (Math.random() < chance) {
+                    completeAwakeningTrial(true);
+                } else {
+                    failAwakeningTrial('天雷过猛');
+                }
+            } else if (trialType === 'enlightenment') {
+                // 悟道试炼 - 简化为直接判定
+                const chance = 0.6 + (gameState.spiritRoot.resonance / 15);
+                if (Math.random() < chance) {
+                    completeAwakeningTrial(true);
+                } else {
+                    failAwakeningTrial('悟道不足');
+                }
+            }
+        }
+
+        // ===== completeAwakeningTrial =====
+        function completeAwakeningTrial(success) {
+            const sr = gameState.spiritRoot;
+            const sra = gameState.spiritRootAwakening;
+            const nextQuality = SPIRIT_ROOT_AWAKENING_MAP[sr.quality];
+
+            if (!nextQuality) {
+                showToast('灵根已达最高品质');
+                return;
+            }
+
+            // 提升灵根品质
+            sr.quality = nextQuality;
+            sr.awakenedQuality = nextQuality;
+            sr.hasAwakened = true;
+
+            // 应用觉醒奖励
+            sra.status = 'completed';
+            sra.stage = 3;
+            sra.rewards = {
+                speedBonus: 0.2,
+                bottleneckBonus: 0.15,
+                tribulationBonus: 0.1
+            };
+
+            // 更新属性加成
+            applySpiritRootAwakeningBonus();
+
+            // 显示成功界面
+            const html = `
+                <div style="text-align:center;padding:30px">
+                    <div style="font-size:64px;margin-bottom:15px">🌟✨🌟</div>
+                    <div style="font-size:28px;color:#ffd700;margin-bottom:10px">灵根觉醒成功！</div>
+                    <div style="color:#aaa;margin-bottom:20px">品质提升至 ${nextQuality}</div>
+                    <div style="background:rgba(255,215,0,0.1);padding:15px;border-radius:12px;margin-bottom:20px">
+                        <div style="color:#4caf50">🎁 觉醒奖励</div>
+                        <div style="color:#fff;margin-top:8px">修炼速度 +20%</div>
+                        <div style="color:#fff">突破瓶颈加成 +15%</div>
+                        <div style="color:#fff">渡劫成功率 +10%</div>
+                    </div>
+                    <button onclick="closeModal('modalNormal');updateDisplay();" style="padding:12px 30px;background:#ffd700;color:#000;border:none;border-radius:8px;cursor:pointer;font-size:16px">确定</button>
+                </div>
+            `;
+
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = html;
+            }
+
+            addLog('good', '灵根觉醒', `灵根品质提升至 ${nextQuality}！`);
+        }
+
+        // ===== failAwakeningTrial =====
+        function failAwakeningTrial(reason) {
+            const sra = gameState.spiritRootAwakening;
+
+            const html = `
+                <div style="text-align:center;padding:30px">
+                    <div style="font-size:48px;margin-bottom:15px">💔</div>
+                    <div style="font-size:22px;color:#f44336;margin-bottom:10px">觉醒失败</div>
+                    <div style="color:#aaa;margin-bottom:20px">${reason}</div>
+                    <div style="background:rgba(255,0,0,0.1);padding:15px;border-radius:8px;margin-bottom:20px">
+                        <div style="color:#ffa500">可重新尝试试炼（已有 ${sra.attempts} 次尝试）</div>
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:center">
+                        <button onclick="sra.status='stage1';sra.tasks.forEach(t=>t.completed=false);sra.tasks.forEach(t=>t.current=0);generateAwakeningTasks();closeModal('modalNormal');showSpiritRootAwakeningUI();" style="padding:10px 20px;background:#2196f3;color:#fff;border:none;border-radius:6px;cursor:pointer">重置任务</button>
+                        <button onclick="closeModal('modalNormal')" style="padding:10px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">稍后</button>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = html;
+            }
+        }
+
+        // ===== applySpiritRootAwakeningBonus =====
+        function applySpiritRootAwakeningBonus() {
+            const sra = gameState.spiritRootAwakening;
+            if (!sra.rewards) return;
+
+            // 增强修炼速度
+            if (!gameState.activeEffects.spirit_root_awakening_speed) {
+                gameState.activeEffects.spirit_root_awakening_speed = sra.rewards.speedBonus;
+            } else {
+                gameState.activeEffects.spirit_root_awakening_speed += sra.rewards.speedBonus * 0.5;
+            }
+        }
+
+        // ===== triggerSpiritRootAwakeningFromItem =====
+        function triggerSpiritRootAwakeningFromItem() {
+            const sr = gameState.spiritRoot;
+            const sra = gameState.spiritRootAwakening;
+
+            if (sra.status !== 'dormant') {
+                showToast('灵根正在觉醒中');
+                return;
+            }
+
+            const nextQuality = SPIRIT_ROOT_AWAKENING_MAP[sr.quality];
+            if (!nextQuality) {
+                showToast('灵根已达最高品质');
+                return;
+            }
+
+            triggerSpiritRootAwakening();
         }
 

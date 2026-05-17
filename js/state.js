@@ -115,7 +115,20 @@
                 quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
                 affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
                 resonance: 0,
-                lastRefreshDay: 0
+                lastRefreshDay: 0,
+                awakeningAvailable: false, // V32 是否可以觉醒
+                hasAwakened: false,          // V32 是否已完成觉醒
+                awakenedQuality: null        // V32 觉醒后的品质
+            },
+            // V32 灵根觉醒系统
+            spiritRootAwakening: {
+                status: 'dormant',   // dormant | stage1 | stage2 | stage3 | completed
+                stage: 0,
+                triggerDay: 0,
+                tasks: [],           // [{type, target, current, completed}]
+                rewards: null,
+                lastEventDay: 0,
+                attempts: 0
             },
             constitutions: [], // 已获得的体质
             // V8 丹药炼器系统字段

@@ -128,7 +128,22 @@
                     serendipityBoostEndDay: 0
                 },
                 // V7 灵根/体质系统
-                spiritRoot: generateRandomSpiritRoot(),
+                spiritRoot: {
+                    ...generateRandomSpiritRoot(),
+                    awakeningAvailable: false,
+                    hasAwakened: false,
+                    awakenedQuality: null
+                },
+                // V32 灵根觉醒系统
+                spiritRootAwakening: {
+                    status: 'dormant',
+                    stage: 0,
+                    triggerDay: 0,
+                    tasks: [],
+                    rewards: null,
+                    lastEventDay: 0,
+                    attempts: 0
+                },
                 constitutions: [],
                 // V8 丹药炼器系统
                 crafting: {
@@ -264,7 +279,22 @@
                         serendipityBoostEndDay: 0
                     },
                     // V7 灵根/体质系统
-                    spiritRoot: loaded.spiritRoot || generateRandomSpiritRoot(),
+                    spiritRoot: loaded.spiritRoot ? {
+                        ...loaded.spiritRoot,
+                        awakeningAvailable: loaded.spiritRoot.awakeningAvailable || false,
+                        hasAwakened: loaded.spiritRoot.hasAwakened || false,
+                        awakenedQuality: loaded.spiritRoot.awakenedQuality || null
+                    } : { ...generateRandomSpiritRoot(), awakeningAvailable: false, hasAwakened: false, awakenedQuality: null },
+                    // V32 灵根觉醒系统
+                    spiritRootAwakening: loaded.spiritRootAwakening || {
+                        status: 'dormant',
+                        stage: 0,
+                        triggerDay: 0,
+                        tasks: [],
+                        rewards: null,
+                        lastEventDay: 0,
+                        attempts: 0
+                    },
                     constitutions: loaded.constitutions || [],
                     // V8 丹药炼器系统
                     crafting: loaded.crafting || {
