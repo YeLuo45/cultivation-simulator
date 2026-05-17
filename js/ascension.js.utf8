@@ -1,0 +1,6 @@
+// Auto-generated module: ascension.js
+'use strict';
+
+// ===== ASCENSION_COSTS =====
+const ASCENSION_COSTS = {
+    spiritStones: 500000,  // 50ä¸‡ç

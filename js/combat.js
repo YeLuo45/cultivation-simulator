@@ -1033,24 +1033,269 @@
         }
 
         // ===== executeOpponentTurn =====
+
+        // ===== V33 战斗AI学习系统 =====
+
+        // AI工具注册表（类似ruflo hooks模式）
+        const COMBAT_AI_TOOLS = {
+            // 攻击工具
+            heavyAttack: {
+                name: '重击',
+                weight: 1.0,
+                trigger: 'player_defending',
+                description: '对防御中的玩家造成更多伤害'
+            },
+            quickAttack: {
+                name: '快攻',
+                weight: 1.0,
+                trigger: 'player_low_hp',
+                description: '玩家血量低时快速结束战斗'
+            },
+            spellAttack: {
+                name: '技法攻击',
+                weight: 1.0,
+                trigger: 'player_spell_cooldown',
+                description: '趁玩家技能冷却时攻击'
+            },
+            ultimateSkill: {
+                name: '大招',
+                weight: 0.5,
+                trigger: 'energy_full',
+                description: '能量充足时释放大招'
+            },
+            // 防守工具
+            heal: {
+                name: '使用丹药',
+                weight: 1.0,
+                trigger: 'hp_below_50',
+                description: '血量低于50%时使用丹药'
+            },
+            defend: {
+                name: '防御',
+                weight: 1.0,
+                trigger: 'player_high_aggression',
+                description: '玩家进攻强烈时防御'
+            },
+            counter: {
+                name: '反击',
+                weight: 1.0,
+                trigger: 'player_attack_pattern',
+                description: '识破玩家攻击规律后反击'
+            },
+            // 破防工具
+            techniqueBreak: {
+                name: '破功',
+                weight: 1.0,
+                trigger: 'player_technique_active',
+                description: '破除玩家功法加成'
+            },
+            armorBreak: {
+                name: '破甲',
+                weight: 1.2,
+                trigger: 'player_defense_high',
+                description: '针对高防御玩家'
+            }
+        };
+
+        // ===== recordPlayerAction =====
+        function recordPlayerAction(actionType, detail = {}) {
+            if (!gameState.combatProfile) return;
+            
+            const profile = gameState.combatProfile;
+            profile.totalBattles++;
+            profile.lastCombatDay = gameState.days;
+            
+            // 记录行动模式
+            const existing = profile.playerPatterns.find(p => p.action === actionType);
+            if (existing) {
+                existing.count++;
+                existing.lastUsed = gameState.days;
+            } else {
+                profile.playerPatterns.push({
+                    action: actionType,
+                    count: 1,
+                    lastUsed: gameState.days,
+                    detail: detail
+                });
+            }
+            
+            // 记录特殊模式
+            if (actionType === 'defend') {
+                profile.defenseFrequency = (profile.defenseFrequency * (profile.totalBattles - 1) + 1) / profile.totalBattles;
+            }
+            if (actionType === 'ultimate') {
+                profile.attackTiming.push('ultimate');
+            }
+            if (actionType === 'attack' && detail.weaponType) {
+                profile.preferredDistance = detail.weaponType;
+            }
+        }
+
+        // ===== analyzePlayerProfile =====
+        function analyzePlayerProfile() {
+            const profile = gameState.combatProfile;
+            if (!profile || profile.totalBattles < 3) return null;
+            
+            // 计算各模式占比
+            const total = profile.playerPatterns.reduce((sum, p) => sum + p.count, 0);
+            const patterns = profile.playerPatterns.map(p => ({
+                ...p,
+                ratio: p.count / total
+            }));
+            
+            // 判断玩家风格
+            const defenseRatio = profile.defenseFrequency;
+            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
+            
+            let style = 'balanced';
+            if (defenseRatio > 0.6) style = 'defensive';
+            else if (defenseRatio < 0.2 && ultimateCount > profile.totalBattles * 0.4) style = 'aggressive';
+            
+            // 检测弱点
+            const weaknesses = [];
+            const attackPatterns = patterns.filter(p => p.action === 'attack');
+            if (attackPatterns.length > 0) {
+                // 玩家经常使用某种攻击
+                const commonAttack = attackPatterns.reduce((a, b) => a.count > b.count ? a : b);
+                if (commonAttack.ratio > 0.4) {
+                    weaknesses.push('attack_predictable'); // 攻击可预测
+                }
+            }
+            
+            return {
+                style: style,
+                patterns: patterns,
+                weaknesses: weaknesses,
+                defenseRatio: defenseRatio,
+                spellUsageRate: profile.spellUsageRate
+            };
+        }
+
+        // ===== getAdjustedToolWeights =====
+        function getAdjustedToolWeights() {
+            const profile = gameState.combatProfile;
+            const analysis = analyzePlayerProfile();
+            
+            // 复制基础权重
+            const weights = {};
+            for (const tool in COMBAT_AI_TOOLS) {
+                weights[tool] = COMBAT_AI_TOOLS[tool].weight;
+            }
+            
+            if (!analysis) return weights;
+            
+            // 根据玩家风格调整权重
+            if (analysis.defenseRatio > 0.5) {
+                // 玩家爱防御 → 提高破防工具权重
+                weights.heavyAttack *= 1.4;
+                weights.armorBreak *= 1.3;
+                weights.techniqueBreak *= 1.2;
+            }
+            
+            if (analysis.weaknesses.includes('attack_predictable')) {
+                // 玩家攻击可预测 → 提高反击权重
+                weights.counter *= 1.5;
+                weights.defend *= 0.7; // 少防御，多等反击机会
+            }
+            
+            // 检查玩家使用大招的时机
+            const ultimateCount = profile.attackTiming.filter(t => t === 'ultimate').length;
+            if (ultimateCount > profile.totalBattles * 0.3) {
+                // 玩家爱用大招 → 提高打断能力
+                weights.techniqueBreak *= 1.3;
+            }
+            
+            return weights;
+        }
+
+        // ===== selectBestAI tool =====
+        function selectBestAITool(opponentHp, playerHp, playerDefending, playerEffects) {
+            const weights = getAdjustedToolWeights();
+            const tools = Object.keys(weights);
+            
+            // 计算每个工具的适用度
+            const scores = tools.map(tool => {
+                let score = weights[tool];
+                const toolDef = COMBAT_AI_TOOLS[tool];
+                
+                // 根据触发条件调整
+                if (toolDef.trigger === 'player_defending' && playerDefending) {
+                    score *= 2;
+                }
+                if (toolDef.trigger === 'hp_below_50' && opponentHp < opponent.maxHP * 0.5) {
+                    score *= 1.8;
+                }
+                if (toolDef.trigger === 'player_high_aggression' && playerEffects.attacking) {
+                    score *= 1.5;
+                }
+                if (toolDef.trigger === 'energy_full' && combatEnergy >= 80) {
+                    score *= 1.3;
+                }
+                
+                return { tool, score, name: toolDef.name };
+            });
+            
+            // 按分数排序
+            scores.sort((a, b) => b.score - a.score);
+            
+            return scores[0];
+        }
+
+        // ===== executeOpponentTurn with AI Learning =====
+        const originalExecuteOpponentTurn = executeOpponentTurn;
         function executeOpponentTurn() {
             if (!combatState.inProgress || combatState.opponent.hp <= 0) return;
-
+            
             combatState.round++;
             const p = combatState.player;
             const o = combatState.opponent;
             const effects = combatState.effects.opponent;
-
+            
+            // 显示AI思考状态
+            showAIThinking();
+            
             // 清除防御状态
             effects.defending = false;
-
-            // 对手AI：随机选择行动
-            const rand = Math.random();
-            let action = 'attack';
-            if (rand < 0.1 && getItemCount('回春丹') > 0 && o.hp < o.maxHP * 0.5) {
-                action = 'heal';
+            
+            // V33: AI工具选择（基于玩家画像）
+            const aiDecision = selectBestAITool(o.hp, p.hp, p.defending, p.effects || {});
+            
+            // 记录玩家行动（事后学习）
+            if (combatState.turn === 'player') {
+                // 玩家刚行动过，记录该行动
+                const lastAction = combatState.log[combatState.log.length - 1];
+                if (lastAction && lastAction.type === 'player-action') {
+                    if (lastAction.actionType === 'attack') {
+                        recordPlayerAction('attack', { damage: lastAction.damage });
+                    } else if (lastAction.actionType === 'defend') {
+                        recordPlayerAction('defend');
+                    } else if (lastAction.actionType === 'ultimate') {
+                        recordPlayerAction('ultimate');
+                    }
+                }
             }
-
+            
+            // 根据AI决策选择行动
+            let action = 'attack';
+            let actionDetail = '';
+            
+            if (aiDecision && aiDecision.tool === 'heal') {
+                action = 'heal';
+                actionDetail = '使用丹药';
+            } else if (aiDecision && aiDecision.tool === 'defend') {
+                action = 'defend';
+                actionDetail = '防御';
+            } else if (aiDecision && aiDecision.tool === 'counter') {
+                action = 'counter';
+                actionDetail = '反击';
+            }
+            
+            // 如果hp低且有回春丹，优先治疗
+            if (o.hp < o.maxHP * 0.4 && getItemCount('回春丹') > 0 && Math.random() < 0.6) {
+                action = 'heal';
+                actionDetail = '紧急治疗';
+            }
+            
             if (action === 'heal') {
                 // 使用回春丹
                 const idx = gameState.inventory.findIndex(i => i.name === '回春丹');
@@ -1065,15 +1310,30 @@
                 combatState.log.push({
                     type: 'opponent-action',
                     actionType: 'heal',
-                    text: `${o.name}使用了回春丹，恢复${heal}生命`,
+                    text: `${o.name}使用了回春丹，恢复${heal}生命 (AI分析:${aiDecision?.name || '攻击'})`,
                     round: combatState.round
                 });
-            } else {
-                // 攻击
+            } else if (action === 'defend') {
+                effects.defending = true;
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'defend',
+                    text: `${o.name}进入防御姿态 (AI识破玩家进攻模式)`,
+                    round: combatState.round
+                });
+            } else if (action === 'counter') {
+                // 反击 - 先记录，等玩家攻击后触发
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'counter_setup',
+                    text: `${o.name}识破玩家攻击规律，准备反击`,
+                    round: combatState.round
+                });
+                // 直接攻击，但标记为反击
                 let baseDamage = o.attack;
+                baseDamage = Math.floor(baseDamage * 1.3); // 反击加成
                 baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
-
-                // 功法相克
+                
                 let techniqueMultiplier = 1;
                 if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
                     techniqueMultiplier = 1.5;
@@ -1081,23 +1341,50 @@
                     techniqueMultiplier = 0.7;
                 }
                 baseDamage = Math.floor(baseDamage * techniqueMultiplier);
-
-                // 玩家防御减伤
+                
+                let finalDamage = baseDamage;
+                if (combatState.effects.player.defending) {
+                    finalDamage = Math.floor(baseDamage * 0.5);
+                }
+                finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * 0.5));
+                
+                p.hp = Math.max(0, p.hp - finalDamage);
+                combatState.effects.player.defending = false;
+                
+                const techniqueColor = TECHNIQUE_COLORS[o.technique];
+                combatState.log.push({
+                    type: 'opponent-action',
+                    actionType: 'damage',
+                    text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害（反击）`,
+                    round: combatState.round
+                });
+            } else {
+                // 普通攻击
+                let baseDamage = o.attack;
+                baseDamage = Math.floor(baseDamage * (1 + effects.attackBoost));
+                
+                let techniqueMultiplier = 1;
+                if (TECHNIQUE_BONUS[o.technique].beats === p.technique) {
+                    techniqueMultiplier = 1.5;
+                } else if (TECHNIQUE_BONUS[o.technique].losesTo === p.technique) {
+                    techniqueMultiplier = 0.7;
+                }
+                baseDamage = Math.floor(baseDamage * techniqueMultiplier);
+                
                 let finalDamage = baseDamage;
                 if (combatState.effects.player.defending) {
                     finalDamage = Math.floor(baseDamage * 0.5);
                 }
                 finalDamage = Math.max(1, finalDamage - Math.floor(p.defense * (1 + combatState.effects.player.defenseBoost)));
-
-                // 暴击
+                
                 const isCrit = Math.random() < o.critRate;
                 if (isCrit) {
                     finalDamage = Math.floor(finalDamage * 1.5);
                 }
-
+                
                 p.hp = Math.max(0, p.hp - finalDamage);
                 combatState.effects.player.defending = false;
-
+                
                 const techniqueColor = TECHNIQUE_COLORS[o.technique];
                 combatState.log.push({
                     type: 'opponent-action',
@@ -1105,36 +1392,85 @@
                     text: `${o.name}施展<span style="color:${techniqueColor}">${o.technique}</span>，造成 <span style="color:#ff6666">${finalDamage}</span> 点伤害${isCrit ? '（暴击）' : ''}`,
                     round: combatState.round
                 });
-
-                // ========== A5 防御反击系统 ==========
-                // 反击逻辑：受到攻击时检查反击能量
-                if (combatState.player.counterEnergy >= 50 && !combatState.player.inDefenseStance) {
-                    const weaponData = combatState.player.weaponData || { name: '空手', star: 1 };
-                    const starMultiplier = ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1;
-                    const baseWeaponDamage = 50; // 基础反击伤害基数
-                    let counterDamage = Math.floor(baseWeaponDamage * p.attack * starMultiplier * 0.01); // 0.01为反击系数
-
-                    // 玄武甲套装效果：反击伤害+50%，额外恢复HP
-                    if (combatState.player.skills && combatState.player.skills.includes('玄武反击')) {
-                        counterDamage = Math.floor(counterDamage * 1.5);
-                        const healAmount = Math.floor(counterDamage * 0.15);
-                        combatState.player.hp = Math.min(combatState.player.maxHP, combatState.player.hp + healAmount);
-                        combatState.log.push({ type: 'system', text: `🐢 玄武反击！伤害+50%并恢复 ${healAmount} HP！`, round: combatState.round });
-                    }
-
-                    combatState.opponent.hp = Math.max(1, combatState.opponent.hp - counterDamage);
-                    combatState.player.counterEnergy -= 50;
-                    combatState.log.push({ type: 'player-action', text: `⚡ 反击！对敌人造成 ${counterDamage} 点伤害！（-${50}反击能量）`, round: combatState.round });
-                }
             }
-
-            renderCombatArena();
-
+            
+            // 检查玩家是否死亡
             if (p.hp <= 0) {
                 setTimeout(() => endCombat('lose'), 500);
             } else {
                 combatState.turn = 'player';
                 renderCombatArena();
+            }
+        }
+
+        // ===== showAIThinking =====
+        function showAIThinking() {
+            const analysis = analyzePlayerProfile();
+            if (!analysis) return;
+            
+            // 在对手血条附近显示AI状态
+            const aiStatusEl = document.getElementById('aiThinkingStatus');
+            if (aiStatusEl) {
+                let statusText = '';
+                if (analysis.style === 'defensive') {
+                    statusText = '📊 分析中: 玩家偏防守，启用破防策略...';
+                } else if (analysis.style === 'aggressive') {
+                    statusText = '📊 分析中: 玩家进攻猛烈，等待反击时机...';
+                } else {
+                    statusText = '📊 分析中: 玩家风格均衡，保持平衡策略...';
+                }
+                aiStatusEl.textContent = statusText;
+                aiStatusEl.style.display = 'block';
+                
+                // 3秒后隐藏
+                setTimeout(() => {
+                    if (aiStatusEl) aiStatusEl.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // ===== learnFromCombat =====
+        function learnFromCombat(result) {
+            const profile = gameState.combatProfile;
+            if (!profile) return;
+            
+            if (result === 'win') {
+                profile.winsAgainst++;
+            }
+            
+            // 战后分析
+            const analysis = analyzePlayerProfile();
+            if (analysis) {
+                // 显示学习报告
+                setTimeout(() => {
+                    showLearningReport(analysis);
+                }, 1000);
+            }
+        }
+
+        // ===== showLearningReport =====
+        function showLearningReport(analysis) {
+            const report = `
+                <div style="padding:20px;text-align:center">
+                    <div style="font-size:24px;color:#2196f3;margin-bottom:15px">🧠 AI对战报告</div>
+                    <div style="background:rgba(33,150,243,0.1);padding:15px;border-radius:8px;text-align:left;margin-bottom:15px">
+                        <div style="color:#ffd700">📈 观察到的玩家风格:</div>
+                        <div style="color:#fff;margin-top:8px">战斗风格: <span style="color:${
+                            analysis.style === 'defensive' ? '#4caf50' : 
+                            analysis.style === 'aggressive' ? '#f44336' : '#2196f3'
+                        }">${analysis.style === 'defensive' ? '防守型' : analysis.style === 'aggressive' ? '进攻型' : '平衡型'}</span></div>
+                        <div style="color:#fff">防御频率: ${(analysis.defenseRatio * 100).toFixed(0)}%</div>
+                        <div style="color:#fff">弱点检测: ${analysis.weaknesses.length > 0 ? '攻击可预测' : '无明显弱点'}</div>
+                    </div>
+                    <div style="color:#aaa;font-size:12px">AI已根据您的风格调整策略</div>
+                    <button onclick="closeModal('modalNormal')" style="margin-top:15px;padding:8px 20px;background:#444;color:#fff;border:none;border-radius:6px;cursor:pointer">确定</button>
+                </div>
+            `;
+            
+            const modal = document.getElementById('modalNormal');
+            if (modal) {
+                modal.innerHTML = report;
+                modal.classList.remove('hidden');
             }
         }
 
@@ -1214,6 +1550,9 @@
             if (gameState.combat.battleHistory.length > 50) {
                 gameState.combat.battleHistory.pop();
             }
+
+            // V33: 触发AI学习
+            learnFromCombat(result);
 
             saveGame();
             renderCombatArena();

@@ -194,7 +194,20 @@
                 player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
                 opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
             },
-            battleRecord: []
+            battleRecord: [],
+            // V33 战斗AI学习系统
+            combatProfile: {
+                playerPatterns: [],     // [{action, count, lastUsed}]
+                totalBattles: 0,
+                winsAgainst: 0,
+                currentEnemy: null,
+                learningData: {},       // {enemyId: {adaptationLevel, observedPatterns}}
+                preferredDistance: null,
+                spellUsageRate: 0,
+                defenseFrequency: 0,
+                attackTiming: []
+            },
+            lastCombatDay: 0           // V33 上次战斗天数（用于触发学习）
         };
 
         // --- secretRealmState (7391-7398) ---

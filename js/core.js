@@ -22,11 +22,6 @@
             document.getElementById('eventModal').classList.add('active');
         }
 
-        // ===== closeModal =====
-        function closeModal() {
-            document.getElementById('eventModal').classList.remove('active');
-        }
-
         // ===== manualSave =====
         function manualSave() {
             showSaveLoadModal();

@@ -237,6 +237,19 @@
                         injured: false,
                         injuryEndDay: 0
                     },
+                    // V33 战斗AI学习系统
+                    combatProfile: loaded.combatProfile || {
+                        playerPatterns: [],
+                        totalBattles: 0,
+                        winsAgainst: 0,
+                        currentEnemy: null,
+                        learningData: {},
+                        preferredDistance: null,
+                        spellUsageRate: 0,
+                        defenseFrequency: 0,
+                        attackTiming: []
+                    },
+                    lastCombatDay: loaded.lastCombatDay || 0,
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
