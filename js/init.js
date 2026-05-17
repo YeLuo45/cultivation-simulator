@@ -104,6 +104,14 @@
                         leaderComment: '',
                         buffApplied: false,
                         submitDay: 0
+                    },
+                    // V31 天道轮回系统
+                    celestialCycle: {
+                        day: 0,
+                        completed: false,
+                        lastResult: null,
+                        blessingActive: false,
+                        cycleInterval: 3
                     }
                 },
                 // V6 奇遇系统字段
@@ -222,6 +230,9 @@
                         tribulationRequest: loaded.sect.tribulationRequest || {
                             status: 'none', elderScore: 0, elderComment: '',
                             leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
+                        },
+                        celestialCycle: loaded.sect.celestialCycle || {
+                            day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
                         }
                     } : {
                         name: null,

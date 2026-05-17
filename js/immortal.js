@@ -285,6 +285,232 @@ function showImmortalMap() {
     openModal('仙界地图', html, '');
 }
 
+// ===== getImmortalDailyIncome =====
+function getImmortalDailyIncome() {
+    if (gameState.currentRealm !== 'immortal') return { qi: 0, stones: 0 };
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const baseQi = realmData.cultivationBase * 0.1;
+    const regionBonus = (regionData.dangerLevel || 1) * 0.05;
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.2 : 0;
+    return {
+        qi: Math.floor(baseQi * (1 + regionBonus + blessingBonus)),
+        stones: Math.floor((regionData.dangerLevel || 1) * 10 * Math.random())
+    };
+}
+
+// ===== processCelestialCycle =====
+function processCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const cc = gameState.celestialCycle;
+    const interval = cc.cycleInterval || 3;
+    
+    // 每日仙界修炼结算（自动主路径）
+    const income = getImmortalDailyIncome();
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const progressGain = Math.floor(income.qi * spiritRootBonus);
+    
+    // 更新修炼进度
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+        gameState.immortal.spiritStones += income.stones;
+        
+        // 检查境界突破
+        const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+        if (realmData && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
+            const nextRealm = gameState.immortal.realm + 1;
+            if (nextRealm <= 5) {
+                gameState.immortal.realm = nextRealm;
+                gameState.immortal.cultivationProgress = 0;
+                addLog('good', '境界突破', `天道轮回中，突破至${IMMORTAL_REALMS[nextRealm].name}！`);
+            }
+        }
+    }
+    
+    // 天道轮回日结算
+    cc.day++;
+    if (cc.day >= interval && !cc.completed) {
+        executeCelestialCycle();
+        cc.day = 0;
+        cc.completed = true;
+    }
+    
+    // 新周期开始
+    if (cc.day === 0) {
+        cc.completed = false;
+    }
+}
+
+// ===== executeCelestialCycle =====
+function executeCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    
+    // 主路径：修炼结算
+    let resultText = `【天道轮回·第${gameState.days}天】\n`;
+    let eventType = 'neutral';
+    let effects = { qi: 0, stones: 0, mindset: 0 };
+    
+    const baseProgress = realmData.cultivationBase;
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const regionBonus = (regionData.dangerLevel || 1) * 0.1;
+    const progressGain = Math.floor(baseProgress * (1 + regionBonus) * spiritRootBonus);
+    
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+    }
+    resultText += `修炼进度 +${progressGain}\n`;
+    effects.qi = progressGain;
+    
+    // 次路径：气运波动触发器
+    const roll = Math.random();
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.15 : 0;
+    
+    if (roll < 0.4 + blessingBonus) {
+        // 正面事件 40%
+        eventType = 'positive';
+        const positiveEvents = [
+            { text: '✨ 顿悟时刻', effect: () => { 
+                if (gameState.immortal) gameState.immortal.cultivationProgress += Math.floor(progressGain * 0.5);
+                effects.qi += Math.floor(progressGain * 0.5);
+                return '修炼进度额外 +50%';
+            }},
+            { text: '🌟 天赐灵物', effect: () => {
+                const stoneGain = Math.floor(500 * Math.random()) + 100;
+                if (gameState.immortal) gameState.immortal.spiritStones += stoneGain;
+                effects.stones = stoneGain;
+                return `获得 ${stoneGain} 灵石`;
+            }},
+            { text: '☁️ 祥瑞降临', effect: () => {
+                effects.mindset = 10;
+                return '心态 +10';
+            }}
+        ];
+        const event = positiveEvents[Math.floor(Math.random() * positiveEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else if (roll < 0.7 + blessingBonus) {
+        // 负面事件 30%
+        eventType = 'negative';
+        const negativeEvents = [
+            { text: '👹 心魔入侵', effect: () => {
+                effects.mindset = -20;
+                return '心态 -20，修炼受阻';
+            }},
+            { text: '⚡ 天道压制', effect: () => {
+                effects.qi = -Math.floor(progressGain * 0.3);
+                if (gameState.immortal) gameState.immortal.cultivationProgress -= Math.floor(progressGain * 0.3);
+                return '当日修炼效率 -30%';
+            }},
+            { text: '💔 灵气紊乱', effect: () => {
+                const stoneLoss = Math.floor((gameState.immortal?.spiritStones || 0) * 0.05);
+                if (gameState.immortal && stoneLoss > 0) gameState.immortal.spiritStones -= stoneLoss;
+                effects.stones = -stoneLoss;
+                return `损失 ${stoneLoss} 灵石`;
+            }}
+        ];
+        const event = negativeEvents[Math.floor(Math.random() * negativeEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else {
+        // 中性事件 30%
+        eventType = 'neutral';
+        const neutralEvents = [
+            { text: '🧙 仙人指路', effect: () => {
+                return '天道启示：继续保持当前修炼节奏';
+            }},
+            { text: '🔮 奇遇发现', effect: () => {
+                // 解锁新区域线索
+                return '隐约感知到未知区域的召唤';
+            }},
+            { text: '⏳ 平静期', effect: () => {
+                return '天道运行平稳，无特殊事件';
+            }}
+        ];
+        const event = neutralEvents[Math.floor(Math.random() * neutralEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+    }
+    
+    // 清除祈福状态
+    gameState.celestialCycle.blessingActive = false;
+    
+    // 保存结果
+    const result = { type: eventType, text: resultText, effects: effects, day: gameState.days };
+    gameState.celestialCycle.lastResult = result;
+    
+    showCelestialCycleResult(result);
+    
+    addLog(eventType === 'positive' ? 'good' : eventType === 'negative' ? 'bad' : 'normal', 
+           '天道轮回', resultText.replace(/\n/g, ' '));
+}
+
+// ===== showCelestialCycleResult =====
+function showCelestialCycleResult(result) {
+    const icon = result.type === 'positive' ? '🌟' : result.type === 'negative' ? '💥' : '🔮';
+    const color = result.type === 'positive' ? '#4caf50' : result.type === 'negative' ? '#f44336' : '#2196f3';
+    
+    const modal = document.getElementById('modalNormal');
+    if (!modal) return;
+    
+    let effectsText = '';
+    if (result.effects.qi !== 0) effectsText += ` 灵气 ${result.effects.qi > 0 ? '+' : ''}${result.effects.qi}`;
+    if (result.effects.stones !== 0) effectsText += ` 灵石 ${result.effects.stones > 0 ? '+' : ''}${result.effects.stones}`;
+    if (result.effects.mindset !== 0) effectsText += ` 心态 ${result.effects.mindset > 0 ? '+' : ''}${result.effects.mindset}`;
+    
+    modal.innerHTML = `
+        <div class="result-title" style="color:${color}">${icon} 天道轮回结算 ${icon}</div>
+        <div style="margin:15px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;text-align:left">
+            ${result.text.replace(/\n/g, '<br/>')}
+        </div>
+        <div style="color:#aaa;font-size:12px">${effectsText}</div>
+        <div style="margin-top:15px">
+            <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">确定</button>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+}
+
+// ===== requestExtraCycle =====
+function requestExtraCycle() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能请求天道轮回');
+        return;
+    }
+    const cost = 100;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石请求额外轮回`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.day = gameState.celestialCycle.cycleInterval || 3;
+    showToast(`消耗 ${cost} 灵石，请求天道轮回`);
+    addLog('normal', '主动干预', `消耗 ${cost} 灵石请求额外天道轮回`);
+}
+
+// ===== requestFortuneBlessing =====
+function requestFortuneBlessing() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行气运祈福');
+        return;
+    }
+    const cost = 200;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石进行气运祈福`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.blessingActive = true;
+    showToast(`消耗 ${cost} 灵石，气运祈福生效（下次轮回正面事件概率+15%）`);
+    addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
+}
+
 // ===== renderImmortalUI =====
 function renderImmortalUI() {
     if (gameState.currentRealm !== 'immortal') return;

@@ -78,7 +78,7 @@
                 npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
                 npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
                 npcLastActions: {},        // {uid: {action, day}}
-                // V30 渡劫审批系统
+// V30 渡劫审批系统
                 tribulationRequest: {
                     status: 'none',        // none | pending_elder | pending_leader | approved | rejected
                     elderScore: 0,
@@ -87,7 +87,15 @@
                     leaderComment: '',
                     buffApplied: false,
                     submitDay: 0
-                }
+                },
+                // V31 天道轮回系统
+                celestialCycle: {
+                    day: 0,                // 距离下次轮回的天数
+                    completed: false,      // 本周期是否已完成
+                    lastResult: null,       // 上次轮回结果 {type, text, effects}
+                    blessingActive: false, // 气运祈福是否激活
+                    cycleInterval: 3        // 轮回间隔天数
+                },
             },
             // V6 奇遇系统字段
             serendipity: {

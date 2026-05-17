@@ -368,6 +368,10 @@
                 processNpcTasks();
                 processNpcAutoBehavior();
             }
+            // V31 天道轮回处理（仙界每日自动结算）
+            if (gameState.currentRealm === 'immortal') {
+                processCelestialCycle();
+            }
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
