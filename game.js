@@ -751,7 +751,10 @@
             // V35 宗门互动增强
             sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
             sectMissionCooldown: 0,    // 任务冷却
-            lastMissionRefreshDay: 0   // 上次任务刷新
+            lastMissionRefreshDay: 0,   // 上次任务刷新
+            // V36 装备打造增强
+            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
+            lastForgeDay: 0            // 上次打造时间
         };
 
         // --- secretRealmState (7391-7398) ---
@@ -9920,6 +9923,9 @@ function renderSecretRealmList() {
                     sectMissions: loaded.sectMissions || [],
                     sectMissionCooldown: loaded.sectMissionCooldown || 0,
                     lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
+                    lastForgeDay: loaded.lastForgeDay || 0,
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -11069,6 +11075,82 @@ const EQUIPMENT_BASE_STATS = {
     resist: 15
 };
 
+// ===== EQUIPMENT_AFFIX_TYPES =====
+const EQUIPMENT_AFFIX_TYPES = [
+    { name: 'attack', display: '攻击', min: 5, max: 30, rarity: 'common' },
+    { name: 'defense', display: '防御', min: 5, max: 25, rarity: 'common' },
+    { name: 'hp', display: '生命', min: 20, max: 100, rarity: 'common' },
+    { name: 'crit', display: '暴击', min: 3, max: 15, rarity: 'uncommon' },
+    { name: 'resist', display: '抗性', min: 3, max: 12, rarity: 'uncommon' },
+    { name: 'speed', display: '速度', min: 2, max: 10, rarity: 'uncommon' },
+    { name: 'cultivate_qi_rate', display: '灵气效率', min: 0.05, max: 0.15, rarity: 'rare', isPercent: true },
+    { name: 'breakthrough_boost', display: '突破加成', min: 0.05, max: 0.10, rarity: 'rare', isPercent: true },
+    { name: 'tribulation_damage_reduce', display: '渡劫减伤', min: 0.05, max: 0.15, rarity: 'epic', isPercent: true },
+    { name: 'all_stats', display: '全属性', min: 0.03, max: 0.08, rarity: 'legendary', isPercent: true }
+];
+
+const AFFIX_RARITY_COLORS = {
+    common: '#aaa',
+    uncommon: '#4CAF50',
+    rare: '#2196f3',
+    epic: '#9c27b0',
+    legendary: '#ff9800'
+};
+
+// ===== generateAffix =====
+function generateAffix(quality, tier) {
+    // 根据品质和难度等级筛选可用词条
+    const availableAffixes = EQUIPMENT_AFFIX_TYPES.filter(a => {
+        if (tier === 0) return a.rarity === 'common' || a.rarity === 'uncommon';
+        if (tier === 1) return a.rarity !== 'legendary';
+        return true;  // tier >= 2 所有词条
+    });
+    
+    const affix = availableAffixes[Math.floor(Math.random() * availableAffixes.length)];
+    const value = affix.min + Math.random() * (affix.max - affix.min);
+    
+    return {
+        name: affix.name,
+        display: affix.display,
+        value: affix.isPercent ? parseFloat(value.toFixed(2)) : Math.floor(value),
+        rarity: affix.rarity,
+        isPercent: affix.isPercent || false,
+        icon: affix.isPercent ? '%' : ''
+    };
+}
+
+// ===== calculateEquipScore =====
+function calculateEquipScore(equip) {
+    if (!equip) return 0;
+    let score = 0;
+    
+    // 基础属性评分
+    const statWeights = { attack: 2, defense: 1.5, hp: 0.5, speed: 1, crit: 1.5, resist: 1 };
+    for (const stat in equip.stats) {
+        score += (equip.stats[stat] || 0) * (statWeights[stat] || 1);
+    }
+    
+    // 词条加成评分
+    if (equip.affixes) {
+        equip.affixes.forEach(affix => {
+            const rarityMultiplier = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 5 };
+            score += affix.value * (rarityMultiplier[affix.rarity] || 1);
+        });
+    }
+    
+    // 强化等级加成
+    if (equip.enhancementLevel > 0) {
+        score *= (1 + equip.enhancementLevel * 0.1);
+    }
+    
+    // 精炼等级加成
+    if (equip.refinementLevel > 0) {
+        score *= (1 + equip.refinementLevel * 0.05);
+    }
+    
+    return Math.floor(score);
+}
+
 // ===== generateImmortalEquip =====
 function generateImmortalEquip(slot, quality) {
     const qualityData = IMMORTAL_EQUIP_QUALITIES[quality];
@@ -11083,13 +11165,22 @@ function generateImmortalEquip(slot, quality) {
         icon: slotData.icon,
         stats: {},
         setName: null, // 套装名
-        refinationLevel: 0
+        refinationLevel: 0,  // V36 精炼等级 0-12
+        enhancementLevel: 0,  // V36 强化等级 0-15
+        affixes: []           // V36 随机词条
     };
     
     // 根据品质生成属性
     const multiplier = qualityData.multiplier;
     for (const stat in EQUIPMENT_BASE_STATS) {
         equip.stats[stat] = Math.floor(EQUIPMENT_BASE_STATS[stat] * multiplier * (0.8 + Math.random() * 0.4));
+    }
+    
+    // V36 根据品质生成1-3条随机词条
+    const affixCount = quality + Math.floor(Math.random() * quality);
+    const tier = Math.min(2, Math.floor(quality / 2));
+    for (let i = 0; i < affixCount; i++) {
+        equip.affixes.push(generateAffix(quality, tier));
     }
     
     // 30%概率生成套装
@@ -11099,6 +11190,84 @@ function generateImmortalEquip(slot, quality) {
     }
     
     return equip;
+}
+
+// ===== enhanceEquipment =====
+function enhanceEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.enhancementLevel >= 15) {
+        showToast('已达强化上限+15');
+        return;
+    }
+    
+    const level = equip.enhancementLevel;
+    const baseCost = 500 * Math.pow(1.8, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`强化需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    
+    // 成功率：+1:100%, +5:80%, +10:50%, +15:20%
+    const successRates = [100, 100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30, 25, 20, 15];
+    const successRate = successRates[level + 1] || 20;
+    const roll = Math.random() * 100;
+    
+    if (roll < successRate) {
+        equip.enhancementLevel++;
+        addLog('good', '装备强化', `强化成功！${equip.name}强化到+${equip.enhancementLevel}`);
+        showToast(`强化成功！+${equip.enhancementLevel}`);
+    } else {
+        equip.enhancementLevel = Math.max(0, equip.enhancementLevel - 1);
+        addLog('warn', '装备强化', `强化失败，${equip.name}降为+${equip.enhancementLevel}`);
+        showToast(`强化失败，降为+${equip.enhancementLevel}`);
+    }
+    
+    saveGame();
+    showImmortalEquipPanel();
+}
+
+// ===== refineEquipment =====
+function refineEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.refinementLevel >= 12) {
+        showToast('已达精炼上限+12');
+        return;
+    }
+    
+    const level = equip.refinementLevel;
+    const baseCost = 1000 * Math.pow(2, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`精炼需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    equip.refinementLevel++;
+    
+    // 精炼必定成功（消耗同名装备可以100%成功，这里简化处理）
+    addLog('good', '装备精炼', `精炼成功！${equip.name}精炼到+${equip.refinementLevel}`);
+    showToast(`精炼成功！+${equip.refinementLevel}`);
+    
+    saveGame();
+    showImmortalEquipPanel();
 }
 
 // ===== equipImmortalItem =====
@@ -11302,6 +11471,7 @@ function showEquipSlotDetail(slot) {
     
     const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
     const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+    const score = calculateEquipScore(equip);
     
     let html = '<div style="padding:16px;">';
     html += `<div style="text-align:center;">`;
@@ -11311,16 +11481,60 @@ function showEquipSlotDetail(slot) {
     if (equip.setName) {
         html += `<div style="color:#ffd700;font-size:12px;margin-top:4px;">套装：${equip.setName}</div>`;
     }
+    html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">评分：${score}</div>`;
+    html += '</div>';
+    
+    // V36 强化和精炼等级
+    html += '<div style="display:flex;gap:10px;margin-top:12px;">';
+    if (equip.enhancementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#ff9800;font-size:11px;">强化+${equip.enhancementLevel}</span>`;
+    }
+    if (equip.refinementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#9c27b0;font-size:11px;">精炼+${equip.refinementLevel}</span>`;
+    }
     html += '</div>';
     
     html += '<div style="margin-top:16px;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">属性：</div>';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">基础属性：</div>';
     for (const stat in equip.stats) {
         const statNames = { attack: '攻击', defense: '防御', hp: '生命', speed: '速度', crit: '暴击', resist: '抗性' };
+        let value = equip.stats[stat];
+        // 精炼加成
+        if (equip.refinementLevel > 0) {
+            value = Math.floor(value * (1 + equip.refinementLevel * 0.05));
+        }
         html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">`;
         html += `<span style="color:#888;">${statNames[stat]}</span>`;
-        html += `<span style="color:#fff;">+${equip.stats[stat]}</span>`;
+        html += `<span style="color:#fff;">+${value}</span>`;
         html += '</div>';
+    }
+    html += '</div>';
+    
+    // V36 词条显示
+    if (equip.affixes && equip.affixes.length > 0) {
+        html += '<div style="margin-top:16px;">';
+        html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">词条：</div>';
+        equip.affixes.forEach(affix => {
+            const color = AFFIX_RARITY_COLORS[affix.rarity] || '#aaa';
+            const valueStr = affix.isPercent ? `${(affix.value * 100).toFixed(0)}%` : affix.value;
+            html += `<div style="display:flex;justify-content:space-between;padding:3px 0;">`;
+            html += `<span style="color:${color};font-size:11px;">◆ ${affix.display}</span>`;
+            html += `<span style="color:${color};font-size:11px;">+${valueStr}</span>`;
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    
+    // V36 强化和精炼按钮
+    const enhanceCost = Math.floor(500 * Math.pow(1.8, equip.enhancementLevel));
+    const refineCost = Math.floor(1000 * Math.pow(2, equip.refinementLevel));
+    
+    html += '<div style="margin-top:16px;display:flex;gap:8px;">';
+    if (equip.enhancementLevel < 15) {
+        html += `<button onclick="enhanceEquipment('${slot}')" ${gameState.immortal.spiritStones >= enhanceCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= enhanceCost ? '#e65100' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= enhanceCost ? 'pointer' : 'not-allowed'};font-size:12px;">强化+${equip.enhancementLevel + 1}(${enhanceCost}💎)</button>`;
+    }
+    if (equip.refinementLevel < 12) {
+        html += `<button onclick="refineEquipment('${slot}')" ${gameState.immortal.spiritStones >= refineCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= refineCost ? '#6a1b9a' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= refineCost ? 'pointer' : 'not-allowed'};font-size:12px;">精炼+${equip.refinementLevel + 1}(${refineCost}💎)</button>`;
     }
     html += '</div>';
     
