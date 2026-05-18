@@ -1087,13 +1087,15 @@ async function generateBreakthroughResult() {
 
         // ===== openSettings =====
         function openSettings() {
+            // 使用 window fallback 防止 TDZ（miniMaxConfig 在其他模块）
+            const cfg = window.miniMaxConfig || miniMaxConfig || { apiKey: '', baseUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7', features: {} };
             // 填充当前配置
-            document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
-            document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
-            document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-M2.7';
-            document.getElementById('featureAiDialogue').checked = miniMaxConfig.features.aiDialogue || false;
-            document.getElementById('featureAiSerendipity').checked = miniMaxConfig.features.aiSerendipity || false;
-            document.getElementById('featureAiTechnique').checked = miniMaxConfig.features.aiTechnique || false;
+            document.getElementById('settingsApiKey').value = cfg.apiKey || '';
+            document.getElementById('settingsBaseUrl').value = cfg.baseUrl || 'https://api.minimaxi.com/v1';
+            document.getElementById('settingsModel').value = cfg.model || 'MiniMax-M2.7';
+            document.getElementById('featureAiDialogue').checked = cfg.features.aiDialogue || false;
+            document.getElementById('featureAiSerendipity').checked = cfg.features.aiSerendipity || false;
+            document.getElementById('featureAiTechnique').checked = cfg.features.aiTechnique || false;
             
             // 清除测试结果
             document.querySelectorAll('.test-result').forEach(el => {

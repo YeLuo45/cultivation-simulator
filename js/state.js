@@ -182,6 +182,8 @@
                 aiTechnique: false
             }
         };
+        // 确保其他模块可访问（window fallback 防止 TDZ）
+        window.miniMaxConfig = miniMaxConfig;
 
         // --- combatState (5037-5051) ---
         let combatState = {
