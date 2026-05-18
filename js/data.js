@@ -384,6 +384,8 @@
             processDailySocial();
             // V39 仙宠培养系统每日处理
             processDailyPets();
+            // V40 仙界拍卖行每日处理
+            processAuctionEnd();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());

@@ -285,6 +285,8 @@
                     allyApplications: loaded.allyApplications || [],
                     // V39 仙宠培养系统
                     spiritPets: loaded.spiritPets || { pets: [], lastInteractionDay: 0 },
+                    // V40 仙界拍卖行
+                    auction: loaded.auction || { listings: [], frozenFunds: 0, playerId: null, playerName: null, sortType: 'endingSoon' },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -457,6 +459,11 @@
             const tradingBtn = document.getElementById('tradingBtn');
             if (tradingBtn) {
                 tradingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V40 拍卖按钮显示（境界≥地仙=realm 8）
+            const auctionBtn = document.getElementById('auctionBtn');
+            if (auctionBtn) {
+                auctionBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

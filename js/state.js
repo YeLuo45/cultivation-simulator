@@ -245,8 +245,16 @@
             allyApplications: [],   // [{allyId, allyName, allyRank, applyDay, status}]
             // V39 仙宠培养系统
             spiritPets: {
-                pets: [],           // [{type, quality, growth, nickname, level, exp, nextLevelExp, stats, skills, isHatched, hatchDays, bond, element}]
+                pets: [],
                 lastInteractionDay: 0
+            },
+            // V40 仙界拍卖行
+            auction: {
+                listings: [],      // [{id, item, sellerId, sellerName, startPrice, currentPrice, startTime, endTime, bids, status, winnerPaid}]
+                frozenFunds: 0,    // 冻结的灵石
+                playerId: null,
+                playerName: null,
+                sortType: 'endingSoon'
             }
         };
 
