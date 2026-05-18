@@ -519,6 +519,11 @@
             if (farmingBtn) {
                 farmingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
+            // V47 灵宠进化树按钮显示（境界≥地仙=realm 8）
+            const evoTreeBtn = document.getElementById('evoTreeBtn');
+            if (evoTreeBtn) {
+                evoTreeBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
         }
 
         // ===== updateDisplay =====
