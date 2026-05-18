@@ -293,6 +293,13 @@
                         totalWealth: 0, avgDailyIncome: 50, avgDailyExpense: 0,
                         luxuryPurchases: 0, activeEvents: [], economyBuffs: {}
                     },
+                    // V42 天道竞技场
+                    celestialArena: loaded.celestialArena || {
+                        currentSeason: 1, seasonStartTime: Date.now(), currentRank: 1, highestRank: 1,
+                        score: 0, totalScoreEarned: 0, totalWins: 0, totalLosses: 0, currentStreak: 0,
+                        longestStreak: 0, promotionWins: 0, dailyChallengesUsed: 0, derankProtection: 2,
+                        matchHistory: [], lastRewardClaimed: 0, totalRewardsClaimed: 0, bountyPool: 0, bountyWins: 0
+                    },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -475,6 +482,11 @@
             const economyBtn = document.getElementById('economyBtn');
             if (economyBtn) {
                 economyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V42 天道竞技场按钮显示（境界≥地仙=realm 8）
+            const arenaBtn = document.getElementById('arenaBtn');
+            if (arenaBtn) {
+                arenaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 
