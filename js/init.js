@@ -287,6 +287,12 @@
                     spiritPets: loaded.spiritPets || { pets: [], lastInteractionDay: 0 },
                     // V40 仙界拍卖行
                     auction: loaded.auction || { listings: [], frozenFunds: 0, playerId: null, playerName: null, sortType: 'endingSoon' },
+                    // V41 仙界经济系统
+                    economy: loaded.economy || {
+                        currentInflation: 0.02, totalIncome: 0, totalExpense: 0, totalTax: 0,
+                        totalWealth: 0, avgDailyIncome: 50, avgDailyExpense: 0,
+                        luxuryPurchases: 0, activeEvents: [], economyBuffs: {}
+                    },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -464,6 +470,11 @@
             const auctionBtn = document.getElementById('auctionBtn');
             if (auctionBtn) {
                 auctionBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V41 经济系统按钮显示（境界≥地仙=realm 8）
+            const economyBtn = document.getElementById('economyBtn');
+            if (economyBtn) {
+                economyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

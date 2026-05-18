@@ -250,11 +250,24 @@
             },
             // V40 仙界拍卖行
             auction: {
-                listings: [],      // [{id, item, sellerId, sellerName, startPrice, currentPrice, startTime, endTime, bids, status, winnerPaid}]
-                frozenFunds: 0,    // 冻结的灵石
+                listings: [],
+                frozenFunds: 0,
                 playerId: null,
                 playerName: null,
                 sortType: 'endingSoon'
+            },
+            // V41 仙界经济系统
+            economy: {
+                currentInflation: 0.02,
+                totalIncome: 0,
+                totalExpense: 0,
+                totalTax: 0,
+                totalWealth: 0,
+                avgDailyIncome: 50,
+                avgDailyExpense: 0,
+                luxuryPurchases: 0,
+                activeEvents: [],
+                economyBuffs: {}
             }
         };
 

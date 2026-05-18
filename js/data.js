@@ -386,6 +386,8 @@
             processDailyPets();
             // V40 仙界拍卖行每日处理
             processAuctionEnd();
+            // V41 仙界经济系统每日处理
+            processDailyEconomy();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());
