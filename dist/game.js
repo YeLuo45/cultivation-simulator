@@ -2299,6 +2299,9 @@
             // 仙界经济系统每日结算
             processCelestialEconomyDaily();
 
+            // V39: NPC自主行动每日结算
+            processNpcAutonomousLoop();
+
             // V6: 检查是否触发奇遇
             const serendipityResult = checkSerendipity();
             if (serendipityResult) {
@@ -10917,7 +10920,11 @@
                 dualTrackEnabled: false,
                 syncResources: false,
                 syncInterval: 1,
-                dispatchedToPalace: 0
+                dispatchedToPalace: 0,
+                // V39 NPC自主行动系统字段
+                npcTasks: [],
+                npcLeaderId: null,
+                npcLastActionDay: 0
             };
             
             // 给宗主添加一个初始弟子
@@ -10962,20 +10969,27 @@
                 const statusClass = d.status === 'idle' ? 'status-idle' : d.status === 'training' ? 'status-training' : 'status-elder';
                 const realmName = CONFIG.realms[d.realm] + '期';
                 const isElder = sect.elders.includes(d.uid);
+                const npcRole = d.npcRole || 'disciple';
+                const roleIcon = getNpcRoleIcon(d);
+                const roleTitle = getNpcRoleTitle(d);
+                const npcMood = d.npcMood === 'happy' ? '😊' : d.npcMood === 'upset' ? '😔' : '😐';
+                const taskInfo = d.npcTask ? `任务:${d.npcTask.progress}/${d.npcTask.target}` : '';
                 
                 html += `
                     <div class="disciple-card">
                         <div class="disciple-info">
-                            <span class="disciple-avatar">${isElder ? '👴' : '🧑‍🎓'}</span>
+                            <span class="disciple-avatar">${roleIcon}</span>
                             <div>
-                                <div class="disciple-name">${d.name}</div>
+                                <div class="disciple-name">${d.name} <span style="color:${NPC_ROLES[npcRole] ? NPC_ROLES[npcRole].color : '#4CAF50'};font-size:0.75em;">[${roleTitle}]</span> ${npcMood}</div>
                                 <div class="disciple-realm">${realmName}</div>
+                                ${taskInfo ? `<div style="color:#aaa;font-size:0.8em;">${taskInfo}</div>` : ''}
                             </div>
                             <span class="disciple-talent ${talentClass}">${d.talent}</span>
                         </div>
                         <div style="text-align:right;">
                             <div class="disciple-contribution">贡献: ${d.contribution}</div>
                             <span class="disciple-status ${statusClass}">${isElder ? '长老' : d.status}</span>
+                            <button onclick="openNpcDialogue('${d.uid}')" style="display:block;margin-top:5px;background:#333;color:#aaa;border:none;padding:3px 8px;border-radius:4px;font-size:0.75em;cursor:pointer;">💬 对话</button>
                         </div>
                     </div>
                 `;
@@ -11597,8 +11611,22 @@
                 talentIndex: talentIndex,
                 contribution: 0,
                 techniques: [],
-                status: 'idle'
+                status: 'idle',
+                // V39 NPC自主行动系统字段
+                npcRole: 'disciple',
+                npcDialogueHistory: [],
+                npcMood: 'normal',
+                npcAffection: 50,
+                npcTask: null,
+                npcTaskDays: 0
             });
+            
+            // V39: 宗门创建时宗主自动成为掌门
+            if (sect.npcLeaderId === null) {
+                sect.npcLeaderId = uid;
+                const newDisciple = sect.disciples[sect.disciples.length - 1];
+                if (newDisciple) newDisciple.npcRole = 'leader';
+            }
         }
 
         // ===== weightedRandom =====
@@ -11610,6 +11638,279 @@
                 if (random <= 0) return i;
             }
             return weights.length - 1;
+        }
+
+        // ===== V39 NPC角色系统 =====
+
+        // NPC角色定义
+        const NPC_ROLES = {
+            leader: { title: '掌门', icon: '👑', taskType: 'lead', color: '#FFD700' },
+            elder: { title: '长老', icon: '👴', taskType: 'train', color: '#9c27b0' },
+            disciple: { title: '弟子', icon: '🧑‍🎓', taskType: 'collect', color: '#4CAF50' }
+        };
+
+        // 获取弟子NPC图标
+        function getNpcRoleIcon(d) {
+            const role = d.npcRole || 'disciple';
+            return NPC_ROLES[role] ? NPC_ROLES[role].icon : NPC_ROLES.disciple.icon;
+        }
+
+        // 获取弟子NPC身份文字
+        function getNpcRoleTitle(d) {
+            const role = d.npcRole || 'disciple';
+            return NPC_ROLES[role] ? NPC_ROLES[role].title : '弟子';
+        }
+
+        // ===== processNpcAutonomousLoop =====
+        // V39: NPC自主行动每日结算
+        function processNpcAutonomousLoop() {
+            const sect = gameState.sect;
+            if (!sect.name || sect.disciples.length === 0) return;
+
+            // 检查是否已执行
+            if (sect.npcLastActionDay >= gameState.days) return;
+            sect.npcLastActionDay = gameState.days;
+
+            const logMessages = [];
+
+            sect.disciples.forEach(d => {
+                // 掌门：自动发布任务
+                if (d.npcRole === 'leader') {
+                    // 掌门有30%概率发布新任务
+                    if (Math.random() < 0.3 && sect.npcTasks.length < 3) {
+                        const taskTypes = ['collect', 'train', 'combat'];
+                        const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+                        const taskId = 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+                        const rewards = { spiritStones: Math.floor(20 + Math.random() * 30), contribution: Math.floor(5 + Math.random() * 10) };
+                        sect.npcTasks.push({
+                            id: taskId,
+                            type: taskType,
+                            target: Math.floor(3 + Math.random() * 5),
+                            progress: 0,
+                            status: 'active',
+                            reward: rewards,
+                            assignedUid: null,
+                            createdDay: gameState.days
+                        });
+                        logMessages.push(`【${d.name}】发布了新的宗门任务`);
+                    }
+                }
+
+                // 有任务的弟子执行任务
+                if (d.npcTask) {
+                    d.npcTaskDays++;
+                    d.npcTask.progress++;
+
+                    // 根据任务类型给予奖励
+                    if (d.npcTask.type === 'collect') {
+                        d.contribution += 2;
+                    } else if (d.npcTask.type === 'train') {
+                        if (Math.random() < 0.3) {
+                            d.realm = Math.min(d.realm + 1, gameState.realm + 2);
+                            logMessages.push(`【${d.name}】修炼精进，境界提升！`);
+                        }
+                    } else if (d.npcTask.type === 'combat') {
+                        d.contribution += 3;
+                    }
+
+                    // 任务完成
+                    if (d.npcTask.progress >= d.npcTask.target) {
+                        const task = sect.npcTasks.find(t => t.id === d.npcTask.id);
+                        if (task) {
+                            task.status = 'completed';
+                            sect.spiritStones += task.reward.spiritStones;
+                            d.contribution += task.reward.contribution;
+                            logMessages.push(`【${d.name}】完成任务：${task.reward.spiritStones}灵石！`);
+                        }
+                        d.npcTask = null;
+                        d.npcTaskDays = 0;
+                    }
+                } else {
+                    // 无任务弟子自动选择行为
+                    const rand = Math.random();
+                    if (rand < 0.5) {
+                        // 自动修炼
+                        d.status = 'training';
+                        d.npcMood = 'normal';
+                    } else if (rand < 0.8) {
+                        // 自动采集
+                        d.status = 'collecting';
+                        sect.spiritStones += Math.floor(5 + d.talentIndex * 2);
+                    } else {
+                        // 闭关
+                        d.status = 'meditating';
+                        d.npcMood = Math.random() < 0.7 ? 'happy' : 'normal';
+                    }
+                }
+            });
+
+            // 记录日志
+            if (logMessages.length > 0) {
+                logMessages.forEach(msg => addLog('good', '宗门动态', msg));
+            }
+        }
+
+        // ===== openNpcDialogue =====
+        function openNpcDialogue(discipleUid) {
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple) return;
+
+            const role = NPC_ROLES[disciple.npcRole] || NPC_ROLES.disciple;
+            const realmName = CONFIG.realms[disciple.realm] || '炼气期';
+            const moodEmoji = disciple.npcMood === 'happy' ? '😊' : disciple.npcMood === 'upset' ? '😔' : '😐';
+
+            let historyHtml = '';
+            const history = disciple.npcDialogueHistory || [];
+            history.slice(-5).forEach(entry => {
+                historyHtml += `<div class="npc-msg ${entry.isPlayer ? 'player-msg' : 'npc-msg-other'}">${entry.text}</div>`;
+            });
+            if (history.length === 0) {
+                historyHtml = '<p style="color:#888;text-align:center;">暂无对话记录</p>';
+            }
+
+            const modal = document.getElementById('npcDialogueModal');
+            if (modal) modal.remove();
+
+            const html = `
+                <div id="npcDialogueModal" style="position:fixed;z-index:2000;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid ${role.color};border-radius:15px;padding:20px;max-width:450px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 0 30px rgba(${role.color === '#FFD700' ? '255,215,0' : role.color === '#9c27b0' ? '156,39,176' : '76,175,80'},0.3);">
+                        <div style="display:flex;align-items:center;margin-bottom:15px;border-bottom:1px solid #333;padding-bottom:10px;">
+                            <span style="font-size:2em;margin-right:10px;">${role.icon}</span>
+                            <div>
+                                <div style="color:${role.color};font-weight:bold;font-size:1.1em;">${disciple.name}</div>
+                                <div style="color:#888;font-size:0.85em;">${role.title} · ${realmName} · ${moodEmoji}</div>
+                            </div>
+                            <button onclick="closeNpcDialogue()" style="margin-left:auto;background:#333;color:#fff;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1.1em;">×</button>
+                        </div>
+                        <div id="npcDialogueHistory" style="max-height:200px;overflow-y:auto;margin-bottom:15px;padding:10px;background:#0d0d1a;border-radius:8px;">
+                            ${historyHtml}
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <button onclick="sendNpcQuickMessage('${discipleUid}','请教')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">请教</button>
+                            <button onclick="sendNpcQuickMessage('${discipleUid}','任务')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">任务</button>
+                            <button onclick="sendNpcQuickMessage('${discipleUid}','闲聊')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">闲聊</button>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="npcDialogueInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid #333;background:#1a1a2e;color:#fff;font-size:0.9em;" onkeydown="if(event.key==='Enter')sendNpcMessage('${discipleUid}')">
+                            <button onclick="sendNpcMessage('${discipleUid}')" class="btn" style="background:${role.color};color:#000;font-weight:bold;padding:8px 16px;border:none;cursor:pointer;border-radius:8px;">发送</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        // ===== closeNpcDialogue =====
+        function closeNpcDialogue() {
+            const modal = document.getElementById('npcDialogueModal');
+            if (modal) modal.remove();
+        }
+
+        // ===== sendNpcMessage =====
+        function sendNpcMessage(discipleUid) {
+            const input = document.getElementById('npcDialogueInput');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple) return;
+
+            // 记录玩家消息
+            if (!disciple.npcDialogueHistory) disciple.npcDialogueHistory = [];
+            disciple.npcDialogueHistory.push({ text, isPlayer: true, day: gameState.days });
+            if (disciple.npcDialogueHistory.length > 50) disciple.npcDialogueHistory.shift();
+
+            // 生成NPC回复
+            const response = generateNpcResponse(disciple, text);
+            disciple.npcDialogueHistory.push({ text: response, isPlayer: false, day: gameState.days });
+            if (disciple.npcDialogueHistory.length > 50) disciple.npcDialogueHistory.shift();
+
+            // 更新显示
+            const historyDiv = document.getElementById('npcDialogueHistory');
+            if (historyDiv) {
+                const history = disciple.npcDialogueHistory || [];
+                historyDiv.innerHTML = history.slice(-5).map(entry =>
+                    `<div class="npc-msg ${entry.isPlayer ? 'player-msg' : 'npc-msg-other'}">${entry.text}</div>`
+                ).join('');
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+            }
+        }
+
+        // ===== sendNpcQuickMessage =====
+        function sendNpcQuickMessage(discipleUid, type) {
+            const texts = {
+                '请教': ['修炼之道贵在坚持，切不可急功近利。', '你的疑惑，老夫略知一二。', '此事需从基础做起，不可好高骛远。'],
+                '任务': ['近日宗门事务繁忙，你可愿代为分忧？', '有一事需你相助。', '我正有一项任务要交付。'],
+                '闲聊': ['今日天气甚好，适合闭关修炼。', '宗门事务繁忙，无暇闲聊。', '你且说来听听。']
+            };
+            const options = texts[type] || texts['闲聊'];
+            const randomText = options[Math.floor(Math.random() * options.length)];
+            const input = document.getElementById('npcDialogueInput');
+            if (input) input.value = randomText;
+            sendNpcMessage(discipleUid);
+        }
+
+        // ===== generateNpcResponse =====
+        function generateNpcResponse(disciple, playerMessage) {
+            const role = disciple.npcRole || 'disciple';
+            const lowerMsg = playerMessage.toLowerCase();
+
+            // 掌门回复
+            if (role === 'leader') {
+                if (lowerMsg.includes('请教') || lowerMsg.includes('修炼')) {
+                    return '修炼之道，在于心境平和。你若能保持心境，突破境界指日可待。';
+                }
+                if (lowerMsg.includes('任务')) {
+                    if (disciple.npcTask) {
+                        return `当前任务：${disciple.npcTask.progress}/${disciple.npcTask.target}，继续努力。`;
+                    }
+                    return '宗门暂无紧急任务，你且安心修炼。';
+                }
+                return '宗门之事，老夫自有安排。你只需专注修行。';
+            }
+
+            // 长老回复
+            if (role === 'elder') {
+                if (lowerMsg.includes('请教') || lowerMsg.includes('功法')) {
+                    return '老夫修行多年，有些心得可与你分享。勤加练习，必有所成。';
+                }
+                if (lowerMsg.includes('任务')) {
+                    return '我正在指导弟子修炼，若有任务自会告知。';
+                }
+                return '师叔祖有何吩咐？';
+            }
+
+            // 弟子回复
+            if (lowerMsg.includes('请教')) {
+                return '师兄/师姐，我也还在学习中，我们可以一起探讨。';
+            }
+            if (lowerMsg.includes('任务')) {
+                return disciple.npcTask
+                    ? `我正在执行任务，已完成${disciple.npcTask.progress}/${disciple.npcTask.target}。`
+                    : '我暂时没有任务，可以去做些什么呢？';
+            }
+            return '今天修炼感觉不错，谢谢关心！';
+        }
+
+        // ===== assignNpcTask =====
+        function assignNpcTask(discipleUid, taskType) {
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple || disciple.npcRole === 'leader') return;
+
+            disciple.npcTask = {
+                id: 'task_' + Date.now(),
+                type: taskType,
+                target: Math.floor(3 + Math.random() * 5),
+                progress: 0
+            };
+            disciple.npcTaskDays = 0;
+            addLog('good', '任务分配', `为【${disciple.name}】分配了${taskType === 'collect' ? '采集' : taskType === 'train' ? '修炼' : '战斗'}任务`);
+            renderSectHome();
         }
 
         // ===== collectSectResources =====
