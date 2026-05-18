@@ -394,6 +394,8 @@
             processDailyPalace();
             // V44 仙法创造每日处理
             processDailySpellPractice();
+            // V45 天道轮回增强每日处理
+            processReincarnationRewards();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());

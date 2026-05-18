@@ -309,6 +309,8 @@
                     // V44 仙法创造系统
                     customSpells: loaded.customSpells || [],
                     essences: loaded.essences || {},
+                    // V45 天道轮回增强
+                    karma: loaded.karma || { points: 0, goodKarma: 0, evilKarma: 0, reincarnationCount: 0, pastLifeMemories: [] },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -506,6 +508,11 @@
             const spellBtn = document.getElementById('spellBtn');
             if (spellBtn) {
                 spellBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V45 天道轮回按钮显示（境界≥地仙=realm 8）
+            const karmaBtn = document.getElementById('karmaBtn');
+            if (karmaBtn) {
+                karmaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

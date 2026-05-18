@@ -307,7 +307,15 @@
             },
             // V44 仙法创造系统
             customSpells: [],
-            essences: {}
+            essences: {},
+            // V45 天道轮回增强
+            karma: {
+                points: 0,
+                goodKarma: 0,
+                evilKarma: 0,
+                reincarnationCount: 0,
+                pastLifeMemories: []
+            }
         };
 
         // --- secretRealmState (7391-7398) ---
