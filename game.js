@@ -1198,7 +1198,7 @@
             }
         };
 
-        // --- miniMaxConfig (1492-1502) ---
+        // --- miniMaxConfig ---
         let miniMaxConfig = {
             apiKey: '',
             baseUrl: 'https://api.minimaxi.com/v1',
@@ -2070,80 +2070,7 @@
             document.getElementById('achievementModal').classList.remove('active');
         }
 
-        // ===== renderAchievements =====
-        function renderAchievements() {
-            const content = document.getElementById('achievementContent');
-            if (!content) return;
-
-            const ach = gameState.achievements || { unlocked: [], titles: [], stats: {} };
-
-            let html = `<div class="achievement-header">`;
-            html += `<div class="achievement-title-display">当前称号：<span style="color:#ffd700;">【${gameState.title || '无'}】</span></div>`;
-            html += `</div>`;
-
-            // 分类显示
-            const categories = {
-                cultivation: '修炼',
-                combat: '战斗',
-                collection: '收集',
-                story: '剧情',
-                special: '特殊'
-            };
-
-            for (const [catKey, catName] of Object.entries(categories)) {
-                const catAchievements = ACHIEVEMENTS.filter(a => a.category === catKey);
-                if (catAchievements.length === 0) continue;
-
-                html += `<div class="achievement-category">`;
-                html += `<h4>${catName}</h4>`;
-
-                for (const a of catAchievements) {
-                    const isUnlocked = ach.unlocked.includes(a.id);
-                    const progress = getAchievementProgress(a, ach);
-
-                    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">`;
-                    html += `<div class="achievement-icon">${isUnlocked ? '🏆' : '🔒'}</div>`;
-                    html += `<div class="achievement-info">`;
-                    html += `<div class="achievement-name">${a.name}</div>`;
-                    html += `<div class="achievement-desc">${a.desc}</div>`;
-
-                    if (!isUnlocked && progress > 0) {
-                        html += `<div class="achievement-progress">`;
-                        html += `<div class="progress-bar" style="width:${progress}%"></div>`;
-                        html += `</div>`;
-                        html += `<div class="achievement-progress-text">${getAchievementProgressText(a, ach)}</div>`;
-                    }
-
-                    html += `</div>`;
-                    html += `<div class="achievement-reward">`;
-                    html += `<div style="color:#4caf50;">奖励：${getRewardText(a)}</div>`;
-                    if (a.title) html += `<div style="color:#ffd700;">称号：${a.title}</div>`;
-                    html += `</div>`;
-                    html += `</div>`;
-                }
-
-                html += `</div>`;
-            }
-
-            // 已获得称号列表
-            if (ach.titles.length > 0) {
-                html += `<div class="achievement-category">`;
-                html += `<h4>已获称号</h4>`;
-                html += `<div class="title-list">`;
-                for (const t of ach.titles) {
-                    const isEquipped = gameState.title === t;
-                    html += `<div class="title-item ${isEquipped ? 'equipped' : ''}" onclick="equipTitle('${t}')">`;
-                    html += `【${t}】${isEquipped ? '(已装备)' : '(点击装备)'}`;
-                    html += `</div>`;
-                }
-                html += `</div>`;
-                html += `</div>`;
-            }
-
-            content.innerHTML = html;
-        }
-
-        // ===== renderSpiritRootContent =====
+        // ===== getTitleBonus =====
         function renderSpiritRootContent() {
             const content = document.getElementById('spiritRootContent');
             const sr = gameState.spiritRoot;
@@ -6496,12 +6423,6 @@
             document.getElementById('invDetail').style.display = 'none';
         }
 
-        // ===== getItemCount =====
-        function getItemCount(name) {
-            const item = gameState.inventory.find(i => i.name === name);
-            return item ? item.quantity : 0;
-        }
-
         // ===== removeItem =====
         function removeItem(name, quantity) {
             const idx = gameState.inventory.findIndex(i => i.name === name);
@@ -7618,10 +7539,6 @@
         ];
         let combatEnergy = 0;
         const MAX_ENERGY = 100;
-        function closeModal() {
-            const modal = document.getElementById('eventModal');
-            if (modal) modal.classList.remove('active');
-        }
         const ELEMENT_HIGH_THRESHOLD = 50;
         async function testApiConfig() {
             const apiKey = document.getElementById('settingsApiKey').value.trim();
@@ -12884,20 +12801,6 @@
                     palace.spiritStones += syncAmount;
                 }
             }
-        }
-
-        // ===== collectPalaceProduction =====
-        function collectPalaceProduction() {
-            const bonuses = {};
-            for (const room of gameState.palace.rooms) {
-                const roomConfig = PALACE_CONFIG.roomTypes[room.type];
-                if (roomConfig) {
-                    const effectKey = roomConfig.effect;
-                    const effectValue = roomConfig.effectValue * room.level;
-                    bonuses[effectKey] = (bonuses[effectKey] || 0) + effectValue;
-                }
-            }
-            return bonuses;
         }
 
         // ===== upgradePalace =====
