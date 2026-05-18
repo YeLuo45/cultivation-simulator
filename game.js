@@ -10812,6 +10812,11 @@
                         <div class="sect-resource-value">${calculateSectIncome()}</div>
                         <div class="sect-resource-label">每日产出</div>
                     </div>
+                    ${sect.sectMood !== undefined ? `<div class="sect-resource">
+                        <div class="sect-resource-icon">${sect.sectMood >= 70 ? '😊' : sect.sectMood >= 40 ? '😐' : '😰'}</div>
+                        <div class="sect-resource-value">${sect.sectMood}</div>
+                        <div class="sect-resource-label">宗门气氛</div>
+                    </div>` : ''}
                 </div>
                 <div class="sect-tabs">
                     <div class="sect-tab active" onclick="switchSectTab('disciples')">👥 弟子</div>
@@ -10924,7 +10929,9 @@
                 // V39 NPC自主行动系统字段
                 npcTasks: [],
                 npcLeaderId: null,
-                npcLastActionDay: 0
+                npcLastActionDay: 0,
+                // V41 宗门气氛值
+                sectMood: 70
             };
             
             // 给宗主添加一个初始弟子
@@ -10974,13 +10981,15 @@
                 const roleTitle = getNpcRoleTitle(d);
                 const npcMood = d.npcMood === 'happy' ? '😊' : d.npcMood === 'upset' ? '😔' : '😐';
                 const taskInfo = d.npcTask ? `任务:${d.npcTask.progress}/${d.npcTask.target}` : '';
-                
+                const personalityInfo = getPersonalityInfo(d.npcPersonality);
+                const personalityTag = d.npcPersonality ? `<span style="color:${personalityInfo.color};font-size:0.75em;">${personalityInfo.emoji}${personalityInfo.label}</span>` : '';
+
                 html += `
                     <div class="disciple-card">
                         <div class="disciple-info">
                             <span class="disciple-avatar">${roleIcon}</span>
                             <div>
-                                <div class="disciple-name">${d.name} <span style="color:${NPC_ROLES[npcRole] ? NPC_ROLES[npcRole].color : '#4CAF50'};font-size:0.75em;">[${roleTitle}]</span> ${npcMood}</div>
+                                <div class="disciple-name">${d.name} <span style="color:${NPC_ROLES[npcRole] ? NPC_ROLES[npcRole].color : '#4CAF50'};font-size:0.75em;">[${roleTitle}]</span> ${npcMood} ${personalityTag}</div>
                                 <div class="disciple-realm">${realmName}</div>
                                 ${taskInfo ? `<div style="color:#aaa;font-size:0.8em;">${taskInfo}</div>` : ''}
                             </div>
@@ -11622,7 +11631,9 @@
                 // V40 NPC好感度+师徒系统字段
                 npcMasterId: null,
                 npcApprentices: [],
-                npcGiftLiked: null // V40: 喜欢的礼物类型
+                npcGiftLiked: null, // V40: 喜欢的礼物类型
+                // V41 NPC性格系统字段
+                npcPersonality: null // 'diligent'|'lazy'|'aggressive'|'steady'
             });
             
             // V39: 宗门创建时宗主自动成为掌门
@@ -11630,6 +11641,13 @@
                 sect.npcLeaderId = uid;
                 const newDisciple = sect.disciples[sect.disciples.length - 1];
                 if (newDisciple) newDisciple.npcRole = 'leader';
+            }
+
+            // V41: 分配随机性格
+            const personalities = ['diligent', 'lazy', 'aggressive', 'steady'];
+            const newDiscipleRef = sect.disciples[sect.disciples.length - 1];
+            if (newDiscipleRef) {
+                newDiscipleRef.npcPersonality = personalities[Math.floor(Math.random() * personalities.length)];
             }
         }
 
@@ -11659,6 +11677,18 @@
             mid: { name: '灵草', cost: 200, affection: 15 },
             high: { name: '功法残卷', cost: 500, affection: 30 }
         };
+
+        // V41 NPC性格配置
+        const NPC_PERSONALITIES = {
+            diligent: { label: '勤奋', emoji: '📖', color: '#4CAF50', taskPref: 'train', efficiency: 1.3 },
+            lazy: { label: '懒散', emoji: '😴', color: '#9e9e9e', taskPref: 'collect', efficiency: 0.7 },
+            aggressive: { label: '好斗', emoji: '⚔️', color: '#f44336', taskPref: 'combat', efficiency: 1.1 },
+            steady: { label: '稳重', emoji: '🧘', color: '#2196F3', taskPref: 'train', efficiency: 1.0 }
+        };
+
+        function getPersonalityInfo(p) {
+            return NPC_PERSONALITIES[p] || NPC_PERSONALITIES.steady;
+        }
 
         // 获取弟子NPC图标
         function getNpcRoleIcon(d) {
@@ -11740,23 +11770,43 @@
                         d.npcTaskDays = 0;
                     }
                 } else {
-                    // 无任务弟子自动选择行为
+                    // 无任务弟子自动选择行为（V41：性格影响偏好）
+                    const personality = d.npcPersonality || 'steady';
+                    const pinfo = getPersonalityInfo(personality);
                     const rand = Math.random();
-                    if (rand < 0.5) {
-                        // 自动修炼
-                        d.status = 'training';
-                        d.npcMood = 'normal';
-                    } else if (rand < 0.8) {
-                        // 自动采集
-                        d.status = 'collecting';
-                        sect.spiritStones += Math.floor(5 + d.talentIndex * 2);
+                    if (personality === 'diligent') {
+                        // 勤奋型：70%修炼，20%采集，10%闭关
+                        if (rand < 0.7) { d.status = 'training'; d.npcMood = 'happy'; }
+                        else if (rand < 0.9) { d.status = 'collecting'; sect.spiritStones += Math.floor(5 * pinfo.efficiency + d.talentIndex * 2); }
+                        else { d.status = 'meditating'; d.npcMood = 'happy'; }
+                    } else if (personality === 'lazy') {
+                        // 懒散型：20%修炼，60%采集，20%休息
+                        if (rand < 0.2) { d.status = 'training'; d.npcMood = 'normal'; }
+                        else if (rand < 0.8) { d.status = 'collecting'; sect.spiritStones += Math.floor(5 * pinfo.efficiency + d.talentIndex * 2); }
+                        else { d.status = 'idle'; d.npcMood = 'normal'; }
+                    } else if (personality === 'aggressive') {
+                        // 好斗型：30%修炼，30%采集，40%闭关
+                        if (rand < 0.3) { d.status = 'training'; d.npcMood = 'normal'; }
+                        else if (rand < 0.6) { d.status = 'collecting'; sect.spiritStones += Math.floor(5 * pinfo.efficiency + d.talentIndex * 2); }
+                        else { d.status = 'meditating'; d.npcMood = Math.random() < 0.5 ? 'upset' : 'normal'; }
                     } else {
-                        // 闭关
-                        d.status = 'meditating';
-                        d.npcMood = Math.random() < 0.7 ? 'happy' : 'normal';
+                        // 稳重型：50%修炼，30%采集，20%闭关
+                        if (rand < 0.5) { d.status = 'training'; d.npcMood = 'normal'; }
+                        else if (rand < 0.8) { d.status = 'collecting'; sect.spiritStones += Math.floor(5 * pinfo.efficiency + d.talentIndex * 2); }
+                        else { d.status = 'meditating'; d.npcMood = 'normal'; }
                     }
                 }
             });
+
+            // V41: 更新宗门气氛
+            const avgMood = sect.disciples.reduce((sum, d) => {
+                const mood = d.npcMood === 'happy' ? 100 : d.npcMood === 'upset' ? 0 : 50;
+                return sum + mood;
+            }, 0) / sect.disciples.length;
+            sect.sectMood = Math.max(0, Math.min(100, Math.round(sect.sectMood * 0.7 + avgMood * 0.3)));
+
+            // V41: 触发宗门随机事件
+            processSectRandomEvent();
 
             // 记录日志
             if (logMessages.length > 0) {
@@ -12101,6 +12151,72 @@
             const realmDiff = master.realm - disciple.realm;
             if (realmDiff <= 0) return 0;
             return Math.floor(2 + realmDiff * 1.5);
+        }
+
+        // ===== processSectRandomEvent =====
+        // V41: 宗门随机事件系统
+        function processSectRandomEvent() {
+            const sect = gameState.sect;
+            if (!sect.name) return;
+
+            // 气氛影响事件触发概率
+            const baseChance = 0.15;
+            const moodModifier = (sect.sectMood - 50) / 500; // ±10%
+            const triggerChance = baseChance + moodModifier;
+            if (Math.random() > triggerChance) return;
+
+            const events = [
+                // 奇遇类
+                { type: 'serendipity', weight: 1, title: '🌟 弟子顿悟', desc: '某位弟子在修炼中突然顿悟，境界有所提升', effect: (sect) => {
+                    const d = sect.disciples[Math.floor(Math.random() * sect.disciples.length)];
+                    if (d) {
+                        d.realm = Math.min(d.realm + 1, gameState.realm + 2);
+                        addLog('good', '宗门事件', `【${d.name}】修炼中顿悟，境界提升！`);
+                    }
+                }},
+                { type: 'serendipity', weight: 1, title: '💎 矿区发现', desc: '弟子在附近发现了一处灵石矿区', effect: (sect) => {
+                    const gain = Math.floor(200 + Math.random() * 300);
+                    sect.spiritStones += gain;
+                    addLog('good', '宗门事件', `发现灵石矿区，获得${gain}灵石！`);
+                }},
+                // 危机类
+                { type: 'crisis', weight: 1, title: '🔥 宗门冲突', desc: '弟子之间发生冲突，宗门气氛下降', effect: (sect) => {
+                    sect.sectMood = Math.max(0, sect.sectMood - 15);
+                    const d = sect.disciples[Math.floor(Math.random() * sect.disciples.length)];
+                    if (d) modifyAffection(d, -10);
+                    addLog('bad', '宗门事件', '弟子冲突，宗门气氛下降！');
+                }},
+                { type: 'crisis', weight: 1, title: '⚠️ 外部挑衅', desc: '其他势力对宗门产生敌意', effect: (sect) => {
+                    sect.sectMood = Math.max(0, sect.sectMood - 10);
+                    addLog('bad', '宗门事件', '外部势力挑衅，宗门气氛受损！');
+                }},
+                // 日常类
+                { type: 'daily', weight: 2, title: '🎉 宗门团建', desc: '弟子们举办了一次联谊活动', effect: (sect) => {
+                    sect.sectMood = Math.min(100, sect.sectMood + 10);
+                    sect.disciples.forEach(d => modifyAffection(d, 3));
+                    addLog('good', '宗门事件', '宗门联谊，气氛提升！');
+                }},
+                { type: 'daily', weight: 2, title: '📚 功法交流会', desc: '长老主持功法交流，弟子们受益匪浅', effect: (sect) => {
+                    sect.disciples.forEach(d => modifyAffection(d, 2));
+                    addLog('good', '宗门事件', '功法交流会，弟子好感提升！');
+                }},
+                { type: 'daily', weight: 1, title: '🌿 灵草丰收', desc: '宗门灵草园喜获丰收', effect: (sect) => {
+                    const gain = Math.floor(50 + Math.random() * 100);
+                    sect.spiritStones += gain;
+                    addLog('good', '宗门事件', `灵草丰收，获得${gain}灵石！`);
+                }}
+            ];
+
+            // 按权重随机选择
+            const totalWeight = events.reduce((sum, e) => sum + e.weight, 0);
+            let rand = Math.random() * totalWeight;
+            let selectedEvent = events[events.length - 1];
+            for (const e of events) {
+                rand -= e.weight;
+                if (rand <= 0) { selectedEvent = e; break; }
+            }
+
+            selectedEvent.effect(sect);
         }
 
         // ===== collectSectResources =====
