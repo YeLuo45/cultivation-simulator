@@ -26,23 +26,24 @@ if (jsStartIdx !== -1 && jsEndIdx !== -1) {
     writeFileSync(`${distDir}/index.html`, header + footer);
     console.log('Generated dist/index.html with bundled JS (inline mode)');
 } else {
-    // External JS mode: check if dist/game.js exists and is valid
+    // External JS mode: always copy source game.js to dist, then build index.html
+    const srcGame = 'game.js';
     const distGame = `${distDir}/game.js`;
-    if (existsSync(distGame)) {
-        const content = readFileSync(distGame, 'utf8');
-        if (content.includes('function init()') && content.includes('const CONFIG = {')) {
-            console.log('Using existing dist/game.js:', content.length, 'bytes');
-            // Build dist/index.html from source index.html
-            writeFileSync(`${distDir}/index.html`, html);
-            console.log('Generated dist/index.html with external game.js');
-        } else {
-            console.error('ERROR: dist/game.js exists but is invalid');
-            process.exit(1);
-        }
-    } else {
-        console.error('ERROR: No inline JS found in index.html and no dist/game.js');
+    if (!existsSync(srcGame)) {
+        console.error('ERROR: game.js not found in project root');
         process.exit(1);
     }
+    // Always refresh dist/game.js from source
+    const gameContent = readFileSync(srcGame, 'utf8');
+    if (!gameContent.includes('function init()') || !gameContent.includes('const CONFIG = {')) {
+        console.error('ERROR: source game.js is invalid (missing init() or CONFIG)');
+        process.exit(1);
+    }
+    writeFileSync(distGame, gameContent);
+    console.log('Copied game.js to dist:', gameContent.length, 'bytes');
+    // Build dist/index.html from source index.html
+    writeFileSync(`${distDir}/index.html`, html);
+    console.log('Generated dist/index.html with external game.js');
 }
 
 const finalJs = readFileSync(`${distDir}/game.js`, 'utf8');
