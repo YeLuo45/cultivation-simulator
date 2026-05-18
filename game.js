@@ -1,4 +1,1169 @@
-// Auto-generated module: achievements.js
+// ===== config.js =====
+
+        // --- CONFIG (3-11) ---
+        const CONFIG = {
+            realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
+            stages: ['初期', '中期', '后期'],
+            stageNames: ['凡人', '修士', '真人', '天君', '大能'],
+            apiUrl: 'https://api.minimaxi.com/v1/chat/completions',
+            storageKey: 'cultivationSave',
+            apiConfigKey: 'cultivationApiConfig',
+            miniMaxConfigKey: 'cultivationMiniMaxConfig'
+        };
+
+        // --- PILLS (15-23) ---
+        const PILLS = {
+            '聚灵丹': { quality: 'common', effect: { type: 'qi', value: 50 }, price: 30, desc: '恢复50灵气', icon: '💊' },
+            '心魔丹': { quality: 'common', effect: { type: 'mindset', value: 30 }, price: 40, desc: '恢复30心境', icon: '💊' },
+            '金髓丹': { quality: 'rare', effect: { type: 'qi', value: 200 }, price: 100, desc: '恢复200灵气', icon: '💊' },
+            '筑基丹': { quality: 'rare', effect: { type: 'breakthrough_boost', value: 0.2 }, price: 1200, desc: '突破成功率+20%', icon: '💊' },
+            '破境丹': { quality: 'precious', effect: { type: 'breakthrough_boost', value: 0.3 }, price: 5000, desc: '突破+30%', icon: '💊' },
+            '洗髓丹': { quality: 'precious', effect: { type: 'cultivate_speed', value: 0.1 }, price: 8000, desc: '修炼速度+10%', icon: '💊' },
+            '定神丹': { quality: 'precious', effect: { type: '渡劫_mindset_protect', value: 0.5 }, price: 12000, desc: '渡劫心境消耗-50%', icon: '💊' }
+        };
+
+        // --- TREASURES (27-35) ---
+        const TREASURES = {
+            '青锋剑': { type: 'weapon', quality: 'common', effect: { type: 'attack', value: 0.1 }, price: 150, desc: '攻击+10%', icon: '⚔️' },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { type: 'defense', value: 0.1 }, price: 150, desc: '防御+10%', icon: '🛡️' },
+            '聚灵阵': { type: 'accessory', quality: 'rare', effect: { type: 'cultivate_qi_rate', value: 0.2 }, price: 800, desc: '修炼灵气+20%', icon: '📿' },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { type: '渡劫_damage_reduce', value: 0.3 }, price: 1500, desc: '渡劫伤害-30%', icon: '🔥' },
+            '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 600, desc: '逃跑成功率+50%', icon: '📜' },
+            '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 8000, desc: '预知事件类型', icon: '🔮' },
+            '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 40000, desc: '全属性+5%', icon: '珠' }
+        };
+
+        // --- COMBAT_TREASURES (39-49) ---
+        const COMBAT_TREASURES = {
+            '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 300 },
+            '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 250 },
+            '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 600 },
+            '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 400 },
+            '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 500 },
+            '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 5000 },
+            '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 5000 },
+            '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 5000 },
+            '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 5000 }
+        };
+
+        // --- COMBAT_PILLS (53-58) ---
+        const COMBAT_PILLS = {
+            '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 600 },
+            '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 600 },
+            '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 4000 },
+            '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 500 }
+        };
+
+        // --- ENHANCE_CONFIG (61-86) ---
+        const ENHANCE_CONFIG = {
+            // 1→2, 2→3, ... : [玄铁, 天材, 混沌石, 灵石]
+            costs: {
+                1: { iron: 3,  heavenly: 0, chaos: 0, stones: 200 },
+                2: { iron: 5,  heavenly: 0, chaos: 0, stones: 400 },
+                3: { iron: 8,  heavenly: 0, chaos: 0, stones: 800 },
+                4: { iron: 10, heavenly: 1, chaos: 0, stones: 1500 },
+                5: { iron: 12, heavenly: 2, chaos: 0, stones: 3000 },
+                6: { iron: 15, heavenly: 3, chaos: 0, stones: 6000 },
+                7: { iron: 0,  heavenly: 5, chaos: 1, stones: 15000 },
+                8: { iron: 0,  heavenly: 8, chaos: 2, stones: 30000 },
+                9: { iron: 0,  heavenly: 10, chaos: 3, stones: 60000 }
+            },
+            // 每级基础成功率（1→2用costs[1]）
+            successRates: {
+                1: 0.85, 2: 0.80, 3: 0.75, 4: 0.65, 5: 0.55,
+                6: 0.45, 7: 0.35, 8: 0.30, 9: 0.25
+            },
+            // 每级强化后属性倍率
+            starMultipliers: {
+                1: 1.0, 2: 1.15, 3: 1.35, 4: 1.60, 5: 1.90,
+                6: 2.25, 7: 2.70, 8: 3.20, 9: 4.00
+            },
+            // 炼器台等级限制可强化的最高星级
+            anvilStarLimit: { 1: 3, 2: 6, 3: 9 }
+        };
+
+        // --- TRIBULATIONS (888-934) ---
+        const TRIBULATIONS = {
+            '金丹初期雷劫': {
+                type: 'thunder',
+                realm: 3,
+                stage: '初期',
+                baseRate: 0.6,
+                stages: 3,
+                damage: 30,
+                desc: '九天神雷，淬体锻魂'
+            },
+            '金丹中期阴火': {
+                type: 'fire',
+                realm: 3,
+                stage: '中期',
+                baseRate: 0.5,
+                stages: 5,
+                damage: 40,
+                desc: '琉璃阴火，焚心烧魄'
+            },
+            '金丹后期风劫': {
+                type: 'wind',
+                realm: 3,
+                stage: '后期',
+                baseRate: 0.4,
+                stages: 7,
+                damage: 50,
+                desc: '九幽阴风，刮骨伐髓'
+            },
+            '元婴心魔': {
+                type: 'demon',
+                realm: 4,
+                stage: '任意',
+                baseRate: 0.4,
+                stages: 9,
+                damage: 0,
+                desc: '心魔滋生，最难渡'
+            },
+            '化神飞升': {
+                type: 'all',
+                realm: 5,
+                stage: '后期',
+                baseRate: 0.2,
+                stages: 9,
+                damage: 60,
+                desc: '飞升之劫，成败在此一举'
+            }
+        };
+
+        // --- FURNACES (939-943) ---
+        const FURNACES = {
+            '土炼丹炉': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼丹炉' },
+            '玄火丹炉': { level: 2, successBonus: 0.15, cost: 50000, unlockCondition: '宗门2级或50000灵石', desc: '中级炼丹炉，成功率+15%' },
+            '天玄神炉': { level: 3, successBonus: 0.30, cost: 200000, unlockCondition: '化神期', desc: '高级炼丹炉，成功率+30%' }
+        };
+
+        // --- ANVILS (947-951) ---
+        const ANVILS = {
+            '土炼器台': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼器台' },
+            '玄铁熔炉': { level: 2, successBonus: 0.15, cost: 80000, unlockCondition: '宗门2级或80000灵石', desc: '中级炼器台，成功率+15%' },
+            '天工神炉': { level: 3, successBonus: 0.30, cost: 300000, unlockCondition: '化神期', desc: '高级炼器台，成功率+30%' }
+        };
+
+        // --- ALCHEMY_RECIPES (954-962) ---
+        const ALCHEMY_RECIPES = {
+            '回气丹': { materials: { '灵草': 3 }, successRate: 0.80, fuelCost: 100, desc: '恢复20%灵力', icon: '💊' },
+            '疗伤丹': { materials: { '灵草': 2, '妖兽血': 1 }, successRate: 0.75, fuelCost: 100, desc: '恢复30%生命', icon: '💊' },
+            '聚灵丹': { materials: { '灵石': 100, '灵草': 5 }, successRate: 0.60, fuelCost: 100, desc: '修炼速度+20%，持续3天', icon: '💊' },
+            '破境丹': { materials: { '灵石': 500, '天材': 2 }, successRate: 0.40, fuelCost: 100, desc: '突破瓶颈概率+15%', icon: '💊' },
+            '渡劫丹': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.30, fuelCost: 100, desc: '渡劫成功率+10%', icon: '💊' },
+            '洗髓丹': { materials: { '天材': 3, '灵石': 500 }, successRate: 0.50, fuelCost: 100, desc: '灵根刷新', icon: '💊' },
+            '混沌丹': { materials: { '混沌石': 1, '天材': 10 }, successRate: 0.20, fuelCost: 100, desc: '保底混沌灵根', icon: '💊', requireChaos: true }
+        };
+
+        // --- FORGE_RECIPES (965-972) ---
+        const FORGE_RECIPES = {
+            '凡铁剑': { materials: { '玄铁': 5 }, successRate: 0.90, fuelCost: 200, effect: { type: 'attack', value: 0.05 }, desc: '攻击+5%', icon: '⚔️' },
+            '青云剑': { materials: { '玄铁': 10, '天材': 1 }, successRate: 0.60, fuelCost: 200, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚔️' },
+            '混元珠': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.40, fuelCost: 200, effect: { type: 'crit', value: 0.10 }, desc: '暴击+10%', icon: '🔮' },
+            '金缕衣': { materials: { '天材': 3, '妖兽皮': 5 }, successRate: 0.50, fuelCost: 200, effect: { type: 'hp', value: 0.10 }, desc: '生命+10%', icon: '👘' },
+            '避火罩': { materials: { '天材': 2, '妖兽骨': 5 }, successRate: 0.45, fuelCost: 200, effect: { type: 'fireResist', value: 0.30 }, desc: '火抗+30%', icon: '🔥' },
+            '定神珠': { materials: { '天材': 5, '灵石': 2000 }, successRate: 0.35, fuelCost: 200, effect: { type: 'mindset', value: 0.20 }, desc: '精神状态+20%', icon: '📿' }
+        };
+
+        // --- MATERIALS (976-984) ---
+        const MATERIALS = {
+            '灵草': { type: 'herb', basePrice: 100, icon: '🌿', desc: '普通灵草，炼丹材料' },
+            '妖兽血': { type: 'beast', basePrice: 200, icon: '🩸', desc: '妖兽血液，炼丹炼器材料' },
+            '天材': { type: 'rare', basePrice: 500, icon: '✨', desc: '稀有天材，高级材料' },
+            '混沌石': { type: 'legendary', basePrice: 1667, icon: '💎', desc: '混沌神石，传说材料', requireChaos: true },
+            '玄铁': { type: 'metal', basePrice: 100, icon: '🔩', desc: '玄铁矿物，炼器材料' },
+            '妖兽皮': { type: 'beast', basePrice: 180, icon: '🐾', desc: '妖兽皮毛，炼器材料' },
+            '妖兽骨': { type: 'beast', basePrice: 220, icon: '🦴', desc: '妖兽骨骼，炼器材料' }
+        };
+
+        // --- ADVANCED_FORGE_RECIPES (988-1037) ---
+        const ADVANCED_FORGE_RECIPES = {
+            '灵宝·苍穹印': { 
+                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
+                fuelCost: 2000, 
+                desc: '灵宝·攻击+25%', icon: '🔮', 
+                effect: { type: 'attack', value: 0.25 }
+            },
+            '灵宝·玄武甲': { 
+                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
+                fuelCost: 2000, 
+                desc: '灵宝·防御+25%', icon: '🛡️', 
+                effect: { type: 'defense', value: 0.25 }
+            },
+            '圣器·天使神剑': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·攻击+40%', icon: '⚔️', 
+                effect: { type: 'attack', value: 0.40 }
+            },
+            '圣器·天使神甲': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·防御+40%', icon: '👘', 
+                effect: { type: 'defense', value: 0.40 }
+            },
+            '圣器·天使神翼': { 
+                materials: { '天材': 10, '混沌石': 3 }, 
+                fuelCost: 8000, 
+                desc: '圣器·全属性+15%', icon: '👼', 
+                effect: { type: 'all_stats', value: 0.15 }
+            },
+            '天神器·天使神剑': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·攻击+60%', icon: '⚔️', 
+                effect: { type: 'attack', value: 0.60 }
+            },
+            '天神器·天使神甲': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·防御+60%', icon: '👘', 
+                effect: { type: 'defense', value: 0.60 }
+            },
+            '天神器·天使神翼': { 
+                materials: { '天材': 20, '混沌石': 8 }, 
+                fuelCost: 20000, 
+                desc: '天神器·全属性+25%', icon: '👼', 
+                effect: { type: 'all_stats', value: 0.25 }
+            }
+        };
+
+        // --- SERENDIPITY_EVENTS (1041-1265) ---
+        const SERENDIPITY_EVENTS = {
+            // 正面奇遇
+            '古修士传承': {
+                type: 'positive',
+                icon: '📜',
+                minRealm: 2, // 金丹及以上
+                effect: (state) => {
+                    const rewards = [
+                        { type: 'spiritStones', value: Math.floor(1000 + Math.random() * 2000) },
+                        { type: 'technique', value: 1 }
+                    ];
+                    const reward = rewards[Math.floor(Math.random() * rewards.length)];
+                    if (reward.type === 'spiritStones') {
+                        state.spiritStones += reward.value;
+                        return { title: '古修士传承', text: `获得前辈遗留的 ${reward.value} 灵石！`, effects: [{ type: '灵石', value: reward.value, positive: true }] };
+                    } else {
+                        return { title: '古修士传承', text: '获得高阶功法传承！', effects: [{ type: '功法', value: 1, positive: true }] };
+                    }
+                }
+            },
+            '秘境入口': {
+                type: 'positive',
+                icon: '🌀',
+                minRealm: 0,
+                effect: (state) => {
+                    state.currentEvent = { type: '秘境入口', inProgress: true };
+                    return { title: '秘境入口', text: '发现一处神秘秘境入口，进入可能获得稀有奖励！', effects: [], showRealmBattle: true };
+                }
+            },
+            '神兽认主': {
+                type: 'positive',
+                icon: '🦅',
+                minRealm: 3, // 元婴及以上
+                effect: (state) => {
+                    const bonuses = [
+                        { type: 'attack', value: 0.1 },
+                        { type: 'defense', value: 0.1 },
+                        { type: 'cultivate_speed', value: 0.05 }
+                    ];
+                    const bonus = bonuses[Math.floor(Math.random() * bonuses.length)];
+                    state.activeEffects[bonus.type] += bonus.value;
+                    return { title: '神兽认主', text: `神兽与你结缘，${bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度'}+${Math.round(bonus.value * 100)}%！`, effects: [{ type: bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度', value: Math.round(bonus.value * 100) + '%', positive: true }] };
+                }
+            },
+            '仙人指路': {
+                type: 'positive',
+                icon: '🧙',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.serendipityBoostEndDay = state.days + 3;
+                    state.activeEffects.serendipity_boost = 0.15;
+                    return { title: '仙人指路', text: '仙人指点，突破成功率+30%，持续3天！', effects: [{ type: '突破成功率', value: '+30%', positive: true }] };
+                }
+            },
+            '灵根觉醒': {
+                type: 'positive',
+                icon: '✨',
+                minRealm: 0,
+                effect: (state) => {
+                    const gain = Math.floor(5 + Math.random() * 10);
+                    state.activeEffects.cultivate_speed += gain / 1000;
+                    return { title: '灵根觉醒', text: `灵根资质提升，修炼速度+${gain}%！`, effects: [{ type: '修炼速度', value: gain + '%', positive: true }] };
+                }
+            },
+            '顿悟': {
+                type: 'positive',
+                icon: '💡',
+                minRealm: 0,
+                effect: (state) => {
+                    state.spiritStones += 10000;
+                    return { title: '顿悟', text: '修炼中顿悟，获得10000灵石！', effects: [{ type: '灵石', value: 10000, positive: true }] };
+                }
+            },
+            // V7 体质相关奇遇
+            '天赐体质·至尊骨': {
+                type: 'positive',
+                icon: '🦴',
+                minRealm: 2, // 金丹及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '至尊骨'),
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '天赐体质·至尊骨', inProgress: true, choices: ['接受完整传承', '只取部分精华'] };
+                    return { title: '天赐体质·至尊骨', text: '异象降世！骨如金铁，光耀万里……你可否愿接受完整传承？', effects: [], showChoice: true };
+                }
+            },
+            '天赐体质·疾风灵体': {
+                type: 'positive',
+                icon: '💨',
+                minRealm: 1, // 筑基及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '疾风灵体'),
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '天赐体质·疾风灵体', inProgress: true, choices: ['与风融为一体', '保持自我意识'] };
+                    return { title: '天赐体质·疾风灵体', text: '风之精灵感应你的存在……与风融为一体可获完整灵体，但需冒风险。', effects: [], showChoice: true };
+                }
+            },
+            '天赐体质·重瞳': {
+                type: 'positive',
+                icon: '👁️',
+                minRealm: 3, // 元婴及以上
+                condition: (state) => !state.constitutions.find(c => c.type === '重瞳'),
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '天赐体质·重瞳', inProgress: true, choices: ['承受重瞳试炼', '以凡眼视之'] };
+                    return { title: '天赐体质·重瞳', text: '天道震怒！重瞳降临将开启你的天眼……试炼凶险，但成功后可看透万物本质。', effects: [], showChoice: true };
+                }
+            },
+            // 负面奇遇
+            '心魔入侵': {
+                type: 'negative',
+                icon: '👹',
+                minRealm: 3, // 元婴及以上
+                effect: (state) => {
+                    const loss = Math.floor(state.spiritStones * 0.3);
+                    state.spiritStones -= loss;
+                    state.serendipity.luckStatus = 'unlucky';
+                    state.serendipity.luckEndDay = state.days + 3;
+                    return { title: '心魔入侵', text: `心魔入侵，损失 ${loss} 灵石，运气-，持续3天！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
+                }
+            },
+            '仇家追杀': {
+                type: 'negative',
+                icon: '⚔️',
+                minRealm: 0,
+                condition: (state) => state.combat.losses > 0,
+                effect: (state) => {
+                    const loss = Math.floor(state.spiritStones * 0.5);
+                    state.spiritStones -= loss;
+                    return { title: '仇家追杀', text: `旧日仇家找上门来，损失 ${loss} 灵石！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
+                }
+            },
+            '魔器诱惑': {
+                type: 'negative',
+                icon: '🗡️',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '魔器诱惑', inProgress: true };
+                    return { title: '魔器诱惑', text: '发现一把散发魔气的武器，装备后每回合扣血！', effects: [], showChoice: true };
+                }
+            },
+            '走火入魔': {
+                type: 'negative',
+                icon: '💀',
+                minRealm: 0,
+                condition: (state) => state.cultivationProgress > 1000,
+                effect: (state) => {
+                    if (state.realm > 0) state.realm--;
+                    state.cultivationProgress = 0;
+                    state.serendipity.luckStatus = 'unlucky';
+                    state.serendipity.luckEndDay = state.days + 3;
+                    return { title: '走火入魔', text: '修炼过度，走火入魔！境界-1，强制休息！', effects: [{ type: '境界', value: -1, positive: false }] };
+                }
+            },
+            '妖兽袭击': {
+                type: 'negative',
+                icon: '🐺',
+                minRealm: 0,
+                effect: (state) => {
+                    state.currentEvent = { type: '妖兽袭击', inProgress: true };
+                    return { title: '妖兽袭击', text: '遭遇妖兽袭击！', effects: [], showRealmBattle: true, isNegative: true };
+                }
+            },
+            // 中性奇遇
+            '乞丐讨缘': {
+                type: 'neutral',
+                icon: '🙏',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '乞丐讨缘', inProgress: true, choices: ['施舍100灵石', '不给'] };
+                    return { title: '乞丐讨缘', text: '路遇乞丐向你讨缘，你会怎么做？', effects: [] };
+                }
+            },
+            '商人交易': {
+                type: 'neutral',
+                icon: '💰',
+                minRealm: 0,
+                effect: (state) => {
+                    const items = ['聚灵丹', '心魔丹', '金髓丹'];
+                    const item = items[Math.floor(Math.random() * items.length)];
+                    const cost = Math.floor(100 + Math.random() * 200);
+                    if (state.spiritStones >= cost) {
+                        state.spiritStones -= cost;
+                        addItemToInventory(item, 1);
+                        return { title: '商人交易', text: `花费 ${cost} 灵石购买了 ${item}！`, effects: [{ type: '灵石', value: -cost, positive: false }, { type: item, value: 1, positive: true }] };
+                    } else {
+                        return { title: '商人交易', text: '灵石不足，无法交易！', effects: [] };
+                    }
+                }
+            },
+            '散修求助': {
+                type: 'neutral',
+                icon: '👤',
+                minRealm: 0,
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '散修求助', inProgress: true, choices: ['帮助', '不帮'] };
+                    return { title: '散修求助', text: '一位散修请求你帮忙，你会帮助吗？', effects: [] };
+                }
+            },
+            // B1 扩充奇遇
+            '天地精华': {
+                type: 'positive',
+                icon: '🌟',
+                minRealm: 0,
+                effect: (state) => {
+                    const qiGain = Math.floor(state.maxQi * 0.5);
+                    state.qi = Math.min(state.maxQi, state.qi + qiGain);
+                    return { title: '天地精华', text: `吸收天地精华，灵气+${qiGain}！`, effects: [{ type: '灵气', value: qiGain, positive: true }] };
+                }
+            },
+            '心魔试炼': {
+                type: 'negative',
+                icon: '👹',
+                minRealm: 1, // 筑基及以上
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '心魔试炼', inProgress: true, choices: ['勇敢面对', '退缩'] };
+                    return { title: '心魔试炼', text: '识海中浮现心魔化身！你要直面还是退缩？', effects: [], showChoice: true };
+                }
+            },
+            '上古遗迹': {
+                type: 'neutral',
+                icon: '🏛️',
+                minRealm: 2, // 金丹及以上
+                effect: (state) => {
+                    state.serendipity.currentEvent = { type: '上古遗迹', inProgress: true, choices: ['深入探索', '浅尝辄止', '离开'] };
+                    return { title: '上古遗迹', text: '发现一处上古遗迹，灵气浓郁！如何行动？', effects: [], showChoice: true };
+                }
+            }
+        };
+
+        // --- SERENDIPITY_TALISMANS (1268-1273) ---
+        const SERENDIPITY_TALISMANS = {
+            '祥云符': { type: 'consumable', effect: { type: 'serendipity_boost', value: 0.1 }, duration: 1, price: 2000, desc: '奇遇概率+10%，持续1天', icon: '☁️' },
+            '避厄符': { type: 'consumable', effect: { type: 'immune_negative', value: 1 }, duration: 1, price: 1500, desc: '免疫下次负面奇遇', icon: '🛡️' },
+            '探路符': { type: 'consumable', effect: { type: 'force_realm', value: 1 }, duration: 0, price: 3000, desc: '指定触发"秘境入口"奇遇', icon: '📜' },
+            '还童丹': { type: 'consumable', effect: { type: 'convert_demon', value: 1 }, duration: 0, price: 5000, desc: '将魔器转换为正常法宝', icon: '💊' }
+        };
+
+        // --- SPIRIT_ROOT_QUALITIES (1278-1285) ---
+        const SPIRIT_ROOT_QUALITIES = {
+            '伪灵根': { grade: 0, icon: '🌱', speedBonus: 0.6, bottleneckBonus: 0.4, tribulationBonus: -0.2, weight: 35 },
+            '下品灵根': { grade: 1, icon: '🌿', speedBonus: 0.8, bottleneckBonus: 0.2, tribulationBonus: -0.1, weight: 25 },
+            '中品灵根': { grade: 2, icon: '🌳', speedBonus: 1.0, bottleneckBonus: 0, tribulationBonus: 0, weight: 20 },
+            '上品灵根': { grade: 3, icon: '🌲', speedBonus: 1.3, bottleneckBonus: -0.15, tribulationBonus: 0.1, weight: 12 },
+            '天灵根': { grade: 4, icon: '✨', speedBonus: 1.6, bottleneckBonus: -0.25, tribulationBonus: 0.2, weight: 6 },
+            '混沌灵根': { grade: 5, icon: '🌈', speedBonus: 2.0, bottleneckBonus: -0.4, tribulationBonus: 0.3, weight: 2 }
+        };
+
+        // --- FIVE_ELEMENT_TECHNIQUES (1288-1294) ---
+        const FIVE_ELEMENT_TECHNIQUES = {
+            '金': { name: '庚金剑诀', icon: '⚔️', bonusType: 'attack', bonusValue: 0.25, threshold: 20 },
+            '木': { name: '青木长生诀', icon: '🌿', bonusType: 'heal', bonusValue: 0.5, threshold: 20 },
+            '水': { name: '玄冰寒咒', icon: '❄️', bonusType: 'defense', bonusValue: 0.2, threshold: 20 },
+            '火': { name: '烈焰真经', icon: '🔥', bonusType: 'attack', bonusValue: 0.2, threshold: 20 },
+            '土': { name: '厚土玄功', icon: '🛡️', bonusType: 'resist', bonusValue: 0.25, threshold: 20 }
+        };
+
+        // --- CONSTITUTIONS (1297-1360) ---
+        const CONSTITUTIONS = {
+            '先天道体': {
+                icon: '👼',
+                desc: '全属性+20%，修炼速度+50%',
+                effect: { allStats: 0.2, cultivateSpeed: 0.5 },
+                trigger: (state) => state.spiritRoot.quality === '混沌灵根' && state.realm >= 3,
+                source: '混沌灵根突破元婴'
+            },
+            '至尊骨': {
+                icon: '🦴',
+                desc: '攻击+30%，战斗中暴击+15%',
+                effect: { attack: 0.3, crit: 0.15 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            },
+            '琉璃玉体': {
+                icon: '💎',
+                desc: '防御+25%，受到伤害-15%',
+                effect: { defense: 0.25, damageReduce: 0.15 },
+                trigger: (state) => {
+                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
+                    return grade >= 2 && state.realm === 2 && state.cultivationProgress >= REALM_REQUIREMENTS[2].stageThreshold[2];
+                },
+                source: '中品以上灵根突破金丹'
+            },
+            '玄冥之体': {
+                icon: '🌊',
+                desc: '水系功法伤害+40%，水系抗性+50%',
+                effect: { waterBonus: 0.4, waterResist: 0.5 },
+                trigger: (state) => state.spiritRoot.affinity.water >= 80,
+                source: '水属性亲和≥80'
+            },
+            '烈焰战体': {
+                icon: '🔥',
+                desc: '火系功法伤害+40%，生命上限+20%',
+                effect: { fireBonus: 0.4, hpBonus: 0.2 },
+                trigger: (state) => state.spiritRoot.affinity.fire >= 80,
+                source: '火属性亲和≥80'
+            },
+            '疾风灵体': {
+                icon: '💨',
+                desc: '速度+35%，先手概率+25%',
+                effect: { speed: 0.35, firstStrike: 0.25 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            },
+            '不灭金身': {
+                icon: '🛡️',
+                desc: '免疫一次致命伤害，每日1次',
+                effect: { lethalImmune: 1 },
+                trigger: (state) => {
+                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
+                    return grade >= 3 && state.realm === 4 && state.cultivationProgress >= REALM_REQUIREMENTS[4].stageThreshold[2];
+                },
+                source: '上品以上灵根突破化神'
+            },
+            '重瞳': {
+                icon: '👁️',
+                desc: '可预判敌人攻击，闪避+20%',
+                effect: { dodge: 0.2, foresee: 1 },
+                trigger: () => false, // 只能通过奇遇获得
+                source: '随机奇遇'
+            }
+        };
+
+        // --- REALM_REQUIREMENTS (1483-1489) ---
+        const REALM_REQUIREMENTS = {
+            0: { maxQi: 100, stageThreshold: [30, 60, 90], breakthroughQi: 100 },
+            1: { maxQi: 200, stageThreshold: [60, 120, 180], breakthroughQi: 200 },
+            2: { maxQi: 400, stageThreshold: [120, 240, 360], breakthroughQi: 400 },
+            3: { maxQi: 800, stageThreshold: [240, 480, 720], breakthroughQi: 800 },
+            4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 }
+        };
+
+        // --- DEFAULT_MINIMAX_CONFIG (1505-1515) ---
+        const DEFAULT_MINIMAX_CONFIG = {
+            apiKey: '',
+            baseUrl: 'https://api.minimaxi.com/v1',
+            model: 'MiniMax-M2.7',
+            groupId: '',
+            features: {
+                aiDialogue: false,
+                aiSerendipity: false,
+                aiTechnique: false
+            }
+        };
+
+        // --- TECHNIQUE_BONUS (5014-5019) ---
+        const TECHNIQUE_BONUS = {
+            '雷法': { beats: '体术', losesTo: '火法' },
+            '火法': { beats: '雷法', losesTo: '水法' },
+            '水法': { beats: '火法', losesTo: '体术' },
+            '体术': { beats: '水法', losesTo: '雷法' }
+        };
+
+        // --- TECHNIQUE_COLORS (5020-5025) ---
+        const TECHNIQUE_COLORS = {
+            '雷法': '#ffff00',
+            '火法': '#ff4500',
+            '水法': '#00bfff',
+            '体术': '#228b22'
+        };
+
+        // --- SECT_CONFIG (6086-6101) ---
+        const SECT_CONFIG = {
+            createCost: 50000,
+            maxDisciples: { 1: 30, 2: 50, 3: 80 },
+            upgradeCost: { 2: 80000, 3: 150000 },
+            upgradeDisciples: { 2: 20, 3: 40 },
+            buildings: {
+                library: { name: '功法阁', icon: '📚', cost: 10000, unlockLevel: 1, desc: '存放可供传承的功法' },
+                alchemy: { name: '炼丹房', icon: '⚗️', cost: 20000, unlockLevel: 2, desc: '宗门产出丹药' },
+                forge: { name: '炼器室', icon: '🔨', cost: 20000, unlockLevel: 2, desc: '宗门产出法宝' },
+                archive: { name: '藏经阁', icon: '🏛️', cost: 50000, unlockLevel: 3, desc: '存放至高功法' }
+            },
+            talents: ['下品', '中品', '上品', '极品'],
+            talentWeights: [0.4, 0.35, 0.2, 0.05],
+            techniqueGrades: ['人阶', '灵阶', '天阶', '仙阶'],
+            techniqueGradeColors: ['grade-human', 'grade-spirit', 'grade-heaven', 'grade-immortal']
+        };
+
+        // --- SECT_TECHNIQUES (6104-6111) ---
+        const SECT_TECHNIQUES = {
+            '基础练气诀': { grade: 0, effect: { type: 'cultivate_speed', value: 0.05 }, desc: '修炼速度+5%', icon: '📖' },
+            '灵根培育法': { grade: 1, effect: { type: 'qi_rate', value: 0.1 }, desc: '灵气获取+10%', icon: '🌱' },
+            '天元心法': { grade: 1, effect: { type: 'breakthrough_boost', value: 0.1 }, desc: '突破成功率+10%', icon: '☀️' },
+            '金刚炼体术': { grade: 2, effect: { type: 'defense', value: 0.15 }, desc: '防御+15%', icon: '🛡️' },
+            '紫霄雷法': { grade: 2, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚡' },
+            '九转玄天诀': { grade: 3, effect: { type: 'all_stats', value: 0.1 }, desc: '全属性+10%', icon: '🌟' }
+        };
+
+
+// ===== state.js =====
+
+        // --- gameState (1366-1480) ---
+        let gameState = {
+            realm: 0,       // 0-4 对应 炼气到化神
+            stage: 0,       // 0-2 对应 初期/中期/后期
+            qi: 0,
+            maxQi: 100,
+            spiritStones: 50,
+            mindset: 50,
+            days: 1,
+            cultivationProgress: 0,
+            eventLog: [],
+            combatLogHistory: [],
+            eventLogHistory: [],
+            isGameOver: false,
+            isVictory: false,
+            // V2新增字段
+            inventory: [],
+            equippedTreasures: [null, null, null],
+            maxInventorySlots: 20,
+            shopItems: [],
+            lastShopDay: 0,
+            activeEffects: {
+                breakthrough_boost: 0,
+                cultivate_speed: 0,
+                渡劫_mindset_protect: 0,
+                attack: 0,
+                defense: 0,
+                cultivate_qi_rate: 0,
+                渡劫_damage_reduce: 0,
+                escape: 0,
+                foresee_event: 0,
+                all_stats: 0,
+                serendipity_boost: 0
+            },
+            // V3渡劫系统字段
+            tribulation: {
+                inProgress: false,
+                currentStage: 0,
+                totalStages: 9,
+                currentType: null,
+                preparations: [],
+                damageTaken: 0,
+                tribKey: null
+            },
+            hasTransmigrationBuff: false,
+            tribulationRecord: [],
+            // V4 战斗系统字段
+            combat: {
+                wins: 0,
+                losses: 0,
+                honor: 0,
+                fame: 0,
+                battleHistory: [],
+                injured: false,
+                injuryEndDay: 0
+            },
+            // V5 宗门系统字段
+            sect: {
+                name: null,
+                level: 0,
+                spiritStones: 0,
+                disciples: [],
+                elders: [],
+                buildings: {
+                    library: false,
+                    alchemy: false,
+                    forge: false,
+                    archive: false
+                },
+                techniques: [],
+                contributionShop: [],
+                lastShopRefresh: 0,
+                lastResourceCollection: 0,
+                // V29 NPC AI系统
+                npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
+                npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
+                npcLastActions: {},        // {uid: {action, day}}
+                // V30 渡劫审批系统
+                tribulationRequest: {
+                    status: 'none',        // none | pending_elder | pending_leader | approved | rejected
+                    elderScore: 0,
+                    elderComment: '',
+                    leaderDecision: '',
+                    leaderComment: '',
+                    buffApplied: false,
+                    submitDay: 0
+                },
+                // V31 天道轮回系统
+                celestialCycle: {
+                    day: 0,                // 距离下次轮回的天数
+                    completed: false,      // 本周期是否已完成
+                    lastResult: null,       // 上次轮回结果 {type, text, effects}
+                    blessingActive: false, // 气运祈福是否激活
+                    cycleInterval: 3        // 轮回间隔天数
+                },
+                // V35 宗门任务链
+                sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+                sectMissionCooldown: 0    // 任务冷却
+            },
+            // V6 奇遇系统字段
+            serendipity: {
+                lastTriggerDay: 0,
+                todayCount: 0,
+                lastTriggerType: null,
+                cooldownTypes: {},
+                badLuck: 0,
+                currentEvent: null,
+                log: [],
+                luckStatus: null,
+                luckEndDay: 0,
+                serendipityBoostEndDay: 0
+            },
+            // V7 灵根/体质系统字段
+            spiritRoot: {
+                quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
+                affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+                resonance: 0,
+                lastRefreshDay: 0,
+                awakeningAvailable: false, // V32 是否可以觉醒
+                hasAwakened: false,          // V32 是否已完成觉醒
+                awakenedQuality: null        // V32 觉醒后的品质
+            },
+            // V32 灵根觉醒系统
+            spiritRootAwakening: {
+                status: 'dormant',   // dormant | stage1 | stage2 | stage3 | completed
+                stage: 0,
+                triggerDay: 0,
+                tasks: [],           // [{type, target, current, completed}]
+                rewards: null,
+                lastEventDay: 0,
+                attempts: 0
+            },
+            constitutions: [], // 已获得的体质
+            // V8 丹药炼器系统字段
+            crafting: {
+                furnace: { level: 1, type: 'alchemy' },
+                anvil: { level: 1, type: 'forge' },
+                transactionLog: []
+            },
+            // V11 成就/称号系统字段
+            title: '筑基修士',
+            achievements: {
+                unlocked: [],
+                titles: [],
+                stats: {
+                    tribulationsCompleted: 0,
+                    dungeonBossesKilled: 0,
+                    sectContributions: 0,
+                    treasuresRefined: 0,
+                    serendipitiesEncountered: 0,
+                    flawlessTribulations: 0
+                }
+            },
+            // V11 飞升系统字段
+            currentRealm: 'mortal',  // 'mortal' | 'immortal'
+            immortal: null,          // 仙界状态，飞升后初始化
+            mounts: [],              // 仙兽列表（最多3只）
+            immortalSkills: [],       // 仙法列表
+            immortalEquipment: {      // 飞升装备栏
+                head: null,
+                body: null,
+                foot: null,
+                weapon: null,
+                shield: null,
+                accessory: null
+            },
+            currentMount: null       // 当前骑乘的仙兽
+        };
+
+        // --- miniMaxConfig (1492-1502) ---
+        let miniMaxConfig = {
+            apiKey: '',
+            baseUrl: 'https://api.minimaxi.com/v1',
+            model: 'MiniMax-M2.7',
+            groupId: '',
+            features: {
+                aiDialogue: false,
+                aiSerendipity: false,
+                aiTechnique: false
+            }
+        };
+        // 确保其他模块可访问（window fallback 防止 TDZ）
+        window.miniMaxConfig = miniMaxConfig;
+
+        // --- combatState (5037-5051) ---
+        let combatState = {
+            inProgress: false,
+            player: null,
+            opponent: null,
+            round: 0,
+            turn: 'player',
+            playerAction: null,
+            playerSubAction: null,
+            log: [],
+            effects: {
+                player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
+                opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
+            },
+            battleRecord: [],
+            // V33 战斗AI学习系统
+            combatProfile: {
+                playerPatterns: [],     // [{action, count, lastUsed}]
+                totalBattles: 0,
+                winsAgainst: 0,
+                currentEnemy: null,
+                learningData: {},       // {enemyId: {adaptationLevel, observedPatterns}}
+                preferredDistance: null,
+                spellUsageRate: 0,
+                defenseFrequency: 0,
+                attackTiming: []
+            },
+            lastCombatDay: 0,           // V33 上次战斗天数（用于触发学习）
+            // V35 宗门互动增强
+            sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
+            sectMissionCooldown: 0,    // 任务冷却
+            lastMissionRefreshDay: 0,   // 上次任务刷新
+            // V36 装备打造增强
+            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
+            lastForgeDay: 0,            // 上次打造时间
+            // V37 天道法则系统
+            celestialLaws: {
+                comprehended: [],          // 已领悟的法则 ['time','space',...]
+                active: [],                // 当前激活的法则（最多3个）
+                comprehending: null,        // 当前领悟中的法则
+                comprehendingProgress: 0,  // 领悟进度 0-100
+                comprehendDays: 0,         // 领悟已进行的天数
+                maxActiveLaws: 3,          // 最大激活数量
+                lawBonus: {}               // 当前激活法则计算后的加成
+            },
+            // V38 仙界社交系统
+            immortalAlly: {
+                id: null,
+                name: '',
+                rank: 1,
+                role: 'none',     // none|member|elder|vice_leader|leader
+                contribution: 0,
+                joinedDay: 0,
+                allies: [],
+                skillLevel: 0,
+                dailyActivity: 0,
+                lastActivityDay: 0
+            },
+            immortalFriends: [],   // [{uid, name, realm, intimacy, lastInteraction}]
+            allyApplications: [],   // [{allyId, allyName, allyRank, applyDay, status}]
+            // V39 仙宠培养系统
+            spiritPets: {
+                pets: [],
+                lastInteractionDay: 0
+            },
+            // V40 仙界拍卖行
+            auction: {
+                listings: [],
+                frozenFunds: 0,
+                playerId: null,
+                playerName: null,
+                sortType: 'endingSoon'
+            },
+            // V41 仙界经济系统
+            economy: {
+                currentInflation: 0.02,
+                totalIncome: 0,
+                totalExpense: 0,
+                totalTax: 0,
+                totalWealth: 0,
+                avgDailyIncome: 50,
+                avgDailyExpense: 0,
+                luxuryPurchases: 0,
+                activeEvents: [],
+                economyBuffs: {}
+            },
+            // V42 天道竞技场
+            celestialArena: {
+                currentSeason: 1,
+                seasonStartTime: Date.now(),
+                currentRank: 1,
+                highestRank: 1,
+                score: 0,
+                totalScoreEarned: 0,
+                totalWins: 0,
+                totalLosses: 0,
+                currentStreak: 0,
+                longestStreak: 0,
+                promotionWins: 0,
+                dailyChallengesUsed: 0,
+                derankProtection: 2,
+                matchHistory: [],
+                lastRewardClaimed: 0,
+                totalRewardsClaimed: 0,
+                bountyPool: 0,
+                bountyWins: 0
+            },
+            // V43 仙宫建设系统
+            palace: {
+                level: 1,
+                prosperity: 100,
+                buildings: [],
+                workers: [],
+                styleIndex: 0,
+                bonus: {
+                    incomeBonus: 0,
+                    cultivationSpeed: 0,
+                    serendipityChance: 0,
+                    combatPower: 0
+                },
+                totalWagesPaid: 0
+            },
+            // V44 仙法创造系统
+            customSpells: [],
+            essences: {},
+            // V45 天道轮回增强
+            karma: {
+                points: 0,
+                goodKarma: 0,
+                evilKarma: 0,
+                reincarnationCount: 0,
+                pastLifeMemories: []
+            }
+        };
+
+        // --- secretRealmState (7391-7398) ---
+        let secretRealmState = {
+            wave: 0,
+            totalWaves: 3,
+            enemies: [],
+            playerHP: 0,
+            playerMaxHP: 0,
+            rewards: []
+        };
+
+
+// ===== ui.js =====
+
+        // --- CONTINENTS (7877-7926) ---
+        const CONTINENTS = {
+            '中州': {
+                icon: '🏯',
+                requiredRealm: 0, // 筑基
+                dangerLevel: 1,
+                description: '新手大陆，安全区域，宗门林立',
+                color: '#4caf50',
+                regions: ['中州城', '中州野外', '青云山']
+            },
+            '南疆': {
+                icon: '🌴',
+                requiredRealm: 1, // 金丹
+                dangerLevel: 2,
+                description: '妖兽聚集之地，材料丰富',
+                color: '#ff9800',
+                regions: ['南疆密林', '妖兽谷', '毒瘴沼泽']
+            },
+            '北域': {
+                icon: '❄️',
+                requiredRealm: 2, // 元婴
+                dangerLevel: 3,
+                description: '宗门林立，功法交易盛行',
+                color: '#2196f3',
+                regions: ['北域雪山', '冰魄宫', '寒冰洞府']
+            },
+            '西域': {
+                icon: '🏜️',
+                requiredRealm: 3, // 化神
+                dangerLevel: 4,
+                description: '秘境众多，机缘深厚',
+                color: '#ff5722',
+                regions: ['西域沙漠', '火焰山', '风沙遗迹']
+            },
+            '东海': {
+                icon: '🌊',
+                requiredRealm: 2, // 元婴
+                dangerLevel: 3,
+                description: '海族领地，神兽出没',
+                color: '#00bcd4',
+                regions: ['东海渔村', '深海礁石', '龙宫入口']
+            },
+            '仙界碎片': {
+                icon: '✨',
+                requiredRealm: 4, // 渡劫
+                dangerLevel: 5,
+                description: '飞升前最终试炼，蕴含成仙之秘',
+                color: '#9c27b0',
+                regions: ['仙府遗迹', '天劫之渊', '飞升祭坛']
+            }
+        };
+
+        // --- REGIONS (7929-8052) ---
+        const REGIONS = {
+            '中州城': {
+                type: 'safe', // 安全区
+                monsters: [],
+                resources: ['灵草', '普通矿石'],
+                description: '繁华的修仙者聚落，可休息和交易'
+            },
+            '中州野外': {
+                type: 'wild', // 野外区
+                monsters: ['野兔精', '狐狸精'],
+                monsterLevel: [1, 5],
+                resources: ['灵草', '妖兽血'],
+                description: '中州边缘的野外区域，有低级妖兽出没'
+            },
+            '青云山': {
+                type: 'secret', // 秘境
+                secretRealm: '青云洞府',
+                difficulty: 'low',
+                description: '上古修士洞府，藏有入门功法'
+            },
+            '南疆密林': {
+                type: 'wild',
+                monsters: ['妖兽狼', '巨蟒'],
+                monsterLevel: [10, 20],
+                resources: ['妖兽皮', '妖兽骨', '南疆蛊虫'],
+                description: '密林深处，妖兽横行'
+            },
+            '妖兽谷': {
+                type: 'boss', // 有首领
+                monsters: ['妖兽狼王'],
+                monsterLevel: [25],
+                bossName: '妖兽谷主',
+                resources: ['妖兽皮', '兽王胆'],
+                description: '妖兽聚集之地，首领，每7天刷新'
+            },
+            '毒瘴沼泽': {
+                type: 'wild',
+                monsters: ['毒蛙', '沼蟒'],
+                monsterLevel: [15, 25],
+                resources: ['毒囊', '沼泽精华'],
+                description: '充满毒气的沼泽区域'
+            },
+            '北域雪山': {
+                type: 'wild',
+                monsters: ['冰魄熊', '雪怪'],
+                monsterLevel: [25, 35],
+                resources: ['冰魄精', '寒冰髓'],
+                description: '终年积雪，寒冷刺骨'
+            },
+            '冰魄宫': {
+                type: 'boss',
+                monsters: ['冰魄熊王'],
+                monsterLevel: [40],
+                bossName: '冰魄宫主',
+                resources: ['冰魄精', '万年寒冰'],
+                description: '冰系修士的圣地，首领，每7天刷新'
+            },
+            '寒冰洞府': {
+                type: 'secret',
+                secretRealm: '上古冰宫',
+                difficulty: 'medium',
+                description: '上古遗迹，藏有冰系高阶功法'
+            },
+            '西域沙漠': {
+                type: 'wild',
+                monsters: ['沙虫', '蝎王'],
+                monsterLevel: [40, 50],
+                resources: ['沙之心', '蝎王毒'],
+                description: '茫茫沙漠，危机四伏'
+            },
+            '火焰山': {
+                type: 'boss',
+                monsters: ['火焰狮王'],
+                monsterLevel: [55],
+                bossName: '火焰山主',
+                resources: ['火精', '熔岩核心'],
+                description: '火焰肆虐之地，首领，每7天刷新'
+            },
+            '风沙遗迹': {
+                type: 'secret',
+                secretRealm: '古修士遗迹',
+                difficulty: 'high',
+                description: '上古遗迹，藏有混沌石'
+            },
+            '东海渔村': {
+                type: 'safe',
+                monsters: [],
+                resources: ['珍珠', '海藻'],
+                description: '东海之滨的小渔村，可休整'
+            },
+            '深海礁石': {
+                type: 'wild',
+                monsters: ['海妖', '巨型章鱼'],
+                monsterLevel: [35, 45],
+                resources: ['海妖珠', '深海珍珠'],
+                description: '深海区域，海族妖兽出没'
+            },
+            '龙宫入口': {
+                type: 'secret',
+                secretRealm: '东海龙宫',
+                difficulty: 'high',
+                description: '传说中龙族的宫殿，藏有龙族秘宝'
+            },
+            '仙府遗迹': {
+                type: 'secret',
+                secretRealm: '仙府',
+                difficulty: 'extreme',
+                description: '仙界碎片中的遗迹，有飞升道具'
+            },
+            '天劫之渊': {
+                type: 'boss',
+                monsters: ['天劫守护兽'],
+                monsterLevel: [70],
+                bossName: '天劫化身',
+                resources: ['天劫雷晶', '渡劫丹方'],
+                description: '天劫之力凝聚，首领，每7天刷新'
+            },
+            '飞升祭坛': {
+                type: 'secret',
+                secretRealm: '飞升台',
+                difficulty: 'extreme',
+                description: '最终飞升之地，需要渡劫期才能进入'
+            }
+        };
+
+        // --- SECRET_REALMS (8055-8086) ---
+        const SECRET_REALMS = {
+            '青云洞府': {
+                duration: 30,
+                reward: '入门功法',
+                successRate: 0.8
+            },
+            '上古冰宫': {
+                duration: 40,
+                reward: '冰系功法',
+                successRate: 0.6
+            },
+            '古修士遗迹': {
+                duration: 50,
+                reward: '混沌石',
+                successRate: 0.4
+            },
+            '东海龙宫': {
+                duration: 50,
+                reward: '龙族材料',
+                successRate: 0.35
+            },
+            '仙府': {
+                duration: 60,
+                reward: '飞升道具',
+                successRate: 0.25
+            },
+            '飞升台': {
+                duration: 60,
+                reward: '飞升丹',
+                successRate: 0.2
+            }
+        };
+
+
+// ===== achievements.js =====
 
         // ===== checkAchievements =====
         function checkAchievements() {
@@ -317,919 +1482,689 @@
         }
 
 
-// Auto-generated module: arena.js
+// ===== cultivation.js =====
 
-// ===== CELESTIAL_ARENA CONSTANTS (V42) =====
-const ARENA_CONFIG = {
-    seasonDays: 14,           // 赛季周期14天
-    dailyChallenges: 3,       // 每日挑战次数
-    rankTiers: 12,            // 段位数量
-    promotionMatches: 3,       // 晋级赛所需场次
-    derankProtection: 2,       // 掉段保护次数
-    matchHistoryLimit: 50,
-    rewardClaimDays: 7         // 奖励领取期限
-};
-
-const ARENA_RANKS = {
-    // 段位名称和图标
-    1:  { name: '青铜Ⅰ', icon: '🥉', minScore: 0, promotionScore: 100 },
-    2:  { name: '青铜Ⅱ', icon: '🥈', minScore: 100, promotionScore: 200 },
-    3:  { name: '青铜Ⅲ', icon: '🥇', minScore: 200, promotionScore: 350 },
-    4:  { name: '白银Ⅰ', icon: '🤍', minScore: 350, promotionScore: 500 },
-    5:  { name: '白银Ⅱ', icon: '🩶', minScore: 500, promotionScore: 700 },
-    6:  { name: '白银Ⅲ', icon: '💿', minScore: 700, promotionScore: 900 },
-    7:  { name: '黄金Ⅰ', icon: '🥉', minScore: 900, promotionScore: 1200 },
-    8:  { name: '黄金Ⅱ', icon: '🥈', minScore: 1200, promotionScore: 1500 },
-    9:  { name: '黄金Ⅲ', icon: '🥇', minScore: 1500, promotionScore: 2000 },
-    10: { name: '钻石Ⅰ', icon: '💎', minScore: 2000, promotionScore: 3000 },
-    11: { name: '钻石Ⅱ', icon: '💠', minScore: 3000, promotionScore: 4500 },
-    12: { name: '至尊', icon: '👑', minScore: 4500, promotionScore: 99999 }
-};
-
-const ARENA_REWARDS = {
-    // 段位赛季奖励
-    1:  { stones: 500, honor: 50, badge: '青铜勋章' },
-    2:  { stones: 800, honor: 80, badge: '青铜勋章' },
-    3:  { stones: 1200, honor: 120, badge: '青铜之星' },
-    4:  { stones: 1800, honor: 180, badge: '白银勋章' },
-    5:  { stones: 2500, honor: 250, badge: '白银勋章' },
-    6:  { stones: 3500, honor: 350, badge: '白银之星' },
-    7:  { stones: 5000, honor: 500, badge: '黄金勋章' },
-    8:  { stones: 7000, honor: 700, badge: '黄金勋章' },
-    9:  { stones: 10000, honor: 1000, badge: '黄金之星' },
-    10: { stones: 15000, honor: 1500, badge: '钻石勋章' },
-    11: { stones: 25000, honor: 2500, badge: '钻石勋章' },
-    12: { stones: 50000, honor: 5000, badge: '至尊龙徽' }
-};
-
-const ARENA_BATTLE_MODES = {
-    '排位赛': {
-        icon: '🎯',
-        desc: '提升段位，获取丰厚奖励',
-        scoreWin: 25,
-        scoreLose: -15,
-        cost: 0
-    },
-    '练习赛': {
-        icon: '⚔️',
-        desc: '无风险，积累战斗经验',
-        scoreWin: 5,
-        scoreLose: 0,
-        cost: 0
-    },
-    '赏金赛': {
-        icon: '💰',
-        desc: '支付灵石参赛，胜者瓜分奖池',
-        scoreWin: 30,
-        scoreLose: -20,
-        cost: 500
-    }
-};
-
-// ===== ARENA FUNCTIONS =====
-
-function showArenaPanel() {
-    const arena = gameState.celestialArena;
-    const now = Date.now();
-    const seasonEnd = arena.seasonStartTime + ARENA_CONFIG.seasonDays * 86400000;
-    const seasonDaysLeft = Math.max(0, Math.ceil((seasonEnd - now) / 86400000));
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff6f00;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff6f00;text-align:center;margin-bottom:10px;">🏆 天道竞技场</h2>
-            <div style="text-align:center;color:#aaa;margin-bottom:15px;">
-                第${arena.currentSeason}赛季 | 剩余${seasonDaysLeft}天 | 段位: ${ARENA_RANKS[arena.currentRank]?.icon} ${ARENA_RANKS[arena.currentRank]?.name}
-            </div>
-
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px;">
-                <div style="background:rgba(255,111,0,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">积分</div>
-                    <div style="color:#ffd700;font-size:1.3em;font-weight:bold;">${arena.score}</div>
+        // ===== renderLog =====
+        function renderLog() {
+            const container = document.getElementById('logEntries');
+            const recentLogs = gameState.eventLog.slice(0, 5);
+            container.innerHTML = recentLogs.map(log => `
+                <div class="log-entry ${log.type}">
+                    <div class="log-entry-title">第${log.day}天 - ${log.title}</div>
+                    <div class="log-entry-text">${log.text}</div>
                 </div>
-                <div style="background:rgba(255,111,0,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">胜场</div>
-                    <div style="color:#4caf50;font-size:1.3em;font-weight:bold;">${arena.totalWins}</div>
-                </div>
-                <div style="background:rgba(255,111,0,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">负场</div>
-                    <div style="color:#f44336;font-size:1.3em;font-weight:bold;">${arena.totalLosses}</div>
-                </div>
-                <div style="background:rgba(255,111,0,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">连胜</div>
-                    <div style="color:#ff9800;font-size:1.3em;font-weight:bold;">${arena.currentStreak}</div>
-                </div>
-            </div>
-
-            <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-                <button class="btn" style="background:#4caf50;color:white;" onclick="showArenaRankings()">📊 排行榜</button>
-                <button class="btn" style="background:#2196f3;color:white;" onclick="showArenaHistory()">📜 战斗记录</button>
-                <button class="btn" style="background:#9c27b0;color:white;" onclick="showArenaRewards()">🎁 段位奖励</button>
-                <button class="btn" style="background:#ff9800;color:white;" onclick="claimArenaSeasonReward()">✨ 领取奖励</button>
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <h3 style="color:#ffd700;margin-bottom:10px;">⚔️ 挑战模式</h3>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">`;
-
-    Object.entries(ARENA_BATTLE_MODES).forEach(([mode, data]) => {
-        const canAfford = mode === '赏金赛' ? gameState.spiritStones >= data.cost : true;
-        const challengesLeft = mode === '排位赛' ? Math.max(0, ARENA_CONFIG.dailyChallenges - arena.dailyChallengesUsed) : '∞';
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:12px;">
-            <div style="color:#ffd700;font-weight:bold;font-size:1.1em;">${data.icon} ${mode}</div>
-            <div style="color:#aaa;font-size:0.85em;margin:5px 0;">${data.desc}</div>
-            <div style="color:#aaa;font-size:0.85em;">今日剩余: ${challengesLeft}</div>
-            ${mode === '赏金赛' ? `<div style="color:#ff9800;font-size:0.85em;">参赛费: ${data.cost}灵石</div>` : ''}
-            <button class="btn" style="background:${canAfford ? '#4caf50' : '#555'};color:white;width:100%;margin-top:8px;"
-                onclick="enterArenaBattle('${mode}')" ${canAfford ? '' : 'disabled'}>
-                ${canAfford ? '进入' : '灵石不足'}
-            </button>
-        </div>`;
-    });
-
-    html += `</div></div>
-
-            <div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-                <h4 style="color:#ffd700;margin-bottom:8px;">📋 当前赛季信息</h4>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:0.9em;">
-                    <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">最高段位</span><span>${ARENA_RANKS[arena.highestRank]?.icon || '?'} ${ARENA_RANKS[arena.highestRank]?.name || '无'}</span></div>
-                    <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">晋级赛</span><span style="color:${arena.promotionWins >= ARENA_CONFIG.promotionMatches ? '#4caf50' : '#ff9800'};">${arena.promotionWins}/${ARENA_CONFIG.promotionMatches}胜</span></div>
-                    <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">累计积分</span><span>${arena.totalScoreEarned}</span></div>
-                    <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">赏金赛奖励</span><span>${arena.bountyWins}胜</span></div>
-                </div>
-            </div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('天道竞技场', html, []);
-}
-
-function showArenaRankings() {
-    const arena = gameState.celestialArena;
-    const now = Date.now();
-    const seasonEnd = arena.seasonStartTime + ARENA_CONFIG.seasonDays * 86400000;
-    const seasonDaysLeft = Math.max(0, Math.ceil((seasonEnd - now) / 86400000));
-
-    // 获取排行榜（本地模拟）
-    const rankings = getArenaRankings();
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff6f00;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff6f00;text-align:center;margin-bottom:10px;">📊 排行榜</h2>
-            <div style="text-align:center;color:#aaa;margin-bottom:15px;">第${arena.currentSeason}赛季 | 剩余${seasonDaysLeft}天</div>
-
-            <div style="max-height:400px;overflow-y:auto;">`;
-
-    // 玩家排名
-    const playerRank = getArenaPlayerRank();
-    html += `<div style="background:rgba(255,111,0,0.2);border:2px solid #ff6f00;border-radius:8px;padding:12px;margin-bottom:15px;">
-                <div style="color:#ffd700;font-weight:bold;">你的排名</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
-                    <div>
-                        <span style="color:#ff6f00;font-size:1.5em;font-weight:bold;">#${playerRank}</span>
-                        <span style="color:#ffd700;margin-left:10px;">${ARENA_RANKS[arena.currentRank]?.icon} ${ARENA_RANKS[arena.currentRank]?.name}</span>
-                    </div>
-                    <div style="color:#ffd700;">${arena.score}分</div>
-                </div>
-            </div>`;
-
-    // Top 20
-    html += `<div style="display:grid;gap:8px;">`;
-    rankings.slice(0, 20).forEach((entry, idx) => {
-        const isPlayer = entry.isPlayer;
-        const rankColors = ['#ffd700', '#c0c0c0', '#cd7f32', '#aaa', '#aaa'];
-        const rankColor = idx < 3 ? rankColors[idx] : '#aaa';
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:${isPlayer ? 'rgba(255,111,0,0.2)' : 'rgba(0,0,0,0.2)'};border-radius:5px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="color:${rankColor};font-weight:bold;min-width:30px;">${idx + 1}</span>
-                <span style="color:#fff;">${entry.name}</span>
-                <span style="color:#888;font-size:0.85em;">${ARENA_RANKS[entry.rank]?.icon || '?'} ${ARENA_RANKS[entry.rank]?.name || '?'}</span>
-            </div>
-            <div style="color:#ffd700;">${entry.score}分</div>
-        </div>`;
-    });
-    html += `</div></div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="showArenaPanel()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('排行榜', html, []);
-}
-
-function showArenaHistory() {
-    const arena = gameState.celestialArena;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #2196f3;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#2196f3;text-align:center;margin-bottom:15px;">📜 战斗记录</h2>`;
-
-    if (arena.matchHistory.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">暂无战斗记录</p>`;
-    } else {
-        html += `<div style="max-height:400px;overflow-y:auto;display:grid;gap:8px;">`;
-        arena.matchHistory.slice().reverse().forEach(match => {
-            const isWin = match.result === 'win';
-            const modeData = ARENA_BATTLE_MODES[match.mode] || {};
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(0,0,0,0.3);border-radius:5px;border-left:3px solid ${isWin ? '#4caf50' : '#f44336'};">
-                <div>
-                    <div style="color:${isWin ? '#4caf50' : '#f44336'};font-weight:bold;">${isWin ? '胜' : '负'} ${match.mode}</div>
-                    <div style="color:#888;font-size:0.85em;">vs ${match.opponentName || '神秘对手'}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="color:#ffd700;">${isWin ? '+' : ''}${match.scoreChange}分</div>
-                    <div style="color:#888;font-size:0.85em;">${formatArenaTime(match.timestamp)}</div>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="showArenaPanel()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('战斗记录', html, []);
-}
-
-function showArenaRewards() {
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:500px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">🎁 段位奖励</h2>
-            <p style="color:#aaa;text-align:center;margin-bottom:15px;">赛季结算时按最高段位发放</p>
-
-            <div style="display:grid;gap:8px;">`;
-    Object.entries(ARENA_REWARDS).forEach(([rank, reward]) => {
-        const rankData = ARENA_RANKS[rank];
-        const isCurrentOrHigher = gameState.celestialArena.currentRank >= parseInt(rank);
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:${isCurrentOrHigher ? 'rgba(76,175,80,0.2)' : 'rgba(0,0,0,0.3)'};border-radius:5px;border:1px solid ${isCurrentOrHigher ? '#4caf50' : '#444'};">
-            <div>
-                <span style="color:#ffd700;font-weight:bold;">${rankData?.icon} ${rankData?.name}</span>
-            </div>
-            <div style="text-align:right;">
-                <div style="color:#ffd700;">💎 ${reward.stones.toLocaleString()}</div>
-                <div style="color:#aaa;font-size:0.85em;">荣誉+${reward.honor}</div>
-            </div>
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="showArenaPanel()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('段位奖励', html, []);
-}
-
-function enterArenaBattle(mode) {
-    const arena = gameState.celestialArena;
-    const modeData = ARENA_BATTLE_MODES[mode];
-
-    if (mode === '排位赛') {
-        if (arena.dailyChallengesUsed >= ARENA_CONFIG.dailyChallenges) {
-            addLog('今日排位赛次数已用完', '#f44336');
-            return;
+            `).join('');
         }
-    }
 
-    if (mode === '赏金赛') {
-        if (gameState.spiritStones < modeData.cost) {
-            addLog('灵石不足', '#f44336');
-            return;
-        }
-        gameState.spiritStones -= modeData.cost;
-        arena.bountyPool += modeData.cost;
-    }
-
-    // 生成对手
-    const opponent = generateArenaOpponent();
-    const playerPower = calculatePlayerArenaPower();
-    const opponentPower = opponent.power;
-
-    // 计算胜负（考虑装备、技能、境界等）
-    const winChance = calculateArenaWinChance(playerPower, opponentPower);
-    const isWin = Math.random() < winChance;
-
-    // 计算积分变化
-    let scoreChange = isWin ? modeData.scoreWin : modeData.scoreLose;
-    if (isWin && arena.currentStreak >= 3) {
-        scoreChange += 5; // 连胜加成
-    }
-    if (mode === '赏金赛') {
-        scoreChange = isWin ? modeData.scoreWin * 2 : modeData.scoreLose;
-    }
-
-    // 更新arena状态
-    arena.dailyChallengesUsed++;
-    arena.score = Math.max(0, arena.score + scoreChange);
-
-    if (isWin) {
-        arena.totalWins++;
-        arena.currentStreak++;
-        arena.promotionWins++;
-        if (mode === '赏金赛') {
-            arena.bountyWins++;
-            const bountyReward = Math.floor(arena.bountyPool * 0.8);
-            gameState.spiritStones += bountyReward;
-            arena.bountyPool = 0;
-            addLog(`🏆 赏金赛胜利！获得${bountyReward}灵石！`, '#ffd700');
-        }
-        if (arena.currentStreak > arena.longestStreak) {
-            arena.longestStreak = arena.currentStreak;
-        }
-    } else {
-        arena.totalLosses++;
-        arena.currentStreak = 0;
-        arena.promotionWins = 0;
-    }
-
-    // 检查段位提升
-    checkArenaPromotion();
-
-    // 记录战斗
-    const match = {
-        mode: mode,
-        opponentName: opponent.name,
-        opponentRank: opponent.rank,
-        result: isWin ? 'win' : 'loss',
-        scoreChange: scoreChange,
-        playerPower: playerPower,
-        opponentPower: opponentPower,
-        timestamp: Date.now()
-    };
-    arena.matchHistory.push(match);
-    if (arena.matchHistory.length > ARENA_CONFIG.matchHistoryLimit) {
-        arena.matchHistory.shift();
-    }
-
-    // 更新统计
-    arena.totalScoreEarned += Math.max(0, scoreChange);
-
-    // 战斗日志
-    if (isWin) {
-        addLog(`🏆 天道竞技场${mode}胜利！+${scoreChange}分！当前段位: ${ARENA_RANKS[arena.currentRank]?.icon} ${ARENA_RANKS[arena.currentRank]?.name}`, '#4caf50');
-    } else {
-        addLog(`⚔️ 天道竞技场${mode}失败！${scoreChange}分...`, '#f44336');
-    }
-
-    updateDisplay();
-    showArenaPanel();
-}
-
-function generateArenaOpponent() {
-    const arena = gameState.celestialArena;
-    const playerRank = arena.currentRank;
-
-    // 根据玩家段位生成对手（上下浮动2个段位）
-    const rankRange = Math.min(2, playerRank - 1, 12 - playerRank);
-    const opponentRank = Math.max(1, Math.min(12, playerRank + Math.floor(Math.random() * (rankRange * 2 + 1)) - rankRange));
-
-    const opponentNames = ['青云子', '玄冥真人', '紫霄真人', '白眉老祖', '血魔尊者', '天璇散人', '无极魔君', '天机阁主', '太虚真人', '九幽冥王', '玉清仙子', '东华帝君'];
-    const realmNames = ['炼气', '筑基', '金丹', '元婴', '化神', '大乘', '地仙', '天仙', '金仙'];
-
-    const basePower = 100 + opponentRank * 50 + Math.floor(Math.random() * 30);
-    const power = basePower * (0.9 + Math.random() * 0.2);
-
-    return {
-        name: opponentNames[Math.floor(Math.random() * opponentNames.length)],
-        rank: opponentRank,
-        realm: Math.min(realmNames.length - 1, Math.floor(opponentRank * 0.8)),
-        power: Math.round(power)
-    };
-}
-
-function calculatePlayerArenaPower() {
-    const player = gameState;
-    let power = 100;
-
-    // 境界加成
-    power += player.realm * 30;
-    power += player.stage * 5;
-
-    // 战斗属性加成
-    const combat = player.combat || {};
-    if (combat.fame) power += combat.fame * 0.1;
-    if (combat.honor) power += combat.honor * 0.2;
-
-    // 装备加成
-    if (player.immortalEquipment) {
-        Object.values(player.immortalEquipment).forEach(eq => {
-            if (eq && eq.stats) {
-                power += (eq.stats.attack || 0) * 0.5;
-                power += (eq.stats.defense || 0) * 0.3;
+        // ===== doCultivate =====
+        function doCultivate() {
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
+            // V7 应用灵根速度加成
+            baseGain *= getSpiritRootSpeedBonus();
+            // 应用体质修炼速度加成
+            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.cultivateSpeed) {
+                baseGain *= (1 + gameState.activeEffects.constitution_bonuses.cultivateSpeed);
             }
-        });
-    }
-
-    // 法则加成
-    if (player.celestialLaws && player.celestialLaws.active) {
-        power += player.celestialLaws.active.length * 15;
-    }
-
-    // 仙宠加成
-    if (player.spiritPets && player.spiritPets.pets) {
-        player.spiritPets.pets.forEach(pet => {
-            if (pet.isHatched) {
-                power += pet.stats.attack * 0.3;
-                power += pet.stats.defense * 0.2;
+            // 应用装备和丹药效果
+            baseGain *= (1 + gameState.activeEffects.cultivate_speed);
+            baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
+            baseGain *= (1 + gameState.activeEffects.all_stats);
+            const gain = Math.floor(baseGain);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.cultivationProgress += gain;
+            
+            let logType = 'good';
+            let logText = `修炼${gain}点灵气，感觉体内的灵力更加充沛。`;
+            
+            // 检查是否需要晋级
+            if (gameState.cultivationProgress >= req.stageThreshold[gameState.stage] && gameState.stage < 2) {
+                gameState.stage++;
+                logText = `修炼${gain}点灵气，境界突破到${CONFIG.stages[gameState.stage]}！`;
+                addLog(logType, '境界突破', logText);
+            } else if (gameState.cultivationProgress >= req.stageThreshold[2]) {
+                logText = `修炼${gain}点灵气，${CONFIG.realms[gameState.realm]}期修炼圆满，可以尝试突破到下一个境界！`;
+                addLog('neutral', '境界圆满', logText);
+            } else {
+                addLog(logType, '修炼', logText);
             }
-        });
-    }
+            
+            gameState.days++;
+            saveGame();
+            updateDisplay();
+            doMorningExercise();
+        }
 
-    return Math.round(power);
-}
+        // ===== doMorningExercise =====
+        function doMorningExercise() {
+            const gain = Math.floor(2 + Math.random() * 5);
+            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
+            gameState.mindset = Math.min(100, gameState.mindset + 1);
+            updateDisplay();
 
-function calculateArenaWinChance(playerPower, opponentPower) {
-    const ratio = playerPower / opponentPower;
-    if (ratio >= 1.5) return 0.85;
-    if (ratio >= 1.2) return 0.70;
-    if (ratio >= 1.0) return 0.55;
-    if (ratio >= 0.8) return 0.40;
-    if (ratio >= 0.6) return 0.25;
-    return 0.15;
-}
+            // V6: 处理每日奇遇结算
+            processEndOfDaySerendipity();
 
-function checkArenaPromotion() {
-    const arena = gameState.celestialArena;
-    const currentRank = ARENA_RANKS[arena.currentRank];
-
-    // 检查是否达到晋级条件
-    if (arena.promotionWins >= ARENA_CONFIG.promotionMatches && arena.score >= currentRank.promotionScore) {
-        if (arena.currentRank < ARENA_CONFIG.rankTiers) {
-            arena.currentRank++;
-            arena.promotionWins = 0;
-            addLog(`🎉 恭喜突破至${ARENA_RANKS[arena.currentRank]?.icon} ${ARENA_RANKS[arena.currentRank]?.name}！`, '#ffd700');
-
-            // 记录最高段位
-            if (arena.currentRank > arena.highestRank) {
-                arena.highestRank = arena.currentRank;
+            // V6: 检查是否触发奇遇
+            const serendipityResult = checkSerendipity();
+            if (serendipityResult) {
+                showSerendipityModal(serendipityResult);
             }
         }
-    }
 
-    // 检查是否降段
-    const minScoreForRank = ARENA_RANKS[arena.currentRank]?.minScore || 0;
-    if (arena.currentRank > 1 && arena.score < minScoreForRank - 50) {
-        if (arena.derankProtection > 0) {
-            arena.derankProtection--;
-            addLog(`⚠️ 段位保护生效（剩余${arena.derankProtection}次）`, '#ff9800');
-        } else {
-            arena.currentRank--;
-            arena.derankProtection = ARENA_CONFIG.derankProtection;
-            addLog(`📉 段位掉落至${ARENA_RANKS[arena.currentRank]?.icon} ${ARENA_RANKS[arena.currentRank]?.name}`, '#f44336');
-        }
-    }
-}
-
-function claimArenaSeasonReward() {
-    const arena = gameState.celestialArena;
-    const now = Date.now();
-    const seasonEnd = arena.seasonStartTime + ARENA_CONFIG.seasonDays * 86400000;
-
-    // 检查赛季是否结束
-    if (now < seasonEnd) {
-        addLog('赛季尚未结束', '#f44336');
-        return;
-    }
-
-    // 检查是否已领取
-    if (arena.lastRewardClaimed >= arena.seasonStartTime) {
-        addLog('本赛季奖励已领取', '#f44336');
-        return;
-    }
-
-    // 计算可领取奖励（基于最高段位）
-    const reward = ARENA_REWARDS[arena.highestRank] || ARENA_REWARDS[1];
-    gameState.spiritStones += reward.stones;
-    gameState.combat.honor += reward.honor;
-
-    arena.lastRewardClaimed = now;
-    arena.totalRewardsClaimed++;
-
-    addLog(`🎁 领取赛季奖励：${reward.stones}灵石 + ${reward.honor}荣誉（${reward.badge}）`, '#ffd700');
-    updateDisplay();
-}
-
-function getArenaRankings() {
-    // 模拟排行榜数据
-    const arena = gameState.celestialArena;
-    const rankings = [];
-
-    // 添加玩家
-    rankings.push({
-        name: gameState.playerName || '你',
-        rank: arena.currentRank,
-        score: arena.score,
-        isPlayer: true
-    });
-
-    // 生成AI玩家
-    const aiNames = ['天璇子', '无极真人', '太虚剑仙', '九幽冥后', '天机老人', '紫霄仙子', '血魔老祖', '玉清真人', '东华帝君', '昆仑散人',
-                     '蓬莱仙翁', '瑶池圣母', '东海龙王', '西王母', '南华真人', '北冥老祖', '中天大帝', '斗战胜佛', '齐天大圣', '如来佛祖'];
-    const realms = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-    for (let i = 0; i < 50; i++) {
-        const rank = realms[Math.floor(Math.random() * realms.length)];
-        const score = ARENA_RANKS[rank]?.minScore + Math.floor(Math.random() * 200);
-        rankings.push({
-            name: aiNames[i % aiNames.length] + (i >= aiNames.length ? (i + 1) : ''),
-            rank: rank,
-            score: score,
-            isPlayer: false
-        });
-    }
-
-    // 按分数排序
-    rankings.sort((a, b) => b.score - a.score);
-    return rankings;
-}
-
-function getArenaPlayerRank() {
-    const rankings = getArenaRankings();
-    const idx = rankings.findIndex(e => e.isPlayer);
-    return idx + 1;
-}
-
-function formatArenaTime(timestamp) {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (days > 0) return `${days}天前`;
-    if (hours > 0) return `${hours}小时前`;
-    if (minutes > 0) return `${minutes}分钟前`;
-    return '刚刚';
-}
-
-function processDailyArenaReset() {
-    const arena = gameState.celestialArena;
-    const now = Date.now();
-    const seasonEnd = arena.seasonStartTime + ARENA_CONFIG.seasonDays * 86400000;
-
-    // 每日重置挑战次数
-    arena.dailyChallengesUsed = 0;
-
-    // 检查赛季是否结束
-    if (now >= seasonEnd) {
-        // 赛季结束，结算奖励
-        if (!arena.lastRewardClaimed || arena.lastRewardClaimed < arena.seasonStartTime) {
-            addLog('🏆 赛季结束！请领取您的段位奖励！', '#ffd700');
+        // ===== getLocalRandomEvent =====
+        function getLocalRandomEvent() {
+            const events = [
+                {
+                    title: '🌿 发现灵草',
+                    description: '在山林间发现一株散发幽香的灵草，似乎可以服用增强灵气。',
+                    options: [
+                        { text: '小心采摘', risk: 'low', effects: { qi: 15, mindset: 0, spiritStones: 0 } },
+                        { text: '直接服用', risk: 'medium', effects: { qi: 35, mindset: -5, spiritStones: 0 } },
+                        { text: '连根拔起研究', risk: 'high', effects: { qi: 60, mindset: -15, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '⚔️ 遇到妖兽',
+                    description: '一只妖兽从林中窜出，眼中闪烁着凶光，似乎把你当成了猎物。',
+                    options: [
+                        { text: '悄悄绕行', risk: 'low', effects: { qi: 0, mindset: 5, spiritStones: 0 } },
+                        { text: '与之搏斗', risk: 'medium', effects: { qi: -20, mindset: -10, spiritStones: 30 } },
+                        { text: '全力击杀', risk: 'high', effects: { qi: -40, mindset: -25, spiritStones: 80 } }
+                    ]
+                },
+                {
+                    title: '🏯 废弃洞府',
+                    description: '前方有一座废弃的修士洞府，门口的石碑上刻着模糊的文字。',
+                    options: [
+                        { text: '礼貌叩门', risk: 'low', effects: { qi: 10, mindset: 5, spiritStones: 0 } },
+                        { text: '尝试破阵', risk: 'medium', effects: { qi: 30, mindset: -10, spiritStones: 50 } },
+                        { text: '强行闯入', risk: 'high', effects: { qi: -30, mindset: -30, spiritStones: 150 } }
+                    ]
+                },
+                {
+                    title: '☁️ 灵气潮汐',
+                    description: '天地灵气突然变得躁动，形成一股灵气潮汐，正是修炼的好时机。',
+                    options: [
+                        { text: '静心吸收', risk: 'low', effects: { qi: 25, mindset: 10, spiritStones: 0 } },
+                        { text: '引导入体', risk: 'medium', effects: { qi: 50, mindset: 0, spiritStones: 0 } },
+                        { text: '强行吞噬', risk: 'high', effects: { qi: 100, mindset: -20, spiritStones: 0 } }
+                    ]
+                },
+                {
+                    title: '🧘 偶遇前辈',
+                    description: '一位神秘的前辈高人出现在你面前，似乎对你有所指点。',
+                    options: [
+                        { text: '恭敬请教', risk: 'low', effects: { qi: 20, mindset: 15, spiritStones: 0 } },
+                        { text: '交流心得', risk: 'medium', effects: { qi: 40, mindset: 5, spiritStones: 0 } },
+                        { text: '请求收徒', risk: 'high', effects: { qi: 80, mindset: -10, spiritStones: -50 } }
+                    ]
+                }
+            ];
+            return events[Math.floor(Math.random() * events.length)];
         }
 
-        // 开始新赛季
-        arena.currentSeason++;
-        arena.seasonStartTime = now;
-        arena.promotionWins = 0;
-        arena.bountyPool = 0;
-        arena.bountyWins = 0;
-        // 段位保留或微调
-        if (arena.currentRank > 1) {
-            arena.currentRank = Math.max(1, arena.currentRank - 1);
+        // ===== displayEventModal =====
+        function displayEventModal(event) {
+            document.getElementById('modalTitle').textContent = event.title;
+            document.getElementById('modalDescription').textContent = event.description;
+            
+            const optionsContainer = document.getElementById('modalOptions');
+            optionsContainer.innerHTML = event.options.map((opt, idx) => `
+                <button class="option-btn" onclick="handleOption(${idx}, ${JSON.stringify(event.options[idx]).replace(/"/g, '&quot;')})">
+                    ${opt.text}
+                    <span class="option-risk ${opt.risk}">${opt.risk === 'low' ? '低风险' : opt.risk === 'medium' ? '中风险' : '高风险'}</span>
+                </button>
+            `).join('');
+            
+            // 保存当前事件
+            window.currentEvent = event;
         }
-        arena.score = ARENA_RANKS[arena.currentRank]?.minScore || 0;
-        addLog(`🌟 第${arena.currentSeason}赛季开始！`, '#ff9800');
-    }
-}
-// Auto-generated module: ascension.js
 
-// ===== ASCENSION_COSTS =====
-const ASCENSION_COSTS = {
-    spiritStones: 500000,  // 50万灵石
-    equipmentQuality: 'rare' // 需要紫色(rare)或以上装备
-};
+        // ===== getTribulationKey =====
+        function getTribulationKey(realm, stage) {
+            if (realm === 3) {
+                if (stage === 0) return '金丹初期雷劫';
+                if (stage === 1) return '金丹中期阴火';
+                return '金丹后期风劫';
+            }
+            if (realm === 4) return '元婴心魔';
+            return '化神飞升';
+        }
 
-// ===== hasOrangeOrHigherEquip =====
-function hasOrangeOrHigherEquip() {
-    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
-    const minQuality = qualityOrder['rare']; // 紫色=rare=1, 橙色=precious=2
-    
-    // 检查背包
-    for (const item of gameState.inventory) {
-        if (item.type === 'treasure') {
-            if ((qualityOrder[item.quality] || 0) >= minQuality) {
-                return true;
+        // ===== localBreakthrough =====
+        function localBreakthrough(isTribulation = false) {
+            if (isTribulation) {
+                executeTribulation();
+                return;
+            }
+            
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            let chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
+            // 应用突破加成效果
+            chance *= (1 + gameState.activeEffects.breakthrough_boost);
+            chance *= (1 + gameState.activeEffects.all_stats);
+            
+            if (Math.random() < chance) {
+                if (gameState.realm >= 4) {
+                    // 飞升！
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                    saveGame();
+                    showGameOverScreen();
+                } else {
+                    // 突破成功
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                    // V7 检查体质激活
+                    initializeConstitutionEffects();
+                    saveGame();
+                    updateDisplay();
+                }
+            } else {
+                // 突破失败
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+                saveGame();
+                updateDisplay();
             }
         }
-    }
-    
-    // 检查已装备
-    for (const equip of gameState.equippedTreasures) {
-        if (equip && (qualityOrder[equip.quality] || 0) >= minQuality) {
-            return true;
+
+        // ===== displayBreakthroughResult =====
+        function displayBreakthroughResult(result) {
+            document.getElementById('modalDescription').innerHTML = '';
+            const descDiv = document.createElement('div');
+            descDiv.className = 'modal-description';
+            descDiv.innerHTML = `<strong>${result.title}</strong><br><br>${result.description}`;
+            document.getElementById('modalDescription').appendChild(descDiv);
+            
+            if (result.success) {
+                if (gameState.realm >= 4) {
+                    gameState.isGameOver = true;
+                    gameState.isVictory = true;
+                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
+                } else {
+                    gameState.realm++;
+                    gameState.stage = 0;
+                    gameState.cultivationProgress = 0;
+                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+                    gameState.qi = Math.floor(gameState.qi * 0.3);
+                    gameState.mindset = Math.max(0, gameState.mindset - 10);
+                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
+                }
+            } else {
+                gameState.qi = Math.floor(gameState.qi * 0.3);
+                gameState.mindset = Math.max(0, gameState.mindset - 20);
+                addLog('bad', '突破失败', '突破失败，灵气反噬...');
+            }
+            
+            saveGame();
+            updateDisplay();
+            
+            document.getElementById('modalOptions').classList.add('hidden');
         }
-    }
-    
-    return false;
-}
 
-// ===== canAscend =====
-function canAscend() {
-    // 检查渡劫是否成功
-    const hasCompletedTribulation = gameState.realm >= 4 && gameState.stage >= 2;
-    if (!hasCompletedTribulation) {
-        return { result: false, reason: '需要渡劫成功（化神后期）' };
-    }
-    
-    // 检查灵石
-    if (gameState.spiritStones < ASCENSION_COSTS.spiritStones) {
-        return { result: false, reason: `需要${ASCENSION_COSTS.spiritStones}灵石，飞升费用` };
-    }
-    
-    // 检查橙色以上装备
-    if (!hasOrangeOrHigherEquip()) {
-        return { result: false, reason: '需要至少1件紫色以上品质的装备' };
-    }
-    
-    // 检查是否已经飞升
-    if (gameState.currentRealm === 'immortal') {
-        return { result: false, reason: '已经飞升' };
-    }
-    
-    return { result: true };
-}
+        // ===== showTribulationUI =====
+        function showTribulationUI() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            const modal = document.getElementById('tribulationModal');
+            const scene = document.getElementById('tribulationScene');
+            const typeDiv = document.getElementById('tribType');
+            const rateSpan = document.getElementById('successRate');
+            const prepDiv = document.getElementById('tribulationPreparations');
+            const actionsDiv = document.getElementById('tribulationActions');
+            const prepList = document.getElementById('prepList');
 
-// ===== showAscensionButton =====
-function showAscensionButton() {
-    const check = canAscend();
-    
-    const btn = document.getElementById('ascensionBtn');
-    if (!btn) return;
-    
-    if (check.result) {
-        btn.style.display = 'inline-block';
-        btn.style.background = 'linear-gradient(135deg, #9c27b0, #e91e63)';
-        btn.style.boxShadow = '0 0 20px rgba(233, 30, 99, 0.5)';
-        btn.onclick = showAscensionModal;
-    } else {
-        btn.style.display = 'inline-block';
-        btn.style.background = '#444';
-        btn.style.boxShadow = 'none';
-        btn.onclick = () => showToast(check.reason);
-    }
-}
+            // 设置场景样式
+            scene.className = 'tribulation-scene ' + trib.type;
+            scene.innerHTML = `<p style="color:#aaa;font-size:1.1em">${trib.desc}</p><p style="color:#ffd700;margin-top:10px">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>`;
 
-// ===== showAscensionModal =====
-function showAscensionModal() {
-    const check = canAscend();
-    if (!check.result) {
-        showToast(check.reason);
-        return;
-    }
-    
-    let html = '<div style="padding:20px;text-align:center;">';
-    html += '<div style="font-size:48px;margin-bottom:10px;">🌟</div>';
-    html += '<h2 style="color:#ffd700;margin-bottom:10px;">飞升成仙</h2>';
-    html += '<p style="color:#aaa;font-size:13px;margin-bottom:20px;">突破凡界桎梏，进入仙界篇章</p>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升消耗：</div>';
-    html += `<div style="color:#f44336;margin-bottom:4px;">💎 500000 灵石（保留50%）</div>`;
-    html += '<div style="color:#ff9800;margin-bottom:4px;">⚔️ 橙色以上装备 → 仙界材料</div>';
-    html += '<div style="color:#4caf50;">✨ 已学功法 → 转换仙界版</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升保留：</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 灵石（扣除50%）</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 已学功法（转换仙界版）</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 宗门归属</div>';
-    html += '<div style="color:#aaa;margin-bottom:4px;">• 成就/称号（部分保留）</div>';
-    html += '<div style="color:#aaa;">• 宗门贡献</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">仙界境界：</div>';
-    html += '<div style="color:#4caf50;margin-bottom:4px;">🌱 地仙境 → 天仙境 → 金仙境</div>';
-    html += '<div style="color:#2196f3;">⭐ 大罗金仙 → 混元大罗</div>';
-    html += '</div>';
-    
-    html += `<button onclick="doAscend()" style="width:100%;padding:14px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">🌟 确认飞升</button>`;
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">返回</button>`;
-    html += '</div>';
-    
-    openModal('飞升', html, '');
-}
+            // 天劫类型
+            typeDiv.innerHTML = `【${gameState.tribulation.tribKey}】`;
 
-// ===== doAscend =====
-function doAscend() {
-    const check = canAscend();
-    if (!check.result) {
-        showToast(check.reason);
-        closeModal();
-        return;
-    }
-    
-    // 1. 扣除灵石（保留50%）
-    const keepStones = Math.floor(gameState.spiritStones * 0.5);
-    const spentStones = gameState.spiritStones - keepStones;
-    gameState.spiritStones = keepStones;
-    
-    // 2. 凡界装备 → 材料（只保留橙色以上）
-    const materialsGained = [];
-    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
-    
-    // 背包装备转化
-    const newInventory = [];
-    for (const item of gameState.inventory) {
-        if (item.type === 'treasure' && qualityOrder[item.quality] >= qualityOrder['precious']) {
-            materialsGained.push({ name: item.name, quality: item.quality });
-        } else {
-            newInventory.push(item);
+            // 计算并显示成功率
+            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
+            rateSpan.textContent = Math.round(rate * 100) + '%';
+
+            // 准备加成列表
+            updatePrepList();
+
+            // 生成准备选项
+            prepDiv.innerHTML = '';
+            
+            // 阵法选项
+            const hasArray = gameState.tribulation.preparations.includes('阵法');
+            const arrayBtn = document.createElement('button');
+            arrayBtn.innerHTML = hasArray ? '✓ 阵法已布置' : '📿 布置阵法 (-2000灵石)';
+            arrayBtn.className = hasArray ? 'active' : '';
+            arrayBtn.disabled = hasArray || gameState.spiritStones < 2000;
+            arrayBtn.onclick = () => addPreparation('阵法');
+            prepDiv.appendChild(arrayBtn);
+
+            // 定神丹选项
+            const hasPill = gameState.tribulation.preparations.includes('定神丹');
+            const hasDingShen = gameState.inventory.some(item => item.name === '定神丹');
+            const pillBtn = document.createElement('button');
+            pillBtn.innerHTML = hasPill ? '✓ 已服用定神丹' : '💊 服用定神丹';
+            pillBtn.className = hasPill ? 'active' : '';
+            pillBtn.disabled = hasPill || !hasDingShen;
+            pillBtn.onclick = () => addPreparation('定神丹');
+            prepDiv.appendChild(pillBtn);
+
+            // 祈祷选项
+            const hasPray = gameState.tribulation.preparations.includes('祈祷');
+            const prayBtn = document.createElement('button');
+            prayBtn.innerHTML = hasPray ? '✓ 祈祷已完成' : '🙏 祈祷先祖 (-10000灵石)';
+            prayBtn.className = hasPray ? 'active' : '';
+            prayBtn.disabled = hasPray || gameState.spiritStones < 10000;
+            prayBtn.onclick = () => addPreparation('祈祷');
+            prepDiv.appendChild(prayBtn);
+
+            // 装备检查
+            const equipped = gameState.equippedTreasures.filter(t => t);
+            if (equipped.length > 0) {
+                const equipInfo = equipped.map(t => `${t.icon||'📦'}${t.name}`).join(', ');
+                const equipDiv = document.createElement('div');
+                equipDiv.style.cssText = 'font-size:0.85em;color:#aaa;margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;';
+                equipDiv.innerHTML = `当前装备：${equipInfo}`;
+                prepDiv.appendChild(equipDiv);
+            }
+
+            // 转世buff提示
+            if (gameState.hasTransmigrationBuff) {
+                const buffDiv = document.createElement('div');
+                buffDiv.className = 'buff-indicator';
+                buffDiv.style.cssText = 'margin-top:10px;display:inline-block;';
+                buffDiv.innerHTML = '✨ 转世重修加成：成功率+10%';
+                prepDiv.appendChild(buffDiv);
+            }
+
+            // 操作按钮
+            actionsDiv.innerHTML = '';
+            const startBtn = document.createElement('button');
+            startBtn.className = 'btn-tribulation start';
+            startBtn.textContent = '🔥 开始渡劫';
+            startBtn.onclick = () => startTribulation();
+            actionsDiv.appendChild(startBtn);
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn-tribulation cancel';
+            cancelBtn.textContent = '⏸ 暂缓突破';
+            cancelBtn.onclick = () => cancelTribulation();
+            actionsDiv.appendChild(cancelBtn);
+
+            modal.classList.add('active');
         }
-    }
-    gameState.inventory = newInventory;
-    
-    // 装备栏转化
-    for (let i = 0; i < gameState.equippedTreasures.length; i++) {
-        const equip = gameState.equippedTreasures[i];
-        if (equip && qualityOrder[equip.quality] >= qualityOrder['precious']) {
-            materialsGained.push({ name: equip.name, quality: equip.quality });
-            gameState.equippedTreasures[i] = null;
+
+        // ===== updatePrepList =====
+        function updatePrepList() {
+            const prepList = document.getElementById('prepList');
+            const preps = gameState.tribulation.preparations;
+            if (preps.length === 0) {
+                prepList.innerHTML = '';
+                return;
+            }
+            prepList.innerHTML = '准备加成：' + preps.map(p => {
+                let bonus = '';
+                if (p === '阵法') bonus = '(伤害-30%)';
+                if (p === '定神丹') bonus = '(心境消耗-50%)';
+                if (p === '祈祷') bonus = '(成功率+10%)';
+                return p + bonus;
+            }).join('、');
         }
-    }
-    
-    // 3. 初始化仙界状态
-    initializeImmortalState();
-    
-    // 4. 设置初始仙石
-    gameState.immortal.spiritStones = 0; // 仙石独立
-    
-    // 5. 切换到仙界
-    gameState.currentRealm = 'immortal';
-    
-    // 6. 保留一些凡界资源
-    gameState.realm = 1; // 凡界境界回归筑基
-    gameState.stage = 0;
-    gameState.cultivationProgress = 0;
-    
-    // 7. 保存日志
-    addLog('good', '飞升成功', `历经${gameState.days}天的修炼，终于飞升成仙！`);
-    
-    saveGame();
-    
-    // 8. 关闭模态框，显示成功界面
-    closeModal();
-    showAscensionSuccessScreen();
-}
 
-// ===== showAscensionSuccessScreen =====
-function showAscensionSuccessScreen() {
-    let html = '<div style="padding:30px;text-align:center;">';
-    html += '<div style="font-size:64px;animation:pulse 2s infinite;">✨🌟✨</div>';
-    html += '<h2 style="color:#ffd700;font-size:24px;margin:20px 0;">恭喜飞升成仙！</h2>';
-    html += '<p style="color:#aaa;margin-bottom:20px;">你已突破凡界桎梏，进入仙界篇章</p>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
-    html += '<div style="color:#4caf50;margin-bottom:8px;">✅ 保留50%灵石：' + gameState.spiritStones + '</div>';
-    html += '<div style="color:#2196f3;margin-bottom:8px;">✅ 境界：地仙境（重新修炼）</div>';
-    html += '<div style="color:#9c27b0;">✅ 仙界篇章开启</div>';
-    html += '</div>';
-    
-    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
-    html += '<div style="color:#ffd700;margin-bottom:8px;">📍 当前区域：仙灵谷</div>';
-    html += '<div style="color:#aaa;font-size:13px;">仙气充沛，适合初入仙界者修炼</div>';
-    html += '</div>';
-    
-    html += `<button onclick="enterImmortalRealm()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">☁️ 进入仙界</button>`;
-    html += '</div>';
-    
-    openModal('飞升', html, '');
-}
+        // ===== addPreparation =====
+        function addPreparation(type) {
+            if (gameState.tribulation.preparations.includes(type)) return;
 
-// ===== enterImmortalRealm =====
-function enterImmortalRealm() {
-    closeModal();
-    saveGame();
-    updateDisplay();
-    
-    // 显示仙界UI
-    if (typeof showImmortalMainUI === 'function') {
-        showImmortalMainUI();
-    }
-    
-    addLog('good', '进入仙界', '踏入仙界，开始全新的修仙之旅！');
-}
+            if (type === '阵法') {
+                if (gameState.spiritStones < 2000) {
+                    alert('灵石不足！布置阵法需要2000灵石');
+                    return;
+                }
+                gameState.spiritStones -= 2000;
+            } else if (type === '定神丹') {
+                const idx = gameState.inventory.findIndex(item => item.name === '定神丹');
+                if (idx === -1) {
+                    alert('背包中没有定神丹！');
+                    return;
+                }
+                gameState.inventory.splice(idx, 1);
+            } else if (type === '祈祷') {
+                if (gameState.spiritStones < 10000) {
+                    alert('灵石不足！祈祷先祖需要10000灵石');
+                    return;
+                }
+                gameState.spiritStones -= 10000;
+            }
 
-// ===== switchRealm =====
-function switchRealm(targetRealm) {
-    if (targetRealm === gameState.currentRealm) return;
-    
-    if (targetRealm === 'immortal') {
-        if (!gameState.immortal) {
-            showToast('尚未飞升，无法进入仙界');
-            return;
+            gameState.tribulation.preparations.push(type);
+            saveGame();
+            showTribulationUI();
+            updateDisplay();
         }
-        gameState.currentRealm = 'immortal';
-        addLog('neutral', '切换位面', '进入仙界');
-    } else {
-        gameState.currentRealm = 'mortal';
-        addLog('neutral', '切换位面', '返回凡界');
-    }
-    
-    saveGame();
-    updateDisplay();
-    
-    // 重新渲染UI
-    if (typeof renderGameUI === 'function') renderGameUI();
-}
 
-// ===== showRealmSwitchButton =====
-function showRealmSwitchButton() {
-    if (!gameState.immortal) return; // 未飞升不显示
-    
-    const btn = document.getElementById('realmSwitchBtn');
-    if (!btn) return;
-    
-    if (gameState.currentRealm === 'mortal') {
-        btn.textContent = '☁️ 仙界';
-        btn.onclick = () => switchRealm('immortal');
-    } else {
-        btn.textContent = '🏯 凡界';
-        btn.onclick = () => switchRealm('mortal');
-    }
-    
-    btn.style.display = 'inline-block';
-}
+        // ===== calculateTribulationSuccess =====
+        function calculateTribulationSuccess(tribKey) {
+            const trib = TRIBULATIONS[tribKey];
+            let rate = trib.baseRate;
 
-// ===== doFateTask =====
-function doFateTask() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('仙缘任务只在仙界可用');
-        return;
-    }
-    
-    const today = Math.floor(gameState.days / 1);
-    if (gameState.immortal.fateTaskRefreshDay === today) {
-        showToast('今日仙缘任务已完成');
-        return;
-    }
-    
-    // 仙缘任务奖励
-    const reward = Math.floor(100 + Math.random() * 400);
-    earnSpiritStones(reward, '每日仙缘任务');
-    
-    // 20%概率额外奖励
-    if (Math.random() < 0.2) {
-        const bonus = Math.floor(50 + Math.random() * 150);
-        earnSpiritStones(bonus, '天赐福缘');
-        showToast(`天赐福缘！额外获得${bonus}仙石`);
-    }
-    
-    gameState.immortal.fateTaskRefreshDay = today;
-    gameState.immortal.lastFateTask = gameState.days;
-    saveGame();
-}
+            // 心境加成
+            rate += (gameState.mindset / 100) * 0.2;
 
-// ===== doCelestialCycle =====
-function doCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('天道轮回只在仙界可用');
-        return;
-    }
-    
-    const cycleDay = 7;
-    const daysSinceCycle = gameState.days - (gameState.immortal.celestialCycleDay || 0);
-    
-    if (daysSinceCycle < cycleDay) {
-        showToast(`天道轮回每7天一次，还需${cycleDay - daysSinceCycle}天`);
-        return;
-    }
-    
-    // 开始天道轮回
-    const survivalChance = 0.7 + (gameState.immortal.realm * 0.05);
-    
-    if (Math.random() < survivalChance) {
-        // 成功
-        const reward = Math.floor(200 + Math.random() * 600);
-        earnSpiritStones(reward, '天道轮回奖励');
-        
-        // 额外奖励
-        if (gameState.immortal.celestialCycleCompleted) {
-            const extra = Math.floor(100 + Math.random() * 200);
-            earnSpiritStones(extra, '轮回福报');
+            // 转世重修buff
+            if (gameState.hasTransmigrationBuff) {
+                rate += 0.1;
+            }
+
+            // 装备加成
+            const equipped = gameState.equippedTreasures.filter(t => t);
+            equipped.forEach(t => {
+                if (t.effects) {
+                    t.effects.forEach(e => {
+                        if (e.type === '渡劫_damage_reduce') rate += e.value * 0.1;
+                        if (e.type === 'all_stats') rate += e.value * 0.5;
+                    });
+                }
+            });
+
+            // 准备加成
+            if (gameState.tribulation.preparations.includes('阵法')) rate += 0.15;
+            if (gameState.tribulation.preparations.includes('定神丹')) rate += 0.1;
+            if (gameState.tribulation.preparations.includes('祈祷')) rate += 0.1;
+
+            // 境界惩罚
+            if (gameState.realm === 4) rate -= 0.1;
+            if (gameState.realm === 5) rate -= 0.2;
+
+            return Math.min(0.95, Math.max(0.05, rate));
         }
-        
-        gameState.immortal.celestialCycleCompleted = true;
-        showToast(`天道轮回完成！获得${reward}仙石`);
-    } else {
-        // 失败
-        const loss = Math.floor(gameState.immortal.spiritStones * 0.1);
-        gameState.immortal.spiritStones = Math.max(0, gameState.immortal.spiritStones - loss);
-        showToast(`天道轮回失败！损失${loss}仙石`);
-    }
-    
-    gameState.immortal.celestialCycleDay = gameState.days;
-    saveGame();
-    updateDisplay();
-}
 
-// Auto-generated module: combat.js
+        // ===== generateTribulationScene =====
+        function generateTribulationScene(realm, callback) {
+            const model = miniMaxConfig.model || 'MiniMax-M2.7';
+            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
+            
+当前玩家信息：
+- 境界：${REALMS[realm] || '未知'}
+- 灵石：${gameState.stones}
+- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
+
+要求：
+1. 生成一段50-100字的渡劫场景描述
+2. 包含天象异变（雷电/乌云/异火等）
+3. 包含内心心境描写
+4. 描述要独特，每次生成都不同
+5. 用中文输出，不要加引号
+
+直接输出场景描述文字，不要前缀。`;
+
+            callMiniMaxAPI(prompt, model, 200, (reply) => {
+                if (reply && reply.trim()) {
+                    callback(reply.trim());
+                } else {
+                    callback(getDefaultTribulationScene(realm));
+                }
+            }, (err) => {
+                callback(getDefaultTribulationScene(realm));
+            });
+        }
+
+        // ===== getDefaultTribulationScene =====
+        function getDefaultTribulationScene(realm) {
+            const scenes = [
+                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
+                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
+                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
+            ];
+            return scenes[realm % scenes.length];
+        }
+
+        // ===== executeTribulation =====
+        function executeTribulation() {
+            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
+            const roll = Math.random();
+
+            if (roll < rate) {
+                // 成功
+                if (roll < rate * 0.5) {
+                    // 大成功
+                    handleGreatSuccess();
+                } else {
+                    // 普通成功
+                    handleSuccess();
+                }
+            } else {
+                // 失败
+                if (roll < 0.3) {
+                    // 陨落
+                    handleDeath();
+                } else {
+                    // 重伤
+                    handleInjury();
+                }
+            }
+        }
+
+        // ===== handleGreatSuccess =====
+        function handleGreatSuccess() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 突破成功
+            gameState.realm++;
+            gameState.stage = 0;
+            gameState.cultivationProgress = 0;
+            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+            gameState.qi = Math.floor(gameState.qi * 0.5); // 大成功保留50%
+            gameState.mindset = Math.min(100, gameState.mindset + 20); // 心境提升
+            gameState.hasTransmigrationBuff = false; // 清除转世buff
+
+            // 天劫洗礼加成
+            gameState.activeEffects.attack += 0.1;
+            gameState.activeEffects.defense += 0.1;
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '大成功',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result great-success">
+                    <h3>✨ 大成功 ✨</h3>
+                    <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
+                    <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
+                    <p style="color:#ff69b4;margin-top:5px">心境+20</p>
+                </div>
+            `;
+
+            addLog('good', '渡劫大成功', `历经天劫洗礼，突破到${CONFIG.realms[gameState.realm]}期！获得天劫洗礼加成！`);
+            saveGame();
+            updateDisplay();
+
+            // 3秒后关闭
+            setTimeout(() => {
+                closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
+            }, 3000);
+        }
+
+        // ===== handleSuccess =====
+        function handleSuccess() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+            const wasTranscending = gameState.realm >= 4; // V11: 记录是否在渡劫期
+
+            // 突破成功
+            gameState.realm++;
+            gameState.stage = 0;
+            gameState.cultivationProgress = 0;
+            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
+            gameState.qi = Math.floor(gameState.qi * 0.3);
+            gameState.mindset = Math.max(0, gameState.mindset - 5);
+            gameState.hasTransmigrationBuff = false;
+
+            // 天劫洗礼加成（较小）
+            gameState.activeEffects.attack += 0.05;
+            gameState.activeEffects.defense += 0.05;
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '成功',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result success">
+                    <h3>🎉 渡劫成功 🎉</h3>
+                    <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
+                    <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
+                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
+                    ${wasTranscending ? '<p style="color:#e91e63;margin-top:15px;font-size:16px;">✨ 可以准备飞升了！ ✨</p>' : ''}
+                </div>
+            `;
+
+            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
+            saveGame();
+            updateDisplay();
+
+            setTimeout(() => {
+                closeTribulationModal();
+                // V11: 渡劫成功后显示飞升按钮
+                showAscensionButton();
+            }, 3000);
+        }
+
+        // ===== handleInjury =====
+        function handleInjury() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 渡劫失败但保命
+            gameState.qi = Math.floor(gameState.qi * 0.1);
+            gameState.mindset = Math.max(0, gameState.mindset - 30);
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '重伤',
+                day: gameState.days
+            });
+
+            gameState.tribulation.inProgress = false;
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result injury">
+                    <h3>💔 重伤💔</h3>
+                    <p style="color:#aaa">天劫反噬，你身受重伤...</p>
+                    <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
+                    <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
+                </div>
+            `;
+
+            addLog('bad', '渡劫重伤', `渡过${trib.desc}失败，身受重伤...`);
+            saveGame();
+            updateDisplay();
+
+            setTimeout(() => {
+                closeTribulationModal();
+            }, 3000);
+        }
+
+        // ===== handleDeath =====
+        function handleDeath() {
+            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 保留10%资源
+            const keepStones = Math.floor(gameState.spiritStones * 0.1);
+            const keepPills = gameState.inventory.filter(item =>
+                item.name === '聚灵丹'
+            ).slice(0, 2);
+
+            // 重置状态
+            gameState.realm = 1;
+            gameState.stage = 0;
+            gameState.qi = 50;
+            gameState.maxQi = 100;
+            gameState.spiritStones = keepStones;
+            gameState.inventory = keepPills;
+            gameState.mindset = 50;
+            gameState.days = 1;
+            gameState.cultivationProgress = 0;
+            gameState.hasTransmigrationBuff = true; // 转世buff
+            gameState.tribulation.inProgress = false;
+
+            // 清空装备效果
+            recalculateAllEffects();
+
+            // 记录
+            gameState.tribulationRecord.push({
+                type: gameState.tribulation.tribKey,
+                result: '陨落',
+                day: gameState.days
+            });
+
+            const scene = document.getElementById('tribulationScene');
+            scene.innerHTML = `
+                <div class="tribulation-result death">
+                    <h3>💀 陨落 💀</h3>
+                    <p style="color:#f44336">天劫无情，你陨落了...</p>
+                    <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
+                    <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
+                    <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
+                </div>
+            `;
+
+            addLog('bad', '渡劫陨落', `渡劫失败，陨落了...但转世重修，获得转世buff！`);
+
+            setTimeout(() => {
+                closeTribulationModal();
+                saveGame();
+                showGameUI();
+                updateDisplay();
+            }, 3000);
+        }
+
+        // ===== closeTribulationModal =====
+        function closeTribulationModal() {
+            document.getElementById('tribulationModal').classList.remove('active');
+            gameState.tribulation.inProgress = false;
+        }
+
+        // ===== cancelTribulation =====
+        function cancelTribulation() {
+            gameState.tribulation.inProgress = false;
+            gameState.tribulation.preparations = [];
+            closeTribulationModal();
+            addLog('neutral', '暂缓突破', '你决定暂缓突破，继续积累实力...');
+            saveGame();
+        }
+
+        // ===== getPlayerTechnique =====
+        function getPlayerTechnique() {
+            if (gameState.realm <= 1) return '体术';
+            if (gameState.realm === 2) return ['雷法', '火法', '水法'][Math.floor(Math.random() * 3)];
+            return TECHNIQUES[Math.floor(Math.random() * 4)];
+        }
+
+
+// ===== combat.js =====
 
         // ===== calculateSetBonuses =====
         function calculateSetBonuses() {
@@ -2824,625 +3759,7 @@ function doCelestialCycle() {
         }
 
 
-// Auto-generated module: config.js
-
-        // --- CONFIG (3-11) ---
-        const CONFIG = {
-            realms: ['炼气', '筑基', '金丹', '元婴', '化神'],
-            stages: ['初期', '中期', '后期'],
-            stageNames: ['凡人', '修士', '真人', '天君', '大能'],
-            apiUrl: 'https://api.minimaxi.com/v1/chat/completions',
-            storageKey: 'cultivationSave',
-            apiConfigKey: 'cultivationApiConfig',
-            miniMaxConfigKey: 'cultivationMiniMaxConfig'
-        };
-
-        // --- PILLS (15-23) ---
-        const PILLS = {
-            '聚灵丹': { quality: 'common', effect: { type: 'qi', value: 50 }, price: 30, desc: '恢复50灵气', icon: '💊' },
-            '心魔丹': { quality: 'common', effect: { type: 'mindset', value: 30 }, price: 40, desc: '恢复30心境', icon: '💊' },
-            '金髓丹': { quality: 'rare', effect: { type: 'qi', value: 200 }, price: 100, desc: '恢复200灵气', icon: '💊' },
-            '筑基丹': { quality: 'rare', effect: { type: 'breakthrough_boost', value: 0.2 }, price: 1200, desc: '突破成功率+20%', icon: '💊' },
-            '破境丹': { quality: 'precious', effect: { type: 'breakthrough_boost', value: 0.3 }, price: 5000, desc: '突破+30%', icon: '💊' },
-            '洗髓丹': { quality: 'precious', effect: { type: 'cultivate_speed', value: 0.1 }, price: 8000, desc: '修炼速度+10%', icon: '💊' },
-            '定神丹': { quality: 'precious', effect: { type: '渡劫_mindset_protect', value: 0.5 }, price: 12000, desc: '渡劫心境消耗-50%', icon: '💊' }
-        };
-
-        // --- TREASURES (27-35) ---
-        const TREASURES = {
-            '青锋剑': { type: 'weapon', quality: 'common', effect: { type: 'attack', value: 0.1 }, price: 150, desc: '攻击+10%', icon: '⚔️' },
-            '玄铁盾': { type: 'armor', quality: 'common', effect: { type: 'defense', value: 0.1 }, price: 150, desc: '防御+10%', icon: '🛡️' },
-            '聚灵阵': { type: 'accessory', quality: 'rare', effect: { type: 'cultivate_qi_rate', value: 0.2 }, price: 800, desc: '修炼灵气+20%', icon: '📿' },
-            '避火罩': { type: 'armor', quality: 'rare', effect: { type: '渡劫_damage_reduce', value: 0.3 }, price: 1500, desc: '渡劫伤害-30%', icon: '🔥' },
-            '缩地符': { type: 'accessory', quality: 'rare', effect: { type: 'escape', value: 0.5 }, price: 600, desc: '逃跑成功率+50%', icon: '📜' },
-            '天机镜': { type: 'accessory', quality: 'precious', effect: { type: 'foresee_event', value: 1 }, price: 8000, desc: '预知事件类型', icon: '🔮' },
-            '混元珠': { type: 'accessory', quality: 'legendary', effect: { type: 'all_stats', value: 0.05 }, price: 40000, desc: '全属性+5%', icon: '珠' }
-        };
-
-        // --- COMBAT_TREASURES (39-49) ---
-        const COMBAT_TREASURES = {
-            '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 300 },
-            '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 250 },
-            '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 600 },
-            '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 400 },
-            '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 500 },
-            '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 5000 },
-            '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 5000 },
-            '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 5000 },
-            '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 5000 }
-        };
-
-        // --- COMBAT_PILLS (53-58) ---
-        const COMBAT_PILLS = {
-            '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 600 },
-            '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 600 },
-            '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 4000 },
-            '回春丹': { effect: { type: 'heal', value: 0.3 }, desc: '恢复30%生命', icon: '💊', price: 500 }
-        };
-
-        // --- ENHANCE_CONFIG (61-86) ---
-        const ENHANCE_CONFIG = {
-            // 1→2, 2→3, ... : [玄铁, 天材, 混沌石, 灵石]
-            costs: {
-                1: { iron: 3,  heavenly: 0, chaos: 0, stones: 200 },
-                2: { iron: 5,  heavenly: 0, chaos: 0, stones: 400 },
-                3: { iron: 8,  heavenly: 0, chaos: 0, stones: 800 },
-                4: { iron: 10, heavenly: 1, chaos: 0, stones: 1500 },
-                5: { iron: 12, heavenly: 2, chaos: 0, stones: 3000 },
-                6: { iron: 15, heavenly: 3, chaos: 0, stones: 6000 },
-                7: { iron: 0,  heavenly: 5, chaos: 1, stones: 15000 },
-                8: { iron: 0,  heavenly: 8, chaos: 2, stones: 30000 },
-                9: { iron: 0,  heavenly: 10, chaos: 3, stones: 60000 }
-            },
-            // 每级基础成功率（1→2用costs[1]）
-            successRates: {
-                1: 0.85, 2: 0.80, 3: 0.75, 4: 0.65, 5: 0.55,
-                6: 0.45, 7: 0.35, 8: 0.30, 9: 0.25
-            },
-            // 每级强化后属性倍率
-            starMultipliers: {
-                1: 1.0, 2: 1.15, 3: 1.35, 4: 1.60, 5: 1.90,
-                6: 2.25, 7: 2.70, 8: 3.20, 9: 4.00
-            },
-            // 炼器台等级限制可强化的最高星级
-            anvilStarLimit: { 1: 3, 2: 6, 3: 9 }
-        };
-
-        // --- TRIBULATIONS (888-934) ---
-        const TRIBULATIONS = {
-            '金丹初期雷劫': {
-                type: 'thunder',
-                realm: 3,
-                stage: '初期',
-                baseRate: 0.6,
-                stages: 3,
-                damage: 30,
-                desc: '九天神雷，淬体锻魂'
-            },
-            '金丹中期阴火': {
-                type: 'fire',
-                realm: 3,
-                stage: '中期',
-                baseRate: 0.5,
-                stages: 5,
-                damage: 40,
-                desc: '琉璃阴火，焚心烧魄'
-            },
-            '金丹后期风劫': {
-                type: 'wind',
-                realm: 3,
-                stage: '后期',
-                baseRate: 0.4,
-                stages: 7,
-                damage: 50,
-                desc: '九幽阴风，刮骨伐髓'
-            },
-            '元婴心魔': {
-                type: 'demon',
-                realm: 4,
-                stage: '任意',
-                baseRate: 0.4,
-                stages: 9,
-                damage: 0,
-                desc: '心魔滋生，最难渡'
-            },
-            '化神飞升': {
-                type: 'all',
-                realm: 5,
-                stage: '后期',
-                baseRate: 0.2,
-                stages: 9,
-                damage: 60,
-                desc: '飞升之劫，成败在此一举'
-            }
-        };
-
-        // --- FURNACES (939-943) ---
-        const FURNACES = {
-            '土炼丹炉': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼丹炉' },
-            '玄火丹炉': { level: 2, successBonus: 0.15, cost: 50000, unlockCondition: '宗门2级或50000灵石', desc: '中级炼丹炉，成功率+15%' },
-            '天玄神炉': { level: 3, successBonus: 0.30, cost: 200000, unlockCondition: '化神期', desc: '高级炼丹炉，成功率+30%' }
-        };
-
-        // --- ANVILS (947-951) ---
-        const ANVILS = {
-            '土炼器台': { level: 1, successBonus: 0, cost: 0, unlockCondition: '默认', desc: '基础炼器台' },
-            '玄铁熔炉': { level: 2, successBonus: 0.15, cost: 80000, unlockCondition: '宗门2级或80000灵石', desc: '中级炼器台，成功率+15%' },
-            '天工神炉': { level: 3, successBonus: 0.30, cost: 300000, unlockCondition: '化神期', desc: '高级炼器台，成功率+30%' }
-        };
-
-        // --- ALCHEMY_RECIPES (954-962) ---
-        const ALCHEMY_RECIPES = {
-            '回气丹': { materials: { '灵草': 3 }, successRate: 0.80, fuelCost: 100, desc: '恢复20%灵力', icon: '💊' },
-            '疗伤丹': { materials: { '灵草': 2, '妖兽血': 1 }, successRate: 0.75, fuelCost: 100, desc: '恢复30%生命', icon: '💊' },
-            '聚灵丹': { materials: { '灵石': 100, '灵草': 5 }, successRate: 0.60, fuelCost: 100, desc: '修炼速度+20%，持续3天', icon: '💊' },
-            '破境丹': { materials: { '灵石': 500, '天材': 2 }, successRate: 0.40, fuelCost: 100, desc: '突破瓶颈概率+15%', icon: '💊' },
-            '渡劫丹': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.30, fuelCost: 100, desc: '渡劫成功率+10%', icon: '💊' },
-            '洗髓丹': { materials: { '天材': 3, '灵石': 500 }, successRate: 0.50, fuelCost: 100, desc: '灵根刷新', icon: '💊' },
-            '混沌丹': { materials: { '混沌石': 1, '天材': 10 }, successRate: 0.20, fuelCost: 100, desc: '保底混沌灵根', icon: '💊', requireChaos: true }
-        };
-
-        // --- FORGE_RECIPES (965-972) ---
-        const FORGE_RECIPES = {
-            '凡铁剑': { materials: { '玄铁': 5 }, successRate: 0.90, fuelCost: 200, effect: { type: 'attack', value: 0.05 }, desc: '攻击+5%', icon: '⚔️' },
-            '青云剑': { materials: { '玄铁': 10, '天材': 1 }, successRate: 0.60, fuelCost: 200, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚔️' },
-            '混元珠': { materials: { '天材': 5, '灵石': 1000 }, successRate: 0.40, fuelCost: 200, effect: { type: 'crit', value: 0.10 }, desc: '暴击+10%', icon: '🔮' },
-            '金缕衣': { materials: { '天材': 3, '妖兽皮': 5 }, successRate: 0.50, fuelCost: 200, effect: { type: 'hp', value: 0.10 }, desc: '生命+10%', icon: '👘' },
-            '避火罩': { materials: { '天材': 2, '妖兽骨': 5 }, successRate: 0.45, fuelCost: 200, effect: { type: 'fireResist', value: 0.30 }, desc: '火抗+30%', icon: '🔥' },
-            '定神珠': { materials: { '天材': 5, '灵石': 2000 }, successRate: 0.35, fuelCost: 200, effect: { type: 'mindset', value: 0.20 }, desc: '精神状态+20%', icon: '📿' }
-        };
-
-        // --- MATERIALS (976-984) ---
-        const MATERIALS = {
-            '灵草': { type: 'herb', basePrice: 100, icon: '🌿', desc: '普通灵草，炼丹材料' },
-            '妖兽血': { type: 'beast', basePrice: 200, icon: '🩸', desc: '妖兽血液，炼丹炼器材料' },
-            '天材': { type: 'rare', basePrice: 500, icon: '✨', desc: '稀有天材，高级材料' },
-            '混沌石': { type: 'legendary', basePrice: 1667, icon: '💎', desc: '混沌神石，传说材料', requireChaos: true },
-            '玄铁': { type: 'metal', basePrice: 100, icon: '🔩', desc: '玄铁矿物，炼器材料' },
-            '妖兽皮': { type: 'beast', basePrice: 180, icon: '🐾', desc: '妖兽皮毛，炼器材料' },
-            '妖兽骨': { type: 'beast', basePrice: 220, icon: '🦴', desc: '妖兽骨骼，炼器材料' }
-        };
-
-        // --- ADVANCED_FORGE_RECIPES (988-1037) ---
-        const ADVANCED_FORGE_RECIPES = {
-            '灵宝·苍穹印': { 
-                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
-                fuelCost: 2000, 
-                desc: '灵宝·攻击+25%', icon: '🔮', 
-                effect: { type: 'attack', value: 0.25 }
-            },
-            '灵宝·玄武甲': { 
-                materials: { '玄铁': 20, '天材': 5, '混沌石': 1 }, 
-                fuelCost: 2000, 
-                desc: '灵宝·防御+25%', icon: '🛡️', 
-                effect: { type: 'defense', value: 0.25 }
-            },
-            '圣器·天使神剑': { 
-                materials: { '天材': 10, '混沌石': 3 }, 
-                fuelCost: 8000, 
-                desc: '圣器·攻击+40%', icon: '⚔️', 
-                effect: { type: 'attack', value: 0.40 }
-            },
-            '圣器·天使神甲': { 
-                materials: { '天材': 10, '混沌石': 3 }, 
-                fuelCost: 8000, 
-                desc: '圣器·防御+40%', icon: '👘', 
-                effect: { type: 'defense', value: 0.40 }
-            },
-            '圣器·天使神翼': { 
-                materials: { '天材': 10, '混沌石': 3 }, 
-                fuelCost: 8000, 
-                desc: '圣器·全属性+15%', icon: '👼', 
-                effect: { type: 'all_stats', value: 0.15 }
-            },
-            '天神器·天使神剑': { 
-                materials: { '天材': 20, '混沌石': 8 }, 
-                fuelCost: 20000, 
-                desc: '天神器·攻击+60%', icon: '⚔️', 
-                effect: { type: 'attack', value: 0.60 }
-            },
-            '天神器·天使神甲': { 
-                materials: { '天材': 20, '混沌石': 8 }, 
-                fuelCost: 20000, 
-                desc: '天神器·防御+60%', icon: '👘', 
-                effect: { type: 'defense', value: 0.60 }
-            },
-            '天神器·天使神翼': { 
-                materials: { '天材': 20, '混沌石': 8 }, 
-                fuelCost: 20000, 
-                desc: '天神器·全属性+25%', icon: '👼', 
-                effect: { type: 'all_stats', value: 0.25 }
-            }
-        };
-
-        // --- SERENDIPITY_EVENTS (1041-1265) ---
-        const SERENDIPITY_EVENTS = {
-            // 正面奇遇
-            '古修士传承': {
-                type: 'positive',
-                icon: '📜',
-                minRealm: 2, // 金丹及以上
-                effect: (state) => {
-                    const rewards = [
-                        { type: 'spiritStones', value: Math.floor(1000 + Math.random() * 2000) },
-                        { type: 'technique', value: 1 }
-                    ];
-                    const reward = rewards[Math.floor(Math.random() * rewards.length)];
-                    if (reward.type === 'spiritStones') {
-                        state.spiritStones += reward.value;
-                        return { title: '古修士传承', text: `获得前辈遗留的 ${reward.value} 灵石！`, effects: [{ type: '灵石', value: reward.value, positive: true }] };
-                    } else {
-                        return { title: '古修士传承', text: '获得高阶功法传承！', effects: [{ type: '功法', value: 1, positive: true }] };
-                    }
-                }
-            },
-            '秘境入口': {
-                type: 'positive',
-                icon: '🌀',
-                minRealm: 0,
-                effect: (state) => {
-                    state.currentEvent = { type: '秘境入口', inProgress: true };
-                    return { title: '秘境入口', text: '发现一处神秘秘境入口，进入可能获得稀有奖励！', effects: [], showRealmBattle: true };
-                }
-            },
-            '神兽认主': {
-                type: 'positive',
-                icon: '🦅',
-                minRealm: 3, // 元婴及以上
-                effect: (state) => {
-                    const bonuses = [
-                        { type: 'attack', value: 0.1 },
-                        { type: 'defense', value: 0.1 },
-                        { type: 'cultivate_speed', value: 0.05 }
-                    ];
-                    const bonus = bonuses[Math.floor(Math.random() * bonuses.length)];
-                    state.activeEffects[bonus.type] += bonus.value;
-                    return { title: '神兽认主', text: `神兽与你结缘，${bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度'}+${Math.round(bonus.value * 100)}%！`, effects: [{ type: bonus.type === 'attack' ? '攻击' : bonus.type === 'defense' ? '防御' : '修炼速度', value: Math.round(bonus.value * 100) + '%', positive: true }] };
-                }
-            },
-            '仙人指路': {
-                type: 'positive',
-                icon: '🧙',
-                minRealm: 0,
-                effect: (state) => {
-                    state.serendipity.serendipityBoostEndDay = state.days + 3;
-                    state.activeEffects.serendipity_boost = 0.15;
-                    return { title: '仙人指路', text: '仙人指点，突破成功率+30%，持续3天！', effects: [{ type: '突破成功率', value: '+30%', positive: true }] };
-                }
-            },
-            '灵根觉醒': {
-                type: 'positive',
-                icon: '✨',
-                minRealm: 0,
-                effect: (state) => {
-                    const gain = Math.floor(5 + Math.random() * 10);
-                    state.activeEffects.cultivate_speed += gain / 1000;
-                    return { title: '灵根觉醒', text: `灵根资质提升，修炼速度+${gain}%！`, effects: [{ type: '修炼速度', value: gain + '%', positive: true }] };
-                }
-            },
-            '顿悟': {
-                type: 'positive',
-                icon: '💡',
-                minRealm: 0,
-                effect: (state) => {
-                    state.spiritStones += 10000;
-                    return { title: '顿悟', text: '修炼中顿悟，获得10000灵石！', effects: [{ type: '灵石', value: 10000, positive: true }] };
-                }
-            },
-            // V7 体质相关奇遇
-            '天赐体质·至尊骨': {
-                type: 'positive',
-                icon: '🦴',
-                minRealm: 2, // 金丹及以上
-                condition: (state) => !state.constitutions.find(c => c.type === '至尊骨'),
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '天赐体质·至尊骨', inProgress: true, choices: ['接受完整传承', '只取部分精华'] };
-                    return { title: '天赐体质·至尊骨', text: '异象降世！骨如金铁，光耀万里……你可否愿接受完整传承？', effects: [], showChoice: true };
-                }
-            },
-            '天赐体质·疾风灵体': {
-                type: 'positive',
-                icon: '💨',
-                minRealm: 1, // 筑基及以上
-                condition: (state) => !state.constitutions.find(c => c.type === '疾风灵体'),
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '天赐体质·疾风灵体', inProgress: true, choices: ['与风融为一体', '保持自我意识'] };
-                    return { title: '天赐体质·疾风灵体', text: '风之精灵感应你的存在……与风融为一体可获完整灵体，但需冒风险。', effects: [], showChoice: true };
-                }
-            },
-            '天赐体质·重瞳': {
-                type: 'positive',
-                icon: '👁️',
-                minRealm: 3, // 元婴及以上
-                condition: (state) => !state.constitutions.find(c => c.type === '重瞳'),
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '天赐体质·重瞳', inProgress: true, choices: ['承受重瞳试炼', '以凡眼视之'] };
-                    return { title: '天赐体质·重瞳', text: '天道震怒！重瞳降临将开启你的天眼……试炼凶险，但成功后可看透万物本质。', effects: [], showChoice: true };
-                }
-            },
-            // 负面奇遇
-            '心魔入侵': {
-                type: 'negative',
-                icon: '👹',
-                minRealm: 3, // 元婴及以上
-                effect: (state) => {
-                    const loss = Math.floor(state.spiritStones * 0.3);
-                    state.spiritStones -= loss;
-                    state.serendipity.luckStatus = 'unlucky';
-                    state.serendipity.luckEndDay = state.days + 3;
-                    return { title: '心魔入侵', text: `心魔入侵，损失 ${loss} 灵石，运气-，持续3天！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
-                }
-            },
-            '仇家追杀': {
-                type: 'negative',
-                icon: '⚔️',
-                minRealm: 0,
-                condition: (state) => state.combat.losses > 0,
-                effect: (state) => {
-                    const loss = Math.floor(state.spiritStones * 0.5);
-                    state.spiritStones -= loss;
-                    return { title: '仇家追杀', text: `旧日仇家找上门来，损失 ${loss} 灵石！`, effects: [{ type: '灵石', value: -loss, positive: false }] };
-                }
-            },
-            '魔器诱惑': {
-                type: 'negative',
-                icon: '🗡️',
-                minRealm: 0,
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '魔器诱惑', inProgress: true };
-                    return { title: '魔器诱惑', text: '发现一把散发魔气的武器，装备后每回合扣血！', effects: [], showChoice: true };
-                }
-            },
-            '走火入魔': {
-                type: 'negative',
-                icon: '💀',
-                minRealm: 0,
-                condition: (state) => state.cultivationProgress > 1000,
-                effect: (state) => {
-                    if (state.realm > 0) state.realm--;
-                    state.cultivationProgress = 0;
-                    state.serendipity.luckStatus = 'unlucky';
-                    state.serendipity.luckEndDay = state.days + 3;
-                    return { title: '走火入魔', text: '修炼过度，走火入魔！境界-1，强制休息！', effects: [{ type: '境界', value: -1, positive: false }] };
-                }
-            },
-            '妖兽袭击': {
-                type: 'negative',
-                icon: '🐺',
-                minRealm: 0,
-                effect: (state) => {
-                    state.currentEvent = { type: '妖兽袭击', inProgress: true };
-                    return { title: '妖兽袭击', text: '遭遇妖兽袭击！', effects: [], showRealmBattle: true, isNegative: true };
-                }
-            },
-            // 中性奇遇
-            '乞丐讨缘': {
-                type: 'neutral',
-                icon: '🙏',
-                minRealm: 0,
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '乞丐讨缘', inProgress: true, choices: ['施舍100灵石', '不给'] };
-                    return { title: '乞丐讨缘', text: '路遇乞丐向你讨缘，你会怎么做？', effects: [] };
-                }
-            },
-            '商人交易': {
-                type: 'neutral',
-                icon: '💰',
-                minRealm: 0,
-                effect: (state) => {
-                    const items = ['聚灵丹', '心魔丹', '金髓丹'];
-                    const item = items[Math.floor(Math.random() * items.length)];
-                    const cost = Math.floor(100 + Math.random() * 200);
-                    if (state.spiritStones >= cost) {
-                        state.spiritStones -= cost;
-                        addItemToInventory(item, 1);
-                        return { title: '商人交易', text: `花费 ${cost} 灵石购买了 ${item}！`, effects: [{ type: '灵石', value: -cost, positive: false }, { type: item, value: 1, positive: true }] };
-                    } else {
-                        return { title: '商人交易', text: '灵石不足，无法交易！', effects: [] };
-                    }
-                }
-            },
-            '散修求助': {
-                type: 'neutral',
-                icon: '👤',
-                minRealm: 0,
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '散修求助', inProgress: true, choices: ['帮助', '不帮'] };
-                    return { title: '散修求助', text: '一位散修请求你帮忙，你会帮助吗？', effects: [] };
-                }
-            },
-            // B1 扩充奇遇
-            '天地精华': {
-                type: 'positive',
-                icon: '🌟',
-                minRealm: 0,
-                effect: (state) => {
-                    const qiGain = Math.floor(state.maxQi * 0.5);
-                    state.qi = Math.min(state.maxQi, state.qi + qiGain);
-                    return { title: '天地精华', text: `吸收天地精华，灵气+${qiGain}！`, effects: [{ type: '灵气', value: qiGain, positive: true }] };
-                }
-            },
-            '心魔试炼': {
-                type: 'negative',
-                icon: '👹',
-                minRealm: 1, // 筑基及以上
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '心魔试炼', inProgress: true, choices: ['勇敢面对', '退缩'] };
-                    return { title: '心魔试炼', text: '识海中浮现心魔化身！你要直面还是退缩？', effects: [], showChoice: true };
-                }
-            },
-            '上古遗迹': {
-                type: 'neutral',
-                icon: '🏛️',
-                minRealm: 2, // 金丹及以上
-                effect: (state) => {
-                    state.serendipity.currentEvent = { type: '上古遗迹', inProgress: true, choices: ['深入探索', '浅尝辄止', '离开'] };
-                    return { title: '上古遗迹', text: '发现一处上古遗迹，灵气浓郁！如何行动？', effects: [], showChoice: true };
-                }
-            }
-        };
-
-        // --- SERENDIPITY_TALISMANS (1268-1273) ---
-        const SERENDIPITY_TALISMANS = {
-            '祥云符': { type: 'consumable', effect: { type: 'serendipity_boost', value: 0.1 }, duration: 1, price: 2000, desc: '奇遇概率+10%，持续1天', icon: '☁️' },
-            '避厄符': { type: 'consumable', effect: { type: 'immune_negative', value: 1 }, duration: 1, price: 1500, desc: '免疫下次负面奇遇', icon: '🛡️' },
-            '探路符': { type: 'consumable', effect: { type: 'force_realm', value: 1 }, duration: 0, price: 3000, desc: '指定触发"秘境入口"奇遇', icon: '📜' },
-            '还童丹': { type: 'consumable', effect: { type: 'convert_demon', value: 1 }, duration: 0, price: 5000, desc: '将魔器转换为正常法宝', icon: '💊' }
-        };
-
-        // --- SPIRIT_ROOT_QUALITIES (1278-1285) ---
-        const SPIRIT_ROOT_QUALITIES = {
-            '伪灵根': { grade: 0, icon: '🌱', speedBonus: 0.6, bottleneckBonus: 0.4, tribulationBonus: -0.2, weight: 35 },
-            '下品灵根': { grade: 1, icon: '🌿', speedBonus: 0.8, bottleneckBonus: 0.2, tribulationBonus: -0.1, weight: 25 },
-            '中品灵根': { grade: 2, icon: '🌳', speedBonus: 1.0, bottleneckBonus: 0, tribulationBonus: 0, weight: 20 },
-            '上品灵根': { grade: 3, icon: '🌲', speedBonus: 1.3, bottleneckBonus: -0.15, tribulationBonus: 0.1, weight: 12 },
-            '天灵根': { grade: 4, icon: '✨', speedBonus: 1.6, bottleneckBonus: -0.25, tribulationBonus: 0.2, weight: 6 },
-            '混沌灵根': { grade: 5, icon: '🌈', speedBonus: 2.0, bottleneckBonus: -0.4, tribulationBonus: 0.3, weight: 2 }
-        };
-
-        // --- FIVE_ELEMENT_TECHNIQUES (1288-1294) ---
-        const FIVE_ELEMENT_TECHNIQUES = {
-            '金': { name: '庚金剑诀', icon: '⚔️', bonusType: 'attack', bonusValue: 0.25, threshold: 20 },
-            '木': { name: '青木长生诀', icon: '🌿', bonusType: 'heal', bonusValue: 0.5, threshold: 20 },
-            '水': { name: '玄冰寒咒', icon: '❄️', bonusType: 'defense', bonusValue: 0.2, threshold: 20 },
-            '火': { name: '烈焰真经', icon: '🔥', bonusType: 'attack', bonusValue: 0.2, threshold: 20 },
-            '土': { name: '厚土玄功', icon: '🛡️', bonusType: 'resist', bonusValue: 0.25, threshold: 20 }
-        };
-
-        // --- CONSTITUTIONS (1297-1360) ---
-        const CONSTITUTIONS = {
-            '先天道体': {
-                icon: '👼',
-                desc: '全属性+20%，修炼速度+50%',
-                effect: { allStats: 0.2, cultivateSpeed: 0.5 },
-                trigger: (state) => state.spiritRoot.quality === '混沌灵根' && state.realm >= 3,
-                source: '混沌灵根突破元婴'
-            },
-            '至尊骨': {
-                icon: '🦴',
-                desc: '攻击+30%，战斗中暴击+15%',
-                effect: { attack: 0.3, crit: 0.15 },
-                trigger: () => false, // 只能通过奇遇获得
-                source: '随机奇遇'
-            },
-            '琉璃玉体': {
-                icon: '💎',
-                desc: '防御+25%，受到伤害-15%',
-                effect: { defense: 0.25, damageReduce: 0.15 },
-                trigger: (state) => {
-                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
-                    return grade >= 2 && state.realm === 2 && state.cultivationProgress >= REALM_REQUIREMENTS[2].stageThreshold[2];
-                },
-                source: '中品以上灵根突破金丹'
-            },
-            '玄冥之体': {
-                icon: '🌊',
-                desc: '水系功法伤害+40%，水系抗性+50%',
-                effect: { waterBonus: 0.4, waterResist: 0.5 },
-                trigger: (state) => state.spiritRoot.affinity.water >= 80,
-                source: '水属性亲和≥80'
-            },
-            '烈焰战体': {
-                icon: '🔥',
-                desc: '火系功法伤害+40%，生命上限+20%',
-                effect: { fireBonus: 0.4, hpBonus: 0.2 },
-                trigger: (state) => state.spiritRoot.affinity.fire >= 80,
-                source: '火属性亲和≥80'
-            },
-            '疾风灵体': {
-                icon: '💨',
-                desc: '速度+35%，先手概率+25%',
-                effect: { speed: 0.35, firstStrike: 0.25 },
-                trigger: () => false, // 只能通过奇遇获得
-                source: '随机奇遇'
-            },
-            '不灭金身': {
-                icon: '🛡️',
-                desc: '免疫一次致命伤害，每日1次',
-                effect: { lethalImmune: 1 },
-                trigger: (state) => {
-                    const grade = SPIRIT_ROOT_QUALITIES[state.spiritRoot.quality].grade;
-                    return grade >= 3 && state.realm === 4 && state.cultivationProgress >= REALM_REQUIREMENTS[4].stageThreshold[2];
-                },
-                source: '上品以上灵根突破化神'
-            },
-            '重瞳': {
-                icon: '👁️',
-                desc: '可预判敌人攻击，闪避+20%',
-                effect: { dodge: 0.2, foresee: 1 },
-                trigger: () => false, // 只能通过奇遇获得
-                source: '随机奇遇'
-            }
-        };
-
-        // --- REALM_REQUIREMENTS (1483-1489) ---
-        const REALM_REQUIREMENTS = {
-            0: { maxQi: 100, stageThreshold: [30, 60, 90], breakthroughQi: 100 },
-            1: { maxQi: 200, stageThreshold: [60, 120, 180], breakthroughQi: 200 },
-            2: { maxQi: 400, stageThreshold: [120, 240, 360], breakthroughQi: 400 },
-            3: { maxQi: 800, stageThreshold: [240, 480, 720], breakthroughQi: 800 },
-            4: { maxQi: 1600, stageThreshold: [480, 960, 1440], breakthroughQi: 1600 }
-        };
-
-        // --- DEFAULT_MINIMAX_CONFIG (1505-1515) ---
-        const DEFAULT_MINIMAX_CONFIG = {
-            apiKey: '',
-            baseUrl: 'https://api.minimaxi.com/v1',
-            model: 'MiniMax-M2.7',
-            groupId: '',
-            features: {
-                aiDialogue: false,
-                aiSerendipity: false,
-                aiTechnique: false
-            }
-        };
-
-        // --- TECHNIQUE_BONUS (5014-5019) ---
-        const TECHNIQUE_BONUS = {
-            '雷法': { beats: '体术', losesTo: '火法' },
-            '火法': { beats: '雷法', losesTo: '水法' },
-            '水法': { beats: '火法', losesTo: '体术' },
-            '体术': { beats: '水法', losesTo: '雷法' }
-        };
-
-        // --- TECHNIQUE_COLORS (5020-5025) ---
-        const TECHNIQUE_COLORS = {
-            '雷法': '#ffff00',
-            '火法': '#ff4500',
-            '水法': '#00bfff',
-            '体术': '#228b22'
-        };
-
-        // --- SECT_CONFIG (6086-6101) ---
-        const SECT_CONFIG = {
-            createCost: 50000,
-            maxDisciples: { 1: 30, 2: 50, 3: 80 },
-            upgradeCost: { 2: 80000, 3: 150000 },
-            upgradeDisciples: { 2: 20, 3: 40 },
-            buildings: {
-                library: { name: '功法阁', icon: '📚', cost: 10000, unlockLevel: 1, desc: '存放可供传承的功法' },
-                alchemy: { name: '炼丹房', icon: '⚗️', cost: 20000, unlockLevel: 2, desc: '宗门产出丹药' },
-                forge: { name: '炼器室', icon: '🔨', cost: 20000, unlockLevel: 2, desc: '宗门产出法宝' },
-                archive: { name: '藏经阁', icon: '🏛️', cost: 50000, unlockLevel: 3, desc: '存放至高功法' }
-            },
-            talents: ['下品', '中品', '上品', '极品'],
-            talentWeights: [0.4, 0.35, 0.2, 0.05],
-            techniqueGrades: ['人阶', '灵阶', '天阶', '仙阶'],
-            techniqueGradeColors: ['grade-human', 'grade-spirit', 'grade-heaven', 'grade-immortal']
-        };
-
-        // --- SECT_TECHNIQUES (6104-6111) ---
-        const SECT_TECHNIQUES = {
-            '基础练气诀': { grade: 0, effect: { type: 'cultivate_speed', value: 0.05 }, desc: '修炼速度+5%', icon: '📖' },
-            '灵根培育法': { grade: 1, effect: { type: 'qi_rate', value: 0.1 }, desc: '灵气获取+10%', icon: '🌱' },
-            '天元心法': { grade: 1, effect: { type: 'breakthrough_boost', value: 0.1 }, desc: '突破成功率+10%', icon: '☀️' },
-            '金刚炼体术': { grade: 2, effect: { type: 'defense', value: 0.15 }, desc: '防御+15%', icon: '🛡️' },
-            '紫霄雷法': { grade: 2, effect: { type: 'attack', value: 0.15 }, desc: '攻击+15%', icon: '⚡' },
-            '九转玄天诀': { grade: 3, effect: { type: 'all_stats', value: 0.1 }, desc: '全属性+10%', icon: '🌟' }
-        };
-
-
-// Auto-generated module: core.js
+// ===== core.js =====
 
         // ===== showModal =====
         function showModal(html) {
@@ -3979,7 +4296,7 @@ function doCelestialCycle() {
         }
 
 
-// Auto-generated module: crafting.js
+// ===== crafting.js =====
 
         // ===== openShop =====
         function openShop() {
@@ -4485,689 +4802,7 @@ function doCelestialCycle() {
         }
 
 
-// Auto-generated module: cultivation.js
-
-        // ===== renderLog =====
-        function renderLog() {
-            const container = document.getElementById('logEntries');
-            const recentLogs = gameState.eventLog.slice(0, 5);
-            container.innerHTML = recentLogs.map(log => `
-                <div class="log-entry ${log.type}">
-                    <div class="log-entry-title">第${log.day}天 - ${log.title}</div>
-                    <div class="log-entry-text">${log.text}</div>
-                </div>
-            `).join('');
-        }
-
-        // ===== doCultivate =====
-        function doCultivate() {
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            let baseGain = 5 + Math.random() * 10 + gameState.realm * 3;
-            // V7 应用灵根速度加成
-            baseGain *= getSpiritRootSpeedBonus();
-            // 应用体质修炼速度加成
-            if (gameState.activeEffects.constitution_bonuses && gameState.activeEffects.constitution_bonuses.cultivateSpeed) {
-                baseGain *= (1 + gameState.activeEffects.constitution_bonuses.cultivateSpeed);
-            }
-            // 应用装备和丹药效果
-            baseGain *= (1 + gameState.activeEffects.cultivate_speed);
-            baseGain *= (1 + gameState.activeEffects.cultivate_qi_rate);
-            baseGain *= (1 + gameState.activeEffects.all_stats);
-            const gain = Math.floor(baseGain);
-            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
-            gameState.cultivationProgress += gain;
-            
-            let logType = 'good';
-            let logText = `修炼${gain}点灵气，感觉体内的灵力更加充沛。`;
-            
-            // 检查是否需要晋级
-            if (gameState.cultivationProgress >= req.stageThreshold[gameState.stage] && gameState.stage < 2) {
-                gameState.stage++;
-                logText = `修炼${gain}点灵气，境界突破到${CONFIG.stages[gameState.stage]}！`;
-                addLog(logType, '境界突破', logText);
-            } else if (gameState.cultivationProgress >= req.stageThreshold[2]) {
-                logText = `修炼${gain}点灵气，${CONFIG.realms[gameState.realm]}期修炼圆满，可以尝试突破到下一个境界！`;
-                addLog('neutral', '境界圆满', logText);
-            } else {
-                addLog(logType, '修炼', logText);
-            }
-            
-            gameState.days++;
-            saveGame();
-            updateDisplay();
-            doMorningExercise();
-        }
-
-        // ===== doMorningExercise =====
-        function doMorningExercise() {
-            const gain = Math.floor(2 + Math.random() * 5);
-            gameState.qi = Math.min(gameState.maxQi, gameState.qi + gain);
-            gameState.mindset = Math.min(100, gameState.mindset + 1);
-            updateDisplay();
-
-            // V6: 处理每日奇遇结算
-            processEndOfDaySerendipity();
-
-            // V6: 检查是否触发奇遇
-            const serendipityResult = checkSerendipity();
-            if (serendipityResult) {
-                showSerendipityModal(serendipityResult);
-            }
-        }
-
-        // ===== getLocalRandomEvent =====
-        function getLocalRandomEvent() {
-            const events = [
-                {
-                    title: '🌿 发现灵草',
-                    description: '在山林间发现一株散发幽香的灵草，似乎可以服用增强灵气。',
-                    options: [
-                        { text: '小心采摘', risk: 'low', effects: { qi: 15, mindset: 0, spiritStones: 0 } },
-                        { text: '直接服用', risk: 'medium', effects: { qi: 35, mindset: -5, spiritStones: 0 } },
-                        { text: '连根拔起研究', risk: 'high', effects: { qi: 60, mindset: -15, spiritStones: 0 } }
-                    ]
-                },
-                {
-                    title: '⚔️ 遇到妖兽',
-                    description: '一只妖兽从林中窜出，眼中闪烁着凶光，似乎把你当成了猎物。',
-                    options: [
-                        { text: '悄悄绕行', risk: 'low', effects: { qi: 0, mindset: 5, spiritStones: 0 } },
-                        { text: '与之搏斗', risk: 'medium', effects: { qi: -20, mindset: -10, spiritStones: 30 } },
-                        { text: '全力击杀', risk: 'high', effects: { qi: -40, mindset: -25, spiritStones: 80 } }
-                    ]
-                },
-                {
-                    title: '🏯 废弃洞府',
-                    description: '前方有一座废弃的修士洞府，门口的石碑上刻着模糊的文字。',
-                    options: [
-                        { text: '礼貌叩门', risk: 'low', effects: { qi: 10, mindset: 5, spiritStones: 0 } },
-                        { text: '尝试破阵', risk: 'medium', effects: { qi: 30, mindset: -10, spiritStones: 50 } },
-                        { text: '强行闯入', risk: 'high', effects: { qi: -30, mindset: -30, spiritStones: 150 } }
-                    ]
-                },
-                {
-                    title: '☁️ 灵气潮汐',
-                    description: '天地灵气突然变得躁动，形成一股灵气潮汐，正是修炼的好时机。',
-                    options: [
-                        { text: '静心吸收', risk: 'low', effects: { qi: 25, mindset: 10, spiritStones: 0 } },
-                        { text: '引导入体', risk: 'medium', effects: { qi: 50, mindset: 0, spiritStones: 0 } },
-                        { text: '强行吞噬', risk: 'high', effects: { qi: 100, mindset: -20, spiritStones: 0 } }
-                    ]
-                },
-                {
-                    title: '🧘 偶遇前辈',
-                    description: '一位神秘的前辈高人出现在你面前，似乎对你有所指点。',
-                    options: [
-                        { text: '恭敬请教', risk: 'low', effects: { qi: 20, mindset: 15, spiritStones: 0 } },
-                        { text: '交流心得', risk: 'medium', effects: { qi: 40, mindset: 5, spiritStones: 0 } },
-                        { text: '请求收徒', risk: 'high', effects: { qi: 80, mindset: -10, spiritStones: -50 } }
-                    ]
-                }
-            ];
-            return events[Math.floor(Math.random() * events.length)];
-        }
-
-        // ===== displayEventModal =====
-        function displayEventModal(event) {
-            document.getElementById('modalTitle').textContent = event.title;
-            document.getElementById('modalDescription').textContent = event.description;
-            
-            const optionsContainer = document.getElementById('modalOptions');
-            optionsContainer.innerHTML = event.options.map((opt, idx) => `
-                <button class="option-btn" onclick="handleOption(${idx}, ${JSON.stringify(event.options[idx]).replace(/"/g, '&quot;')})">
-                    ${opt.text}
-                    <span class="option-risk ${opt.risk}">${opt.risk === 'low' ? '低风险' : opt.risk === 'medium' ? '中风险' : '高风险'}</span>
-                </button>
-            `).join('');
-            
-            // 保存当前事件
-            window.currentEvent = event;
-        }
-
-        // ===== getTribulationKey =====
-        function getTribulationKey(realm, stage) {
-            if (realm === 3) {
-                if (stage === 0) return '金丹初期雷劫';
-                if (stage === 1) return '金丹中期阴火';
-                return '金丹后期风劫';
-            }
-            if (realm === 4) return '元婴心魔';
-            return '化神飞升';
-        }
-
-        // ===== localBreakthrough =====
-        function localBreakthrough(isTribulation = false) {
-            if (isTribulation) {
-                executeTribulation();
-                return;
-            }
-            
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            let chance = (gameState.mindset / 100) * (gameState.qi / req.breakthroughQi);
-            // 应用突破加成效果
-            chance *= (1 + gameState.activeEffects.breakthrough_boost);
-            chance *= (1 + gameState.activeEffects.all_stats);
-            
-            if (Math.random() < chance) {
-                if (gameState.realm >= 4) {
-                    // 飞升！
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
-                    saveGame();
-                    showGameOverScreen();
-                } else {
-                    // 突破成功
-                    gameState.realm++;
-                    gameState.stage = 0;
-                    gameState.cultivationProgress = 0;
-                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-                    gameState.qi = Math.floor(gameState.qi * 0.3);
-                    gameState.mindset = Math.max(0, gameState.mindset - 10);
-                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
-                    // V7 检查体质激活
-                    initializeConstitutionEffects();
-                    saveGame();
-                    updateDisplay();
-                }
-            } else {
-                // 突破失败
-                gameState.qi = Math.floor(gameState.qi * 0.3);
-                gameState.mindset = Math.max(0, gameState.mindset - 20);
-                addLog('bad', '突破失败', '突破失败，灵气反噬...');
-                saveGame();
-                updateDisplay();
-            }
-        }
-
-        // ===== displayBreakthroughResult =====
-        function displayBreakthroughResult(result) {
-            document.getElementById('modalDescription').innerHTML = '';
-            const descDiv = document.createElement('div');
-            descDiv.className = 'modal-description';
-            descDiv.innerHTML = `<strong>${result.title}</strong><br><br>${result.description}`;
-            document.getElementById('modalDescription').appendChild(descDiv);
-            
-            if (result.success) {
-                if (gameState.realm >= 4) {
-                    gameState.isGameOver = true;
-                    gameState.isVictory = true;
-                    addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！`);
-                } else {
-                    gameState.realm++;
-                    gameState.stage = 0;
-                    gameState.cultivationProgress = 0;
-                    gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-                    gameState.qi = Math.floor(gameState.qi * 0.3);
-                    gameState.mindset = Math.max(0, gameState.mindset - 10);
-                    addLog('good', '突破成功', `恭喜！突破到${CONFIG.realms[gameState.realm]}期！`);
-                }
-            } else {
-                gameState.qi = Math.floor(gameState.qi * 0.3);
-                gameState.mindset = Math.max(0, gameState.mindset - 20);
-                addLog('bad', '突破失败', '突破失败，灵气反噬...');
-            }
-            
-            saveGame();
-            updateDisplay();
-            
-            document.getElementById('modalOptions').classList.add('hidden');
-        }
-
-        // ===== showTribulationUI =====
-        function showTribulationUI() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-            const modal = document.getElementById('tribulationModal');
-            const scene = document.getElementById('tribulationScene');
-            const typeDiv = document.getElementById('tribType');
-            const rateSpan = document.getElementById('successRate');
-            const prepDiv = document.getElementById('tribulationPreparations');
-            const actionsDiv = document.getElementById('tribulationActions');
-            const prepList = document.getElementById('prepList');
-
-            // 设置场景样式
-            scene.className = 'tribulation-scene ' + trib.type;
-            scene.innerHTML = `<p style="color:#aaa;font-size:1.1em">${trib.desc}</p><p style="color:#ffd700;margin-top:10px">第 ${gameState.tribulation.currentStage + 1} / ${gameState.tribulation.totalStages} 重</p>`;
-
-            // 天劫类型
-            typeDiv.innerHTML = `【${gameState.tribulation.tribKey}】`;
-
-            // 计算并显示成功率
-            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
-            rateSpan.textContent = Math.round(rate * 100) + '%';
-
-            // 准备加成列表
-            updatePrepList();
-
-            // 生成准备选项
-            prepDiv.innerHTML = '';
-            
-            // 阵法选项
-            const hasArray = gameState.tribulation.preparations.includes('阵法');
-            const arrayBtn = document.createElement('button');
-            arrayBtn.innerHTML = hasArray ? '✓ 阵法已布置' : '📿 布置阵法 (-2000灵石)';
-            arrayBtn.className = hasArray ? 'active' : '';
-            arrayBtn.disabled = hasArray || gameState.spiritStones < 2000;
-            arrayBtn.onclick = () => addPreparation('阵法');
-            prepDiv.appendChild(arrayBtn);
-
-            // 定神丹选项
-            const hasPill = gameState.tribulation.preparations.includes('定神丹');
-            const hasDingShen = gameState.inventory.some(item => item.name === '定神丹');
-            const pillBtn = document.createElement('button');
-            pillBtn.innerHTML = hasPill ? '✓ 已服用定神丹' : '💊 服用定神丹';
-            pillBtn.className = hasPill ? 'active' : '';
-            pillBtn.disabled = hasPill || !hasDingShen;
-            pillBtn.onclick = () => addPreparation('定神丹');
-            prepDiv.appendChild(pillBtn);
-
-            // 祈祷选项
-            const hasPray = gameState.tribulation.preparations.includes('祈祷');
-            const prayBtn = document.createElement('button');
-            prayBtn.innerHTML = hasPray ? '✓ 祈祷已完成' : '🙏 祈祷先祖 (-10000灵石)';
-            prayBtn.className = hasPray ? 'active' : '';
-            prayBtn.disabled = hasPray || gameState.spiritStones < 10000;
-            prayBtn.onclick = () => addPreparation('祈祷');
-            prepDiv.appendChild(prayBtn);
-
-            // 装备检查
-            const equipped = gameState.equippedTreasures.filter(t => t);
-            if (equipped.length > 0) {
-                const equipInfo = equipped.map(t => `${t.icon||'📦'}${t.name}`).join(', ');
-                const equipDiv = document.createElement('div');
-                equipDiv.style.cssText = 'font-size:0.85em;color:#aaa;margin-top:10px;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;';
-                equipDiv.innerHTML = `当前装备：${equipInfo}`;
-                prepDiv.appendChild(equipDiv);
-            }
-
-            // 转世buff提示
-            if (gameState.hasTransmigrationBuff) {
-                const buffDiv = document.createElement('div');
-                buffDiv.className = 'buff-indicator';
-                buffDiv.style.cssText = 'margin-top:10px;display:inline-block;';
-                buffDiv.innerHTML = '✨ 转世重修加成：成功率+10%';
-                prepDiv.appendChild(buffDiv);
-            }
-
-            // 操作按钮
-            actionsDiv.innerHTML = '';
-            const startBtn = document.createElement('button');
-            startBtn.className = 'btn-tribulation start';
-            startBtn.textContent = '🔥 开始渡劫';
-            startBtn.onclick = () => startTribulation();
-            actionsDiv.appendChild(startBtn);
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'btn-tribulation cancel';
-            cancelBtn.textContent = '⏸ 暂缓突破';
-            cancelBtn.onclick = () => cancelTribulation();
-            actionsDiv.appendChild(cancelBtn);
-
-            modal.classList.add('active');
-        }
-
-        // ===== updatePrepList =====
-        function updatePrepList() {
-            const prepList = document.getElementById('prepList');
-            const preps = gameState.tribulation.preparations;
-            if (preps.length === 0) {
-                prepList.innerHTML = '';
-                return;
-            }
-            prepList.innerHTML = '准备加成：' + preps.map(p => {
-                let bonus = '';
-                if (p === '阵法') bonus = '(伤害-30%)';
-                if (p === '定神丹') bonus = '(心境消耗-50%)';
-                if (p === '祈祷') bonus = '(成功率+10%)';
-                return p + bonus;
-            }).join('、');
-        }
-
-        // ===== addPreparation =====
-        function addPreparation(type) {
-            if (gameState.tribulation.preparations.includes(type)) return;
-
-            if (type === '阵法') {
-                if (gameState.spiritStones < 2000) {
-                    alert('灵石不足！布置阵法需要2000灵石');
-                    return;
-                }
-                gameState.spiritStones -= 2000;
-            } else if (type === '定神丹') {
-                const idx = gameState.inventory.findIndex(item => item.name === '定神丹');
-                if (idx === -1) {
-                    alert('背包中没有定神丹！');
-                    return;
-                }
-                gameState.inventory.splice(idx, 1);
-            } else if (type === '祈祷') {
-                if (gameState.spiritStones < 10000) {
-                    alert('灵石不足！祈祷先祖需要10000灵石');
-                    return;
-                }
-                gameState.spiritStones -= 10000;
-            }
-
-            gameState.tribulation.preparations.push(type);
-            saveGame();
-            showTribulationUI();
-            updateDisplay();
-        }
-
-        // ===== calculateTribulationSuccess =====
-        function calculateTribulationSuccess(tribKey) {
-            const trib = TRIBULATIONS[tribKey];
-            let rate = trib.baseRate;
-
-            // 心境加成
-            rate += (gameState.mindset / 100) * 0.2;
-
-            // 转世重修buff
-            if (gameState.hasTransmigrationBuff) {
-                rate += 0.1;
-            }
-
-            // 装备加成
-            const equipped = gameState.equippedTreasures.filter(t => t);
-            equipped.forEach(t => {
-                if (t.effects) {
-                    t.effects.forEach(e => {
-                        if (e.type === '渡劫_damage_reduce') rate += e.value * 0.1;
-                        if (e.type === 'all_stats') rate += e.value * 0.5;
-                    });
-                }
-            });
-
-            // 准备加成
-            if (gameState.tribulation.preparations.includes('阵法')) rate += 0.15;
-            if (gameState.tribulation.preparations.includes('定神丹')) rate += 0.1;
-            if (gameState.tribulation.preparations.includes('祈祷')) rate += 0.1;
-
-            // 境界惩罚
-            if (gameState.realm === 4) rate -= 0.1;
-            if (gameState.realm === 5) rate -= 0.2;
-
-            return Math.min(0.95, Math.max(0.05, rate));
-        }
-
-        // ===== generateTribulationScene =====
-        function generateTribulationScene(realm, callback) {
-            const model = miniMaxConfig.model || 'MiniMax-M2.7';
-            const prompt = `你是一个修仙游戏的天劫场景生成器。请为玩家的渡劫场景生成一段独特的描述。
-            
-当前玩家信息：
-- 境界：${REALMS[realm] || '未知'}
-- 灵石：${gameState.stones}
-- 装备：${typeof getEquippedItems === 'function' ? getEquippedItems() : '无'}
-
-要求：
-1. 生成一段50-100字的渡劫场景描述
-2. 包含天象异变（雷电/乌云/异火等）
-3. 包含内心心境描写
-4. 描述要独特，每次生成都不同
-5. 用中文输出，不要加引号
-
-直接输出场景描述文字，不要前缀。`;
-
-            callMiniMaxAPI(prompt, model, 200, (reply) => {
-                if (reply && reply.trim()) {
-                    callback(reply.trim());
-                } else {
-                    callback(getDefaultTribulationScene(realm));
-                }
-            }, (err) => {
-                callback(getDefaultTribulationScene(realm));
-            });
-        }
-
-        // ===== getDefaultTribulationScene =====
-        function getDefaultTribulationScene(realm) {
-            const scenes = [
-                '天空骤然暗沉，乌云如墨般压下，电蛇在云层中狂舞，一道道紫色的天雷在云间酝酿，整个世界仿佛都在这股天威下颤抖。',
-                '狂风骤起，飞沙走石，虚空中裂开一道道金色的裂缝，从中泄出炽热的光芒，仿佛有无形的神灵在注视着你，天劫即将降临。',
-                '天地间一片肃杀之气，极寒与极热交替从天空倾泻而下，雷云翻涌如海，一道道银白色的雷劫之柱从天而降，直指你的位置。'
-            ];
-            return scenes[realm % scenes.length];
-        }
-
-        // ===== executeTribulation =====
-        function executeTribulation() {
-            const rate = calculateTribulationSuccess(gameState.tribulation.tribKey);
-            const roll = Math.random();
-
-            if (roll < rate) {
-                // 成功
-                if (roll < rate * 0.5) {
-                    // 大成功
-                    handleGreatSuccess();
-                } else {
-                    // 普通成功
-                    handleSuccess();
-                }
-            } else {
-                // 失败
-                if (roll < 0.3) {
-                    // 陨落
-                    handleDeath();
-                } else {
-                    // 重伤
-                    handleInjury();
-                }
-            }
-        }
-
-        // ===== handleGreatSuccess =====
-        function handleGreatSuccess() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 突破成功
-            gameState.realm++;
-            gameState.stage = 0;
-            gameState.cultivationProgress = 0;
-            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-            gameState.qi = Math.floor(gameState.qi * 0.5); // 大成功保留50%
-            gameState.mindset = Math.min(100, gameState.mindset + 20); // 心境提升
-            gameState.hasTransmigrationBuff = false; // 清除转世buff
-
-            // 天劫洗礼加成
-            gameState.activeEffects.attack += 0.1;
-            gameState.activeEffects.defense += 0.1;
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '大成功',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result great-success">
-                    <h3>✨ 大成功 ✨</h3>
-                    <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
-                    <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
-                    <p style="color:#ff69b4;margin-top:5px">心境+20</p>
-                </div>
-            `;
-
-            addLog('good', '渡劫大成功', `历经天劫洗礼，突破到${CONFIG.realms[gameState.realm]}期！获得天劫洗礼加成！`);
-            saveGame();
-            updateDisplay();
-
-            // 3秒后关闭
-            setTimeout(() => {
-                closeTribulationModal();
-                // V11: 渡劫成功后显示飞升按钮
-                showAscensionButton();
-            }, 3000);
-        }
-
-        // ===== handleSuccess =====
-        function handleSuccess() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-            const wasTranscending = gameState.realm >= 4; // V11: 记录是否在渡劫期
-
-            // 突破成功
-            gameState.realm++;
-            gameState.stage = 0;
-            gameState.cultivationProgress = 0;
-            gameState.maxQi = REALM_REQUIREMENTS[gameState.realm].maxQi;
-            gameState.qi = Math.floor(gameState.qi * 0.3);
-            gameState.mindset = Math.max(0, gameState.mindset - 5);
-            gameState.hasTransmigrationBuff = false;
-
-            // 天劫洗礼加成（较小）
-            gameState.activeEffects.attack += 0.05;
-            gameState.activeEffects.defense += 0.05;
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '成功',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result success">
-                    <h3>🎉 渡劫成功 🎉</h3>
-                    <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
-                    <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                    <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
-                    ${wasTranscending ? '<p style="color:#e91e63;margin-top:15px;font-size:16px;">✨ 可以准备飞升了！ ✨</p>' : ''}
-                </div>
-            `;
-
-            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
-            saveGame();
-            updateDisplay();
-
-            setTimeout(() => {
-                closeTribulationModal();
-                // V11: 渡劫成功后显示飞升按钮
-                showAscensionButton();
-            }, 3000);
-        }
-
-        // ===== handleInjury =====
-        function handleInjury() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 渡劫失败但保命
-            gameState.qi = Math.floor(gameState.qi * 0.1);
-            gameState.mindset = Math.max(0, gameState.mindset - 30);
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '重伤',
-                day: gameState.days
-            });
-
-            gameState.tribulation.inProgress = false;
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result injury">
-                    <h3>💔 重伤💔</h3>
-                    <p style="color:#aaa">天劫反噬，你身受重伤...</p>
-                    <p style="color:#ff9800;margin-top:10px">灵气大幅减少，心境下降</p>
-                    <p style="color:#aaa;margin-top:10px">突破失败，但保住了性命</p>
-                </div>
-            `;
-
-            addLog('bad', '渡劫重伤', `渡过${trib.desc}失败，身受重伤...`);
-            saveGame();
-            updateDisplay();
-
-            setTimeout(() => {
-                closeTribulationModal();
-            }, 3000);
-        }
-
-        // ===== handleDeath =====
-        function handleDeath() {
-            const trib = TRIBULATIONS[gameState.tribulation.tribKey];
-
-            // 保留10%资源
-            const keepStones = Math.floor(gameState.spiritStones * 0.1);
-            const keepPills = gameState.inventory.filter(item =>
-                item.name === '聚灵丹'
-            ).slice(0, 2);
-
-            // 重置状态
-            gameState.realm = 1;
-            gameState.stage = 0;
-            gameState.qi = 50;
-            gameState.maxQi = 100;
-            gameState.spiritStones = keepStones;
-            gameState.inventory = keepPills;
-            gameState.mindset = 50;
-            gameState.days = 1;
-            gameState.cultivationProgress = 0;
-            gameState.hasTransmigrationBuff = true; // 转世buff
-            gameState.tribulation.inProgress = false;
-
-            // 清空装备效果
-            recalculateAllEffects();
-
-            // 记录
-            gameState.tribulationRecord.push({
-                type: gameState.tribulation.tribKey,
-                result: '陨落',
-                day: gameState.days
-            });
-
-            const scene = document.getElementById('tribulationScene');
-            scene.innerHTML = `
-                <div class="tribulation-result death">
-                    <h3>💀 陨落 💀</h3>
-                    <p style="color:#f44336">天劫无情，你陨落了...</p>
-                    <p style="color:#aaa;margin-top:10px">但天道循环，你得以转世重修</p>
-                    <p style="color:#e1bee7;margin-top:10px">保留部分资源和记忆</p>
-                    <p style="color:#ffd700;margin-top:10px">获得【转世重修】加成：成功率+10%</p>
-                </div>
-            `;
-
-            addLog('bad', '渡劫陨落', `渡劫失败，陨落了...但转世重修，获得转世buff！`);
-
-            setTimeout(() => {
-                closeTribulationModal();
-                saveGame();
-                showGameUI();
-                updateDisplay();
-            }, 3000);
-        }
-
-        // ===== closeTribulationModal =====
-        function closeTribulationModal() {
-            document.getElementById('tribulationModal').classList.remove('active');
-            gameState.tribulation.inProgress = false;
-        }
-
-        // ===== cancelTribulation =====
-        function cancelTribulation() {
-            gameState.tribulation.inProgress = false;
-            gameState.tribulation.preparations = [];
-            closeTribulationModal();
-            addLog('neutral', '暂缓突破', '你决定暂缓突破，继续积累实力...');
-            saveGame();
-        }
-
-        // ===== getPlayerTechnique =====
-        function getPlayerTechnique() {
-            if (gameState.realm <= 1) return '体术';
-            if (gameState.realm === 2) return ['雷法', '火法', '水法'][Math.floor(Math.random() * 3)];
-            return TECHNIQUES[Math.floor(Math.random() * 4)];
-        }
-
-
-// Auto-generated module: data.js
+// ===== data.js =====
 
         let selectedEnhanceItem = null; // 背包中选中的待强化灵宝
         let selectedEnhanceSlot = null; // 装备栏中选中的槽位（0/1/2）
@@ -6255,13 +5890,15 @@ async function generateBreakthroughResult() {
 
         // ===== openSettings =====
         function openSettings() {
+            // 使用 window fallback 防止 TDZ（miniMaxConfig 在其他模块）
+            const cfg = window.miniMaxConfig || miniMaxConfig || { apiKey: '', baseUrl: 'https://api.minimaxi.com/v1', model: 'MiniMax-M2.7', features: {} };
             // 填充当前配置
-            document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
-            document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
-            document.getElementById('settingsModel').value = miniMaxConfig.model || 'MiniMax-M2.7';
-            document.getElementById('featureAiDialogue').checked = miniMaxConfig.features.aiDialogue || false;
-            document.getElementById('featureAiSerendipity').checked = miniMaxConfig.features.aiSerendipity || false;
-            document.getElementById('featureAiTechnique').checked = miniMaxConfig.features.aiTechnique || false;
+            document.getElementById('settingsApiKey').value = cfg.apiKey || '';
+            document.getElementById('settingsBaseUrl').value = cfg.baseUrl || 'https://api.minimaxi.com/v1';
+            document.getElementById('settingsModel').value = cfg.model || 'MiniMax-M2.7';
+            document.getElementById('featureAiDialogue').checked = cfg.features.aiDialogue || false;
+            document.getElementById('featureAiSerendipity').checked = cfg.features.aiSerendipity || false;
+            document.getElementById('featureAiTechnique').checked = cfg.features.aiTechnique || false;
             
             // 清除测试结果
             document.querySelectorAll('.test-result').forEach(el => {
@@ -7202,6282 +6839,7 @@ async function generateBreakthroughResult() {
         }
 
 
-// Auto-generated module: economy.js
-
-// ===== ECONOMY CONSTANTS (V41) =====
-const ECONOMY_CONFIG = {
-    // 灵石通胀控制
-    baseIncomeRate: 1.0,       // 基础收入倍率
-    inflationRate: 0.02,       // 每日通胀率2%
-    maxSpiritStones: 999999999, // 灵石上限
-
-    // 灵石 sinks（消耗渠道）
-    repairCostPercent: 0.05,   // 装备维修5%
-    upgradeWastePercent: 0.1,  // 强化失败损失10%
-    tradeTaxRate: 0.03,        // 交易税3%
-    auctionFeeRate: 0.03,      // 拍卖手续费3%
-    realmTransitionTax: 0.15,  // 境界突破税15%
-
-    // 灵石 source（产出渠道）
-    dailyBaseIncome: 50,        // 基础每日收入
-    cultivationIncomeBonus: 10, // 修炼等级加成
-    sectIncomeBonus: 5,         // 宗门等级加成
-    combatWinBonus: 100,        // 战斗胜利奖励
-    serendipityBonus: 200,      // 奇遇奖励
-
-    // 经济周期
-    economicCycleDays: 7,       // 经济周期7天
-    taxHolidayDays: 30          // 新手免税期30天
-};
-
-const LUXURY_ITEMS = {
-    // 奢侈品（大型灵石 sinks）
-    '悟道丹': { cost: 50000, effect: '悟道速度+50%', sink: true },
-    '破天丹': { cost: 100000, effect: '突破成功率+20%', sink: true },
-    '仙缘果': { cost: 30000, effect: '奇遇概率+30%', sink: true },
-    '聚灵阵图纸': { cost: 80000, effect: '修炼速度+30%', sink: true },
-    '仙宠进化丹': { cost: 50000, effect: '仙宠必定进化', sink: true },
-    '天劫护符': { cost: 150000, effect: '渡劫伤害-30%', sink: true },
-    '轮回镜': { cost: 200000, effect: '天道轮回冷却-50%', sink: true },
-    '造化鼎': { cost: 300000, effect: '炼制仙丹成功率+40%', sink: true }
-};
-
-const ECONOMIC_EVENTS = {
-    // 随机经济事件
-    '灵石矿脉发现': { type: 'source', minAmount: 5000, maxAmount: 50000, probability: 0.05 },
-    '灵脉枯竭': { type: 'sink', minAmount: 1000, maxAmount: 10000, probability: 0.03 },
-    '商人大会': { type: 'trade_boost', bonus: 0.2, duration: 3, probability: 0.04 },
-    '仙盟悬赏': { type: 'source', minAmount: 3000, maxAmount: 15000, probability: 0.06 },
-    '妖兽肆虐': { type: 'sink', minAmount: 2000, maxAmount: 8000, probability: 0.04 },
-    '天材地宝成熟': { type: 'source', minAmount: 8000, maxAmount: 30000, probability: 0.03 },
-    '经济繁荣': { type: 'income_boost', bonus: 0.3, duration: 5, probability: 0.05 },
-    '经济萧条': { type: 'income_reduce', penalty: 0.2, duration: 3, probability: 0.04 }
-};
-
-// ===== ECONOMY FUNCTIONS =====
-
-function showEconomyPanel() {
-    const eco = gameState.economy;
-    const player = gameState;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ffd700;text-align:center;margin-bottom:15px;">💰 仙界经济系统</h2>`;
-
-    // 经济概览
-    html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:15px;">
-        <div style="background:rgba(255,215,0,0.1);padding:12px;border-radius:8px;text-align:center;">
-            <div style="color:#aaa;font-size:0.85em;">当前灵石</div>
-            <div style="color:#ffd700;font-size:1.5em;font-weight:bold;">${formatEcoNumber(player.spiritStones)}</div>
-        </div>
-        <div style="background:rgba(255,152,0,0.1);padding:12px;border-radius:8px;text-align:center;">
-            <div style="color:#aaa;font-size:0.85em;">通胀率</div>
-            <div style="color:#ff9800;font-size:1.5em;font-weight:bold;">${(eco.currentInflation * 100).toFixed(1)}%</div>
-        </div>
-        <div style="background:rgba(76,175,80,0.1);padding:12px;border-radius:8px;text-align:center;">
-            <div style="color:#aaa;font-size:0.85em;">日收入</div>
-            <div style="color:#4caf50;font-size:1.5em;font-weight:bold;">+${formatEcoNumber(eco.avgDailyIncome)}</div>
-        </div>
-        <div style="background:rgba(244,67,54,0.1);padding:12px;border-radius:8px;text-align:center;">
-            <div style="color:#aaa;font-size:0.85em;">日支出</div>
-            <div style="color:#f44336;font-size:1.5em;font-weight:bold;">-${formatEcoNumber(eco.avgDailyExpense)}</div>
-        </div>
-    </div>`;
-
-    // 每日交易税
-    html += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <h4 style="color:#ffd700;margin-bottom:8px;">🏦 灵石兑换商店</h4>
-        <p style="color:#aaa;font-size:0.85em;margin-bottom:10px;">大额灵石兑换（自动扣除3%交易税）</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn" style="background:#333;color:#ffd700;" onclick="exchangeSpiritStones(1000)">💎 1000灵石</button>
-            <button class="btn" style="background:#333;color:#ffd700;" onclick="exchangeSpiritStones(5000)">💎 5000灵石</button>
-            <button class="btn" style="background:#333;color:#ffd700;" onclick="exchangeSpiritStones(10000)">💎 10000灵石</button>
-            <button class="btn" style="background:#333;color:#ffd700;" onclick="exchangeSpiritStones(50000)">💎 50000灵石</button>
-        </div>
-    </div>`;
-
-    // 奢侈品商店
-    html += `<div style="margin-bottom:15px;">
-        <h4 style="color:#ffd700;margin-bottom:10px;">🏆 奢侈品商店（大型灵石 sinks）</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">`;
-    Object.entries(LUXURY_ITEMS).forEach(([name, data]) => {
-        const canAfford = player.spiritStones >= data.cost;
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:10px;">
-            <div style="color:#ffd700;font-weight:bold;">${name}</div>
-            <div style="color:#aaa;font-size:0.85em;">${data.effect}</div>
-            <div style="color:#ffd700;margin:5px 0;">💎 ${formatEcoNumber(data.cost)}</div>
-            <button class="btn" style="background:${canAfford ? '#4caf50' : '#555'};color:white;width:100%;font-size:0.85em;"
-                onclick="buyLuxuryItem('${name}')" ${canAfford ? '' : 'disabled'}>
-                ${canAfford ? '购买' : '灵石不足'}
-            </button>
-        </div>`;
-    });
-    html += `</div></div>`;
-
-    // 经济统计
-    html += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <h4 style="color:#ffd700;margin-bottom:8px;">📊 经济统计</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:0.9em;">
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">累计收入</span><span style="color:#4caf50;">${formatEcoNumber(eco.totalIncome)}</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">累计支出</span><span style="color:#f44336;">${formatEcoNumber(eco.totalExpense)}</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">累计税收</span><span style="color:#ff9800;">${formatEcoNumber(eco.totalTax)}</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">玩家财富</span><span style="color:#ffd700;">${formatEcoNumber(eco.totalWealth)}</span></div>
-        </div>
-    </div>`;
-
-    // 当前经济事件
-    if (eco.activeEvents.length > 0) {
-        html += `<div style="background:rgba(156,39,176,0.2);padding:12px;border-radius:8px;margin-bottom:15px;">
-            <h4 style="color:#9c27b0;margin-bottom:8px;">🌟 当前经济事件</h4>`;
-        eco.activeEvents.forEach(ev => {
-            html += `<div style="display:flex;justify-content:space-between;padding:4px;">
-                <span style="color:#fff;">${ev.name}</span>
-                <span style="color:#aaa;">剩余${ev.daysLeft}天</span>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    // 境界转换税提示
-    html += `<div style="background:rgba(33,150,243,0.2);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <h4 style="color:#2196f3;margin-bottom:5px;">⚠️ 境界突破税务</h4>
-        <p style="color:#aaa;font-size:0.85em;">每次境界突破需缴纳当前灵石的15%作为税款</p>
-        <p style="color:#ff9800;font-size:0.85em;">当前境界: ${getRealmName(player.realm)} | 预计税款: ~${formatEcoNumber(Math.floor(player.spiritStones * ECONOMY_CONFIG.realmTransitionTax))}灵石</p>
-    </div>`;
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-    </div></div></div>`;
-    openModal('仙界经济系统', html, []);
-}
-
-function exchangeSpiritStones(amount) {
-    const tax = Math.floor(amount * ECONOMY_CONFIG.tradeTaxRate);
-    const totalCost = amount + tax;
-
-    if (gameState.spiritStones < totalCost) {
-        addLog('灵石不足（包含交易税）', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= totalCost;
-
-    // 记录税收
-    if (!gameState.economy.totalTax) gameState.economy.totalTax = 0;
-    gameState.economy.totalTax += tax;
-
-    // 财富转移（模拟系统消耗）
-    trackEconomicFlow('expense', amount + tax);
-    addLog(`兑换${amount}灵石，缴纳${tax}灵石交易税`, '#ff9800');
-    updateDisplay();
-}
-
-function buyLuxuryItem(itemName) {
-    const item = LUXURY_ITEMS[itemName];
-    if (!item) return;
-
-    if (gameState.spiritStones < item.cost) {
-        addLog('灵石不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= item.cost;
-
-    // 记录大型 sink
-    if (!gameState.economy.luxuryPurchases) gameState.economy.luxuryPurchases = 0;
-    gameState.economy.luxuryPurchases++;
-
-    trackEconomicFlow('expense', item.cost);
-
-    // 应用效果
-    applyLuxuryEffect(itemName);
-
-    addLog(`购买奢侈品「${itemName}」，效果：${item.effect}`, '#ffd700');
-    updateDisplay();
-}
-
-function applyLuxuryEffect(itemName) {
-    const player = gameState;
-    const days = player.days;
-
-    switch (itemName) {
-        case '悟道丹':
-            // 加速法则领悟
-            if (player.celestialLaws) {
-                player.celestialLaws.comprehendingProgress = Math.min(100, player.celestialLaws.comprehendingProgress + 50);
-            }
-            break;
-        case '破天丹':
-            // 永久提升突破率（记录在buff中）
-            if (!player.economyBuffs) player.economyBuffs = {};
-            player.economyBuffs.breakthroughBoost = (player.economyBuffs.breakthroughBoost || 0) + 0.2;
-            break;
-        case '仙缘果':
-            if (!player.economyBuffs) player.economyBuffs = {};
-            player.economyBuffs.serendipityBoost = (player.economyBuffs.serendipityBoost || 0) + 0.3;
-            break;
-        case '聚灵阵图纸':
-            if (!player.economyBuffs) player.economyBuffs = {};
-            player.economyBuffs.cultivateSpeedBoost = (player.economyBuffs.cultivateSpeedBoost || 0) + 0.3;
-            break;
-        case '仙宠进化丹':
-            // 应用在仙宠系统
-            if (player.spiritPets && player.spiritPets.pets.length > 0) {
-                const pet = player.spiritPets.pets[0];
-                if (pet.level >= 10 && pet.bond >= 80) {
-                    // 自动进化
-                    const evoResult = `进化成功！${pet.type}变得更强大！`;
-                    addLog(evoResult, '#9c27b0');
-                }
-            }
-            break;
-        case '天劫护符':
-            if (!player.economyBuffs) player.economyBuffs = {};
-            player.economyBuffs.tribulationDamageReduce = (player.economyBuffs.tribulationDamageReduce || 0) + 0.3;
-            break;
-        case '轮回镜':
-            if (player.sect && player.sect.celestialCycle) {
-                player.sect.celestialCycle.cycleInterval = Math.max(1, player.sect.celestialCycle.cycleInterval - 1);
-            }
-            break;
-        case '造化鼎':
-            if (!player.economyBuffs) player.economyBuffs = {};
-            player.economyBuffs.alchemySuccessBoost = (player.economyBuffs.alchemySuccessBoost || 0) + 0.4;
-            break;
-    }
-}
-
-function trackEconomicFlow(type, amount) {
-    const eco = gameState.economy;
-    if (!eco.totalIncome) eco.totalIncome = 0;
-    if (!eco.totalExpense) eco.totalExpense = 0;
-    if (!eco.totalWealth) eco.totalWealth = 0;
-
-    if (type === 'income') {
-        eco.totalIncome += amount;
-        eco.avgDailyIncome = Math.round(eco.totalIncome / Math.max(1, gameState.days));
-    } else if (type === 'expense') {
-        eco.totalExpense += amount;
-        eco.avgDailyExpense = Math.round(eco.totalExpense / Math.max(1, gameState.days));
-    }
-
-    // 财富 = 收入 - 支出
-    eco.totalWealth = eco.totalIncome - eco.totalExpense;
-}
-
-function processDailyEconomy() {
-    const eco = gameState.economy;
-    const player = gameState;
-
-    if (!eco.currentInflation) eco.currentInflation = ECONOMY_CONFIG.inflationRate;
-    if (!eco.totalIncome) eco.totalIncome = 0;
-    if (!eco.totalExpense) eco.totalExpense = 0;
-    if (!eco.avgDailyIncome) eco.avgDailyIncome = ECONOMY_CONFIG.dailyBaseIncome;
-    if (!eco.avgDailyExpense) eco.avgDailyExpense = 0;
-    if (!eco.luxuryPurchases) eco.luxuryPurchases = 0;
-    if (!eco.totalTax) eco.totalTax = 0;
-    if (!eco.activeEvents) eco.activeEvents = [];
-
-    // 1. 计算玩家日收入
-    let dailyIncome = ECONOMY_CONFIG.dailyBaseIncome;
-    dailyIncome += ECONOMY_CONFIG.cultivationIncomeBonus * player.realm;
-    if (player.sect && player.sect.level) {
-        dailyIncome += ECONOMY_CONFIG.sectIncomeBonus * player.sect.level;
-    }
-
-    // 经济事件加成
-    eco.activeEvents.forEach(ev => {
-        if (ev.type === 'income_boost') {
-            dailyIncome *= (1 + ev.bonus);
-        } else if (ev.type === 'income_reduce') {
-            dailyIncome *= (1 - ev.penalty);
-        }
-    });
-
-    // 财富等级加成（高财富者收入递减）
-    const wealthRatio = Math.min(1, player.spiritStones / 100000);
-    dailyIncome *= (1 - wealthRatio * 0.3);
-
-    // 2. 应用通胀（灵石购买力下降）
-    eco.currentInflation = Math.min(0.1, ECONOMY_CONFIG.inflationRate * (1 + gameState.days / 365));
-
-    // 3. 自动征税（装备维修等）
-    const repairTax = Math.floor(player.spiritStones * ECONOMY_CONFIG.repairCostPercent * 0.01);
-    if (repairTax > 0 && player.spiritStones > repairTax) {
-        player.spiritStones -= repairTax;
-        eco.totalExpense += repairTax;
-        eco.totalTax += repairTax;
-    }
-
-    // 4. 处理活跃经济事件
-    eco.activeEvents = eco.activeEvents.filter(ev => {
-        ev.daysLeft--;
-        return ev.daysLeft > 0;
-    });
-
-    // 5. 触发随机经济事件
-    triggerRandomEconomicEvent();
-
-    // 6. 记录日均
-    eco.avgDailyIncome = Math.round((eco.avgDailyIncome * 0.9 + dailyIncome * 0.1));
-    eco.avgDailyExpense = Math.round(eco.avgDailyExpense * 0.95);
-
-    // 7. 灵石上限检查
-    if (player.spiritStones > ECONOMY_CONFIG.maxSpiritStones) {
-        player.spiritStones = ECONOMY_CONFIG.maxSpiritStones;
-    }
-
-    // 8. 每日收入
-    player.spiritStones += Math.floor(dailyIncome);
-    trackEconomicFlow('income', Math.floor(dailyIncome));
-
-    // 9. 境界突破税（当玩家灵石超过一定阈值时）
-    if (player.spiritStones > 100000 && player.days % 30 === 0) {
-        const passiveTax = Math.floor(player.spiritStones * 0.01);
-        if (passiveTax > 0) {
-            player.spiritStones -= passiveTax;
-            trackEconomicFlow('expense', passiveTax);
-        }
-    }
-}
-
-function triggerRandomEconomicEvent() {
-    const eco = gameState.economy;
-    const player = gameState;
-
-    for (const [eventName, eventData] of Object.entries(ECONOMIC_EVENTS)) {
-        if (Math.random() < eventData.probability) {
-            // 检查是否已有相同类型事件
-            if (eco.activeEvents.some(e => e.name === eventName)) continue;
-
-            const event = {
-                name: eventName,
-                type: eventData.type,
-                daysLeft: eventData.duration || 1
-            };
-
-            switch (eventData.type) {
-                case 'source':
-                    const sourceAmount = Math.floor(eventData.minAmount + Math.random() * (eventData.maxAmount - eventData.minAmount));
-                    player.spiritStones += sourceAmount;
-                    trackEconomicFlow('income', sourceAmount);
-                    addLog(`🌟 经济事件「${eventName}」！获得${formatEcoNumber(sourceAmount)}灵石！`, '#ffd700');
-                    break;
-                case 'sink':
-                    const sinkAmount = Math.min(eventData.maxAmount, Math.floor(player.spiritStones * 0.1));
-                    player.spiritStones = Math.max(0, player.spiritStones - sinkAmount);
-                    trackEconomicFlow('expense', sinkAmount);
-                    addLog(`⚠️ 经济事件「${eventName}」！损失${formatEcoNumber(sinkAmount)}灵石！`, '#f44336');
-                    break;
-                case 'trade_boost':
-                case 'income_boost':
-                case 'income_reduce':
-                    event.bonus = eventData.bonus || 0;
-                    event.penalty = eventData.penalty || 0;
-                    eco.activeEvents.push(event);
-                    addLog(`🌟 经济事件「${eventName}」！效果持续${event.daysLeft}天！`, '#9c27b0');
-                    break;
-            }
-            break; // 一次只触发一个事件
-        }
-    }
-}
-
-function formatEcoNumber(num) {
-    if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿';
-    if (num >= 10000) return (num / 10000).toFixed(1) + '万';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-    return num.toLocaleString();
-}
-
-function showEconomyStats() {
-    const eco = gameState.economy;
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ffd700;text-align:center;margin-bottom:15px;">📊 经济统计</h2>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-                <div style="background:rgba(76,175,80,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#4caf50;">累计收入</div>
-                    <div style="color:#4caf50;font-weight:bold;">${formatEcoNumber(eco.totalIncome || 0)}</div>
-                </div>
-                <div style="background:rgba(244,67,54,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#f44336;">累计支出</div>
-                    <div style="color:#f44336;font-weight:bold;">${formatEcoNumber(eco.totalExpense || 0)}</div>
-                </div>
-                <div style="background:rgba(255,152,0,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#ff9800;">累计税收</div>
-                    <div style="color:#ff9800;font-weight:bold;">${formatEcoNumber(eco.totalTax || 0)}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#9c27b0;">奢侈品购买</div>
-                    <div style="color:#9c27b0;font-weight:bold;">${eco.luxuryPurchases || 0}次</div>
-                </div>
-            </div>
-            <div style="margin-top:15px;text-align:center;">
-                <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('经济统计', html, []);
-}
-// Auto-generated module: evoTree.js
-
-// ===== PET EVOLUTION TREE CONSTANTS (V47) =====
-
-// 进化树配置 - 每个宠物类型有多个进化路径
-const EVO_TREE_CONFIG = {
-    maxEvoBranches: 3,       // 最多3个进化分支
-    branchUnlockLevel: 20,   // 分支解锁等级
-    rareFormChance: 0.05,    // 稀有形态概率
-    superRareChance: 0.01    // 超稀有形态概率
-};
-
-// 宠物进化树 - 定义每个类型的进化路径
-const PET_EVO_TREES = {
-    '仙鹤': {
-        baseIcon: '🦅',
-        branches: {
-            '风灵鹤': {
-                icon: '🦢',
-                element: '风',
-                color: '#81d4fa',
-                unlockLevel: 20,
-                stats: { attack: 20, defense: 12, speed: 50, luck: 25 },
-                skills: ['御空加速', '风之屏障', '旋风斩'],
-                evolutionCost: { stones: 20000, herbs: 100 },
-                desc: '风系仙鹤进化路线，速度见长',
-                requirements: { level: 20, element: '风' }
-            },
-            '天羽鹤': {
-                icon: '🦋',
-                element: '光',
-                color: '#ffd54f',
-                unlockLevel: 30,
-                stats: { attack: 25, defense: 15, speed: 40, luck: 35 },
-                skills: ['天羽之光', '羽化登仙', '圣光普照'],
-                evolutionCost: { stones: 35000, herbs: 200 },
-                desc: '光系仙鹤进化路线，辅助能力突出',
-                requirements: { level: 30, element: '光' }
-            },
-            '暗黑鹤': {
-                icon: '🦅',
-                element: '暗',
-                color: '#7e57c2',
-                unlockLevel: 40,
-                stats: { attack: 35, defense: 10, speed: 45, luck: 20 },
-                skills: ['暗影突袭', '幽冥之气', '暗黑涅槃'],
-                evolutionCost: { stones: 50000, herbs: 300 },
-                desc: '暗系仙鹤进化路线，攻击能力最强',
-                requirements: { level: 40, element: '暗' }
-            }
-        }
-    },
-    '凤凰': {
-        baseIcon: '🔥',
-        branches: {
-            '烈焰凤凰': {
-                icon: '🔥',
-                element: '火',
-                color: '#ff5722',
-                unlockLevel: 20,
-                stats: { attack: 45, defense: 25, speed: 30, luck: 35 },
-                skills: ['涅槃之火', '烈焰灼烧', '火凤燎原'],
-                evolutionCost: { stones: 25000, herbs: 150 },
-                desc: '火系凤凰进化路线，输出爆炸',
-                requirements: { level: 20, element: '火' }
-            },
-            '紫焰凤凰': {
-                icon: '💜',
-                element: '火+暗',
-                color: '#9c27b0',
-                unlockLevel: 30,
-                stats: { attack: 50, defense: 20, speed: 25, luck: 40 },
-                skills: ['紫焰焚天', '幽冥之火', '涅槃重生'],
-                evolutionCost: { stones: 40000, herbs: 250 },
-                desc: '火暗双系凤凰，攻防兼备',
-                requirements: { level: 30, element: '火' }
-            },
-            '圣光凤凰': {
-                icon: '✨',
-                element: '火+光',
-                color: '#ffd700',
-                unlockLevel: 40,
-                stats: { attack: 40, defense: 30, speed: 35, luck: 50 },
-                skills: ['圣光之焰', '净化之炎', '凤凰天舞'],
-                evolutionCost: { stones: 60000, herbs: 400 },
-                desc: '火光双系凤凰，幸运与治疗',
-                requirements: { level: 40, element: '光' }
-            }
-        }
-    },
-    '麒麟': {
-        baseIcon: '🦄',
-        branches: {
-            '祥瑞麒麟': {
-                icon: '🦄',
-                element: '土',
-                color: '#8bc34a',
-                unlockLevel: 20,
-                stats: { attack: 35, defense: 45, speed: 25, luck: 30 },
-                skills: ['祥云笼罩', '地动山摇', '祥瑞之光'],
-                evolutionCost: { stones: 20000, herbs: 120 },
-                desc: '土系麒麟进化路线，防御见长',
-                requirements: { level: 20, element: '土' }
-            },
-            '紫金麒麟': {
-                icon: '💠',
-                element: '土+金',
-                color: '#9c27b0',
-                unlockLevel: 30,
-                stats: { attack: 40, defense: 50, speed: 20, luck: 35 },
-                skills: ['紫金护体', '金属性强化', '麒麟之怒'],
-                evolutionCost: { stones: 38000, herbs: 220 },
-                desc: '土金双系麒麟，综合最强',
-                requirements: { level: 30, element: '金' }
-            },
-            '玄冰麒麟': {
-                icon: '❄️',
-                element: '水',
-                color: '#00bcd4',
-                unlockLevel: 40,
-                stats: { attack: 30, defense: 40, speed: 30, luck: 40 },
-                skills: ['玄冰护甲', '寒冰之力', '冰封千里'],
-                evolutionCost: { stones: 45000, herbs: 280 },
-                desc: '水系麒麟进化路线，控制能力强',
-                requirements: { level: 40, element: '水' }
-            }
-        }
-    },
-    '白虎': {
-        baseIcon: '🐯',
-        branches: {
-            '战魂白虎': {
-                icon: '🐅',
-                element: '金',
-                color: '#ffc107',
-                unlockLevel: 20,
-                stats: { attack: 55, defense: 20, speed: 30, luck: 15 },
-                skills: ['白虎战魂', '金之神力', '战神之力'],
-                evolutionCost: { stones: 22000, herbs: 130 },
-                desc: '金系白虎进化路线，极致输出',
-                requirements: { level: 20, element: '金' }
-            },
-            '铁甲白虎': {
-                icon: '🛡️',
-                element: '金+土',
-                color: '#795548',
-                unlockLevel: 30,
-                stats: { attack: 50, defense: 35, speed: 25, luck: 20 },
-                skills: ['铁甲护体', '金甲防御', '不动如山'],
-                evolutionCost: { stones: 36000, herbs: 200 },
-                desc: '金土双系白虎，攻防均衡',
-                requirements: { level: 30, element: '土' }
-            },
-            '暗影白虎': {
-                icon: '🌑',
-                element: '金+暗',
-                color: '#37474f',
-                unlockLevel: 40,
-                stats: { attack: 60, defense: 15, speed: 40, luck: 25 },
-                skills: ['暗影突击', '夜战八方', '影之分身'],
-                evolutionCost: { stones: 55000, herbs: 350 },
-                desc: '金暗双系白虎，速度与暴击',
-                requirements: { level: 40, element: '暗' }
-            }
-        }
-    },
-    '青龙': {
-        baseIcon: '🐉',
-        branches: {
-            '雷龙': {
-                icon: '⚡',
-                element: '雷',
-                color: '#2196f3',
-                unlockLevel: 20,
-                stats: { attack: 40, defense: 25, speed: 45, luck: 30 },
-                skills: ['雷龙出海', '九天雷罚', '雷霆万钧'],
-                evolutionCost: { stones: 23000, herbs: 140 },
-                desc: '雷系青龙进化路线，速度与攻击兼备',
-                requirements: { level: 20, element: '雷' }
-            },
-            '水龙': {
-                icon: '🌊',
-                element: '水',
-                color: '#03a9f4',
-                unlockLevel: 30,
-                stats: { attack: 35, defense: 30, speed: 40, luck: 35 },
-                skills: ['水龙卷', '海纳百川', '水之守护'],
-                evolutionCost: { stones: 37000, herbs: 230 },
-                desc: '水系青龙进化路线，持续作战能力强',
-                requirements: { level: 30, element: '水' }
-            },
-            '青龙': {
-                icon: '🐲',
-                element: '木',
-                color: '#4caf50',
-                unlockLevel: 40,
-                stats: { attack: 45, defense: 35, speed: 35, luck: 40 },
-                skills: ['青龙之怒', '木灵之力', '生生不息'],
-                evolutionCost: { stones: 48000, herbs: 300 },
-                desc: '木系青龙进化路线，攻守平衡',
-                requirements: { level: 40, element: '木' }
-            }
-        }
-    }
-};
-
-// 稀有形态配置
-const RARE_FORMS = {
-    '黄金圣兽': {
-        icon: '👑',
-        color: '#ffd700',
-        statsMultiplier: 1.5,
-        skills: ['金色战魂', '王者之气'],
-        desc: '金光闪闪，属性大幅提升',
-        chance: 0.05
-    },
-    '暗黑魔兽': {
-        icon: '💀',
-        color: '#37474f',
-        statsMultiplier: 1.3,
-        skills: ['魔化', '暗影腐蚀'],
-        desc: '魔化形态，攻击附带腐蚀效果',
-        chance: 0.03
-    },
-    '天使翼兽': {
-        icon: '😇',
-        color: '#ffffff',
-        statsMultiplier: 1.4,
-        skills: ['神圣之光', '天使庇护'],
-        desc: '圣光护体，防御大幅提升',
-        chance: 0.02
-    },
-    '混沌古兽': {
-        icon: '🌪️',
-        color: '#9e9e9e',
-        statsMultiplier: 1.6,
-        skills: ['混沌之力', '时空扭曲'],
-        desc: '远古混沌之力，所有属性大幅提升',
-        chance: 0.01
-    }
-};
-
-// ===== EVOLUTION TREE FUNCTIONS =====
-
-function openEvoTreePanel() {
-    const pets = gameState.spiritPets?.pets || [];
-    if (pets.length === 0) {
-        addLog('还没有仙宠！', '#ff9800');
-        return;
-    }
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff9800;text-align:center;margin-bottom:10px;">🌳 灵宠进化树</h2>
-
-            <div style="display:grid;grid-template-columns:repeat(${pets.length},1fr);gap:10px;margin-bottom:15px;">`;
-    pets.forEach((pet, idx) => {
-        const evoTree = PET_EVO_TREES[pet.type] || {};
-        const branches = Object.keys(evoTree.branches || {});
-        const canEvo = pet.level >= 20 && branches.length > 0;
-
-        html += `<div style="background:rgba(255,152,0,0.1);border:1px solid #ff9800;border-radius:8px;padding:10px;text-align:center;cursor:pointer;"
-                     onclick="selectEvoTreePet(${idx})">
-            <div style="font-size:2em;">${pet.evoForm?.icon || getPetTypeIcon(pet.type)}</div>
-            <div style="color:#ffd700;font-weight:bold;">${pet.name}</div>
-            <div style="color:#aaa;font-size:0.85em;">Lv.${pet.level} ${pet.type}</div>
-            <div style="color:${canEvo ? '#4caf50' : '#aaa'};font-size:0.85em;margin-top:5px;">
-                ${canEvo ? '✓ 可进化' : `需 Lv.20`}
-            </div>
-        </div>`;
-    });
-    html += `</div>`;
-
-    // 显示当前选中的宠物进化树
-    const selectedIdx = evoTreeSelectedIdx || 0;
-    const selectedPet = pets[selectedIdx] || pets[0];
-    if (selectedPet) {
-        const evoTree = PET_EVO_TREES[selectedPet.type];
-        if (evoTree) {
-            html += renderEvoTree(selectedPet, evoTree);
-        } else {
-            html += `<p style="color:#aaa;text-align:center;">该宠物暂无进化树</p>`;
-        }
-    }
-
-    html += `</div></div>`;
-    openModal('灵宠进化树', html, []);
-}
-
-let evoTreeSelectedIdx = 0;
-
-function selectEvoTreePet(idx) {
-    evoTreeSelectedIdx = idx;
-    openEvoTreePanel();
-}
-
-function renderEvoTree(pet, evoTree) {
-    const branches = evoTree.branches || {};
-    const currentForm = pet.evoForm?.formId || 'base';
-    const petLevel = pet.level;
-
-    let html = `<div style="margin-top:15px;">
-        <h3 style="color:#ffd700;margin-bottom:10px;">📊 ${pet.type} 进化树</h3>
-
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:15px;">`;
-
-    // 基础形态
-    html += `<div style="background:rgba(0,0,0,0.3);border:2px solid ${evoTree.color || '#888'};border-radius:8px;padding:15px;text-align:center;${currentForm === 'base' ? 'box-shadow:0 0 15px rgba(255,215,0,0.5);' : ''}">
-        <div style="font-size:2.5em;margin-bottom:5px;">${evoTree.baseIcon}</div>
-        <div style="color:#ffd700;font-weight:bold;">${pet.type}</div>
-        <div style="color:#aaa;font-size:0.85em;">基础形态</div>
-        <div style="color:#4caf50;font-size:0.9em;margin-top:5px;">当前形态</div>
-    </div>`;
-
-    // 进化分支
-    Object.entries(branches).forEach(([branchId, branch]) => {
-        const isUnlocked = petLevel >= branch.unlockLevel;
-        const isSelected = currentForm === branchId;
-        const reqs = branch.requirements || {};
-        const canEvo = isUnlocked && (!reqs.element || pet.element === reqs.element);
-
-        html += `<div style="background:rgba(0,0,0,0.3);border:2px solid ${isUnlocked ? branch.color : '#555'};border-radius:8px;padding:15px;text-align:center;${isSelected ? 'box-shadow:0 0 15px rgba(255,215,0,0.5);' : ''}">
-            <div style="font-size:2.5em;margin-bottom:5px;${!isUnlocked ? 'filter:grayscale(100%);opacity:0.5;' : ''}">${branch.icon}</div>
-            <div style="color:${branch.color};font-weight:bold;">${branchId}</div>
-            <div style="color:#aaa;font-size:0.85em;">${branch.element}系</div>
-            ${!isUnlocked
-                ? `<div style="color:#f44336;font-size:0.85em;margin-top:5px;">需 Lv.${branch.unlockLevel}</div>`
-                : canEvo
-                    ? `<div style="color:#4caf50;font-size:0.85em;margin-top:5px;">✓ 可进化</div>
-                       <button class="btn" style="background:#ff9800;color:white;font-size:0.85em;margin-top:8px;width:100%;"
-                           onclick="evolvePetToBranch(${pets.indexOf(pet)},'${branchId}')">进化</button>`
-                    : `<div style="color:#ff9800;font-size:0.85em;margin-top:5px;">需 ${reqs.element}系</div>`
-            }
-            <div style="color:#aaa;font-size:0.75em;margin-top:5px;">💎 ${(branch.evolutionCost?.stones || 0).toLocaleString()}</div>
-        </div>`;
-    });
-
-    html += `</div>`;
-
-    // 当前宠物详细属性
-    if (currentForm !== 'base') {
-        const formData = branches[currentForm];
-        if (formData) {
-            html += `<div style="background:rgba(${hexToRgb(formData.color)},0.1);border:1px solid ${formData.color};border-radius:8px;padding:15px;margin-top:15px;">
-                <h4 style="color:${formData.color};margin-bottom:10px;">📋 ${currentForm} 属性</h4>
-                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:0.9em;">
-                    <div><span style="color:#aaa;">攻击</span><br><span style="color:#f44336;">${formData.stats.attack}</span></div>
-                    <div><span style="color:#aaa;">防御</span><br><span style="color:#2196f3;">${formData.stats.defense}</span></div>
-                    <div><span style="color:#aaa;">速度</span><br><span style="color:#ff9800;">${formData.stats.speed}</span></div>
-                    <div><span style="color:#aaa;">幸运</span><br><span style="color:#9c27b0;">${formData.stats.luck}</span></div>
-                </div>
-                <div style="margin-top:10px;">
-                    <span style="color:#aaa;font-size:0.85em;">技能：</span>
-                    <span style="color:#ffd700;font-size:0.85em;">${formData.skills.join(' / ')}</span>
-                </div>
-            </div>`;
-        }
-    }
-
-    html += `</div>`;
-    return html;
-}
-
-function getPetTypeIcon(type) {
-    const trees = Object.values(PET_EVO_TREES);
-    for (const tree of trees) {
-        if (tree.branches) {
-            for (const branch of Object.values(tree.branches)) {
-                return branch.icon;
-            }
-        }
-    }
-    return '🐾';
-}
-
-function evolvePetToBranch(petIdx, branchId) {
-    const pets = gameState.spiritPets?.pets || [];
-    const pet = pets[petIdx];
-    if (!pet) return;
-
-    const evoTree = PET_EVO_TREES[pet.type];
-    if (!evoTree || !evoTree.branches) return;
-
-    const branch = evoTree.branches[branchId];
-    if (!branch) return;
-
-    if (pet.level < branch.unlockLevel) {
-        addLog('等级不足！', '#f44336');
-        return;
-    }
-
-    const reqs = branch.requirements || {};
-    if (reqs.element && pet.element !== reqs.element) {
-        addLog(`需要 ${reqs.element}系宠物！`, '#f44336');
-        return;
-    }
-
-    const cost = branch.evolutionCost || {};
-    if (gameState.spiritStones < (cost.stones || 0)) {
-        addLog('灵石不足！', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones || 0;
-
-    // 检查稀有形态
-    let rareForm = null;
-    const roll = Math.random();
-    if (roll < EVO_TREE_CONFIG.superRareChance) {
-        const superRare = Object.values(RARE_FORMS).find(f => f.chance === EVO_TREE_CONFIG.superRareChance);
-        rareForm = superRare;
-    } else if (roll < EVO_TREE_CONFIG.rareFormChance) {
-        const rare = Object.values(RARE_FORMS).filter(f => f.chance > EVO_TREE_CONFIG.superRareChance);
-        rareForm = rare[Math.floor(Math.random() * rare.length)];
-    }
-
-    // 应用进化
-    pet.evoForm = {
-        formId: branchId,
-        icon: branch.icon,
-        element: branch.element,
-        stats: { ...branch.stats },
-        skills: [...branch.skills],
-        color: branch.color,
-        isRare: !!rareForm,
-        rareForm: rareForm?.icon
-    };
-
-    // 应用稀有形态
-    if (rareForm) {
-        Object.keys(pet.evoForm.stats).forEach(key => {
-            pet.evoForm.stats[key] = Math.floor(pet.evoForm.stats[key] * rareForm.statsMultiplier);
-        });
-        pet.evoForm.skills = [...pet.evoForm.skills, ...rareForm.skills];
-        addLog(`🌟 触发稀有形态「${rareForm.icon} ${Object.keys(RARE_FORMS).find(k => RARE_FORMS[k] === rareForm)}」！`, '#ffd700');
-    }
-
-    addLog(`✨ 进化成功！${pet.name} 进化为「${branchId}」！`, '#ff9800');
-    saveGame();
-    updateDisplay();
-    openEvoTreePanel();
-}
-
-function getEvoTreeStats(pet) {
-    if (!pet.evoForm || !pet.evoForm.stats) {
-        const baseStats = PET_TYPES[pet.type]?.baseStats || { attack: 10, defense: 10, speed: 10, luck: 10 };
-        return baseStats;
-    }
-    return pet.evoForm.stats;
-}
-
-
-// Auto-generated module: farming.js
-
-// ===== FARMING CONSTANTS (V46) =====
-const FARMING_CONFIG = {
-    maxAutoResources: 5,
-    offlineEarningHours: 24,
-    checkIntervalMs: 60000,  // 1分钟检查一次
-    resourceNodes: ['灵草园', '灵石矿', '矿石洞', '仙露池', '灵兽栏']
-};
-
-const FARMING_NODES = {
-    // 资源节点配置
-    '灵草园': {
-        icon: '🌿',
-        color: '#4caf50',
-        resource: 'herbs',
-        baseOutput: 10,
-        outputInterval: 3600000,  // 1小时
-        upgradeCost: { stones: 5000, herbs: 50 },
-        upgradeBonus: 1.5,
-        maxLevel: 10,
-        desc: '自动产出灵草'
-    },
-    '灵石矿': {
-        icon: '💎',
-        color: '#2196f3',
-        resource: 'spiritStones',
-        baseOutput: 100,
-        outputInterval: 7200000,  // 2小时
-        upgradeCost: { stones: 8000, materials: 100 },
-        upgradeBonus: 1.5,
-        maxLevel: 10,
-        desc: '自动产出灵石'
-    },
-    '矿石洞': {
-        icon: '🪨',
-        color: '#795548',
-        resource: 'materials',
-        baseOutput: 20,
-        outputInterval: 3600000,
-        upgradeCost: { stones: 6000, herbs: 30 },
-        upgradeBonus: 1.5,
-        maxLevel: 10,
-        desc: '自动产出矿石'
-    },
-    '仙露池': {
-        icon: '💧',
-        color: '#00bcd4',
-        resource: 'qi',
-        baseOutput: 50,
-        outputInterval: 1800000,  // 30分钟
-        upgradeCost: { stones: 10000, herbs: 100 },
-        upgradeBonus: 1.5,
-        maxLevel: 10,
-        desc: '自动产出灵气'
-    },
-    '灵兽栏': {
-        icon: '🦌',
-        color: '#ff9800',
-        resource: 'petExp',
-        baseOutput: 30,
-        outputInterval: 7200000,
-        upgradeCost: { stones: 15000, herbs: 200 },
-        upgradeBonus: 1.5,
-        maxLevel: 10,
-        desc: '自动产出仙宠经验'
-    }
-};
-
-const FARMING_UPGRADES = {
-    // 全局升级
-    '效率提升': {
-        icon: '⚡',
-        cost: { stones: 20000 },
-        bonus: { allOutput: 0.2 },
-        maxLevel: 5,
-        desc: '所有资源产出+20%'
-    },
-    '自动采集': {
-        icon: '🤖',
-        cost: { stones: 30000 },
-        bonus: { autoCollect: true },
-        maxLevel: 1,
-        desc: '自动收集资源，无需手动点击'
-    },
-    '离线收益': {
-        icon: '💤',
-        cost: { stones: 25000 },
-        bonus: { offlineHours: 12 },
-        maxLevel: 3,
-        desc: '离线收益时间+12小时/级'
-    },
-    '暴击倍率': {
-        icon: '🎯',
-        cost: { stones: 40000 },
-        bonus: { critChance: 0.1 },
-        maxLevel: 5,
-        desc: '资源暴击概率+10%/级'
-    },
-    '资源加成': {
-        icon: '📈',
-        cost: { stones: 50000 },
-        bonus: { specificResource: {} },
-        maxLevel: 1,
-        desc: '选择一项资源产出翻倍'
-    }
-};
-
-// ===== FARMING STATE =====
-let farmingState = {
-    nodes: {},           // { nodeId: { level, lastCollect, totalOutput } }
-    upgrades: {},        // { upgradeId: level }
-    lastOnlineTime: Date.now(),
-    totalOfflineEarnings: null,
-    selectedResource: null,
-    lastAutoCollect: 0
-};
-
-// ===== FARMING FUNCTIONS =====
-
-function openFarmingPanel() {
-    updateFarmingState();
-    const fs = farmingState;
-    const now = Date.now();
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #4caf50;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#4caf50;text-align:center;margin-bottom:10px;">🌾 仙界 farming 系统</h2>
-
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px;">
-                <div style="background:rgba(76,175,80,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">资源节点</div>
-                    <div style="color:#4caf50;font-size:1.3em;font-weight:bold;">${Object.keys(fs.nodes).length}/${FARMING_CONFIG.maxAutoResources}</div>
-                </div>
-                <div style="background:rgba(76,175,80,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">效率加成</div>
-                    <div style="color:#ffd700;font-size:1.3em;font-weight:bold;">+${getFarmingEfficiencyBonus() * 100}%</div>
-                </div>
-                <div style="background:rgba(76,175,80,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">离线收益</div>
-                    <div style="color:#2196f3;font-size:1.1em;font-weight:bold;">${getOfflineHours()}小时</div>
-                </div>
-                <div style="background:rgba(76,175,80,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">暴击概率</div>
-                    <div style="color:#ff9800;font-size:1.3em;font-weight:bold;">${getFarmingCritChance() * 100}%</div>
-                </div>
-            </div>
-
-            <div style="display:flex;gap:10px;margin-bottom:15px;">
-                <button class="btn" style="background:#4caf50;color:white;flex:1;" onclick="showFarmingNodes()">⛏️ 资源节点</button>
-                <button class="btn" style="background:#2196f3;color:white;flex:1;" onclick="showFarmingUpgrades()">⬆️ 全局升级</button>
-                <button class="btn" style="background:#ff9800;color:white;flex:1;" onclick="collectAllResources()">📥 一键采集</button>
-            </div>`;
-
-    // 离线收益提示
-    const offlineHours = getOfflineHours();
-    if (offlineHours > 0) {
-        const offlineEarnings = calculateOfflineEarnings();
-        if (offlineEarnings.total > 0) {
-            html += `<div style="background:rgba(33,150,243,0.1);border:1px solid #2196f3;border-radius:8px;padding:15px;margin-bottom:15px;">
-                <h4 style="color:#2196f3;margin-bottom:10px;">💤 离线收益</h4>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:0.9em;">`;
-            Object.entries(offlineEarnings.byResource).forEach(([res, amount]) => {
-                if (amount > 0) {
-                    const names = { spiritStones: '灵石', herbs: '灵草', materials: '矿石', qi: '灵气', petExp: '仙宠经验' };
-                    html += `<div style="text-align:center;"><span style="color:#aaa;">${names[res] || res}</span><br><span style="color:#4caf50;font-weight:bold;">+${formatNumber(amount)}</span></div>`;
-                }
-            });
-            html += `</div>
-                <button class="btn" style="background:#2196f3;color:white;width:100%;margin-top:10px;" onclick="claimOfflineEarnings()">领取离线收益</button>
-            </div>`;
-        }
-    }
-
-    // 当前节点状态
-    html += `<div style="margin-bottom:15px;">
-        <h3 style="color:#ffd700;margin-bottom:10px;">⛏️ 资源节点状态</h3>`;
-
-    if (Object.keys(fs.nodes).length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">尚未建造任何资源节点</p>`;
-    } else {
-        html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">`;
-        Object.entries(fs.nodes).forEach(([nodeId, nodeData]) => {
-            const config = FARMING_NODES[nodeId];
-            if (!config) return;
-
-            const timeSinceLast = now - (nodeData.lastCollect || 0);
-            const timeToNext = Math.max(0, config.outputInterval - timeSinceLast);
-            const progress = Math.min(100, (timeSinceLast / config.outputInterval) * 100);
-            const output = Math.round(config.baseOutput * Math.pow(config.upgradeBonus, nodeData.level - 1) * getFarmingEfficiencyBonus());
-
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${config.color};border-radius:8px;padding:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <div>
-                        <span style="color:${config.color};font-weight:bold;font-size:1.1em;">${config.icon} ${nodeId}</span>
-                        <span style="color:#ff9800;margin-left:5px;">Lv.${nodeData.level}</span>
-                    </div>
-                    <div style="color:#aaa;font-size:0.85em;">${config.desc}</div>
-                </div>
-                <div style="background:#333;border-radius:4px;height:8px;margin-bottom:5px;">
-                    <div style="background:${config.color};height:100%;border-radius:4px;width:${progress}%;transition:width 0.3s;"></div>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:0.85em;">
-                    <span style="color:#aaa;">下次产出: ${timeToNext > 0 ? formatTime(timeToNext) : '可采集'}</span>
-                    <span style="color:#4caf50;">+${output}</span>
-                </div>
-                <div style="display:flex;gap:5px;margin-top:8px;">
-                    <button class="btn" style="background:#4caf50;color:white;font-size:0.8em;flex:1;" onclick="collectFarmingNodeResource('${nodeId}')" ${timeToNext > 0 ? 'disabled' : ''}>采集</button>
-                    <button class="btn" style="background:#ff9800;color:white;font-size:0.8em;flex:1;" onclick="upgradeFarmingNode('${nodeId}')">升级</button>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    html += `</div>
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('仙界 farming', html, []);
-}
-
-function showFarmingNodes() {
-    const fs = farmingState;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #4caf50;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#4caf50;text-align:center;margin-bottom:15px;">⛏️ 建造资源节点</h2>
-            <p style="color:#aaa;text-align:center;margin-bottom:15px;font-size:0.9em;">最多建造 ${FARMING_CONFIG.maxAutoResources} 个节点</p>
-
-            <div style="display:grid;gap:10px;">`;
-    Object.entries(FARMING_NODES).forEach(([nodeId, config]) => {
-        const existing = fs.nodes[nodeId];
-        const canBuild = !existing && Object.keys(fs.nodes).length < FARMING_CONFIG.maxAutoResources;
-        const cost = config.upgradeCost;
-
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${existing ? '#4caf50' : '#555'};border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div>
-                    <span style="color:${config.color};font-weight:bold;font-size:1.1em;">${config.icon} ${nodeId}</span>
-                    ${existing ? `<span style="color:#ff9800;margin-left:5px;">Lv.${existing.level}</span>` : ''}
-                </div>
-                <div style="color:#aaa;font-size:0.85em;">${config.desc}</div>
-            </div>
-            <div style="color:#aaa;font-size:0.85em;margin-bottom:8px;">
-                产出: ${config.baseOutput} ${config.resource} / ${config.outputInterval / 3600000}小时
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <span style="color:#aaa;font-size:0.85em;">💎 ${cost.stones.toLocaleString()}</span>
-                    <span style="color:#aaa;font-size:0.85em;margin-left:10px;">🌿 ${cost.herbs || 0}</span>
-                </div>
-                ${existing
-                    ? `<button class="btn" style="background:#555;color:#888;font-size:0.85em;" disabled>已建造</button>`
-                    : canBuild
-                        ? `<button class="btn" style="background:#4caf50;color:white;" onclick="buildFarmingNode('${nodeId}')">建造</button>`
-                        : `<button class="btn" style="background:#555;color:#888;font-size:0.85em;" disabled>节点已满</button>`
-                }
-            </div>
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="openFarmingPanel()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('资源节点', html, []);
-}
-
-function buildFarmingNode(nodeId) {
-    const config = FARMING_NODES[nodeId];
-    if (!config) return;
-
-    if (Object.keys(farmingState.nodes).length >= FARMING_CONFIG.maxAutoResources) {
-        addLog('资源节点数量已达上限', '#f44336');
-        return;
-    }
-
-    if (farmingState.nodes[nodeId]) {
-        addLog('该节点已存在', '#f44336');
-        return;
-    }
-
-    const cost = config.upgradeCost;
-    if (gameState.spiritStones < cost.stones || (gameState.herbs || 0) < (cost.herbs || 0)) {
-        addLog('资源不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones;
-    gameState.herbs = (gameState.herbs || 0) - (cost.herbs || 0);
-
-    farmingState.nodes[nodeId] = {
-        level: 1,
-        lastCollect: Date.now(),
-        totalOutput: 0
-    };
-
-    addLog(`⛏️ 建造「${nodeId}」成功！`, '#4caf50');
-    saveFarmingState();
-    updateDisplay();
-    showFarmingNodes();
-}
-
-function upgradeFarmingNode(nodeId) {
-    const config = FARMING_NODES[nodeId];
-    const nodeData = farmingState.nodes[nodeId];
-    if (!config || !nodeData) return;
-
-    if (nodeData.level >= config.maxLevel) {
-        addLog('已达最高等级', '#f44336');
-        return;
-    }
-
-    const cost = {
-        stones: Math.floor(config.upgradeCost.stones * Math.pow(1.5, nodeData.level)),
-        herbs: Math.floor((config.upgradeCost.herbs || 0) * Math.pow(1.5, nodeData.level))
-    };
-
-    if (gameState.spiritStones < cost.stones || (gameState.herbs || 0) < cost.herbs) {
-        addLog('资源不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones;
-    gameState.herbs = (gameState.herbs || 0) - cost.herbs;
-
-    nodeData.level++;
-    addLog(`⬆️ 「${nodeId}」升级至 Lv.${nodeData.level}！`, '#ff9800');
-    saveFarmingState();
-    updateDisplay();
-    openFarmingPanel();
-}
-
-function collectFarmingNodeResource(nodeId) {
-    const config = FARMING_NODES[nodeId];
-    const nodeData = farmingState.nodes[nodeId];
-    if (!config || !nodeData) return;
-
-    const now = Date.now();
-    const timeSinceLast = now - (nodeData.lastCollect || 0);
-
-    if (timeSinceLast < config.outputInterval) {
-        addLog('资源尚未产出', '#f44336');
-        return;
-    }
-
-    // 计算产出
-    let output = Math.round(config.baseOutput * Math.pow(config.upgradeBonus, nodeData.level - 1) * getFarmingEfficiencyBonus());
-
-    // 暴击检查
-    let isCrit = false;
-    if (Math.random() < getFarmingCritChance()) {
-        output = Math.round(output * 2);
-        isCrit = true;
-    }
-
-    // 添加资源
-    switch (config.resource) {
-        case 'spiritStones':
-            gameState.spiritStones += output;
-            break;
-        case 'herbs':
-            gameState.herbs = (gameState.herbs || 0) + output;
-            break;
-        case 'materials':
-            gameState.materials = (gameState.materials || 0) + output;
-            break;
-        case 'qi':
-            gameState.qi = Math.min(gameState.maxQi, gameState.qi + output);
-            break;
-        case 'petExp':
-            if (gameState.spiritPets && gameState.spiritPets.pets.length > 0) {
-                gameState.spiritPets.pets[0].exp = (gameState.spiritPets.pets[0].exp || 0) + output;
-            }
-            break;
-    }
-
-    nodeData.lastCollect = now;
-    nodeData.totalOutput = (nodeData.totalOutput || 0) + output;
-
-    const critText = isCrit ? ' 🎯暴击！' : '';
-    addLog(`📥 采集「${nodeId}」获得 ${output} ${config.resource}${critText}`, '#4caf50');
-
-    saveFarmingState();
-    updateDisplay();
-    openFarmingPanel();
-}
-
-function collectAllResources() {
-    let totalCollected = 0;
-    Object.keys(farmingState.nodes).forEach(nodeId => {
-        const config = FARMING_NODES[nodeId];
-        const nodeData = farmingState.nodes[nodeId];
-        if (!config || !nodeData) return;
-
-        const now = Date.now();
-        const timeSinceLast = now - (nodeData.lastCollect || 0);
-
-        if (timeSinceLast >= config.outputInterval) {
-            let output = Math.round(config.baseOutput * Math.pow(config.upgradeBonus, nodeData.level - 1) * getFarmingEfficiencyBonus());
-            if (Math.random() < getFarmingCritChance()) {
-                output = Math.round(output * 2);
-            }
-
-            switch (config.resource) {
-                case 'spiritStones':
-                    gameState.spiritStones += output;
-                    break;
-                case 'herbs':
-                    gameState.herbs = (gameState.herbs || 0) + output;
-                    break;
-                case 'materials':
-                    gameState.materials = (gameState.materials || 0) + output;
-                    break;
-            }
-
-            nodeData.lastCollect = now;
-            nodeData.totalOutput = (nodeData.totalOutput || 0) + output;
-            totalCollected++;
-        }
-    });
-
-    if (totalCollected > 0) {
-        addLog(`📥 一键采集 ${totalCollected} 个节点完成！`, '#4caf50');
-        saveFarmingState();
-        updateDisplay();
-    } else {
-        addLog('暂无资源可采集', '#ff9800');
-    }
-    openFarmingPanel();
-}
-
-function showFarmingUpgrades() {
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #2196f3;border-radius:12px;padding:20px;max-width:500px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#2196f3;text-align:center;margin-bottom:15px;">⬆️ 全局升级</h2>
-
-            <div style="display:grid;gap:10px;">`;
-    Object.entries(FARMING_UPGRADES).forEach(([upgradeId, config]) => {
-        const currentLevel = farmingState.upgrades[upgradeId] || 0;
-        const isMaxed = currentLevel >= config.maxLevel;
-        const cost = { stones: config.cost.stones * (currentLevel + 1) };
-        const canAfford = gameState.spiritStones >= cost.stones;
-
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${isMaxed ? '#4caf50' : '#555'};border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-                <div>
-                    <span style="font-size:1.2em;">${config.icon}</span>
-                    <span style="color:#ffd700;font-weight:bold;margin-left:5px;">${upgradeId}</span>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;">Lv.${currentLevel}/${config.maxLevel}</div>
-            </div>
-            <div style="color:#aaa;font-size:0.85em;margin-bottom:8px;">${config.desc}</div>
-            ${isMaxed
-                ? `<button class="btn" style="background:#555;color:#888;width:100%;" disabled>已满级</button>`
-                : `<button class="btn" style="background:${canAfford ? '#2196f3' : '#555'};color:white;width:100%;"
-                    onclick="upgradeFarmingGlobal('${upgradeId}')" ${canAfford ? '' : 'disabled'}>
-                    升级 (💎 ${cost.stones.toLocaleString()})
-                </button>`
-            }
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="openFarmingPanel()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('全局升级', html, []);
-}
-
-function upgradeFarmingGlobal(upgradeId) {
-    const config = FARMING_UPGRADES[upgradeId];
-    if (!config) return;
-
-    const currentLevel = farmingState.upgrades[upgradeId] || 0;
-    if (currentLevel >= config.maxLevel) {
-        addLog('已达最高等级', '#f44336');
-        return;
-    }
-
-    const cost = { stones: config.cost.stones * (currentLevel + 1) };
-    if (gameState.spiritStones < cost.stones) {
-        addLog('灵石不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones;
-    farmingState.upgrades[upgradeId] = currentLevel + 1;
-
-    addLog(`⬆️ 全局升级「${upgradeId}」升至 Lv.${currentLevel + 1}！`, '#2196f3');
-    saveFarmingState();
-    updateDisplay();
-    showFarmingUpgrades();
-}
-
-function getFarmingEfficiencyBonus() {
-    let bonus = 1.0;
-
-    // 全局效率提升
-    const effLevel = farmingState.upgrades['效率提升'] || 0;
-    bonus += effLevel * 0.2;
-
-    // 节点加成
-    Object.values(farmingState.nodes).forEach(node => {
-        bonus += (node.level - 1) * 0.05;
-    });
-
-    return bonus;
-}
-
-function getOfflineHours() {
-    let hours = 0;
-    const level = farmingState.upgrades['离线收益'] || 0;
-    hours = 12 * level;
-    return hours;
-}
-
-function getFarmingCritChance() {
-    const level = farmingState.upgrades['暴击倍率'] || 0;
-    return level * 0.1;
-}
-
-function calculateOfflineEarnings() {
-    const fs = farmingState;
-    const now = Date.now();
-    const lastOnline = fs.lastOnlineTime || now;
-    const maxOfflineMs = getOfflineHours() * 3600000;
-    const offlineMs = Math.min(now - lastOnline, maxOfflineMs);
-
-    if (offlineMs < 60000) return { total: 0, byResource: {} };
-
-    const byResource = {};
-    let total = 0;
-
-    Object.entries(fs.nodes).forEach(([nodeId, nodeData]) => {
-        const config = FARMING_NODES[nodeId];
-        if (!config) return;
-
-        const timeSinceLast = now - (nodeData.lastCollect || 0);
-        if (timeSinceLast >= config.outputInterval) {
-            // 计算错过的产出次数
-            const missedIntervals = Math.floor((offlineMs - timeSinceLast) / config.outputInterval);
-            let output = Math.round(config.baseOutput * Math.pow(config.upgradeBonus, nodeData.level - 1) * getFarmingEfficiencyBonus() * missedIntervals);
-
-            if (output > 0) {
-                byResource[config.resource] = (byResource[config.resource] || 0) + output;
-                total += output;
-            }
-        }
-    });
-
-    return { total, byResource };
-}
-
-function claimOfflineEarnings() {
-    const earnings = calculateOfflineEarnings();
-    if (earnings.total <= 0) {
-        addLog('无可领取的离线收益', '#ff9800');
-        return;
-    }
-
-    Object.entries(earnings.byResource).forEach(([resource, amount]) => {
-        switch (resource) {
-            case 'spiritStones':
-                gameState.spiritStones += amount;
-                break;
-            case 'herbs':
-                gameState.herbs = (gameState.herbs || 0) + amount;
-                break;
-            case 'materials':
-                gameState.materials = (gameState.materials || 0) + amount;
-                break;
-        }
-    });
-
-    addLog(`💤 领取离线收益：${earnings.total} 资源！`, '#2196f3');
-    farmingState.lastOnlineTime = Date.now();
-    saveFarmingState();
-    updateDisplay();
-    openFarmingPanel();
-}
-
-function updateFarmingState() {
-    // 从 gameState 恢复 farmingState
-    if (!farmingState.lastOnlineTime) {
-        farmingState.lastOnlineTime = Date.now();
-    }
-}
-
-function saveFarmingState() {
-    // farmingState 保存在内存中，下次打开时恢复
-}
-
-function processFarmingTick() {
-    const now = Date.now();
-    const fs = farmingState;
-
-    // 自动采集
-    const autoCollect = (farmingState.upgrades['自动采集'] || 0) >= 1;
-    if (autoCollect && now - fs.lastAutoCollect > 60000) {
-        collectAllResources();
-        fs.lastAutoCollect = now;
-    }
-}
-
-function onFarmingClose() {
-    // 记录离线时间
-    farmingState.lastOnlineTime = Date.now();
-    saveFarmingState();
-}
-
-
-
-// Auto-generated module: immortal.js
-
-// ===== IMMORTAL_REALMS =====
-const IMMORTAL_REALMS = {
-    1: { name: '地仙境', icon: '🌱', description: '仙界最低境界，相当于凡界筑基~金丹', cultivationBase: 100 },
-    2: { name: '天仙境', icon: '☁️', description: '中级仙人，相当于凡界元婴', cultivationBase: 200 },
-    3: { name: '金仙境', icon: '⭐', description: '高级仙人，相当于凡界化神', cultivationBase: 400 },
-    4: { name: '大罗金仙', icon: '🌟', description: '顶级强者，相当于凡界渡劫', cultivationBase: 800 },
-    5: { name: '混元大罗', icon: '💫', description: '飞升目标，超越凡界一切', cultivationBase: 1600 }
-};
-
-// ===== SECRET_REALMS_IMMORTAL =====
-const SECRET_REALMS_IMMORTAL = {
-    '太虚遗迹': {
-        type: 'ruins',
-        realmRequired: 1,
-        dangerLevel: 2,
-        waves: 3,
-        rewards: ['太虚仙法残卷', '上古丹药', '仙灵泉水'],
-        npc: { type: 'guardian', name: '太虚守护者' }
-    },
-    '九天瑶池': {
-        type: 'resource',
-        realmRequired: 2,
-        dangerLevel: 1,
-        waves: 2,
-        rewards: ['九天仙草', '瑶池圣水', '万年灵芝'],
-        npc: { type: 'merchant', name: '瑶池仙子' }
-    },
-    '混沌战场': {
-        type: 'combat',
-        realmRequired: 3,
-        dangerLevel: 4,
-        waves: 4,
-        rewards: ['混沌至宝', '神魔精血', '混沌丹'],
-        boss: { name: '混沌魔神' }
-    },
-    '星辰海洋': {
-        type: 'serendipity',
-        realmRequired: 2,
-        dangerLevel: 2,
-        waves: 1,
-        rewards: ['星辰精华', '星君传承'],
-        special: true
-    }
-};
-
-// ===== IMMORTAL_REGIONS =====
-const IMMORTAL_REGIONS = {
-    '仙灵谷': {
-        realmRequired: 1,
-        dangerLevel: 1,
-        icon: '🌿',
-        description: '新手区域，仙气充沛，适合初入仙界者',
-        resources: ['仙草', '仙兽蛋'],
-        color: '#4caf50'
-    },
-    '天庭': {
-        realmRequired: 2,
-        dangerLevel: 2,
-        icon: '🏯',
-        description: '仙界中心，天道法则汇聚之地',
-        resources: ['天庭令牌', '仙官赐福'],
-        color: '#ffd700'
-    },
-    '万妖山': {
-        realmRequired: 2,
-        dangerLevel: 2,
-        icon: '🏔️',
-        description: '妖修领地，妖族强者云集',
-        resources: ['妖修功法', '妖族坐骑'],
-        color: '#ff5722'
-    },
-    '神魔战场': {
-        realmRequired: 3,
-        dangerLevel: 4,
-        icon: '⚔️',
-        description: '上古神魔大战遗迹，蕴含无穷奥秘',
-        resources: ['神魔装备', '混沌碎片'],
-        color: '#9c27b0'
-    },
-    '三十三天': {
-        realmRequired: 4,
-        dangerLevel: 5,
-        icon: '🔮',
-        description: '极高危险区域，突破混元大罗的必经之地',
-        resources: ['混沌碎片', '飞升道具'],
-        color: '#e91e63'
-    },
-    '混沌海': {
-        realmRequired: 5,
-        dangerLevel: 5,
-        icon: '🌀',
-        description: '最终区域，传说中混元大罗的诞生之地',
-        resources: ['混沌神石', '位面法则'],
-        color: '#00bcd4'
-    }
-};
-
-// ===== initializeImmortalState =====
-function initializeImmortalState() {
-    if (!gameState.immortal) {
-        gameState.immortal = {
-            realm: 1,
-            spiritStones: 0,
-            currentRegion: '仙灵谷',
-            exploredRegions: ['仙灵谷'],
-            cultivationProgress: 0,
-            map: {
-                '仙灵谷': { unlocked: true, explored: [] },
-                '天庭': { unlocked: false, realmRequired: 2 },
-                '万妖山': { unlocked: false, realmRequired: 2 },
-                '神魔战场': { unlocked: false, realmRequired: 3 },
-                '三十三天': { unlocked: false, realmRequired: 4 },
-                '混沌海': { unlocked: false, realmRequired: 5 }
-            },
-            lastAerialCooldown: 0,
-            lastFateTask: 0,
-            fateTaskRefreshDay: 0,
-            celestialCycleDay: 0,
-            celestialCycleCompleted: false,
-            // V34 仙界秘境探索系统
-            secretRealm: {
-                inSecretRealm: false,
-                currentRealm: null,
-                currentType: null,
-                wave: 0,
-                totalWaves: 0,
-                enemies: [],
-                rewards: [],
-                npc: null,
-                jade: 0,  // 仙玉
-                tokens: 1,  // 秘境令牌（每日重置）
-                lastTokenRefresh: 0,
-                explored: []  // 已探索秘境记录
-            }
-        };
-    }
-    // V34 秘境令牌每日重置
-    if (gameState.immortal && gameState.immortal.secretRealm) {
-        const today = Math.floor(gameState.days / 10) * 10;  // 简化：每10天重置
-        if (gameState.immortal.secretRealm.lastTokenRefresh < today) {
-            gameState.immortal.secretRealm.tokens = 3;
-            gameState.immortal.secretRealm.lastTokenRefresh = today;
-        }
-    }
-    if (!gameState.mounts) gameState.mounts = [];
-    if (!gameState.immortalSkills) gameState.immortalSkills = [];
-    if (!gameState.immortalEquipment) {
-        gameState.immortalEquipment = {
-            head: null,
-            body: null,
-            foot: null,
-            weapon: null,
-            shield: null,
-            accessory: null
-        };
-    }
-    if (!gameState.currentRealm) gameState.currentRealm = 'mortal';
-    if (gameState.currentMount === undefined) gameState.currentMount = null;
-}
-
-// ===== canEnterRegion =====
-function canEnterRegion(region) {
-    const req = IMMORTAL_REGIONS[region].realmRequired;
-    return gameState.immortal.realm >= req;
-}
-
-// ===== doAerialTravel =====
-function doAerialTravel(targetRegion) {
-    if (!gameState.immortal || gameState.immortal.currentRegion === targetRegion) return;
-    
-    const cooldown = getAerialCooldown();
-    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
-    
-    if (timeSinceLast < cooldown) {
-        const remaining = Math.ceil((cooldown - timeSinceLast) / 1000);
-        showToast(`御空术冷却中，还需${remaining}秒`);
-        return;
-    }
-    
-    if (!canEnterRegion(targetRegion)) {
-        showToast('境界不足，无法进入该区域');
-        return;
-    }
-    
-    gameState.immortal.currentRegion = targetRegion;
-    gameState.immortal.lastAerialCooldown = Date.now();
-    
-    // 添加到已探索
-    if (!gameState.immortal.exploredRegions.includes(targetRegion)) {
-        gameState.immortal.exploredRegions.push(targetRegion);
-    }
-    
-    // 触发区域事件
-    triggerRegionEvent(targetRegion);
-    saveGame();
-    updateDisplay();
-    
-    // 更新UI
-    if (typeof renderImmortalUI === 'function') renderImmortalUI();
-}
-
-// ===== getAerialCooldown =====
-function getAerialCooldown() {
-    const baseCooldown = 10000; // 10秒基础冷却
-    const mountBonus = getMountSpeedBonus();
-    return Math.max(1000, baseCooldown * (1 - mountBonus));
-}
-
-// ===== getMountSpeedBonus =====
-function getMountSpeedBonus() {
-    const mount = gameState.currentMount;
-    if (!mount) return 0;
-    // 成熟度越高加速越多
-    return (mount.maturity / 100) * (mount.stats.speed / 100) * 0.5;
-}
-
-// ===== triggerRegionEvent =====
-function triggerRegionEvent(region) {
-    const rand = Math.random();
-    if (rand < 0.3) {
-        // 30%概率触发仙缘任务
-        if (gameState.immortal.currentRegion !== '天庭') {
-            showToast(`在${region}遇到神秘机缘...`);
-        }
-    }
-}
-
-// ===== earnSpiritStones =====
-function earnSpiritStones(amount, source) {
-    gameState.immortal.spiritStones += amount;
-    addLog('good', '获得仙石', `获得 ${amount} 仙石（${source}）`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== spendSpiritStones =====
-function spendSpiritStones(amount, reason) {
-    if (gameState.immortal.spiritStones < amount) {
-        showToast('仙石不足');
-        return false;
-    }
-    gameState.immortal.spiritStones -= amount;
-    saveGame();
-    return true;
-}
-
-// ===== doImmortalCultivation =====
-function doImmortalCultivation() {
-    const realm = gameState.immortal.realm;
-    const realmData = IMMORTAL_REALMS[realm];
-    let baseGain = realmData.cultivationBase * (1 + Math.random() * 0.5);
-    
-    // 应用装备加成
-    baseGain *= (1 + getImmortalEquipBonus());
-    
-    // 应用仙兽加成
-    if (gameState.currentMount) {
-        baseGain *= (1 + gameState.currentMount.stats.speed / 200);
-    }
-    
-    const gain = Math.floor(baseGain);
-    gameState.immortal.cultivationProgress += gain;
-    
-    // 检查境界突破
-    const nextRealm = realm + 1;
-    if (nextRealm <= 5 && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
-        gameState.immortal.realm = nextRealm;
-        gameState.immortal.cultivationProgress = 0;
-        // 解锁新区域
-        unlockRegionForRealm(nextRealm);
-        addLog('good', '境界突破', `突破到${IMMORTAL_REALMS[nextRealm].name}！`);
-        showToast(`恭喜突破到${IMMORTAL_REALMS[nextRealm].name}！`);
-    } else {
-        addLog('neutral', '仙气修炼', `修炼${gain}点仙气，感觉体内的仙力更加充沛。`);
-    }
-    
-    gameState.days++;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== unlockRegionForRealm =====
-function unlockRegionForRealm(realm) {
-    for (const region in gameState.immortal.map) {
-        if (gameState.immortal.map[region].realmRequired === realm) {
-            gameState.immortal.map[region].unlocked = true;
-        }
-    }
-}
-
-// ===== getImmortalEquipBonus =====
-function getImmortalEquipBonus() {
-    let bonus = 0;
-    const equip = gameState.immortalEquipment;
-    for (const slot in equip) {
-        if (equip[slot]) {
-            bonus += equip[slot].quality * 0.1;
-        }
-    }
-    return bonus;
-}
-
-// ===== showImmortalMap =====
-function showImmortalMap() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">☁️ 仙界地图 ☁️</h3>';
-    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
-    
-    for (const region in IMMORTAL_REGIONS) {
-        const data = IMMORTAL_REGIONS[region];
-        const isUnlocked = canEnterRegion(region);
-        const isCurrent = gameState.immortal.currentRegion === region;
-        const isExplored = gameState.immortal.exploredRegions.includes(region);
-        
-        let style = 'padding:12px;border-radius:8px;text-align:center;cursor:pointer;';
-        style += isUnlocked ? `background:${data.color}33;border:2px solid ${data.color};` : 'background:#333;border:2px solid #555;';
-        style += isCurrent ? 'box-shadow:0 0 15px #ffd700;' : '';
-        
-        html += `<div style="${style}" onclick="${isUnlocked ? `doAerialTravel('${region}')` : ''}">`;
-        html += `<div style="font-size:24px;">${data.icon}</div>`;
-        html += `<div style="color:${isUnlocked ? '#fff' : '#666'};font-weight:bold;">${region}</div>`;
-        html += `<div style="font-size:11px;color:${isUnlocked ? '#aaa' : '#444'};">需要${data.realmRequired}重天</div>`;
-        html += isCurrent ? '<div style="color:#ffd700;font-size:11px;">当前位置</div>' : '';
-        html += '</div>';
-    }
-    
-    html += '</div></div>';
-    
-    // 冷却显示
-    const cooldown = getAerialCooldown();
-    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
-    const remaining = Math.max(0, cooldown - timeSinceLast);
-    
-    html += `<div style="text-align:center;margin-top:16px;padding:10px;background:#1a1a2e;border-radius:8px;">`;
-    html += `<div style="color:#aaa;font-size:12px;">御空术冷却: ${Math.ceil(remaining / 1000)}秒</div>`;
-    if (gameState.currentMount) {
-        html += `<div style="color:#4caf50;font-size:12px;">🐎 骑乘${gameState.currentMount.name}，冷却缩短50%</div>`;
-    }
-    html += '</div>';
-    
-    openModal('仙界地图', html, '');
-}
-
-// ===== getImmortalDailyIncome =====
-function getImmortalDailyIncome() {
-    if (gameState.currentRealm !== 'immortal') return { qi: 0, stones: 0 };
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const baseQi = realmData.cultivationBase * 0.1;
-    const regionBonus = (regionData.dangerLevel || 1) * 0.05;
-    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.2 : 0;
-    return {
-        qi: Math.floor(baseQi * (1 + regionBonus + blessingBonus)),
-        stones: Math.floor((regionData.dangerLevel || 1) * 10 * Math.random())
-    };
-}
-
-// ===== processCelestialCycle =====
-function processCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    const cc = gameState.celestialCycle;
-    const interval = cc.cycleInterval || 3;
-    
-    // 每日仙界修炼结算（自动主路径）
-    const income = getImmortalDailyIncome();
-    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
-    const progressGain = Math.floor(income.qi * spiritRootBonus);
-    
-    // 更新修炼进度
-    if (gameState.immortal) {
-        gameState.immortal.cultivationProgress += progressGain;
-        gameState.immortal.spiritStones += income.stones;
-        
-        // 检查境界突破
-        const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-        if (realmData && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
-            const nextRealm = gameState.immortal.realm + 1;
-            if (nextRealm <= 5) {
-                gameState.immortal.realm = nextRealm;
-                gameState.immortal.cultivationProgress = 0;
-                addLog('good', '境界突破', `天道轮回中，突破至${IMMORTAL_REALMS[nextRealm].name}！`);
-            }
-        }
-    }
-    
-    // 天道轮回日结算
-    cc.day++;
-    if (cc.day >= interval && !cc.completed) {
-        executeCelestialCycle();
-        cc.day = 0;
-        cc.completed = true;
-    }
-    
-    // 新周期开始
-    if (cc.day === 0) {
-        cc.completed = false;
-    }
-}
-
-// ===== executeCelestialCycle =====
-function executeCelestialCycle() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    
-    // 主路径：修炼结算
-    let resultText = `【天道轮回·第${gameState.days}天】\n`;
-    let eventType = 'neutral';
-    let effects = { qi: 0, stones: 0, mindset: 0 };
-    
-    const baseProgress = realmData.cultivationBase;
-    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
-    const regionBonus = (regionData.dangerLevel || 1) * 0.1;
-    const progressGain = Math.floor(baseProgress * (1 + regionBonus) * spiritRootBonus);
-    
-    if (gameState.immortal) {
-        gameState.immortal.cultivationProgress += progressGain;
-    }
-    resultText += `修炼进度 +${progressGain}\n`;
-    effects.qi = progressGain;
-    
-    // 次路径：气运波动触发器
-    const roll = Math.random();
-    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.15 : 0;
-    
-    if (roll < 0.4 + blessingBonus) {
-        // 正面事件 40%
-        eventType = 'positive';
-        const positiveEvents = [
-            { text: '✨ 顿悟时刻', effect: () => { 
-                if (gameState.immortal) gameState.immortal.cultivationProgress += Math.floor(progressGain * 0.5);
-                effects.qi += Math.floor(progressGain * 0.5);
-                return '修炼进度额外 +50%';
-            }},
-            { text: '🌟 天赐灵物', effect: () => {
-                const stoneGain = Math.floor(500 * Math.random()) + 100;
-                if (gameState.immortal) gameState.immortal.spiritStones += stoneGain;
-                effects.stones = stoneGain;
-                return `获得 ${stoneGain} 灵石`;
-            }},
-            { text: '☁️ 祥瑞降临', effect: () => {
-                effects.mindset = 10;
-                return '心态 +10';
-            }}
-        ];
-        const event = positiveEvents[Math.floor(Math.random() * positiveEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-        
-    } else if (roll < 0.7 + blessingBonus) {
-        // 负面事件 30%
-        eventType = 'negative';
-        const negativeEvents = [
-            { text: '👹 心魔入侵', effect: () => {
-                effects.mindset = -20;
-                return '心态 -20，修炼受阻';
-            }},
-            { text: '⚡ 天道压制', effect: () => {
-                effects.qi = -Math.floor(progressGain * 0.3);
-                if (gameState.immortal) gameState.immortal.cultivationProgress -= Math.floor(progressGain * 0.3);
-                return '当日修炼效率 -30%';
-            }},
-            { text: '💔 灵气紊乱', effect: () => {
-                const stoneLoss = Math.floor((gameState.immortal?.spiritStones || 0) * 0.05);
-                if (gameState.immortal && stoneLoss > 0) gameState.immortal.spiritStones -= stoneLoss;
-                effects.stones = -stoneLoss;
-                return `损失 ${stoneLoss} 灵石`;
-            }}
-        ];
-        const event = negativeEvents[Math.floor(Math.random() * negativeEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-        
-    } else {
-        // 中性事件 30%
-        eventType = 'neutral';
-        const neutralEvents = [
-            { text: '🧙 仙人指路', effect: () => {
-                return '天道启示：继续保持当前修炼节奏';
-            }},
-            { text: '🔮 奇遇发现', effect: () => {
-                // 解锁新区域线索
-                return '隐约感知到未知区域的召唤';
-            }},
-            { text: '⏳ 平静期', effect: () => {
-                return '天道运行平稳，无特殊事件';
-            }}
-        ];
-        const event = neutralEvents[Math.floor(Math.random() * neutralEvents.length)];
-        resultText += event.text + '：' + event.effect() + '\n';
-    }
-    
-    // 清除祈福状态
-    gameState.celestialCycle.blessingActive = false;
-    
-    // 保存结果
-    const result = { type: eventType, text: resultText, effects: effects, day: gameState.days };
-    gameState.celestialCycle.lastResult = result;
-    
-    showCelestialCycleResult(result);
-    
-    addLog(eventType === 'positive' ? 'good' : eventType === 'negative' ? 'bad' : 'normal', 
-           '天道轮回', resultText.replace(/\n/g, ' '));
-}
-
-// ===== showCelestialCycleResult =====
-function showCelestialCycleResult(result) {
-    const icon = result.type === 'positive' ? '🌟' : result.type === 'negative' ? '💥' : '🔮';
-    const color = result.type === 'positive' ? '#4caf50' : result.type === 'negative' ? '#f44336' : '#2196f3';
-    
-    const modal = document.getElementById('modalNormal');
-    if (!modal) return;
-    
-    let effectsText = '';
-    if (result.effects.qi !== 0) effectsText += ` 灵气 ${result.effects.qi > 0 ? '+' : ''}${result.effects.qi}`;
-    if (result.effects.stones !== 0) effectsText += ` 灵石 ${result.effects.stones > 0 ? '+' : ''}${result.effects.stones}`;
-    if (result.effects.mindset !== 0) effectsText += ` 心态 ${result.effects.mindset > 0 ? '+' : ''}${result.effects.mindset}`;
-    
-    modal.innerHTML = `
-        <div class="result-title" style="color:${color}">${icon} 天道轮回结算 ${icon}</div>
-        <div style="margin:15px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;text-align:left">
-            ${result.text.replace(/\n/g, '<br/>')}
-        </div>
-        <div style="color:#aaa;font-size:12px">${effectsText}</div>
-        <div style="margin-top:15px">
-            <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">确定</button>
-        </div>
-    `;
-    modal.classList.remove('hidden');
-}
-
-// ===== requestExtraCycle =====
-function requestExtraCycle() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能请求天道轮回');
-        return;
-    }
-    const cost = 100;
-    if ((gameState.immortal?.spiritStones || 0) < cost) {
-        showToast(`需要 ${cost} 灵石请求额外轮回`);
-        return;
-    }
-    if (gameState.immortal) {
-        gameState.immortal.spiritStones -= cost;
-    }
-    gameState.celestialCycle.day = gameState.celestialCycle.cycleInterval || 3;
-    showToast(`消耗 ${cost} 灵石，请求天道轮回`);
-    addLog('normal', '主动干预', `消耗 ${cost} 灵石请求额外天道轮回`);
-}
-
-// ===== requestFortuneBlessing =====
-function requestFortuneBlessing() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能进行气运祈福');
-        return;
-    }
-    const cost = 200;
-    if ((gameState.immortal?.spiritStones || 0) < cost) {
-        showToast(`需要 ${cost} 灵石进行气运祈福`);
-        return;
-    }
-    if (gameState.immortal) {
-        gameState.immortal.spiritStones -= cost;
-    }
-    gameState.celestialCycle.blessingActive = true;
-    showToast(`消耗 ${cost} 灵石，气运祈福生效（下次轮回正面事件概率+15%）`);
-    addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
-}
-
-// ===== V34 仙界秘境探索系统 =====
-
-// ===== canEnterSecretRealm =====
-function canEnterSecretRealm(realmName) {
-    const realm = SECRET_REALMS_IMMORTAL[realmName];
-    if (!realm) return { result: false, reason: '秘境不存在' };
-    if (gameState.immortal.realm < realm.realmRequired) {
-        return { result: false, reason: `需要${IMMORTAL_REALMS[realm.realmRequired].name}才能进入` };
-    }
-    if (!gameState.immortal.secretRealm || gameState.immortal.secretRealm.tokens <= 0) {
-        return { result: false, reason: '秘境令牌不足' };
-    }
-    return { result: true };
-}
-
-// ===== enterSecretRealm =====
-function enterSecretRealm(realmName) {
-    const check = canEnterSecretRealm(realmName);
-    if (!check.result) {
-        showToast(check.reason);
-        return;
-    }
-    
-    const realm = SECRET_REALMS_IMMORTAL[realmName];
-    gameState.immortal.secretRealm.tokens--;
-    gameState.immortal.secretRealm.inSecretRealm = true;
-    gameState.immortal.secretRealm.currentRealm = realmName;
-    gameState.immortal.secretRealm.currentType = realm.type;
-    gameState.immortal.secretRealm.wave = 0;
-    gameState.immortal.secretRealm.totalWaves = realm.waves;
-    gameState.immortal.secretRealm.enemies = [];
-    gameState.immortal.secretRealm.rewards = [];
-    gameState.immortal.secretRealm.npc = realm.npc ? { ...realm.npc } : null;
-    
-    showToast(`进入【${realmName}】`);
-    renderSecretRealmUI();
-}
-
-// ===== renderSecretRealmUI =====
-function renderSecretRealmUI() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr || !sr.inSecretRealm) return;
-    
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
-    const typeNames = { ruins: '遗迹秘境', resource: '资源秘境', combat: '战斗秘境', serendipity: '奇遇秘境' };
-    
-    let content = `
-        <div style="padding:20px;color:#fff">
-            <div style="text-align:center;margin-bottom:20px">
-                <div style="font-size:24px">${typeIcons[realm.type] || '🏛️'} ${sr.currentRealm}</div>
-                <div style="color:#aaa;font-size:12px">${typeNames[realm.type]} - 第${sr.wave}/${sr.totalWaves}波</div>
-            </div>
-    `;
-    
-    // 类型特定UI
-    if (realm.type === 'resource') {
-        content += `
-            <div style="background:rgba(76,175,80,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#4caf50;font-size:14px">🌿 资源秘境 - 收集仙草和灵材</div>
-            </div>
-            <button onclick="collectResource()" style="width:100%;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">采集资源</button>
-        `;
-    } else if (realm.type === 'ruins') {
-        content += `
-            <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#9c27b0;font-size:14px">🏛️ 遗迹秘境 - 探索上古仙人洞府</div>
-                ${sr.npc && sr.npc.type === 'guardian' ? `<div style="color:#ff5722;margin-top:8px">⚠️ 守护者: ${sr.npc.name}</div>` : ''}
-            </div>
-            <button onclick="exploreRuins()" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">探索遗迹</button>
-        `;
-    } else if (realm.type === 'combat') {
-        content += `
-            <div style="background:rgba(244,67,54,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#f44336;font-size:14px">⚔️ 战斗秘境 - 击败守护者获取混沌至宝</div>
-                ${realm.boss ? `<div style="color:#ff5722;margin-top:8px">💀 Boss: ${realm.boss.name}</div>` : ''}
-            </div>
-            <button onclick="fightSecretRealmBoss()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">挑战Boss</button>
-        `;
-    } else if (realm.type === 'serendipity') {
-        content += `
-            <div style="background:rgba(255,215,0,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
-                <div style="color:#ffd700;font-size:14px">✨ 奇遇秘境 - 随机触发特殊事件</div>
-            </div>
-            <button onclick="triggerSerendipityEvent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#333;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">触发奇遇</button>
-        `;
-    }
-    
-    // 奖励展示
-    if (sr.rewards.length > 0) {
-        content += `
-            <div style="margin-top:15px">
-                <div style="color:#ffd700;margin-bottom:8px">已获得奖励:</div>
-                ${sr.rewards.map(r => `<div style="color:#4caf50;font-size:12px">✧ ${r}</div>`).join('')}
-            </div>
-        `;
-    }
-    
-    content += `
-            <button onclick="exitSecretRealm()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:15px">返回仙界</button>
-        </div>
-    `;
-    
-    openModal('秘境探索', content, '');
-}
-
-// ===== collectResource =====
-function collectResource() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    sr.wave++;
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-    sr.rewards.push(reward);
-    
-    showToast(`获得: ${reward}`);
-    addLog('good', '秘境收获', `在${sr.currentRealm}获得${reward}`);
-    
-    if (sr.wave >= sr.totalWaves) {
-        completeImmortalSecretRealm();
-    } else {
-        renderSecretRealmUI();
-    }
-}
-
-// ===== exploreRuins =====
-function exploreRuins() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    sr.wave++;
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    
-    // 遗迹探索可能遇到敌人或奖励
-    if (Math.random() < 0.4 && sr.wave < sr.totalWaves) {
-        // 遇到守护者战斗
-        showToast(`遭遇${sr.npc?.name || '守护者'}！`);
-        startImmortalRealmBattle(sr.npc);
-    } else {
-        // 获得奖励
-        const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-        sr.rewards.push(reward);
-        showToast(`探索获得: ${reward}`);
-        addLog('good', '秘境收获', `在${sr.currentRealm}探索获得${reward}`);
-        
-        if (sr.wave >= sr.totalWaves) {
-            completeImmortalSecretRealm();
-        } else {
-            renderSecretRealmUI();
-        }
-    }
-}
-
-// ===== fightSecretRealmBoss =====
-function fightSecretRealmBoss() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-    const bossName = realm.boss?.name || '秘境守卫';
-    const bossHP = 5000 + (gameState.immortal.realm * 2000);
-    
-    showToast(`挑战 ${bossName}！`);
-    startImmortalRealmBattle({ name: bossName, hp: bossHP, maxHP: bossHP });
-}
-
-// ===== startImmortalRealmBattle =====
-function startImmortalRealmBattle(enemy) {
-    const sr = gameState.immortal.secretRealm;
-    
-    // 使用通用战斗系统
-    const playerMaxHP = gameState.maxHP || 1000;
-    const playerAttack = gameState.attack || 100;
-    const playerDefense = gameState.defense || 50;
-    
-    combatState.inProgress = true;
-    combatState.player = {
-        hp: playerMaxHP,
-        maxHP: playerMaxHP,
-        attack: playerAttack,
-        defense: playerDefense,
-        technique: gameState.technique || '金刚诀'
-    };
-    combatState.opponent = {
-        name: enemy.name || '秘境守卫',
-        hp: enemy.hp || 3000,
-        maxHP: enemy.maxHP || enemy.hp || 3000,
-        attack: 80 + (gameState.immortal?.realm || 1) * 30,
-        defense: 40 + (gameState.immortal?.realm || 1) * 15,
-        technique: '混沌诀',
-        critRate: 0.1,
-        level: 1
-    };
-    combatState.round = 0;
-    combatState.turn = 'player';
-    combatState.log = [];
-    combatState.effects = {
-        player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 },
-        opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 }
-    };
-    
-    // 设置战斗结束回调
-    window.secretRealmBattleEnd = function(result) {
-        if (result === 'win') {
-            const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
-            const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
-            sr.rewards.push(reward);
-            showToast(`战斗胜利！获得: ${reward}`);
-            addLog('good', '秘境战斗', `在${sr.currentRealm}击败${enemy.name}获得${reward}`);
-            
-            sr.wave++;
-            if (sr.wave >= sr.totalWaves) {
-                completeImmortalSecretRealm();
-            } else {
-                renderSecretRealmUI();
-            }
-        } else {
-            showToast('战斗失败，秘境探索结束');
-            exitSecretRealm();
-        }
-        delete window.secretRealmBattleEnd;
-    };
-    
-    renderCombatArena();
-}
-
-// ===== triggerSerendipityEvent =====
-function triggerSerendipityEvent() {
-    const sr = gameState.immortal.secretRealm;
-    if (!sr.inSecretRealm) return;
-    
-    const events = [
-        { type: 'epiphany', text: '💡 顿悟！境界提升！', effect: () => { gameState.immortal.realm = Math.min(5, gameState.immortal.realm + 1); } },
-        { type: 'treasure', text: '💎 发现上古宝藏！', effect: () => { sr.rewards.push('上古宝藏'); } },
-        { type: 'technique', text: '📜 获得仙人传承！', effect: () => { sr.rewards.push('星君传承'); } },
-        { type: 'jade', text: '💰 发现仙玉矿脉！', effect: () => { sr.rewards.push('仙玉x100'); } }
-    ];
-    
-    const event = events[Math.floor(Math.random() * events.length)];
-    event.effect();
-    
-    showToast(event.text);
-    addLog('good', '奇遇秘境', `${event.text} - ${sr.currentRealm}`);
-    
-    completeImmortalSecretRealm();
-}
-
-// ===== completeImmortalSecretRealm =====
-function completeImmortalSecretRealm() {
-    const sr = gameState.immortal.secretRealm;
-    
-    showToast(`秘境探索完成！获得${sr.rewards.length}个奖励`);
-    addLog('good', '秘境完成', `完成${sr.currentRealm}，获得: ${sr.rewards.join(', ')}`);
-    
-    // 添加探索记录
-    if (!sr.explored) sr.explored = [];
-    if (!sr.explored.includes(sr.currentRealm)) {
-        sr.explored.push(sr.currentRealm);
-    }
-    
-    setTimeout(() => exitSecretRealm(), 1500);
-}
-
-// ===== exitSecretRealm =====
-function exitSecretRealm() {
-    const sr = gameState.immortal.secretRealm;
-    const rewards = [...(sr.rewards || [])];
-    
-    sr.inSecretRealm = false;
-    sr.currentRealm = null;
-    sr.currentType = null;
-    sr.wave = 0;
-    sr.enemies = [];
-    sr.npc = null;
-    
-    closeModal('modalNormal');
-    showToast(`秘境奖励: ${rewards.length > 0 ? rewards.join(', ') : '无'}`);
-    renderImmortalUI();
-}
-
-// ===== renderImmortalUI =====
-function renderImmortalUI() {
-    if (gameState.currentRealm !== 'immortal') return;
-    
-    // 更新仙界状态显示
-    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
-    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
-    
-    // 更新境界显示
-    const realmDisplay = document.getElementById('immortalRealmDisplay');
-    if (realmDisplay) {
-        realmDisplay.innerHTML = `${realmData.icon} ${realmData.name}`;
-    }
-    
-    // 更新仙石显示
-    const stoneDisplay = document.getElementById('immortalStoneDisplay');
-    if (stoneDisplay) {
-        stoneDisplay.textContent = `💎 ${gameState.immortal.spiritStones}`;
-    }
-    
-    // 更新区域显示
-    const regionDisplay = document.getElementById('immortalRegionDisplay');
-    if (regionDisplay) {
-        regionDisplay.innerHTML = `${regionData.icon} ${gameState.immortal.currentRegion}`;
-    }
-    
-    // V34 添加秘境探索入口
-    const secretBtn = document.getElementById('secretRealmBtn');
-    if (secretBtn && gameState.immortal.secretRealm) {
-        secretBtn.textContent = `🏛️ 秘境探索 (令牌:${gameState.immortal.secretRealm.tokens})`;
-    }
-}
-
-// ===== V34 renderSecretRealmList =====
-function renderSecretRealmList() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('只有在仙界才能进行秘境探索');
-        return;
-    }
-    
-    const sr = gameState.immortal.secretRealm;
-    let content = `
-        <div style="padding:20px;color:#fff">
-            <div style="text-align:center;margin-bottom:20px">
-                <div style="font-size:20px;color:#ffd700">🏛️ 仙界秘境</div>
-                <div style="color:#aaa;font-size:12px">秘境令牌: ${sr?.tokens || 0}</div>
-            </div>
-    `;
-    
-    // 列出所有秘境
-    for (const [name, realm] of Object.entries(SECRET_REALMS_IMMORTAL)) {
-        const canEnter = gameState.immortal.realm >= realm.realmRequired;
-        const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
-        const typeNames = { ruins: '遗迹', resource: '资源', combat: '战斗', serendipity: '奇遇' };
-        
-        content += `
-            <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-bottom:10px;${!canEnter ? 'opacity:0.5' : ''}">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                        <div style="font-size:16px">${typeIcons[realm.type]} ${name}</div>
-                        <div style="color:#aaa;font-size:11px">${typeNames[realm.type]} | 危险${'⚠️'.repeat(realm.dangerLevel)} | 需要: ${IMMORTAL_REALMS[realm.realmRequired]?.name || '未知'}</div>
-                    </div>
-                    ${canEnter ? `<button onclick="enterSecretRealm('${name}')" style="padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">进入</button>` : '<span style="color:#f44336;font-size:11px">境界不足</span>'}
-                </div>
-            </div>
-        `;
-    }
-    
-    content += `
-            <button onclick="closeModal('modalNormal')" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:10px">返回</button>
-        </div>
-    `;
-    
-    openModal('秘境探索', content, '');
-}
-
-// Auto-generated module: immortalEquip.js
-
-// ===== IMMORTAL_EQUIP_QUALITIES =====
-const IMMORTAL_EQUIP_QUALITIES = {
-    1: { name: '仙器', color: '#2196f3', multiplier: 1.5, colorHex: '蓝色' },
-    2: { name: '灵仙器', color: '#9c27b0', multiplier: 2.0, colorHex: '紫色' },
-    3: { name: '神仙器', color: '#ff9800', multiplier: 3.0, colorHex: '橙色' },
-    4: { name: '混沌器', color: '#ffd700', multiplier: 5.0, colorHex: '金色' }
-};
-
-// ===== IMMORTAL_EQUIP_SLOTS =====
-const IMMORTAL_EQUIP_SLOTS = {
-    head: { name: '仙冠', icon: '👑', pos: 0 },
-    body: { name: '仙袍', icon: '👘', pos: 1 },
-    foot: { name: '仙履', icon: '👟', pos: 2 },
-    weapon: { name: '仙剑', icon: '⚔️', pos: 3 },
-    shield: { name: '仙盾', icon: '🛡️', pos: 4 },
-    accessory: { name: '仙佩', icon: '📿', pos: 5 }
-};
-
-// ===== IMMORTAL_EQUIP_SETS =====
-const IMMORTAL_EQUIP_SETS = {
-    '仙灵套装': {
-        pieces: ['仙冠-仙灵', '仙袍-仙灵', '仙履-仙灵'],
-        setBonus: { effect: 'cultivationSpeed', value: 0.2 },
-        description: '2件：仙气修炼效率+20%'
-    },
-    '战神套装': {
-        pieces: ['仙剑-战神', '仙盾-战神', '仙冠-战神', '仙袍-战神'],
-        setBonus: { effect: 'attack', value: 0.5 },
-        description: '4件：攻击+50%，仙兽参战伤害+30%'
-    },
-    '不死套装': {
-        pieces: ['仙冠-不死', '仙袍-不死', '仙履-不死', '仙佩-不死'],
-        setBonus: { effect: 'invincible', value: 3, cooldown: 60 },
-        description: '4件：致命伤害时无敌3秒，CD60秒'
-    },
-    '混沌套装': {
-        pieces: ['仙冠-混沌', '仙袍-混沌', '仙履-混沌', '仙剑-混沌', '仙盾-混沌', '仙佩-混沌'],
-        setBonus: { effect: 'allStats', value: 1.0 },
-        description: '6件：全属性+100%，仙法伤害+100%'
-    }
-};
-
-// ===== EQUIPMENT_BASE_STATS =====
-const EQUIPMENT_BASE_STATS = {
-    attack: 100,
-    defense: 80,
-    hp: 500,
-    speed: 50,
-    crit: 10,
-    resist: 15
-};
-
-// ===== EQUIPMENT_AFFIX_TYPES =====
-const EQUIPMENT_AFFIX_TYPES = [
-    { name: 'attack', display: '攻击', min: 5, max: 30, rarity: 'common' },
-    { name: 'defense', display: '防御', min: 5, max: 25, rarity: 'common' },
-    { name: 'hp', display: '生命', min: 20, max: 100, rarity: 'common' },
-    { name: 'crit', display: '暴击', min: 3, max: 15, rarity: 'uncommon' },
-    { name: 'resist', display: '抗性', min: 3, max: 12, rarity: 'uncommon' },
-    { name: 'speed', display: '速度', min: 2, max: 10, rarity: 'uncommon' },
-    { name: 'cultivate_qi_rate', display: '灵气效率', min: 0.05, max: 0.15, rarity: 'rare', isPercent: true },
-    { name: 'breakthrough_boost', display: '突破加成', min: 0.05, max: 0.10, rarity: 'rare', isPercent: true },
-    { name: 'tribulation_damage_reduce', display: '渡劫减伤', min: 0.05, max: 0.15, rarity: 'epic', isPercent: true },
-    { name: 'all_stats', display: '全属性', min: 0.03, max: 0.08, rarity: 'legendary', isPercent: true }
-];
-
-const AFFIX_RARITY_COLORS = {
-    common: '#aaa',
-    uncommon: '#4CAF50',
-    rare: '#2196f3',
-    epic: '#9c27b0',
-    legendary: '#ff9800'
-};
-
-// ===== generateAffix =====
-function generateAffix(quality, tier) {
-    // 根据品质和难度等级筛选可用词条
-    const availableAffixes = EQUIPMENT_AFFIX_TYPES.filter(a => {
-        if (tier === 0) return a.rarity === 'common' || a.rarity === 'uncommon';
-        if (tier === 1) return a.rarity !== 'legendary';
-        return true;  // tier >= 2 所有词条
-    });
-    
-    const affix = availableAffixes[Math.floor(Math.random() * availableAffixes.length)];
-    const value = affix.min + Math.random() * (affix.max - affix.min);
-    
-    return {
-        name: affix.name,
-        display: affix.display,
-        value: affix.isPercent ? parseFloat(value.toFixed(2)) : Math.floor(value),
-        rarity: affix.rarity,
-        isPercent: affix.isPercent || false,
-        icon: affix.isPercent ? '%' : ''
-    };
-}
-
-// ===== calculateEquipScore =====
-function calculateEquipScore(equip) {
-    if (!equip) return 0;
-    let score = 0;
-    
-    // 基础属性评分
-    const statWeights = { attack: 2, defense: 1.5, hp: 0.5, speed: 1, crit: 1.5, resist: 1 };
-    for (const stat in equip.stats) {
-        score += (equip.stats[stat] || 0) * (statWeights[stat] || 1);
-    }
-    
-    // 词条加成评分
-    if (equip.affixes) {
-        equip.affixes.forEach(affix => {
-            const rarityMultiplier = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 5 };
-            score += affix.value * (rarityMultiplier[affix.rarity] || 1);
-        });
-    }
-    
-    // 强化等级加成
-    if (equip.enhancementLevel > 0) {
-        score *= (1 + equip.enhancementLevel * 0.1);
-    }
-    
-    // 精炼等级加成
-    if (equip.refinementLevel > 0) {
-        score *= (1 + equip.refinementLevel * 0.05);
-    }
-    
-    return Math.floor(score);
-}
-
-// ===== generateImmortalEquip =====
-function generateImmortalEquip(slot, quality) {
-    const qualityData = IMMORTAL_EQUIP_QUALITIES[quality];
-    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-    
-    const equip = {
-        uid: 'equip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        slot: slot,
-        name: `${slotData.name}-${qualityData.name}`,
-        quality: quality,
-        qualityName: qualityData.name,
-        icon: slotData.icon,
-        stats: {},
-        setName: null, // 套装名
-        refinationLevel: 0,  // V36 精炼等级 0-12
-        enhancementLevel: 0,  // V36 强化等级 0-15
-        affixes: []           // V36 随机词条
-    };
-    
-    // 根据品质生成属性
-    const multiplier = qualityData.multiplier;
-    for (const stat in EQUIPMENT_BASE_STATS) {
-        equip.stats[stat] = Math.floor(EQUIPMENT_BASE_STATS[stat] * multiplier * (0.8 + Math.random() * 0.4));
-    }
-    
-    // V36 根据品质生成1-3条随机词条
-    const affixCount = quality + Math.floor(Math.random() * quality);
-    const tier = Math.min(2, Math.floor(quality / 2));
-    for (let i = 0; i < affixCount; i++) {
-        equip.affixes.push(generateAffix(quality, tier));
-    }
-    
-    // 30%概率生成套装
-    if (Math.random() < 0.3) {
-        const setNames = Object.keys(IMMORTAL_EQUIP_SETS);
-        equip.setName = setNames[Math.floor(Math.random() * setNames.length)];
-    }
-    
-    return equip;
-}
-
-// ===== enhanceEquipment =====
-function enhanceEquipment(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位没有装备');
-        return;
-    }
-    
-    if (equip.enhancementLevel >= 15) {
-        showToast('已达强化上限+15');
-        return;
-    }
-    
-    const level = equip.enhancementLevel;
-    const baseCost = 500 * Math.pow(1.8, level);
-    const cost = Math.floor(baseCost);
-    
-    if (gameState.immortal.spiritStones < cost) {
-        showToast(`强化需要${cost}灵石`);
-        return;
-    }
-    
-    gameState.immortal.spiritStones -= cost;
-    gameState.equipmentForgeCount++;
-    
-    // 成功率：+1:100%, +5:80%, +10:50%, +15:20%
-    const successRates = [100, 100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30, 25, 20, 15];
-    const successRate = successRates[level + 1] || 20;
-    const roll = Math.random() * 100;
-    
-    if (roll < successRate) {
-        equip.enhancementLevel++;
-        addLog('good', '装备强化', `强化成功！${equip.name}强化到+${equip.enhancementLevel}`);
-        showToast(`强化成功！+${equip.enhancementLevel}`);
-    } else {
-        equip.enhancementLevel = Math.max(0, equip.enhancementLevel - 1);
-        addLog('warn', '装备强化', `强化失败，${equip.name}降为+${equip.enhancementLevel}`);
-        showToast(`强化失败，降为+${equip.enhancementLevel}`);
-    }
-    
-    saveGame();
-    showImmortalEquipPanel();
-}
-
-// ===== refineEquipment =====
-function refineEquipment(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位没有装备');
-        return;
-    }
-    
-    if (equip.refinementLevel >= 12) {
-        showToast('已达精炼上限+12');
-        return;
-    }
-    
-    const level = equip.refinementLevel;
-    const baseCost = 1000 * Math.pow(2, level);
-    const cost = Math.floor(baseCost);
-    
-    if (gameState.immortal.spiritStones < cost) {
-        showToast(`精炼需要${cost}灵石`);
-        return;
-    }
-    
-    gameState.immortal.spiritStones -= cost;
-    gameState.equipmentForgeCount++;
-    equip.refinementLevel++;
-    
-    // 精炼必定成功（消耗同名装备可以100%成功，这里简化处理）
-    addLog('good', '装备精炼', `精炼成功！${equip.name}精炼到+${equip.refinementLevel}`);
-    showToast(`精炼成功！+${equip.refinementLevel}`);
-    
-    saveGame();
-    showImmortalEquipPanel();
-}
-
-// ===== equipImmortalItem =====
-function equipImmortalItem(equip) {
-    const slot = equip.slot;
-    const oldEquip = gameState.immortalEquipment[slot];
-    
-    gameState.immortalEquipment[slot] = equip;
-    
-    addLog('good', '装备仙器', `装备【${equip.name}】`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== unequipImmortalItem =====
-function unequipImmortalItem(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) return;
-    
-    // 卸下到背包（暂时不实现背包系统，这里直接消失）
-    addLog('neutral', '卸下仙器', `卸下了${equip.name}`);
-    gameState.immortalEquipment[slot] = null;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== calculateEquipSetBonus =====
-function calculateEquipSetBonus() {
-    const equipped = gameState.immortalEquipment;
-    const bonuses = {};
-    
-    // 统计各套装件数
-    const setCounts = {};
-    for (const slot in equipped) {
-        if (equipped[slot] && equipped[slot].setName) {
-            setCounts[equipped[slot].setName] = (setCounts[equipped[slot].setName] || 0) + 1;
-        }
-    }
-    
-    // 计算套装效果
-    for (const setName in setCounts) {
-        const setData = IMMORTAL_EQUIP_SETS[setName];
-        if (setData) {
-            const count = setCounts[setName];
-            // 检查是否满足套装条件
-            for (let i = 0; i < setData.pieces.length; i++) {
-                const requiredPieces = i + 2; // 2件起效
-                if (count >= requiredPieces) {
-                    bonuses[setName] = setData.setBonus;
-                }
-            }
-        }
-    }
-    
-    return bonuses;
-}
-
-// ===== getImmortalEquipStats =====
-function getImmortalEquipStats() {
-    let stats = { attack: 0, defense: 0, hp: 0, speed: 0, crit: 0, resist: 0 };
-    const equip = gameState.immortalEquipment;
-    
-    for (const slot in equip) {
-        if (equip[slot]) {
-            for (const stat in equip[slot].stats) {
-                stats[stat] += equip[slot].stats[stat];
-            }
-        }
-    }
-    
-    // 应用套装加成
-    const setBonuses = calculateEquipSetBonus();
-    for (const setName in setBonuses) {
-        const bonus = setBonuses[setName];
-        if (bonus.effect === 'allStats') {
-            stats.attack *= (1 + bonus.value);
-            stats.defense *= (1 + bonus.value);
-            stats.hp *= (1 + bonus.value);
-        }
-    }
-    
-    return stats;
-}
-
-// ===== showImmortalEquipPanel =====
-function showImmortalEquipPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">⚔️ 飞升装备</h3>';
-    
-    // 装备栏
-    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
-    
-    for (const slot in IMMORTAL_EQUIP_SLOTS) {
-        const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-        const equip = gameState.immortalEquipment[slot];
-        
-        let bgColor = '#252540';
-        let borderColor = '#444';
-        
-        if (equip) {
-            const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
-            bgColor = qualityData.color + '22';
-            borderColor = qualityData.color;
-        }
-        
-        html += `<div style="background:${bgColor};border:2px solid ${borderColor};border-radius:8px;padding:10px;text-align:center;cursor:pointer;" onclick="showEquipSlotDetail('${slot}')">`;
-        html += `<div style="font-size:24px;">${slotData.icon}</div>`;
-        
-        if (equip) {
-            html += `<div style="color:#fff;font-size:11px;">${equip.name}</div>`;
-            html += `<div style="color:${IMMORTAL_EQUIP_QUALITIES[equip.quality].color};font-size:10px;">${equip.qualityName}</div>`;
-        } else {
-            html += `<div style="color:#666;font-size:11px;">${slotData.name}</div>`;
-        }
-        
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    
-    // 当前属性
-    const stats = getImmortalEquipStats();
-    html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
-    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">装备加成</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">';
-    html += `<div><div style="color:#f44336;">${stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
-    html += `<div><div style="color:#2196f3;">${stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
-    html += `<div><div style="color:#4caf50;">${stats.hp}</div><div style="color:#666;font-size:10px;">生命</div></div>`;
-    html += `<div><div style="color:#ff9800;">${stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
-    html += `<div><div style="color:#9c27b0;">${stats.crit}%</div><div style="color:#666;font-size:10px;">暴击</div></div>`;
-    html += `<div><div style="color:#00bcd4;">${stats.resist}%</div><div style="color:#666;font-size:10px;">抗性</div></div>`;
-    html += '</div></div>';
-    
-    // 套装效果
-    const setBonuses = calculateEquipSetBonus();
-    if (Object.keys(setBonuses).length > 0) {
-        html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
-        html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">套装效果</div>';
-        
-        for (const setName in setBonuses) {
-            const setData = IMMORTAL_EQUIP_SETS[setName];
-            const bonus = setBonuses[setName];
-            html += `<div style="color:#aaa;font-size:11px;margin-bottom:4px;">【${setName}】${setData.description}</div>`;
-        }
-        html += '</div>';
-    }
-    
-    // 购买装备（仙界商店）
-    html += '<div style="border-top:1px solid #333;padding-top:12px;margin-top:8px;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙界商店</div>';
-    
-    const buyOptions = [
-        { slot: 'weapon', quality: 1, price: 1000, name: '仙器' },
-        { slot: 'weapon', quality: 2, price: 5000, name: '灵仙器' },
-        { slot: 'weapon', quality: 3, price: 20000, name: '神仙器' }
-    ];
-    
-    for (const opt of buyOptions) {
-        const qualityData = IMMORTAL_EQUIP_QUALITIES[opt.quality];
-        const slotData = IMMORTAL_EQUIP_SLOTS[opt.slot];
-        
-        html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">`;
-        html += `<div style="display:flex;align-items:center;gap:10px;">`;
-        html += `<span style="font-size:20px;">${slotData.icon}</span>`;
-        html += `<div><div style="color:${qualityData.color};">${qualityData.name}${slotData.name}</div><div style="color:#888;font-size:10px;">${opt.price}💎</div></div>`;
-        html += '</div>';
-        
-        const canBuy = gameState.immortal.spiritStones >= opt.price;
-        html += `<button onclick="buyImmortalEquip('${opt.slot}', ${opt.quality}, ${opt.price})" ${canBuy ? '' : 'disabled'} style="padding:4px 10px;background:${canBuy ? '#2e7d32' : '#444'};color:${canBuy ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canBuy ? 'pointer' : 'not-allowed'};font-size:11px;">购买</button>`;
-        html += '</div>';
-    }
-    
-    html += '</div>';
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('飞升装备', html, '');
-}
-
-// ===== buyImmortalEquip =====
-function buyImmortalEquip(slot, quality, price) {
-    if (!spendSpiritStones(price, '购买飞升装备')) {
-        return;
-    }
-    
-    const equip = generateImmortalEquip(slot, quality);
-    equipImmortalItem(equip);
-    showToast(`购买成功！获得【${equip.name}】`);
-    closeModal();
-    showImmortalEquipPanel();
-}
-
-// ===== showEquipSlotDetail =====
-function showEquipSlotDetail(slot) {
-    const equip = gameState.immortalEquipment[slot];
-    if (!equip) {
-        showToast('该部位暂无装备');
-        return;
-    }
-    
-    const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
-    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
-    const score = calculateEquipScore(equip);
-    
-    let html = '<div style="padding:16px;">';
-    html += `<div style="text-align:center;">`;
-    html += `<div style="font-size:48px;">${equip.icon}</div>`;
-    html += `<div style="color:${qualityData.color};font-size:18px;font-weight:bold;margin-top:8px;">${equip.name}</div>`;
-    html += `<div style="color:#888;font-size:12px;">${slotData.name}位</div>`;
-    if (equip.setName) {
-        html += `<div style="color:#ffd700;font-size:12px;margin-top:4px;">套装：${equip.setName}</div>`;
-    }
-    html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">评分：${score}</div>`;
-    html += '</div>';
-    
-    // V36 强化和精炼等级
-    html += '<div style="display:flex;gap:10px;margin-top:12px;">';
-    if (equip.enhancementLevel > 0) {
-        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#ff9800;font-size:11px;">强化+${equip.enhancementLevel}</span>`;
-    }
-    if (equip.refinementLevel > 0) {
-        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#9c27b0;font-size:11px;">精炼+${equip.refinementLevel}</span>`;
-    }
-    html += '</div>';
-    
-    html += '<div style="margin-top:16px;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">基础属性：</div>';
-    for (const stat in equip.stats) {
-        const statNames = { attack: '攻击', defense: '防御', hp: '生命', speed: '速度', crit: '暴击', resist: '抗性' };
-        let value = equip.stats[stat];
-        // 精炼加成
-        if (equip.refinementLevel > 0) {
-            value = Math.floor(value * (1 + equip.refinementLevel * 0.05));
-        }
-        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">`;
-        html += `<span style="color:#888;">${statNames[stat]}</span>`;
-        html += `<span style="color:#fff;">+${value}</span>`;
-        html += '</div>';
-    }
-    html += '</div>';
-    
-    // V36 词条显示
-    if (equip.affixes && equip.affixes.length > 0) {
-        html += '<div style="margin-top:16px;">';
-        html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">词条：</div>';
-        equip.affixes.forEach(affix => {
-            const color = AFFIX_RARITY_COLORS[affix.rarity] || '#aaa';
-            const valueStr = affix.isPercent ? `${(affix.value * 100).toFixed(0)}%` : affix.value;
-            html += `<div style="display:flex;justify-content:space-between;padding:3px 0;">`;
-            html += `<span style="color:${color};font-size:11px;">◆ ${affix.display}</span>`;
-            html += `<span style="color:${color};font-size:11px;">+${valueStr}</span>`;
-            html += '</div>';
-        });
-        html += '</div>';
-    }
-    
-    // V36 强化和精炼按钮
-    const enhanceCost = Math.floor(500 * Math.pow(1.8, equip.enhancementLevel));
-    const refineCost = Math.floor(1000 * Math.pow(2, equip.refinementLevel));
-    
-    html += '<div style="margin-top:16px;display:flex;gap:8px;">';
-    if (equip.enhancementLevel < 15) {
-        html += `<button onclick="enhanceEquipment('${slot}')" ${gameState.immortal.spiritStones >= enhanceCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= enhanceCost ? '#e65100' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= enhanceCost ? 'pointer' : 'not-allowed'};font-size:12px;">强化+${equip.enhancementLevel + 1}(${enhanceCost}💎)</button>`;
-    }
-    if (equip.refinementLevel < 12) {
-        html += `<button onclick="refineEquipment('${slot}')" ${gameState.immortal.spiritStones >= refineCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= refineCost ? '#6a1b9a' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= refineCost ? 'pointer' : 'not-allowed'};font-size:12px;">精炼+${equip.refinementLevel + 1}(${refineCost}💎)</button>`;
-    }
-    html += '</div>';
-    
-    html += `<button onclick="unequipImmortalItem('${slot}');closeModal();" style="width:100%;margin-top:16px;padding:10px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;">卸下</button>`;
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('装备详情', html, '');
-}
-
-// Auto-generated module: immortalSkill.js
-
-// ===== IMMORTAL_SKILLS_DATA =====
-const IMMORTAL_SKILLS_DATA = {
-    '万剑归宗': {
-        type: '剑仙法',
-        icon: '⚔️',
-        baseDamage: 200,
-        cooldown: 5,
-        maxLevel: 10,
-        description: '召唤万剑攻击目标，造成大量伤害',
-        upgradeCost: { spiritStones: 500, herbs: 5 },
-        damageType: 'attack'
-    },
-    '金刚不坏': {
-        type: '体仙法',
-        icon: '🛡️',
-        baseDamage: 0,
-        cooldown: 8,
-        maxLevel: 10,
-        description: '进入金刚不坏状态，防御大幅提升，免疫控制',
-        upgradeCost: { spiritStones: 500, herbs: 5 },
-        damageType: 'defense'
-    },
-    '天地大同': {
-        type: '法仙法',
-        icon: '🌍',
-        baseDamage: 150,
-        cooldown: 6,
-        maxLevel: 10,
-        description: '仙法伤害+150%，范围攻击',
-        upgradeCost: { spiritStones: 600, herbs: 6 },
-        damageType: 'AoE'
-    },
-    '撒豆成兵': {
-        type: '召唤仙法',
-        icon: '👥',
-        baseDamage: 80,
-        cooldown: 10,
-        maxLevel: 10,
-        description: '召唤仙兵助战，仙兵继承部分属性',
-        upgradeCost: { spiritStones: 700, herbs: 8 },
-        damageType: 'summon'
-    },
-    '周天星斗': {
-        type: '阵法仙法',
-        icon: '⭐',
-        baseDamage: 0,
-        cooldown: 15,
-        maxLevel: 10,
-        description: '布置周天星斗阵，阵内队友属性+50%',
-        upgradeCost: { spiritStones: 800, herbs: 10 },
-        damageType: 'buff'
-    }
-};
-
-// ===== IMMORTAL_SKILL_TYPES =====
-const IMMORTAL_SKILL_TYPES = {
-    '剑仙法': { color: '#f44336', bonusType: 'attack', bonusValue: 0.2 },
-    '体仙法': { color: '#4caf50', bonusType: 'defense', bonusValue: 0.2 },
-    '法仙法': { color: '#2196f3', bonusType: 'spellDamage', bonusValue: 0.15 },
-    '召唤仙法': { color: '#9c27b0', bonusType: 'summon', bonusValue: 0.1 },
-    '阵法仙法': { color: '#ff9800', bonusType: 'teamBuff', bonusValue: 0.05 }
-};
-
-// ===== learnImmortalSkill =====
-function learnImmortalSkill(skillName) {
-    const skillData = IMMORTAL_SKILLS_DATA[skillName];
-    if (!skillData) return false;
-    
-    // 检查是否已学会
-    if (gameState.immortalSkills.find(s => s.name === skillName)) {
-        showToast('已学会此仙法');
-        return false;
-    }
-    
-    const skill = {
-        uid: 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        name: skillName,
-        type: skillData.type,
-        level: 1,
-        maxLevel: skillData.maxLevel,
-        cooldown: skillData.cooldown,
-        currentCooldown: 0,
-        damage: skillData.baseDamage,
-        description: skillData.description
-    };
-    
-    gameState.immortalSkills.push(skill);
-    addLog('good', '学会仙法', `学会【${skillName}】！`);
-    saveGame();
-    return true;
-}
-
-// ===== upgradeImmortalSkill =====
-function upgradeImmortalSkill(skillIndex) {
-    if (gameState.immortalSkills.length <= skillIndex) return;
-    
-    const skill = gameState.immortalSkills[skillIndex];
-    const skillData = IMMORTAL_SKILLS_DATA[skill.name];
-    
-    if (skill.level >= skill.maxLevel) {
-        showToast('仙法已达最大等级');
-        return;
-    }
-    
-    const cost = {
-        spiritStones: skillData.upgradeCost.spiritStones * skill.level,
-        herbs: skillData.upgradeCost.herbs * skill.level
-    };
-    
-    if (gameState.immortal.spiritStones < cost.spiritStones) {
-        showToast('仙石不足');
-        return;
-    }
-    
-    // 扣除仙石
-    gameState.immortal.spiritStones -= cost.spiritStones;
-    
-    // 升级
-    skill.level++;
-    skill.damage = Math.floor(skillData.baseDamage * (1 + skill.level * 0.1));
-    
-    addLog('good', '仙法升级', `${skill.name}升级到Lv.${skill.level}！`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== useImmortalSkill =====
-function useImmortalSkill(skillIndex, target) {
-    if (gameState.immortalSkills.length <= skillIndex) return;
-    
-    const skill = gameState.immortalSkills[skillIndex];
-    
-    if (skill.currentCooldown > 0) {
-        showToast(`${skill.name}冷却中，还需${skill.currentCooldown}秒`);
-        return;
-    }
-    
-    // 应用技能效果
-    const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
-    let effectDescription = '';
-    
-    switch (skill.damageType) {
-        case 'attack':
-            effectDescription = `对目标造成${skill.damage}%伤害`;
-            // 直接应用伤害（战斗系统会在此处接入）
-            break;
-        case 'defense':
-            effectDescription = '防御大幅提升，免疫控制3秒';
-            break;
-        case 'AoE':
-            effectDescription = `对范围内敌人造成${skill.damage}%伤害`;
-            break;
-        case 'summon':
-            effectDescription = '召唤仙兵助战';
-            break;
-        case 'buff':
-            effectDescription = '阵内队友属性+50%';
-            break;
-    }
-    
-    // 设置冷却
-    skill.currentCooldown = skill.cooldown;
-    
-    addLog('good', '施展仙法', `施展【${skill.name}】：${effectDescription}`);
-    saveGame();
-    
-    // 启动冷却计时
-    startSkillCooldownTimer(skillIndex);
-    
-    return true;
-}
-
-// ===== startSkillCooldownTimer =====
-function startSkillCooldownTimer(skillIndex) {
-    const interval = setInterval(() => {
-        if (gameState.immortalSkills.length <= skillIndex) {
-            clearInterval(interval);
-            return;
-        }
-        
-        const skill = gameState.immortalSkills[skillIndex];
-        if (skill.currentCooldown > 0) {
-            skill.currentCooldown--;
-            updateDisplay();
-        } else {
-            clearInterval(interval);
-        }
-    }, 1000);
-}
-
-// ===== showImmortalSkillPanel =====
-function showImmortalSkillPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">✨ 仙法面板</h3>';
-    
-    // 技能列表
-    if (gameState.immortalSkills.length === 0) {
-        html += '<div style="text-align:center;color:#666;padding:30px;">尚未学会任何仙法</div>';
-    } else {
-        for (let i = 0; i < gameState.immortalSkills.length; i++) {
-            const skill = gameState.immortalSkills[i];
-            const skillData = IMMORTAL_SKILLS_DATA[skill.name];
-            const typeData = IMMORTAL_SKILL_TYPES[skill.type];
-            
-            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:10px;border-left:4px solid ${typeData.color};">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:28px;">${skillData.icon}</span>`;
-            html += `<div style="flex:1;">`;
-            html += `<div style="color:#fff;font-weight:bold;">${skill.name} <span style="color:${typeData.color};font-size:12px;">[${skill.type}]</span></div>`;
-            html += `<div style="color:#888;font-size:11px;">Lv.${skill.level}/${skill.maxLevel}</div>`;
-            html += '</div>';
-            
-            // 冷却显示
-            if (skill.currentCooldown > 0) {
-                html += `<div style="color:#f44336;font-size:12px;">冷却:${skill.currentCooldown}秒</div>`;
-            } else {
-                html += `<button onclick="useImmortalSkill(${i});closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">施展</button>`;
-            }
-            
-            html += '</div>';
-            
-            // 升级按钮
-            const upgradeCost = {
-                spiritStones: skillData.upgradeCost.spiritStones * skill.level,
-                herbs: skillData.upgradeCost.herbs * skill.level
-            };
-            
-            html += `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">`;
-            html += `<div style="color:#aaa;font-size:11px;">${skill.description}</div>`;
-            
-            if (skill.level < skill.maxLevel) {
-                const canUpgrade = gameState.immortal.spiritStones >= upgradeCost.spiritStones;
-                html += `<button onclick="upgradeImmortalSkill(${i});closeModal();" ${canUpgrade ? '' : 'disabled'} style="padding:4px 8px;background:${canUpgrade ? '#1565c0' : '#444'};color:${canUpgrade ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canUpgrade ? 'pointer' : 'not-allowed'};font-size:11px;">升级 ${upgradeCost.spiritStones}💎</button>`;
-            } else {
-                html += `<span style="color:#ffd700;font-size:11px;">已满级</span>`;
-            }
-            
-            html += '</div></div>';
-        }
-    }
-    
-    // 学习新仙法
-    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #333;">';
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">可学习仙法：</div>';
-    
-    const availableSkills = Object.keys(IMMORTAL_SKILLS_DATA).filter(
-        name => !gameState.immortalSkills.find(s => s.name === name)
-    );
-    
-    if (availableSkills.length === 0) {
-        html += '<div style="color:#666;text-align:center;">已学会所有仙法</div>';
-    } else {
-        for (const skillName of availableSkills) {
-            const skillData = IMMORTAL_SKILLS_DATA[skillName];
-            const typeData = IMMORTAL_SKILL_TYPES[skillData.type];
-            
-            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:20px;">${skillData.icon}</span>`;
-            html += `<div><div style="color:#fff;font-size:13px;">${skillName}</div><div style="color:${typeData.color};font-size:11px;">${skillData.type}</div></div>`;
-            html += '</div>';
-            html += `<button onclick="learnImmortalSkill('${skillName}');closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">学习</button>`;
-            html += '</div>';
-        }
-    }
-    html += '</div>';
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('仙法', html, '');
-}
-
-// ===== getImmortalSkillBonus =====
-function getImmortalSkillBonus(type) {
-    let bonus = 0;
-    for (const skill of gameState.immortalSkills) {
-        const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
-        if (skillTypeData.bonusType === type) {
-            bonus += skillTypeData.bonusValue * skill.level;
-        }
-    }
-    return bonus;
-}
-
-// Auto-generated module: init.js
-
-        // ===== init =====
-        function init() {
-            loadMiniMaxConfig();
-            updateDisplay();
-        }
-
-        // ===== loadMiniMaxConfig =====
-        function loadMiniMaxConfig() {
-            const saved = localStorage.getItem(CONFIG.miniMaxConfigKey);
-            if (saved) {
-                try {
-                    miniMaxConfig = JSON.parse(saved);
-                    // 确保features结构完整
-                    if (!miniMaxConfig.features) {
-                        miniMaxConfig.features = { ...DEFAULT_MINIMAX_CONFIG.features };
-                    }
-                } catch (e) {
-                    miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
-                }
-            }
-        }
-
-        // ===== startNewGame =====
-        function startNewGame() {
-            gameState = {
-                realm: 0,
-                stage: 0,
-                qi: 20,
-                maxQi: 100,
-                spiritStones: 50,
-                mindset: 50,
-                days: 1,
-                cultivationProgress: 0,
-                eventLog: [],
-                isGameOver: false,
-                isVictory: false,
-                inventory: [],
-                equippedTreasures: [null, null, null],
-                maxInventorySlots: 20,
-                shopItems: [],
-                lastShopDay: 0,
-                shopRefreshCount: 0, // 经济调整：商店刷新次数计数器，用于递增刷新费用
-                activeEffects: {
-                    breakthrough_boost: 0,
-                    cultivate_speed: 0,
-                    渡劫_mindset_protect: 0,
-                    attack: 0,
-                    defense: 0,
-                    cultivate_qi_rate: 0,
-                    渡劫_damage_reduce: 0,
-                    escape: 0,
-                    foresee_event: 0,
-                    all_stats: 0
-                },
-                tribulation: {
-                    inProgress: false,
-                    currentStage: 0,
-                    totalStages: 9,
-                    currentType: null,
-                    preparations: [],
-                    damageTaken: 0,
-                    tribKey: null
-                },
-                hasTransmigrationBuff: false,
-                tribulationRecord: [],
-                combat: {
-                    wins: 0,
-                    losses: 0,
-                    honor: 0,
-                    fame: 0,
-                    battleHistory: [],
-                    injured: false,
-                    injuryEndDay: 0
-                },
-                sect: {
-                    name: null,
-                    level: 0,
-                    spiritStones: 0,
-                    disciples: [],
-                    elders: [],
-                    buildings: {
-                        library: false,
-                        alchemy: false,
-                        forge: false,
-                        archive: false
-                    },
-                    techniques: [],
-                    contributionShop: [],
-                    lastShopRefresh: 0,
-                    lastResourceCollection: 0,
-                    // V29 NPC AI系统
-                    npcDialogueHistory: [],
-                    npcTasks: [],
-                    npcLastActions: {},
-                    // V30 渡劫审批系统
-                    tribulationRequest: {
-                        status: 'none',
-                        elderScore: 0,
-                        elderComment: '',
-                        leaderDecision: '',
-                        leaderComment: '',
-                        buffApplied: false,
-                        submitDay: 0
-                    },
-                    // V31 天道轮回系统
-                    celestialCycle: {
-                        day: 0,
-                        completed: false,
-                        lastResult: null,
-                        blessingActive: false,
-                        cycleInterval: 3
-                    },
-                    // V35 宗门任务链
-                    sectMissions: [],
-                    sectMissionCooldown: 0,
-                    lastMissionRefreshDay: 0,
-                    // V36 装备打造增强
-                    equipmentForgeCount: 0,
-                    lastForgeDay: 0,
-                    // V37 天道法则系统
-                    celestialLaws: {
-                        comprehended: [], active: [], comprehending: null,
-                        comprehendingProgress: 0, comprehendDays: 0,
-                        maxActiveLaws: 3, lawBonus: {}
-                    }
-                },
-                // V6 奇遇系统字段
-                serendipity: {
-                    lastTriggerDay: 0,
-                    todayCount: 0,
-                    lastTriggerType: null,
-                    cooldownTypes: {},
-                    badLuck: 0,
-                    currentEvent: null,
-                    log: [],
-                    luckStatus: null,
-                    luckEndDay: 0,
-                    serendipityBoostEndDay: 0
-                },
-                // V7 灵根/体质系统
-                spiritRoot: {
-                    ...generateRandomSpiritRoot(),
-                    awakeningAvailable: false,
-                    hasAwakened: false,
-                    awakenedQuality: null
-                },
-                // V32 灵根觉醒系统
-                spiritRootAwakening: {
-                    status: 'dormant',
-                    stage: 0,
-                    triggerDay: 0,
-                    tasks: [],
-                    rewards: null,
-                    lastEventDay: 0,
-                    attempts: 0
-                },
-                constitutions: [],
-                // V8 丹药炼器系统
-                crafting: {
-                    furnace: { level: 1, type: 'alchemy' },
-                    anvil: { level: 1, type: 'forge' },
-                    transactionLog: []
-                },
-                // V9 世界地图系统
-                worldMap: {
-                    currentContinent: '中州',
-                    currentRegion: '中州城',
-                    exploredContinents: ['中州'],
-                    exploredRegions: ['中州城', '中州野外'],
-                    actionPower: 10,
-                    maxActionPower: 10,
-                    continentUnlocks: {
-                        '中州': 0,
-                        '南疆': 1,
-                        '北域': 2,
-                        '西域': 3,
-                        '东海': 2,
-                        '仙界碎片': 4
-                    },
-                    bossRefreshDays: {},
-                    lastTravelDay: 0
-                },
-                // E1 NPC对话记忆
-                npcMemory: [],
-                // B 成就/称号系统
-                title: '筑基修士',
-                achievements: {
-                    unlocked: [],
-                    titles: [],
-                    stats: {
-                        tribulationsCompleted: 0,
-                        dungeonBossesKilled: 0,
-                        sectContributions: 0,
-                        treasuresRefined: 0,
-                        serendipitiesEncountered: 0,
-                        flawlessTribulations: 0
-                    }
-                }
-            };
-            saveGame();
-            showGameUI();
-            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
-        }
-
-        // ===== loadGame =====
-        function loadGame() {
-            const saved = localStorage.getItem(CONFIG.storageKey);
-            if (saved) {
-                const loaded = JSON.parse(saved);
-                // 确保V2新增字段存在（向后兼容）
-                gameState = {
-                    ...gameState,
-                    ...loaded,
-                    activeEffects: loaded.activeEffects || {
-                        breakthrough_boost: 0,
-                        cultivate_speed: 0,
-                        渡劫_mindset_protect: 0,
-                        attack: 0,
-                        defense: 0,
-                        cultivate_qi_rate: 0,
-                        渡劫_damage_reduce: 0,
-                        escape: 0,
-                        foresee_event: 0,
-                        all_stats: 0
-                    },
-                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
-                    inventory: loaded.inventory || [],
-                    shopItems: loaded.shopItems || [],
-                    lastShopDay: loaded.lastShopDay || 0,
-                    tribulation: loaded.tribulation || {
-                        inProgress: false,
-                        currentStage: 0,
-                        totalStages: 9,
-                        currentType: null,
-                        preparations: [],
-                        damageTaken: 0,
-                        tribKey: null
-                    },
-                    hasTransmigrationBuff: loaded.hasTransmigrationBuff || false,
-                    tribulationRecord: loaded.tribulationRecord || [],
-                    combat: loaded.combat || {
-                        wins: 0,
-                        losses: 0,
-                        honor: 0,
-                        fame: 0,
-                        battleHistory: [],
-                        injured: false,
-                        injuryEndDay: 0
-                    },
-                    // V33 战斗AI学习系统
-                    combatProfile: loaded.combatProfile || {
-                        playerPatterns: [],
-                        totalBattles: 0,
-                        winsAgainst: 0,
-                        currentEnemy: null,
-                        learningData: {},
-                        preferredDistance: null,
-                        spellUsageRate: 0,
-                        defenseFrequency: 0,
-                        attackTiming: []
-                    },
-                    lastCombatDay: loaded.lastCombatDay || 0,
-                    // V35 宗门互动增强
-                    sectMissions: loaded.sectMissions || [],
-                    sectMissionCooldown: loaded.sectMissionCooldown || 0,
-                    lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
-                    // V36 装备打造增强
-                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
-                    lastForgeDay: loaded.lastForgeDay || 0,
-                    // V37 天道法则系统
-                    celestialLaws: loaded.celestialLaws || {
-                        comprehended: [], active: [], comprehending: null,
-                        comprehendingProgress: 0, comprehendDays: 0,
-                        maxActiveLaws: 3, lawBonus: {}
-                    },
-                    // V38 仙界社交系统
-                    immortalAlly: loaded.immortalAlly || {
-                        id: null, name: '', rank: 1, role: 'none', contribution: 0,
-                        joinedDay: 0, allies: [], skillLevel: 0, dailyActivity: 0, lastActivityDay: 0
-                    },
-                    immortalFriends: loaded.immortalFriends || [],
-                    allyApplications: loaded.allyApplications || [],
-                    // V39 仙宠培养系统
-                    spiritPets: loaded.spiritPets || { pets: [], lastInteractionDay: 0 },
-                    // V40 仙界拍卖行
-                    auction: loaded.auction || { listings: [], frozenFunds: 0, playerId: null, playerName: null, sortType: 'endingSoon' },
-                    // V41 仙界经济系统
-                    economy: loaded.economy || {
-                        currentInflation: 0.02, totalIncome: 0, totalExpense: 0, totalTax: 0,
-                        totalWealth: 0, avgDailyIncome: 50, avgDailyExpense: 0,
-                        luxuryPurchases: 0, activeEvents: [], economyBuffs: {}
-                    },
-                    // V42 天道竞技场
-                    celestialArena: loaded.celestialArena || {
-                        currentSeason: 1, seasonStartTime: Date.now(), currentRank: 1, highestRank: 1,
-                        score: 0, totalScoreEarned: 0, totalWins: 0, totalLosses: 0, currentStreak: 0,
-                        longestStreak: 0, promotionWins: 0, dailyChallengesUsed: 0, derankProtection: 2,
-                        matchHistory: [], lastRewardClaimed: 0, totalRewardsClaimed: 0, bountyPool: 0, bountyWins: 0
-                    },
-                    // V43 仙宫建设系统
-                    palace: loaded.palace || {
-                        level: 1, prosperity: 100, buildings: [], workers: [], styleIndex: 0,
-                        bonus: { incomeBonus: 0, cultivationSpeed: 0, serendipityChance: 0, combatPower: 0 },
-                        totalWagesPaid: 0
-                    },
-                    // V44 仙法创造系统
-                    customSpells: loaded.customSpells || [],
-                    essences: loaded.essences || {},
-                    // V45 天道轮回增强
-                    karma: loaded.karma || { points: 0, goodKarma: 0, evilKarma: 0, reincarnationCount: 0, pastLifeMemories: [] },
-                    sect: loaded.sect ? {
-                        ...loaded.sect,
-                        npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
-                        npcTasks: loaded.sect.npcTasks || [],
-                        npcLastActions: loaded.sect.npcLastActions || {},
-                        tribulationRequest: loaded.sect.tribulationRequest || {
-                            status: 'none', elderScore: 0, elderComment: '',
-                            leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
-                        },
-                        celestialCycle: loaded.sect.celestialCycle || {
-                            day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
-                        },
-                        // V35 宗门任务链
-                        sectMissions: loaded.sect.sectMissions || [],
-                        sectMissionCooldown: loaded.sect.sectMissionCooldown || 0
-                    } : {
-                        name: null,
-                        level: 0,
-                        spiritStones: 0,
-                        disciples: [],
-                        elders: [],
-                        buildings: {
-                            library: false,
-                            alchemy: false,
-                            forge: false,
-                            archive: false
-                        },
-                        techniques: [],
-                        contributionShop: [],
-                        lastShopRefresh: 0,
-                        lastResourceCollection: 0
-                    },
-                    serendipity: loaded.serendipity || {
-                        lastTriggerDay: 0,
-                        todayCount: 0,
-                        lastTriggerType: null,
-                        cooldownTypes: {},
-                        badLuck: 0,
-                        currentEvent: null,
-                        log: [],
-                        luckStatus: null,
-                        luckEndDay: 0,
-                        serendipityBoostEndDay: 0
-                    },
-                    // V7 灵根/体质系统
-                    spiritRoot: loaded.spiritRoot ? {
-                        ...loaded.spiritRoot,
-                        awakeningAvailable: loaded.spiritRoot.awakeningAvailable || false,
-                        hasAwakened: loaded.spiritRoot.hasAwakened || false,
-                        awakenedQuality: loaded.spiritRoot.awakenedQuality || null
-                    } : { ...generateRandomSpiritRoot(), awakeningAvailable: false, hasAwakened: false, awakenedQuality: null },
-                    // V32 灵根觉醒系统
-                    spiritRootAwakening: loaded.spiritRootAwakening || {
-                        status: 'dormant',
-                        stage: 0,
-                        triggerDay: 0,
-                        tasks: [],
-                        rewards: null,
-                        lastEventDay: 0,
-                        attempts: 0
-                    },
-                    constitutions: loaded.constitutions || [],
-                    // V8 丹药炼器系统
-                    crafting: loaded.crafting || {
-                        furnace: { level: 1, type: 'alchemy' },
-                        anvil: { level: 1, type: 'forge' },
-                        transactionLog: []
-                    },
-                    // V9 世界地图系统
-                    worldMap: loaded.worldMap || {
-                        currentContinent: '中州',
-                        currentRegion: '中州城',
-                        exploredContinents: ['中州'],
-                        exploredRegions: ['中州城', '中州野外'],
-                        actionPower: 10,
-                        maxActionPower: 10,
-                        continentUnlocks: {
-                            '中州': 0,
-                            '南疆': 1,
-                            '北域': 2,
-                            '西域': 3,
-                            '东海': 2,
-                            '仙界碎片': 4
-                        },
-                        bossRefreshDays: {},
-                        lastTravelDay: 0
-                    }
-                };
-                // E1 确保npcMemory字段存在（向后兼容）
-                if (!gameState.npcMemory) gameState.npcMemory = [];
-                // B 成就/称号系统向后兼容
-                if (!gameState.title) gameState.title = '筑基修士';
-                if (!gameState.achievements) {
-                    gameState.achievements = {
-                        unlocked: [],
-                        titles: [],
-                        stats: {
-                            tribulationsCompleted: 0,
-                            dungeonBossesKilled: 0,
-                            sectContributions: 0,
-                            treasuresRefined: 0,
-                            serendipitiesEncountered: 0,
-                            flawlessTribulations: 0
-                        }
-                    };
-                }
-                // 确保activeEffects包含serendipity_boost
-                if (!gameState.activeEffects.serendipity_boost) {
-                    gameState.activeEffects.serendipity_boost = 0;
-                }
-                // 初始化体质效果
-                initializeConstitutionEffects();
-                // 重新计算装备效果
-                recalculateAllEffects();
-                // 初始化世界地图
-                initWorldMap();
-                if (gameState.isGameOver) {
-                    showGameOverScreen();
-                } else {
-                    showGameUI();
-                }
-            } else {
-                alert('没有找到存档！');
-            }
-        }
-
-        // ===== showGameUI =====
-        function showGameUI() {
-            document.getElementById('startScreen').classList.add('hidden');
-            document.getElementById('apiConfig').classList.add('hidden');
-            document.getElementById('gameStats').classList.remove('hidden');
-            document.getElementById('cultivationProgress').classList.remove('hidden');
-            document.getElementById('equipmentBar').classList.remove('hidden');
-            document.getElementById('gameButtons').classList.remove('hidden');
-            document.getElementById('eventLog').classList.remove('hidden');
-            updateDisplay();
-            renderLog();
-            updateEquipmentBar();
-            // 检查商店刷新
-            if (gameState.lastShopDay < gameState.days) {
-                refreshShop(true);
-            }
-            // 重置每日行动力
-            if (gameState.worldMap) {
-                const wm = gameState.worldMap;
-                if (wm.lastTravelDay < gameState.days) {
-                    wm.actionPower = wm.maxActionPower;
-                    wm.lastTravelDay = 0;
-                }
-            }
-            // 检查宗门按钮显示
-            const sectBtn = document.getElementById('sectBtn');
-            if (sectBtn) {
-                sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
-            }
-            // V37 检查悟道按钮显示
-            const lawBtn = document.getElementById('lawBtn');
-            if (lawBtn) {
-                lawBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V38 检查仙界社交按钮显示（境界≥地仙=realm 8）
-            const allyBtn = document.getElementById('allyBtn');
-            if (allyBtn) {
-                allyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            const friendsBtn = document.getElementById('friendsBtn');
-            if (friendsBtn) {
-                friendsBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            const tradingBtn = document.getElementById('tradingBtn');
-            if (tradingBtn) {
-                tradingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V40 拍卖按钮显示（境界≥地仙=realm 8）
-            const auctionBtn = document.getElementById('auctionBtn');
-            if (auctionBtn) {
-                auctionBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V41 经济系统按钮显示（境界≥地仙=realm 8）
-            const economyBtn = document.getElementById('economyBtn');
-            if (economyBtn) {
-                economyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V42 天道竞技场按钮显示（境界≥地仙=realm 8）
-            const arenaBtn = document.getElementById('arenaBtn');
-            if (arenaBtn) {
-                arenaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V43 仙宫建设按钮显示（境界≥地仙=realm 8）
-            const palaceBtn = document.getElementById('palaceBtn');
-            if (palaceBtn) {
-                palaceBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V44 仙法创造按钮显示（境界≥地仙=realm 8）
-            const spellBtn = document.getElementById('spellBtn');
-            if (spellBtn) {
-                spellBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V45 天道轮回按钮显示（境界≥地仙=realm 8）
-            const karmaBtn = document.getElementById('karmaBtn');
-            if (karmaBtn) {
-                karmaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V46 仙界 farming 按钮显示（境界≥地仙=realm 8）
-            const farmingBtn = document.getElementById('farmingBtn');
-            if (farmingBtn) {
-                farmingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-            // V47 灵宠进化树按钮显示（境界≥地仙=realm 8）
-            const evoTreeBtn = document.getElementById('evoTreeBtn');
-            if (evoTreeBtn) {
-                evoTreeBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
-            }
-        }
-
-        // ===== updateDisplay =====
-        function updateDisplay() {
-            const realmName = CONFIG.realms[gameState.realm];
-            const stageName = CONFIG.stages[gameState.stage];
-            
-            document.getElementById('realmDisplay').textContent = `${realmName}期`;
-            document.getElementById('qiDisplay').textContent = `${gameState.qi}/${gameState.maxQi}`;
-            document.getElementById('stonesDisplay').textContent = gameState.spiritStones;
-            document.getElementById('mindsetDisplay').textContent = gameState.mindset;
-            document.getElementById('daysDisplay').textContent = gameState.days;
-            
-            document.getElementById('realmName').textContent = `${realmName}期`;
-            document.getElementById('realmStage').textContent = stageName;
-
-            // A5 更新称号显示
-            const titleDisplay = document.getElementById('titleDisplay');
-            if (titleDisplay) {
-                titleDisplay.textContent = `【${gameState.title || '筑基修士'}】`;
-            }
-
-            const req = REALM_REQUIREMENTS[gameState.realm];
-            const progressInStage = gameState.stage === 0 ? 
-                gameState.cultivationProgress : 
-                gameState.cultivationProgress - req.stageThreshold[gameState.stage - 1];
-            const stageSize = gameState.stage === 0 ? 
-                req.stageThreshold[0] : 
-                (req.stageThreshold[gameState.stage] - req.stageThreshold[gameState.stage - 1]);
-            const percentage = Math.min(100, (progressInStage / stageSize) * 100);
-            
-            document.getElementById('cultivationBar').style.width = `${percentage}%`;
-            document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
-            
-            // V7 更新灵根显示
-            updateSpiritRootDisplay();
-            
-            // V9 更新世界地图显示
-            updateMinimapDisplay();
-            if (gameState.worldMap) {
-                const wm = gameState.worldMap;
-                document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
-            }
-        }
-
-
-// Auto-generated module: laws.js
-
-// ===== CELESTIAL LAWS CONSTANTS (V37) =====
-const CELESTIAL_LAWS = {
-    time: {
-        name: '时间法则', icon: '⏳', attr: 'cultivate_speed', value: 0.15,
-        realm: '大乘', synergy: 'space', conflict: 'space',
-        desc: '修炼速度+15%', cost: 5000, comprehendDays: 30
-    },
-    space: {
-        name: '空间法则', icon: '🌀', attr: 'escape', value: 0.20,
-        realm: '大乘', synergy: 'time', conflict: 'time',
-        desc: '躲避率+20%', cost: 5000, comprehendDays: 30
-    },
-    wuxing: {
-        name: '五行法则', icon: '🌈', attr: 'all_stats', value: 0.10,
-        realm: '大乘', synergy: 'yinyang', conflict: 'chaos',
-        desc: '全属性+10%', cost: 5000, comprehendDays: 30
-    },
-    yinyang: {
-        name: '阴阳法则', icon: '☯️', attr: 'attack_defense_balance', value: 0.12,
-        realm: '大乘', synergy: 'wuxing', conflict: 'destiny',
-        desc: '攻防均衡+12%', cost: 5000, comprehendDays: 30
-    },
-    cause: {
-        name: '因果法则', icon: '🔮', attr: 'crit', value: 0.18,
-        realm: '地仙', synergy: 'destiny', conflict: 'reincarnation',
-        desc: '暴击率+18%', cost: 8000, comprehendDays: 45
-    },
-    destiny: {
-        name: '命运法则', icon: '⭐', attr: 'serendipity', value: 0.25,
-        realm: '地仙', synergy: 'cause', conflict: 'yinyang',
-        desc: '奇遇概率+25%', cost: 8000, comprehendDays: 45
-    },
-    destruction: {
-        name: '毁灭法则', icon: '💥', attr: 'attack', value: 0.20,
-        realm: '地仙', synergy: 'creation', conflict: 'creation',
-        desc: '伤害+20%', cost: 8000, comprehendDays: 45
-    },
-    creation: {
-        name: '创造法则', icon: '✨', attr: 'heal', value: 0.25,
-        realm: '地仙', synergy: 'destruction', conflict: 'destruction',
-        desc: '治疗效果+25%', cost: 8000, comprehendDays: 45
-    },
-    reincarnation: {
-        name: '轮回法则', icon: '🔄', attr: 'cooldown_reduce', value: 0.20,
-        realm: '太乙', synergy: 'chaos', conflict: 'cause',
-        desc: '冷却缩减-20%', cost: 12000, comprehendDays: 60
-    },
-    chaos: {
-        name: '混沌法则', icon: '🌌', attr: 'all_stats', value: 0.15,
-        realm: '太乙', synergy: 'reincarnation', conflict: 'wuxing',
-        desc: '全属性+15%，受伤+10%', cost: 12000, comprehendDays: 60,
-        debuff: 'damage_taken', debuffValue: 0.10
-    }
-};
-
-const LAW_RELM_REQUIREMENTS = { '大乘': 8, '地仙': 9, '太乙': 10 };
-
-// ===== CORE FUNCTIONS =====
-
-// 检查是否可以领悟法则
-function canComprehendLaw(lawId) {
-    const law = CELESTIAL_LAWS[lawId];
-    if (!law) return { result: false, reason: '未知法则' };
-    if (gameState.celestialLaws.comprehended.includes(lawId)) {
-        return { result: false, reason: '已领悟此法则' };
-    }
-    if (gameState.celestialLaws.comprehending === lawId) {
-        return { result: false, reason: '正在领悟此法则' };
-    }
-    if (gameState.celestialLaws.active.length >= gameState.celestialLaws.maxActiveLaws) {
-        return { result: false, reason: `最多激活${gameState.celestialLaws.maxActiveLaws}条法则` };
-    }
-    const realmReq = LAW_RELM_REQUIREMENTS[law.realm];
-    if (gameState.realm < realmReq) {
-        return { result: false, reason: `需要境界达到${law.realm}` };
-    }
-    return { result: true };
-}
-
-// 开始领悟法则
-function startComprehendLaw(lawId) {
-    const check = canComprehendLaw(lawId);
-    if (!check.result) {
-        showToast(check.reason);
-        return;
-    }
-    const law = CELESTIAL_LAWS[lawId];
-    if (gameState.spiritStones < law.cost) {
-        showToast('灵石不足');
-        return;
-    }
-    gameState.spiritStones -= law.cost;
-    gameState.celestialLaws.comprehending = lawId;
-    gameState.celestialLaws.comprehendingProgress = 0;
-    gameState.celestialLaws.comprehendDays = 0;
-    addLog('good', '悟道开始', `开始领悟【${law.name}】`);
-    showToast(`开始领悟【${law.name}】`);
-    renderGameUI();
-}
-
-// 处理每日领悟进度
-function processLawComprehension() {
-    const cl = gameState.celestialLaws;
-    if (!cl.comprehending) return;
-
-    const law = CELESTIAL_LAWS[cl.comprehending];
-    cl.comprehendDays++;
-    // 每天进度 = 100 / 总天数
-    cl.comprehendingProgress = Math.min(100, (cl.comprehendDays / law.comprehendDays) * 100);
-
-    if (cl.comprehendingProgress >= 100) {
-        // 领悟完成
-        cl.comprehended.push(cl.comprehending);
-        const completedLaw = cl.comprehending;
-        cl.comprehending = null;
-        cl.comprehendingProgress = 0;
-        cl.comprehendDays = 0;
-
-        // 自动激活（如有空位）
-        if (cl.active.length < cl.maxActiveLaws) {
-            cl.active.push(completedLaw);
-        }
-        addLog('good', '法则领悟', `【${CELESTIAL_LAWS[completedLaw].name}】领悟完成！`);
-        showToast(`【${CELESTIAL_LAWS[completedLaw].name}】领悟成功！`);
-        calculateLawBonus();
-    }
-}
-
-// 计算法则加成
-function calculateLawBonus() {
-    const cl = gameState.celestialLaws;
-    const bonus = {
-        attack: 0, defense: 0, maxHp: 0, crit: 0, escape: 0,
-        cultivate_speed: 0, serendipity: 0, cooldown_reduce: 0,
-        all_stats: 0, heal: 0, damage_taken: 0, tribulation_boost: 0
-    };
-
-    if (cl.active.length === 0) {
-        cl.lawBonus = bonus;
-        applyLawBonus(bonus);
-        return;
-    }
-
-    let hasConflict = false;
-    let hasSynergy = false;
-
-    // 计算每条激活法则的加成
-    for (const lawId of cl.active) {
-        const law = CELESTIAL_LAWS[lawId];
-        if (!law) continue;
-
-        let value = law.value;
-
-        // 检测相克
-        if (cl.active.includes(law.conflict)) {
-            value *= 0.7; // 相克降低30%
-            hasConflict = true;
-        }
-
-        // 检测相助（额外+15%）
-        if (cl.active.includes(law.synergy)) {
-            value *= 1.15;
-            hasSynergy = true;
-        }
-
-        // 应用到对应属性
-        if (law.attr === 'all_stats') {
-            bonus.attack += value;
-            bonus.defense += value;
-            bonus.maxHp += value;
-        } else if (law.attr === 'attack_defense_balance') {
-            bonus.attack += value * 0.5;
-            bonus.defense += value * 0.5;
-        } else if (bonus.hasOwnProperty(law.attr)) {
-            bonus[law.attr] += value;
-        }
-
-        // 混沌法则的减益
-        if (law.debuff && bonus.hasOwnProperty(law.debuff)) {
-            bonus[law.debuff] += law.debuffValue;
-        }
-    }
-
-    // 渡劫加成：每条激活法则+5%，相克时取消
-    bonus.tribulation_boost = hasConflict ? 0 : cl.active.length * 0.05;
-
-    cl.lawBonus = bonus;
-    applyLawBonus(bonus);
-
-    // 记录日志（仅在状态变化时）
-    if (hasConflict || hasSynergy) {
-        const conflictLaws = cl.active.filter(id => cl.active.includes(CELESTIAL_LAWS[id].conflict));
-        const synergyPairs = [];
-        for (const lawId of cl.active) {
-            const law = CELESTIAL_LAWS[lawId];
-            if (cl.active.includes(law.synergy)) {
-                synergyPairs.push(`${law.icon}${CELESTIAL_LAWS[law.synergy].icon}`);
-            }
-        }
-        if (hasConflict) {
-            addLog('warn', '法则相克', `激活的相克法则效果降低30%`);
-        }
-        if (hasSynergy && synergyPairs.length > 0) {
-            addLog('good', '法则相助', `激活相助法则，额外+15%效果: ${synergyPairs.join(', ')}`);
-        }
-    }
-}
-
-// 应用法则加成到activeEffects
-function applyLawBonus(bonus) {
-    const ae = gameState.activeEffects;
-    ae.attack = bonus.attack;
-    ae.defense = bonus.defense;
-    ae.all_stats = bonus.all_stats;
-    ae.serendipity_boost = bonus.serendipity;
-    ae.cultivate_speed = bonus.cultivate_speed;
-    // 渡劫加成特殊处理
-    if (bonus.tribulation_boost > 0) {
-        ae.tribulation_boost_law = bonus.tribulation_boost;
-    } else {
-        delete ae.tribulation_boost_law;
-    }
-}
-
-// 激活/停用法则
-function toggleLawActive(lawId) {
-    const cl = gameState.celestialLaws;
-    if (!cl.comprehended.includes(lawId)) {
-        showToast('请先领悟此法则');
-        return;
-    }
-
-    const idx = cl.active.indexOf(lawId);
-    if (idx >= 0) {
-        // 停用
-        cl.active.splice(idx, 1);
-        calculateLawBonus();
-        showToast(`【${CELESTIAL_LAWS[lawId].name}】已停用`);
-    } else {
-        // 激活
-        if (cl.active.length >= cl.maxActiveLaws) {
-            showToast(`最多激活${cl.maxActiveLaws}条法则`);
-            return;
-        }
-        cl.active.push(lawId);
-        calculateLawBonus();
-        showToast(`【${CELESTIAL_LAWS[lawId].name}】已激活`);
-    }
-    renderGameUI();
-}
-
-// 获取法则状态
-function getLawStatus(lawId) {
-    const cl = gameState.celestialLaws;
-    if (cl.active.includes(lawId)) return 'active';
-    if (cl.comprehending === lawId) return 'comprehending';
-    if (cl.comprehended.includes(lawId)) return 'comprehended';
-    return 'locked';
-}
-
-// 获取法则颜色
-function getLawColor(status) {
-    switch (status) {
-        case 'active': return '#ffd700';
-        case 'comprehending': return '#ff6b35';
-        case 'comprehended': return '#4ecdc4';
-        default: return '#666';
-    }
-}
-
-// 显示悟道台界面
-function showLawComprehension() {
-    const cl = gameState.celestialLaws;
-    const realm = gameState.realm >= 8 ? '大乘' : gameState.realm >= 9 ? '地仙' : gameState.realm >= 10 ? '太乙' : null;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ffd700;text-align:center;margin-bottom:15px;">⏳ 悟道台 - 天道法则</h2>`;
-
-    // 当前加成显示
-    if (cl.active.length > 0) {
-        html += `<div style="background:#16213e;border-radius:8px;padding:12px;margin-bottom:15px;">`;
-        html += `<div style="color:#4ecdc4;font-size:12px;margin-bottom:5px;">当前激活法则效果：</div>`;
-        const bonus = cl.lawBonus || {};
-        const parts = [];
-        if (bonus.attack > 0) parts.push(`攻击+${(bonus.attack*100).toFixed(0)}%`);
-        if (bonus.defense > 0) parts.push(`防御+${(bonus.defense*100).toFixed(0)}%`);
-        if (bonus.cultivate_speed > 0) parts.push(`修炼+${(bonus.cultivate_speed*100).toFixed(0)}%`);
-        if (bonus.crit > 0) parts.push(`暴击+${(bonus.crit*100).toFixed(0)}%`);
-        if (bonus.escape > 0) parts.push(`躲避+${(bonus.escape*100).toFixed(0)}%`);
-        if (bonus.serendipity > 0) parts.push(`奇遇+${(bonus.serendipity*100).toFixed(0)}%`);
-        if (bonus.tribulation_boost > 0) parts.push(`渡劫+${(bonus.tribulation_boost*100).toFixed(0)}%`);
-        html += `<div style="color:#fff;">${parts.join(' | ') || '无'}</div></div>`;
-    }
-
-    // 悟道路径提示
-    if (!realm) {
-        html += `<div style="text-align:center;color:#888;margin:30px 0;">
-            悟道需境界达到【大乘】，当前境界不足<br>
-            <span style="color:#aaa;font-size:12px;">境界达到大乘后可解锁悟道台</span>
-        </div>`;
-    } else {
-        // 法则列表
-        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:15px;">`;
-        for (const [lawId, law] of Object.entries(CELESTIAL_LAWS)) {
-            const status = getLawStatus(lawId);
-            const isAvailable = !realm || LAW_RELM_REQUIREMENTS[law.realm] <= gameState.realm;
-            const color = getLawColor(status);
-            const borderColor = status === 'active' ? '#ffd700' : status === 'comprehending' ? '#ff6b35' : '#333';
-
-            let stateLabel = '';
-            let progressBar = '';
-            if (status === 'comprehending') {
-                stateLabel = '领悟中';
-                progressBar = `<div style="background:#333;border-radius:4px;height:6px;margin-top:5px;">
-                    <div style="background:linear-gradient(90deg,#ff6b35,#ffd700);height:100%;width:${cl.comprehendingProgress}%;border-radius:4px;transition:width 0.3s;"></div>
-                </div>`;
-            } else if (status === 'comprehended') {
-                stateLabel = '已领悟';
-            } else if (status === 'active') {
-                stateLabel = '已激活';
-            } else if (!isAvailable) {
-                stateLabel = `需要${law.realm}`;
-            }
-
-            const synergyLaw = law.synergy ? CELESTIAL_LAWS[law.synergy] : null;
-            const conflictLaw = law.conflict ? CELESTIAL_LAWS[law.conflict] : null;
-
-            html += `<div style="background:#0f0f23;border:1px solid ${borderColor};border-radius:8px;padding:12px;opacity:${isAvailable ? 1 : 0.5};">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                    <span style="font-size:20px;">${law.icon}</span>
-                    <div>
-                        <div style="color:${color};font-weight:bold;">${law.name}</div>
-                        <div style="color:#888;font-size:11px;">${stateLabel}</div>
-                    </div>
-                </div>
-                <div style="color:#aaa;font-size:11px;margin-bottom:5px;">${law.desc}</div>
-                ${progressBar}
-                <div style="color:#666;font-size:10px;margin-top:5px;">
-                    ${synergyLaw ? `<span style="color:#4ecdc4;">相助: ${synergyLaw.icon}${synergyLaw.name}</span>` : ''}
-                    ${conflictLaw ? `<span style="color:#ff6b6b;"> | 相克: ${conflictLaw.icon}${conflictLaw.name}</span>` : ''}
-                </div>
-                <div style="color:#888;font-size:10px;margin-top:3px;">消耗: ${law.cost}灵石 | ${law.comprehendDays}天</div>`;
-
-            // 按钮
-            if (realm && isAvailable) {
-                if (status === 'locked') {
-                    const check = canComprehendLaw(lawId);
-                    html += `<button class="btn" style="margin-top:8px;width:100%;font-size:11px;padding:5px 8px;"
-                        onclick="startComprehendLaw('${lawId}')" ${check.result ? '' : 'disabled'}>
-                        ${check.result ? '开始领悟' : check.reason}
-                    </button>`;
-                } else if (status === 'comprehended') {
-                    html += `<button class="btn" style="margin-top:8px;width:100%;font-size:11px;padding:5px 8px;"
-                        onclick="toggleLawActive('${lawId}')">
-                        ${cl.active.includes(lawId) ? '停用' : '激活'}
-                    </button>`;
-                } else if (status === 'comprehending') {
-                    html += `<div style="margin-top:8px;text-align:center;color:#ff6b35;font-size:11px;">
-                        领悟中... ${Math.floor(cl.comprehendingProgress)}%
-                    </div>`;
-                }
-            }
-            html += `</div>`;
-        }
-        html += `</div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" onclick="closeModal('lawComprehension')">关闭</button>
-    </div></div></div>`;
-
-    setModalContent('lawComprehension', html);
-    document.getElementById('modal-lawComprehension').style.display = 'block';
-}
-
-// 检查悟道台是否可用
-function isLawComprehensionAvailable() {
-    return gameState.realm >= 8; // 大乘
-}
-// Auto-generated module: mount.js
-
-// ===== MOUNT_TYPES =====
-const MOUNT_TYPES = {
-    '仙鹤': {
-        icon: '🦅',
-        baseStats: { speed: 30, attack: 10, defense: 5, luck: 15 },
-        skills: ['御空加速'],
-        growthRate: 1.0,
-        maturityMax: 100,
-        price: 1000
-    },
-    '凤凰': {
-        icon: '🦅',
-        baseStats: { speed: 25, attack: 20, defense: 15, luck: 25 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.2,
-        maturityMax: 120,
-        price: 5000
-    },
-    '麒麟': {
-        icon: '🦄',
-        baseStats: { speed: 20, attack: 25, defense: 20, luck: 20 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.1,
-        maturityMax: 110,
-        price: 8000
-    },
-    '白虎': {
-        icon: '🐯',
-        baseStats: { speed: 25, attack: 30, defense: 10, luck: 10 },
-        skills: ['御空加速', '坐骑融合'],
-        growthRate: 1.15,
-        maturityMax: 105,
-        price: 6000
-    },
-    '青龙': {
-        icon: '🐉',
-        baseStats: { speed: 35, attack: 15, defense: 15, luck: 20 },
-        skills: ['御空加速', '仙缘感应'],
-        growthRate: 1.25,
-        maturityMax: 130,
-        price: 10000
-    },
-    '玄武': {
-        icon: '🐢',
-        baseStats: { speed: 15, attack: 10, defense: 35, luck: 15 },
-        skills: ['御空加速', '仙兽护主'],
-        growthRate: 1.0,
-        maturityMax: 140,
-        price: 7000
-    },
-    '九尾狐': {
-        icon: '🦊',
-        baseStats: { speed: 30, attack: 20, defense: 10, luck: 30 },
-        skills: ['御空加速', '仙缘感应'],
-        growthRate: 1.3,
-        maturityMax: 100,
-        price: 12000
-    },
-    '鲲鹏': {
-        icon: '🐋',
-        baseStats: { speed: 40, attack: 15, defense: 10, luck: 20 },
-        skills: ['御空加速', '坐骑融合', '仙缘感应'],
-        growthRate: 1.4,
-        maturityMax: 150,
-        price: 20000
-    }
-};
-
-// ===== MOUNT_GROWTH_TYPES =====
-const MOUNT_GROWTH_TYPES = {
-    '普通': { multiplier: 0.8, color: '#aaaaaa', price: 0 },
-    '优秀': { multiplier: 1.0, color: '#4caf50', price: 1000 },
-    '稀有': { multiplier: 1.2, color: '#2196f3', price: 5000 },
-    '神话': { multiplier: 1.5, color: '#9c27b0', price: 20000 }
-};
-
-// ===== getRandomMountType =====
-function getRandomMountType() {
-    const types = Object.keys(MOUNT_TYPES);
-    return types[Math.floor(Math.random() * types.length)];
-}
-
-// ===== getRandomGrowthType =====
-function getRandomGrowthType() {
-    const rand = Math.random();
-    if (rand < 0.5) return '普通';
-    if (rand < 0.8) return '优秀';
-    if (rand < 0.95) return '稀有';
-    return '神话';
-}
-
-// ===== createMount =====
-function createMount(type, growth) {
-    const template = MOUNT_TYPES[type];
-    const growthData = MOUNT_GROWTH_TYPES[growth];
-    
-    return {
-        uid: 'mount_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        name: type,
-        type: type,
-        level: 1,
-        growth: growth,
-        stats: {
-            speed: Math.floor(template.baseStats.speed * growthData.multiplier),
-            attack: Math.floor(template.baseStats.attack * growthData.multiplier),
-            defense: Math.floor(template.baseStats.defense * growthData.multiplier),
-            luck: Math.floor(template.baseStats.luck * growthData.multiplier)
-        },
-        skills: [...template.skills],
-        maturity: 0,
-        matureMax: template.maturityMax,
-        exp: 0,
-        expToLevel: 100
-    };
-}
-
-// ===== acquireMount =====
-function acquireMount(mount) {
-    if (gameState.mounts.length >= 3) {
-        showToast('仙兽栏已满（最多3只）');
-        return false;
-    }
-    
-    gameState.mounts.push(mount);
-    addLog('good', '获得仙兽', `获得${mount.growth}级仙兽【${mount.name}】！`);
-    saveGame();
-    return true;
-}
-
-// ===== tryCaptureMount =====
-function tryCaptureMount() {
-    if (gameState.currentRealm !== 'immortal') {
-        showToast('仙兽只可在仙界捕捉');
-        return;
-    }
-    
-    const mountType = getRandomMountType();
-    const growth = getRandomGrowthType();
-    const mount = createMount(mountType, growth);
-    
-    // 稀有度影响成功率
-    const successRates = { '普通': 0.8, '优秀': 0.5, '稀有': 0.3, '神话': 0.1 };
-    const luckBonus = gameState.currentMount ? gameState.currentMount.stats.luck / 200 : 0;
-    
-    if (Math.random() < successRates[growth] + luckBonus) {
-        acquireMount(mount);
-        showToast(`捕捉成功！获得${growth}仙兽【${mountType}】`);
-    } else {
-        showToast('捕捉失败，仙兽逃走了...');
-    }
-    
-    saveGame();
-}
-
-// ===== feedMount =====
-function feedMount(mountIndex, herbCount) {
-    if (gameState.mounts.length <= mountIndex) return;
-    
-    const mount = gameState.mounts[mountIndex];
-    if (mount.maturity >= mount.matureMax) {
-        showToast('仙兽已完全成熟');
-        return;
-    }
-    
-    // 仙草喂养，每个仙草+5成熟度
-    const gain = Math.min(herbCount * 5, mount.matureMax - mount.maturity);
-    mount.maturity += gain;
-    
-    // 检查是否成熟
-    if (mount.maturity >= mount.matureMax) {
-        mount.level = Math.min(10, mount.level + 1);
-        mount.maturity = mount.matureMax;
-        showToast(`${mount.name}已完全成熟，等级提升！`);
-    }
-    
-    saveGame();
-    updateDisplay();
-}
-
-// ===== rideMount =====
-function rideMount(mountIndex) {
-    if (gameState.mounts.length <= mountIndex) return;
-    
-    gameState.currentMount = gameState.mounts[mountIndex];
-    addLog('good', '骑乘仙兽', `骑乘【${gameState.currentMount.name}】飞行`);
-    saveGame();
-    updateDisplay();
-}
-
-// ===== dismountMount =====
-function dismountMount() {
-    if (!gameState.currentMount) return;
-    addLog('neutral', '解除骑乘', `解除【${gameState.currentMount.name}】骑乘状态`);
-    gameState.currentMount = null;
-    saveGame();
-    updateDisplay();
-}
-
-// ===== showMountPanel =====
-function showMountPanel() {
-    let html = '<div style="padding:16px;">';
-    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">🐎 仙兽面板</h3>';
-    
-    // 当前骑乘
-    if (gameState.currentMount) {
-        const m = gameState.currentMount;
-        html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid #ffd700;">`;
-        html += `<div style="display:flex;align-items:center;gap:10px;">`;
-        html += `<span style="font-size:32px;">${MOUNT_TYPES[m.type].icon}</span>`;
-        html += `<div><div style="color:#ffd700;font-weight:bold;">${m.name}</div>`;
-        html += `<div style="color:#aaa;font-size:12px;">${m.growth}级 | Lv.${m.level}</div></div>`;
-        html += `<button onclick="dismountMount();closeModal();" style="margin-left:auto;padding:6px 12px;background:#c62828;color:white;border:none;border-radius:4px;cursor:pointer;">解除骑乘</button>`;
-        html += '</div>';
-        
-        // 成熟度条
-        const progress = (m.maturity / m.matureMax * 100).toFixed(0);
-        html += `<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;color:#aaa;font-size:11px;"><span>成熟度</span><span>${progress}%</span></div>`;
-        html += `<div style="height:6px;background:#333;border-radius:3px;margin-top:4px;"><div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:3px;"></div></div></div>`;
-        
-        // 属性
-        html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;text-align:center;">`;
-        html += `<div><div style="color:#4caf50;font-size:14px;">${m.stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
-        html += `<div><div style="color:#f44336;font-size:14px;">${m.stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
-        html += `<div><div style="color:#2196f3;font-size:14px;">${m.stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
-        html += `<div><div style="color:#ff9800;font-size:14px;">${m.stats.luck}</div><div style="color:#666;font-size:10px;">幸运</div></div>`;
-        html += '</div></div>';
-    }
-    
-    // 仙兽列表
-    html += '<div style="margin-bottom:12px;"><div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙兽栏 (' + gameState.mounts.length + '/3)</div>';
-    
-    if (gameState.mounts.length === 0) {
-        html += '<div style="text-align:center;color:#666;padding:20px;">暂无仙兽</div>';
-    } else {
-        for (let i = 0; i < gameState.mounts.length; i++) {
-            const m = gameState.mounts[i];
-            const isRiding = gameState.currentMount && gameState.currentMount.uid === m.uid;
-            const growthColor = MOUNT_GROWTH_TYPES[m.growth].color;
-            
-            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;" onclick="toggleMountDetails(${i})">`;
-            html += `<div style="display:flex;align-items:center;gap:10px;">`;
-            html += `<span style="font-size:24px;">${MOUNT_TYPES[m.type].icon}</span>`;
-            html += `<div style="flex:1;">`;
-            html += `<div style="color:${growthColor};font-weight:bold;">${m.name} <span style="color:#666;font-size:11px;">(${m.growth})</span></div>`;
-            html += `<div style="color:#888;font-size:11px;">Lv.${m.level} | 成熟度${(m.maturity/m.matureMax*100).toFixed(0)}%</div>`;
-            html += '</div>';
-            if (!isRiding) {
-                html += `<button onclick="event.stopPropagation();rideMount(${i});closeModal();" style="padding:4px 8px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">骑乘</button>`;
-            } else {
-                html += `<span style="color:#ffd700;font-size:11px;">已骑乘</span>`;
-            }
-            html += '</div></div>';
-        }
-    }
-    html += '</div>';
-    
-    // 捕捉按钮
-    html += `<button onclick="tryCaptureMount();closeModal();" style="width:100%;padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🔍 捕捉仙兽</button>`;
-    
-    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
-    html += '</div>';
-    
-    openModal('仙兽', html, '');
-}
-
-// ===== MOUNT_SKILLS =====
-const MOUNT_SKILLS = {
-    '御空加速': {
-        icon: '💨',
-        effect: '移动冷却-50%',
-        description: '骑乘时御空术冷却时间减半'
-    },
-    '仙兽护主': {
-        icon: '🛡️',
-        effect: '战斗加成',
-        description: '战斗时仙兽协助攻击，伤害+20%'
-    },
-    '仙缘感应': {
-        icon: '✨',
-        effect: '仙缘任务+20%',
-        description: '仙缘任务刷新概率+20%'
-    },
-    '坐骑融合': {
-        icon: '🔗',
-        effect: '属性翻倍',
-        description: '骑乘时仙兽属性加成翻倍'
-    }
-};
-
-// Auto-generated module: palace.js
-
-// ===== PALACE CONSTANTS (V43) =====
-const PALACE_CONFIG = {
-    maxPalaceLevel: 10,
-    upgradeDaysBase: 7,
-    resourceTypes: ['灵石', '灵草', '矿石', '仙露'],
-    buildingSlots: 6,
-    workerSlots: 4,
-    serendipityChanceBase: 0.05,
-    cultivationSpeedBase: 0.1
-};
-
-const PALACE_BUILDINGS = {
-    // 建筑类型
-    '聚灵阵': {
-        icon: '🔮',
-        desc: '提升修炼速度',
-        maxLevel: 5,
-        effects: { cultivationSpeed: 0.05 },
-        cost: { stones: 5000, materials: 100 },
-        upgradeTime: 5
-    },
-    '藏经阁': {
-        icon: '📚',
-        desc: '提升功法领悟速度',
-        maxLevel: 5,
-        effects: { comprehensionSpeed: 0.05 },
-        cost: { stones: 8000, materials: 150 },
-        upgradeTime: 7
-    },
-    '炼丹房': {
-        icon: '⚗️',
-        desc: '炼制丹药成功率提升',
-        maxLevel: 5,
-        effects: { alchemySuccess: 0.03 },
-        cost: { stones: 10000, materials: 200 },
-        upgradeTime: 7
-    },
-    '灵兽园': {
-        icon: '🦌',
-        desc: '仙宠经验获取增加',
-        maxLevel: 5,
-        effects: { petExpBonus: 0.05 },
-        cost: { stones: 7000, materials: 120 },
-        upgradeTime: 6
-    },
-    '天机阁': {
-        icon: '🔭',
-        desc: '奇遇概率提升',
-        maxLevel: 5,
-        effects: { serendipityChance: 0.02 },
-        cost: { stones: 12000, materials: 250 },
-        upgradeTime: 10
-    },
-    '演武场': {
-        icon: '⚔️',
-        desc: '战斗属性加成',
-        maxLevel: 5,
-        effects: { combatPower: 0.05 },
-        cost: { stones: 9000, materials: 180 },
-        upgradeTime: 8
-    },
-    '聚宝阁': {
-        icon: '💎',
-        desc: '灵石产量增加',
-        maxLevel: 5,
-        effects: { incomeBonus: 0.05 },
-        cost: { stones: 15000, materials: 300 },
-        upgradeTime: 12
-    },
-    '悟道堂': {
-        icon: '🧘',
-        desc: '法则领悟速度提升',
-        maxLevel: 3,
-        effects: { lawComprehension: 0.05 },
-        cost: { stones: 20000, materials: 400 },
-        upgradeTime: 15
-    }
-};
-
-const PALACE_WORKERS = {
-    '杂役弟子': {
-        icon: '👣',
-        cost: 100,
-        dailyCost: 10,
-        task: 'resource',
-        efficiency: 1.0
-    },
-    '炼丹学徒': {
-        icon: '🧪',
-        cost: 500,
-        dailyCost: 50,
-        task: 'alchemy',
-        efficiency: 1.2
-    },
-    '护法长老': {
-        icon: '👴',
-        cost: 2000,
-        dailyCost: 200,
-        task: 'protection',
-        efficiency: 1.5
-    },
-    '仙缘使者': {
-        icon: '🧧',
-        cost: 5000,
-        dailyCost: 500,
-        task: 'serendipity',
-        efficiency: 2.0
-    }
-};
-
-const PALACE_STYLES = [
-    { name: '简约古朴', color: '#8d6e63', bonus: {} },
-    { name: '华丽璀璨', color: '#ffd700', bonus: { fame: 0.2 } },
-    { name: '神秘幽深', color: '#7b1fa2', bonus: { cultivationSpeed: 0.15 } },
-    { name: '威严庄重', color: '#c62828', bonus: { combatPower: 0.15 } },
-    { name: '清新雅致', color: '#26a69a', bonus: { serendipityChance: 0.2 } }
-];
-
-// ===== PALACE FUNCTIONS =====
-
-function openPalace() {
-    const palace = gameState.palace;
-    const player = gameState;
-    const now = Date.now();
-
-    // 检查是否有升级中的建筑
-    const upgradingBuilding = palace.buildings.find(b => b.upgrading && b.upgradeEndTime && now < b.upgradeEndTime);
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:950px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:10px;">🏯 仙宫建设</h2>
-
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px;">
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">仙宫等级</div>
-                    <div style="color:#ffd700;font-size:1.3em;font-weight:bold;">Lv.${palace.level}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">繁荣度</div>
-                    <div style="color:#4caf50;font-size:1.3em;font-weight:bold;">${palace.prosperity}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">建筑数</div>
-                    <div style="color:#2196f3;font-size:1.3em;font-weight:bold;">${palace.buildings.length}/${PALACE_CONFIG.buildingSlots}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">门客数</div>
-                    <div style="color:#ff9800;font-size:1.3em;font-weight:bold;">${palace.workers.length}/${PALACE_CONFIG.workerSlots}</div>
-                </div>
-            </div>
-
-            <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-                <button class="btn" style="background:#4caf50;color:white;" onclick="showPalaceBuildOptions()">🏗️ 建造建筑</button>
-                <button class="btn" style="background:#ff9800;color:white;" onclick="showPalaceWorkers()">👥 招募门客</button>
-                <button class="btn" style="background:#2196f3;color:white;" onclick="showPalaceStyles()">🎨 仙宫风格</button>
-                <button class="btn" style="background:#9c27b0;color:white;" onclick="upgradePalace()">⬆️ 升级仙宫</button>
-            </div>`;
-
-    // 升级提示
-    if (upgradingBuilding) {
-        const timeLeft = Math.ceil((upgradingBuilding.upgradeEndTime - now) / 86400000);
-        html += `<div style="background:rgba(255,152,0,0.2);padding:10px;border-radius:8px;margin-bottom:15px;text-align:center;">
-            <span style="color:#ff9800;">⏳ ${upgradingBuilding.name} 升级中，剩余 ${timeLeft} 天</span>
-        </div>`;
-    }
-
-    // 当前仙宫风格效果
-    const style = PALACE_STYLES[palace.styleIndex] || PALACE_STYLES[0];
-    html += `<div style="background:rgba(${hexToRgb(style.color)},0.2);padding:10px;border-radius:8px;margin-bottom:15px;text-align:center;">
-        <span style="color:${style.color};">当前风格：${style.name}</span>
-        ${Object.keys(style.bonus).length > 0 ? `<span style="color:#aaa;margin-left:10px;">效果: ${formatStyleBonus(style.bonus)}</span>` : ''}
-    </div>`;
-
-    // 建筑列表
-    html += `<div style="margin-bottom:15px;">
-        <h3 style="color:#ffd700;margin-bottom:10px;">🏛️ 建筑列表</h3>`;
-
-    if (palace.buildings.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">尚未建造任何建筑</p>`;
-    } else {
-        html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">`;
-        palace.buildings.forEach((building, idx) => {
-            const config = PALACE_BUILDINGS[building.type];
-            const progress = building.upgrading && building.upgradeEndTime
-                ? Math.max(0, Math.floor((now - building.upgradeStartTime) / (building.upgradeEndTime - building.upgradeStartTime) * 100))
-                : 100;
-
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <span style="color:#ffd700;font-weight:bold;font-size:1.1em;">${config?.icon || '🏛️'} ${building.type}</span>
-                        <span style="color:#ff9800;margin-left:5px;">Lv.${building.level}</span>
-                    </div>
-                    <div style="color:#aaa;font-size:0.85em;">${building.upgrading ? `升级中 ${progress}%` : '正常'}</div>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;margin:5px 0;">${config?.desc || ''}</div>
-                <div style="color:#888;font-size:0.8em;">效果: ${formatBuildingEffects(building)}</div>
-                ${building.level < (config?.maxLevel || 5) && !building.upgrading ? `
-                    <button class="btn" style="background:#ff9800;color:white;width:100%;margin-top:8px;font-size:0.85em;"
-                        onclick="upgradeBuilding(${idx})">升级 (${formatUpgradeCost(building, config)})</button>
-                ` : ''}
-            </div>`;
-        });
-        html += `</div>`;
-    }
-    html += `</div>`;
-
-    // 门客列表
-    html += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <h3 style="color:#ffd700;margin-bottom:8px;">👥 门客（${palace.workers.length}/${PALACE_CONFIG.workerSlots}）</h3>`;
-
-    if (palace.workers.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;font-size:0.9em;">尚未招募门客</p>`;
-    } else {
-        html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">`;
-        palace.workers.forEach((worker, idx) => {
-            const config = PALACE_WORKERS[worker.type];
-            html += `<div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:5px;text-align:center;min-width:80px;">
-                <div style="font-size:1.5em;">${config?.icon || '👤'}</div>
-                <div style="color:#ffd700;font-size:0.85em;">${worker.type}</div>
-                <div style="color:#aaa;font-size:0.75em;">效率x${config?.efficiency || 1}</div>
-                <button class="btn" style="background:#f44336;color:white;font-size:0.75em;padding:2px 8px;margin-top:4px;"
-                    onclick="dismissWorker(${idx})">解雇</button>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-    html += `</div>`;
-
-    // 每日收益
-    html += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <h4 style="color:#ffd700;margin-bottom:8px;">📊 仙宫收益</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:0.9em;">
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">灵石产量</span><span style="color:#4caf50;">+${palace.bonus.incomeBonus || 0}%</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">修炼速度</span><span style="color:#4caf50;">+${palace.bonus.cultivationSpeed || 0}%</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">奇遇概率</span><span style="color:#4caf50;">+${palace.bonus.serendipityChance || 0}%</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:#aaa;">战斗力</span><span style="color:#4caf50;">+${palace.bonus.combatPower || 0}%</span></div>
-        </div>
-    </div>`;
-
-    // 升级仙宫条件
-    const nextLevelCost = getPalaceUpgradeCost(palace.level);
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-    </div></div></div>`;
-    openModal('仙宫建设', html, []);
-}
-
-function showPalaceBuildOptions() {
-    const palace = gameState.palace;
-
-    if (palace.buildings.length >= PALACE_CONFIG.buildingSlots) {
-        addLog('建筑数量已达上限', '#f44336');
-        return;
-    }
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #4caf50;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#4caf50;text-align:center;margin-bottom:15px;">🏗️ 建造建筑</h2>
-
-            <div style="display:grid;gap:10px;">`;
-    Object.entries(PALACE_BUILDINGS).forEach(([type, config]) => {
-        // 检查是否已满级
-        const existing = palace.buildings.find(b => b.type === type);
-        if (existing && existing.level >= config.maxLevel) {
-            return; // 跳过已满级建筑
-        }
-
-        const cost = existing
-            ? { stones: config.cost.stones * (existing.level + 1), materials: config.cost.materials * (existing.level + 1) }
-            : config.cost;
-        const canAfford = gameState.spiritStones >= cost.stones && (gameState.materials || 0) >= cost.materials;
-
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <span style="color:#ffd700;font-weight:bold;font-size:1.1em;">${config.icon} ${type}</span>
-                    <span style="color:#ff9800;margin-left:5px;">${existing ? `Lv.${existing.level}→${existing.level + 1}` : '新建'}</span>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;">${config.desc}</div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-                <div>
-                    <span style="color:#aaa;font-size:0.85em;">💎 ${cost.stones.toLocaleString()}</span>
-                    <span style="color:#aaa;font-size:0.85em;margin-left:10px;">📦 ${cost.materials}</span>
-                </div>
-                <button class="btn" style="background:${canAfford ? '#4caf50' : '#555'};color:white;font-size:0.85em;"
-                    onclick="buildOrUpgradeBuilding('${type}')" ${canAfford ? '' : 'disabled'}>
-                    ${canAfford ? '建造' : '资源不足'}
-                </button>
-            </div>
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="openPalace()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('建造建筑', html, []);
-}
-
-function buildOrUpgradeBuilding(type) {
-    const palace = gameState.palace;
-    const config = PALACE_BUILDINGS[type];
-    if (!config) return;
-
-    const existing = palace.buildings.find(b => b.type === type);
-    const isNew = !existing;
-
-    const cost = isNew
-        ? config.cost
-        : { stones: config.cost.stones * (existing.level + 1), materials: config.cost.materials * (existing.level + 1) };
-
-    if (gameState.spiritStones < cost.stones || (gameState.materials || 0) < cost.materials) {
-        addLog('资源不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones;
-    gameState.materials = (gameState.materials || 0) - cost.materials;
-
-    if (isNew) {
-        palace.buildings.push({
-            type: type,
-            level: 1,
-            upgrading: false,
-            upgradeStartTime: null,
-            upgradeEndTime: null
-        });
-        addLog(`🏗️ 建造「${type}」成功！`, '#4caf50');
-    } else {
-        existing.upgrading = true;
-        existing.upgradeStartTime = Date.now();
-        existing.upgradeEndTime = Date.now() + config.upgradeTime * 86400000;
-        addLog(`⬆️ ${type} 开始升级，预计${config.upgradeTime}天`, '#ff9800');
-    }
-
-    recalculatePalaceBonus();
-    updateDisplay();
-    openPalace();
-}
-
-function upgradeBuilding(idx) {
-    const building = gameState.palace.buildings[idx];
-    if (!building) return;
-    buildOrUpgradeBuilding(building.type);
-}
-
-function showPalaceWorkers() {
-    const palace = gameState.palace;
-
-    if (palace.workers.length >= PALACE_CONFIG.workerSlots) {
-        addLog('门客数量已达上限', '#f44336');
-        return;
-    }
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:500px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff9800;text-align:center;margin-bottom:15px;">👥 招募门客</h2>
-            <p style="color:#aaa;text-align:center;margin-bottom:15px;font-size:0.9em;">门客每日需支付工资</p>
-
-            <div style="display:grid;gap:10px;">`;
-    Object.entries(PALACE_WORKERS).forEach(([type, config]) => {
-        const canAfford = gameState.spiritStones >= config.cost;
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <span style="font-size:1.5em;">${config.icon}</span>
-                    <span style="color:#ffd700;font-weight:bold;margin-left:8px;">${type}</span>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;">效率x${config.efficiency}</div>
-            </div>
-            <div style="color:#aaa;font-size:0.85em;margin:5px 0;">任务: ${getWorkerTaskDesc(config.task)} | 日薪: ${config.dailyCost}灵石</div>
-            <button class="btn" style="background:${canAfford ? '#4caf50' : '#555'};color:white;width:100%;"
-                onclick="recruitWorker('${type}')" ${canAfford ? '' : 'disabled'}>
-                ${canAfford ? `招募 (${config.cost}灵石)` : '灵石不足'}
-            </button>
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="openPalace()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('招募门客', html, []);
-}
-
-function recruitWorker(type) {
-    const config = PALACE_WORKERS[type];
-    if (!config) return;
-
-    if (gameState.spiritStones < config.cost) {
-        addLog('灵石不足', '#f44336');
-        return;
-    }
-
-    if (gameState.palace.workers.length >= PALACE_CONFIG.workerSlots) {
-        addLog('门客已满', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= config.cost;
-    gameState.palace.workers.push({
-        type: type,
-        recruitedDay: gameState.days
-    });
-
-    addLog(`👥 招募${type}成功！`, '#4caf50');
-    recalculatePalaceBonus();
-    updateDisplay();
-    showPalaceWorkers();
-}
-
-function dismissWorker(idx) {
-    const worker = gameState.palace.workers[idx];
-    if (!worker) return;
-
-    gameState.palace.workers.splice(idx, 1);
-    addLog(`👋 解雇${worker.type}`, '#ff9800');
-    recalculatePalaceBonus();
-    updateDisplay();
-    openPalace();
-}
-
-function showPalaceStyles() {
-    const palace = gameState.palace;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #2196f3;border-radius:12px;padding:20px;max-width:500px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#2196f3;text-align:center;margin-bottom:15px;">🎨 仙宫风格</h2>
-
-            <div style="display:grid;gap:10px;">`;
-    PALACE_STYLES.forEach((style, idx) => {
-        const isCurrent = palace.styleIndex === idx;
-        const canAfford = !isCurrent; // 风格切换暂时免费
-        const bonusText = Object.keys(style.bonus).length > 0 ? formatStyleBonus(style.bonus) : '无加成';
-
-        html += `<div style="background:rgba(${hexToRgb(style.color)},0.1);border:2px solid ${isCurrent ? style.color : '#555'};border-radius:8px;padding:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <span style="color:${style.color};font-weight:bold;font-size:1.1em;">${style.name}</span>
-                    ${isCurrent ? '<span style="color:#ffd700;margin-left:5px;">[当前]</span>' : ''}
-                </div>
-                <div style="color:#aaa;font-size:0.85em;">${bonusText}</div>
-            </div>
-            <div style="margin-top:8px;">
-                <button class="btn" style="background:${isCurrent ? '#555' : '#2196f3'};color:white;width:100%;"
-                    onclick="changePalaceStyle(${idx})" ${isCurrent ? 'disabled' : ''}>
-                    ${isCurrent ? '已启用' : '切换风格'}
-                </button>
-            </div>
-        </div>`;
-    });
-    html += `</div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="openPalace()">返回</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('仙宫风格', html, []);
-}
-
-function changePalaceStyle(idx) {
-    const palace = gameState.palace;
-    palace.styleIndex = idx;
-    recalculatePalaceBonus();
-    addLog(`🎨 仙宫风格切换为「${PALACE_STYLES[idx].name}」`, '#2196f3');
-    updateDisplay();
-    showPalaceStyles();
-}
-
-function upgradePalace() {
-    const palace = gameState.palace;
-    if (palace.level >= PALACE_CONFIG.maxPalaceLevel) {
-        addLog('仙宫已达最高等级', '#f44336');
-        return;
-    }
-
-    const cost = getPalaceUpgradeCost(palace.level);
-
-    if (gameState.spiritStones < cost.stones || (gameState.materials || 0) < cost.materials) {
-        addLog('资源不足', '#f44336');
-        return;
-    }
-
-    if (palace.prosperity < cost.prosperity) {
-        addLog(`繁荣度不足，还需${cost.prosperity - palace.prosperity}点`, '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost.stones;
-    gameState.materials = (gameState.materials || 0) - cost.materials;
-    palace.level++;
-    palace.prosperity = Math.floor(palace.prosperity * 0.8); // 升级后繁荣度降低
-
-    addLog(`🏯 仙宫升级至 Lv.${palace.level}！`, '#9c27b0');
-    recalculatePalaceBonus();
-    updateDisplay();
-    openPalace();
-}
-
-function recalculatePalaceBonus() {
-    const palace = gameState.palace;
-    const style = PALACE_STYLES[palace.styleIndex] || PALACE_STYLES[0];
-
-    // 重置基础加成
-    let bonus = {
-        incomeBonus: 0,
-        cultivationSpeed: 0,
-        serendipityChance: 0,
-        combatPower: 0,
-        comprehensionSpeed: 0,
-        alchemySuccess: 0,
-        petExpBonus: 0,
-        lawComprehension: 0
-    };
-
-    // 计算建筑加成
-    palace.buildings.forEach(building => {
-        const config = PALACE_BUILDINGS[building.type];
-        if (config && config.effects) {
-            Object.entries(config.effects).forEach(([key, value]) => {
-                if (bonus[key] !== undefined) {
-                    bonus[key] += value * building.level;
-                }
-            });
-        }
-    });
-
-    // 门客加成
-    palace.workers.forEach(worker => {
-        const config = PALACE_WORKERS[worker.type];
-        if (config) {
-            if (config.task === 'resource') {
-                bonus.incomeBonus += 0.02 * config.efficiency;
-            } else if (config.task === 'serendipity') {
-                bonus.serendipityChance += 0.01 * config.efficiency;
-            } else if (config.task === 'protection') {
-                bonus.combatPower += 0.03 * config.efficiency;
-            }
-        }
-    });
-
-    // 仙宫等级加成
-    bonus.incomeBonus += palace.level * 0.02;
-    bonus.cultivationSpeed += palace.level * 0.01;
-
-    // 风格加成
-    if (style.bonus) {
-        Object.entries(style.bonus).forEach(([key, value]) => {
-            if (bonus[key] !== undefined) {
-                bonus[key] += value;
-            }
-        });
-    }
-
-    palace.bonus = bonus;
-}
-
-function getPalaceUpgradeCost(level) {
-    return {
-        stones: Math.floor(20000 * Math.pow(1.8, level)),
-        materials: Math.floor(500 * Math.pow(1.5, level)),
-        prosperity: 100 + level * 50
-    };
-}
-
-function formatUpgradeCost(building, config) {
-    if (!config) return '';
-    const cost = {
-        stones: config.cost.stones * (building.level + 1),
-        materials: config.cost.materials * (building.level + 1)
-    };
-    return `💎${cost.stones} 📦${cost.materials}`;
-}
-
-function formatBuildingEffects(building) {
-    const config = PALACE_BUILDINGS[building.type];
-    if (!config || !config.effects) return '无';
-
-    return Object.entries(config.effects)
-        .map(([key, value]) => {
-            const effectNames = {
-                cultivationSpeed: '修炼速度',
-                comprehensionSpeed: '领悟速度',
-                alchemySuccess: '炼丹成功率',
-                petExpBonus: '仙宠经验',
-                serendipityChance: '奇遇概率',
-                combatPower: '战斗力',
-                incomeBonus: '灵石产量',
-                lawComprehension: '法则领悟'
-            };
-            return `+${(value * building.level * 100).toFixed(0)}% ${effectNames[key] || key}`;
-        })
-        .join(', ');
-}
-
-function formatStyleBonus(bonus) {
-    return Object.entries(bonus)
-        .map(([key, value]) => {
-            const names = {
-                fame: '声望',
-                cultivationSpeed: '修炼速度',
-                combatPower: '战斗力',
-                serendipityChance: '奇遇概率'
-            };
-            return `+${(value * 100).toFixed(0)}% ${names[key] || key}`;
-        })
-        .join(', ');
-}
-
-function getWorkerTaskDesc(task) {
-    const descs = {
-        resource: '资源采集',
-        alchemy: '丹药炼制',
-        protection: '仙宫守护',
-        serendipity: '奇遇搜寻'
-    };
-    return descs[task] || task;
-}
-
-function hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-        ? `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`
-        : '0,0,0';
-}
-
-function processDailyPalace() {
-    const palace = gameState.palace;
-    const now = Date.now();
-
-    // 1. 处理建筑升级
-    palace.buildings.forEach(building => {
-        if (building.upgrading && building.upgradeEndTime && now >= building.upgradeEndTime) {
-            building.level++;
-            building.upgrading = false;
-            building.upgradeStartTime = null;
-            building.upgradeEndTime = null;
-            addLog(`🏛️ ${building.type} 升级完成！现在是 Lv.${building.level}`, '#4caf50');
-        }
-    });
-
-    // 2. 支付门客工资
-    let totalWage = 0;
-    palace.workers.forEach(worker => {
-        const config = PALACE_WORKERS[worker.type];
-        if (config) {
-            totalWage += config.dailyCost;
-        }
-    });
-
-    if (totalWage > 0 && gameState.spiritStones >= totalWage) {
-        gameState.spiritStones -= totalWage;
-        palace.totalWagesPaid = (palace.totalWagesPaid || 0) + totalWage;
-    }
-
-    // 3. 更新繁荣度
-    const prosperityGain = Math.floor(palace.level * 2 + Math.random() * palace.level);
-    palace.prosperity += prosperityGain;
-
-    // 4. 资源自动产出（基于建筑和门客）
-    if (palace.bonus.incomeBonus > 0) {
-        const resourceGain = Math.floor(100 * palace.bonus.incomeBonus);
-        gameState.spiritStones += resourceGain;
-    }
-
-    // 5. 触发仙宫奇遇
-    if (palace.bonus.serendipityChance > 0 && Math.random() < palace.bonus.serendipityChance) {
-        triggerPalaceSerendipity();
-    }
-
-    recalculatePalaceBonus();
-}
-
-function triggerPalaceSerendipity() {
-    const events = [
-        { type: 'stones', amount: 1000, desc: '打扫仙宫时发现散落的灵石' },
-        { type: 'materials', amount: 50, desc: '在废墟中发现珍贵矿石' },
-        { type: 'pet', desc: '一只野生的仙兽路过你的仙宫' },
-        { type: 'comprehension', desc: '仙宫气场让你有所领悟' }
-    ];
-
-    const event = events[Math.floor(Math.random() * events.length)];
-
-    switch (event.type) {
-        case 'stones':
-            gameState.spiritStones += event.amount;
-            addLog(`🌟 仙宫奇遇：${event.desc}，获得${event.amount}灵石`, '#ffd700');
-            break;
-        case 'materials':
-            gameState.materials = (gameState.materials || 0) + event.amount;
-            addLog(`🌟 仙宫奇遇：${event.desc}，获得${event.amount}矿石`, '#ffd700');
-            break;
-        case 'pet':
-            if (gameState.spiritPets && gameState.spiritPets.pets.length < 5) {
-                addLog(`🌟 仙宫奇遇：${event.desc}！`, '#ffd700');
-            }
-            break;
-        case 'comprehension':
-            if (gameState.cultivation && gameState.cultivation.comprehension) {
-                gameState.cultivation.comprehension += 5;
-                addLog(`🌟 仙宫奇遇：${event.desc}，领悟+5`, '#9c27b0');
-            }
-            break;
-    }
-}
-
-function getPalaceStats() {
-    const palace = gameState.palace;
-    return {
-        level: palace.level,
-        prosperity: palace.prosperity,
-        buildings: palace.buildings.length,
-        workers: palace.workers.length,
-        bonus: palace.bonus
-    };
-}
-// Auto-generated module: pet.js
-
-// ===== PET CONSTANTS (V39) =====
-const PET_CONFIG = {
-    maxPets: 5,           // 最多5只仙宠
-    eggHatchDays: 3,      // 孵化所需天数
-    evolveMinLevel: 10,   // 进化最低等级
-    skillSlotBase: 1,     // 基础技能槽
-    skillSlotPerEvo: 1,   // 每次进化解锁1个技能槽
-    feedCostBase: 50,     // 基础喂养灵石
-    bondMax: 100          // 羁绊最大值
-};
-
-const PET_QUALITIES = {
-    '凡品': { multiplier: 0.8, color: '#9e9e9e', hatchRate: 0.7, growthBonus: 0.5 },
-    '良品': { multiplier: 1.0, color: '#4caf50', hatchRate: 0.2, growthBonus: 1.0 },
-    '上品': { multiplier: 1.2, color: '#2196f3', hatchRate: 0.08, growthBonus: 1.5 },
-    '精品': { multiplier: 1.5, color: '#9c27b0', hatchRate: 0.015, growthBonus: 2.0 },
-    '仙品': { multiplier: 2.0, color: '#ff9800', hatchRate: 0.004, growthBonus: 3.0 },
-    '神品': { multiplier: 2.5, color: '#ffd700', hatchRate: 0.001, growthBonus: 5.0 }
-};
-
-const PET_TYPES = {
-    '仙鹤': {
-        icon: '🦅', element: '风',
-        baseStats: { attack: 15, defense: 10, speed: 40, luck: 20 },
-        skills: ['御空加速', '仙羽护体'],
-        growthRate: 1.0, maturityMax: 80, eggIcon: '🥚'
-    },
-    '凤凰': {
-        icon: '🦅', element: '火',
-        baseStats: { attack: 35, defense: 20, speed: 25, luck: 30 },
-        skills: ['涅槃之火', '羽翼灼烧'],
-        growthRate: 1.3, maturityMax: 120, eggIcon: '🥚'
-    },
-    '麒麟': {
-        icon: '🦄', element: '土',
-        baseStats: { attack: 30, defense: 35, speed: 20, luck: 25 },
-        skills: ['祥云笼罩', '踏火祥瑞'],
-        growthRate: 1.1, maturityMax: 100, eggIcon: '🥚'
-    },
-    '白虎': {
-        icon: '🐯', element: '金',
-        baseStats: { attack: 45, defense: 15, speed: 25, luck: 10 },
-        skills: ['白虎战魂', '金之神力'],
-        growthRate: 1.15, maturityMax: 90, eggIcon: '🥚'
-    },
-    '青龙': {
-        icon: '🐉', element: '木',
-        baseStats: { attack: 25, defense: 20, speed: 35, luck: 30 },
-        skills: ['青龙之怒', '行云布雨'],
-        growthRate: 1.2, maturityMax: 110, eggIcon: '🥚'
-    },
-    '玄武': {
-        icon: '🐢', element: '水',
-        baseStats: { attack: 15, defense: 45, speed: 15, luck: 20 },
-        skills: ['玄冰护甲', '龟息大法'],
-        growthRate: 0.9, maturityMax: 130, eggIcon: '🥚'
-    },
-    '九尾狐': {
-        icon: '🦊', element: '魅',
-        baseStats: { attack: 30, defense: 15, speed: 35, luck: 45 },
-        skills: ['九尾魅惑', '狐火之术'],
-        growthRate: 1.4, maturityMax: 85, eggIcon: '🥚'
-    },
-    '鲲鹏': {
-        icon: '🐋', element: '雷',
-        baseStats: { attack: 35, defense: 15, speed: 50, luck: 25 },
-        skills: ['鲲鹏展翅', '雷霆万钧'],
-        growthRate: 1.5, maturityMax: 140, eggIcon: '🥚'
-    },
-    '独角兽': {
-        icon: '🦄', element: '光',
-        baseStats: { attack: 25, defense: 25, speed: 30, luck: 40 },
-        skills: ['圣光治愈', '独角突刺'],
-        growthRate: 1.25, maturityMax: 95, eggIcon: '🥚'
-    },
-    '白泽': {
-        icon: '🦌', element: '智',
-        baseStats: { attack: 20, defense: 30, speed: 25, luck: 50 },
-        skills: ['神兽智慧', '白泽之鉴'],
-        growthRate: 1.35, maturityMax: 105, eggIcon: '🥚'
-    }
-};
-
-const PET_SKILLS = {
-    '御空加速': { type: 'passive', effect: { speed: 0.2 }, desc: '速度+20%' },
-    '仙羽护体': { type: 'active', effect: { defense: 0.15 }, desc: '防御+15%', cost: 10 },
-    '涅槃之火': { type: 'active', effect: { attack: 0.25, revive: 0.3 }, desc: '攻击+25%，30%概率复活', cost: 20 },
-    '羽翼灼烧': { type: 'active', effect: { attack: 0.2, burn: true }, desc: '攻击+20%，灼烧效果', cost: 15 },
-    '祥云笼罩': { type: 'passive', effect: { luck: 0.3 }, desc: '幸运+30%' },
-    '踏火祥瑞': { type: 'active', effect: { attack: 0.2, defense: 0.1 }, desc: '攻击+20%，防御+10%', cost: 15 },
-    '白虎战魂': { type: 'active', effect: { attack: 0.35 }, desc: '攻击+35%', cost: 25 },
-    '金之神力': { type: 'passive', effect: { attack: 0.15, defense: 0.1 }, desc: '攻击+15%，防御+10%' },
-    '青龙之怒': { type: 'active', effect: { attack: 0.3, speed: 0.1 }, desc: '攻击+30%，速度+10%', cost: 20 },
-    '行云布雨': { type: 'active', effect: { attack: 0.15, heal: 0.1 }, desc: '攻击+15%，治疗+10%', cost: 15 },
-    '玄冰护甲': { type: 'passive', effect: { defense: 0.25 }, desc: '防御+25%' },
-    '龟息大法': { type: 'passive', effect: { defense: 0.15, revive: 0.15 }, desc: '防御+15%，15%概率复活' },
-    '九尾魅惑': { type: 'active', effect: { control: true, attack: 0.2 }, desc: '控制敌人，攻击+20%', cost: 25 },
-    '狐火之术': { type: 'active', effect: { attack: 0.25, burn: true }, desc: '攻击+25%，灼烧效果', cost: 20 },
-    '鲲鹏展翅': { type: 'passive', effect: { speed: 0.4, attack: 0.1 }, desc: '速度+40%，攻击+10%' },
-    '雷霆万钧': { type: 'active', effect: { attack: 0.4, stun: true }, desc: '攻击+40%，眩晕效果', cost: 30 },
-    '圣光治愈': { type: 'active', effect: { heal: 0.25 }, desc: '治疗+25%', cost: 20 },
-    '独角突刺': { type: 'active', effect: { attack: 0.3 }, desc: '攻击+30%', cost: 20 },
-    '神兽智慧': { type: 'passive', effect: { luck: 0.25, serendipity: 0.2 }, desc: '幸运+25%，奇遇+20%' },
-    '白泽之鉴': { type: 'active', effect: { foresee: true, defense: 0.2 }, desc: '预知敌人行动，防御+20%', cost: 25 }
-};
-
-const PET_EVOLUTION_MAP = {
-    '仙鹤': '金羽仙鹤',
-    '凤凰': '九天凤凰',
-    '麒麟': '圣金麒麟',
-    '白虎': '战伐白虎',
-    '青龙': '苍青神龙',
-    '玄武': '冥水玄武',
-    '九尾狐': '九天真狐',
-    '鲲鹏': '太古鲲鹏',
-    '独角兽': '星辉独角兽',
-    '白泽': '祥瑞白泽'
-};
-
-const PET_FOOD = {
-    '灵果': { cost: 50, exp: 20, happiness: 5 },
-    '仙露': { cost: 100, exp: 50, happiness: 10 },
-    '仙丹': { cost: 300, exp: 150, happiness: 15 },
-    '神兽肉': { cost: 500, exp: 300, happiness: 25 }
-};
-
-// ===== PET FUNCTIONS =====
-
-function showPetPanel() {
-    const sp = gameState.spiritPets;
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff9800;text-align:center;margin-bottom:15px;">🐉 仙宠培养</h2>`;
-
-    // 仙宠列表
-    html += `<div style="margin-bottom:20px;">
-        <h3 style="color:#ffd700;margin-bottom:10px;">我的仙宠（${sp.pets.length}/${PET_CONFIG.maxPets}）</h3>`;
-
-    if (sp.pets.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">暂无仙宠，去获取仙兽蛋吧！</p>`;
-    } else {
-        sp.pets.forEach((pet, idx) => {
-            const template = PET_TYPES[pet.type] || PET_QUALITIES[pet.quality];
-            const qualityColor = PET_QUALITIES[pet.quality]?.color || '#fff';
-            const evoStage = Math.floor(pet.level / PET_CONFIG.evolveMinLevel);
-            const evoName = evoStage > 0 ? PET_EVOLUTION_MAP[pet.type] || pet.type : pet.type;
-            const skillSlots = PET_CONFIG.skillSlotBase + evoStage * PET_CONFIG.skillSlotPerEvo;
-
-            html += `<div style="background:rgba(255,152,0,0.1);border:1px solid ${qualityColor};border-radius:8px;padding:12px;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                    <span style="font-size:2em;">${template.icon}</span>
-                    <div style="flex:1;">
-                        <div style="color:${qualityColor};font-weight:bold;">${evoName} ${pet.nickname ? `"${pet.nickname}"` : ''}</div>
-                        <div style="color:#aaa;font-size:0.9em;">等级 Lv.${pet.level} | ${pet.quality} | ${template.element}属性 | 成长${pet.growth.toFixed(2)}x</div>
-                    </div>
-                    <div style="color:#ffd700;">❤️ ${pet.bond}/${PET_CONFIG.bondMax}</div>
-                </div>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
-                    <span style="color:#aaa;font-size:0.85em;">攻击:${Math.round(pet.stats.attack)}</span>
-                    <span style="color:#aaa;font-size:0.85em;">防御:${Math.round(pet.stats.defense)}</span>
-                    <span style="color:#aaa;font-size:0.85em;">速度:${Math.round(pet.stats.speed)}</span>
-                    <span style="color:#aaa;font-size:0.85em;">幸运:${Math.round(pet.stats.luck)}</span>
-                    <span style="color:#aaa;font-size:0.85em;">经验:${pet.exp}/${pet.nextLevelExp}</span>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;margin-bottom:8px;">
-                    技能槽(${pet.skills.length}/${skillSlots}): ${pet.skills.map(s => `${s}(${PET_SKILLS[s]?.desc || '?'})`).join(' | ') || '暂无'}
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">`;
-
-            if (!pet.isHatched) {
-                html += `<button class="btn" style="background:#4caf50;color:white;" onclick="hatchPetEgg(${idx})">🥚 孵化（剩余${pet.hatchDays}天）</button>`;
-            } else {
-                html += `<button class="btn" style="background:#ff9800;color:white;" onclick="feedPet(${idx})">🍖 喂养</button>`;
-                if (evoStage < 3 && pet.level >= PET_CONFIG.evolveMinLevel * (evoStage + 1)) {
-                    html += `<button class="btn" style="background:#9c27b0;color:white;" onclick="evolvePet(${idx})">✨ 进化（需${PET_CONFIG.evolveMinLevel * (evoStage + 1)}级）</button>`;
-                }
-                if (pet.skills.length < skillSlots) {
-                    html += `<button class="btn" style="background:#2196f3;color:white;" onclick="teachPetSkill(${idx})">📖 传授技能</button>`;
-                }
-                html += `<button class="btn" style="background:#f44336;color:white;" onclick="releasePet(${idx})">🗑️ 放生</button>`;
-            }
-            html += `</div></div>`;
-        });
-    }
-    html += `</div>`;
-
-    // 仙兽蛋市场
-    html += `<div style="margin-top:20px;">
-        <h3 style="color:#ffd700;margin-bottom:10px;">🥚 仙兽蛋市场</h3>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">`;
-
-    const eggTypes = ['凡品蛋', '良品蛋', '上品蛋', '精品蛋', '仙品蛋'];
-    const eggCosts = [500, 2000, 8000, 30000, 100000];
-    const eggRates = [0.7, 0.2, 0.08, 0.015, 0.004];
-
-    eggTypes.forEach((egg, i) => {
-        html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #555;border-radius:8px;padding:10px;text-align:center;">
-            <div style="color:#aaa;">${egg}</div>
-            <div style="color:#ffd700;">💎 ${eggCosts[i]}</div>
-            <div style="color:#aaa;font-size:0.8em;">孵化成功:凡品${eggTypes.length-i}品</div>
-            <button class="btn" style="background:#ff9800;color:white;margin-top:5px;" onclick="buyPetEgg(${i})"
-                ${gameState.spiritStones < eggCosts[i] ? 'disabled' : ''}>购买</button>
-        </div>`;
-    });
-
-    html += `</div></div>`;
-
-    // 每日互动
-    html += `<div style="margin-top:20px;text-align:center;">
-        <button class="btn" style="background:#4caf50;color:white;" onclick="interactWithPets()">🤝 与所有仙宠互动（+羁绊）</button>
-    </div>`;
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-    </div></div></div>`;
-
-    openModal('仙宠培养', html, []);
-}
-
-function buyPetEgg(qualityIndex) {
-    const eggCosts = [500, 2000, 8000, 30000, 100000];
-    const cost = eggCosts[qualityIndex];
-
-    if (gameState.spiritStones < cost) {
-        addLog('灵石不足！', '#f44336');
-        return;
-    }
-
-    const sp = gameState.spiritPets;
-    if (sp.pets.length >= PET_CONFIG.maxPets) {
-        addLog('仙宠栏已满！', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= cost;
-    const qualities = ['凡品', '良品', '上品', '精品', '仙品'];
-    const quality = qualities[qualityIndex];
-    const types = Object.keys(PET_TYPES);
-    const type = types[Math.floor(Math.random() * types.length)];
-    const growthTypes = ['普通', '普通', '普通', '优秀', '优秀', '稀有', '稀有', '神话'];
-
-    const egg = {
-        type: type,
-        quality: quality,
-        growth: PET_QUALITIES[quality].growthBonus * (0.8 + Math.random() * 0.4),
-        nickname: '',
-        level: 1,
-        exp: 0,
-        nextLevelExp: 100,
-        stats: { attack: 0, defense: 0, speed: 0, luck: 0 },
-        skills: [],
-        isHatched: false,
-        hatchDays: PET_CONFIG.eggHatchDays,
-        bond: 20,
-        element: PET_TYPES[type].element
-    };
-
-    sp.pets.push(egg);
-    addLog(`获得${quality}${type}蛋！`, '#ff9800');
-    updateDisplay();
-    showPetPanel();
-}
-
-function hatchPetEgg(idx) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-
-    if (pet.isHatched) {
-        addLog('这只仙兽已经孵化了！', '#f44336');
-        return;
-    }
-
-    pet.hatchDays--;
-    if (pet.hatchDays <= 0) {
-        pet.isHatched = true;
-        // 根据品质决定是否变异
-        const qualityData = PET_QUALITIES[pet.quality];
-        if (Math.random() < qualityData.hatchRate * 0.1) {
-            // 变异
-            const allTypes = Object.keys(PET_TYPES);
-            pet.type = allTypes[Math.floor(Math.random() * allTypes.length)];
-            pet.quality = '精品';
-            addLog(`🐣 孵化成功！仙兽发生变异，成为${pet.quality}${pet.type}！`, '#ffd700');
-        } else {
-            addLog(`🐣 孵化成功！获得${pet.quality}${pet.type}！`, '#ff9800');
-        }
-
-        // 初始化属性
-        const template = PET_TYPES[pet.type];
-        const multiplier = PET_QUALITIES[pet.quality].multiplier * pet.growth;
-        pet.stats.attack = Math.round(template.baseStats.attack * multiplier);
-        pet.stats.defense = Math.round(template.baseStats.defense * multiplier);
-        pet.stats.speed = Math.round(template.baseStats.speed * multiplier);
-        pet.stats.luck = Math.round(template.baseStats.luck * multiplier);
-
-        // 遗传技能
-        if (Math.random() < 0.5) {
-            const inheritedSkills = template.skills.filter(() => Math.random() < 0.3);
-            pet.skills = inheritedSkills.slice(0, 1);
-        }
-        updateDisplay();
-    } else {
-        addLog(`仙兽蛋还需要${pet.hatchDays}天孵化...`, '#aaa');
-    }
-    showPetPanel();
-}
-
-function feedPet(idx) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-
-    if (!pet.isHatched) {
-        addLog('仙兽蛋无法喂养！', '#f44336');
-        return;
-    }
-
-    // 弹出喂养选择
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:500px;">
-            <h3 style="color:#ff9800;text-align:center;">🍖 喂养${pet.type}</h3>
-            <p style="color:#aaa;text-align:center;">选择食物（当前灵石: ${gameState.spiritStones}）</p>`;
-
-    Object.keys(PET_FOOD).forEach((food, i) => {
-        const f = PET_FOOD[food];
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #333;">
-            <div>
-                <span style="color:#ffd700;">${food}</span>
-                <span style="color:#aaa;font-size:0.9em;"> +经验${f.exp} +好感${f.happiness}</span>
-            </div>
-            <button class="btn" style="background:#4caf50;color:white;" onclick="confirmFeedPet(${idx},${i})"
-                ${gameState.spiritStones < f.cost ? 'disabled' : ''}>💎${f.cost}</button>
-        </div>`;
-    });
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showPetPanel()">返回</button>
-    </div></div></div>`;
-    openModal('喂养', html, []);
-}
-
-function confirmFeedPet(idx, foodIdx) {
-    const foods = Object.keys(PET_FOOD);
-    const food = foods[foodIdx];
-    const f = PET_FOOD[food];
-
-    if (gameState.spiritStones < f.cost) {
-        addLog('灵石不足！', '#f44336');
-        return;
-    }
-
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-
-    gameState.spiritStones -= f.cost;
-    pet.exp += f.exp;
-    pet.bond = Math.min(PET_CONFIG.bondMax, pet.bond + f.happiness);
-
-    // 检查升级
-    while (pet.exp >= pet.nextLevelExp) {
-        pet.exp -= pet.nextLevelExp;
-        pet.level++;
-        pet.nextLevelExp = Math.floor(pet.nextLevelExp * 1.5);
-        // 属性成长
-        const template = PET_TYPES[pet.type];
-        const multiplier = PET_QUALITIES[pet.quality].multiplier * pet.growth;
-        const growthPerLevel = template.growthRate * multiplier;
-        pet.stats.attack += Math.round(template.baseStats.attack * growthPerLevel * 0.1);
-        pet.stats.defense += Math.round(template.baseStats.defense * growthPerLevel * 0.1);
-        pet.stats.speed += Math.round(template.baseStats.speed * growthPerLevel * 0.1);
-        pet.stats.luck += Math.round(template.baseStats.luck * growthPerLevel * 0.1);
-        addLog(`🐉 ${pet.type}升级到Lv.${pet.level}！`, '#ffd700');
-    }
-
-    addLog(`喂养${pet.type}成功！`, '#4caf50');
-    updateDisplay();
-    showPetPanel();
-}
-
-function evolvePet(idx) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-    const evoStage = Math.floor(pet.level / PET_CONFIG.evolveMinLevel);
-
-    if (evoStage >= 3) {
-        addLog('已达到最大进化阶段！', '#f44336');
-        return;
-    }
-
-    const evoCost = 5000 * (evoStage + 1);
-    if (gameState.spiritStones < evoCost) {
-        addLog(`进化需要${evoCost}灵石！`, '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= evoCost;
-    const newType = PET_EVOLUTION_MAP[pet.type] || pet.type;
-    pet.type = newType;
-
-    // 进化加成
-    const multiplier = PET_QUALITIES[pet.quality].multiplier * pet.growth;
-    const template = PET_TYPES[pet.type] || PET_TYPES[Object.keys(PET_TYPES)[0]];
-    pet.stats.attack += Math.round(template.baseStats.attack * multiplier * 0.3);
-    pet.stats.defense += Math.round(template.baseStats.defense * multiplier * 0.3);
-    pet.stats.speed += Math.round(template.baseStats.speed * multiplier * 0.3);
-    pet.stats.luck += Math.round(template.baseStats.luck * multiplier * 0.3);
-
-    // 解锁进化天赋
-    const evoTalents = {
-        '金羽仙鹤': '御空加速',
-        '九天凤凰': '涅槃之火',
-        '圣金麒麟': '祥云笼罩',
-        '战伐白虎': '白虎战魂',
-        '苍青神龙': '青龙之怒',
-        '冥水玄武': '玄冰护甲',
-        '九天真狐': '九尾魅惑',
-        '太古鲲鹏': '鲲鹏展翅',
-        '星辉独角兽': '圣光治愈',
-        '祥瑞白泽': '神兽智慧'
-    };
-
-    if (evoTalents[newType] && !pet.skills.includes(evoTalents[newType])) {
-        pet.skills.push(evoTalents[newType]);
-        addLog(`✨ 进化成功！领悟天赋【${evoTalents[newType]}】！`, '#ffd700');
-    } else {
-        addLog(`✨ 进化成功！${pet.type}！`, '#ff9800');
-    }
-
-    updateDisplay();
-    showPetPanel();
-}
-
-function teachPetSkill(idx) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-    const template = PET_TYPES[pet.type];
-    const allSkills = Object.keys(PET_SKILLS);
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #2196f3;border-radius:12px;padding:20px;max-width:500px;">
-            <h3 style="color:#2196f3;text-align:center;">📖 传授技能给${pet.type}</h3>`;
-
-    // 可学习的技能
-    const learnableSkills = allSkills.filter(s => !pet.skills.includes(s) && PET_SKILLS[s]);
-    learnableSkills.forEach(skill => {
-        const sk = PET_SKILLS[skill];
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #333;">
-            <div>
-                <span style="color:#ffd700;">${skill}</span>
-                <span style="color:#aaa;font-size:0.85em;">${sk.desc}</span>
-            </div>
-            <button class="btn" style="background:#2196f3;color:white;" onclick="confirmTeachSkill(${idx},'${skill}')">学习</button>
-        </div>`;
-    });
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showPetPanel()">返回</button>
-    </div></div></div>`;
-    openModal('传授技能', html, []);
-}
-
-function confirmTeachSkill(idx, skill) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-    const sk = PET_SKILLS[skill];
-
-    if (pet.skills.length >= PET_CONFIG.skillSlotBase + Math.floor(pet.level / PET_CONFIG.evolveMinLevel)) {
-        addLog('技能槽已满！', '#f44336');
-        return;
-    }
-
-    pet.skills.push(skill);
-    addLog(`🐉 ${pet.type}学会【${skill}】！`, '#2196f3');
-    showPetPanel();
-}
-
-function releasePet(idx) {
-    const sp = gameState.spiritPets;
-    const pet = sp.pets[idx];
-
-    if (confirm(`确定放生${pet.type}吗？放生后无法恢复！`)) {
-        sp.pets.splice(idx, 1);
-        addLog(`${pet.type}已被放生...`, '#aaa');
-        updateDisplay();
-        showPetPanel();
-    }
-}
-
-function interactWithPets() {
-    const sp = gameState.spiritPets;
-    if (sp.pets.length === 0) {
-        addLog('还没有仙宠！', '#f44336');
-        return;
-    }
-
-    sp.pets.forEach(pet => {
-        if (pet.isHatched) {
-            pet.bond = Math.min(PET_CONFIG.bondMax, pet.bond + 5);
-            // 互动增加少量经验
-            pet.exp += 5;
-            if (pet.exp >= pet.nextLevelExp) {
-                pet.exp -= pet.nextLevelExp;
-                pet.level++;
-                pet.nextLevelExp = Math.floor(pet.nextLevelExp * 1.5);
-                addLog(`🐉 ${pet.type}升级到Lv.${pet.level}！`, '#ffd700');
-            }
-        }
-    });
-
-    addLog('与所有仙宠互动，好感度提升！', '#4caf50');
-    updateDisplay();
-    showPetPanel();
-}
-
-// Alias for existing button handler
-function openPet() {
-    showPetPanel();
-}
-
-function processDailyPets() {
-    const sp = gameState.spiritPets;
-    if (sp.pets.length === 0) return;
-
-    sp.pets.forEach(pet => {
-        if (!pet.isHatched) {
-            // 未孵化仙兽蛋自然孵化
-            // 已在hatchPetEgg中处理
-        } else {
-            // 羁绊每日衰减
-            pet.bond = Math.max(0, pet.bond - 2);
-
-            // 羁绊加成：战斗时仙宠助战
-            if (pet.bond >= 80) {
-                const bonus = 0.1 + (pet.bond - 80) * 0.005;
-                if (!gameState.activeEffects.petBond) {
-                    gameState.activeEffects.petBond = 0;
-                }
-                gameState.activeEffects.petBond += bonus;
-            }
-        }
-    });
-
-    // 每日喂养提醒
-    if (sp.pets.some(p => p.isHatched)) {
-        addLog('🐉 你的仙宠饿了，记得去喂养哦！', '#ff9800');
-    }
-}
-
-// 输出宠物战斗助战效果
-function getPetCombatBonus() {
-    const sp = gameState.spiritPets;
-    let bonus = { attack: 0, defense: 0, speed: 0, luck: 0, revive: 0 };
-
-    sp.pets.forEach(pet => {
-        if (!pet.isHatched || pet.bond < 50) return;
-
-        const bondFactor = pet.bond / PET_CONFIG.bondMax;
-        const levelFactor = pet.level / 100 + 0.5;
-
-        bonus.attack += pet.stats.attack * bondFactor * levelFactor * 0.3;
-        bonus.defense += pet.stats.defense * bondFactor * levelFactor * 0.3;
-        bonus.speed += pet.stats.speed * bondFactor * levelFactor * 0.2;
-        bonus.luck += pet.stats.luck * bondFactor * levelFactor * 0.2;
-
-        // 复活概率
-        if (pet.skills.some(s => PET_SKILLS[s]?.effect?.revive)) {
-            bonus.revive += 0.1 * bondFactor;
-        }
-    });
-
-    return bonus;
-}
-// Auto-generated module: reincarnation.js
-
-// ===== REINCARNATION CONSTANTS (V45) =====
-const REINCARNATION_CONFIG = {
-    baseKarmaRate: 0.1,
-    maxKarma: 10000,
-    maxPastLifeMemories: 12,
-    reincarnationPointMultiplier: 1.5,
-    karmaGoodThreshold: 5000,
-    karmaEvilThreshold: -5000
-};
-
-const PAST_LIFE_MEMORIES = [
-    { id: 'warrior', name: '战士之魂', icon: '⚔️', bonus: { attack: 0.1 }, desc: '前世战斗经验' },
-    { id: 'healer', name: '医者之心', icon: '💚', bonus: { healing: 0.15 }, desc: '前世医术传承' },
-    { id: 'scholar', name: '学者之慧', icon: '📚', bonus: { comprehension: 0.2 }, desc: '前世学识积累' },
-    { id: 'merchant', name: '商人之道', icon: '💰', bonus: { incomeBonus: 0.2 }, desc: '前世商业头脑' },
-    { id: 'artisan', name: '匠人之艺', icon: '🔨', bonus: { crafting: 0.2 }, desc: '前世锻造技艺' },
-    { id: 'mage', name: '法师之魂', icon: '🔮', bonus: { spellPower: 0.15 }, desc: '前世魔法天赋' },
-    { id: 'farmer', name: '农夫之力', icon: '🌾', bonus: { hp: 0.15 }, desc: '前世劳作体魄' },
-    { id: 'poet', name: '诗人之情', icon: '📜', bonus: { serendipity: 0.2 }, desc: '前世艺术感悟' },
-    { id: 'guard', name: '守卫之责', icon: '🛡️', bonus: { defense: 0.15 }, desc: '前世护卫生涯' },
-    { id: 'wanderer', name: '行者之路', icon: '🌟', bonus: { speed: 0.2 }, desc: '前世游历见闻' },
-    { id: 'sage', name: '先知之明', icon: '🔭', bonus: { lawComprehension: 0.25 }, desc: '前世悟道心得' },
-    { id: 'dragon', name: '龙之血脉', icon: '🐉', bonus: { allAttributes: 0.1 }, desc: '远古龙族传承' }
-];
-
-const KARMA_ACTIONS = {
-    // 善行（增加因果）
-    good: {
-        '帮助他人': { karma: 50, threshold: 0 },
-        '施舍灵石': { karma: 100, threshold: 100 },
-        '救死扶伤': { karma: 150, threshold: 200 },
-        '维护正义': { karma: 200, threshold: 500 },
-        '舍己为人': { karma: 300, threshold: 1000 },
-        '建造仙宫': { karma: 500, threshold: 2000 },
-        '传授功法': { karma: 400, threshold: 1500 },
-        '炼制丹药': { karma: 100, threshold: 300 },
-        '护佑苍生': { karma: 1000, threshold: 5000 }
-    },
-    // 恶行（减少因果）
-    evil: {
-        '抢夺他人': { karma: -80, threshold: 0 },
-        '欺凌弱小': { karma: -100, threshold: -100 },
-        '偷窃财物': { karma: -120, threshold: -200 },
-        '伤害无辜': { karma: -200, threshold: -500 },
-        '杀生过多': { karma: -300, threshold: -1000 },
-        '贪婪吝啬': { karma: -150, threshold: -500 },
-        '背信弃义': { karma: -250, threshold: -1000 },
-        '为非作歹': { karma: -500, threshold: -2000 },
-        '涂炭生灵': { karma: -1000, threshold: -5000 }
-    }
-};
-
-const REINCARNATION_BLESSINGS = {
-    // 大善人福报（因果>5000）
-    saint: {
-        title: '圣人转世',
-        icon: '👼',
-        color: '#ffd700',
-        effects: {
-            attack: 0.3,
-            defense: 0.3,
-            healing: 0.3,
-            serendipity: 0.5,
-            reincarnationBonus: 2.0
-        },
-        desc: '圣人之资，万法皆通'
-    },
-    // 善人福报（因果>2000）
-    benevolent: {
-        title: '善人转世',
-        icon: '🙏',
-        color: '#4caf50',
-        effects: {
-            attack: 0.15,
-            defense: 0.15,
-            healing: 0.2,
-            serendipity: 0.25,
-            reincarnationBonus: 1.5
-        },
-        desc: '积德行善，福报加身'
-    },
-    // 普通（因果>-2000且<2000）
-    neutral: {
-        title: '凡人转世',
-        icon: '🧑',
-        color: '#9e9e9e',
-        effects: {
-            attack: 0,
-            defense: 0,
-            healing: 0,
-            serendipity: 0,
-            reincarnationBonus: 1.0
-        },
-        desc: '六道轮回，因果自担'
-    },
-    // 恶人报应（因果<-2000）
-    wicked: {
-        title: '恶人转世',
-        icon: '👿',
-        color: '#f44336',
-        effects: {
-            attack: 0.2,
-            defense: -0.1,
-            healing: -0.2,
-            serendipity: -0.3,
-            reincarnationBonus: 0.5
-        },
-        desc: '作恶多端，因果报应'
-    },
-    // 大恶人报应（因果<-5000）
-    demon: {
-        title: '恶魔转世',
-        icon: '😈',
-        color: '#7b1fa2',
-        effects: {
-            attack: 0.4,
-            defense: 0.1,
-            healing: -0.4,
-            serendipity: -0.5,
-            reincarnationBonus: 0.3
-        },
-        desc: '恶魔降世，万劫不复'
-    }
-};
-
-const REINCARNATION_REWARDS = {
-    // 轮回奖励池
-    good: [
-        { type: 'spiritStones', amount: 5000, desc: '前世积蓄的灵石' },
-        { type: 'comprehension', amount: 30, desc: '前世悟道心得' },
-        { type: 'herb', amount: 100, desc: '前世珍藏灵草' },
-        { type: 'memory', memoryId: 'warrior', desc: '战士之魂碎片' },
-        { type: 'memory', memoryId: 'sage', desc: '先知之明碎片' },
-        { type: 'lawFragment', amount: 5, desc: '法则感悟碎片' },
-        { type: 'reputation', amount: 1000, desc: '前世声望' }
-    ],
-    neutral: [
-        { type: 'spiritStones', amount: 2000, desc: '前世遗留灵石' },
-        { type: 'comprehension', amount: 10, desc: '前世感悟' },
-        { type: 'herb', amount: 30, desc: '前世遗留灵草' }
-    ],
-    evil: [
-        { type: 'spiritStones', amount: -1000, desc: '因果清算' },
-        { type: 'comprehension', amount: -10, desc: '业障蒙心' },
-        { type: 'memory', memoryId: 'demon', desc: '恶魔血脉觉醒' }
-    ]
-};
-
-// ===== REINCARNATION FUNCTIONS =====
-
-function openReincarnationPanel() {
-    const karma = gameState.karma || {};
-    const karmaLevel = getKarmaLevel(karma.points || 0);
-    const blessing = getKarmaBlessing(karma.points || 0);
-    const memories = karma.pastLifeMemories || [];
-    const memoriesBonus = calculateMemoriesBonus(memories);
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:700px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:10px;">🔄 天道轮回增强</h2>
-
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:15px;">
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">轮回次数</div>
-                    <div style="color:#ffd700;font-size:1.3em;font-weight:bold;">${karma.reincarnationCount || 0}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">因果点数</div>
-                    <div style="color:${blessing.color};font-size:1.3em;font-weight:bold;">${karma.points || 0}</div>
-                </div>
-                <div style="background:rgba(156,39,176,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">因果等级</div>
-                    <div style="color:${blessing.color};font-size:1.1em;font-weight:bold;">${karmaLevel}</div>
-                </div>
-            </div>
-
-            <div style="background:rgba(${hexToRgb(blessing.color)},0.1);border:1px solid ${blessing.color};border-radius:8px;padding:15px;margin-bottom:15px;text-align:center;">
-                <div style="font-size:1.5em;margin-bottom:5px;">${blessing.icon}</div>
-                <div style="color:${blessing.color};font-weight:bold;font-size:1.1em;">${blessing.title}</div>
-                <div style="color:#aaa;font-size:0.9em;">${blessing.desc}</div>
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <h3 style="color:#ffd700;margin-bottom:10px;">📊 因果明细</h3>
-                <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;font-size:0.9em;">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-                        <span style="color:#aaa;">善行累计</span>
-                        <span style="color:#4caf50;">+${karma.goodKarma || 0}</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-                        <span style="color:#aaa;">恶行累计</span>
-                        <span style="color:#f44336;">${karma.evilKarma || 0}</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;">
-                        <span style="color:#aaa;">轮回加成</span>
-                        <span style="color:#2196f3;">${((blessing.effects.reincarnationBonus || 1) - 1) * 100 >= 0 ? '+' : ''}${((blessing.effects.reincarnationBonus || 1) - 1) * 100}%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <h3 style="color:#ffd700;margin-bottom:10px;">👻 前世记忆（${memories.length}/${REINCARNATION_CONFIG.maxPastLifeMemories}）</h3>`;
-
-    if (memories.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">尚未觉醒任何前世记忆</p>`;
-    } else {
-        html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">`;
-        memories.forEach(memoryId => {
-            const memory = PAST_LIFE_MEMORIES.find(m => m.id === memoryId);
-            if (memory) {
-                html += `<div style="background:rgba(0,0,0,0.3);border:1px solid #ffd700;border-radius:5px;padding:8px;text-align:center;">
-                    <div style="font-size:1.5em;">${memory.icon}</div>
-                    <div style="color:#ffd700;font-size:0.85em;">${memory.name}</div>
-                    <div style="color:#aaa;font-size:0.75em;">${memory.desc}</div>
-                </div>`;
-            }
-        });
-        html += `</div>`;
-    }
-
-    // 记忆加成
-    if (Object.keys(memoriesBonus).length > 0) {
-        html += `<div style="background:rgba(255,215,0,0.1);padding:8px;border-radius:5px;margin-top:8px;font-size:0.85em;">
-            <span style="color:#ffd700;">记忆加成：</span>${formatMemoriesBonus(memoriesBonus)}
-        </div>`;
-    }
-
-    html += `</div>
-
-            <div style="margin-bottom:15px;">
-                <h3 style="color:#ffd700;margin-bottom:10px;">⚡ 积德任务</h3>
-                <div style="display:grid;gap:8px;">`;
-    // 显示可完成的积德任务
-    const availableGood = Object.entries(KARMA_ACTIONS.good).filter(([name, data]) => {
-        return (karma.points || 0) >= data.threshold;
-    });
-    const availableEvil = Object.entries(KARMA_ACTIONS.evil).filter(([name, data]) => {
-        return (karma.points || 0) >= data.threshold;
-    });
-
-    availableGood.slice(0, 3).forEach(([name, data]) => {
-        html += `<div style="background:rgba(76,175,80,0.1);border:1px solid #4caf50;border-radius:5px;padding:8px;display:flex;justify-content:space-between;align-items:center;">
-                    <div><span style="color:#4caf50;">✓</span> ${name} <span style="color:#aaa;font-size:0.85em;">+${data.karma}因果</span></div>
-                    <button class="btn" style="background:#4caf50;color:white;font-size:0.8em;" onclick="performGoodDeed('${name}')">执行</button>
-                </div>`;
-    });
-
-    html += `</div></div>
-
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('天道轮回', html, []);
-}
-
-function getKarmaLevel(karmaPoints) {
-    if (karmaPoints >= 8000) return '大贤者';
-    if (karmaPoints >= 5000) return '贤者';
-    if (karmaPoints >= 2000) return '善人';
-    if (karmaPoints >= 500) return '小善人';
-    if (karmaPoints >= -500) return '普通人';
-    if (karmaPoints >= -2000) return '小恶人';
-    if (karmaPoints >= -5000) return '恶人';
-    if (karmaPoints >= -8000) return '大恶人';
-    return '魔头';
-}
-
-function getKarmaBlessing(karmaPoints) {
-    if (karmaPoints >= REINCARNATION_CONFIG.karmaGoodThreshold) {
-        if (karmaPoints >= 8000) return REINCARNATION_BLESSINGS.saint;
-        return REINCARNATION_BLESSINGS.benevolent;
-    }
-    if (karmaPoints <= -REINCARNATION_CONFIG.karmaEvilThreshold) {
-        if (karmaPoints <= -8000) return REINCARNATION_BLESSINGS.demon;
-        return REINCARNATION_BLESSINGS.wicked;
-    }
-    return REINCARNATION_BLESSINGS.neutral;
-}
-
-function calculateMemoriesBonus(memories) {
-    const bonus = {
-        attack: 0,
-        defense: 0,
-        healing: 0,
-        spellPower: 0,
-        serendipity: 0,
-        incomeBonus: 0,
-        comprehension: 0,
-        lawComprehension: 0,
-        crafting: 0,
-        speed: 0,
-        hp: 0
-    };
-
-    memories.forEach(memoryId => {
-        const memory = PAST_LIFE_MEMORIES.find(m => m.id === memoryId);
-        if (memory && memory.bonus) {
-            Object.entries(memory.bonus).forEach(([key, value]) => {
-                if (key === 'allAttributes') {
-                    Object.keys(bonus).forEach(k => bonus[k] += value);
-                } else if (bonus[key] !== undefined) {
-                    bonus[key] += value;
-                }
-            });
-        }
-    });
-
-    return bonus;
-}
-
-function formatMemoriesBonus(bonus) {
-    return Object.entries(bonus)
-        .filter(([k, v]) => v > 0)
-        .map(([k, v]) => {
-            const names = {
-                attack: '攻击', defense: '防御', healing: '治疗', spellPower: '仙法威力',
-                serendipity: '奇遇', incomeBonus: '灵石收益', comprehension: '领悟',
-                lawComprehension: '法则领悟', crafting: '锻造', speed: '速度', hp: '生命'
-            };
-            return `+${(v * 100).toFixed(0)}% ${names[k] || k}`;
-        })
-        .join(', ') || '无';
-}
-
-function performGoodDeed(deedName) {
-    const karmaAction = KARMA_ACTIONS.good[deedName];
-    if (!karmaAction) return;
-
-    const karma = gameState.karma || {};
-    karma.points = (karma.points || 0) + karmaAction.karma;
-    karma.goodKarma = (karma.goodKarma || 0) + karmaAction.karma;
-    gameState.karma = karma;
-
-    addLog(`⚡ 积德：「${deedName}」+${karmaAction.karma}因果`, '#4caf50');
-    updateDisplay();
-    openReincarnationPanel();
-}
-
-function addKarma(points, reason) {
-    const karma = gameState.karma || { points: 0, goodKarma: 0, evilKarma: 0, reincarnationCount: 0, pastLifeMemories: [] };
-    karma.points = Math.max(-REINCARNATION_CONFIG.maxKarma, Math.min(REINCARNATION_CONFIG.maxKarma, karma.points + points));
-
-    if (points > 0) {
-        karma.goodKarma = (karma.goodKarma || 0) + points;
-    } else {
-        karma.evilKarma = (karma.evilKarma || 0) + Math.abs(points);
-    }
-
-    gameState.karma = karma;
-    updateKarmaBonusDisplay();
-}
-
-function getKarmaBonus() {
-    const karma = gameState.karma || {};
-    const blessing = getKarmaBlessing(karma.points || 0);
-    const memoriesBonus = calculateMemoriesBonus(karma.pastLifeMemories || []);
-
-    // 合并加成
-    const combined = { ...blessing.effects };
-    Object.entries(memoriesBonus).forEach(([key, value]) => {
-        if (combined[key] !== undefined) {
-            combined[key] += value;
-        } else {
-            combined[key] = value;
-        }
-    });
-
-    return combined;
-}
-
-function updateKarmaBonusDisplay() {
-    // 更新显示上的因果加成
-    const bonus = getKarmaBonus();
-    // 可选：添加视觉提示
-}
-
-function processReincarnationRewards() {
-    const karma = gameState.karma || {};
-    const blessing = getKarmaBlessing(karma.points || 0);
-    const multiplier = blessing.effects.reincarnationBonus || 1;
-
-    // 每日因果收益
-    const dailyKarmaGain = Math.floor(10 * multiplier);
-    karma.points = (karma.points || 0) + dailyKarmaGain;
-
-    // 每7天额外奖励检查
-    if ((gameState.days || 0) % 7 === 0) {
-        triggerReincarnationReward();
-    }
-
-    gameState.karma = karma;
-}
-
-function triggerReincarnationReward() {
-    const karma = gameState.karma || {};
-    const blessing = getKarmaBlessing(karma.points || 0);
-    const multiplier = blessing.effects.reincarnationBonus || 1;
-
-    let rewardPool = [];
-    if (karma.points >= 2000) {
-        rewardPool = REINCARNATION_REWARDS.good;
-    } else if (karma.points <= -2000) {
-        rewardPool = REINCARNATION_REWARDS.evil;
-    } else {
-        rewardPool = REINCARNATION_REWARDS.neutral;
-    }
-
-    // 根据因果等级选择奖励
-    const reward = rewardPool[Math.floor(Math.random() * rewardPool.length)];
-    if (!reward) return;
-
-    let rewardText = '';
-    switch (reward.type) {
-        case 'spiritStones':
-            const amount = Math.floor(reward.amount * multiplier);
-            gameState.spiritStones += amount;
-            rewardText = `获得 ${amount} 灵石（${reward.desc}）`;
-            break;
-        case 'comprehension':
-            if (!gameState.cultivation) gameState.cultivation = {};
-            gameState.cultivation.comprehension = (gameState.cultivation.comprehension || 0) + reward.amount;
-            rewardText = `领悟 +${reward.amount}（${reward.desc}）`;
-            break;
-        case 'herb':
-            gameState.herbs = (gameState.herbs || 0) + reward.amount;
-            rewardText = `获得 ${reward.amount} 灵草（${reward.desc}）`;
-            break;
-        case 'memory':
-            if ((karma.pastLifeMemories || []).length < REINCARNATION_CONFIG.maxPastLifeMemories) {
-                if (!karma.pastLifeMemories) karma.pastLifeMemories = [];
-                if (!karma.pastLifeMemories.includes(reward.memoryId)) {
-                    karma.pastLifeMemories.push(reward.memoryId);
-                    const memory = PAST_LIFE_MEMORIES.find(m => m.id === reward.memoryId);
-                    rewardText = `觉醒「${memory?.name || reward.memoryId}」（${reward.desc}）`;
-                }
-            }
-            break;
-        case 'lawFragment':
-            if (!gameState.laws) gameState.laws = { fragments: 0 };
-            gameState.laws.fragments = (gameState.laws.fragments || 0) + reward.amount;
-            rewardText = `获得 ${reward.amount} 法则碎片（${reward.desc}）`;
-            break;
-    }
-
-    if (rewardText) {
-        addLog(`🔄 轮回福报：${rewardText}`, '#9c27b0');
-    }
-
-    gameState.karma = karma;
-}
-
-function triggerReincarnation() {
-    const karma = gameState.karma || {};
-    karma.reincarnationCount = (karma.reincarnationCount || 0) + 1;
-
-    const blessing = getKarmaBlessing(karma.points || 0);
-    const multiplier = blessing.effects.reincarnationBonus || 1;
-
-    // 清零部分因果（保留一定比例）
-    const retainedKarma = Math.floor((karma.points || 0) * 0.3);
-    karma.points = retainedKarma;
-
-    // 触发奖励
-    triggerReincarnationReward();
-
-    // 小概率获得新记忆
-    if (Math.random() < 0.3 * multiplier) {
-        const memories = karma.pastLifeMemories || [];
-        if (memories.length < REINCARNATION_CONFIG.maxPastLifeMemories) {
-            const availableMemories = PAST_LIFE_MEMORIES.filter(m => !memories.includes(m.id));
-            if (availableMemories.length > 0) {
-                const newMemory = availableMemories[Math.floor(Math.random() * availableMemories.length)];
-                memories.push(newMemory.id);
-                addLog(`👻 轮回时觉醒前世记忆：「${newMemory.name}」！`, '#9c27b0');
-            }
-        }
-    }
-
-    gameState.karma = karma;
-
-    // 触发特殊事件
-    if (karma.reincarnationCount >= 10) {
-        addLog(`🔄 已轮回${karma.reincarnationCount}次，因果已深`, '#7b1fa2');
-    }
-}
-
-function getKarmaStats() {
-    const karma = gameState.karma || {};
-    return {
-        points: karma.points || 0,
-        level: getKarmaLevel(karma.points || 0),
-        blessing: getKarmaBlessing(karma.points || 0),
-        reincarnationCount: karma.reincarnationCount || 0,
-        pastLifeMemories: karma.pastLifeMemories || [],
-        goodKarma: karma.goodKarma || 0,
-        evilKarma: karma.evilKarma || 0
-    };
-}
-
-
-// Auto-generated module: sect.js
+// ===== sect.js =====
 
         // ===== openSect =====
         function openSect() {
@@ -15147,7 +8509,7 @@ function getKarmaStats() {
         }
 
 
-// Auto-generated module: serendipity.js
+// ===== serendipity.js =====
 
         // ===== calculateSerendipityChance =====
         function calculateSerendipityChance() {
@@ -16066,2314 +9428,7 @@ function getKarmaStats() {
         }
 
 
-// Auto-generated module: social.js
-
-// ===== ALLY CONSTANTS (V38) =====
-const ALLY_CONFIG = {
-    createCost: 10000,
-    maxMembers: 50,
-    maxApplications: 5,
-    taxRate: 0.05,
-    maxFriends: 20
-};
-
-const ALLY_RANKS = {
-    1: { name: '一级仙盟', maxMembers: 20, skillCap: 1 },
-    2: { name: '二级仙盟', maxMembers: 25, skillCap: 2 },
-    3: { name: '三级仙盟', maxMembers: 30, skillCap: 2 },
-    4: { name: '四级仙盟', maxMembers: 35, skillCap: 3 },
-    5: { name: '五级仙盟', maxMembers: 40, skillCap: 3 },
-    6: { name: '六级仙盟', maxMembers: 45, skillCap: 4 },
-    7: { name: '七级仙盟', maxMembers: 48, skillCap: 4 },
-    8: { name: '八级仙盟', maxMembers: 49, skillCap: 5 },
-    9: { name: '九级仙盟', maxMembers: 49, skillCap: 5 },
-    10: { name: '十级仙盟', maxMembers: 50, skillCap: 5 }
-};
-
-const ALLY_SKILLS = {
-    1: { name: '集体修炼', icon: '🧘', desc: '全员修炼速度+5%/级', cost: 1000, effect: { cultivate_speed: 0.05 } },
-    2: { name: '奇遇加成', icon: '✨', desc: '奇遇概率+10%/级', cost: 2000, effect: { serendipity: 0.10 } },
-    3: { name: '资源共享', icon: '🔗', desc: '可借用成员装备', cost: 3000, effect: { share: true } },
-    4: { name: '战斗加成', icon: '⚔️', desc: '仙盟成员战斗+5%/级', cost: 2500, effect: { combat: 0.05 } },
-    5: { name: '灵石加成', icon: '💎', desc: '每日灵石收益+10%/级', cost: 3500, effect: { spiritStone: 0.10 } }
-};
-
-const ALLY_ACTIVITIES = {
-    '修炼': { desc: '与仙盟成员组队修炼', reward: 'contribution', amount: 15, icon: '🧘' },
-    '采集': { desc: '采集仙盟领地资源', reward: 'spiritStone', amount: 100, icon: '🌿' },
-    '战斗': { desc: '击败仙盟入侵者', reward: 'contribution', amount: 25, icon: '⚔️' },
-    '探索': { desc: '共同探索秘境', reward: 'contribution', amount: 20, icon: '🗺️' },
-    '传功': { desc: '传授功法给后辈', reward: 'contribution', amount: 30, icon: '📖' }
-};
-
-// ===== ALLY FUNCTIONS =====
-
-function showAllyPanel() {
-    const ia = gameState.immortalAlly;
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">🏛️ 仙盟</h2>`;
-
-    if (!ia.id) {
-        // 无仙盟
-        html += `<div style="text-align:center;padding:30px;">
-            <div style="color:#888;margin-bottom:20px;">您还没有加入任何仙盟</div>
-            <div style="margin-bottom:20px;">
-                <button class="btn" style="background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;" onclick="showCreateAllyUI()">🏗️ 创建仙盟（${ALLY_CONFIG.createCost}灵石）</button>
-            </div>
-            <div>
-                <button class="btn" style="background:#333;color:#fff;" onclick="showJoinAllyUI()">🔍 加入仙盟</button>
-            </div>
-        </div>`;
-    } else {
-        // 有仙盟
-        const rankInfo = ALLY_RANKS[ia.rank] || ALLY_RANKS[1];
-        html += `<div style="background:#16213e;border-radius:8px;padding:12px;margin-bottom:15px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="color:#9c27b0;font-size:18px;font-weight:bold;">${ia.name}</div>
-                    <div style="color:#888;font-size:12px;">${rankInfo.name} | 成员 ${ia.allies.length}/${rankInfo.maxMembers}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="color:#ffd700;">贡献: ${ia.contribution}</div>
-                    <div style="color:#888;font-size:11px;">职位: ${getAllyRoleName(ia.role)}</div>
-                </div>
-            </div>
-        </div>`;
-
-        // 仙盟技能
-        html += `<div style="margin-bottom:15px;">
-            <div style="color:#9c27b0;margin-bottom:8px;">仙盟技能 (等级${ia.skillLevel})</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">`;
-        for (const [lv, skill] of Object.entries(ALLY_SKILLS)) {
-            const unlocked = parseInt(lv) <= rankInfo.skillCap;
-            const active = parseInt(lv) <= ia.skillLevel;
-            html += `<div style="background:#0f0f23;border:1px solid ${active ? '#9c27b0' : '#333'};border-radius:6px;padding:8px;opacity:${unlocked ? 1 : 0.5};min-width:120px;">
-                <div style="color:${active ? '#ffd700' : '#666'};">${skill.icon} ${skill.name}</div>
-                <div style="color:#888;font-size:10px;">${skill.desc}</div>
-                ${unlocked && !active && ia.role === 'leader' ? `<button class="btn" style="margin-top:5px;font-size:10px;padding:3px 8px;" onclick="upgradeAllySkill(${lv})">升级(${skill.cost}贡献)</button>` : ''}
-            </div>`;
-        }
-        html += `</div></div>`;
-
-        // 仙盟活动
-        html += `<div style="margin-bottom:15px;">
-            <div style="color:#9c27b0;margin-bottom:8px;">今日活动</div>
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">`;
-        for (const [type, act] of Object.entries(ALLY_ACTIVITIES)) {
-            html += `<div style="background:#0f0f23;border-radius:6px;padding:8px;text-align:center;cursor:pointer;" onclick="doAllyActivity('${type}')">
-                <div style="font-size:20px;">${act.icon}</div>
-                <div style="color:#fff;font-size:11px;">${type}</div>
-                <div style="color:#888;font-size:10px;">+${act.amount} ${act.reward === 'contribution' ? '贡献' : '灵石'}</div>
-            </div>`;
-        }
-        html += `</div></div>`;
-
-        // 成员列表
-        html += `<div style="margin-bottom:15px;">
-            <div style="color:#9c27b0;margin-bottom:8px;">成员列表</div>
-            <div style="max-height:200px;overflow-y:auto;">`;
-        const sortedAllies = [...ia.allies].sort((a, b) => {
-            const roleOrder = { leader: 0, vice_leader: 1, elder: 2, member: 3 };
-            return (roleOrder[a.role] || 4) - (roleOrder[b.role] || 4);
-        });
-        for (const ally of sortedAllies) {
-            const realmName = getRealmName(ally.realm);
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:#0f0f23;border-radius:4px;margin-bottom:4px;">
-                <div>
-                    <span style="color:${ally.role === 'leader' ? '#ffd700' : '#fff'};">${ally.name}</span>
-                    <span style="color:#888;font-size:10px;"> ${realmName}</span>
-                </div>
-                <div>
-                    <span style="color:#888;font-size:11px;">${getAllyRoleName(ally.role)}</span>
-                    <span style="color:#9c27b0;font-size:11px;"> | 贡献:${ally.contribution}</span>
-                </div>
-            </div>`;
-        }
-        html += `</div></div>`;
-
-        // 入盟申请（盟主/副盟主可见）
-        if (ia.role === 'leader' || ia.role === 'vice_leader') {
-            const pendingApps = gameState.allyApplications.filter(a => a.allyId === ia.id && a.status === 'pending');
-            if (pendingApps.length > 0) {
-                html += `<div style="margin-bottom:15px;">
-                    <div style="color:#ff9800;margin-bottom:8px;">待审批入盟申请 (${pendingApps.length})</div>`;
-                for (const app of pendingApps) {
-                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:#0f0f23;border-radius:4px;margin-bottom:4px;">
-                        <div style="color:#fff;">${app.applicantName} (${app.applicantRealm})</div>
-                        <div>
-                            <button class="btn" style="background:#4caf50;color:white;padding:3px 10px;font-size:11px;" onclick="handleAllyApplication('${app.applyDay}', 'approve')">批准</button>
-                            <button class="btn" style="background:#f44336;color:white;padding:3px 10px;font-size:11px;" onclick="handleAllyApplication('${app.applyDay}', 'reject')">拒绝</button>
-                        </div>
-                    </div>`;
-                }
-                html += `</div>`;
-            }
-        }
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" onclick="closeModal('eventModal')">关闭</button>
-    </div></div></div>`;
-
-    setModalContent('allyPanel', html);
-    openSocialModal('仙盟');
-}
-
-function getAllyRoleName(role) {
-    const names = { none: '无', member: '弟子', elder: '长老', vice_leader: '副盟主', leader: '盟主' };
-    return names[role] || role;
-}
-
-function getRealmName(realm) {
-    const realms = ['凡', '炼气', '筑基', '金丹', '元婴', '化神', '渡劫', '大乘', '地仙', '天仙', '金仙', '大罗', '混元'];
-    return realms[realm] || '凡';
-}
-
-function showCreateAllyUI() {
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:400px;">
-            <h3 style="color:#9c27b0;text-align:center;">🏗️ 创建仙盟</h3>
-            <div style="margin:15px 0;">
-                <input type="text" id="allyNameInput" placeholder="输入仙盟名称" style="width:100%;padding:10px;background:#0f0f23;border:1px solid #333;color:#fff;border-radius:6px;">
-            </div>
-            <div style="color:#888;text-align:center;margin-bottom:15px;">消耗 ${ALLY_CONFIG.createCost} 灵石</div>
-            <div style="text-align:center;">
-                <button class="btn" style="background:#9c27b0;color:white;" onclick="createAlly()">创建</button>
-                <button class="btn" style="background:#333;color:#fff;" onclick="closeModal('eventModal')">取消</button>
-            </div>
-        </div></div>`;
-    setModalContent('createAlly', html);
-    openSocialModal('创建仙盟');
-}
-
-function createAlly() {
-    const name = document.getElementById('allyNameInput').value.trim();
-    if (!name) { showToast('请输入仙盟名称'); return; }
-    if (gameState.spiritStones < ALLY_CONFIG.createCost) { showToast('灵石不足'); return; }
-
-    gameState.spiritStones -= ALLY_CONFIG.createCost;
-    gameState.immortalAlly = {
-        id: 'ally_' + Date.now(),
-        name: name,
-        rank: 1,
-        role: 'leader',
-        contribution: 0,
-        joinedDay: gameState.days,
-        allies: [{ uid: 'player', name: gameState.playerName || '我', realm: gameState.realm, role: 'leader', contribution: 0 }],
-        skillLevel: 0,
-        dailyActivity: 0,
-        lastActivityDay: gameState.days
-    };
-
-    addLog('good', '仙盟创建', `成功创建仙盟【${name}】！`);
-    showToast(`仙盟【${name}】创建成功！`);
-    closeModal('eventModal');
-    showAllyPanel();
-}
-
-function showJoinAllyUI() {
-    // 简化版：随机生成3个可加入的仙盟
-    const sampleAllies = [
-        { id: 'ally_1', name: '青云宗', rank: 3, memberCount: 15, skillLevel: 2 },
-        { id: 'ally_2', name: '天机阁', rank: 5, memberCount: 28, skillLevel: 3 },
-        { id: 'ally_3', name: '万仙盟', rank: 7, memberCount: 40, skillLevel: 4 }
-    ];
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:500px;max-height:80vh;overflow-y:auto;">
-            <h3 style="color:#9c27b0;text-align:center;margin-bottom:15px;">🔍 加入仙盟</h3>`;
-
-    for (const ally of sampleAllies) {
-        html += `<div style="background:#0f0f23;border-radius:8px;padding:12px;margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="color:#fff;font-weight:bold;">${ally.name}</div>
-                    <div style="color:#888;font-size:11px;">${ALLY_RANKS[ally.rank].name} | 成员 ${ally.memberCount}/${ALLY_RANKS[ally.rank].maxMembers}</div>
-                </div>
-                <button class="btn" style="background:#9c27b0;color:white;" onclick="applyToJoinAlly('${ally.id}', '${ally.name}', ${ally.rank})">申请</button>
-            </div>
-        </div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#333;color:#fff;" onclick="closeModal('eventModal')">关闭</button>
-    </div></div></div>`;
-
-    setModalContent('joinAlly', html);
-    openSocialModal('加入仙盟');
-}
-
-function applyToJoinAlly(allyId, allyName, allyRank) {
-    if (gameState.allyApplications.length >= ALLY_CONFIG.maxApplications) {
-        showToast('申请数量已达上限');
-        return;
-    }
-    gameState.allyApplications.push({
-        allyId, allyName, allyRank, applyDay: gameState.days, status: 'pending', applicantName: gameState.playerName || '我', applicantRealm: getRealmName(gameState.realm)
-    });
-    showToast(`已申请加入【${allyName}】`);
-    closeModal('eventModal');
-}
-
-function handleAllyApplication(applyDay, decision) {
-    const ia = gameState.immortalAlly;
-    const appIdx = gameState.allyApplications.findIndex(a => a.applyDay == applyDay && a.allyId === ia.id && a.status === 'pending');
-    if (appIdx < 0) return;
-
-    const app = gameState.allyApplications[appIdx];
-    if (decision === 'approve') {
-        ia.allies.push({ uid: 'ally_' + Date.now(), name: app.applicantName, realm: app.applicantRealm, role: 'member', contribution: 0 });
-        app.status = 'approved';
-        addLog('good', '仙盟', `${app.applicantName} 加入仙盟`);
-    } else {
-        app.status = 'rejected';
-    }
-    showAllyPanel();
-}
-
-function doAllyActivity(type) {
-    const ia = gameState.immortalAlly;
-    if (!ia.id) return;
-
-    const act = ALLY_ACTIVITIES[type];
-    if (!act) return;
-
-    if (act.reward === 'contribution') {
-        ia.contribution += act.amount;
-    } else {
-        gameState.spiritStones += act.amount;
-    }
-    ia.dailyActivity++;
-
-    // 仙盟技能加成
-    if (ia.skillLevel > 0 && act.reward === 'contribution') {
-        const bonus = Math.floor(act.amount * 0.1 * ia.skillLevel);
-        ia.contribution += bonus;
-    }
-
-    addLog('good', '仙盟活动', `完成【${type}】，获得${act.amount}${act.reward === 'contribution' ? '贡献' : '灵石'}`);
-    showToast(`活动完成：+${act.amount} ${act.reward === 'contribution' ? '贡献' : '灵石'}`);
-    showAllyPanel();
-}
-
-function upgradeAllySkill(lv) {
-    const ia = gameState.immortalAlly;
-    if (ia.role !== 'leader') { showToast('只有盟主可以升级技能'); return; }
-
-    const skill = ALLY_SKILLS[lv];
-    if (!skill || ia.skillLevel >= parseInt(lv)) { showToast('无法升级'); return; }
-
-    if (ia.contribution < skill.cost) { showToast('贡献点不足'); return; }
-
-    ia.contribution -= skill.cost;
-    ia.skillLevel = parseInt(lv);
-    addLog('good', '仙盟技能', `升级【${skill.name}】至${ia.skillLevel}级`);
-    showToast(`技能升级成功！`);
-    showAllyPanel();
-}
-
-// ===== FRIENDS FUNCTIONS =====
-
-function showFriendsPanel() {
-    const friends = gameState.immortalFriends;
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #4caf50;border-radius:12px;padding:20px;max-width:700px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#4caf50;text-align:center;margin-bottom:15px;">👥 仙友</h2>`;
-
-    if (friends.length === 0) {
-        html += `<div style="text-align:center;padding:30px;color:#888;">
-            暂无仙友，快去结交道友吧！
-        </div>`;
-    } else {
-        html += `<div style="max-height:400px;overflow-y:auto;">`;
-        const sortedFriends = [...friends].sort((a, b) => b.intimacy - a.intimacy);
-        for (const f of sortedFriends) {
-            const intimacyColor = f.intimacy >= 70 ? '#ffd700' : f.intimacy >= 30 ? '#4caf50' : '#888';
-            html += `<div style="background:#0f0f23;border-radius:8px;padding:12px;margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <span style="color:#fff;font-weight:bold;">${f.name}</span>
-                        <span style="color:#888;font-size:11px;"> ${getRealmName(f.realm)}</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="color:${intimacyColor};">友好度 ${f.intimacy}/100</div>
-                        <div style="color:#666;font-size:10px;">最后互动: ${f.lastInteraction > 0 ? `${gameState.days - f.lastInteraction}天前` : '今天'}</div>
-                    </div>
-                </div>
-                <div style="margin-top:8px;display:flex;gap:8px;">
-                    <button class="btn" style="background:#4caf50;color:white;font-size:11px;padding:4px 10px;" onclick="giveGiftToFriend('${f.uid}')">🎁 送礼</button>
-                    <button class="btn" style="background:#2196f3;color:white;font-size:11px;padding:4px 10px;" ${f.intimacy < 30 ? 'disabled title="友好度不足30"' : ''} onclick="requestFriendHelp('${f.uid}')">🤝 协助</button>
-                </div>
-            </div>`;
-        }
-        html += `</div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#333;color:#fff;" onclick="closeModal('eventModal')">关闭</button>
-    </div></div></div>`;
-
-    setModalContent('friendsPanel', html);
-    openSocialModal('仙友');
-}
-
-function giveGiftToFriend(friendUid) {
-    const friend = gameState.immortalFriends.find(f => f.uid === friendUid);
-    if (!friend) return;
-
-    const giftAmount = Math.min(gameState.spiritStones, 500);
-    if (giftAmount <= 0) { showToast('灵石不足'); return; }
-
-    gameState.spiritStones -= giftAmount;
-    friend.intimacy = Math.min(100, friend.intimacy + Math.floor(giftAmount / 50));
-    friend.lastInteraction = gameState.days;
-
-    addLog('good', '仙友互动', `向【${friend.name}】赠送了${giftAmount}灵石，友好度+${Math.floor(giftAmount / 50)}`);
-    showToast(`送礼成功！友好度+${Math.floor(giftAmount / 50)}`);
-    showFriendsPanel();
-}
-
-function requestFriendHelp(friendUid) {
-    const friend = gameState.immortalFriends.find(f => f.uid === friendUid);
-    if (!friend || friend.intimacy < 30) { showToast('友好度不足30，无法请求协助'); return; }
-
-    // 简化：直接获得修炼加成
-    const bonus = Math.floor(friend.intimacy * 0.01);
-    gameState.activeEffects.cultivate_speed += bonus;
-    friend.intimacy = Math.max(0, friend.intimacy - 5);
-    friend.lastInteraction = gameState.days;
-
-    addLog('good', '仙友协助', `【${friend.name}】协助修炼，修炼速度+${(bonus * 100).toFixed(0)}%`);
-    showToast(`获得协助！修炼速度+${(bonus * 100).toFixed(0)}%`);
-    closeModal('eventModal');
-}
-
-function addRandomFriend() {
-    if (gameState.immortalFriends.length >= ALLY_CONFIG.maxFriends) return;
-    if (gameState.realm < 1) return; // 炼气及以上才有仙友
-
-    const names = ['太乙真人', '广成子', '南极仙翁', '镇元大仙', '观音菩萨', '普贤菩萨', '文殊菩萨', '地藏王'];
-    const usedNames = gameState.immortalFriends.map(f => f.name);
-    const available = names.filter(n => !usedNames.includes(n));
-    if (available.length === 0) return;
-
-    const name = available[Math.floor(Math.random() * available.length)];
-    gameState.immortalFriends.push({
-        uid: 'npc_' + Date.now(),
-        name: name,
-        realm: Math.max(1, gameState.realm - 2 + Math.floor(Math.random() * 4)),
-        intimacy: 10,
-        lastInteraction: gameState.days
-    });
-    addLog('good', '新仙友', `结交了新仙友【${name}】！`);
-}
-
-// ===== TRADING POST =====
-
-function showTradingPost() {
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff9800;text-align:center;margin-bottom:15px;">🏪 仙境交易行</h2>`;
-
-    // 简化：显示一些示例商品
-    const sampleItems = [
-        { name: '筑基丹', quality: 'rare', price: 500, seller: '青云子' },
-        { name: '破境丹', quality: 'precious', price: 2000, seller: '天机老人' },
-        { name: '上品灵草', quality: 'uncommon', price: 150, seller: '采药仙子' },
-        { name: '金刚杵', quality: 'rare', price: 3000, seller: '炼器师' },
-        { name: '混元珠', quality: 'precious', price: 5000, seller: '万宝阁' }
-    ];
-
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:15px;">`;
-    for (const item of sampleItems) {
-        const color = item.quality === 'rare' ? '#2196f3' : item.quality === 'precious' ? '#9c27b0' : '#4caf50';
-        html += `<div style="background:#0f0f23;border:1px solid ${color};border-radius:8px;padding:10px;text-align:center;">
-            <div style="color:${color};font-weight:bold;">${item.name}</div>
-            <div style="color:#ffd700;font-size:14px;margin:5px 0;">💎 ${item.price}</div>
-            <div style="color:#888;font-size:10px;">卖家: ${item.seller}</div>
-            <button class="btn" style="margin-top:8px;background:${color};color:white;font-size:11px;padding:4px 12px;" onclick="buyItemFromPost('${item.name}', ${item.price})">购买</button>
-        </div>`;
-    }
-    html += `</div>`;
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#333;color:#fff;" onclick="closeModal('eventModal')">关闭</button>
-    </div></div></div>`;
-
-    setModalContent('tradingPost', html);
-    openSocialModal('仙境交易行');
-}
-
-function buyItemFromPost(itemName, price) {
-    if (gameState.spiritStones < price) { showToast('灵石不足'); return; }
-
-    const tax = Math.floor(price * ALLY_CONFIG.taxRate);
-    gameState.spiritStones -= price;
-
-    // 添加物品到背包
-    gameState.inventory.push({
-        name: itemName,
-        type: 'pill',
-        quality: 'rare',
-        effect: { type: 'breakthrough_boost', value: 0.1 }
-    });
-
-    addLog('good', '交易行', `购买【${itemName}】成功，花费${price}灵石（含${tax}税费）`);
-    showToast(`购买成功！`);
-    showTradingPost();
-}
-
-// ===== DAILY PROCESSING =====
-
-function processDailySocial() {
-    // 仙友友好度衰减
-    const friends = gameState.immortalFriends;
-    for (const f of friends) {
-        if (gameState.days - f.lastInteraction > 7) {
-            f.intimacy = Math.max(0, f.intimacy - 1);
-        }
-    }
-
-    // 随机结交新仙友（5%概率）
-    if (Math.random() < 0.05) {
-        addRandomFriend();
-    }
-
-    // 仙盟每日重置
-    const ia = gameState.immortalAlly;
-    if (ia.id && ia.lastActivityDay < gameState.days) {
-        ia.dailyActivity = 0;
-        ia.lastActivityDay = gameState.days;
-    }
-}
-
-// ===== HELPER =====
-let _currentSocialModalId = '';
-let _currentSocialModalHTML = '';
-
-function setModalContent(id, html) {
-    _currentSocialModalId = id;
-    _currentSocialModalHTML = html;
-}
-
-function openSocialModal(title) {
-    openModal(title, _currentSocialModalHTML, '');
-}
-// Auto-generated module: spellCreation.js
-
-// ===== SPELL_CREATION CONSTANTS (V44) =====
-const SPELL_CONFIG = {
-    maxCustomSpells: 10,
-    minCreateLevel: 5,
-    essenceSlotCount: 3,
-    combineSlotCount: 2,
-    spellNameMaxLen: 8
-};
-
-const ELEMENTAL_ESSENCES = {
-    // 元素精华
-    '火': { icon: '🔥', color: '#f44336', effect: { attack: 1.2, scaling: 0.1 } },
-    '水': { icon: '💧', color: '#2196f3', effect: { defense: 1.2, hp: 0.15 } },
-    '雷': { icon: '⚡', color: '#ffeb3b', effect: { attack: 1.3, cooldown: -0.1 } },
-    '风': { icon: '🌪️', color: '#00bcd4', effect: { speed: 1.2, dodge: 0.1 } },
-    '土': { icon: '🪨', color: '#795548', effect: { defense: 1.25, hp: 0.1 } },
-    '木': { icon: '🌿', color: '#4caf50', effect: { healing: 1.2, regen: 0.1 } },
-    '光': { icon: '✨', color: '#ffd700', effect: { attack: 1.15, critRate: 0.15 } },
-    '暗': { icon: '🌑', color: '#9c27b0', effect: { attack: 1.25, critDamage: 0.2 } },
-    '金': { icon: '🔱', color: '#ffc107', effect: { attack: 1.2, armorPen: 0.15 } },
-    '冰': { icon: '❄️', color: '#03a9f4', effect: { attack: 1.15, slow: 0.2 } }
-};
-
-const SPELL_TYPES = {
-    // 仙法类型
-    '攻击': { icon: '⚔️', baseEffect: 'damage', defaultDamage: 100 },
-    '防御': { icon: '🛡️', baseEffect: 'shield', defaultShield: 80 },
-    '治疗': { icon: '💚', baseEffect: 'heal', defaultHeal: 60 },
-    '召唤': { icon: '👥', baseEffect: 'summon', defaultSummonPower: 50 },
-    '诅咒': { icon: '💀', baseEffect: 'debuff', defaultDebuff: 40 },
-    '辅助': { icon: '🌟', baseEffect: 'buff', defaultBuff: 30 }
-};
-
-const SPELL_RARITY = {
-    '凡品': { color: '#9e9e9e', multiplier: 1.0, maxLevel: 5 },
-    '精品': { color: '#4caf50', multiplier: 1.3, maxLevel: 7 },
-    '极品': { color: '#2196f3', multiplier: 1.7, maxLevel: 9 },
-    '仙品': { color: '#9c27b0', multiplier: 2.2, maxLevel: 10 },
-    '神品': { color: '#ffd700', multiplier: 3.0, maxLevel: 10 }
-};
-
-const SPELL_EFFECTS_COMBINATIONS = {
-    // 效果组合
-    '火+水': { name: '蒸汽爆炸', icon: '💥', effect: 'attack_boost', bonus: 0.3 },
-    '火+风': { name: '烈焰风暴', icon: '🌋', effect: 'aoe_damage', bonus: 0.4 },
-    '火+土': { name: '熔岩护盾', icon: '🛡️', effect: 'shield_damage', bonus: 0.35 },
-    '水+冰': { name: '寒冰冲击', icon: '🧊', effect: 'freeze', bonus: 0.3 },
-    '雷+光': { name: '天罚雷劫', icon: '⚡', effect: 'stun', bonus: 0.4 },
-    '暗+诅咒': { name: '魂噬', icon: '💀', effect: 'lifeSteal', bonus: 0.35 },
-    '木+光': { name: '生命绽放', icon: '🌸', effect: 'heal_over_time', bonus: 0.4 },
-    '金+光': { name: '金光护体', icon: '🛡️', effect: 'perfect_shield', bonus: 0.5 },
-    '风+雷': { name: '疾风迅雷', icon: '🌪️', effect: 'speed_strike', bonus: 0.45 },
-    '水+木': { name: '生命之泉', icon: '💧', effect: 'continuous_heal', bonus: 0.35 }
-};
-
-const SPELL_ICONS = ['⚔️', '🛡️', '💚', '👥', '💀', '🌟', '🔥', '💧', '⚡', '🌪️', '🪨', '🌿', '✨', '🌑', '🔱', '❄️', '💥', '🌋', '🧊', '🌸'];
-
-// ===== SPELL_CREATION FUNCTIONS =====
-
-function openSpellCreation() {
-    const spells = gameState.customSpells || [];
-    const player = gameState;
-
-    if (player.realm < SPELL_CONFIG.minCreateLevel) {
-        addLog(`需要境界达到地仙才能创造仙法`, '#f44336');
-        return;
-    }
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #e91e63;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#e91e63;text-align:center;margin-bottom:10px;">✨ 仙法创造系统</h2>
-
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px;">
-                <div style="background:rgba(233,30,99,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">已创造</div>
-                    <div style="color:#ffd700;font-size:1.3em;font-weight:bold;">${spells.length}/${SPELL_CONFIG.maxCustomSpells}</div>
-                </div>
-                <div style="background:rgba(233,30,99,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">领悟等级</div>
-                    <div style="color:#e91e63;font-size:1.3em;font-weight:bold;">${player.cultivation?.comprehension || 0}</div>
-                </div>
-                <div style="background:rgba(233,30,99,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">仙法威力</div>
-                    <div style="color:#f44336;font-size:1.3em;font-weight:bold;">${calculateTotalSpellPower()}%</div>
-                </div>
-                <div style="background:rgba(233,30,99,0.1);padding:10px;border-radius:8px;text-align:center;">
-                    <div style="color:#aaa;font-size:0.8em;">精华数量</div>
-                    <div style="color:#2196f3;font-size:1.3em;font-weight:bold;">${player.essences ? Object.values(player.essences).reduce((a, b) => a + b, 0) : 0}</div>
-                </div>
-            </div>
-
-            <button class="btn" style="background:#e91e63;color:white;width:100%;margin-bottom:15px;padding:12px;" onclick="showSpellCreationPanel()">
-                ✨ 创造新仙法
-            </button>
-
-            <div style="margin-bottom:15px;">
-                <h3 style="color:#ffd700;margin-bottom:10px;">📜 已掌握的仙法</h3>`;
-
-    if (spells.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">尚未创造任何仙法</p>`;
-    } else {
-        html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:400px;overflow-y:auto;">`;
-        spells.forEach((spell, idx) => {
-            const rarity = SPELL_RARITY[spell.rarity] || SPELL_RARITY['凡品'];
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${rarity.color};border-radius:8px;padding:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <span style="color:${rarity.color};font-weight:bold;font-size:1.1em;">${spell.icon} ${spell.name}</span>
-                        <span style="color:#aaa;margin-left:5px;">${spell.rarity}</span>
-                    </div>
-                    <div style="color:#aaa;font-size:0.85em;">Lv.${spell.level}</div>
-                </div>
-                <div style="color:#aaa;font-size:0.85em;margin:5px 0;">类型: ${spell.type} | 冷却: ${spell.cooldown}回合</div>
-                <div style="color:#888;font-size:0.8em;margin-bottom:5px;">效果: ${spell.effectDesc}</div>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">`;
-            if (spell.essences) {
-                spell.essences.forEach(es => {
-                    const esData = ELEMENTAL_ESSENCES[es];
-                    html += `<span style="color:${esData?.color || '#fff'};font-size:1.2em;" title="${es}">${esData?.icon || '💎'}</span>`;
-                });
-            }
-            html += `</div>
-                <div style="display:flex;gap:5px;">
-                    <button class="btn" style="background:#4caf50;color:white;font-size:0.8em;flex:1;" onclick="upgradeCustomSpell(${idx})">升级</button>
-                    <button class="btn" style="background:#ff9800;color:white;font-size:0.8em;flex:1;" onclick="castCustomSpell(${idx})">施展</button>
-                    <button class="btn" style="background:#f44336;color:white;font-size:0.8em;flex:1;" onclick="forgetCustomSpell(${idx})">遗忘</button>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    html += `</div>
-            <div style="text-align:center;margin-top:15px;">
-                <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('仙法创造', html, []);
-}
-
-function showSpellCreationPanel() {
-    const spells = gameState.customSpells || [];
-
-    if (spells.length >= SPELL_CONFIG.maxCustomSpells) {
-        addLog('仙法数量已达上限', '#f44336');
-        return;
-    }
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #e91e63;border-radius:12px;padding:20px;max-width:700px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#e91e63;text-align:center;margin-bottom:15px;">✨ 创造新仙法</h2>
-
-            <div style="margin-bottom:15px;">
-                <label style="color:#ffd700;display:block;margin-bottom:5px;">仙法名称（2-8字）</label>
-                <input type="text" id="spellNameInput" maxlength="${SPELL_CONFIG.spellNameMaxLen}"
-                    placeholder="输入仙法名称"
-                    style="width:100%;padding:10px;background:#333;border:1px solid #555;color:#fff;border-radius:5px;">
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <label style="color:#ffd700;display:block;margin-bottom:5px;">仙法类型</label>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">`;
-    Object.entries(SPELL_TYPES).forEach(([type, data]) => {
-        html += `<button class="btn" style="background:#333;color:#fff;border:1px solid #555;" id="spellType_${type}"
-                    onclick="selectSpellType('${type}')">${data.icon} ${type}</button>`;
-    });
-    html += `</div></div>
-
-            <div style="margin-bottom:15px;">
-                <label style="color:#ffd700;display:block;margin-bottom:5px;">选择元素精华（0-3个）</label>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">`;
-    Object.entries(ELEMENTAL_ESSENCES).forEach(([elem, data]) => {
-        const count = gameState.essences?.[elem] || 0;
-        const disabled = count <= 0 ? 'disabled style="opacity:0.3;"' : '';
-        html += `<button class="btn" id="essence_${elem}" style="background:${data.color}33;color:${data.color};border:1px solid ${data.color};" onclick="toggleEssence('${elem}')" ${disabled}>
-                    ${data.icon} ${elem} (${count})
-                </button>`;
-    });
-    html += `</div></div>
-
-            <div style="margin-bottom:15px;">
-                <label style="color:#ffd700;display:block;margin-bottom:5px;">选择图标</label>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">`;
-    SPELL_ICONS.forEach((icon, idx) => {
-        html += `<button class="btn" id="spellIcon_${idx}" style="background:#333;color:#fff;font-size:1.2em;padding:5px 10px;" onclick="selectSpellIcon(${idx})">${icon}</button>`;
-    });
-    html += `</div></div>
-
-            <div id="spellPreview" style="background:rgba(0,0,0,0.5);padding:15px;border-radius:8px;margin-bottom:15px;">
-                <h4 style="color:#ffd700;margin-bottom:10px;">📋 仙法预览</h4>
-                <div id="previewContent" style="color:#aaa;">请选择仙法类型和元素精华</div>
-            </div>
-
-            <div style="display:flex;gap:10px;">
-                <button class="btn" style="background:#4caf50;color:white;flex:1;" onclick="confirmSpellCreation()">✨ 创造仙法</button>
-                <button class="btn" style="background:#555;color:white;flex:1;" onclick="openSpellCreation()">取消</button>
-            </div>
-        </div>
-    </div>`;
-    openModal('创造仙法', html, []);
-}
-
-let selectedSpellType = null;
-let selectedEssences = [];
-let selectedSpellIcon = '⚔️';
-
-function selectSpellType(type) {
-    selectedSpellType = type;
-    document.querySelectorAll('[id^="spellType_"]').forEach(btn => {
-        btn.style.borderColor = '#555';
-        btn.style.background = '#333';
-    });
-    const btn = document.getElementById('spellType_' + type);
-    if (btn) {
-        btn.style.borderColor = '#e91e63';
-        btn.style.background = '#e91e6333';
-    }
-    updateSpellPreview();
-}
-
-function toggleEssence(elem) {
-    const idx = selectedEssences.indexOf(elem);
-    if (idx >= 0) {
-        selectedEssences.splice(idx, 1);
-    } else if (selectedEssences.length < SPELL_CONFIG.essenceSlotCount) {
-        selectedEssences.push(elem);
-    }
-    updateSpellPreview();
-}
-
-function selectSpellIcon(idx) {
-    selectedSpellIcon = SPELL_ICONS[idx];
-    document.querySelectorAll('[id^="spellIcon_"]').forEach(btn => {
-        btn.style.borderColor = '#555';
-        btn.style.background = '#333';
-    });
-    const btn = document.getElementById('spellIcon_' + idx);
-    if (btn) {
-        btn.style.borderColor = '#e91e63';
-        btn.style.background = '#e91e6333';
-    }
-    updateSpellPreview();
-}
-
-function updateSpellPreview() {
-    const preview = document.getElementById('previewContent');
-    if (!preview) return;
-
-    let content = '';
-
-    if (!selectedSpellType) {
-        preview.innerHTML = '<span style="color:#888;">请选择仙法类型</span>';
-        return;
-    }
-
-    const typeData = SPELL_TYPES[selectedSpellType];
-    content += `<div style="margin-bottom:8px;"><span style="color:#ffd700;">类型:</span> ${typeData.icon} ${selectedSpellType}</div>`;
-
-    // 计算效果
-    let attackBonus = 1.0;
-    let cooldownMod = 0;
-    let defenseBonus = 1.0;
-    let hpBonus = 0;
-    let healBonus = 1.0;
-
-    const essenceEffects = [];
-    selectedEssences.forEach(es => {
-        const esData = ELEMENTAL_ESSENCES[es];
-        if (esData) {
-            essenceEffects.push(`${esData.icon} ${es}`);
-            if (esData.effect.attack) attackBonus *= esData.effect.attack;
-            if (esData.effect.cooldown) cooldownMod += esData.effect.cooldown;
-            if (esData.effect.defense) defenseBonus *= esData.effect.defense;
-            if (esData.effect.hp) hpBonus += esData.effect.hp;
-            if (esData.effect.healing) healBonus *= esData.effect.healing;
-        }
-    });
-
-    if (essenceEffects.length > 0) {
-        content += `<div style="margin-bottom:8px;"><span style="color:#ffd700;">元素:</span> ${essenceEffects.join(' + ')}</div>`;
-    }
-
-    // 基础数值
-    let baseValue = typeData.defaultDamage || typeData.defaultShield || typeData.defaultHeal || 50;
-    let effectDesc = '';
-
-    switch (typeData.baseEffect) {
-        case 'damage':
-            effectDesc = `伤害 ${Math.round(baseValue * attackBonus)}`;
-            if (cooldownMod !== 0) effectDesc += ` | 冷却 ${Math.round((1 + cooldownMod) * 10) / 10}回合`;
-            break;
-        case 'shield':
-            effectDesc = `护盾 ${Math.round(baseValue * defenseBonus)}`;
-            if (hpBonus > 0) effectDesc += ` | 生命上限 +${Math.round(hpBonus * 100)}%`;
-            break;
-        case 'heal':
-            effectDesc = `治疗 ${Math.round(baseValue * healBonus)}`;
-            break;
-        default:
-            effectDesc = typeData.baseEffect;
-    }
-
-    // 检测组合效果
-    if (selectedEssences.length >= 2) {
-        const comboKey = selectedEssences.slice(0, 2).sort().join('+');
-        const combo = SPELL_EFFECTS_COMBINATIONS[comboKey];
-        if (combo) {
-            effectDesc += ` | 🌟 ${combo.name} (+${Math.round(combo.bonus * 100)}%)`;
-        }
-    }
-
-    content += `<div style="margin-bottom:8px;"><span style="color:#ffd700;">效果:</span> ${effectDesc}</div>`;
-
-    // 稀有度
-    const rarity = selectedEssences.length === 0 ? '凡品'
-        : selectedEssences.length === 1 ? '精品'
-        : selectedEssences.length === 2 ? '极品'
-        : '仙品';
-    const rarityData = SPELL_RARITY[rarity];
-    content += `<div style="margin-top:8px;"><span style="color:${rarityData.color};font-weight:bold;">${rarity}</span></div>`;
-
-    preview.innerHTML = content;
-}
-
-function confirmSpellCreation() {
-    const nameInput = document.getElementById('spellNameInput');
-    const name = nameInput?.value?.trim();
-
-    if (!name || name.length < 2) {
-        addLog('请输入至少2个字的仙法名称', '#f44336');
-        return;
-    }
-
-    if (!selectedSpellType) {
-        addLog('请选择仙法类型', '#f44336');
-        return;
-    }
-
-    // 检查是否已有同名仙法
-    const spells = gameState.customSpells || [];
-    if (spells.some(s => s.name === name)) {
-        addLog('已有同名仙法', '#f44336');
-        return;
-    }
-
-    // 消耗元素精华
-    const essenceCost = selectedEssences.length;
-    if (essenceCost > 0) {
-        selectedEssences.forEach(es => {
-            if (gameState.essences && gameState.essences[es] > 0) {
-                gameState.essences[es]--;
-            }
-        });
-    }
-
-    // 计算数值
-    const typeData = SPELL_TYPES[selectedSpellType];
-    let baseValue = typeData.defaultDamage || typeData.defaultShield || typeData.defaultHeal || 50;
-    let power = baseValue;
-    let cooldown = 5;
-
-    const rarity = selectedEssences.length === 0 ? '凡品'
-        : selectedEssences.length === 1 ? '精品'
-        : selectedEssences.length === 2 ? '极品'
-        : '仙品';
-    const rarityData = SPELL_RARITY[rarity];
-
-    // 计算效果加成
-    let attackBonus = 1.0;
-    let cooldownMod = 0;
-    selectedEssences.forEach(es => {
-        const esData = ELEMENTAL_ESSENCES[es];
-        if (esData && esData.effect.attack) attackBonus *= esData.effect.attack;
-        if (esData && esData.effect.cooldown) cooldownMod += esData.effect.cooldown;
-    });
-
-    power = Math.round(baseValue * attackBonus * rarityData.multiplier);
-    cooldown = Math.max(1, Math.round((1 + cooldownMod) * 5));
-
-    let effectDesc = '';
-    switch (typeData.baseEffect) {
-        case 'damage':
-            effectDesc = `伤害 ${power}`;
-            if (cooldownMod !== 0) effectDesc += ` | 冷却${cooldown}回合`;
-            break;
-        case 'shield':
-            effectDesc = `护盾 ${power}`;
-            break;
-        case 'heal':
-            effectDesc = `治疗 ${power}`;
-            break;
-        case 'buff':
-            effectDesc = `辅助效果`;
-            break;
-        case 'debuff':
-            effectDesc = `诅咒效果`;
-            break;
-        case 'summon':
-            effectDesc = `召唤威力 ${power}`;
-            break;
-        default:
-            effectDesc = typeData.baseEffect;
-    }
-
-    // 检测组合效果
-    if (selectedEssences.length >= 2) {
-        const comboKey = selectedEssences.slice(0, 2).sort().join('+');
-        const combo = SPELL_EFFECTS_COMBINATIONS[comboKey];
-        if (combo) {
-            effectDesc += ` | 🌟 ${combo.name}`;
-        }
-    }
-
-    const newSpell = {
-        name: name,
-        icon: selectedSpellIcon,
-        type: selectedSpellType,
-        essences: [...selectedEssences],
-        rarity: rarity,
-        level: 1,
-        power: power,
-        cooldown: cooldown,
-        effectDesc: effectDesc,
-        experience: 0,
-        createdAt: Date.now()
-    };
-
-    if (!gameState.customSpells) gameState.customSpells = [];
-    gameState.customSpells.push(newSpell);
-
-    addLog(`✨ 创造仙法「${name}」成功！${rarity}级`, '#e91e63');
-
-    // 重置选择
-    selectedSpellType = null;
-    selectedEssences = [];
-    selectedSpellIcon = '⚔️';
-
-    updateDisplay();
-    openSpellCreation();
-}
-
-function upgradeCustomSpell(idx) {
-    const spell = gameState.customSpells?.[idx];
-    if (!spell) return;
-
-    const rarityData = SPELL_RARITY[spell.rarity];
-    if (spell.level >= rarityData.maxLevel) {
-        addLog('已达等级上限', '#f44336');
-        return;
-    }
-
-    const upgradeCost = Math.floor(1000 * Math.pow(1.5, spell.level));
-    const herbCost = Math.floor(10 * Math.pow(1.3, spell.level));
-
-    if (gameState.spiritStones < upgradeCost || (gameState.herbs || 0) < herbCost) {
-        addLog('资源不足', '#f44336');
-        return;
-    }
-
-    gameState.spiritStones -= upgradeCost;
-    gameState.herbs = (gameState.herbs || 0) - herbCost;
-
-    spell.level++;
-    spell.power = Math.round(spell.power * 1.15);
-    spell.experience = 0;
-
-    addLog(`⬆️ 仙法「${spell.name}」升级至 Lv.${spell.level}！`, '#4caf50');
-    updateDisplay();
-    openSpellCreation();
-}
-
-function castCustomSpell(idx) {
-    const spell = gameState.customSpells?.[idx];
-    if (!spell) return;
-
-    // 检查冷却
-    if (spell.lastCastTime && Date.now() - spell.lastCastTime < spell.cooldown * 1000) {
-        addLog('仙法冷却中', '#f44336');
-        return;
-    }
-
-    spell.lastCastTime = Date.now();
-
-    // 施展效果
-    const typeData = SPELL_TYPES[spell.type];
-    switch (typeData.baseEffect) {
-        case 'damage':
-            // 对战斗中的敌人造成伤害
-            if (gameState.combat && gameState.combat.enemy) {
-                const damage = spell.power;
-                gameState.combat.enemy.hp = Math.max(0, gameState.combat.enemy.hp - damage);
-                addLog(`✨ 施展「${spell.name}」，造成 ${damage} 点伤害！`, '#f44336');
-            } else {
-                addLog(`✨ 施展「${spell.name}」，威力 ${spell.power}！`, '#e91e63');
-            }
-            break;
-        case 'shield':
-            if (!gameState.buffs) gameState.buffs = {};
-            gameState.buffs.shield = (gameState.buffs.shield || 0) + spell.power;
-            addLog(`✨ 施展「${spell.name}」，获得 ${spell.power} 点护盾！`, '#2196f3');
-            break;
-        case 'heal':
-            const healAmount = Math.round(spell.power * (1 + (gameState.cultivation?.comprehension || 0) * 0.01));
-            gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + healAmount);
-            addLog(`✨ 施展「${spell.name}」，恢复 ${healAmount} 点生命！`, '#4caf50');
-            break;
-        default:
-            addLog(`✨ 施展「${spell.name}」！`, '#e91e63');
-    }
-
-    updateDisplay();
-}
-
-function forgetCustomSpell(idx) {
-    const spell = gameState.customSpells?.[idx];
-    if (!spell) return;
-
-    // 返还部分精华
-    if (spell.essences && gameState.essences) {
-        spell.essences.forEach(es => {
-            gameState.essences[es] = (gameState.essences[es] || 0) + 1;
-        });
-    }
-
-    gameState.customSpells.splice(idx, 1);
-    addLog(`💨 遗忘仙法「${spell.name}」`, '#9e9e9e');
-    updateDisplay();
-    openSpellCreation();
-}
-
-function calculateTotalSpellPower() {
-    const spells = gameState.customSpells || [];
-    if (spells.length === 0) return 0;
-
-    let total = 0;
-    spells.forEach(spell => {
-        const rarityData = SPELL_RARITY[spell.rarity];
-        total += spell.power * rarityData.multiplier * spell.level;
-    });
-
-    return Math.round(total / spells.length);
-}
-
-function processDailySpellPractice() {
-    const spells = gameState.customSpells || [];
-
-    // 修炼加成
-    if (spells.length > 0 && gameState.cultivation) {
-        const practiceBonus = spells.length * 2;
-        if (!gameState.cultivation.comprehension) gameState.cultivation.comprehension = 0;
-        gameState.cultivation.comprehension += practiceBonus;
-    }
-
-    // 仙法自动领悟（每日小概率触发）
-    if (gameState.cultivation?.comprehension >= 50 && Math.random() < 0.1) {
-        // 随机领悟一个元素
-        const elements = Object.keys(ELEMENTAL_ESSENCES);
-        const randomElem = elements[Math.floor(Math.random() * elements.length)];
-        if (!gameState.essences) gameState.essences = {};
-        gameState.essences[randomElem] = (gameState.essences[randomElem] || 0) + 1;
-        addLog(`✨ 修炼时领悟了「${randomElem}」元素精华！`, '#e91e63');
-    }
-}
-// Auto-generated module: state.js
-
-        // --- gameState (1366-1480) ---
-        let gameState = {
-            realm: 0,       // 0-4 对应 炼气到化神
-            stage: 0,       // 0-2 对应 初期/中期/后期
-            qi: 0,
-            maxQi: 100,
-            spiritStones: 50,
-            mindset: 50,
-            days: 1,
-            cultivationProgress: 0,
-            eventLog: [],
-            combatLogHistory: [],
-            eventLogHistory: [],
-            isGameOver: false,
-            isVictory: false,
-            // V2新增字段
-            inventory: [],
-            equippedTreasures: [null, null, null],
-            maxInventorySlots: 20,
-            shopItems: [],
-            lastShopDay: 0,
-            activeEffects: {
-                breakthrough_boost: 0,
-                cultivate_speed: 0,
-                渡劫_mindset_protect: 0,
-                attack: 0,
-                defense: 0,
-                cultivate_qi_rate: 0,
-                渡劫_damage_reduce: 0,
-                escape: 0,
-                foresee_event: 0,
-                all_stats: 0,
-                serendipity_boost: 0
-            },
-            // V3渡劫系统字段
-            tribulation: {
-                inProgress: false,
-                currentStage: 0,
-                totalStages: 9,
-                currentType: null,
-                preparations: [],
-                damageTaken: 0,
-                tribKey: null
-            },
-            hasTransmigrationBuff: false,
-            tribulationRecord: [],
-            // V4 战斗系统字段
-            combat: {
-                wins: 0,
-                losses: 0,
-                honor: 0,
-                fame: 0,
-                battleHistory: [],
-                injured: false,
-                injuryEndDay: 0
-            },
-            // V5 宗门系统字段
-            sect: {
-                name: null,
-                level: 0,
-                spiritStones: 0,
-                disciples: [],
-                elders: [],
-                buildings: {
-                    library: false,
-                    alchemy: false,
-                    forge: false,
-                    archive: false
-                },
-                techniques: [],
-                contributionShop: [],
-                lastShopRefresh: 0,
-                lastResourceCollection: 0,
-                // V29 NPC AI系统
-                npcDialogueHistory: [],   // [{uid, text, isPlayer, day}]
-                npcTasks: [],             // [{uid, type, target, startDay, endDay, completed, progress}]
-                npcLastActions: {},        // {uid: {action, day}}
-                // V30 渡劫审批系统
-                tribulationRequest: {
-                    status: 'none',        // none | pending_elder | pending_leader | approved | rejected
-                    elderScore: 0,
-                    elderComment: '',
-                    leaderDecision: '',
-                    leaderComment: '',
-                    buffApplied: false,
-                    submitDay: 0
-                },
-                // V31 天道轮回系统
-                celestialCycle: {
-                    day: 0,                // 距离下次轮回的天数
-                    completed: false,      // 本周期是否已完成
-                    lastResult: null,       // 上次轮回结果 {type, text, effects}
-                    blessingActive: false, // 气运祈福是否激活
-                    cycleInterval: 3        // 轮回间隔天数
-                },
-                // V35 宗门任务链
-                sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
-                sectMissionCooldown: 0    // 任务冷却
-            },
-            // V6 奇遇系统字段
-            serendipity: {
-                lastTriggerDay: 0,
-                todayCount: 0,
-                lastTriggerType: null,
-                cooldownTypes: {},
-                badLuck: 0,
-                currentEvent: null,
-                log: [],
-                luckStatus: null,
-                luckEndDay: 0,
-                serendipityBoostEndDay: 0
-            },
-            // V7 灵根/体质系统字段
-            spiritRoot: {
-                quality: '中品灵根', // 伪灵根/下品灵根/中品灵根/上品灵根/天灵根/混沌灵根
-                affinity: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
-                resonance: 0,
-                lastRefreshDay: 0,
-                awakeningAvailable: false, // V32 是否可以觉醒
-                hasAwakened: false,          // V32 是否已完成觉醒
-                awakenedQuality: null        // V32 觉醒后的品质
-            },
-            // V32 灵根觉醒系统
-            spiritRootAwakening: {
-                status: 'dormant',   // dormant | stage1 | stage2 | stage3 | completed
-                stage: 0,
-                triggerDay: 0,
-                tasks: [],           // [{type, target, current, completed}]
-                rewards: null,
-                lastEventDay: 0,
-                attempts: 0
-            },
-            constitutions: [], // 已获得的体质
-            // V8 丹药炼器系统字段
-            crafting: {
-                furnace: { level: 1, type: 'alchemy' },
-                anvil: { level: 1, type: 'forge' },
-                transactionLog: []
-            },
-            // V11 成就/称号系统字段
-            title: '筑基修士',
-            achievements: {
-                unlocked: [],
-                titles: [],
-                stats: {
-                    tribulationsCompleted: 0,
-                    dungeonBossesKilled: 0,
-                    sectContributions: 0,
-                    treasuresRefined: 0,
-                    serendipitiesEncountered: 0,
-                    flawlessTribulations: 0
-                }
-            },
-            // V11 飞升系统字段
-            currentRealm: 'mortal',  // 'mortal' | 'immortal'
-            immortal: null,          // 仙界状态，飞升后初始化
-            mounts: [],              // 仙兽列表（最多3只）
-            immortalSkills: [],       // 仙法列表
-            immortalEquipment: {      // 飞升装备栏
-                head: null,
-                body: null,
-                foot: null,
-                weapon: null,
-                shield: null,
-                accessory: null
-            },
-            currentMount: null       // 当前骑乘的仙兽
-        };
-
-        // --- miniMaxConfig (1492-1502) ---
-        let miniMaxConfig = {
-            apiKey: '',
-            baseUrl: 'https://api.minimaxi.com/v1',
-            model: 'MiniMax-M2.7',
-            groupId: '',
-            features: {
-                aiDialogue: false,
-                aiSerendipity: false,
-                aiTechnique: false
-            }
-        };
-
-        // --- combatState (5037-5051) ---
-        let combatState = {
-            inProgress: false,
-            player: null,
-            opponent: null,
-            round: 0,
-            turn: 'player',
-            playerAction: null,
-            playerSubAction: null,
-            log: [],
-            effects: {
-                player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0, manaDrain: 0 },
-                opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
-            },
-            battleRecord: [],
-            // V33 战斗AI学习系统
-            combatProfile: {
-                playerPatterns: [],     // [{action, count, lastUsed}]
-                totalBattles: 0,
-                winsAgainst: 0,
-                currentEnemy: null,
-                learningData: {},       // {enemyId: {adaptationLevel, observedPatterns}}
-                preferredDistance: null,
-                spellUsageRate: 0,
-                defenseFrequency: 0,
-                attackTiming: []
-            },
-            lastCombatDay: 0,           // V33 上次战斗天数（用于触发学习）
-            // V35 宗门互动增强
-            sectMissions: [],         // [{id, type, target, progress, reward, assignedUid, status, description}]
-            sectMissionCooldown: 0,    // 任务冷却
-            lastMissionRefreshDay: 0,   // 上次任务刷新
-            // V36 装备打造增强
-            equipmentForgeCount: 0,     // 累计打造次数（用于解锁配方）
-            lastForgeDay: 0,            // 上次打造时间
-            // V37 天道法则系统
-            celestialLaws: {
-                comprehended: [],          // 已领悟的法则 ['time','space',...]
-                active: [],                // 当前激活的法则（最多3个）
-                comprehending: null,        // 当前领悟中的法则
-                comprehendingProgress: 0,  // 领悟进度 0-100
-                comprehendDays: 0,         // 领悟已进行的天数
-                maxActiveLaws: 3,          // 最大激活数量
-                lawBonus: {}               // 当前激活法则计算后的加成
-            },
-            // V38 仙界社交系统
-            immortalAlly: {
-                id: null,
-                name: '',
-                rank: 1,
-                role: 'none',     // none|member|elder|vice_leader|leader
-                contribution: 0,
-                joinedDay: 0,
-                allies: [],
-                skillLevel: 0,
-                dailyActivity: 0,
-                lastActivityDay: 0
-            },
-            immortalFriends: [],   // [{uid, name, realm, intimacy, lastInteraction}]
-            allyApplications: [],   // [{allyId, allyName, allyRank, applyDay, status}]
-            // V39 仙宠培养系统
-            spiritPets: {
-                pets: [],
-                lastInteractionDay: 0
-            },
-            // V40 仙界拍卖行
-            auction: {
-                listings: [],
-                frozenFunds: 0,
-                playerId: null,
-                playerName: null,
-                sortType: 'endingSoon'
-            },
-            // V41 仙界经济系统
-            economy: {
-                currentInflation: 0.02,
-                totalIncome: 0,
-                totalExpense: 0,
-                totalTax: 0,
-                totalWealth: 0,
-                avgDailyIncome: 50,
-                avgDailyExpense: 0,
-                luxuryPurchases: 0,
-                activeEvents: [],
-                economyBuffs: {}
-            },
-            // V42 天道竞技场
-            celestialArena: {
-                currentSeason: 1,
-                seasonStartTime: Date.now(),
-                currentRank: 1,
-                highestRank: 1,
-                score: 0,
-                totalScoreEarned: 0,
-                totalWins: 0,
-                totalLosses: 0,
-                currentStreak: 0,
-                longestStreak: 0,
-                promotionWins: 0,
-                dailyChallengesUsed: 0,
-                derankProtection: 2,
-                matchHistory: [],
-                lastRewardClaimed: 0,
-                totalRewardsClaimed: 0,
-                bountyPool: 0,
-                bountyWins: 0
-            },
-            // V43 仙宫建设系统
-            palace: {
-                level: 1,
-                prosperity: 100,
-                buildings: [],
-                workers: [],
-                styleIndex: 0,
-                bonus: {
-                    incomeBonus: 0,
-                    cultivationSpeed: 0,
-                    serendipityChance: 0,
-                    combatPower: 0
-                },
-                totalWagesPaid: 0
-            },
-            // V44 仙法创造系统
-            customSpells: [],
-            essences: {},
-            // V45 天道轮回增强
-            karma: {
-                points: 0,
-                goodKarma: 0,
-                evilKarma: 0,
-                reincarnationCount: 0,
-                pastLifeMemories: []
-            }
-        };
-
-        // --- secretRealmState (7391-7398) ---
-        let secretRealmState = {
-            wave: 0,
-            totalWaves: 3,
-            enemies: [],
-            playerHP: 0,
-            playerMaxHP: 0,
-            rewards: []
-        };
-
-
-// Auto-generated module: auction.js
-
-// ===== AUCTION CONSTANTS (V40) =====
-const AUCTION_CONFIG = {
-    minIncrement: 0.05,      // 最低加价幅度5%
-    maxBidHours: 24,        // 竞拍时长24小时
-    bidExtensionMinutes: 5, // 最后5分钟有人出价延长的时长
-    platformFee: 0.03,      // 平台手续费3%
-    listingFee: 100,         // 挂单费用100灵石
-    maxListings: 20,         // 最多同时挂20个物品
-    categories: ['功法', '装备', '丹药', '材料', '仙宠', '其他']
-};
-
-const AUCTION_RARITY = {
-    '普通': { color: '#9e9e9e', bidMultiplier: 1.0 },
-    '稀有': { color: '#2196f3', bidMultiplier: 1.5 },
-    '珍贵': { color: '#9c27b0', bidMultiplier: 2.5 },
-    '史诗': { color: '#ff9800', bidMultiplier: 5 },
-    '传说': { color: '#ffd700', bidMultiplier: 10 },
-    '神话': { color: '#f44336', bidMultiplier: 25 }
-};
-
-const AUCTION_CATEGORIES = {
-    '功法': { icon: '📖', itemTypes: ['technique', 'manual'] },
-    '装备': { icon: '⚔️', itemTypes: ['weapon', 'armor', 'accessory'] },
-    '丹药': { icon: '💊', itemTypes: ['pill', 'elixir'] },
-    '材料': { icon: '💎', itemTypes: ['herb', 'ore', 'spirit'] },
-    '仙宠': { icon: '🐉', itemTypes: ['pet'] },
-    '其他': { icon: '🎁', itemTypes: ['misc'] }
-};
-
-// ===== AUCTION FUNCTIONS =====
-
-function showAuctionPanel() {
-    const auction = gameState.auction;
-    const now = Date.now();
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:1000px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">🏪 仙界拍卖行</h2>
-            <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-                <button class="btn" style="background:#4caf50;color:white;" onclick="showAuctionBrowse()">🔍 浏览拍卖</button>
-                <button class="btn" style="background:#ff9800;color:white;" onclick="showAuctionMyBids()">📊 我的竞拍</button>
-                <button class="btn" style="background:#2196f3;color:white;" onclick="showAuctionMyListings()">📦 我的挂单</button>
-                <button class="btn" style="background:#9c27b0;color:white;" onclick="showAuctionCreateListing()">➕ 发布拍卖</button>
-            </div>`;
-
-    // 当前热门
-    const activeAuctions = auction.listings.filter(l => l.endTime > now && l.status === 'active');
-    const endingSoon = activeAuctions.filter(l => l.endTime - now < 3600000).sort((a, b) => a.endTime - b.endTime).slice(0, 5);
-
-    if (endingSoon.length > 0) {
-        html += `<div style="margin-bottom:15px;">
-            <h3 style="color:#f44336;margin-bottom:10px;">⏰ 即将结束</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">`;
-        endingSoon.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const timeLeft = formatAuctionTime(l.endTime - now);
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            html += `<div style="background:rgba(244,67,54,0.2);border:1px solid #f44336;border-radius:8px;padding:10px;cursor:pointer;" onclick="showAuctionDetail(${l.id})">
-                <div style="color:${rarityData.color};font-weight:bold;">${item.name}</div>
-                <div style="color:#aaa;font-size:0.85em;">${item.category} | ${item.rarity}</div>
-                <div style="color:#ffd700;">当前: ${currentBid}灵石</div>
-                <div style="color:#f44336;font-size:0.9em;">剩余: ${timeLeft}</div>
-            </div>`;
-        });
-        html += `</div></div>`;
-    }
-
-    // 高价值物品
-    const highValue = activeAuctions.filter(l => {
-        const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-        return currentBid >= 10000;
-    }).sort((a, b) => {
-        const aBid = a.bids.length > 0 ? a.bids[a.bids.length - 1].amount : a.startPrice;
-        const bBid = b.bids.length > 0 ? b.bids[b.bids.length - 1].amount : b.startPrice;
-        return bBid - aBid;
-    }).slice(0, 5);
-
-    if (highValue.length > 0) {
-        html += `<div style="margin-bottom:15px;">
-            <h3 style="color:#ffd700;margin-bottom:10px;">💰 高价值拍卖</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">`;
-        highValue.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            html += `<div style="background:rgba(255,215,0,0.1);border:1px solid #ffd700;border-radius:8px;padding:10px;cursor:pointer;" onclick="showAuctionDetail(${l.id})">
-                <div style="color:${rarityData.color};font-weight:bold;">${item.name}</div>
-                <div style="color:#aaa;font-size:0.85em;">${item.category} | ${item.rarity}</div>
-                <div style="color:#ffd700;">当前: ${currentBid}灵石</div>
-                <div style="color:#aaa;font-size:0.85em;">出价次数: ${l.bids.length}</div>
-            </div>`;
-        });
-        html += `</div></div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="closeModal()">关闭</button>
-    </div></div></div>`;
-    openModal('仙界拍卖行', html, []);
-}
-
-function showAuctionBrowse() {
-    const auction = gameState.auction;
-    const now = Date.now();
-    const activeListings = auction.listings.filter(l => l.endTime > now && l.status === 'active');
-    const categories = AUCTION_CONFIG.categories;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">🔍 浏览拍卖</h2>
-            <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
-                <button class="btn" style="background:#555;color:white;" onclick="showAuctionBrowse()">全部</button>`;
-    categories.forEach(cat => {
-        html += `<button class="btn" style="background:#333;color:white;" onclick="showAuctionBrowseByCategory('${cat}')">${AUCTION_CATEGORIES[cat].icon} ${cat}</button>`;
-    });
-    html += `</div>`;
-
-    // 排序选项
-    html += `<div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;">
-        <span style="color:#aaa;">排序:</span>
-        <button class="btn" style="background:#333;color:white;font-size:0.85em;" onclick="sortAuctionListings('endingSoon')">即将结束</button>
-        <button class="btn" style="background:#333;color:white;font-size:0.85em;" onclick="sortAuctionListings('priceHigh')">价格最高</button>
-        <button class="btn" style="background:#333;color:white;font-size:0.85em;" onclick="sortAuctionListings('priceLow')">价格最低</button>
-        <button class="btn" style="background:#333;color:white;font-size:0.85em;" onclick="sortAuctionListings('newest')">最新</button>
-    </div>`;
-
-    // 物品列表
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">`;
-    if (activeListings.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;grid-column:1/-1;">暂无拍卖物品</p>`;
-    } else {
-        activeListings.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const timeLeft = formatAuctionTime(l.endTime - now);
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            const isEnding = l.endTime - now < 3600000;
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${rarityData.color};border-radius:8px;padding:12px;cursor:pointer;${isEnding ? 'border-color:#f44336;' : ''}" onclick="showAuctionDetail(${l.id})">
-                <div style="color:${rarityData.color};font-weight:bold;font-size:1.05em;">${item.name}</div>
-                <div style="color:#aaa;font-size:0.85em;margin:4px 0;">${AUCTION_CATEGORIES[item.category]?.icon || '🎁'} ${item.category} | ${item.rarity}</div>
-                ${item.level ? `<div style="color:#aaa;font-size:0.8em;">等级: ${item.level}</div>` : ''}
-                <div style="color:#ffd700;margin-top:5px;">当前: ${formatNumber(currentBid)}灵石</div>
-                <div style="color:${isEnding ? '#f44336' : '#aaa'};font-size:0.85em;">⏰ ${timeLeft}</div>
-                <div style="color:#aaa;font-size:0.8em;">出价: ${l.bids.length}次</div>
-            </div>`;
-        });
-    }
-    html += `</div><div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionPanel()">返回</button>
-    </div></div></div>`;
-    openModal('浏览拍卖', html, []);
-}
-
-function showAuctionBrowseByCategory(category) {
-    const auction = gameState.auction;
-    const now = Date.now();
-    const activeListings = auction.listings.filter(l => l.endTime > now && l.status === 'active' && l.item.category === category);
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:900px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">${AUCTION_CATEGORIES[category].icon} ${category}拍卖</h2>`;
-
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">`;
-    if (activeListings.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;grid-column:1/-1;">该分类暂无拍卖物品</p>`;
-    } else {
-        activeListings.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const timeLeft = formatAuctionTime(l.endTime - now);
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            const isEnding = l.endTime - now < 3600000;
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${rarityData.color};border-radius:8px;padding:12px;cursor:pointer;${isEnding ? 'border-color:#f44336;' : ''}" onclick="showAuctionDetail(${l.id})">
-                <div style="color:${rarityData.color};font-weight:bold;font-size:1.05em;">${item.name}</div>
-                <div style="color:#aaa;font-size:0.85em;margin:4px 0;">${item.rarity}</div>
-                ${item.level ? `<div style="color:#aaa;font-size:0.8em;">等级: ${item.level}</div>` : ''}
-                <div style="color:#ffd700;margin-top:5px;">当前: ${formatNumber(currentBid)}灵石</div>
-                <div style="color:${isEnding ? '#f44336' : '#aaa'};font-size:0.85em;">⏰ ${timeLeft}</div>
-            </div>`;
-        });
-    }
-    html += `</div><div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionBrowse()">返回</button>
-    </div></div></div>`;
-    openModal(`${category}拍卖`, html, []);
-}
-
-function sortAuctionListings(sortType) {
-    gameState.auction.sortType = sortType;
-    showAuctionBrowse();
-}
-
-function showAuctionDetail(listingId) {
-    const auction = gameState.auction;
-    const listing = auction.listings.find(l => l.id === listingId);
-    if (!listing) {
-        addLog('拍卖物品不存在', '#f44336');
-        return;
-    }
-
-    const item = listing.item;
-    const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-    const now = Date.now();
-    const timeLeft = listing.endTime - now;
-    const currentBid = listing.bids.length > 0 ? listing.bids[listing.bids.length - 1].amount : listing.startPrice;
-    const minNextBid = Math.ceil(currentBid * (1 + AUCTION_CONFIG.minIncrement));
-    const myBids = listing.bids.filter(b => b.bidderId === gameState.playerId);
-    const isHighestBidder = myBids.length > 0 && listing.bids[listing.bids.length - 1].bidderId === gameState.playerId;
-    const isOwner = listing.sellerId === gameState.playerId;
-    const isEnded = timeLeft <= 0;
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid ${rarityData.color};border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:${rarityData.color};text-align:center;margin-bottom:10px;">${AUCTION_CATEGORIES[item.category]?.icon || '🎁'} ${item.name}</h2>
-            <div style="text-align:center;margin-bottom:15px;">
-                <span style="color:#aaa;">${item.category} | ${item.rarity}</span>
-                ${item.level ? `<span style="color:#aaa;"> | 等级: ${item.level}</span>` : ''}
-            </div>`;
-
-    // 物品描述
-    html += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;">
-        <div style="color:#ffd700;">${item.description || '暂无描述'}</div>
-        ${item.stats ? `<div style="margin-top:8px;color:#aaa;">属性: ${Object.entries(item.stats).map(([k, v]) => `${k}+${v}`).join(' | ')}</div>` : ''}
-        ${item.effects ? `<div style="color:#aaa;font-size:0.9em;">效果: ${item.effects}</div>` : ''}
-    </div>`;
-
-    // 拍卖信息
-    html += `<div style="margin-bottom:15px;">
-        <div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #333;">
-            <span style="color:#aaa;">起拍价</span>
-            <span style="color:#ffd700;">${formatNumber(listing.startPrice)}灵石</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #333;">
-            <span style="color:#aaa;">当前价</span>
-            <span style="color:#ffd700;font-weight:bold;">${formatNumber(currentBid)}灵石</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #333;">
-            <span style="color:#aaa;">竞拍次数</span>
-            <span style="color:#fff;">${listing.bids.length}次</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #333;">
-            <span style="color:#aaa;">剩余时间</span>
-            <span style="color:${timeLeft < 3600000 ? '#f44336' : '#4caf50'};font-weight:bold;">${isEnded ? '已结束' : formatAuctionTime(timeLeft)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px;">
-            <span style="color:#aaa;">卖家</span>
-            <span style="color:#fff;">${listing.sellerName}</span>
-        </div>
-    </div>`;
-
-    // 竞拍历史
-    if (listing.bids.length > 0) {
-        html += `<div style="margin-bottom:15px;">
-            <h4 style="color:#ffd700;margin-bottom:8px;">竞拍记录</h4>`;
-        listing.bids.slice(-5).reverse().forEach(b => {
-            const isMe = b.bidderId === gameState.playerId;
-            html += `<div style="display:flex;justify-content:space-between;padding:4px;font-size:0.9em;">
-                <span style="color:${isMe ? '#4caf50' : '#aaa'};">${isMe ? '我' : b.bidderName}</span>
-                <span style="color:#ffd700;">${formatNumber(b.amount)}灵石</span>
-                <span style="color:#888;">${formatAuctionTime(now - b.time)}前</span>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    // 出价/取消
-    if (!isEnded) {
-        if (isOwner) {
-            html += `<p style="color:#aaa;text-align:center;">这是您的拍卖物品</p>`;
-        } else {
-            if (isHighestBidder) {
-                html += `<p style="color:#4caf50;text-align:center;margin-bottom:10px;">🏆 您是当前最高出价者</p>`;
-            }
-            html += `<div style="display:flex;gap:10px;margin-bottom:10px;">
-                <input type="number" id="bidAmount" value="${minNextBid}" min="${minNextBid}" step="${Math.ceil(minNextBid * 0.05)}"
-                    style="flex:1;background:#333;border:1px solid #555;color:#ffd700;padding:10px;border-radius:5px;" />
-                <button class="btn" style="background:#4caf50;color:white;" onclick="placeBid(${listingId})">出价</button>
-            </div>`;
-            if (myBids.length > 0) {
-                html += `<button class="btn" style="background:#f44336;color:white;width:100%;" onclick="cancelMyBid(${listingId})">取消我的出价（返还${myBids[0].amount}灵石）</button>`;
-            }
-        }
-    } else {
-        // 拍卖已结束
-        if (listing.bids.length > 0) {
-            const winner = listing.bids[listing.bids.length - 1];
-            if (winner.bidderId === gameState.playerId) {
-                html += `<p style="color:#4caf50;text-align:center;font-size:1.2em;">🏆 恭喜您拍得此物品！</p>`;
-                if (!listing.winnerPaid) {
-                    html += `<button class="btn" style="background:#4caf50;color:white;width:100%;margin-top:10px;" onclick="claimAuctionItem(${listingId})">确认收货（支付${formatNumber(currentBid)}灵石）</button>`;
-                } else {
-                    html += `<p style="color:#aaa;text-align:center;">物品已发放至背包</p>`;
-                }
-            } else if (isOwner) {
-                html += `<p style="color:#ffd700;text-align:center;">拍卖结束，售出给 ${winner.bidderName}</p>`;
-                html += `<p style="color:#aaa;text-align:center;">获得 ${formatNumber(Math.floor(currentBid * (1 - AUCTION_CONFIG.platformFee)))} 灵石（扣除${AUCTION_CONFIG.platformFee * 100}%手续费）</p>`;
-            } else {
-                html += `<p style="color:#aaa;text-align:center;">很遗憾，您未能拍得此物品</p>`;
-            }
-        } else {
-            html += `<p style="color:#aaa;text-align:center;">拍卖流拍</p>`;
-            if (isOwner) {
-                html += `<p style="color:#888;text-align:center;">物品已返还至背包</p>`;
-            }
-        }
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionBrowse()">返回</button>
-    </div></div></div>`;
-    openModal('拍卖详情', html, []);
-}
-
-function placeBid(listingId) {
-    const bidInput = document.getElementById('bidAmount');
-    if (!bidInput) return;
-    const amount = parseInt(bidInput.value);
-
-    const auction = gameState.auction;
-    const listing = auction.listings.find(l => l.id === listingId);
-    if (!listing) {
-        addLog('拍卖物品不存在', '#f44336');
-        return;
-    }
-
-    if (listing.sellerId === gameState.playerId) {
-        addLog('不能竞拍自己的物品', '#f44336');
-        return;
-    }
-
-    if (amount > gameState.spiritStones) {
-        addLog('灵石不足', '#f44336');
-        return;
-    }
-
-    const currentBid = listing.bids.length > 0 ? listing.bids[listing.bids.length - 1].amount : listing.startPrice;
-    const minBid = Math.ceil(currentBid * (1 + AUCTION_CONFIG.minIncrement));
-
-    if (amount < minBid) {
-        addLog(`最低出价 ${formatNumber(minBid)} 灵石`, '#f44336');
-        return;
-    }
-
-    // 冻结灵石
-    gameState.spiritStones -= amount;
-    if (!auction.frozenFunds) auction.frozenFunds = 0;
-    auction.frozenFunds += amount;
-
-    // 记录出价
-    const bid = {
-        bidderId: gameState.playerId,
-        bidderName: gameState.playerName,
-        amount: amount,
-        time: Date.now()
-    };
-    listing.bids.push(bid);
-
-    // 延长竞拍时间（最后5分钟）
-    const now = Date.now();
-    const timeLeft = listing.endTime - now;
-    if (timeLeft < AUCTION_CONFIG.bidExtensionMinutes * 60 * 1000) {
-        listing.endTime = now + AUCTION_CONFIG.bidExtensionMinutes * 60 * 1000;
-        addLog('竞拍时间已延长5分钟', '#ff9800');
-    }
-
-    addLog(`出价成功：${formatNumber(amount)}灵石`, '#4caf50');
-    updateDisplay();
-    showAuctionDetail(listingId);
-}
-
-function cancelMyBid(listingId) {
-    const auction = gameState.auction;
-    const listing = auction.listings.find(l => l.id === listingId);
-    if (!listing) return;
-
-    const myBidIdx = listing.bids.findIndex(b => b.bidderId === gameState.playerId);
-    if (myBidIdx === -1) {
-        addLog('您没有出价记录', '#f44336');
-        return;
-    }
-
-    // 解冻灵石
-    const myBid = listing.bids[myBidIdx];
-    gameState.spiritStones += myBid.amount;
-    if (auction.frozenFunds) auction.frozenFunds -= myBid.amount;
-
-    // 移除出价（只移除最后一笔）
-    listing.bids.splice(myBidIdx, 1);
-    addLog('已取消出价', '#4caf50');
-    updateDisplay();
-    showAuctionBrowse();
-}
-
-function claimAuctionItem(listingId) {
-    const auction = gameState.auction;
-    const listing = auction.listings.find(l => l.id === listingId);
-    if (!listing) return;
-
-    const winner = listing.bids[listing.bids.length - 1];
-    if (winner.bidderId !== gameState.playerId) {
-        addLog('您不是最高出价者', '#f44336');
-        return;
-    }
-
-    if (listing.winnerPaid) {
-        addLog('已确认收货', '#f44336');
-        return;
-    }
-
-    const finalPrice = winner.amount;
-    const platformFee = Math.floor(finalPrice * AUCTION_CONFIG.platformFee);
-
-    // 解冻并扣除
-    if (auction.frozenFunds) auction.frozenFunds -= finalPrice;
-    gameState.spiritStones -= (finalPrice - winner.amount); // 只补差价
-    if (gameState.spiritStones < 0) {
-        gameState.spiritStones += finalPrice;
-        addLog('灵石不足', '#f44336');
-        return;
-    }
-
-    // 发放物品
-    addItemToInventory(listing.item);
-    listing.winnerPaid = true;
-
-    // 给卖家转帐（扣除手续费）
-    const sellerEarnings = finalPrice - platformFee;
-    // 卖家灵石通过后台处理，这里只记录
-    listing.sellerEarnings = sellerEarnings;
-
-    addLog(`获得物品：${listing.item.name}`, '#4caf50');
-    updateDisplay();
-    showAuctionPanel();
-}
-
-function showAuctionMyBids() {
-    const auction = gameState.auction;
-    const now = Date.now();
-    const myBidListings = auction.listings.filter(l => l.bids.some(b => b.bidderId === gameState.playerId));
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #ff9800;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#ff9800;text-align:center;margin-bottom:15px;">📊 我的竞拍</h2>`;
-
-    if (myBidListings.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">暂无竞拍记录</p>`;
-    } else {
-        html += `<div style="display:grid;gap:12px;">`;
-        myBidListings.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            const myLastBid = [...l.bids].reverse().find(b => b.bidderId === gameState.playerId);
-            const isHighest = l.bids.length > 0 && l.bids[l.bids.length - 1].bidderId === gameState.playerId;
-            const isEnded = l.endTime <= now;
-            const timeLeft = l.endTime - now;
-
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${rarityData.color};border-radius:8px;padding:12px;cursor:pointer;" onclick="showAuctionDetail(${l.id})">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="color:${rarityData.color};font-weight:bold;">${item.name}</div>
-                        <div style="color:#aaa;font-size:0.85em;">${item.category} | ${item.rarity}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="color:${isHighest ? '#4caf50' : '#f44336'};">${isHighest ? '🏆 领先' : '落后'}</div>
-                        <div style="color:#ffd700;">我的出价: ${formatNumber(myLastBid?.amount || 0)}</div>
-                        <div style="color:#aaa;font-size:0.85em;">${isEnded ? '已结束' : '剩余: ' + formatAuctionTime(timeLeft)}</div>
-                    </div>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionPanel()">返回</button>
-    </div></div></div>`;
-    openModal('我的竞拍', html, []);
-}
-
-function showAuctionMyListings() {
-    const auction = gameState.auction;
-    const now = Date.now();
-    const myListings = auction.listings.filter(l => l.sellerId === gameState.playerId);
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #2196f3;border-radius:12px;padding:20px;max-width:800px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#2196f3;text-align:center;margin-bottom:15px;">📦 我的挂单</h2>`;
-
-    if (myListings.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">暂无挂单</p>`;
-    } else {
-        html += `<div style="display:grid;gap:12px;">`;
-        myListings.forEach(l => {
-            const item = l.item;
-            const rarityData = AUCTION_RARITY[item.rarity] || AUCTION_RARITY['普通'];
-            const currentBid = l.bids.length > 0 ? l.bids[l.bids.length - 1].amount : l.startPrice;
-            const isEnded = l.endTime <= now;
-            const timeLeft = l.endTime - now;
-
-            html += `<div style="background:rgba(0,0,0,0.3);border:1px solid ${rarityData.color};border-radius:8px;padding:12px;cursor:pointer;" onclick="showAuctionDetail(${l.id})">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="color:${rarityData.color};font-weight:bold;">${item.name}</div>
-                        <div style="color:#aaa;font-size:0.85em;">起拍: ${formatNumber(l.startPrice)}灵石</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="color:#ffd700;font-weight:bold;">当前: ${formatNumber(currentBid)}灵石</div>
-                        <div style="color:${isEnded ? '#f44336' : '#4caf50'};">${isEnded ? '已结束' : '剩余: ' + formatAuctionTime(timeLeft)}</div>
-                        <div style="color:#aaa;font-size:0.85em;">出价: ${l.bids.length}次</div>
-                    </div>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionPanel()">返回</button>
-    </div></div></div>`;
-    openModal('我的挂单', html, []);
-}
-
-function showAuctionCreateListing() {
-    const auction = gameState.auction;
-    if (auction.listings.filter(l => l.sellerId === gameState.playerId && l.endTime > Date.now()).length >= AUCTION_CONFIG.maxListings) {
-        addLog(`最多同时挂${AUCTION_CONFIG.maxListings}个物品`, '#f44336');
-        return;
-    }
-
-    // 获取可上架物品（背包中的装备/丹药/材料等）
-    const sellableItems = gameState.inventory.filter(item => {
-        return item && (item.rarity || item.quality) && !item.auctionListed;
-    });
-
-    let html = `<div class="modal" style="display:block;background:rgba(0,0,0,0.8);">
-        <div style="background:#1a1a2e;border:2px solid #9c27b0;border-radius:12px;padding:20px;max-width:600px;max-height:90vh;overflow-y:auto;">
-            <h2 style="color:#9c27b0;text-align:center;margin-bottom:15px;">➕ 发布拍卖</h2>
-            <p style="color:#aaa;text-align:center;margin-bottom:15px;">挂单费用: ${AUCTION_CONFIG.listingFee}灵石 | 手续费: ${AUCTION_CONFIG.platformFee * 100}%</p>`;
-
-    if (sellableItems.length === 0) {
-        html += `<p style="color:#aaa;text-align:center;">背包中没有可上架的物品</p>`;
-    } else {
-        html += `<div style="max-height:300px;overflow-y:auto;margin-bottom:15px;">
-            <div style="display:grid;gap:8px;">`;
-        sellableItems.slice(0, 10).forEach((item, idx) => {
-            const rarity = item.rarity || item.quality || '普通';
-            const rarityData = AUCTION_RARITY[rarity] || AUCTION_RARITY['普通'];
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:5px;cursor:pointer;"
-                onclick="selectAuctionItem(${idx})" id="auctionItem${idx}">
-                <div>
-                    <span style="color:${rarityData.color};">${item.name}</span>
-                    <span style="color:#888;font-size:0.85em;">${rarity}</span>
-                </div>
-                <span style="color:#ffd700;">选择</span>
-            </div>`;
-        });
-        html += `</div></div>`;
-
-        // 选择后显示设置表单
-        html += `<div id="auctionForm" style="display:none;">
-            <div style="margin-bottom:10px;">
-                <label style="color:#aaa;display:block;margin-bottom:5px;">起拍价（灵石）</label>
-                <input type="number" id="auctionStartPrice" value="1000" min="1" step="100"
-                    style="width:100%;background:#333;border:1px solid #555;color:#ffd700;padding:8px;border-radius:5px;" />
-            </div>
-            <div style="margin-bottom:10px;">
-                <label style="color:#aaa;display:block;margin-bottom:5px;">拍卖时长</label>
-                <select id="auctionDuration" style="width:100%;background:#333;border:1px solid #555;color:#ffd700;padding:8px;border-radius:5px;">
-                    <option value="6">6小时</option>
-                    <option value="12">12小时</option>
-                    <option value="24" selected>24小时</option>
-                    <option value="48">48小时</option>
-                    <option value="72">72小时</option>
-                </select>
-            </div>
-            <button class="btn" style="background:#4caf50;color:white;width:100%;" onclick="confirmAuctionListing()">确认发布</button>
-        </div>`;
-
-        // 存储选择
-        window._selectedAuctionItem = null;
-        window._sellableItems = sellableItems.slice(0, 10);
-    }
-
-    html += `<div style="text-align:center;margin-top:15px;">
-        <button class="btn" style="background:#555;color:white;" onclick="showAuctionPanel()">取消</button>
-    </div></div></div>`;
-    openModal('发布拍卖', html, []);
-}
-
-function selectAuctionItem(idx) {
-    window._selectedAuctionItem = idx;
-    document.getElementById('auctionForm').style.display = 'block';
-
-    // 高亮选中
-    document.querySelectorAll('[id^="auctionItem"]').forEach((el, i) => {
-        el.style.border = i === idx ? '2px solid #4caf50' : 'none';
-    });
-}
-
-function confirmAuctionListing() {
-    const idx = window._selectedAuctionItem;
-    if (idx === null || idx === undefined) {
-        addLog('请选择要拍卖的物品', '#f44336');
-        return;
-    }
-
-    const item = window._sellableItems[idx];
-    if (!item) return;
-
-    const startPrice = parseInt(document.getElementById('auctionStartPrice').value);
-    const duration = parseInt(document.getElementById('auctionDuration').value);
-
-    if (startPrice < 1) {
-        addLog('起拍价必须大于0', '#f44336');
-        return;
-    }
-
-    if (gameState.spiritStones < AUCTION_CONFIG.listingFee) {
-        addLog(`挂单费用${AUCTION_CONFIG.listingFee}灵石不足`, '#f44336');
-        return;
-    }
-
-    // 扣除挂单费
-    gameState.spiritStones -= AUCTION_CONFIG.listingFee;
-
-    // 从背包移除
-    const invIdx = gameState.inventory.findIndex(i => i === item);
-    if (invIdx !== -1) gameState.inventory.splice(invIdx, 1);
-
-    // 创建拍卖
-    const auction = gameState.auction;
-    const listing = {
-        id: 'auction_' + Date.now(),
-        item: { ...item },
-        sellerId: gameState.playerId,
-        sellerName: gameState.playerName,
-        startPrice: startPrice,
-        currentPrice: startPrice,
-        startTime: Date.now(),
-        endTime: Date.now() + duration * 3600000,
-        bids: [],
-        status: 'active',
-        winnerPaid: false,
-        sellerEarnings: 0
-    };
-
-    auction.listings.push(listing);
-    addLog(`拍卖发布成功：${item.name}，起拍价${formatNumber(startPrice)}灵石`, '#4caf50');
-    updateDisplay();
-    showAuctionPanel();
-}
-
-function processAuctionEnd() {
-    const auction = gameState.auction;
-    const now = Date.now();
-
-    auction.listings.forEach(listing => {
-        if (listing.status === 'active' && listing.endTime <= now) {
-            listing.status = 'ended';
-
-            if (listing.bids.length > 0) {
-                const winner = listing.bids[listing.bids.length - 1];
-                // 如果赢家未付款或未确认，物品返还卖家（简化处理）
-                if (!listing.winnerPaid && winner.bidderId !== listing.sellerId) {
-                    // 返还卖家灵石（解冻）
-                    // 实际上赢家灵石已冻结，这里简化处理
-                }
-            } else {
-                // 流拍，物品返还卖家
-                addItemToInventory(listing.item);
-                addLog(`拍卖流拍：${listing.item.name} 已返还背包`, '#aaa');
-            }
-        }
-    });
-}
-
-function formatAuctionTime(ms) {
-    if (ms <= 0) return '0秒';
-    const hours = Math.floor(ms / 3600000);
-    const minutes = Math.floor((ms % 3600000) / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    if (hours > 0) return `${hours}小时${minutes}分`;
-    if (minutes > 0) return `${minutes}分${seconds}秒`;
-    return `${seconds}秒`;
-}
-
-function formatNumber(num) {
-    if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿';
-    if (num >= 10000) return (num / 10000).toFixed(1) + '万';
-    return num.toLocaleString();
-}
-
-// 初始化playerId
-if (!gameState.playerId) {
-    gameState.playerId = 'player_' + Date.now();
-}
-if (!gameState.playerName) {
-    gameState.playerName = '修士' + Math.floor(Math.random() * 9999);
-}
-// Auto-generated module: ui.js
-
-        // --- CONTINENTS (7877-7926) ---
-        const CONTINENTS = {
-            '中州': {
-                icon: '🏯',
-                requiredRealm: 0, // 筑基
-                dangerLevel: 1,
-                description: '新手大陆，安全区域，宗门林立',
-                color: '#4caf50',
-                regions: ['中州城', '中州野外', '青云山']
-            },
-            '南疆': {
-                icon: '🌴',
-                requiredRealm: 1, // 金丹
-                dangerLevel: 2,
-                description: '妖兽聚集之地，材料丰富',
-                color: '#ff9800',
-                regions: ['南疆密林', '妖兽谷', '毒瘴沼泽']
-            },
-            '北域': {
-                icon: '❄️',
-                requiredRealm: 2, // 元婴
-                dangerLevel: 3,
-                description: '宗门林立，功法交易盛行',
-                color: '#2196f3',
-                regions: ['北域雪山', '冰魄宫', '寒冰洞府']
-            },
-            '西域': {
-                icon: '🏜️',
-                requiredRealm: 3, // 化神
-                dangerLevel: 4,
-                description: '秘境众多，机缘深厚',
-                color: '#ff5722',
-                regions: ['西域沙漠', '火焰山', '风沙遗迹']
-            },
-            '东海': {
-                icon: '🌊',
-                requiredRealm: 2, // 元婴
-                dangerLevel: 3,
-                description: '海族领地，神兽出没',
-                color: '#00bcd4',
-                regions: ['东海渔村', '深海礁石', '龙宫入口']
-            },
-            '仙界碎片': {
-                icon: '✨',
-                requiredRealm: 4, // 渡劫
-                dangerLevel: 5,
-                description: '飞升前最终试炼，蕴含成仙之秘',
-                color: '#9c27b0',
-                regions: ['仙府遗迹', '天劫之渊', '飞升祭坛']
-            }
-        };
-
-        // --- REGIONS (7929-8052) ---
-        const REGIONS = {
-            '中州城': {
-                type: 'safe', // 安全区
-                monsters: [],
-                resources: ['灵草', '普通矿石'],
-                description: '繁华的修仙者聚落，可休息和交易'
-            },
-            '中州野外': {
-                type: 'wild', // 野外区
-                monsters: ['野兔精', '狐狸精'],
-                monsterLevel: [1, 5],
-                resources: ['灵草', '妖兽血'],
-                description: '中州边缘的野外区域，有低级妖兽出没'
-            },
-            '青云山': {
-                type: 'secret', // 秘境
-                secretRealm: '青云洞府',
-                difficulty: 'low',
-                description: '上古修士洞府，藏有入门功法'
-            },
-            '南疆密林': {
-                type: 'wild',
-                monsters: ['妖兽狼', '巨蟒'],
-                monsterLevel: [10, 20],
-                resources: ['妖兽皮', '妖兽骨', '南疆蛊虫'],
-                description: '密林深处，妖兽横行'
-            },
-            '妖兽谷': {
-                type: 'boss', // 有首领
-                monsters: ['妖兽狼王'],
-                monsterLevel: [25],
-                bossName: '妖兽谷主',
-                resources: ['妖兽皮', '兽王胆'],
-                description: '妖兽聚集之地，首领，每7天刷新'
-            },
-            '毒瘴沼泽': {
-                type: 'wild',
-                monsters: ['毒蛙', '沼蟒'],
-                monsterLevel: [15, 25],
-                resources: ['毒囊', '沼泽精华'],
-                description: '充满毒气的沼泽区域'
-            },
-            '北域雪山': {
-                type: 'wild',
-                monsters: ['冰魄熊', '雪怪'],
-                monsterLevel: [25, 35],
-                resources: ['冰魄精', '寒冰髓'],
-                description: '终年积雪，寒冷刺骨'
-            },
-            '冰魄宫': {
-                type: 'boss',
-                monsters: ['冰魄熊王'],
-                monsterLevel: [40],
-                bossName: '冰魄宫主',
-                resources: ['冰魄精', '万年寒冰'],
-                description: '冰系修士的圣地，首领，每7天刷新'
-            },
-            '寒冰洞府': {
-                type: 'secret',
-                secretRealm: '上古冰宫',
-                difficulty: 'medium',
-                description: '上古遗迹，藏有冰系高阶功法'
-            },
-            '西域沙漠': {
-                type: 'wild',
-                monsters: ['沙虫', '蝎王'],
-                monsterLevel: [40, 50],
-                resources: ['沙之心', '蝎王毒'],
-                description: '茫茫沙漠，危机四伏'
-            },
-            '火焰山': {
-                type: 'boss',
-                monsters: ['火焰狮王'],
-                monsterLevel: [55],
-                bossName: '火焰山主',
-                resources: ['火精', '熔岩核心'],
-                description: '火焰肆虐之地，首领，每7天刷新'
-            },
-            '风沙遗迹': {
-                type: 'secret',
-                secretRealm: '古修士遗迹',
-                difficulty: 'high',
-                description: '上古遗迹，藏有混沌石'
-            },
-            '东海渔村': {
-                type: 'safe',
-                monsters: [],
-                resources: ['珍珠', '海藻'],
-                description: '东海之滨的小渔村，可休整'
-            },
-            '深海礁石': {
-                type: 'wild',
-                monsters: ['海妖', '巨型章鱼'],
-                monsterLevel: [35, 45],
-                resources: ['海妖珠', '深海珍珠'],
-                description: '深海区域，海族妖兽出没'
-            },
-            '龙宫入口': {
-                type: 'secret',
-                secretRealm: '东海龙宫',
-                difficulty: 'high',
-                description: '传说中龙族的宫殿，藏有龙族秘宝'
-            },
-            '仙府遗迹': {
-                type: 'secret',
-                secretRealm: '仙府',
-                difficulty: 'extreme',
-                description: '仙界碎片中的遗迹，有飞升道具'
-            },
-            '天劫之渊': {
-                type: 'boss',
-                monsters: ['天劫守护兽'],
-                monsterLevel: [70],
-                bossName: '天劫化身',
-                resources: ['天劫雷晶', '渡劫丹方'],
-                description: '天劫之力凝聚，首领，每7天刷新'
-            },
-            '飞升祭坛': {
-                type: 'secret',
-                secretRealm: '飞升台',
-                difficulty: 'extreme',
-                description: '最终飞升之地，需要渡劫期才能进入'
-            }
-        };
-
-        // --- SECRET_REALMS (8055-8086) ---
-        const SECRET_REALMS = {
-            '青云洞府': {
-                duration: 30,
-                reward: '入门功法',
-                successRate: 0.8
-            },
-            '上古冰宫': {
-                duration: 40,
-                reward: '冰系功法',
-                successRate: 0.6
-            },
-            '古修士遗迹': {
-                duration: 50,
-                reward: '混沌石',
-                successRate: 0.4
-            },
-            '东海龙宫': {
-                duration: 50,
-                reward: '龙族材料',
-                successRate: 0.35
-            },
-            '仙府': {
-                duration: 60,
-                reward: '飞升道具',
-                successRate: 0.25
-            },
-            '飞升台': {
-                duration: 60,
-                reward: '飞升丹',
-                successRate: 0.2
-            }
-        };
-
-
-// Auto-generated module: worldmap.js
+// ===== worldmap.js =====
 
         // ===== initWorldMap =====
         function initWorldMap() {
@@ -18887,4 +9942,2938 @@ if (!gameState.playerName) {
             }
         }
 
+
+// ===== init.js =====
+
+        // ===== init =====
+        function init() {
+            loadMiniMaxConfig();
+            updateDisplay();
+        }
+
+        // ===== loadMiniMaxConfig =====
+        function loadMiniMaxConfig() {
+            const saved = localStorage.getItem(CONFIG.miniMaxConfigKey);
+            if (saved) {
+                try {
+                    miniMaxConfig = JSON.parse(saved);
+                    // 确保features结构完整
+                    if (!miniMaxConfig.features) {
+                        miniMaxConfig.features = { ...DEFAULT_MINIMAX_CONFIG.features };
+                    }
+                } catch (e) {
+                    miniMaxConfig = { ...DEFAULT_MINIMAX_CONFIG };
+                }
+            }
+        }
+
+        // ===== startNewGame =====
+        function startNewGame() {
+            gameState = {
+                realm: 0,
+                stage: 0,
+                qi: 20,
+                maxQi: 100,
+                spiritStones: 50,
+                mindset: 50,
+                days: 1,
+                cultivationProgress: 0,
+                eventLog: [],
+                isGameOver: false,
+                isVictory: false,
+                inventory: [],
+                equippedTreasures: [null, null, null],
+                maxInventorySlots: 20,
+                shopItems: [],
+                lastShopDay: 0,
+                shopRefreshCount: 0, // 经济调整：商店刷新次数计数器，用于递增刷新费用
+                activeEffects: {
+                    breakthrough_boost: 0,
+                    cultivate_speed: 0,
+                    渡劫_mindset_protect: 0,
+                    attack: 0,
+                    defense: 0,
+                    cultivate_qi_rate: 0,
+                    渡劫_damage_reduce: 0,
+                    escape: 0,
+                    foresee_event: 0,
+                    all_stats: 0
+                },
+                tribulation: {
+                    inProgress: false,
+                    currentStage: 0,
+                    totalStages: 9,
+                    currentType: null,
+                    preparations: [],
+                    damageTaken: 0,
+                    tribKey: null
+                },
+                hasTransmigrationBuff: false,
+                tribulationRecord: [],
+                combat: {
+                    wins: 0,
+                    losses: 0,
+                    honor: 0,
+                    fame: 0,
+                    battleHistory: [],
+                    injured: false,
+                    injuryEndDay: 0
+                },
+                sect: {
+                    name: null,
+                    level: 0,
+                    spiritStones: 0,
+                    disciples: [],
+                    elders: [],
+                    buildings: {
+                        library: false,
+                        alchemy: false,
+                        forge: false,
+                        archive: false
+                    },
+                    techniques: [],
+                    contributionShop: [],
+                    lastShopRefresh: 0,
+                    lastResourceCollection: 0,
+                    // V29 NPC AI系统
+                    npcDialogueHistory: [],
+                    npcTasks: [],
+                    npcLastActions: {},
+                    // V30 渡劫审批系统
+                    tribulationRequest: {
+                        status: 'none',
+                        elderScore: 0,
+                        elderComment: '',
+                        leaderDecision: '',
+                        leaderComment: '',
+                        buffApplied: false,
+                        submitDay: 0
+                    },
+                    // V31 天道轮回系统
+                    celestialCycle: {
+                        day: 0,
+                        completed: false,
+                        lastResult: null,
+                        blessingActive: false,
+                        cycleInterval: 3
+                    },
+                    // V35 宗门任务链
+                    sectMissions: [],
+                    sectMissionCooldown: 0,
+                    lastMissionRefreshDay: 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: 0,
+                    lastForgeDay: 0,
+                    // V37 天道法则系统
+                    celestialLaws: {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    }
+                },
+                // V6 奇遇系统字段
+                serendipity: {
+                    lastTriggerDay: 0,
+                    todayCount: 0,
+                    lastTriggerType: null,
+                    cooldownTypes: {},
+                    badLuck: 0,
+                    currentEvent: null,
+                    log: [],
+                    luckStatus: null,
+                    luckEndDay: 0,
+                    serendipityBoostEndDay: 0
+                },
+                // V7 灵根/体质系统
+                spiritRoot: {
+                    ...generateRandomSpiritRoot(),
+                    awakeningAvailable: false,
+                    hasAwakened: false,
+                    awakenedQuality: null
+                },
+                // V32 灵根觉醒系统
+                spiritRootAwakening: {
+                    status: 'dormant',
+                    stage: 0,
+                    triggerDay: 0,
+                    tasks: [],
+                    rewards: null,
+                    lastEventDay: 0,
+                    attempts: 0
+                },
+                constitutions: [],
+                // V8 丹药炼器系统
+                crafting: {
+                    furnace: { level: 1, type: 'alchemy' },
+                    anvil: { level: 1, type: 'forge' },
+                    transactionLog: []
+                },
+                // V9 世界地图系统
+                worldMap: {
+                    currentContinent: '中州',
+                    currentRegion: '中州城',
+                    exploredContinents: ['中州'],
+                    exploredRegions: ['中州城', '中州野外'],
+                    actionPower: 10,
+                    maxActionPower: 10,
+                    continentUnlocks: {
+                        '中州': 0,
+                        '南疆': 1,
+                        '北域': 2,
+                        '西域': 3,
+                        '东海': 2,
+                        '仙界碎片': 4
+                    },
+                    bossRefreshDays: {},
+                    lastTravelDay: 0
+                },
+                // E1 NPC对话记忆
+                npcMemory: [],
+                // B 成就/称号系统
+                title: '筑基修士',
+                achievements: {
+                    unlocked: [],
+                    titles: [],
+                    stats: {
+                        tribulationsCompleted: 0,
+                        dungeonBossesKilled: 0,
+                        sectContributions: 0,
+                        treasuresRefined: 0,
+                        serendipitiesEncountered: 0,
+                        flawlessTribulations: 0
+                    }
+                }
+            };
+            saveGame();
+            showGameUI();
+            addLog('welcome', '欢迎', '你踏入修仙之路，成为一名炼气期修士。吸收天地灵气，开启你的修仙之旅！');
+        }
+
+        // ===== loadGame =====
+        function loadGame() {
+            const saved = localStorage.getItem(CONFIG.storageKey);
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                // 确保V2新增字段存在（向后兼容）
+                gameState = {
+                    ...gameState,
+                    ...loaded,
+                    activeEffects: loaded.activeEffects || {
+                        breakthrough_boost: 0,
+                        cultivate_speed: 0,
+                        渡劫_mindset_protect: 0,
+                        attack: 0,
+                        defense: 0,
+                        cultivate_qi_rate: 0,
+                        渡劫_damage_reduce: 0,
+                        escape: 0,
+                        foresee_event: 0,
+                        all_stats: 0
+                    },
+                    equippedTreasures: loaded.equippedTreasures || [null, null, null],
+                    inventory: loaded.inventory || [],
+                    shopItems: loaded.shopItems || [],
+                    lastShopDay: loaded.lastShopDay || 0,
+                    tribulation: loaded.tribulation || {
+                        inProgress: false,
+                        currentStage: 0,
+                        totalStages: 9,
+                        currentType: null,
+                        preparations: [],
+                        damageTaken: 0,
+                        tribKey: null
+                    },
+                    hasTransmigrationBuff: loaded.hasTransmigrationBuff || false,
+                    tribulationRecord: loaded.tribulationRecord || [],
+                    combat: loaded.combat || {
+                        wins: 0,
+                        losses: 0,
+                        honor: 0,
+                        fame: 0,
+                        battleHistory: [],
+                        injured: false,
+                        injuryEndDay: 0
+                    },
+                    // V33 战斗AI学习系统
+                    combatProfile: loaded.combatProfile || {
+                        playerPatterns: [],
+                        totalBattles: 0,
+                        winsAgainst: 0,
+                        currentEnemy: null,
+                        learningData: {},
+                        preferredDistance: null,
+                        spellUsageRate: 0,
+                        defenseFrequency: 0,
+                        attackTiming: []
+                    },
+                    lastCombatDay: loaded.lastCombatDay || 0,
+                    // V35 宗门互动增强
+                    sectMissions: loaded.sectMissions || [],
+                    sectMissionCooldown: loaded.sectMissionCooldown || 0,
+                    lastMissionRefreshDay: loaded.lastMissionRefreshDay || 0,
+                    // V36 装备打造增强
+                    equipmentForgeCount: loaded.equipmentForgeCount || 0,
+                    lastForgeDay: loaded.lastForgeDay || 0,
+                    // V37 天道法则系统
+                    celestialLaws: loaded.celestialLaws || {
+                        comprehended: [], active: [], comprehending: null,
+                        comprehendingProgress: 0, comprehendDays: 0,
+                        maxActiveLaws: 3, lawBonus: {}
+                    },
+                    // V38 仙界社交系统
+                    immortalAlly: loaded.immortalAlly || {
+                        id: null, name: '', rank: 1, role: 'none', contribution: 0,
+                        joinedDay: 0, allies: [], skillLevel: 0, dailyActivity: 0, lastActivityDay: 0
+                    },
+                    immortalFriends: loaded.immortalFriends || [],
+                    allyApplications: loaded.allyApplications || [],
+                    // V39 仙宠培养系统
+                    spiritPets: loaded.spiritPets || { pets: [], lastInteractionDay: 0 },
+                    // V40 仙界拍卖行
+                    auction: loaded.auction || { listings: [], frozenFunds: 0, playerId: null, playerName: null, sortType: 'endingSoon' },
+                    // V41 仙界经济系统
+                    economy: loaded.economy || {
+                        currentInflation: 0.02, totalIncome: 0, totalExpense: 0, totalTax: 0,
+                        totalWealth: 0, avgDailyIncome: 50, avgDailyExpense: 0,
+                        luxuryPurchases: 0, activeEvents: [], economyBuffs: {}
+                    },
+                    // V42 天道竞技场
+                    celestialArena: loaded.celestialArena || {
+                        currentSeason: 1, seasonStartTime: Date.now(), currentRank: 1, highestRank: 1,
+                        score: 0, totalScoreEarned: 0, totalWins: 0, totalLosses: 0, currentStreak: 0,
+                        longestStreak: 0, promotionWins: 0, dailyChallengesUsed: 0, derankProtection: 2,
+                        matchHistory: [], lastRewardClaimed: 0, totalRewardsClaimed: 0, bountyPool: 0, bountyWins: 0
+                    },
+                    // V43 仙宫建设系统
+                    palace: loaded.palace || {
+                        level: 1, prosperity: 100, buildings: [], workers: [], styleIndex: 0,
+                        bonus: { incomeBonus: 0, cultivationSpeed: 0, serendipityChance: 0, combatPower: 0 },
+                        totalWagesPaid: 0
+                    },
+                    // V44 仙法创造系统
+                    customSpells: loaded.customSpells || [],
+                    essences: loaded.essences || {},
+                    // V45 天道轮回增强
+                    karma: loaded.karma || { points: 0, goodKarma: 0, evilKarma: 0, reincarnationCount: 0, pastLifeMemories: [] },
+                    sect: loaded.sect ? {
+                        ...loaded.sect,
+                        npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
+                        npcTasks: loaded.sect.npcTasks || [],
+                        npcLastActions: loaded.sect.npcLastActions || {},
+                        tribulationRequest: loaded.sect.tribulationRequest || {
+                            status: 'none', elderScore: 0, elderComment: '',
+                            leaderDecision: '', leaderComment: '', buffApplied: false, submitDay: 0
+                        },
+                        celestialCycle: loaded.sect.celestialCycle || {
+                            day: 0, completed: false, lastResult: null, blessingActive: false, cycleInterval: 3
+                        },
+                        // V35 宗门任务链
+                        sectMissions: loaded.sect.sectMissions || [],
+                        sectMissionCooldown: loaded.sect.sectMissionCooldown || 0
+                    } : {
+                        name: null,
+                        level: 0,
+                        spiritStones: 0,
+                        disciples: [],
+                        elders: [],
+                        buildings: {
+                            library: false,
+                            alchemy: false,
+                            forge: false,
+                            archive: false
+                        },
+                        techniques: [],
+                        contributionShop: [],
+                        lastShopRefresh: 0,
+                        lastResourceCollection: 0
+                    },
+                    serendipity: loaded.serendipity || {
+                        lastTriggerDay: 0,
+                        todayCount: 0,
+                        lastTriggerType: null,
+                        cooldownTypes: {},
+                        badLuck: 0,
+                        currentEvent: null,
+                        log: [],
+                        luckStatus: null,
+                        luckEndDay: 0,
+                        serendipityBoostEndDay: 0
+                    },
+                    // V7 灵根/体质系统
+                    spiritRoot: loaded.spiritRoot ? {
+                        ...loaded.spiritRoot,
+                        awakeningAvailable: loaded.spiritRoot.awakeningAvailable || false,
+                        hasAwakened: loaded.spiritRoot.hasAwakened || false,
+                        awakenedQuality: loaded.spiritRoot.awakenedQuality || null
+                    } : { ...generateRandomSpiritRoot(), awakeningAvailable: false, hasAwakened: false, awakenedQuality: null },
+                    // V32 灵根觉醒系统
+                    spiritRootAwakening: loaded.spiritRootAwakening || {
+                        status: 'dormant',
+                        stage: 0,
+                        triggerDay: 0,
+                        tasks: [],
+                        rewards: null,
+                        lastEventDay: 0,
+                        attempts: 0
+                    },
+                    constitutions: loaded.constitutions || [],
+                    // V8 丹药炼器系统
+                    crafting: loaded.crafting || {
+                        furnace: { level: 1, type: 'alchemy' },
+                        anvil: { level: 1, type: 'forge' },
+                        transactionLog: []
+                    },
+                    // V9 世界地图系统
+                    worldMap: loaded.worldMap || {
+                        currentContinent: '中州',
+                        currentRegion: '中州城',
+                        exploredContinents: ['中州'],
+                        exploredRegions: ['中州城', '中州野外'],
+                        actionPower: 10,
+                        maxActionPower: 10,
+                        continentUnlocks: {
+                            '中州': 0,
+                            '南疆': 1,
+                            '北域': 2,
+                            '西域': 3,
+                            '东海': 2,
+                            '仙界碎片': 4
+                        },
+                        bossRefreshDays: {},
+                        lastTravelDay: 0
+                    }
+                };
+                // E1 确保npcMemory字段存在（向后兼容）
+                if (!gameState.npcMemory) gameState.npcMemory = [];
+                // B 成就/称号系统向后兼容
+                if (!gameState.title) gameState.title = '筑基修士';
+                if (!gameState.achievements) {
+                    gameState.achievements = {
+                        unlocked: [],
+                        titles: [],
+                        stats: {
+                            tribulationsCompleted: 0,
+                            dungeonBossesKilled: 0,
+                            sectContributions: 0,
+                            treasuresRefined: 0,
+                            serendipitiesEncountered: 0,
+                            flawlessTribulations: 0
+                        }
+                    };
+                }
+                // 确保activeEffects包含serendipity_boost
+                if (!gameState.activeEffects.serendipity_boost) {
+                    gameState.activeEffects.serendipity_boost = 0;
+                }
+                // 初始化体质效果
+                initializeConstitutionEffects();
+                // 重新计算装备效果
+                recalculateAllEffects();
+                // 初始化世界地图
+                initWorldMap();
+                if (gameState.isGameOver) {
+                    showGameOverScreen();
+                } else {
+                    showGameUI();
+                }
+            } else {
+                alert('没有找到存档！');
+            }
+        }
+
+        // ===== showGameUI =====
+        function showGameUI() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('apiConfig').classList.add('hidden');
+            document.getElementById('gameStats').classList.remove('hidden');
+            document.getElementById('cultivationProgress').classList.remove('hidden');
+            document.getElementById('equipmentBar').classList.remove('hidden');
+            document.getElementById('gameButtons').classList.remove('hidden');
+            document.getElementById('eventLog').classList.remove('hidden');
+            updateDisplay();
+            renderLog();
+            updateEquipmentBar();
+            // 检查商店刷新
+            if (gameState.lastShopDay < gameState.days) {
+                refreshShop(true);
+            }
+            // 重置每日行动力
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                if (wm.lastTravelDay < gameState.days) {
+                    wm.actionPower = wm.maxActionPower;
+                    wm.lastTravelDay = 0;
+                }
+            }
+            // 检查宗门按钮显示
+            const sectBtn = document.getElementById('sectBtn');
+            if (sectBtn) {
+                sectBtn.style.display = (gameState.sect && gameState.sect.name) ? 'inline-block' : 'none';
+            }
+            // V37 检查悟道按钮显示
+            const lawBtn = document.getElementById('lawBtn');
+            if (lawBtn) {
+                lawBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V38 检查仙界社交按钮显示（境界≥地仙=realm 8）
+            const allyBtn = document.getElementById('allyBtn');
+            if (allyBtn) {
+                allyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            const friendsBtn = document.getElementById('friendsBtn');
+            if (friendsBtn) {
+                friendsBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            const tradingBtn = document.getElementById('tradingBtn');
+            if (tradingBtn) {
+                tradingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V40 拍卖按钮显示（境界≥地仙=realm 8）
+            const auctionBtn = document.getElementById('auctionBtn');
+            if (auctionBtn) {
+                auctionBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V41 经济系统按钮显示（境界≥地仙=realm 8）
+            const economyBtn = document.getElementById('economyBtn');
+            if (economyBtn) {
+                economyBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V42 天道竞技场按钮显示（境界≥地仙=realm 8）
+            const arenaBtn = document.getElementById('arenaBtn');
+            if (arenaBtn) {
+                arenaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V43 仙宫建设按钮显示（境界≥地仙=realm 8）
+            const palaceBtn = document.getElementById('palaceBtn');
+            if (palaceBtn) {
+                palaceBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V44 仙法创造按钮显示（境界≥地仙=realm 8）
+            const spellBtn = document.getElementById('spellBtn');
+            if (spellBtn) {
+                spellBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V45 天道轮回按钮显示（境界≥地仙=realm 8）
+            const karmaBtn = document.getElementById('karmaBtn');
+            if (karmaBtn) {
+                karmaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V46 仙界 farming 按钮显示（境界≥地仙=realm 8）
+            const farmingBtn = document.getElementById('farmingBtn');
+            if (farmingBtn) {
+                farmingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V47 灵宠进化树按钮显示（境界≥地仙=realm 8）
+            const evoTreeBtn = document.getElementById('evoTreeBtn');
+            if (evoTreeBtn) {
+                evoTreeBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+        }
+
+        // ===== updateDisplay =====
+        function updateDisplay() {
+            const realmName = CONFIG.realms[gameState.realm];
+            const stageName = CONFIG.stages[gameState.stage];
+            
+            document.getElementById('realmDisplay').textContent = `${realmName}期`;
+            document.getElementById('qiDisplay').textContent = `${gameState.qi}/${gameState.maxQi}`;
+            document.getElementById('stonesDisplay').textContent = gameState.spiritStones;
+            document.getElementById('mindsetDisplay').textContent = gameState.mindset;
+            document.getElementById('daysDisplay').textContent = gameState.days;
+            
+            document.getElementById('realmName').textContent = `${realmName}期`;
+            document.getElementById('realmStage').textContent = stageName;
+
+            // A5 更新称号显示
+            const titleDisplay = document.getElementById('titleDisplay');
+            if (titleDisplay) {
+                titleDisplay.textContent = `【${gameState.title || '筑基修士'}】`;
+            }
+
+            const req = REALM_REQUIREMENTS[gameState.realm];
+            const progressInStage = gameState.stage === 0 ? 
+                gameState.cultivationProgress : 
+                gameState.cultivationProgress - req.stageThreshold[gameState.stage - 1];
+            const stageSize = gameState.stage === 0 ? 
+                req.stageThreshold[0] : 
+                (req.stageThreshold[gameState.stage] - req.stageThreshold[gameState.stage - 1]);
+            const percentage = Math.min(100, (progressInStage / stageSize) * 100);
+            
+            document.getElementById('cultivationBar').style.width = `${percentage}%`;
+            document.getElementById('cultivationBar').textContent = `${Math.round(percentage)}%`;
+            
+            // V7 更新灵根显示
+            updateSpiritRootDisplay();
+            
+            // V9 更新世界地图显示
+            updateMinimapDisplay();
+            if (gameState.worldMap) {
+                const wm = gameState.worldMap;
+                document.getElementById('actionPowerDisplay').textContent = `${wm.actionPower}/${wm.maxActionPower}`;
+            }
+        }
+
+
+// ===== immortal.js =====
+
+// ===== IMMORTAL_REALMS =====
+const IMMORTAL_REALMS = {
+    1: { name: '地仙境', icon: '🌱', description: '仙界最低境界，相当于凡界筑基~金丹', cultivationBase: 100 },
+    2: { name: '天仙境', icon: '☁️', description: '中级仙人，相当于凡界元婴', cultivationBase: 200 },
+    3: { name: '金仙境', icon: '⭐', description: '高级仙人，相当于凡界化神', cultivationBase: 400 },
+    4: { name: '大罗金仙', icon: '🌟', description: '顶级强者，相当于凡界渡劫', cultivationBase: 800 },
+    5: { name: '混元大罗', icon: '💫', description: '飞升目标，超越凡界一切', cultivationBase: 1600 }
+};
+
+// ===== SECRET_REALMS_IMMORTAL =====
+const SECRET_REALMS_IMMORTAL = {
+    '太虚遗迹': {
+        type: 'ruins',
+        realmRequired: 1,
+        dangerLevel: 2,
+        waves: 3,
+        rewards: ['太虚仙法残卷', '上古丹药', '仙灵泉水'],
+        npc: { type: 'guardian', name: '太虚守护者' }
+    },
+    '九天瑶池': {
+        type: 'resource',
+        realmRequired: 2,
+        dangerLevel: 1,
+        waves: 2,
+        rewards: ['九天仙草', '瑶池圣水', '万年灵芝'],
+        npc: { type: 'merchant', name: '瑶池仙子' }
+    },
+    '混沌战场': {
+        type: 'combat',
+        realmRequired: 3,
+        dangerLevel: 4,
+        waves: 4,
+        rewards: ['混沌至宝', '神魔精血', '混沌丹'],
+        boss: { name: '混沌魔神' }
+    },
+    '星辰海洋': {
+        type: 'serendipity',
+        realmRequired: 2,
+        dangerLevel: 2,
+        waves: 1,
+        rewards: ['星辰精华', '星君传承'],
+        special: true
+    }
+};
+
+// ===== IMMORTAL_REGIONS =====
+const IMMORTAL_REGIONS = {
+    '仙灵谷': {
+        realmRequired: 1,
+        dangerLevel: 1,
+        icon: '🌿',
+        description: '新手区域，仙气充沛，适合初入仙界者',
+        resources: ['仙草', '仙兽蛋'],
+        color: '#4caf50'
+    },
+    '天庭': {
+        realmRequired: 2,
+        dangerLevel: 2,
+        icon: '🏯',
+        description: '仙界中心，天道法则汇聚之地',
+        resources: ['天庭令牌', '仙官赐福'],
+        color: '#ffd700'
+    },
+    '万妖山': {
+        realmRequired: 2,
+        dangerLevel: 2,
+        icon: '🏔️',
+        description: '妖修领地，妖族强者云集',
+        resources: ['妖修功法', '妖族坐骑'],
+        color: '#ff5722'
+    },
+    '神魔战场': {
+        realmRequired: 3,
+        dangerLevel: 4,
+        icon: '⚔️',
+        description: '上古神魔大战遗迹，蕴含无穷奥秘',
+        resources: ['神魔装备', '混沌碎片'],
+        color: '#9c27b0'
+    },
+    '三十三天': {
+        realmRequired: 4,
+        dangerLevel: 5,
+        icon: '🔮',
+        description: '极高危险区域，突破混元大罗的必经之地',
+        resources: ['混沌碎片', '飞升道具'],
+        color: '#e91e63'
+    },
+    '混沌海': {
+        realmRequired: 5,
+        dangerLevel: 5,
+        icon: '🌀',
+        description: '最终区域，传说中混元大罗的诞生之地',
+        resources: ['混沌神石', '位面法则'],
+        color: '#00bcd4'
+    }
+};
+
+// ===== initializeImmortalState =====
+function initializeImmortalState() {
+    if (!gameState.immortal) {
+        gameState.immortal = {
+            realm: 1,
+            spiritStones: 0,
+            currentRegion: '仙灵谷',
+            exploredRegions: ['仙灵谷'],
+            cultivationProgress: 0,
+            map: {
+                '仙灵谷': { unlocked: true, explored: [] },
+                '天庭': { unlocked: false, realmRequired: 2 },
+                '万妖山': { unlocked: false, realmRequired: 2 },
+                '神魔战场': { unlocked: false, realmRequired: 3 },
+                '三十三天': { unlocked: false, realmRequired: 4 },
+                '混沌海': { unlocked: false, realmRequired: 5 }
+            },
+            lastAerialCooldown: 0,
+            lastFateTask: 0,
+            fateTaskRefreshDay: 0,
+            celestialCycleDay: 0,
+            celestialCycleCompleted: false,
+            // V34 仙界秘境探索系统
+            secretRealm: {
+                inSecretRealm: false,
+                currentRealm: null,
+                currentType: null,
+                wave: 0,
+                totalWaves: 0,
+                enemies: [],
+                rewards: [],
+                npc: null,
+                jade: 0,  // 仙玉
+                tokens: 1,  // 秘境令牌（每日重置）
+                lastTokenRefresh: 0,
+                explored: []  // 已探索秘境记录
+            }
+        };
+    }
+    // V34 秘境令牌每日重置
+    if (gameState.immortal && gameState.immortal.secretRealm) {
+        const today = Math.floor(gameState.days / 10) * 10;  // 简化：每10天重置
+        if (gameState.immortal.secretRealm.lastTokenRefresh < today) {
+            gameState.immortal.secretRealm.tokens = 3;
+            gameState.immortal.secretRealm.lastTokenRefresh = today;
+        }
+    }
+    if (!gameState.mounts) gameState.mounts = [];
+    if (!gameState.immortalSkills) gameState.immortalSkills = [];
+    if (!gameState.immortalEquipment) {
+        gameState.immortalEquipment = {
+            head: null,
+            body: null,
+            foot: null,
+            weapon: null,
+            shield: null,
+            accessory: null
+        };
+    }
+    if (!gameState.currentRealm) gameState.currentRealm = 'mortal';
+    if (gameState.currentMount === undefined) gameState.currentMount = null;
+}
+
+// ===== canEnterRegion =====
+function canEnterRegion(region) {
+    const req = IMMORTAL_REGIONS[region].realmRequired;
+    return gameState.immortal.realm >= req;
+}
+
+// ===== doAerialTravel =====
+function doAerialTravel(targetRegion) {
+    if (!gameState.immortal || gameState.immortal.currentRegion === targetRegion) return;
+    
+    const cooldown = getAerialCooldown();
+    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
+    
+    if (timeSinceLast < cooldown) {
+        const remaining = Math.ceil((cooldown - timeSinceLast) / 1000);
+        showToast(`御空术冷却中，还需${remaining}秒`);
+        return;
+    }
+    
+    if (!canEnterRegion(targetRegion)) {
+        showToast('境界不足，无法进入该区域');
+        return;
+    }
+    
+    gameState.immortal.currentRegion = targetRegion;
+    gameState.immortal.lastAerialCooldown = Date.now();
+    
+    // 添加到已探索
+    if (!gameState.immortal.exploredRegions.includes(targetRegion)) {
+        gameState.immortal.exploredRegions.push(targetRegion);
+    }
+    
+    // 触发区域事件
+    triggerRegionEvent(targetRegion);
+    saveGame();
+    updateDisplay();
+    
+    // 更新UI
+    if (typeof renderImmortalUI === 'function') renderImmortalUI();
+}
+
+// ===== getAerialCooldown =====
+function getAerialCooldown() {
+    const baseCooldown = 10000; // 10秒基础冷却
+    const mountBonus = getMountSpeedBonus();
+    return Math.max(1000, baseCooldown * (1 - mountBonus));
+}
+
+// ===== getMountSpeedBonus =====
+function getMountSpeedBonus() {
+    const mount = gameState.currentMount;
+    if (!mount) return 0;
+    // 成熟度越高加速越多
+    return (mount.maturity / 100) * (mount.stats.speed / 100) * 0.5;
+}
+
+// ===== triggerRegionEvent =====
+function triggerRegionEvent(region) {
+    const rand = Math.random();
+    if (rand < 0.3) {
+        // 30%概率触发仙缘任务
+        if (gameState.immortal.currentRegion !== '天庭') {
+            showToast(`在${region}遇到神秘机缘...`);
+        }
+    }
+}
+
+// ===== earnSpiritStones =====
+function earnSpiritStones(amount, source) {
+    gameState.immortal.spiritStones += amount;
+    addLog('good', '获得仙石', `获得 ${amount} 仙石（${source}）`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== spendSpiritStones =====
+function spendSpiritStones(amount, reason) {
+    if (gameState.immortal.spiritStones < amount) {
+        showToast('仙石不足');
+        return false;
+    }
+    gameState.immortal.spiritStones -= amount;
+    saveGame();
+    return true;
+}
+
+// ===== doImmortalCultivation =====
+function doImmortalCultivation() {
+    const realm = gameState.immortal.realm;
+    const realmData = IMMORTAL_REALMS[realm];
+    let baseGain = realmData.cultivationBase * (1 + Math.random() * 0.5);
+    
+    // 应用装备加成
+    baseGain *= (1 + getImmortalEquipBonus());
+    
+    // 应用仙兽加成
+    if (gameState.currentMount) {
+        baseGain *= (1 + gameState.currentMount.stats.speed / 200);
+    }
+    
+    const gain = Math.floor(baseGain);
+    gameState.immortal.cultivationProgress += gain;
+    
+    // 检查境界突破
+    const nextRealm = realm + 1;
+    if (nextRealm <= 5 && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
+        gameState.immortal.realm = nextRealm;
+        gameState.immortal.cultivationProgress = 0;
+        // 解锁新区域
+        unlockRegionForRealm(nextRealm);
+        addLog('good', '境界突破', `突破到${IMMORTAL_REALMS[nextRealm].name}！`);
+        showToast(`恭喜突破到${IMMORTAL_REALMS[nextRealm].name}！`);
+    } else {
+        addLog('neutral', '仙气修炼', `修炼${gain}点仙气，感觉体内的仙力更加充沛。`);
+    }
+    
+    gameState.days++;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== unlockRegionForRealm =====
+function unlockRegionForRealm(realm) {
+    for (const region in gameState.immortal.map) {
+        if (gameState.immortal.map[region].realmRequired === realm) {
+            gameState.immortal.map[region].unlocked = true;
+        }
+    }
+}
+
+// ===== getImmortalEquipBonus =====
+function getImmortalEquipBonus() {
+    let bonus = 0;
+    const equip = gameState.immortalEquipment;
+    for (const slot in equip) {
+        if (equip[slot]) {
+            bonus += equip[slot].quality * 0.1;
+        }
+    }
+    return bonus;
+}
+
+// ===== showImmortalMap =====
+function showImmortalMap() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">☁️ 仙界地图 ☁️</h3>';
+    html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
+    
+    for (const region in IMMORTAL_REGIONS) {
+        const data = IMMORTAL_REGIONS[region];
+        const isUnlocked = canEnterRegion(region);
+        const isCurrent = gameState.immortal.currentRegion === region;
+        const isExplored = gameState.immortal.exploredRegions.includes(region);
+        
+        let style = 'padding:12px;border-radius:8px;text-align:center;cursor:pointer;';
+        style += isUnlocked ? `background:${data.color}33;border:2px solid ${data.color};` : 'background:#333;border:2px solid #555;';
+        style += isCurrent ? 'box-shadow:0 0 15px #ffd700;' : '';
+        
+        html += `<div style="${style}" onclick="${isUnlocked ? `doAerialTravel('${region}')` : ''}">`;
+        html += `<div style="font-size:24px;">${data.icon}</div>`;
+        html += `<div style="color:${isUnlocked ? '#fff' : '#666'};font-weight:bold;">${region}</div>`;
+        html += `<div style="font-size:11px;color:${isUnlocked ? '#aaa' : '#444'};">需要${data.realmRequired}重天</div>`;
+        html += isCurrent ? '<div style="color:#ffd700;font-size:11px;">当前位置</div>' : '';
+        html += '</div>';
+    }
+    
+    html += '</div></div>';
+    
+    // 冷却显示
+    const cooldown = getAerialCooldown();
+    const timeSinceLast = Date.now() - gameState.immortal.lastAerialCooldown;
+    const remaining = Math.max(0, cooldown - timeSinceLast);
+    
+    html += `<div style="text-align:center;margin-top:16px;padding:10px;background:#1a1a2e;border-radius:8px;">`;
+    html += `<div style="color:#aaa;font-size:12px;">御空术冷却: ${Math.ceil(remaining / 1000)}秒</div>`;
+    if (gameState.currentMount) {
+        html += `<div style="color:#4caf50;font-size:12px;">🐎 骑乘${gameState.currentMount.name}，冷却缩短50%</div>`;
+    }
+    html += '</div>';
+    
+    openModal('仙界地图', html, '');
+}
+
+// ===== getImmortalDailyIncome =====
+function getImmortalDailyIncome() {
+    if (gameState.currentRealm !== 'immortal') return { qi: 0, stones: 0 };
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const baseQi = realmData.cultivationBase * 0.1;
+    const regionBonus = (regionData.dangerLevel || 1) * 0.05;
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.2 : 0;
+    return {
+        qi: Math.floor(baseQi * (1 + regionBonus + blessingBonus)),
+        stones: Math.floor((regionData.dangerLevel || 1) * 10 * Math.random())
+    };
+}
+
+// ===== processCelestialCycle =====
+function processCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const cc = gameState.celestialCycle;
+    const interval = cc.cycleInterval || 3;
+    
+    // 每日仙界修炼结算（自动主路径）
+    const income = getImmortalDailyIncome();
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const progressGain = Math.floor(income.qi * spiritRootBonus);
+    
+    // 更新修炼进度
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+        gameState.immortal.spiritStones += income.stones;
+        
+        // 检查境界突破
+        const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+        if (realmData && gameState.immortal.cultivationProgress >= realmData.cultivationBase * 10) {
+            const nextRealm = gameState.immortal.realm + 1;
+            if (nextRealm <= 5) {
+                gameState.immortal.realm = nextRealm;
+                gameState.immortal.cultivationProgress = 0;
+                addLog('good', '境界突破', `天道轮回中，突破至${IMMORTAL_REALMS[nextRealm].name}！`);
+            }
+        }
+    }
+    
+    // 天道轮回日结算
+    cc.day++;
+    if (cc.day >= interval && !cc.completed) {
+        executeCelestialCycle();
+        cc.day = 0;
+        cc.completed = true;
+    }
+    
+    // 新周期开始
+    if (cc.day === 0) {
+        cc.completed = false;
+    }
+}
+
+// ===== executeCelestialCycle =====
+function executeCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    
+    // 主路径：修炼结算
+    let resultText = `【天道轮回·第${gameState.days}天】\n`;
+    let eventType = 'neutral';
+    let effects = { qi: 0, stones: 0, mindset: 0 };
+    
+    const baseProgress = realmData.cultivationBase;
+    const spiritRootBonus = 1 + (getSpiritRootCultivationBonus ? getSpiritRootCultivationBonus() : 0);
+    const regionBonus = (regionData.dangerLevel || 1) * 0.1;
+    const progressGain = Math.floor(baseProgress * (1 + regionBonus) * spiritRootBonus);
+    
+    if (gameState.immortal) {
+        gameState.immortal.cultivationProgress += progressGain;
+    }
+    resultText += `修炼进度 +${progressGain}\n`;
+    effects.qi = progressGain;
+    
+    // 次路径：气运波动触发器
+    const roll = Math.random();
+    const blessingBonus = gameState.celestialCycle.blessingActive ? 0.15 : 0;
+    
+    if (roll < 0.4 + blessingBonus) {
+        // 正面事件 40%
+        eventType = 'positive';
+        const positiveEvents = [
+            { text: '✨ 顿悟时刻', effect: () => { 
+                if (gameState.immortal) gameState.immortal.cultivationProgress += Math.floor(progressGain * 0.5);
+                effects.qi += Math.floor(progressGain * 0.5);
+                return '修炼进度额外 +50%';
+            }},
+            { text: '🌟 天赐灵物', effect: () => {
+                const stoneGain = Math.floor(500 * Math.random()) + 100;
+                if (gameState.immortal) gameState.immortal.spiritStones += stoneGain;
+                effects.stones = stoneGain;
+                return `获得 ${stoneGain} 灵石`;
+            }},
+            { text: '☁️ 祥瑞降临', effect: () => {
+                effects.mindset = 10;
+                return '心态 +10';
+            }}
+        ];
+        const event = positiveEvents[Math.floor(Math.random() * positiveEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else if (roll < 0.7 + blessingBonus) {
+        // 负面事件 30%
+        eventType = 'negative';
+        const negativeEvents = [
+            { text: '👹 心魔入侵', effect: () => {
+                effects.mindset = -20;
+                return '心态 -20，修炼受阻';
+            }},
+            { text: '⚡ 天道压制', effect: () => {
+                effects.qi = -Math.floor(progressGain * 0.3);
+                if (gameState.immortal) gameState.immortal.cultivationProgress -= Math.floor(progressGain * 0.3);
+                return '当日修炼效率 -30%';
+            }},
+            { text: '💔 灵气紊乱', effect: () => {
+                const stoneLoss = Math.floor((gameState.immortal?.spiritStones || 0) * 0.05);
+                if (gameState.immortal && stoneLoss > 0) gameState.immortal.spiritStones -= stoneLoss;
+                effects.stones = -stoneLoss;
+                return `损失 ${stoneLoss} 灵石`;
+            }}
+        ];
+        const event = negativeEvents[Math.floor(Math.random() * negativeEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+        
+    } else {
+        // 中性事件 30%
+        eventType = 'neutral';
+        const neutralEvents = [
+            { text: '🧙 仙人指路', effect: () => {
+                return '天道启示：继续保持当前修炼节奏';
+            }},
+            { text: '🔮 奇遇发现', effect: () => {
+                // 解锁新区域线索
+                return '隐约感知到未知区域的召唤';
+            }},
+            { text: '⏳ 平静期', effect: () => {
+                return '天道运行平稳，无特殊事件';
+            }}
+        ];
+        const event = neutralEvents[Math.floor(Math.random() * neutralEvents.length)];
+        resultText += event.text + '：' + event.effect() + '\n';
+    }
+    
+    // 清除祈福状态
+    gameState.celestialCycle.blessingActive = false;
+    
+    // 保存结果
+    const result = { type: eventType, text: resultText, effects: effects, day: gameState.days };
+    gameState.celestialCycle.lastResult = result;
+    
+    showCelestialCycleResult(result);
+    
+    addLog(eventType === 'positive' ? 'good' : eventType === 'negative' ? 'bad' : 'normal', 
+           '天道轮回', resultText.replace(/\n/g, ' '));
+}
+
+// ===== showCelestialCycleResult =====
+function showCelestialCycleResult(result) {
+    const icon = result.type === 'positive' ? '🌟' : result.type === 'negative' ? '💥' : '🔮';
+    const color = result.type === 'positive' ? '#4caf50' : result.type === 'negative' ? '#f44336' : '#2196f3';
+    
+    const modal = document.getElementById('modalNormal');
+    if (!modal) return;
+    
+    let effectsText = '';
+    if (result.effects.qi !== 0) effectsText += ` 灵气 ${result.effects.qi > 0 ? '+' : ''}${result.effects.qi}`;
+    if (result.effects.stones !== 0) effectsText += ` 灵石 ${result.effects.stones > 0 ? '+' : ''}${result.effects.stones}`;
+    if (result.effects.mindset !== 0) effectsText += ` 心态 ${result.effects.mindset > 0 ? '+' : ''}${result.effects.mindset}`;
+    
+    modal.innerHTML = `
+        <div class="result-title" style="color:${color}">${icon} 天道轮回结算 ${icon}</div>
+        <div style="margin:15px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;text-align:left">
+            ${result.text.replace(/\n/g, '<br/>')}
+        </div>
+        <div style="color:#aaa;font-size:12px">${effectsText}</div>
+        <div style="margin-top:15px">
+            <button onclick="closeModal('modalNormal')" style="padding:8px 20px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">确定</button>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+}
+
+// ===== requestExtraCycle =====
+function requestExtraCycle() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能请求天道轮回');
+        return;
+    }
+    const cost = 100;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石请求额外轮回`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.day = gameState.celestialCycle.cycleInterval || 3;
+    showToast(`消耗 ${cost} 灵石，请求天道轮回`);
+    addLog('normal', '主动干预', `消耗 ${cost} 灵石请求额外天道轮回`);
+}
+
+// ===== requestFortuneBlessing =====
+function requestFortuneBlessing() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行气运祈福');
+        return;
+    }
+    const cost = 200;
+    if ((gameState.immortal?.spiritStones || 0) < cost) {
+        showToast(`需要 ${cost} 灵石进行气运祈福`);
+        return;
+    }
+    if (gameState.immortal) {
+        gameState.immortal.spiritStones -= cost;
+    }
+    gameState.celestialCycle.blessingActive = true;
+    showToast(`消耗 ${cost} 灵石，气运祈福生效（下次轮回正面事件概率+15%）`);
+    addLog('good', '气运祈福', `消耗 ${cost} 灵石，下次轮回将获得更好气运`);
+}
+
+// ===== V34 仙界秘境探索系统 =====
+
+// ===== canEnterSecretRealm =====
+function canEnterSecretRealm(realmName) {
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    if (!realm) return { result: false, reason: '秘境不存在' };
+    if (gameState.immortal.realm < realm.realmRequired) {
+        return { result: false, reason: `需要${IMMORTAL_REALMS[realm.realmRequired].name}才能进入` };
+    }
+    if (!gameState.immortal.secretRealm || gameState.immortal.secretRealm.tokens <= 0) {
+        return { result: false, reason: '秘境令牌不足' };
+    }
+    return { result: true };
+}
+
+// ===== enterSecretRealm =====
+function enterSecretRealm(realmName) {
+    const check = canEnterSecretRealm(realmName);
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    
+    const realm = SECRET_REALMS_IMMORTAL[realmName];
+    gameState.immortal.secretRealm.tokens--;
+    gameState.immortal.secretRealm.inSecretRealm = true;
+    gameState.immortal.secretRealm.currentRealm = realmName;
+    gameState.immortal.secretRealm.currentType = realm.type;
+    gameState.immortal.secretRealm.wave = 0;
+    gameState.immortal.secretRealm.totalWaves = realm.waves;
+    gameState.immortal.secretRealm.enemies = [];
+    gameState.immortal.secretRealm.rewards = [];
+    gameState.immortal.secretRealm.npc = realm.npc ? { ...realm.npc } : null;
+    
+    showToast(`进入【${realmName}】`);
+    renderSecretRealmUI();
+}
+
+// ===== renderSecretRealmUI =====
+function renderSecretRealmUI() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr || !sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+    const typeNames = { ruins: '遗迹秘境', resource: '资源秘境', combat: '战斗秘境', serendipity: '奇遇秘境' };
+    
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:24px">${typeIcons[realm.type] || '🏛️'} ${sr.currentRealm}</div>
+                <div style="color:#aaa;font-size:12px">${typeNames[realm.type]} - 第${sr.wave}/${sr.totalWaves}波</div>
+            </div>
+    `;
+    
+    // 类型特定UI
+    if (realm.type === 'resource') {
+        content += `
+            <div style="background:rgba(76,175,80,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#4caf50;font-size:14px">🌿 资源秘境 - 收集仙草和灵材</div>
+            </div>
+            <button onclick="collectResource()" style="width:100%;padding:12px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">采集资源</button>
+        `;
+    } else if (realm.type === 'ruins') {
+        content += `
+            <div style="background:rgba(156,39,176,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#9c27b0;font-size:14px">🏛️ 遗迹秘境 - 探索上古仙人洞府</div>
+                ${sr.npc && sr.npc.type === 'guardian' ? `<div style="color:#ff5722;margin-top:8px">⚠️ 守护者: ${sr.npc.name}</div>` : ''}
+            </div>
+            <button onclick="exploreRuins()" style="width:100%;padding:12px;background:linear-gradient(135deg,#9c27b0,#7b1fa2);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">探索遗迹</button>
+        `;
+    } else if (realm.type === 'combat') {
+        content += `
+            <div style="background:rgba(244,67,54,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#f44336;font-size:14px">⚔️ 战斗秘境 - 击败守护者获取混沌至宝</div>
+                ${realm.boss ? `<div style="color:#ff5722;margin-top:8px">💀 Boss: ${realm.boss.name}</div>` : ''}
+            </div>
+            <button onclick="fightSecretRealmBoss()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f44336,#c62828);color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">挑战Boss</button>
+        `;
+    } else if (realm.type === 'serendipity') {
+        content += `
+            <div style="background:rgba(255,215,0,0.2);padding:15px;border-radius:8px;margin-bottom:15px">
+                <div style="color:#ffd700;font-size:14px">✨ 奇遇秘境 - 随机触发特殊事件</div>
+            </div>
+            <button onclick="triggerSerendipityEvent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ffd700,#ff9800);color:#333;border:none;border-radius:8px;cursor:pointer;margin-bottom:10px">触发奇遇</button>
+        `;
+    }
+    
+    // 奖励展示
+    if (sr.rewards.length > 0) {
+        content += `
+            <div style="margin-top:15px">
+                <div style="color:#ffd700;margin-bottom:8px">已获得奖励:</div>
+                ${sr.rewards.map(r => `<div style="color:#4caf50;font-size:12px">✧ ${r}</div>`).join('')}
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="exitSecretRealm()" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:15px">返回仙界</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
+}
+
+// ===== collectResource =====
+function collectResource() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+    sr.rewards.push(reward);
+    
+    showToast(`获得: ${reward}`);
+    addLog('good', '秘境收获', `在${sr.currentRealm}获得${reward}`);
+    
+    if (sr.wave >= sr.totalWaves) {
+        completeImmortalSecretRealm();
+    } else {
+        renderSecretRealmUI();
+    }
+}
+
+// ===== exploreRuins =====
+function exploreRuins() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    sr.wave++;
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    
+    // 遗迹探索可能遇到敌人或奖励
+    if (Math.random() < 0.4 && sr.wave < sr.totalWaves) {
+        // 遇到守护者战斗
+        showToast(`遭遇${sr.npc?.name || '守护者'}！`);
+        startImmortalRealmBattle(sr.npc);
+    } else {
+        // 获得奖励
+        const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+        sr.rewards.push(reward);
+        showToast(`探索获得: ${reward}`);
+        addLog('good', '秘境收获', `在${sr.currentRealm}探索获得${reward}`);
+        
+        if (sr.wave >= sr.totalWaves) {
+            completeImmortalSecretRealm();
+        } else {
+            renderSecretRealmUI();
+        }
+    }
+}
+
+// ===== fightSecretRealmBoss =====
+function fightSecretRealmBoss() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+    const bossName = realm.boss?.name || '秘境守卫';
+    const bossHP = 5000 + (gameState.immortal.realm * 2000);
+    
+    showToast(`挑战 ${bossName}！`);
+    startImmortalRealmBattle({ name: bossName, hp: bossHP, maxHP: bossHP });
+}
+
+// ===== startImmortalRealmBattle =====
+function startImmortalRealmBattle(enemy) {
+    const sr = gameState.immortal.secretRealm;
+    
+    // 使用通用战斗系统
+    const playerMaxHP = gameState.maxHP || 1000;
+    const playerAttack = gameState.attack || 100;
+    const playerDefense = gameState.defense || 50;
+    
+    combatState.inProgress = true;
+    combatState.player = {
+        hp: playerMaxHP,
+        maxHP: playerMaxHP,
+        attack: playerAttack,
+        defense: playerDefense,
+        technique: gameState.technique || '金刚诀'
+    };
+    combatState.opponent = {
+        name: enemy.name || '秘境守卫',
+        hp: enemy.hp || 3000,
+        maxHP: enemy.maxHP || enemy.hp || 3000,
+        attack: 80 + (gameState.immortal?.realm || 1) * 30,
+        defense: 40 + (gameState.immortal?.realm || 1) * 15,
+        technique: '混沌诀',
+        critRate: 0.1,
+        level: 1
+    };
+    combatState.round = 0;
+    combatState.turn = 'player';
+    combatState.log = [];
+    combatState.effects = {
+        player: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 },
+        opponent: { attacking: false, defending: false, attackBoost: 0, defenseBoost: 0 }
+    };
+    
+    // 设置战斗结束回调
+    window.secretRealmBattleEnd = function(result) {
+        if (result === 'win') {
+            const realm = SECRET_REALMS_IMMORTAL[sr.currentRealm];
+            const reward = realm.rewards[Math.floor(Math.random() * realm.rewards.length)];
+            sr.rewards.push(reward);
+            showToast(`战斗胜利！获得: ${reward}`);
+            addLog('good', '秘境战斗', `在${sr.currentRealm}击败${enemy.name}获得${reward}`);
+            
+            sr.wave++;
+            if (sr.wave >= sr.totalWaves) {
+                completeImmortalSecretRealm();
+            } else {
+                renderSecretRealmUI();
+            }
+        } else {
+            showToast('战斗失败，秘境探索结束');
+            exitSecretRealm();
+        }
+        delete window.secretRealmBattleEnd;
+    };
+    
+    renderCombatArena();
+}
+
+// ===== triggerSerendipityEvent =====
+function triggerSerendipityEvent() {
+    const sr = gameState.immortal.secretRealm;
+    if (!sr.inSecretRealm) return;
+    
+    const events = [
+        { type: 'epiphany', text: '💡 顿悟！境界提升！', effect: () => { gameState.immortal.realm = Math.min(5, gameState.immortal.realm + 1); } },
+        { type: 'treasure', text: '💎 发现上古宝藏！', effect: () => { sr.rewards.push('上古宝藏'); } },
+        { type: 'technique', text: '📜 获得仙人传承！', effect: () => { sr.rewards.push('星君传承'); } },
+        { type: 'jade', text: '💰 发现仙玉矿脉！', effect: () => { sr.rewards.push('仙玉x100'); } }
+    ];
+    
+    const event = events[Math.floor(Math.random() * events.length)];
+    event.effect();
+    
+    showToast(event.text);
+    addLog('good', '奇遇秘境', `${event.text} - ${sr.currentRealm}`);
+    
+    completeImmortalSecretRealm();
+}
+
+// ===== completeImmortalSecretRealm =====
+function completeImmortalSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    
+    showToast(`秘境探索完成！获得${sr.rewards.length}个奖励`);
+    addLog('good', '秘境完成', `完成${sr.currentRealm}，获得: ${sr.rewards.join(', ')}`);
+    
+    // 添加探索记录
+    if (!sr.explored) sr.explored = [];
+    if (!sr.explored.includes(sr.currentRealm)) {
+        sr.explored.push(sr.currentRealm);
+    }
+    
+    setTimeout(() => exitSecretRealm(), 1500);
+}
+
+// ===== exitSecretRealm =====
+function exitSecretRealm() {
+    const sr = gameState.immortal.secretRealm;
+    const rewards = [...(sr.rewards || [])];
+    
+    sr.inSecretRealm = false;
+    sr.currentRealm = null;
+    sr.currentType = null;
+    sr.wave = 0;
+    sr.enemies = [];
+    sr.npc = null;
+    
+    closeModal('modalNormal');
+    showToast(`秘境奖励: ${rewards.length > 0 ? rewards.join(', ') : '无'}`);
+    renderImmortalUI();
+}
+
+// ===== renderImmortalUI =====
+function renderImmortalUI() {
+    if (gameState.currentRealm !== 'immortal') return;
+    
+    // 更新仙界状态显示
+    const realmData = IMMORTAL_REALMS[gameState.immortal.realm];
+    const regionData = IMMORTAL_REGIONS[gameState.immortal.currentRegion];
+    
+    // 更新境界显示
+    const realmDisplay = document.getElementById('immortalRealmDisplay');
+    if (realmDisplay) {
+        realmDisplay.innerHTML = `${realmData.icon} ${realmData.name}`;
+    }
+    
+    // 更新仙石显示
+    const stoneDisplay = document.getElementById('immortalStoneDisplay');
+    if (stoneDisplay) {
+        stoneDisplay.textContent = `💎 ${gameState.immortal.spiritStones}`;
+    }
+    
+    // 更新区域显示
+    const regionDisplay = document.getElementById('immortalRegionDisplay');
+    if (regionDisplay) {
+        regionDisplay.innerHTML = `${regionData.icon} ${gameState.immortal.currentRegion}`;
+    }
+    
+    // V34 添加秘境探索入口
+    const secretBtn = document.getElementById('secretRealmBtn');
+    if (secretBtn && gameState.immortal.secretRealm) {
+        secretBtn.textContent = `🏛️ 秘境探索 (令牌:${gameState.immortal.secretRealm.tokens})`;
+    }
+}
+
+// ===== V34 renderSecretRealmList =====
+function renderSecretRealmList() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('只有在仙界才能进行秘境探索');
+        return;
+    }
+    
+    const sr = gameState.immortal.secretRealm;
+    let content = `
+        <div style="padding:20px;color:#fff">
+            <div style="text-align:center;margin-bottom:20px">
+                <div style="font-size:20px;color:#ffd700">🏛️ 仙界秘境</div>
+                <div style="color:#aaa;font-size:12px">秘境令牌: ${sr?.tokens || 0}</div>
+            </div>
+    `;
+    
+    // 列出所有秘境
+    for (const [name, realm] of Object.entries(SECRET_REALMS_IMMORTAL)) {
+        const canEnter = gameState.immortal.realm >= realm.realmRequired;
+        const typeIcons = { ruins: '🏛️', resource: '🌿', combat: '⚔️', serendipity: '✨' };
+        const typeNames = { ruins: '遗迹', resource: '资源', combat: '战斗', serendipity: '奇遇' };
+        
+        content += `
+            <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-bottom:10px;${!canEnter ? 'opacity:0.5' : ''}">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-size:16px">${typeIcons[realm.type]} ${name}</div>
+                        <div style="color:#aaa;font-size:11px">${typeNames[realm.type]} | 危险${'⚠️'.repeat(realm.dangerLevel)} | 需要: ${IMMORTAL_REALMS[realm.realmRequired]?.name || '未知'}</div>
+                    </div>
+                    ${canEnter ? `<button onclick="enterSecretRealm('${name}')" style="padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px">进入</button>` : '<span style="color:#f44336;font-size:11px">境界不足</span>'}
+                </div>
+            </div>
+        `;
+    }
+    
+    content += `
+            <button onclick="closeModal('modalNormal')" style="width:100%;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;margin-top:10px">返回</button>
+        </div>
+    `;
+    
+    openModal('秘境探索', content, '');
+}
+
+// ===== mount.js =====
+
+// ===== MOUNT_TYPES =====
+const MOUNT_TYPES = {
+    '仙鹤': {
+        icon: '🦅',
+        baseStats: { speed: 30, attack: 10, defense: 5, luck: 15 },
+        skills: ['御空加速'],
+        growthRate: 1.0,
+        maturityMax: 100,
+        price: 1000
+    },
+    '凤凰': {
+        icon: '🦅',
+        baseStats: { speed: 25, attack: 20, defense: 15, luck: 25 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.2,
+        maturityMax: 120,
+        price: 5000
+    },
+    '麒麟': {
+        icon: '🦄',
+        baseStats: { speed: 20, attack: 25, defense: 20, luck: 20 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.1,
+        maturityMax: 110,
+        price: 8000
+    },
+    '白虎': {
+        icon: '🐯',
+        baseStats: { speed: 25, attack: 30, defense: 10, luck: 10 },
+        skills: ['御空加速', '坐骑融合'],
+        growthRate: 1.15,
+        maturityMax: 105,
+        price: 6000
+    },
+    '青龙': {
+        icon: '🐉',
+        baseStats: { speed: 35, attack: 15, defense: 15, luck: 20 },
+        skills: ['御空加速', '仙缘感应'],
+        growthRate: 1.25,
+        maturityMax: 130,
+        price: 10000
+    },
+    '玄武': {
+        icon: '🐢',
+        baseStats: { speed: 15, attack: 10, defense: 35, luck: 15 },
+        skills: ['御空加速', '仙兽护主'],
+        growthRate: 1.0,
+        maturityMax: 140,
+        price: 7000
+    },
+    '九尾狐': {
+        icon: '🦊',
+        baseStats: { speed: 30, attack: 20, defense: 10, luck: 30 },
+        skills: ['御空加速', '仙缘感应'],
+        growthRate: 1.3,
+        maturityMax: 100,
+        price: 12000
+    },
+    '鲲鹏': {
+        icon: '🐋',
+        baseStats: { speed: 40, attack: 15, defense: 10, luck: 20 },
+        skills: ['御空加速', '坐骑融合', '仙缘感应'],
+        growthRate: 1.4,
+        maturityMax: 150,
+        price: 20000
+    }
+};
+
+// ===== MOUNT_GROWTH_TYPES =====
+const MOUNT_GROWTH_TYPES = {
+    '普通': { multiplier: 0.8, color: '#aaaaaa', price: 0 },
+    '优秀': { multiplier: 1.0, color: '#4caf50', price: 1000 },
+    '稀有': { multiplier: 1.2, color: '#2196f3', price: 5000 },
+    '神话': { multiplier: 1.5, color: '#9c27b0', price: 20000 }
+};
+
+// ===== getRandomMountType =====
+function getRandomMountType() {
+    const types = Object.keys(MOUNT_TYPES);
+    return types[Math.floor(Math.random() * types.length)];
+}
+
+// ===== getRandomGrowthType =====
+function getRandomGrowthType() {
+    const rand = Math.random();
+    if (rand < 0.5) return '普通';
+    if (rand < 0.8) return '优秀';
+    if (rand < 0.95) return '稀有';
+    return '神话';
+}
+
+// ===== createMount =====
+function createMount(type, growth) {
+    const template = MOUNT_TYPES[type];
+    const growthData = MOUNT_GROWTH_TYPES[growth];
+    
+    return {
+        uid: 'mount_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: type,
+        type: type,
+        level: 1,
+        growth: growth,
+        stats: {
+            speed: Math.floor(template.baseStats.speed * growthData.multiplier),
+            attack: Math.floor(template.baseStats.attack * growthData.multiplier),
+            defense: Math.floor(template.baseStats.defense * growthData.multiplier),
+            luck: Math.floor(template.baseStats.luck * growthData.multiplier)
+        },
+        skills: [...template.skills],
+        maturity: 0,
+        matureMax: template.maturityMax,
+        exp: 0,
+        expToLevel: 100
+    };
+}
+
+// ===== acquireMount =====
+function acquireMount(mount) {
+    if (gameState.mounts.length >= 3) {
+        showToast('仙兽栏已满（最多3只）');
+        return false;
+    }
+    
+    gameState.mounts.push(mount);
+    addLog('good', '获得仙兽', `获得${mount.growth}级仙兽【${mount.name}】！`);
+    saveGame();
+    return true;
+}
+
+// ===== tryCaptureMount =====
+function tryCaptureMount() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('仙兽只可在仙界捕捉');
+        return;
+    }
+    
+    const mountType = getRandomMountType();
+    const growth = getRandomGrowthType();
+    const mount = createMount(mountType, growth);
+    
+    // 稀有度影响成功率
+    const successRates = { '普通': 0.8, '优秀': 0.5, '稀有': 0.3, '神话': 0.1 };
+    const luckBonus = gameState.currentMount ? gameState.currentMount.stats.luck / 200 : 0;
+    
+    if (Math.random() < successRates[growth] + luckBonus) {
+        acquireMount(mount);
+        showToast(`捕捉成功！获得${growth}仙兽【${mountType}】`);
+    } else {
+        showToast('捕捉失败，仙兽逃走了...');
+    }
+    
+    saveGame();
+}
+
+// ===== feedMount =====
+function feedMount(mountIndex, herbCount) {
+    if (gameState.mounts.length <= mountIndex) return;
+    
+    const mount = gameState.mounts[mountIndex];
+    if (mount.maturity >= mount.matureMax) {
+        showToast('仙兽已完全成熟');
+        return;
+    }
+    
+    // 仙草喂养，每个仙草+5成熟度
+    const gain = Math.min(herbCount * 5, mount.matureMax - mount.maturity);
+    mount.maturity += gain;
+    
+    // 检查是否成熟
+    if (mount.maturity >= mount.matureMax) {
+        mount.level = Math.min(10, mount.level + 1);
+        mount.maturity = mount.matureMax;
+        showToast(`${mount.name}已完全成熟，等级提升！`);
+    }
+    
+    saveGame();
+    updateDisplay();
+}
+
+// ===== rideMount =====
+function rideMount(mountIndex) {
+    if (gameState.mounts.length <= mountIndex) return;
+    
+    gameState.currentMount = gameState.mounts[mountIndex];
+    addLog('good', '骑乘仙兽', `骑乘【${gameState.currentMount.name}】飞行`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== dismountMount =====
+function dismountMount() {
+    if (!gameState.currentMount) return;
+    addLog('neutral', '解除骑乘', `解除【${gameState.currentMount.name}】骑乘状态`);
+    gameState.currentMount = null;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== showMountPanel =====
+function showMountPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">🐎 仙兽面板</h3>';
+    
+    // 当前骑乘
+    if (gameState.currentMount) {
+        const m = gameState.currentMount;
+        html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid #ffd700;">`;
+        html += `<div style="display:flex;align-items:center;gap:10px;">`;
+        html += `<span style="font-size:32px;">${MOUNT_TYPES[m.type].icon}</span>`;
+        html += `<div><div style="color:#ffd700;font-weight:bold;">${m.name}</div>`;
+        html += `<div style="color:#aaa;font-size:12px;">${m.growth}级 | Lv.${m.level}</div></div>`;
+        html += `<button onclick="dismountMount();closeModal();" style="margin-left:auto;padding:6px 12px;background:#c62828;color:white;border:none;border-radius:4px;cursor:pointer;">解除骑乘</button>`;
+        html += '</div>';
+        
+        // 成熟度条
+        const progress = (m.maturity / m.matureMax * 100).toFixed(0);
+        html += `<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;color:#aaa;font-size:11px;"><span>成熟度</span><span>${progress}%</span></div>`;
+        html += `<div style="height:6px;background:#333;border-radius:3px;margin-top:4px;"><div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#4caf50,#81c784);border-radius:3px;"></div></div></div>`;
+        
+        // 属性
+        html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;text-align:center;">`;
+        html += `<div><div style="color:#4caf50;font-size:14px;">${m.stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
+        html += `<div><div style="color:#f44336;font-size:14px;">${m.stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
+        html += `<div><div style="color:#2196f3;font-size:14px;">${m.stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
+        html += `<div><div style="color:#ff9800;font-size:14px;">${m.stats.luck}</div><div style="color:#666;font-size:10px;">幸运</div></div>`;
+        html += '</div></div>';
+    }
+    
+    // 仙兽列表
+    html += '<div style="margin-bottom:12px;"><div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙兽栏 (' + gameState.mounts.length + '/3)</div>';
+    
+    if (gameState.mounts.length === 0) {
+        html += '<div style="text-align:center;color:#666;padding:20px;">暂无仙兽</div>';
+    } else {
+        for (let i = 0; i < gameState.mounts.length; i++) {
+            const m = gameState.mounts[i];
+            const isRiding = gameState.currentMount && gameState.currentMount.uid === m.uid;
+            const growthColor = MOUNT_GROWTH_TYPES[m.growth].color;
+            
+            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;" onclick="toggleMountDetails(${i})">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:24px;">${MOUNT_TYPES[m.type].icon}</span>`;
+            html += `<div style="flex:1;">`;
+            html += `<div style="color:${growthColor};font-weight:bold;">${m.name} <span style="color:#666;font-size:11px;">(${m.growth})</span></div>`;
+            html += `<div style="color:#888;font-size:11px;">Lv.${m.level} | 成熟度${(m.maturity/m.matureMax*100).toFixed(0)}%</div>`;
+            html += '</div>';
+            if (!isRiding) {
+                html += `<button onclick="event.stopPropagation();rideMount(${i});closeModal();" style="padding:4px 8px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">骑乘</button>`;
+            } else {
+                html += `<span style="color:#ffd700;font-size:11px;">已骑乘</span>`;
+            }
+            html += '</div></div>';
+        }
+    }
+    html += '</div>';
+    
+    // 捕捉按钮
+    html += `<button onclick="tryCaptureMount();closeModal();" style="width:100%;padding:12px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🔍 捕捉仙兽</button>`;
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('仙兽', html, '');
+}
+
+// ===== MOUNT_SKILLS =====
+const MOUNT_SKILLS = {
+    '御空加速': {
+        icon: '💨',
+        effect: '移动冷却-50%',
+        description: '骑乘时御空术冷却时间减半'
+    },
+    '仙兽护主': {
+        icon: '🛡️',
+        effect: '战斗加成',
+        description: '战斗时仙兽协助攻击，伤害+20%'
+    },
+    '仙缘感应': {
+        icon: '✨',
+        effect: '仙缘任务+20%',
+        description: '仙缘任务刷新概率+20%'
+    },
+    '坐骑融合': {
+        icon: '🔗',
+        effect: '属性翻倍',
+        description: '骑乘时仙兽属性加成翻倍'
+    }
+};
+
+// ===== immortalSkill.js =====
+
+// ===== IMMORTAL_SKILLS_DATA =====
+const IMMORTAL_SKILLS_DATA = {
+    '万剑归宗': {
+        type: '剑仙法',
+        icon: '⚔️',
+        baseDamage: 200,
+        cooldown: 5,
+        maxLevel: 10,
+        description: '召唤万剑攻击目标，造成大量伤害',
+        upgradeCost: { spiritStones: 500, herbs: 5 },
+        damageType: 'attack'
+    },
+    '金刚不坏': {
+        type: '体仙法',
+        icon: '🛡️',
+        baseDamage: 0,
+        cooldown: 8,
+        maxLevel: 10,
+        description: '进入金刚不坏状态，防御大幅提升，免疫控制',
+        upgradeCost: { spiritStones: 500, herbs: 5 },
+        damageType: 'defense'
+    },
+    '天地大同': {
+        type: '法仙法',
+        icon: '🌍',
+        baseDamage: 150,
+        cooldown: 6,
+        maxLevel: 10,
+        description: '仙法伤害+150%，范围攻击',
+        upgradeCost: { spiritStones: 600, herbs: 6 },
+        damageType: 'AoE'
+    },
+    '撒豆成兵': {
+        type: '召唤仙法',
+        icon: '👥',
+        baseDamage: 80,
+        cooldown: 10,
+        maxLevel: 10,
+        description: '召唤仙兵助战，仙兵继承部分属性',
+        upgradeCost: { spiritStones: 700, herbs: 8 },
+        damageType: 'summon'
+    },
+    '周天星斗': {
+        type: '阵法仙法',
+        icon: '⭐',
+        baseDamage: 0,
+        cooldown: 15,
+        maxLevel: 10,
+        description: '布置周天星斗阵，阵内队友属性+50%',
+        upgradeCost: { spiritStones: 800, herbs: 10 },
+        damageType: 'buff'
+    }
+};
+
+// ===== IMMORTAL_SKILL_TYPES =====
+const IMMORTAL_SKILL_TYPES = {
+    '剑仙法': { color: '#f44336', bonusType: 'attack', bonusValue: 0.2 },
+    '体仙法': { color: '#4caf50', bonusType: 'defense', bonusValue: 0.2 },
+    '法仙法': { color: '#2196f3', bonusType: 'spellDamage', bonusValue: 0.15 },
+    '召唤仙法': { color: '#9c27b0', bonusType: 'summon', bonusValue: 0.1 },
+    '阵法仙法': { color: '#ff9800', bonusType: 'teamBuff', bonusValue: 0.05 }
+};
+
+// ===== learnImmortalSkill =====
+function learnImmortalSkill(skillName) {
+    const skillData = IMMORTAL_SKILLS_DATA[skillName];
+    if (!skillData) return false;
+    
+    // 检查是否已学会
+    if (gameState.immortalSkills.find(s => s.name === skillName)) {
+        showToast('已学会此仙法');
+        return false;
+    }
+    
+    const skill = {
+        uid: 'skill_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: skillName,
+        type: skillData.type,
+        level: 1,
+        maxLevel: skillData.maxLevel,
+        cooldown: skillData.cooldown,
+        currentCooldown: 0,
+        damage: skillData.baseDamage,
+        description: skillData.description
+    };
+    
+    gameState.immortalSkills.push(skill);
+    addLog('good', '学会仙法', `学会【${skillName}】！`);
+    saveGame();
+    return true;
+}
+
+// ===== upgradeImmortalSkill =====
+function upgradeImmortalSkill(skillIndex) {
+    if (gameState.immortalSkills.length <= skillIndex) return;
+    
+    const skill = gameState.immortalSkills[skillIndex];
+    const skillData = IMMORTAL_SKILLS_DATA[skill.name];
+    
+    if (skill.level >= skill.maxLevel) {
+        showToast('仙法已达最大等级');
+        return;
+    }
+    
+    const cost = {
+        spiritStones: skillData.upgradeCost.spiritStones * skill.level,
+        herbs: skillData.upgradeCost.herbs * skill.level
+    };
+    
+    if (gameState.immortal.spiritStones < cost.spiritStones) {
+        showToast('仙石不足');
+        return;
+    }
+    
+    // 扣除仙石
+    gameState.immortal.spiritStones -= cost.spiritStones;
+    
+    // 升级
+    skill.level++;
+    skill.damage = Math.floor(skillData.baseDamage * (1 + skill.level * 0.1));
+    
+    addLog('good', '仙法升级', `${skill.name}升级到Lv.${skill.level}！`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== useImmortalSkill =====
+function useImmortalSkill(skillIndex, target) {
+    if (gameState.immortalSkills.length <= skillIndex) return;
+    
+    const skill = gameState.immortalSkills[skillIndex];
+    
+    if (skill.currentCooldown > 0) {
+        showToast(`${skill.name}冷却中，还需${skill.currentCooldown}秒`);
+        return;
+    }
+    
+    // 应用技能效果
+    const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
+    let effectDescription = '';
+    
+    switch (skill.damageType) {
+        case 'attack':
+            effectDescription = `对目标造成${skill.damage}%伤害`;
+            // 直接应用伤害（战斗系统会在此处接入）
+            break;
+        case 'defense':
+            effectDescription = '防御大幅提升，免疫控制3秒';
+            break;
+        case 'AoE':
+            effectDescription = `对范围内敌人造成${skill.damage}%伤害`;
+            break;
+        case 'summon':
+            effectDescription = '召唤仙兵助战';
+            break;
+        case 'buff':
+            effectDescription = '阵内队友属性+50%';
+            break;
+    }
+    
+    // 设置冷却
+    skill.currentCooldown = skill.cooldown;
+    
+    addLog('good', '施展仙法', `施展【${skill.name}】：${effectDescription}`);
+    saveGame();
+    
+    // 启动冷却计时
+    startSkillCooldownTimer(skillIndex);
+    
+    return true;
+}
+
+// ===== startSkillCooldownTimer =====
+function startSkillCooldownTimer(skillIndex) {
+    const interval = setInterval(() => {
+        if (gameState.immortalSkills.length <= skillIndex) {
+            clearInterval(interval);
+            return;
+        }
+        
+        const skill = gameState.immortalSkills[skillIndex];
+        if (skill.currentCooldown > 0) {
+            skill.currentCooldown--;
+            updateDisplay();
+        } else {
+            clearInterval(interval);
+        }
+    }, 1000);
+}
+
+// ===== showImmortalSkillPanel =====
+function showImmortalSkillPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">✨ 仙法面板</h3>';
+    
+    // 技能列表
+    if (gameState.immortalSkills.length === 0) {
+        html += '<div style="text-align:center;color:#666;padding:30px;">尚未学会任何仙法</div>';
+    } else {
+        for (let i = 0; i < gameState.immortalSkills.length; i++) {
+            const skill = gameState.immortalSkills[i];
+            const skillData = IMMORTAL_SKILLS_DATA[skill.name];
+            const typeData = IMMORTAL_SKILL_TYPES[skill.type];
+            
+            html += `<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:10px;border-left:4px solid ${typeData.color};">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:28px;">${skillData.icon}</span>`;
+            html += `<div style="flex:1;">`;
+            html += `<div style="color:#fff;font-weight:bold;">${skill.name} <span style="color:${typeData.color};font-size:12px;">[${skill.type}]</span></div>`;
+            html += `<div style="color:#888;font-size:11px;">Lv.${skill.level}/${skill.maxLevel}</div>`;
+            html += '</div>';
+            
+            // 冷却显示
+            if (skill.currentCooldown > 0) {
+                html += `<div style="color:#f44336;font-size:12px;">冷却:${skill.currentCooldown}秒</div>`;
+            } else {
+                html += `<button onclick="useImmortalSkill(${i});closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">施展</button>`;
+            }
+            
+            html += '</div>';
+            
+            // 升级按钮
+            const upgradeCost = {
+                spiritStones: skillData.upgradeCost.spiritStones * skill.level,
+                herbs: skillData.upgradeCost.herbs * skill.level
+            };
+            
+            html += `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">`;
+            html += `<div style="color:#aaa;font-size:11px;">${skill.description}</div>`;
+            
+            if (skill.level < skill.maxLevel) {
+                const canUpgrade = gameState.immortal.spiritStones >= upgradeCost.spiritStones;
+                html += `<button onclick="upgradeImmortalSkill(${i});closeModal();" ${canUpgrade ? '' : 'disabled'} style="padding:4px 8px;background:${canUpgrade ? '#1565c0' : '#444'};color:${canUpgrade ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canUpgrade ? 'pointer' : 'not-allowed'};font-size:11px;">升级 ${upgradeCost.spiritStones}💎</button>`;
+            } else {
+                html += `<span style="color:#ffd700;font-size:11px;">已满级</span>`;
+            }
+            
+            html += '</div></div>';
+        }
+    }
+    
+    // 学习新仙法
+    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #333;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">可学习仙法：</div>';
+    
+    const availableSkills = Object.keys(IMMORTAL_SKILLS_DATA).filter(
+        name => !gameState.immortalSkills.find(s => s.name === name)
+    );
+    
+    if (availableSkills.length === 0) {
+        html += '<div style="color:#666;text-align:center;">已学会所有仙法</div>';
+    } else {
+        for (const skillName of availableSkills) {
+            const skillData = IMMORTAL_SKILLS_DATA[skillName];
+            const typeData = IMMORTAL_SKILL_TYPES[skillData.type];
+            
+            html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">`;
+            html += `<div style="display:flex;align-items:center;gap:10px;">`;
+            html += `<span style="font-size:20px;">${skillData.icon}</span>`;
+            html += `<div><div style="color:#fff;font-size:13px;">${skillName}</div><div style="color:${typeData.color};font-size:11px;">${skillData.type}</div></div>`;
+            html += '</div>';
+            html += `<button onclick="learnImmortalSkill('${skillName}');closeModal();" style="padding:4px 10px;background:#2e7d32;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">学习</button>`;
+            html += '</div>';
+        }
+    }
+    html += '</div>';
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('仙法', html, '');
+}
+
+// ===== getImmortalSkillBonus =====
+function getImmortalSkillBonus(type) {
+    let bonus = 0;
+    for (const skill of gameState.immortalSkills) {
+        const skillTypeData = IMMORTAL_SKILL_TYPES[skill.type];
+        if (skillTypeData.bonusType === type) {
+            bonus += skillTypeData.bonusValue * skill.level;
+        }
+    }
+    return bonus;
+}
+
+// ===== immortalEquip.js =====
+
+// ===== IMMORTAL_EQUIP_QUALITIES =====
+const IMMORTAL_EQUIP_QUALITIES = {
+    1: { name: '仙器', color: '#2196f3', multiplier: 1.5, colorHex: '蓝色' },
+    2: { name: '灵仙器', color: '#9c27b0', multiplier: 2.0, colorHex: '紫色' },
+    3: { name: '神仙器', color: '#ff9800', multiplier: 3.0, colorHex: '橙色' },
+    4: { name: '混沌器', color: '#ffd700', multiplier: 5.0, colorHex: '金色' }
+};
+
+// ===== IMMORTAL_EQUIP_SLOTS =====
+const IMMORTAL_EQUIP_SLOTS = {
+    head: { name: '仙冠', icon: '👑', pos: 0 },
+    body: { name: '仙袍', icon: '👘', pos: 1 },
+    foot: { name: '仙履', icon: '👟', pos: 2 },
+    weapon: { name: '仙剑', icon: '⚔️', pos: 3 },
+    shield: { name: '仙盾', icon: '🛡️', pos: 4 },
+    accessory: { name: '仙佩', icon: '📿', pos: 5 }
+};
+
+// ===== IMMORTAL_EQUIP_SETS =====
+const IMMORTAL_EQUIP_SETS = {
+    '仙灵套装': {
+        pieces: ['仙冠-仙灵', '仙袍-仙灵', '仙履-仙灵'],
+        setBonus: { effect: 'cultivationSpeed', value: 0.2 },
+        description: '2件：仙气修炼效率+20%'
+    },
+    '战神套装': {
+        pieces: ['仙剑-战神', '仙盾-战神', '仙冠-战神', '仙袍-战神'],
+        setBonus: { effect: 'attack', value: 0.5 },
+        description: '4件：攻击+50%，仙兽参战伤害+30%'
+    },
+    '不死套装': {
+        pieces: ['仙冠-不死', '仙袍-不死', '仙履-不死', '仙佩-不死'],
+        setBonus: { effect: 'invincible', value: 3, cooldown: 60 },
+        description: '4件：致命伤害时无敌3秒，CD60秒'
+    },
+    '混沌套装': {
+        pieces: ['仙冠-混沌', '仙袍-混沌', '仙履-混沌', '仙剑-混沌', '仙盾-混沌', '仙佩-混沌'],
+        setBonus: { effect: 'allStats', value: 1.0 },
+        description: '6件：全属性+100%，仙法伤害+100%'
+    }
+};
+
+// ===== EQUIPMENT_BASE_STATS =====
+const EQUIPMENT_BASE_STATS = {
+    attack: 100,
+    defense: 80,
+    hp: 500,
+    speed: 50,
+    crit: 10,
+    resist: 15
+};
+
+// ===== EQUIPMENT_AFFIX_TYPES =====
+const EQUIPMENT_AFFIX_TYPES = [
+    { name: 'attack', display: '攻击', min: 5, max: 30, rarity: 'common' },
+    { name: 'defense', display: '防御', min: 5, max: 25, rarity: 'common' },
+    { name: 'hp', display: '生命', min: 20, max: 100, rarity: 'common' },
+    { name: 'crit', display: '暴击', min: 3, max: 15, rarity: 'uncommon' },
+    { name: 'resist', display: '抗性', min: 3, max: 12, rarity: 'uncommon' },
+    { name: 'speed', display: '速度', min: 2, max: 10, rarity: 'uncommon' },
+    { name: 'cultivate_qi_rate', display: '灵气效率', min: 0.05, max: 0.15, rarity: 'rare', isPercent: true },
+    { name: 'breakthrough_boost', display: '突破加成', min: 0.05, max: 0.10, rarity: 'rare', isPercent: true },
+    { name: 'tribulation_damage_reduce', display: '渡劫减伤', min: 0.05, max: 0.15, rarity: 'epic', isPercent: true },
+    { name: 'all_stats', display: '全属性', min: 0.03, max: 0.08, rarity: 'legendary', isPercent: true }
+];
+
+const AFFIX_RARITY_COLORS = {
+    common: '#aaa',
+    uncommon: '#4CAF50',
+    rare: '#2196f3',
+    epic: '#9c27b0',
+    legendary: '#ff9800'
+};
+
+// ===== generateAffix =====
+function generateAffix(quality, tier) {
+    // 根据品质和难度等级筛选可用词条
+    const availableAffixes = EQUIPMENT_AFFIX_TYPES.filter(a => {
+        if (tier === 0) return a.rarity === 'common' || a.rarity === 'uncommon';
+        if (tier === 1) return a.rarity !== 'legendary';
+        return true;  // tier >= 2 所有词条
+    });
+    
+    const affix = availableAffixes[Math.floor(Math.random() * availableAffixes.length)];
+    const value = affix.min + Math.random() * (affix.max - affix.min);
+    
+    return {
+        name: affix.name,
+        display: affix.display,
+        value: affix.isPercent ? parseFloat(value.toFixed(2)) : Math.floor(value),
+        rarity: affix.rarity,
+        isPercent: affix.isPercent || false,
+        icon: affix.isPercent ? '%' : ''
+    };
+}
+
+// ===== calculateEquipScore =====
+function calculateEquipScore(equip) {
+    if (!equip) return 0;
+    let score = 0;
+    
+    // 基础属性评分
+    const statWeights = { attack: 2, defense: 1.5, hp: 0.5, speed: 1, crit: 1.5, resist: 1 };
+    for (const stat in equip.stats) {
+        score += (equip.stats[stat] || 0) * (statWeights[stat] || 1);
+    }
+    
+    // 词条加成评分
+    if (equip.affixes) {
+        equip.affixes.forEach(affix => {
+            const rarityMultiplier = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 5 };
+            score += affix.value * (rarityMultiplier[affix.rarity] || 1);
+        });
+    }
+    
+    // 强化等级加成
+    if (equip.enhancementLevel > 0) {
+        score *= (1 + equip.enhancementLevel * 0.1);
+    }
+    
+    // 精炼等级加成
+    if (equip.refinementLevel > 0) {
+        score *= (1 + equip.refinementLevel * 0.05);
+    }
+    
+    return Math.floor(score);
+}
+
+// ===== generateImmortalEquip =====
+function generateImmortalEquip(slot, quality) {
+    const qualityData = IMMORTAL_EQUIP_QUALITIES[quality];
+    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+    
+    const equip = {
+        uid: 'equip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        slot: slot,
+        name: `${slotData.name}-${qualityData.name}`,
+        quality: quality,
+        qualityName: qualityData.name,
+        icon: slotData.icon,
+        stats: {},
+        setName: null, // 套装名
+        refinationLevel: 0,  // V36 精炼等级 0-12
+        enhancementLevel: 0,  // V36 强化等级 0-15
+        affixes: []           // V36 随机词条
+    };
+    
+    // 根据品质生成属性
+    const multiplier = qualityData.multiplier;
+    for (const stat in EQUIPMENT_BASE_STATS) {
+        equip.stats[stat] = Math.floor(EQUIPMENT_BASE_STATS[stat] * multiplier * (0.8 + Math.random() * 0.4));
+    }
+    
+    // V36 根据品质生成1-3条随机词条
+    const affixCount = quality + Math.floor(Math.random() * quality);
+    const tier = Math.min(2, Math.floor(quality / 2));
+    for (let i = 0; i < affixCount; i++) {
+        equip.affixes.push(generateAffix(quality, tier));
+    }
+    
+    // 30%概率生成套装
+    if (Math.random() < 0.3) {
+        const setNames = Object.keys(IMMORTAL_EQUIP_SETS);
+        equip.setName = setNames[Math.floor(Math.random() * setNames.length)];
+    }
+    
+    return equip;
+}
+
+// ===== enhanceEquipment =====
+function enhanceEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.enhancementLevel >= 15) {
+        showToast('已达强化上限+15');
+        return;
+    }
+    
+    const level = equip.enhancementLevel;
+    const baseCost = 500 * Math.pow(1.8, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`强化需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    
+    // 成功率：+1:100%, +5:80%, +10:50%, +15:20%
+    const successRates = [100, 100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30, 25, 20, 15];
+    const successRate = successRates[level + 1] || 20;
+    const roll = Math.random() * 100;
+    
+    if (roll < successRate) {
+        equip.enhancementLevel++;
+        addLog('good', '装备强化', `强化成功！${equip.name}强化到+${equip.enhancementLevel}`);
+        showToast(`强化成功！+${equip.enhancementLevel}`);
+    } else {
+        equip.enhancementLevel = Math.max(0, equip.enhancementLevel - 1);
+        addLog('warn', '装备强化', `强化失败，${equip.name}降为+${equip.enhancementLevel}`);
+        showToast(`强化失败，降为+${equip.enhancementLevel}`);
+    }
+    
+    saveGame();
+    showImmortalEquipPanel();
+}
+
+// ===== refineEquipment =====
+function refineEquipment(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位没有装备');
+        return;
+    }
+    
+    if (equip.refinementLevel >= 12) {
+        showToast('已达精炼上限+12');
+        return;
+    }
+    
+    const level = equip.refinementLevel;
+    const baseCost = 1000 * Math.pow(2, level);
+    const cost = Math.floor(baseCost);
+    
+    if (gameState.immortal.spiritStones < cost) {
+        showToast(`精炼需要${cost}灵石`);
+        return;
+    }
+    
+    gameState.immortal.spiritStones -= cost;
+    gameState.equipmentForgeCount++;
+    equip.refinementLevel++;
+    
+    // 精炼必定成功（消耗同名装备可以100%成功，这里简化处理）
+    addLog('good', '装备精炼', `精炼成功！${equip.name}精炼到+${equip.refinementLevel}`);
+    showToast(`精炼成功！+${equip.refinementLevel}`);
+    
+    saveGame();
+    showImmortalEquipPanel();
+}
+
+// ===== equipImmortalItem =====
+function equipImmortalItem(equip) {
+    const slot = equip.slot;
+    const oldEquip = gameState.immortalEquipment[slot];
+    
+    gameState.immortalEquipment[slot] = equip;
+    
+    addLog('good', '装备仙器', `装备【${equip.name}】`);
+    saveGame();
+    updateDisplay();
+}
+
+// ===== unequipImmortalItem =====
+function unequipImmortalItem(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) return;
+    
+    // 卸下到背包（暂时不实现背包系统，这里直接消失）
+    addLog('neutral', '卸下仙器', `卸下了${equip.name}`);
+    gameState.immortalEquipment[slot] = null;
+    saveGame();
+    updateDisplay();
+}
+
+// ===== calculateEquipSetBonus =====
+function calculateEquipSetBonus() {
+    const equipped = gameState.immortalEquipment;
+    const bonuses = {};
+    
+    // 统计各套装件数
+    const setCounts = {};
+    for (const slot in equipped) {
+        if (equipped[slot] && equipped[slot].setName) {
+            setCounts[equipped[slot].setName] = (setCounts[equipped[slot].setName] || 0) + 1;
+        }
+    }
+    
+    // 计算套装效果
+    for (const setName in setCounts) {
+        const setData = IMMORTAL_EQUIP_SETS[setName];
+        if (setData) {
+            const count = setCounts[setName];
+            // 检查是否满足套装条件
+            for (let i = 0; i < setData.pieces.length; i++) {
+                const requiredPieces = i + 2; // 2件起效
+                if (count >= requiredPieces) {
+                    bonuses[setName] = setData.setBonus;
+                }
+            }
+        }
+    }
+    
+    return bonuses;
+}
+
+// ===== getImmortalEquipStats =====
+function getImmortalEquipStats() {
+    let stats = { attack: 0, defense: 0, hp: 0, speed: 0, crit: 0, resist: 0 };
+    const equip = gameState.immortalEquipment;
+    
+    for (const slot in equip) {
+        if (equip[slot]) {
+            for (const stat in equip[slot].stats) {
+                stats[stat] += equip[slot].stats[stat];
+            }
+        }
+    }
+    
+    // 应用套装加成
+    const setBonuses = calculateEquipSetBonus();
+    for (const setName in setBonuses) {
+        const bonus = setBonuses[setName];
+        if (bonus.effect === 'allStats') {
+            stats.attack *= (1 + bonus.value);
+            stats.defense *= (1 + bonus.value);
+            stats.hp *= (1 + bonus.value);
+        }
+    }
+    
+    return stats;
+}
+
+// ===== showImmortalEquipPanel =====
+function showImmortalEquipPanel() {
+    let html = '<div style="padding:16px;">';
+    html += '<h3 style="color:#ffd700;text-align:center;margin-bottom:16px;">⚔️ 飞升装备</h3>';
+    
+    // 装备栏
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">';
+    
+    for (const slot in IMMORTAL_EQUIP_SLOTS) {
+        const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+        const equip = gameState.immortalEquipment[slot];
+        
+        let bgColor = '#252540';
+        let borderColor = '#444';
+        
+        if (equip) {
+            const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
+            bgColor = qualityData.color + '22';
+            borderColor = qualityData.color;
+        }
+        
+        html += `<div style="background:${bgColor};border:2px solid ${borderColor};border-radius:8px;padding:10px;text-align:center;cursor:pointer;" onclick="showEquipSlotDetail('${slot}')">`;
+        html += `<div style="font-size:24px;">${slotData.icon}</div>`;
+        
+        if (equip) {
+            html += `<div style="color:#fff;font-size:11px;">${equip.name}</div>`;
+            html += `<div style="color:${IMMORTAL_EQUIP_QUALITIES[equip.quality].color};font-size:10px;">${equip.qualityName}</div>`;
+        } else {
+            html += `<div style="color:#666;font-size:11px;">${slotData.name}</div>`;
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    // 当前属性
+    const stats = getImmortalEquipStats();
+    html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">装备加成</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">';
+    html += `<div><div style="color:#f44336;">${stats.attack}</div><div style="color:#666;font-size:10px;">攻击</div></div>`;
+    html += `<div><div style="color:#2196f3;">${stats.defense}</div><div style="color:#666;font-size:10px;">防御</div></div>`;
+    html += `<div><div style="color:#4caf50;">${stats.hp}</div><div style="color:#666;font-size:10px;">生命</div></div>`;
+    html += `<div><div style="color:#ff9800;">${stats.speed}</div><div style="color:#666;font-size:10px;">速度</div></div>`;
+    html += `<div><div style="color:#9c27b0;">${stats.crit}%</div><div style="color:#666;font-size:10px;">暴击</div></div>`;
+    html += `<div><div style="color:#00bcd4;">${stats.resist}%</div><div style="color:#666;font-size:10px;">抗性</div></div>`;
+    html += '</div></div>';
+    
+    // 套装效果
+    const setBonuses = calculateEquipSetBonus();
+    if (Object.keys(setBonuses).length > 0) {
+        html += '<div style="background:#1a1a2e;padding:12px;border-radius:8px;margin-bottom:12px;">';
+        html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">套装效果</div>';
+        
+        for (const setName in setBonuses) {
+            const setData = IMMORTAL_EQUIP_SETS[setName];
+            const bonus = setBonuses[setName];
+            html += `<div style="color:#aaa;font-size:11px;margin-bottom:4px;">【${setName}】${setData.description}</div>`;
+        }
+        html += '</div>';
+    }
+    
+    // 购买装备（仙界商店）
+    html += '<div style="border-top:1px solid #333;padding-top:12px;margin-top:8px;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">仙界商店</div>';
+    
+    const buyOptions = [
+        { slot: 'weapon', quality: 1, price: 1000, name: '仙器' },
+        { slot: 'weapon', quality: 2, price: 5000, name: '灵仙器' },
+        { slot: 'weapon', quality: 3, price: 20000, name: '神仙器' }
+    ];
+    
+    for (const opt of buyOptions) {
+        const qualityData = IMMORTAL_EQUIP_QUALITIES[opt.quality];
+        const slotData = IMMORTAL_EQUIP_SLOTS[opt.slot];
+        
+        html += `<div style="background:#252540;padding:10px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">`;
+        html += `<div style="display:flex;align-items:center;gap:10px;">`;
+        html += `<span style="font-size:20px;">${slotData.icon}</span>`;
+        html += `<div><div style="color:${qualityData.color};">${qualityData.name}${slotData.name}</div><div style="color:#888;font-size:10px;">${opt.price}💎</div></div>`;
+        html += '</div>';
+        
+        const canBuy = gameState.immortal.spiritStones >= opt.price;
+        html += `<button onclick="buyImmortalEquip('${opt.slot}', ${opt.quality}, ${opt.price})" ${canBuy ? '' : 'disabled'} style="padding:4px 10px;background:${canBuy ? '#2e7d32' : '#444'};color:${canBuy ? '#fff' : '#666'};border:none;border-radius:4px;cursor:${canBuy ? 'pointer' : 'not-allowed'};font-size:11px;">购买</button>`;
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:16px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('飞升装备', html, '');
+}
+
+// ===== buyImmortalEquip =====
+function buyImmortalEquip(slot, quality, price) {
+    if (!spendSpiritStones(price, '购买飞升装备')) {
+        return;
+    }
+    
+    const equip = generateImmortalEquip(slot, quality);
+    equipImmortalItem(equip);
+    showToast(`购买成功！获得【${equip.name}】`);
+    closeModal();
+    showImmortalEquipPanel();
+}
+
+// ===== showEquipSlotDetail =====
+function showEquipSlotDetail(slot) {
+    const equip = gameState.immortalEquipment[slot];
+    if (!equip) {
+        showToast('该部位暂无装备');
+        return;
+    }
+    
+    const qualityData = IMMORTAL_EQUIP_QUALITIES[equip.quality];
+    const slotData = IMMORTAL_EQUIP_SLOTS[slot];
+    const score = calculateEquipScore(equip);
+    
+    let html = '<div style="padding:16px;">';
+    html += `<div style="text-align:center;">`;
+    html += `<div style="font-size:48px;">${equip.icon}</div>`;
+    html += `<div style="color:${qualityData.color};font-size:18px;font-weight:bold;margin-top:8px;">${equip.name}</div>`;
+    html += `<div style="color:#888;font-size:12px;">${slotData.name}位</div>`;
+    if (equip.setName) {
+        html += `<div style="color:#ffd700;font-size:12px;margin-top:4px;">套装：${equip.setName}</div>`;
+    }
+    html += `<div style="color:#aaa;font-size:11px;margin-top:4px;">评分：${score}</div>`;
+    html += '</div>';
+    
+    // V36 强化和精炼等级
+    html += '<div style="display:flex;gap:10px;margin-top:12px;">';
+    if (equip.enhancementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#ff9800;font-size:11px;">强化+${equip.enhancementLevel}</span>`;
+    }
+    if (equip.refinementLevel > 0) {
+        html += `<span style="background:#333;padding:3px 8px;border-radius:4px;color:#9c27b0;font-size:11px;">精炼+${equip.refinementLevel}</span>`;
+    }
+    html += '</div>';
+    
+    html += '<div style="margin-top:16px;">';
+    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">基础属性：</div>';
+    for (const stat in equip.stats) {
+        const statNames = { attack: '攻击', defense: '防御', hp: '生命', speed: '速度', crit: '暴击', resist: '抗性' };
+        let value = equip.stats[stat];
+        // 精炼加成
+        if (equip.refinementLevel > 0) {
+            value = Math.floor(value * (1 + equip.refinementLevel * 0.05));
+        }
+        html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">`;
+        html += `<span style="color:#888;">${statNames[stat]}</span>`;
+        html += `<span style="color:#fff;">+${value}</span>`;
+        html += '</div>';
+    }
+    html += '</div>';
+    
+    // V36 词条显示
+    if (equip.affixes && equip.affixes.length > 0) {
+        html += '<div style="margin-top:16px;">';
+        html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px;">词条：</div>';
+        equip.affixes.forEach(affix => {
+            const color = AFFIX_RARITY_COLORS[affix.rarity] || '#aaa';
+            const valueStr = affix.isPercent ? `${(affix.value * 100).toFixed(0)}%` : affix.value;
+            html += `<div style="display:flex;justify-content:space-between;padding:3px 0;">`;
+            html += `<span style="color:${color};font-size:11px;">◆ ${affix.display}</span>`;
+            html += `<span style="color:${color};font-size:11px;">+${valueStr}</span>`;
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    
+    // V36 强化和精炼按钮
+    const enhanceCost = Math.floor(500 * Math.pow(1.8, equip.enhancementLevel));
+    const refineCost = Math.floor(1000 * Math.pow(2, equip.refinementLevel));
+    
+    html += '<div style="margin-top:16px;display:flex;gap:8px;">';
+    if (equip.enhancementLevel < 15) {
+        html += `<button onclick="enhanceEquipment('${slot}')" ${gameState.immortal.spiritStones >= enhanceCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= enhanceCost ? '#e65100' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= enhanceCost ? 'pointer' : 'not-allowed'};font-size:12px;">强化+${equip.enhancementLevel + 1}(${enhanceCost}💎)</button>`;
+    }
+    if (equip.refinementLevel < 12) {
+        html += `<button onclick="refineEquipment('${slot}')" ${gameState.immortal.spiritStones >= refineCost ? '' : 'disabled'} style="flex:1;padding:8px;background:${gameState.immortal.spiritStones >= refineCost ? '#6a1b9a' : '#444'};color:#fff;border:none;border-radius:6px;cursor:${gameState.immortal.spiritStones >= refineCost ? 'pointer' : 'not-allowed'};font-size:12px;">精炼+${equip.refinementLevel + 1}(${refineCost}💎)</button>`;
+    }
+    html += '</div>';
+    
+    html += `<button onclick="unequipImmortalItem('${slot}');closeModal();" style="width:100%;margin-top:16px;padding:10px;background:#c62828;color:white;border:none;border-radius:6px;cursor:pointer;">卸下</button>`;
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">关闭</button>`;
+    html += '</div>';
+    
+    openModal('装备详情', html, '');
+}
+
+// ===== ascension.js =====
+
+// ===== ASCENSION_COSTS =====
+const ASCENSION_COSTS = {
+    spiritStones: 500000,  // 50万灵石
+    equipmentQuality: 'rare' // 需要紫色(rare)或以上装备
+};
+
+// ===== hasOrangeOrHigherEquip =====
+function hasOrangeOrHigherEquip() {
+    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
+    const minQuality = qualityOrder['rare']; // 紫色=rare=1, 橙色=precious=2
+    
+    // 检查背包
+    for (const item of gameState.inventory) {
+        if (item.type === 'treasure') {
+            if ((qualityOrder[item.quality] || 0) >= minQuality) {
+                return true;
+            }
+        }
+    }
+    
+    // 检查已装备
+    for (const equip of gameState.equippedTreasures) {
+        if (equip && (qualityOrder[equip.quality] || 0) >= minQuality) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// ===== canAscend =====
+function canAscend() {
+    // 检查渡劫是否成功
+    const hasCompletedTribulation = gameState.realm >= 4 && gameState.stage >= 2;
+    if (!hasCompletedTribulation) {
+        return { result: false, reason: '需要渡劫成功（化神后期）' };
+    }
+    
+    // 检查灵石
+    if (gameState.spiritStones < ASCENSION_COSTS.spiritStones) {
+        return { result: false, reason: `需要${ASCENSION_COSTS.spiritStones}灵石，飞升费用` };
+    }
+    
+    // 检查橙色以上装备
+    if (!hasOrangeOrHigherEquip()) {
+        return { result: false, reason: '需要至少1件紫色以上品质的装备' };
+    }
+    
+    // 检查是否已经飞升
+    if (gameState.currentRealm === 'immortal') {
+        return { result: false, reason: '已经飞升' };
+    }
+    
+    return { result: true };
+}
+
+// ===== showAscensionButton =====
+function showAscensionButton() {
+    const check = canAscend();
+    
+    const btn = document.getElementById('ascensionBtn');
+    if (!btn) return;
+    
+    if (check.result) {
+        btn.style.display = 'inline-block';
+        btn.style.background = 'linear-gradient(135deg, #9c27b0, #e91e63)';
+        btn.style.boxShadow = '0 0 20px rgba(233, 30, 99, 0.5)';
+        btn.onclick = showAscensionModal;
+    } else {
+        btn.style.display = 'inline-block';
+        btn.style.background = '#444';
+        btn.style.boxShadow = 'none';
+        btn.onclick = () => showToast(check.reason);
+    }
+}
+
+// ===== showAscensionModal =====
+function showAscensionModal() {
+    const check = canAscend();
+    if (!check.result) {
+        showToast(check.reason);
+        return;
+    }
+    
+    let html = '<div style="padding:20px;text-align:center;">';
+    html += '<div style="font-size:48px;margin-bottom:10px;">🌟</div>';
+    html += '<h2 style="color:#ffd700;margin-bottom:10px;">飞升成仙</h2>';
+    html += '<p style="color:#aaa;font-size:13px;margin-bottom:20px;">突破凡界桎梏，进入仙界篇章</p>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升消耗：</div>';
+    html += `<div style="color:#f44336;margin-bottom:4px;">💎 500000 灵石（保留50%）</div>`;
+    html += '<div style="color:#ff9800;margin-bottom:4px;">⚔️ 橙色以上装备 → 仙界材料</div>';
+    html += '<div style="color:#4caf50;">✨ 已学功法 → 转换仙界版</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">飞升保留：</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 灵石（扣除50%）</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 已学功法（转换仙界版）</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 宗门归属</div>';
+    html += '<div style="color:#aaa;margin-bottom:4px;">• 成就/称号（部分保留）</div>';
+    html += '<div style="color:#aaa;">• 宗门贡献</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:16px;">';
+    html += '<div style="color:#ffd700;font-size:12px;margin-bottom:8px;">仙界境界：</div>';
+    html += '<div style="color:#4caf50;margin-bottom:4px;">🌱 地仙境 → 天仙境 → 金仙境</div>';
+    html += '<div style="color:#2196f3;">⭐ 大罗金仙 → 混元大罗</div>';
+    html += '</div>';
+    
+    html += `<button onclick="doAscend()" style="width:100%;padding:14px;background:linear-gradient(135deg,#9c27b0,#e91e63);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">🌟 确认飞升</button>`;
+    html += `<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:10px;background:#444;color:#ccc;border:none;border-radius:6px;cursor:pointer;">返回</button>`;
+    html += '</div>';
+    
+    openModal('飞升', html, '');
+}
+
+// ===== doAscend =====
+function doAscend() {
+    const check = canAscend();
+    if (!check.result) {
+        showToast(check.reason);
+        closeModal();
+        return;
+    }
+    
+    // 1. 扣除灵石（保留50%）
+    const keepStones = Math.floor(gameState.spiritStones * 0.5);
+    const spentStones = gameState.spiritStones - keepStones;
+    gameState.spiritStones = keepStones;
+    
+    // 2. 凡界装备 → 材料（只保留橙色以上）
+    const materialsGained = [];
+    const qualityOrder = { common: 0, rare: 1, precious: 2, legendary: 3 };
+    
+    // 背包装备转化
+    const newInventory = [];
+    for (const item of gameState.inventory) {
+        if (item.type === 'treasure' && qualityOrder[item.quality] >= qualityOrder['precious']) {
+            materialsGained.push({ name: item.name, quality: item.quality });
+        } else {
+            newInventory.push(item);
+        }
+    }
+    gameState.inventory = newInventory;
+    
+    // 装备栏转化
+    for (let i = 0; i < gameState.equippedTreasures.length; i++) {
+        const equip = gameState.equippedTreasures[i];
+        if (equip && qualityOrder[equip.quality] >= qualityOrder['precious']) {
+            materialsGained.push({ name: equip.name, quality: equip.quality });
+            gameState.equippedTreasures[i] = null;
+        }
+    }
+    
+    // 3. 初始化仙界状态
+    initializeImmortalState();
+    
+    // 4. 设置初始仙石
+    gameState.immortal.spiritStones = 0; // 仙石独立
+    
+    // 5. 切换到仙界
+    gameState.currentRealm = 'immortal';
+    
+    // 6. 保留一些凡界资源
+    gameState.realm = 1; // 凡界境界回归筑基
+    gameState.stage = 0;
+    gameState.cultivationProgress = 0;
+    
+    // 7. 保存日志
+    addLog('good', '飞升成功', `历经${gameState.days}天的修炼，终于飞升成仙！`);
+    
+    saveGame();
+    
+    // 8. 关闭模态框，显示成功界面
+    closeModal();
+    showAscensionSuccessScreen();
+}
+
+// ===== showAscensionSuccessScreen =====
+function showAscensionSuccessScreen() {
+    let html = '<div style="padding:30px;text-align:center;">';
+    html += '<div style="font-size:64px;animation:pulse 2s infinite;">✨🌟✨</div>';
+    html += '<h2 style="color:#ffd700;font-size:24px;margin:20px 0;">恭喜飞升成仙！</h2>';
+    html += '<p style="color:#aaa;margin-bottom:20px;">你已突破凡界桎梏，进入仙界篇章</p>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
+    html += '<div style="color:#4caf50;margin-bottom:8px;">✅ 保留50%灵石：' + gameState.spiritStones + '</div>';
+    html += '<div style="color:#2196f3;margin-bottom:8px;">✅ 境界：地仙境（重新修炼）</div>';
+    html += '<div style="color:#9c27b0;">✅ 仙界篇章开启</div>';
+    html += '</div>';
+    
+    html += '<div style="background:#1a1a2e;padding:15px;border-radius:8px;text-align:left;margin-bottom:20px;">';
+    html += '<div style="color:#ffd700;margin-bottom:8px;">📍 当前区域：仙灵谷</div>';
+    html += '<div style="color:#aaa;font-size:13px;">仙气充沛，适合初入仙界者修炼</div>';
+    html += '</div>';
+    
+    html += `<button onclick="enterImmortalRealm()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4caf50,#2e7d32);color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-weight:bold;">☁️ 进入仙界</button>`;
+    html += '</div>';
+    
+    openModal('飞升', html, '');
+}
+
+// ===== enterImmortalRealm =====
+function enterImmortalRealm() {
+    closeModal();
+    saveGame();
+    updateDisplay();
+    
+    // 显示仙界UI
+    if (typeof showImmortalMainUI === 'function') {
+        showImmortalMainUI();
+    }
+    
+    addLog('good', '进入仙界', '踏入仙界，开始全新的修仙之旅！');
+}
+
+// ===== switchRealm =====
+function switchRealm(targetRealm) {
+    if (targetRealm === gameState.currentRealm) return;
+    
+    if (targetRealm === 'immortal') {
+        if (!gameState.immortal) {
+            showToast('尚未飞升，无法进入仙界');
+            return;
+        }
+        gameState.currentRealm = 'immortal';
+        addLog('neutral', '切换位面', '进入仙界');
+    } else {
+        gameState.currentRealm = 'mortal';
+        addLog('neutral', '切换位面', '返回凡界');
+    }
+    
+    saveGame();
+    updateDisplay();
+    
+    // 重新渲染UI
+    if (typeof renderGameUI === 'function') renderGameUI();
+}
+
+// ===== showRealmSwitchButton =====
+function showRealmSwitchButton() {
+    if (!gameState.immortal) return; // 未飞升不显示
+    
+    const btn = document.getElementById('realmSwitchBtn');
+    if (!btn) return;
+    
+    if (gameState.currentRealm === 'mortal') {
+        btn.textContent = '☁️ 仙界';
+        btn.onclick = () => switchRealm('immortal');
+    } else {
+        btn.textContent = '🏯 凡界';
+        btn.onclick = () => switchRealm('mortal');
+    }
+    
+    btn.style.display = 'inline-block';
+}
+
+// ===== doFateTask =====
+function doFateTask() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('仙缘任务只在仙界可用');
+        return;
+    }
+    
+    const today = Math.floor(gameState.days / 1);
+    if (gameState.immortal.fateTaskRefreshDay === today) {
+        showToast('今日仙缘任务已完成');
+        return;
+    }
+    
+    // 仙缘任务奖励
+    const reward = Math.floor(100 + Math.random() * 400);
+    earnSpiritStones(reward, '每日仙缘任务');
+    
+    // 20%概率额外奖励
+    if (Math.random() < 0.2) {
+        const bonus = Math.floor(50 + Math.random() * 150);
+        earnSpiritStones(bonus, '天赐福缘');
+        showToast(`天赐福缘！额外获得${bonus}仙石`);
+    }
+    
+    gameState.immortal.fateTaskRefreshDay = today;
+    gameState.immortal.lastFateTask = gameState.days;
+    saveGame();
+}
+
+// ===== doCelestialCycle =====
+function doCelestialCycle() {
+    if (gameState.currentRealm !== 'immortal') {
+        showToast('天道轮回只在仙界可用');
+        return;
+    }
+    
+    const cycleDay = 7;
+    const daysSinceCycle = gameState.days - (gameState.immortal.celestialCycleDay || 0);
+    
+    if (daysSinceCycle < cycleDay) {
+        showToast(`天道轮回每7天一次，还需${cycleDay - daysSinceCycle}天`);
+        return;
+    }
+    
+    // 开始天道轮回
+    const survivalChance = 0.7 + (gameState.immortal.realm * 0.05);
+    
+    if (Math.random() < survivalChance) {
+        // 成功
+        const reward = Math.floor(200 + Math.random() * 600);
+        earnSpiritStones(reward, '天道轮回奖励');
+        
+        // 额外奖励
+        if (gameState.immortal.celestialCycleCompleted) {
+            const extra = Math.floor(100 + Math.random() * 200);
+            earnSpiritStones(extra, '轮回福报');
+        }
+        
+        gameState.immortal.celestialCycleCompleted = true;
+        showToast(`天道轮回完成！获得${reward}仙石`);
+    } else {
+        // 失败
+        const loss = Math.floor(gameState.immortal.spiritStones * 0.1);
+        gameState.immortal.spiritStones = Math.max(0, gameState.immortal.spiritStones - loss);
+        showToast(`天道轮回失败！损失${loss}仙石`);
+    }
+    
+    gameState.immortal.celestialCycleDay = gameState.days;
+    saveGame();
+    updateDisplay();
+}
 
