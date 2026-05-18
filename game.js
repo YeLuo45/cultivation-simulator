@@ -2070,7 +2070,7 @@
             document.getElementById('achievementModal').classList.remove('active');
         }
 
-        // ===== getTitleBonus =====
+        // ===== renderSpiritRootContent =====
         function renderSpiritRootContent() {
             const content = document.getElementById('spiritRootContent');
             const sr = gameState.spiritRoot;
