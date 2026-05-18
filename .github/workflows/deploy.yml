@@ -27,6 +27,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify build output
+        run: |
+          echo "=== Build verification ==="
+          echo "dist/game.js size: $(wc -c < dist/game.js) bytes"
+          echo "dist/index.html size: $(wc -c < dist/index.html) bytes"
+          echo "CONFIG found: $(grep -c 'const CONFIG = {' dist/game.js)"
+          echo "init() found: $(grep -c 'function init(' dist/game.js)"
+          echo "Syntax OK: $(node --check dist/game.js && echo YES || echo NO)"
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
