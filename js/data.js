@@ -390,6 +390,8 @@
             processDailyEconomy();
             // V42 天道竞技场每日重置
             processDailyArenaReset();
+            // V43 仙宫建设每日处理
+            processDailyPalace();
             gameState.days++;
             if (gameState.spiritStones < 500) {
                 const bonusStones = Math.floor(gameState.realm * 50 * Math.random());

@@ -300,6 +300,12 @@
                         longestStreak: 0, promotionWins: 0, dailyChallengesUsed: 0, derankProtection: 2,
                         matchHistory: [], lastRewardClaimed: 0, totalRewardsClaimed: 0, bountyPool: 0, bountyWins: 0
                     },
+                    // V43 仙宫建设系统
+                    palace: loaded.palace || {
+                        level: 1, prosperity: 100, buildings: [], workers: [], styleIndex: 0,
+                        bonus: { incomeBonus: 0, cultivationSpeed: 0, serendipityChance: 0, combatPower: 0 },
+                        totalWagesPaid: 0
+                    },
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -487,6 +493,11 @@
             const arenaBtn = document.getElementById('arenaBtn');
             if (arenaBtn) {
                 arenaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V43 仙宫建设按钮显示（境界≥地仙=realm 8）
+            const palaceBtn = document.getElementById('palaceBtn');
+            if (palaceBtn) {
+                palaceBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

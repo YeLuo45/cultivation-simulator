@@ -289,6 +289,21 @@
                 totalRewardsClaimed: 0,
                 bountyPool: 0,
                 bountyWins: 0
+            },
+            // V43 仙宫建设系统
+            palace: {
+                level: 1,
+                prosperity: 100,
+                buildings: [],
+                workers: [],
+                styleIndex: 0,
+                bonus: {
+                    incomeBonus: 0,
+                    cultivationSpeed: 0,
+                    serendipityChance: 0,
+                    combatPower: 0
+                },
+                totalWagesPaid: 0
             }
         };
 
