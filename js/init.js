@@ -514,6 +514,11 @@
             if (karmaBtn) {
                 karmaBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
+            // V46 仙界 farming 按钮显示（境界≥地仙=realm 8）
+            const farmingBtn = document.getElementById('farmingBtn');
+            if (farmingBtn) {
+                farmingBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
         }
 
         // ===== updateDisplay =====
