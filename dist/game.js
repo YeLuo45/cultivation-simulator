@@ -11618,7 +11618,11 @@
                 npcMood: 'normal',
                 npcAffection: 50,
                 npcTask: null,
-                npcTaskDays: 0
+                npcTaskDays: 0,
+                // V40 NPC好感度+师徒系统字段
+                npcMasterId: null,
+                npcApprentices: [],
+                npcGiftLiked: null // V40: 喜欢的礼物类型
             });
             
             // V39: 宗门创建时宗主自动成为掌门
@@ -11644,9 +11648,16 @@
 
         // NPC角色定义
         const NPC_ROLES = {
-            leader: { title: '掌门', icon: '👑', taskType: 'lead', color: '#FFD700' },
-            elder: { title: '长老', icon: '👴', taskType: 'train', color: '#9c27b0' },
-            disciple: { title: '弟子', icon: '🧑‍🎓', taskType: 'collect', color: '#4CAF50' }
+            leader: { title: '掌门', icon: '👑', taskType: 'lead', color: '#FFD700', minApprenticeAffection: 60 },
+            elder: { title: '长老', icon: '👴', taskType: 'train', color: '#9c27b0', minApprenticeAffection: 50 },
+            disciple: { title: '弟子', icon: '🧑‍🎓', taskType: 'collect', color: '#4CAF50', minApprenticeAffection: 40 }
+        };
+
+        // V40 NPC礼物配置
+        const NPC_GIFTS = {
+            low: { name: '灵石袋', cost: 50, affection: 5 },
+            mid: { name: '灵草', cost: 200, affection: 15 },
+            high: { name: '功法残卷', cost: 500, affection: 30 }
         };
 
         // 获取弟子NPC图标
@@ -11705,9 +11716,12 @@
                     if (d.npcTask.type === 'collect') {
                         d.contribution += 2;
                     } else if (d.npcTask.type === 'train') {
-                        if (Math.random() < 0.3) {
+                        // V40: 师徒加成
+                        const bonus = getMasterBonus(d);
+                        const trainChance = 0.3 + bonus * 0.05;
+                        if (Math.random() < trainChance) {
                             d.realm = Math.min(d.realm + 1, gameState.realm + 2);
-                            logMessages.push(`【${d.name}】修炼精进，境界提升！`);
+                            logMessages.push(`【${d.name}】在师傅指导下修炼精进，境界提升！`);
                         }
                     } else if (d.npcTask.type === 'combat') {
                         d.contribution += 3;
@@ -11760,6 +11774,26 @@
             const realmName = CONFIG.realms[disciple.realm] || '炼气期';
             const moodEmoji = disciple.npcMood === 'happy' ? '😊' : disciple.npcMood === 'upset' ? '😔' : '😐';
 
+            // V40: 好感度条
+            const affection = disciple.npcAffection || 50;
+            const affectionColor = affection >= 70 ? '#4CAF50' : affection >= 40 ? '#FFC107' : '#f44336';
+            const affectionBar = `<div style="margin-top:5px;display:flex;align-items:center;gap:6px;">
+                <span style="font-size:0.75em;color:#888;">好感</span>
+                <div style="flex:1;height:6px;background:#333;border-radius:3px;">
+                    <div style="width:${affection}%;height:100%;background:${affectionColor};border-radius:3px;transition:width 0.3s;"></div>
+                </div>
+                <span style="font-size:0.75em;color:${affectionColor};">${affection}</span>
+            </div>`;
+
+            // V40: 师徒信息
+            let mentorInfo = '';
+            if (disciple.npcMasterId) {
+                const master = sect.disciples.find(d => d.uid === disciple.npcMasterId);
+                if (master) mentorInfo = `<div style="color:#aaa;font-size:0.8em;margin-top:3px;">师傅：${master.name}</div>`;
+            } else if (disciple.npcApprentices && disciple.npcApprentices.length > 0) {
+                mentorInfo = `<div style="color:#aaa;font-size:0.8em;margin-top:3px;">徒弟：${disciple.npcApprentices.length}人</div>`;
+            }
+
             let historyHtml = '';
             const history = disciple.npcDialogueHistory || [];
             history.slice(-5).forEach(entry => {
@@ -11780,6 +11814,8 @@
                             <div>
                                 <div style="color:${role.color};font-weight:bold;font-size:1.1em;">${disciple.name}</div>
                                 <div style="color:#888;font-size:0.85em;">${role.title} · ${realmName} · ${moodEmoji}</div>
+                                ${affectionBar}
+                                ${mentorInfo}
                             </div>
                             <button onclick="closeNpcDialogue()" style="margin-left:auto;background:#333;color:#fff;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1.1em;">×</button>
                         </div>
@@ -11790,6 +11826,8 @@
                             <button onclick="sendNpcQuickMessage('${discipleUid}','请教')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">请教</button>
                             <button onclick="sendNpcQuickMessage('${discipleUid}','任务')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">任务</button>
                             <button onclick="sendNpcQuickMessage('${discipleUid}','闲聊')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">闲聊</button>
+                            ${disciple.npcMasterId ? '' : `<button onclick="showGiftMenu('${discipleUid}')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">🎁 送礼</button>`}
+                            ${!disciple.npcMasterId && disciple.npcRole !== 'leader' ? `<button onclick="tryApprentice('${discipleUid}')" class="btn" style="background:#333;color:#aaa;padding:6px 12px;font-size:0.85em;border:none;cursor:pointer;border-radius:5px;">拜师</button>` : ''}
                         </div>
                         <div style="display:flex;gap:8px;">
                             <input type="text" id="npcDialogueInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid #333;background:#1a1a2e;color:#fff;font-size:0.9em;" onkeydown="if(event.key==='Enter')sendNpcMessage('${discipleUid}')">
@@ -11842,6 +11880,10 @@
 
         // ===== sendNpcQuickMessage =====
         function sendNpcQuickMessage(discipleUid, type) {
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple) return;
+
             const texts = {
                 '请教': ['修炼之道贵在坚持，切不可急功近利。', '你的疑惑，老夫略知一二。', '此事需从基础做起，不可好高骛远。'],
                 '任务': ['近日宗门事务繁忙，你可愿代为分忧？', '有一事需你相助。', '我正有一项任务要交付。'],
@@ -11851,6 +11893,16 @@
             const randomText = options[Math.floor(Math.random() * options.length)];
             const input = document.getElementById('npcDialogueInput');
             if (input) input.value = randomText;
+
+            // V40: 好感度影响
+            if (disciple) {
+                if (type === '请教') {
+                    modifyAffection(disciple, Math.random() < 0.6 ? 1 : -1);
+                } else if (type === '闲聊') {
+                    modifyAffection(disciple, Math.random() < 0.7 ? 1 : 0);
+                }
+            }
+
             sendNpcMessage(discipleUid);
         }
 
@@ -11911,6 +11963,144 @@
             disciple.npcTaskDays = 0;
             addLog('good', '任务分配', `为【${disciple.name}】分配了${taskType === 'collect' ? '采集' : taskType === 'train' ? '修炼' : '战斗'}任务`);
             renderSectHome();
+        }
+
+        // ===== V40 NPC好感度+师徒系统 =====
+
+        // ===== showGiftMenu =====
+        function showGiftMenu(discipleUid) {
+            const modal = document.getElementById('giftMenuModal');
+            if (modal) modal.remove();
+
+            const html = `
+                <div id="giftMenuModal" style="position:fixed;z-index:2100;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;">
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #9c27b0;border-radius:15px;padding:20px;max-width:350px;width:90%;box-shadow:0 0 30px rgba(156,39,176,0.3);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                            <div style="color:#9c27b0;font-weight:bold;font-size:1.1em;">🎁 选择礼物</div>
+                            <button onclick="closeGiftMenu()" style="background:#333;color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;">×</button>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            ${Object.entries(NPC_GIFTS).map(([key, gift]) => `
+                                <button onclick="sendGift('${discipleUid}','${key}')" class="btn" style="background:#1a1a2e;color:#fff;padding:10px 15px;border:1px solid #333;border-radius:8px;cursor:pointer;text-align:left;">
+                                    <div style="display:flex;justify-content:space-between;">
+                                        <span>${gift.name}</span>
+                                        <span style="color:#f44336;">${gift.cost}灵石</span>
+                                    </div>
+                                    <div style="color:#888;font-size:0.8em;">好感+${gift.affection}</div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        // ===== closeGiftMenu =====
+        function closeGiftMenu() {
+            const modal = document.getElementById('giftMenuModal');
+            if (modal) modal.remove();
+        }
+
+        // ===== sendGift =====
+        function sendGift(discipleUid, giftKey) {
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple) return;
+
+            const gift = NPC_GIFTS[giftKey];
+            if (!gift) return;
+            if (gameState.spiritStones < gift.cost) {
+                alert('灵石不足！');
+                return;
+            }
+
+            gameState.spiritStones -= gift.cost;
+            disciple.npcAffection = Math.min(100, (disciple.npcAffection || 50) + gift.affection);
+
+            // 添加回复
+            if (!disciple.npcDialogueHistory) disciple.npcDialogueHistory = [];
+            disciple.npcDialogueHistory.push({ text: `🎁 收到${gift.name}，甚是欢喜！`, isPlayer: false, day: gameState.days });
+            if (disciple.npcDialogueHistory.length > 50) disciple.npcDialogueHistory.shift();
+
+            addLog('good', '送礼', `向【${disciple.name}】赠送了${gift.name}，好感+${gift.affection}`);
+            closeGiftMenu();
+
+            // 刷新对话框
+            openNpcDialogue(discipleUid);
+            updateDisplay();
+        }
+
+        // ===== tryApprentice =====
+        function tryApprentice(discipleUid) {
+            const sect = gameState.sect;
+            const disciple = sect.disciples.find(d => d.uid === discipleUid);
+            if (!disciple || disciple.npcRole === 'leader') return;
+
+            // 查找可拜的师傅（境界高于自己且未满徒弟数）
+            const potentialMasters = sect.disciples.filter(d => {
+                if (d.uid === discipleUid) return false;
+                if (d.npcRole === 'leader' || d.npcRole === 'elder') {
+                    const hasRoom = (d.npcApprentices || []).length < 3;
+                    const higherRealm = d.realm >= disciple.realm;
+                    return hasRoom && higherRealm;
+                }
+                return false;
+            });
+
+            if (potentialMasters.length === 0) {
+                alert('当前没有可拜的师傅（需要境界不低于你且徒弟未满）');
+                return;
+            }
+
+            // 选择境界最高的
+            const master = potentialMasters.sort((a, b) => b.realm - a.realm)[0];
+            const minAffection = NPC_ROLES[master.npcRole]?.minApprenticeAffection || 50;
+
+            if ((disciple.npcAffection || 50) < minAffection) {
+                alert(`好感度不足${minAffection}，无法拜师！当前好感：${disciple.npcAffection}`);
+                return;
+            }
+
+            // 建立师徒关系
+            disciple.npcMasterId = master.uid;
+            if (!master.npcApprentices) master.npcApprentices = [];
+            master.npcApprentices.push(disciple.uid);
+
+            addLog('good', '拜师', `【${disciple.name}】拜【${master.name}】为师！`);
+            closeNpcDialogue();
+
+            // 刷新显示
+            renderSectHome();
+            updateDisplay();
+        }
+
+        // ===== modifyAffection =====
+        // V40: 修改好感度并记录心情变化
+        function modifyAffection(disciple, delta) {
+            const oldAff = disciple.npcAffection || 50;
+            disciple.npcAffection = Math.max(0, Math.min(100, oldAff + delta));
+
+            // 心情跟随好感变化
+            if (disciple.npcAffection >= 70) disciple.npcMood = 'happy';
+            else if (disciple.npcAffection <= 25) disciple.npcMood = 'upset';
+            else disciple.npcMood = 'normal';
+
+            return disciple.npcAffection - oldAff;
+        }
+
+        // ===== getMasterBonus =====
+        // V40: 获取师徒修炼加成
+        function getMasterBonus(disciple) {
+            if (!disciple.npcMasterId) return 0;
+            const sect = gameState.sect;
+            const master = sect.disciples.find(d => d.uid === disciple.npcMasterId);
+            if (!master) return 0;
+
+            // 师傅境界越高，加成越高
+            const realmDiff = master.realm - disciple.realm;
+            if (realmDiff <= 0) return 0;
+            return Math.floor(2 + realmDiff * 1.5);
         }
 
         // ===== collectSectResources =====
