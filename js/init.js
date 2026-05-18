@@ -306,6 +306,9 @@
                         bonus: { incomeBonus: 0, cultivationSpeed: 0, serendipityChance: 0, combatPower: 0 },
                         totalWagesPaid: 0
                     },
+                    // V44 仙法创造系统
+                    customSpells: loaded.customSpells || [],
+                    essences: loaded.essences || {},
                     sect: loaded.sect ? {
                         ...loaded.sect,
                         npcDialogueHistory: loaded.sect.npcDialogueHistory || [],
@@ -498,6 +501,11 @@
             const palaceBtn = document.getElementById('palaceBtn');
             if (palaceBtn) {
                 palaceBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
+            }
+            // V44 仙法创造按钮显示（境界≥地仙=realm 8）
+            const spellBtn = document.getElementById('spellBtn');
+            if (spellBtn) {
+                spellBtn.style.display = (gameState.realm >= 8) ? 'inline-block' : 'none';
             }
         }
 

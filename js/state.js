@@ -304,7 +304,10 @@
                     combatPower: 0
                 },
                 totalWagesPaid: 0
-            }
+            },
+            // V44 仙法创造系统
+            customSpells: [],
+            essences: {}
         };
 
         // --- secretRealmState (7391-7398) ---
