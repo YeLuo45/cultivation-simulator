@@ -2,8 +2,9 @@
 // 
 // DDD Phase 1: Extract constants to domains/shared/constants/*.js
 // During build: extracted constants are prepended to game.js
-// Original game.js is NOT modified on disk - constants are stripped from content
-// at build-time only to create a working dist/game.js
+// Original game.js is NOT modified on disk
+//
+// Build order: constants stripped from game.js FIRST, then constants prepended
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
@@ -21,8 +22,9 @@ const CONSTANTS_TO_REMOVE = [
     'CONFIG', 'REALM_REQUIREMENTS', 'CONTINENTS', 'THIRTY_THREE_HEAVENS',
     'MAIN_PLOT', 'REGIONS', 'SECRET_REALMS', 'SERENDIPITY_EVENTS', 
     'SERENDIPITY_TALISMANS', 'SPIRIT_ROOT_QUALITIES', 'FIVE_ELEMENT_TECHNIQUES',
-    'CONSTITUTIONS', 'DEFAULT_MINIMAX_CONFIG', 'TECHNIQUE_BONUS', 'TECHNIQUE_COLORS',
-    'SECT_CONFIG', 'PALACE_CONFIG', 'SECT_TECHNIQUES', 'TECHNIQUE_UPGRADE_MATERIALS',
+    'CONSTITUTIONS', 'DEFAULT_MINIMAX_CONFIG',
+    'TECHNIQUE_BONUS', 'TECHNIQUE_COLORS', 'TECHNIQUES',
+    'FIXED_OPPONENTS', 'MAX_ENERGY', 'SECT_CONFIG', 'PALACE_CONFIG', 'SECT_TECHNIQUES', 'TECHNIQUE_UPGRADE_MATERIALS',
     'TECHNIQUE_UPGRADE_EFFECTS', 'PET_TYPES', 'PET_QUALITY_MULTIPLIERS',
     'PET_FOOD_COST', 'PET_SUMMON_COST', 'PET_MAX_LEVEL', 'PET_EXP_NEEDED_PER_LEVEL',
     'PET_LOYALTY_DECAY_RATE', 'PET_HUNGER_DECAY_RATE', 'PET_MAX_LOYALTY',
@@ -48,40 +50,30 @@ const CONSTANTS_TO_REMOVE = [
  * Handles objects {}, arrays [], and simple values
  */
 function removeConstant(content, constName) {
-    // Pattern: optional comment line before, then "const CONST_NAME = ...;"
-    // We need to find the full declaration including nested braces/brackets
-    
-    // Try to find the declaration
-    const declareRegex = new RegExp(`const\\s+${constName}\\s*=`);
-    const match = content.match(declareRegex);
-    if (!match) {
-        // Maybe it's a standalone constant without const (unlikely but handle it)
+    const constDecl = `const ${constName} =`;
+    const startPos = content.indexOf(constDecl);
+    if (startPos === -1) {
         return content;
     }
     
-    const startPos = match.index;
-    
     // Find the start of the line (including optional comment)
-    let lineStart = content.lastIndexOf('\n', startPos) + 1;
-    // Check for comment line before
-    const beforeContent = content.substring(0, startPos);
-    const lastLineMatch = beforeContent.match(/[^\n]*\n([^\n]*)$/);
-    if (lastLineMatch) {
-        const potentialComment = lastLineMatch[1].trim();
-        if (potentialComment.startsWith('//')) {
-            // There's a comment line, include it
-            lineStart = beforeContent.lastIndexOf('\n', beforeContent.length - potentialComment.length - 1) + 1;
-        }
+    // Comment format: "        // --- NAME ---" followed by newline, then const line
+    // We need to include the comment line if it exists
+    let lineStart = content.lastIndexOf('\n', startPos - 1) + 1;
+    const beforeLineStart = content.lastIndexOf('\n', lineStart - 2) + 1;
+    const prevLine = content.substring(beforeLineStart, lineStart - 1);
+    if (prevLine.trim().startsWith('//')) {
+        lineStart = beforeLineStart;
     }
     
     // Find the end of the declaration
-    // Start from '='
+    let endPos = startPos + constDecl.length;
     let braceCount = 0;
     let bracketCount = 0;
     let parenCount = 0;
     let inString = false;
     let stringChar = '';
-    let endPos = startPos + match[0].length;
+    let started = false;
     
     for (let i = endPos; i < content.length; i++) {
         const c = content[i];
@@ -97,17 +89,19 @@ function removeConstant(content, constName) {
                 stringChar = c;
             } else if (c === '{') {
                 braceCount++;
+                started = true;
             } else if (c === '}') {
                 braceCount--;
-                if (braceCount === 0 && bracketCount === 0 && parenCount === 0) {
+                if (started && braceCount === 0 && bracketCount === 0 && parenCount === 0) {
                     endPos = i + 1;
                     break;
                 }
             } else if (c === '[') {
                 bracketCount++;
+                started = true;
             } else if (c === ']') {
                 bracketCount--;
-                if (braceCount === 0 && bracketCount === 0 && parenCount === 0) {
+                if (started && braceCount === 0 && bracketCount === 0 && parenCount === 0) {
                     endPos = i + 1;
                     break;
                 }
@@ -122,13 +116,23 @@ function removeConstant(content, constName) {
         }
     }
     
-    // Remove the constant
-    const removed = content.substring(lineStart, endPos);
     const replacement = `// [DDD Phase 1] ${constName} moved to domains/shared/constants/`;
     return content.substring(0, lineStart) + replacement + content.substring(endPos);
 }
 
-// --- Step 0: Load constant modules ---
+// --- Step 1: Load game.js and remove duplicated constants FIRST ---
+const gamePath = path.join(__dirname, 'game.js');
+let game = readFileSync(gamePath, 'utf8');
+const originalLength = game.length;
+
+for (const constName of CONSTANTS_TO_REMOVE) {
+    game = removeConstant(game, constName);
+}
+
+const processedLength = game.length;
+console.log(`Stripped constants from game.js: ${originalLength} -> ${processedLength} bytes (removed ${originalLength - processedLength})`);
+
+// --- Step 2: Load and concatenate constant modules ---
 const constantFiles = [
     'cultivation.js',
     'world.js',
@@ -152,25 +156,13 @@ for (const filename of constantFiles) {
     }
 }
 
-// --- Step 1: Load game.js and remove duplicated constants ---
-const gamePath = path.join(__dirname, 'game.js');
+// --- Step 3: Combine constants + processed game.js ---
 const distGamePath = path.join(distDir, 'game.js');
-
-let game = readFileSync(gamePath, 'utf8');
-
-// Remove each constant that we've prepended
-for (const constName of CONSTANTS_TO_REMOVE) {
-    game = removeConstant(game, constName);
-}
-
-console.log(`Processed game.js: ${game.length} bytes (original 813192 bytes)`);
-
-// --- Step 2: Combine constants + processed game.js ---
 const combinedGame = concatenatedConstants + game;
 writeFileSync(distGamePath, combinedGame);
-console.log(`Built game.js: ${game.length} bytes (processed) + ${concatenatedConstants.length} bytes (constants)`);
+console.log(`Built game.js: ${processedLength} bytes (processed) + ${concatenatedConstants.length} bytes (constants) = ${combinedGame.length} bytes total`);
 
-// --- Step 3: Copy index.html ---
+// --- Step 4: Copy index.html ---
 const indexSrc = path.join(__dirname, 'index.html');
 const indexDist = path.join(distDir, 'index.html');
 let html = readFileSync(indexSrc, 'utf8');
@@ -181,7 +173,7 @@ html = html.replace(
 writeFileSync(indexDist, html);
 console.log('Generated dist/index.html');
 
-// --- Step 4: Validate content ---
+// --- Step 5: Validate content ---
 const checks = [
   ['CONFIG object', 'const CONFIG = {'],
   ['init function', 'function init('],
@@ -195,7 +187,7 @@ for (const [name, pattern] of checks) {
   console.log(`  ${ok ? '✓' : '✗'} ${name}`);
 }
 
-// --- Step 5: Syntax check via node ---
+// --- Step 6: Syntax check via node ---
 try {
   execSync(`node --check "${distGamePath}"`, { stdio: 'pipe' });
   console.log('✓ Syntax check passed (node --check)');

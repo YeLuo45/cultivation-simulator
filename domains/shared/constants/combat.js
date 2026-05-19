@@ -4,6 +4,92 @@
 // AREA: Combat Domain Constants
 // ============================================================================
 
+// Combat treasures (法宝)
+export const COMBAT_TREASURES = {
+    '青云剑': { type: 'weapon', quality: 'common', effect: { attackBonus: 0.15 }, desc: '攻击+15%', icon: '⚔️', price: 300 },
+    '玄铁盾': { type: 'armor', quality: 'common', effect: { defenseBonus: 0.2 }, desc: '防御+20%', icon: '🛡️', price: 250 },
+    '混元珠': { type: 'weapon', quality: 'rare', effect: { critBonus: 0.1 }, desc: '暴击率+10%', icon: '🔮', price: 600 },
+    '金缕衣': { type: 'armor', quality: 'rare', effect: { hpBonus: 0.1 }, desc: '生命+10%', icon: '👘', price: 400 },
+    '避火罩': { type: 'armor', quality: 'rare', effect: { fireResist: 0.3 }, desc: '火法抗性+30%', icon: '🔥', price: 500 },
+    '雷霆铛': { type: 'weapon', quality: 'precious', effect: { thunderBonus: 0.25 }, desc: '雷法伤害+25%', icon: '⚡', price: 5000 },
+    '赤焰刀': { type: 'weapon', quality: 'precious', effect: { fireBonus: 0.25 }, desc: '火法伤害+25%', icon: '🔪', price: 5000 },
+    '寒冰剑': { type: 'weapon', quality: 'precious', effect: { waterBonus: 0.25 }, desc: '水法伤害+25%', icon: '❄️', price: 5000 },
+    '金刚杵': { type: 'weapon', quality: 'precious', effect: { bodyBonus: 0.25 }, desc: '体术伤害+25%', icon: '🔨', price: 5000 }
+};
+
+// Combat pills (丹药)
+export const COMBAT_PILLS = {
+    '聚灵丹': { effect: { type: 'attackBoost', value: 0.2 }, desc: '攻击+20%', icon: '💊', price: 600 },
+    '护体丹': { effect: { type: 'defenseBoost', value: 0.2 }, desc: '防御+20%', icon: '💊', price: 600 },
+    '破妄丹': { effect: { type: 'ignoreDefense', value: 1 }, desc: '无视防御', icon: '💊', price: 4000 },
+};
+
+// Fixed opponents for combat challenges
+export const FIXED_OPPONENTS = [
+    { name: '青云子', avatar: '👴', baseRealm: 2 },
+    { name: '赤焰仙', avatar: '👩‍🦰', baseRealm: 2 },
+    { name: '寒冰仙子', avatar: '👸', baseRealm: 3 },
+    { name: '金刚罗汉', avatar: '💪', baseRealm: 3 },
+    { name: '雷霆真君', avatar: '👨‍🔬', baseRealm: 4 }
+];
+
+// Ranking/PVP config
+export const RANK_CONFIG = {
+    human: { // 人间界 (炼气-筑基)
+        name: '人间界',
+        icon: '🌍',
+        ranks: [
+            { name: '凡人', icon: '👤', minRating: 0 },
+            { name: '炼气修士', icon: '🌀', minRating: 1000 },
+            { name: '筑基修士', icon: '🧱', minRating: 1100 },
+            { name: '金丹真人', icon: '🌟', minRating: 1200 },
+            { name: '元婴老怪', icon: '👴', minRating: 1300 },
+            { name: '化神大能', icon: '🦢', minRating: 1400 }
+        ]
+    },
+    cultivation: { // 修仙界 (元婴-化神)
+        name: '修仙界',
+        icon: '☁️',
+        ranks: [
+            { name: '散修', icon: '🧙', minRating: 1400 },
+            { name: '宗门弟子', icon: '⚔️', minRating: 1500 },
+            { name: '内门精英', icon: '💎', minRating: 1600 },
+            { name: '长老', icon: '👑', minRating: 1700 },
+            { name: '宗主', icon: '🏰', minRating: 1800 },
+            { name: '飞升仙人', icon: '🌈', minRating: 1900 }
+        ]
+    },
+    immortal: { // 仙界 (飞升后)
+        name: '仙界',
+        icon: '✨',
+        ranks: [
+            { name: '地仙', icon: '🌍', minRating: 1900 },
+            { name: '天仙', icon: '☀️', minRating: 2000 },
+            { name: '金仙', icon: '🌟', minRating: 2100 },
+            { name: '大罗金仙', icon: '💫', minRating: 2200 },
+            { name: '准圣', icon: '🔱', minRating: 2300 },
+            { name: '圣人', icon: '👼', minRating: 2400 }
+        ]
+    }
+};
+
+// AI opponent names for ranking
+export const AI_OPPONENTS = {
+    human: [
+        '青云子', '玄天', '灵虚子', '玉清子', '天璇', '天玑', '天权', '玉衡',
+        '开阳', '摇光', '紫霞仙子', '青莲剑仙', '血魔老祖', '九幽散人'
+    ],
+    cultivation: [
+        '太虚真人', '虚无宗主', '万剑归宗', '九天玄女', '太古魔尊', '天道子',
+        '轮回王', '不灭魔君', '仙盟盟主', '天魔教教主', '万妖女王', '诸神黄昏'
+    ],
+    immortal: [
+        '盘古始祖', '鸿钧道祖', '女娲娘娘', '伏羲圣皇', '神农氏', '轩辕黄帝',
+        '昊天上帝', '西王母', '东皇太一', '帝俊', '烛龙', '应龙'
+    ]
+};
+
+// Tribulations (天劫)
 export const TRIBULATIONS = {
             '金丹初期雷劫': {
                 type: 'thunder',
