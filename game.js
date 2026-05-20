@@ -9162,7 +9162,9 @@
                 npcApprentices: [],
                 npcGiftLiked: null, // V40: 喜欢的礼物类型
                 // V41 NPC性格系统字段
-                npcPersonality: null // 'diligent'|'lazy'|'aggressive'|'steady'
+                npcPersonality: null, // 'diligent'|'lazy'|'aggressive'|'steady'
+                // V49 NPC自进化记忆系统
+                npcMemory: initNpcMemory()
             });
             
             // V39: 宗门创建时宗主自动成为掌门
@@ -9217,6 +9219,247 @@
 
         function getPersonalityInfo(p) {
             return NPC_PERSONALITIES[p] || NPC_PERSONALITIES.steady;
+        }
+
+        // ===== V49 NPC自进化系统 (参考 generic-agent L0-L4 五层记忆) =====
+
+        // NPC记忆层级 (对应 generic-agent L0-L4)
+        const NPC_MEMORY_LAYERS = {
+            L0_episodic: { label: '情景记忆', desc: '单次事件记录', decay: 0.95 },
+            L1_shortTerm: { label: '短时记忆', desc: '近期经验汇总', decay: 0.9 },
+            L2_longTerm: { label: '长时记忆', desc: '重要经历固化', decay: 0.7 },
+            L3_semantic: { label: '语义记忆', desc: '知识与技能', decay: 0.0 },
+            L4_epic: { label: '史诗记忆', desc: '里程碑事件', decay: 0.0 }
+        };
+
+        // NPC技能结晶配置 (技能从经验中"结晶"形成)
+        const NPC_SKILL_CRYSTALS = {
+            combat_master: { name: '战斗精通', desc: '战斗中磨砺出的本能反应', icon: '⚔️', threshold: 10 },
+            resource_sense: { name: '资源敏锐', desc: '对灵石和资源的高度敏感', icon: '💎', threshold: 8 },
+            social_network: { name: '社交高手', desc: '与同门建立深厚关系网', icon: '🤝', threshold: 12 },
+            wisdom_eye: { name: '慧眼', desc: '能洞察事物本质', icon: '👁️', threshold: 15 },
+            cultivation_talent: { name: '修炼天赋', desc: '对灵气运行的天赋', icon: '🧘', threshold: 10 },
+            leadership_aura: { name: '领袖气质', desc: '引领他人的感召力', icon: '👑', threshold: 20 }
+        };
+
+        // 初始化NPC记忆
+        function initNpcMemory() {
+            return {
+                // L0: 情景记忆 - 最近发生的事件
+                L0_episodic: [],
+                // L1: 短时记忆 - 近期经验汇总
+                L1_shortTerm: { totalTasks: 0, completedTasks: 0, totalBattles: 0, wins: 0, giftsGiven: 0, interactions: 0 },
+                // L2: 长时记忆 - 重要经历
+                L2_longTerm: [],
+                // L3: 语义记忆 - 掌握的技能/知识
+                L3_semantic: { skills: [], insights: [] },
+                // L4: 史诗记忆 - 里程碑事件
+                L4_epic: [],
+                // 进化相关
+                evolutionPoints: 0,
+                evolutionLevel: 1,  // 1-5级，对应generic-agent的成长阶段
+                lastEvolved: 0
+            };
+        }
+
+        // NPC记忆系统 - 记录一次交互
+        function recordNpcMemory(npcUid, eventType, eventData) {
+            const sect = gameState.sect;
+            const npc = sect.disciples.find(d => d.uid === npcUid);
+            if (!npc || !npc.npcMemory) return;
+
+            const mem = npc.npcMemory;
+            const timestamp = gameState.days;
+
+            // L0: 记录情景事件
+            mem.L0_episodic.push({
+                type: eventType,
+                data: eventData,
+                day: timestamp,
+                mood: npc.npcMood
+            });
+            // L0 最多保留20条
+            if (mem.L0_episodic.length > 20) mem.L0_episodic.shift();
+
+            // L1: 更新短时统计
+            if (eventType === 'task_complete') {
+                mem.L1_shortTerm.totalTasks++;
+                mem.L1_shortTerm.completedTasks++;
+            } else if (eventType === 'battle') {
+                mem.L1_shortTerm.totalBattles++;
+                if (eventData.won) mem.L1_shortTerm.wins++;
+            } else if (eventType === 'gift') {
+                mem.L1_shortTerm.giftsGiven++;
+            } else if (eventType === 'interaction') {
+                mem.L1_shortTerm.interactions++;
+            }
+
+            // L2: 重要经历超过阈值时固化
+            if (mem.L1_shortTerm.completedTasks >= 5 && mem.L2_longTerm.filter(e => e.type === 'task_master').length === 0) {
+                mem.L2_longTerm.push({ type: 'task_master', day: timestamp, desc: '完成任务5次以上' });
+            }
+            if (mem.L1_shortTerm.wins >= 3 && mem.L2_longTerm.filter(e => e.type === 'combat_hero').length === 0) {
+                mem.L2_longTerm.push({ type: 'combat_hero', day: timestamp, desc: '战斗胜利3次以上' });
+            }
+            // L2 最多保留10条
+            if (mem.L2_longTerm.length > 10) mem.L2_longTerm.shift();
+
+            // 检查技能结晶
+            checkNpcSkillCrystallization(npc);
+
+            // L4: 里程碑事件
+            if (eventType === 'task_complete' && mem.L1_shortTerm.completedTasks === 10 && !mem.L4_epic.find(e => e.type === 'task_master_10')) {
+                mem.L4_epic.push({ type: 'task_master_10', day: timestamp, desc: '完成10项任务' });
+            }
+            if (eventType === 'battle' && mem.L1_shortTerm.wins === 5 && !mem.L4_epic.find(e => e.type === 'combat_hero_5')) {
+                mem.L4_epic.push({ type: 'combat_hero_5', day: timestamp, desc: '战斗5连胜' });
+            }
+            // L4 最多保留5条
+            if (mem.L4_epic.length > 5) mem.L4_epic.shift();
+
+            // 更新进化点数
+            const pointsMap = { task_complete: 2, battle: 3, gift: 1, interaction: 1, evolution: 10 };
+            mem.evolutionPoints += pointsMap[eventType] || 1;
+
+            // 检查是否可升级
+            checkNpcEvolution(npc);
+        }
+
+        // 检查NPC技能结晶
+        function checkNpcSkillCrystallization(npc) {
+            if (!npc || !npc.npcMemory) return;
+            const mem = npc.npcMemory;
+            const skills = mem.L3_semantic.skills;
+
+            // 战斗精通
+            if (mem.L1_shortTerm.totalBattles >= NPC_SKILL_CRYSTALS.combat_master.threshold && !skills.find(s => s.id === 'combat_master')) {
+                skills.push({ id: 'combat_master', ...NPC_SKILL_CRYSTALS.combat_master, crystallizedDay: gameState.days });
+                npc.attack = Math.floor((npc.attack || 5) * 1.2);
+                addLog('good', '技能结晶', `${npc.name}领悟了【${NPC_SKILL_CRYSTALS.combat_master.name}】！攻击力+20%`);
+            }
+            // 资源敏锐
+            if (mem.L1_shortTerm.totalTasks >= NPC_SKILL_CRYSTALS.resource_sense.threshold && !skills.find(s => s.id === 'resource_sense')) {
+                skills.push({ id: 'resource_sense', ...NPC_SKILL_CRYSTALS.resource_sense, crystallizedDay: gameState.days });
+                // 提供资源时奖励更多
+            }
+            // 社交高手
+            if (mem.L1_shortTerm.giftsGiven >= NPC_SKILL_CRYSTALS.social_network.threshold && !skills.find(s => s.id === 'social_network')) {
+                skills.push({ id: 'social_network', ...NPC_SKILL_CRYSTALS.social_network, crystallizedDay: gameState.days });
+                npc.npcAffection = Math.min(100, npc.npcAffection + 20);
+                addLog('good', '技能结晶', `${npc.name}领悟了【${NPC_SKILL_CRYSTALS.social_network.name}】！好感度+20`);
+            }
+            // 慧眼
+            if (mem.L1_shortTerm.interactions >= NPC_SKILL_CRYSTALS.wisdom_eye.threshold && !skills.find(s => s.id === 'wisdom_eye')) {
+                skills.push({ id: 'wisdom_eye', ...NPC_SKILL_CRYSTALS.wisdom_eye, crystallizedDay: gameState.days });
+                skills.push({ id: 'insight', name: '洞察', desc: '能感知隐藏机会', icon: '🔮', crystallizedDay: gameState.days });
+            }
+        }
+
+        // 检查NPC是否可进化
+        function checkNpcEvolution(npc) {
+            if (!npc || !npc.npcMemory) return;
+            const mem = npc.npcMemory;
+            const levelThresholds = [0, 20, 50, 100, 200]; // 每级所需点数
+
+            if (mem.evolutionLevel < 5) {
+                const nextLevel = mem.evolutionLevel + 1;
+                if (mem.evolutionPoints >= levelThresholds[nextLevel]) {
+                    mem.evolutionLevel = nextLevel;
+                    mem.lastEvolved = gameState.days;
+                    // 进化时提升基础属性
+                    npc.attack = Math.floor((npc.attack || 5) * 1.15);
+                    npc.defense = Math.floor((npc.defense || 3) * 1.15);
+                    npc.maxHp = Math.floor((npc.maxHp || 30) * 1.15);
+                    addLog('good', 'NPC进化', `${npc.name}突破至Lv.${nextLevel}！基础属性+15%`);
+                }
+            }
+        }
+
+        // NPC自主决策 - 基于记忆选择行动
+        function npcAutonomousDecision(npc) {
+            if (!npc || !npc.npcMemory) return null;
+            const mem = npc.npcMemory;
+            const personality = NPC_PERSONALITIES[npc.personality] || NPC_PERSONALITIES.steady;
+            const rand = Math.random();
+
+            // L3技能影响决策
+            const hasCombatSkill = mem.L3_semantic.skills.find(s => s.id === 'combat_master');
+            const hasSocialSkill = mem.L3_semantic.skills.find(s => s.id === 'social_network');
+
+            // 高效弟子倾向于训练，懒惰弟子倾向于采集
+            if (rand < personality.efficiency) {
+                // 性格倾向任务
+                if (personality.taskPref === 'train') {
+                    return { action: 'cultivate', reason: '性格勤奋，选择修炼' };
+                } else if (personality.taskPref === 'combat') {
+                    if (hasCombatSkill && rand < 0.5) {
+                        return { action: 'challenge', reason: '战斗精通，挑战强敌' };
+                    }
+                    return { action: 'combat', reason: '好斗性格，选择战斗' };
+                } else {
+                    return { action: 'collect', reason: '性格务实，选择采集' };
+                }
+            } else if (rand < 0.7) {
+                // 30%概率社交
+                if (hasSocialSkill && rand < 0.4) {
+                    return { action: 'socialize', reason: '社交高手，与人交流' };
+                }
+                return { action: 'rest', reason: '稍作休息' };
+            } else {
+                // 探索/随机
+                const actions = ['explore', 'meditate', 'help'];
+                return { action: actions[Math.floor(Math.random() * actions.length)], reason: '自主探索' };
+            }
+        }
+
+        // 获取NPC记忆显示
+        function getNpcMemoryDisplay(npc) {
+            if (!npc || !npc.npcMemory) return '';
+            const mem = npc.npcMemory;
+            let html = '<div class="npc-memory-panel">';
+            html += `<div class="npc-memory-title">🧠 ${npc.name}的记忆 (Lv.${mem.evolutionLevel})</div>`;
+
+            // L4 史诗
+            if (mem.L4_epic.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">📜 史诗记忆</span>`;
+                mem.L4_epic.forEach(e => {
+                    html += `<div class="mem-item epic">第${e.day}天：${e.desc}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // L3 技能
+            if (mem.L3_semantic.skills.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">⚡ 技能结晶</span>`;
+                mem.L3_semantic.skills.forEach(s => {
+                    html += `<span class="skill-tag" title="${s.desc}">${s.icon||'✨'} ${s.name}</span>`;
+                });
+                html += '</div>';
+            }
+
+            // L2 长时
+            if (mem.L2_longTerm.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">💎 重要经历</span>`;
+                mem.L2_longTerm.slice(-3).forEach(e => {
+                    html += `<div class="mem-item">${e.desc}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // L1 统计
+            html += '<div class="npc-mem-layer">';
+            html += `<span class="mem-label">📊 近况</span>`;
+            html += `<span>任务${mem.L1_shortTerm.completedTasks}/${mem.L1_shortTerm.totalTasks}</span> `;
+            html += `<span>战斗${mem.L1_shortTerm.wins}/${mem.L1_shortTerm.totalBattles}</span> `;
+            html += `<span>互动${mem.L1_shortTerm.interactions}</span>`;
+            html += ` <span class="evo-points">进化点:${mem.evolutionPoints}</span>`;
+            html += '</div>';
+
+            html += '</div>';
+            return html;
         }
 
         // 获取弟子NPC图标
