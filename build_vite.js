@@ -1,12 +1,15 @@
-// build_vite.js - Robust CI build: constant module concatenation + syntax check
+// build_vite.js - Robust CI build: constant module + UI layer concatenation + syntax check
 // 
-// DDD Phase 1: Extract constants to domains/shared/constants/*.js
-// During build: extracted constants are prepended to game.js
+// DDD Phase 5: Extract UI render functions to domains/ui/renderers/*.js
+// During build: extracted UI functions are appended to game.js
 // Original game.js is NOT modified on disk
 //
-// Build order: constants stripped from game.js FIRST, then constants prepended
+// Build order: 
+//   1. constants stripped from game.js → prepended to dist/game.js
+//   2. UI renderers stripped from game.js → appended to dist/game.js
+//   3. Full dist/game.js = constants + (game.js - constants - renderers)
 
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -14,6 +17,7 @@ import { execSync } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, 'dist');
 const constantsDir = path.join(__dirname, 'domains/shared/constants');
+const uiRenderersDir = path.join(__dirname, 'domains/ui/renderers');
 
 mkdirSync(distDir, { recursive: true });
 
@@ -45,6 +49,45 @@ const CONSTANTS_TO_REMOVE = [
     'ACHIEVEMENTS', 'ACHIEVEMENT_ID_MAP'
 ];
 
+// UI render functions to remove from game.js (they're now in domains/ui/renderers/)
+const UI_FUNCTIONS_TO_REMOVE = [
+    // render functions
+    'renderAchievements', 'renderSpiritRootContent', 'renderLog',
+    'renderRankingPVP', 'renderRankingTab', 'renderChallengeTab', 
+    'renderHistoryTab', 'renderSeasonTab', 'renderCombatHome',
+    'renderUltimateEnergyBar', 'renderCounterEnergyBar', 'renderCombatArena',
+    'renderPlayerActions', 'renderCombatResult', 'renderHeavenlyDaoSetStatus',
+    'renderSetStatus', 'renderInventoryGrid', 'renderShopItems',
+    'renderCraftingRecipes', 'renderMarketItems', 'renderPetHome',
+    'renderMyPets', 'renderSummonPet', 'renderPetMarket', 'renderPetBreeding',
+    'renderPetIncubation', 'renderPetFusion', 'renderSectHome',
+    'renderCreateSectForm', 'renderDisciplesTab', 'renderBuildingsTab',
+    'renderTechniquesTab', 'renderContributionShop', 'renderManageTab',
+    'renderSectPalaceDualTrack', 'renderPalaceHome', 'renderPalaceTasksTab',
+    'renderCreatePalaceForm', 'renderRoomsTab', 'renderPalaceDisciplesTab',
+    'renderPalaceManageTab', 'renderPalaceSectDualTrack', 'renderBeyondHeaven',
+    'renderThirtyThreeHeavens', 'renderDaoAncestor', 'renderWorldMap',
+    'renderRegionDetail', 'renderCelestialEconomy', 'renderCelestialMarketTab',
+    'renderCelestialInvestTab',
+    // open/close functions
+    'openAchievements', 'closeAchievements', 'openCombat', 'closeCombat',
+    'openRankingPVP', 'closeRankingPVP', 'openModal', 'closeModal',
+    'openEquipSlotMenu', 'closeEquipSlotMenu', 'openHeavenlyDaoSlotMenu',
+    'closeHeavenlyDaoSlotMenu', 'openEvolutionUI', 'closeEvolutionUI',
+    'openInventory', 'closeInventory', 'openTechniqueUpgrade',
+    'closeTechniqueUpgradeModal', 'openShop', 'closeShop',
+    'openCrafting', 'openAlchemy', 'openForge', 'closeAlchemy',
+    'openMarket', 'closeDiscipleSelectionModal', 'openNpcDialogue',
+    'closeNpcDialogue', 'closeGiftMenu', 'openPalace', 'closePalace',
+    'closeSerendipityModal', 'openSerendipityLog', 'openWorldMap',
+    'closeWorldMap', 'openBeyondHeaven', 'closeBeyondHeaven',
+    'closeBeyondResult', 'openCelestialEconomy', 'closeCelestialEconomy',
+    'openSettings', 'closeSettings', 'openSpiritRootModal',
+    'closeSpiritRootModal', 'openPet', 'closePet',
+    'openEnhanceFromInventory', 'openEnhanceFromEquip', 'openEnhancePanel',
+    'closeEnhancePanel', 'openSect', 'closeSect',
+];
+
 /**
  * Remove a constant declaration from game.js content
  * Handles objects {}, arrays [], and simple values
@@ -57,8 +100,6 @@ function removeConstant(content, constName) {
     }
     
     // Find the start of the line (including optional comment)
-    // Comment format: "        // --- NAME ---" followed by newline, then const line
-    // We need to include the comment line if it exists
     let lineStart = content.lastIndexOf('\n', startPos - 1) + 1;
     const beforeLineStart = content.lastIndexOf('\n', lineStart - 2) + 1;
     const prevLine = content.substring(beforeLineStart, lineStart - 1);
@@ -120,6 +161,78 @@ function removeConstant(content, constName) {
     return content.substring(0, lineStart) + replacement + content.substring(endPos);
 }
 
+/**
+ * Find the end of a function given its start position
+ */
+function findFunctionEnd(content, startPos) {
+    let braceCount = 0;
+    let inString = false;
+    let stringChar = '';
+    let foundOpen = false;
+    
+    for (let i = startPos; i < content.length; i++) {
+        const c = content[i];
+        const prevC = i > 0 ? content[i-1] : '';
+        
+        if (inString) {
+            if (c === stringChar && prevC !== '\\') {
+                inString = false;
+            }
+            continue;
+        }
+        
+        if (c === '"' || c === "'" || c === '`') {
+            inString = true;
+            stringChar = c;
+        } else if (c === '{') {
+            foundOpen = true;
+            braceCount++;
+        } else if (c === '}') {
+            braceCount--;
+            if (foundOpen && braceCount === 0) {
+                return i + 1;
+            }
+        }
+    }
+    return startPos;
+}
+
+/**
+ * Remove a function declaration from game.js content
+ */
+function removeFunction(content, funcName) {
+    // Match function declaration with flexible whitespace
+    // The function is inside an IIFE, so indent is 8 spaces
+    const patterns = [
+        new RegExp(`\\n        function ${funcName}\\s*\\(`),
+        new RegExp(`\\n\\s+function ${funcName}\\s*\\(`),
+    ];
+    
+    let startPos = -1;
+    for (const pattern of patterns) {
+        const match = content.match(pattern);
+        if (match) {
+            startPos = match.index;
+            break;
+        }
+    }
+    
+    if (startPos === -1) {
+        console.log(`  Warning: function ${funcName} not found`);
+        return content;
+    }
+    
+    // Find the actual start of the line
+    const lineStart = content.lastIndexOf('\n', startPos) + 1;
+    
+    // Find the end of the function
+    const funcStartPos = lineStart + content.substring(lineStart).indexOf(`function ${funcName}`);
+    const endPos = findFunctionEnd(content, funcStartPos);
+    
+    const replacement = `\n        // [DDD Phase 5] ${funcName} moved to domains/ui/renderers/`;
+    return content.substring(0, lineStart) + replacement + content.substring(endPos);
+}
+
 // --- Step 1: Load game.js and remove duplicated constants FIRST ---
 const gamePath = path.join(__dirname, 'game.js');
 let game = readFileSync(gamePath, 'utf8');
@@ -129,10 +242,18 @@ for (const constName of CONSTANTS_TO_REMOVE) {
     game = removeConstant(game, constName);
 }
 
-const processedLength = game.length;
-console.log(`Stripped constants from game.js: ${originalLength} -> ${processedLength} bytes (removed ${originalLength - processedLength})`);
+const afterConstantsLength = game.length;
+console.log(`Stripped constants from game.js: ${originalLength} -> ${afterConstantsLength} bytes (removed ${originalLength - afterConstantsLength})`);
 
-// --- Step 2: Load and concatenate constant modules ---
+// --- Step 2: Remove UI render functions ---
+for (const funcName of UI_FUNCTIONS_TO_REMOVE) {
+    game = removeFunction(game, funcName);
+}
+
+const processedLength = game.length;
+console.log(`Stripped UI functions from game.js: ${afterConstantsLength} -> ${processedLength} bytes (removed ${afterConstantsLength - processedLength})`);
+
+// --- Step 3: Load and concatenate constant modules ---
 const constantFiles = [
     'cultivation.js',
     'world.js',
@@ -156,13 +277,49 @@ for (const filename of constantFiles) {
     }
 }
 
-// --- Step 3: Combine constants + processed game.js ---
-const distGamePath = path.join(distDir, 'game.js');
-const combinedGame = concatenatedConstants + game;
-writeFileSync(distGamePath, combinedGame);
-console.log(`Built game.js: ${processedLength} bytes (processed) + ${concatenatedConstants.length} bytes (constants) = ${combinedGame.length} bytes total`);
+// --- Step 4: Load and concatenate UI renderer modules ---
+const uiRendererFiles = [
+    'achievement.js',
+    'combat.js',
+    'inventory.js',
+    'shop.js',
+    'pet.js',
+    'sect.js',
+    'world.js',
+    'celestial.js',
+    'modal.js',
+    'log.js'
+];
 
-// --- Step 4: Copy index.html ---
+let concatenatedUIRenderers = '';
+for (const filename of uiRendererFiles) {
+    const filePath = path.join(uiRenderersDir, filename);
+    try {
+        let content = readFileSync(filePath, 'utf8');
+        // Remove 'export' keyword and the comment header since we're inlining
+        content = content.replace(/^\s*export\s+/gm, '');
+        // Keep the function definitions but remove the file header comment
+        content = content.replace(/^\/\/ ===== UI Renderer:.*?\n/gm, '');
+        content = content.replace(/^\/\/ Phase 5 extraction.*?\n/gm, '');
+        concatenatedUIRenderers += content + '\n';
+        console.log(`Added UI renderers: ${filename}`);
+    } catch (e) {
+        console.error(`Warning: Could not read UI renderer ${filename}: ${e.message}`);
+    }
+}
+
+// --- Step 5: Combine constants + processed game.js + UI renderers ---
+const distGamePath = path.join(distDir, 'game.js');
+const combinedGame = concatenatedConstants + '\n' + game + '\n' + concatenatedUIRenderers;
+writeFileSync(distGamePath, combinedGame);
+
+console.log(`\nBuilt game.js:`);
+console.log(`  Constants: ${concatenatedConstants.length} bytes`);
+console.log(`  Processed game.js: ${processedLength} bytes`);
+console.log(`  UI renderers: ${concatenatedUIRenderers.length} bytes`);
+console.log(`  Total: ${combinedGame.length} bytes`);
+
+// --- Step 6: Copy index.html ---
 const indexSrc = path.join(__dirname, 'index.html');
 const indexDist = path.join(distDir, 'index.html');
 let html = readFileSync(indexSrc, 'utf8');
@@ -173,13 +330,16 @@ html = html.replace(
 writeFileSync(indexDist, html);
 console.log('Generated dist/index.html');
 
-// --- Step 5: Validate content ---
+// --- Step 7: Validate content ---
 const checks = [
   ['CONFIG object', 'const CONFIG = {'],
   ['init function', 'function init('],
   ['gameState object', 'let gameState = {'],
   ['startNewGame function', 'function startNewGame('],
   ['updateDisplay function', 'function updateDisplay('],
+  ['renderAchievements', 'function renderAchievements('],
+  ['openInventory', 'function openInventory('],
+  ['openShop', 'function openShop('],
 ];
 
 for (const [name, pattern] of checks) {
@@ -187,7 +347,7 @@ for (const [name, pattern] of checks) {
   console.log(`  ${ok ? '✓' : '✗'} ${name}`);
 }
 
-// --- Step 6: Syntax check via node ---
+// --- Step 8: Syntax check via node ---
 try {
   execSync(`node --check "${distGamePath}"`, { stdio: 'pipe' });
   console.log('✓ Syntax check passed (node --check)');
@@ -198,6 +358,6 @@ try {
 }
 
 console.log('\nBuild complete!');
-console.log(`  dist/game.js    — ${combinedGame.length} bytes (with constants)`);
+console.log(`  dist/game.js    — ${combinedGame.length} bytes`);
 console.log(`  dist/index.html — ${html.length} bytes`);
 console.log('\nNote: Original game.js is unchanged on disk.');
