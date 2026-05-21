@@ -1947,6 +1947,155 @@ const ACHIEVEMENT_ID_MAP = {
 
 // [DDD Phase 1] PET_QUALITY_MULTIPLIERS moved to domains/shared/constants/;
 
+// [DDD Phase 1] PET_LOYALTY_DECAY_RATE moved to domains/shared/constants/ // 每天忠诚度下降
+
+        // ===== PLUGIN_CATEGORIES (V48) =====
+        const PLUGIN_CATEGORIES = {
+            skill: { icon: '⚔️', label: '技能包', desc: '自定义技能和法术' },
+            resource: { icon: '💎', label: '资源包', desc: '灵石/丹药/装备' },
+            plot: { icon: '📜', label: '剧情包', desc: '自定义剧情和事件' },
+            theme: { icon: '🎨', label: '界面主题', desc: '界面样式定制' },
+            combat: { icon: '🏟️', label: '战斗包', desc: '战斗规则修改' }
+        };
+
+        // ===== PROPOSAL_SYSTEM (V50) =====
+        const PROPOSAL_DIRECTIONS = {
+            A: { label: 'A', color: '#e53935', desc: 'AI/智能系统' },
+            B: { label: 'B', color: '#1e88e5', desc: '玩法/系统' },
+            C: { label: 'C', color: '#43a047', desc: '内容/剧情' },
+            D: { label: 'D', color: '#8e24aa', desc: '界面/体验' },
+            E: { label: 'E', color: '#fb8c00', desc: '性能/架构' }
+        };
+        const PROPOSAL_STATUS = {
+            submitted: { label: '待审核', color: '#ff9800' },
+            approved: { label: '已采纳', color: '#4caf50' },
+            rejected: { label: '已拒绝', color: '#f44336' },
+            implemented: { label: '已实现', color: '#2196f3' }
+        };
+
+        // ===== BUILT_IN_PLUGINS (V48) =====
+        const BUILT_IN_PLUGINS = [
+            {
+                id: 'skill_dragon_soul',
+                name: '太古龙魂',
+                version: '1.0.0',
+                author: '系统',
+                description: '解锁太古龙魂技能：龙魂觉醒(HP<30%时触发，回复20%HP+造成150%伤害)',
+                category: 'skill',
+                icon: '🐉',
+                dependencies: [],
+                installCount: 128,
+                rating: 4.8,
+                hooks: {
+                    onBattleEnd: function(result) {
+                        if (result && result.won && gameState.combat && gameState.combat.injured) {
+                            const healAmount = Math.floor((gameState.combat.injured ? 0 : 0));
+                            if (healAmount > 0) {
+                                gameState.qi = Math.min(gameState.qi + healAmount, gameState.maxQi);
+                                addLog('good', '太古龙魂', `龙魂觉醒！回复 ${healAmount} 灵气`);
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                id: 'resource_heaven_treasures',
+                name: '天庭宝藏',
+                version: '1.0.0',
+                author: '系统',
+                description: '每7天自动发放天庭俸禄：5000灵石+10个筑基丹+1件紫金装备',
+                category: 'resource',
+                icon: '👑',
+                dependencies: [],
+                installCount: 256,
+                rating: 4.5,
+                hooks: {
+                    onDayChange: function(day) {
+                        if (day % 7 === 0) {
+                            gameState.spiritStones += 5000;
+                            addLog('good', '天庭宝藏', '天庭俸禄发放：+5000灵石');
+                        }
+                    }
+                }
+            },
+            {
+                id: 'plot_ancient_ruins',
+                name: '上古遗迹',
+                version: '1.0.0',
+                author: '系统',
+                description: '新增「上古遗迹」随机事件，完成可获得传承和稀有道具',
+                category: 'plot',
+                icon: '🏛️',
+                dependencies: [],
+                installCount: 89,
+                rating: 4.3,
+                hooks: {}
+            },
+            {
+                id: 'theme_xianxia_classic',
+                name: '仙侠古风',
+                version: '1.0.0',
+                author: '系统',
+                description: '界面切换为仙侠古风样式，墨绿底色+金色边框+云纹装饰',
+                category: 'theme',
+                icon: '🖌️',
+                dependencies: [],
+                installCount: 512,
+                rating: 4.9,
+                hooks: {
+                    onThemeApply: function() {
+                        applyXianxiaTheme();
+                    }
+                }
+            },
+            {
+                id: 'combat_heaven_arena',
+                name: '天道竞技',
+                version: '1.0.0',
+                author: '系统',
+                description: '新增天道竞技场规则：每场战斗额外获得天道积分，可兑换稀有奖励',
+                category: 'combat',
+                icon: '⚡',
+                dependencies: [],
+                installCount: 167,
+                rating: 4.6,
+                hooks: {
+                    onBattleWin: function(result) {
+                        if (!gameState.celestialEconomy) {
+                            gameState.celestialEconomy = { immortalStones: 0, exchangeRate: 100, totalExchanged: 0, investments: [], marketItems: [], lastMarketRefresh: 0, totalEarned: 0, celestialReputation: 0 };
+                        }
+                        gameState.celestialEconomy.celestialReputation += 10;
+                        addLog('good', '天道竞技', '战斗胜利：+10天道积分');
+                    }
+                }
+            },
+            {
+                id: 'skill_sword_intent',
+                name: '剑意凌云',
+                version: '1.0.0',
+                author: '系统',
+                description: '剑修专属技能包：剑意(每击+5%伤害，最高叠加10层)+万剑归宗(必杀技，500%伤害)',
+                category: 'skill',
+                icon: '⚔️',
+                dependencies: [],
+                installCount: 203,
+                rating: 4.7,
+                hooks: {}
+            }
+        ];
+
+        // 仙侠古风主题应用
+        function applyXianxiaTheme() {
+            const style = document.getElementById('xianxia-theme');
+            if (style) {
+                style.remove();
+            }
+            const css = document.createElement('style');
+            css.id = 'xianxia-theme';
+            css.textContent = 'body { background: linear-gradient(135deg, #0a1a0a 0%, #0d2818 100%) !important; } .panel { border: 2px solid #d4a017 !important; background: rgba(10,30,15,0.95) !important; } .panel-header { background: linear-gradient(90deg, #1a3a1a, #0d2818) !important; border-bottom: 1px solid #d4a017 !important; } .btn { border: 1px solid #d4a017 !important; color: #d4a017 !important; } .btn:hover { background: rgba(212,160,23,0.2) !important; }';
+            document.head.appendChild(css);
+            addLog('good', '仙侠古风', '主题已应用：墨绿底色+金色边框');
+        }
 // [DDD Phase 1] PET_MAX_HUNGER moved to domains/shared/constants/
         
 // [DDD Phase 1] PET_MAX_EGGS moved to domains/shared/constants/ // 最大蛋容量
@@ -2684,6 +2833,11 @@ const ACHIEVEMENT_ID_MAP = {
 
             // V39: NPC自主行动每日结算
             processNpcAutonomousLoop();
+
+            // V48: 插件系统每日钩子
+            if (typeof callPluginHook === 'function') {
+                callPluginHook('onDayChange', gameState.days);
+            }
 
             // V6: 检查是否触发奇遇
             const serendipityResult = checkSerendipity();
@@ -4943,6 +5097,14 @@ const ACHIEVEMENT_ID_MAP = {
             });
             if (gameState.combat.battleHistory.length > 50) {
                 gameState.combat.battleHistory.pop();
+            }
+
+            // V48: 插件系统战斗钩子
+            if (typeof callPluginHook === 'function') {
+                if (result === 'win') {
+                    callPluginHook('onBattleWin', { opponent: o.name, reward, day: gameState.days });
+                }
+                callPluginHook('onBattleEnd', { result, opponent: o.name, reward, penalty, day: gameState.days });
             }
 
             saveGame();
@@ -9093,7 +9255,9 @@ const ACHIEVEMENT_ID_MAP = {
                 npcApprentices: [],
                 npcGiftLiked: null, // V40: 喜欢的礼物类型
                 // V41 NPC性格系统字段
-                npcPersonality: null // 'diligent'|'lazy'|'aggressive'|'steady'
+                npcPersonality: null, // 'diligent'|'lazy'|'aggressive'|'steady'
+                // V49 NPC自进化记忆系统
+                npcMemory: initNpcMemory()
             });
             
             // V39: 宗门创建时宗主自动成为掌门
@@ -9148,6 +9312,247 @@ const ACHIEVEMENT_ID_MAP = {
 
         function getPersonalityInfo(p) {
             return NPC_PERSONALITIES[p] || NPC_PERSONALITIES.steady;
+        }
+
+        // ===== V49 NPC自进化系统 (参考 generic-agent L0-L4 五层记忆) =====
+
+        // NPC记忆层级 (对应 generic-agent L0-L4)
+        const NPC_MEMORY_LAYERS = {
+            L0_episodic: { label: '情景记忆', desc: '单次事件记录', decay: 0.95 },
+            L1_shortTerm: { label: '短时记忆', desc: '近期经验汇总', decay: 0.9 },
+            L2_longTerm: { label: '长时记忆', desc: '重要经历固化', decay: 0.7 },
+            L3_semantic: { label: '语义记忆', desc: '知识与技能', decay: 0.0 },
+            L4_epic: { label: '史诗记忆', desc: '里程碑事件', decay: 0.0 }
+        };
+
+        // NPC技能结晶配置 (技能从经验中"结晶"形成)
+        const NPC_SKILL_CRYSTALS = {
+            combat_master: { name: '战斗精通', desc: '战斗中磨砺出的本能反应', icon: '⚔️', threshold: 10 },
+            resource_sense: { name: '资源敏锐', desc: '对灵石和资源的高度敏感', icon: '💎', threshold: 8 },
+            social_network: { name: '社交高手', desc: '与同门建立深厚关系网', icon: '🤝', threshold: 12 },
+            wisdom_eye: { name: '慧眼', desc: '能洞察事物本质', icon: '👁️', threshold: 15 },
+            cultivation_talent: { name: '修炼天赋', desc: '对灵气运行的天赋', icon: '🧘', threshold: 10 },
+            leadership_aura: { name: '领袖气质', desc: '引领他人的感召力', icon: '👑', threshold: 20 }
+        };
+
+        // 初始化NPC记忆
+        function initNpcMemory() {
+            return {
+                // L0: 情景记忆 - 最近发生的事件
+                L0_episodic: [],
+                // L1: 短时记忆 - 近期经验汇总
+                L1_shortTerm: { totalTasks: 0, completedTasks: 0, totalBattles: 0, wins: 0, giftsGiven: 0, interactions: 0 },
+                // L2: 长时记忆 - 重要经历
+                L2_longTerm: [],
+                // L3: 语义记忆 - 掌握的技能/知识
+                L3_semantic: { skills: [], insights: [] },
+                // L4: 史诗记忆 - 里程碑事件
+                L4_epic: [],
+                // 进化相关
+                evolutionPoints: 0,
+                evolutionLevel: 1,  // 1-5级，对应generic-agent的成长阶段
+                lastEvolved: 0
+            };
+        }
+
+        // NPC记忆系统 - 记录一次交互
+        function recordNpcMemory(npcUid, eventType, eventData) {
+            const sect = gameState.sect;
+            const npc = sect.disciples.find(d => d.uid === npcUid);
+            if (!npc || !npc.npcMemory) return;
+
+            const mem = npc.npcMemory;
+            const timestamp = gameState.days;
+
+            // L0: 记录情景事件
+            mem.L0_episodic.push({
+                type: eventType,
+                data: eventData,
+                day: timestamp,
+                mood: npc.npcMood
+            });
+            // L0 最多保留20条
+            if (mem.L0_episodic.length > 20) mem.L0_episodic.shift();
+
+            // L1: 更新短时统计
+            if (eventType === 'task_complete') {
+                mem.L1_shortTerm.totalTasks++;
+                mem.L1_shortTerm.completedTasks++;
+            } else if (eventType === 'battle') {
+                mem.L1_shortTerm.totalBattles++;
+                if (eventData.won) mem.L1_shortTerm.wins++;
+            } else if (eventType === 'gift') {
+                mem.L1_shortTerm.giftsGiven++;
+            } else if (eventType === 'interaction') {
+                mem.L1_shortTerm.interactions++;
+            }
+
+            // L2: 重要经历超过阈值时固化
+            if (mem.L1_shortTerm.completedTasks >= 5 && mem.L2_longTerm.filter(e => e.type === 'task_master').length === 0) {
+                mem.L2_longTerm.push({ type: 'task_master', day: timestamp, desc: '完成任务5次以上' });
+            }
+            if (mem.L1_shortTerm.wins >= 3 && mem.L2_longTerm.filter(e => e.type === 'combat_hero').length === 0) {
+                mem.L2_longTerm.push({ type: 'combat_hero', day: timestamp, desc: '战斗胜利3次以上' });
+            }
+            // L2 最多保留10条
+            if (mem.L2_longTerm.length > 10) mem.L2_longTerm.shift();
+
+            // 检查技能结晶
+            checkNpcSkillCrystallization(npc);
+
+            // L4: 里程碑事件
+            if (eventType === 'task_complete' && mem.L1_shortTerm.completedTasks === 10 && !mem.L4_epic.find(e => e.type === 'task_master_10')) {
+                mem.L4_epic.push({ type: 'task_master_10', day: timestamp, desc: '完成10项任务' });
+            }
+            if (eventType === 'battle' && mem.L1_shortTerm.wins === 5 && !mem.L4_epic.find(e => e.type === 'combat_hero_5')) {
+                mem.L4_epic.push({ type: 'combat_hero_5', day: timestamp, desc: '战斗5连胜' });
+            }
+            // L4 最多保留5条
+            if (mem.L4_epic.length > 5) mem.L4_epic.shift();
+
+            // 更新进化点数
+            const pointsMap = { task_complete: 2, battle: 3, gift: 1, interaction: 1, evolution: 10 };
+            mem.evolutionPoints += pointsMap[eventType] || 1;
+
+            // 检查是否可升级
+            checkNpcEvolution(npc);
+        }
+
+        // 检查NPC技能结晶
+        function checkNpcSkillCrystallization(npc) {
+            if (!npc || !npc.npcMemory) return;
+            const mem = npc.npcMemory;
+            const skills = mem.L3_semantic.skills;
+
+            // 战斗精通
+            if (mem.L1_shortTerm.totalBattles >= NPC_SKILL_CRYSTALS.combat_master.threshold && !skills.find(s => s.id === 'combat_master')) {
+                skills.push({ id: 'combat_master', ...NPC_SKILL_CRYSTALS.combat_master, crystallizedDay: gameState.days });
+                npc.attack = Math.floor((npc.attack || 5) * 1.2);
+                addLog('good', '技能结晶', `${npc.name}领悟了【${NPC_SKILL_CRYSTALS.combat_master.name}】！攻击力+20%`);
+            }
+            // 资源敏锐
+            if (mem.L1_shortTerm.totalTasks >= NPC_SKILL_CRYSTALS.resource_sense.threshold && !skills.find(s => s.id === 'resource_sense')) {
+                skills.push({ id: 'resource_sense', ...NPC_SKILL_CRYSTALS.resource_sense, crystallizedDay: gameState.days });
+                // 提供资源时奖励更多
+            }
+            // 社交高手
+            if (mem.L1_shortTerm.giftsGiven >= NPC_SKILL_CRYSTALS.social_network.threshold && !skills.find(s => s.id === 'social_network')) {
+                skills.push({ id: 'social_network', ...NPC_SKILL_CRYSTALS.social_network, crystallizedDay: gameState.days });
+                npc.npcAffection = Math.min(100, npc.npcAffection + 20);
+                addLog('good', '技能结晶', `${npc.name}领悟了【${NPC_SKILL_CRYSTALS.social_network.name}】！好感度+20`);
+            }
+            // 慧眼
+            if (mem.L1_shortTerm.interactions >= NPC_SKILL_CRYSTALS.wisdom_eye.threshold && !skills.find(s => s.id === 'wisdom_eye')) {
+                skills.push({ id: 'wisdom_eye', ...NPC_SKILL_CRYSTALS.wisdom_eye, crystallizedDay: gameState.days });
+                skills.push({ id: 'insight', name: '洞察', desc: '能感知隐藏机会', icon: '🔮', crystallizedDay: gameState.days });
+            }
+        }
+
+        // 检查NPC是否可进化
+        function checkNpcEvolution(npc) {
+            if (!npc || !npc.npcMemory) return;
+            const mem = npc.npcMemory;
+            const levelThresholds = [0, 20, 50, 100, 200]; // 每级所需点数
+
+            if (mem.evolutionLevel < 5) {
+                const nextLevel = mem.evolutionLevel + 1;
+                if (mem.evolutionPoints >= levelThresholds[nextLevel]) {
+                    mem.evolutionLevel = nextLevel;
+                    mem.lastEvolved = gameState.days;
+                    // 进化时提升基础属性
+                    npc.attack = Math.floor((npc.attack || 5) * 1.15);
+                    npc.defense = Math.floor((npc.defense || 3) * 1.15);
+                    npc.maxHp = Math.floor((npc.maxHp || 30) * 1.15);
+                    addLog('good', 'NPC进化', `${npc.name}突破至Lv.${nextLevel}！基础属性+15%`);
+                }
+            }
+        }
+
+        // NPC自主决策 - 基于记忆选择行动
+        function npcAutonomousDecision(npc) {
+            if (!npc || !npc.npcMemory) return null;
+            const mem = npc.npcMemory;
+            const personality = NPC_PERSONALITIES[npc.personality] || NPC_PERSONALITIES.steady;
+            const rand = Math.random();
+
+            // L3技能影响决策
+            const hasCombatSkill = mem.L3_semantic.skills.find(s => s.id === 'combat_master');
+            const hasSocialSkill = mem.L3_semantic.skills.find(s => s.id === 'social_network');
+
+            // 高效弟子倾向于训练，懒惰弟子倾向于采集
+            if (rand < personality.efficiency) {
+                // 性格倾向任务
+                if (personality.taskPref === 'train') {
+                    return { action: 'cultivate', reason: '性格勤奋，选择修炼' };
+                } else if (personality.taskPref === 'combat') {
+                    if (hasCombatSkill && rand < 0.5) {
+                        return { action: 'challenge', reason: '战斗精通，挑战强敌' };
+                    }
+                    return { action: 'combat', reason: '好斗性格，选择战斗' };
+                } else {
+                    return { action: 'collect', reason: '性格务实，选择采集' };
+                }
+            } else if (rand < 0.7) {
+                // 30%概率社交
+                if (hasSocialSkill && rand < 0.4) {
+                    return { action: 'socialize', reason: '社交高手，与人交流' };
+                }
+                return { action: 'rest', reason: '稍作休息' };
+            } else {
+                // 探索/随机
+                const actions = ['explore', 'meditate', 'help'];
+                return { action: actions[Math.floor(Math.random() * actions.length)], reason: '自主探索' };
+            }
+        }
+
+        // 获取NPC记忆显示
+        function getNpcMemoryDisplay(npc) {
+            if (!npc || !npc.npcMemory) return '';
+            const mem = npc.npcMemory;
+            let html = '<div class="npc-memory-panel">';
+            html += `<div class="npc-memory-title">🧠 ${npc.name}的记忆 (Lv.${mem.evolutionLevel})</div>`;
+
+            // L4 史诗
+            if (mem.L4_epic.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">📜 史诗记忆</span>`;
+                mem.L4_epic.forEach(e => {
+                    html += `<div class="mem-item epic">第${e.day}天：${e.desc}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // L3 技能
+            if (mem.L3_semantic.skills.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">⚡ 技能结晶</span>`;
+                mem.L3_semantic.skills.forEach(s => {
+                    html += `<span class="skill-tag" title="${s.desc}">${s.icon||'✨'} ${s.name}</span>`;
+                });
+                html += '</div>';
+            }
+
+            // L2 长时
+            if (mem.L2_longTerm.length > 0) {
+                html += '<div class="npc-mem-layer">';
+                html += `<span class="mem-label">💎 重要经历</span>`;
+                mem.L2_longTerm.slice(-3).forEach(e => {
+                    html += `<div class="mem-item">${e.desc}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // L1 统计
+            html += '<div class="npc-mem-layer">';
+            html += `<span class="mem-label">📊 近况</span>`;
+            html += `<span>任务${mem.L1_shortTerm.completedTasks}/${mem.L1_shortTerm.totalTasks}</span> `;
+            html += `<span>战斗${mem.L1_shortTerm.wins}/${mem.L1_shortTerm.totalBattles}</span> `;
+            html += `<span>互动${mem.L1_shortTerm.interactions}</span>`;
+            html += ` <span class="evo-points">进化点:${mem.evolutionPoints}</span>`;
+            html += '</div>';
+
+            html += '</div>';
+            return html;
         }
 
         // 获取弟子NPC图标
@@ -13278,9 +13683,20 @@ const ACHIEVEMENT_ID_MAP = {
                     selectedArea: null,
                     spiritualPower: 0,
                     maxSpiritualPower: 100
+                },
+                // V48 插件系统
+                plugins: {
+                    installed: {},
+                    enabled: [],
+                    favorites: []
+                },
+                // V50 提案系统
+                proposals: {
+                    submitted: [],
+                    nextId: 1
                 }
             };
-            
+
             // 如果是转世重修，应用灵魂修为加成
             if (fromReincarnation && reincarnationData && reincarnationData.rebirthCultivation > 0) {
                 const bonus = reincarnationData.rebirthCultivation;
@@ -13897,6 +14313,353 @@ const ACHIEVEMENT_ID_MAP = {
                     celestialBtn.style.display = 'inline-block';
                 }
             }
+
+            // 插件按钮显示 (V48)
+            const pluginBtn = document.getElementById('pluginBtn');
+            if (pluginBtn) {
+                pluginBtn.style.display = 'inline-block';
+            }
+            const proposalBtn = document.getElementById('proposalBtn');
+            if (proposalBtn) {
+                proposalBtn.style.display = 'inline-block';
+            }
+        }
+
+        // ===== V48 插件系统 =====
+
+        // 插件钩子调用
+        function callPluginHook(hookName, ...args) {
+            let result = args;
+            const enabled = gameState.plugins && gameState.plugins.enabled || [];
+            enabled.forEach(pluginId => {
+                const plugin = gameState.plugins.installed[pluginId];
+                if (plugin && plugin.hooks && typeof plugin.hooks[hookName] === 'function') {
+                    try {
+                        result = plugin.hooks[hookName](...result) !== undefined ? result : args;
+                    } catch (e) {
+                        console.warn(`Plugin ${pluginId} hook ${hookName} error:`, e);
+                    }
+                }
+            });
+            return result;
+        }
+
+        // 插件安装
+        function installPlugin(pluginId) {
+            const marketPlugin = BUILT_IN_PLUGINS.find(p => p.id === pluginId);
+            if (!marketPlugin) return;
+
+            // 检查依赖
+            for (const dep of (marketPlugin.dependencies || [])) {
+                if (!gameState.plugins.installed[dep]) {
+                    showToast(`缺少依赖插件: ${dep}`);
+                    return;
+                }
+            }
+
+            // 安装
+            gameState.plugins.installed[pluginId] = { ...marketPlugin };
+            if (!gameState.plugins.enabled.includes(pluginId)) {
+                gameState.plugins.enabled.push(pluginId);
+            }
+
+            // 调用onSpawn
+            if (marketPlugin.hooks && typeof marketPlugin.hooks.onSpawn === 'function') {
+                try { marketPlugin.hooks.onSpawn(); } catch(e) {}
+            }
+
+            // 调用主题钩子
+            if (marketPlugin.category === 'theme') {
+                callPluginHook('onThemeApply');
+            }
+
+            marketPlugin.installCount = (marketPlugin.installCount || 0) + 1;
+            showToast(`已安装 ${marketPlugin.name}`);
+            saveGame();
+            updateDisplay();
+            if (typeof renderPluginPanel === 'function') renderPluginPanel();
+        }
+
+        // 插件卸载
+        function uninstallPlugin(pluginId) {
+            const plugin = gameState.plugins.installed[pluginId];
+            if (!plugin) return;
+
+            // 检查是否有插件依赖此插件
+            Object.values(gameState.plugins.installed).forEach(p => {
+                if (p.dependencies && p.dependencies.includes(pluginId)) {
+                    showToast(`无法卸载: ${p.name} 依赖此插件`);
+                    return;
+                }
+            });
+
+            // 调用onDestroy
+            if (plugin.hooks && typeof plugin.hooks.onDestroy === 'function') {
+                try { plugin.hooks.onDestroy(); } catch(e) {}
+            }
+
+            delete gameState.plugins.installed[pluginId];
+            gameState.plugins.enabled = gameState.plugins.enabled.filter(id => id !== pluginId);
+            showToast(`已卸载 ${plugin.name}`);
+            saveGame();
+            updateDisplay();
+            if (typeof renderPluginPanel === 'function') renderPluginPanel();
+        }
+
+        // 插件启用/禁用切换
+        function togglePlugin(pluginId) {
+            const idx = gameState.plugins.enabled.indexOf(pluginId);
+            if (idx >= 0) {
+                gameState.plugins.enabled.splice(idx, 1);
+                showToast('插件已禁用');
+            } else {
+                gameState.plugins.enabled.push(pluginId);
+                const plugin = gameState.plugins.installed[pluginId];
+                if (plugin && plugin.hooks && typeof plugin.hooks.onSpawn === 'function') {
+                    try { plugin.hooks.onSpawn(); } catch(e) {}
+                }
+                if (plugin && plugin.category === 'theme') {
+                    callPluginHook('onThemeApply');
+                }
+                showToast('插件已启用');
+            }
+            saveGame();
+            updateDisplay();
+            if (typeof renderPluginPanel === 'function') renderPluginPanel();
+        }
+
+        // 切换收藏
+        function togglePluginFavorite(pluginId) {
+            if (!gameState.plugins.favorites) gameState.plugins.favorites = [];
+            const idx = gameState.plugins.favorites.indexOf(pluginId);
+            if (idx >= 0) {
+                gameState.plugins.favorites.splice(idx, 1);
+            } else {
+                gameState.plugins.favorites.push(pluginId);
+            }
+            saveGame();
+            if (typeof renderPluginPanel === 'function') renderPluginPanel();
+        }
+
+        // 渲染插件面板
+        let currentPluginTab = 'market';
+        let currentPluginCategory = 'skill';
+
+        function openPluginPanel() {
+            showModal('📦 插件系统', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentPluginTab === 'market' ? 'active' : ''}" onclick="setPluginTab('market')">📦 市场</button>
+                    <button class="tab-btn ${currentPluginTab === 'installed' ? 'active' : ''}" onclick="setPluginTab('installed')">📥 我的插件</button>
+                </div>
+                <div id="pluginTabContent"></div>
+            `, 600);
+            renderPluginPanel();
+        }
+
+        function setPluginTab(tab) {
+            currentPluginTab = tab;
+            renderPluginPanel();
+        }
+
+        function renderPluginPanel() {
+            const content = document.getElementById('pluginTabContent');
+            if (!content) return;
+            if (currentPluginTab === 'market') {
+                content.innerHTML = renderPluginMarket();
+            } else {
+                content.innerHTML = renderInstalledPlugins();
+            }
+        }
+
+        // 渲染市场插件
+        function renderPluginMarket() {
+            let html = '<div class="market-categories">';
+            Object.entries(PLUGIN_CATEGORIES).forEach(([key, cat]) => {
+                html += `<button class="tab-btn ${currentPluginCategory === key ? 'active' : ''}" onclick="setPluginCategory('${key}')">${cat.icon} ${cat.label}</button>`;
+            });
+            html += '</div>';
+
+            const filtered = BUILT_IN_PLUGINS.filter(p => p.category === currentPluginCategory);
+            if (filtered.length === 0) {
+                html += '<div class="empty-state">该分类暂无插件</div>';
+            } else {
+                filtered.forEach(plugin => {
+                    html += renderMarketPluginCard(plugin);
+                });
+            }
+            return html;
+        }
+
+        function setPluginCategory(cat) {
+            currentPluginCategory = cat;
+            renderPluginPanel();
+        }
+
+        // 渲染市场插件卡片
+        function renderMarketPluginCard(plugin) {
+            const isInstalled = gameState.plugins.installed[plugin.id];
+            const isFav = gameState.plugins.favorites && gameState.plugins.favorites.includes(plugin.id);
+            const isEnabled = gameState.plugins.enabled.includes(plugin.id);
+
+            let actionBtn = '';
+            if (isInstalled) {
+                actionBtn = `<button class="btn btn-sm ${isEnabled ? 'btn-installed' : 'btn-disabled'}" onclick="togglePlugin('${plugin.id}')">${isEnabled ? '已启用' : '已禁用'}</button>
+                             <button class="btn btn-sm btn-uninstall" onclick="uninstallPlugin('${plugin.id}')">卸载</button>`;
+            } else {
+                actionBtn = `<button class="btn btn-sm btn-install" onclick="installPlugin('${plugin.id}')">安装</button>`;
+            }
+
+            return `<div class="plugin-card">
+                <div class="plugin-card-header">
+                    <span class="plugin-icon">${plugin.icon}</span>
+                    <div class="plugin-info">
+                        <span class="plugin-name">${plugin.name}</span>
+                        <span class="plugin-version">v${plugin.version}</span>
+                    </div>
+                    <span class="plugin-rating">⭐ ${(plugin.rating || 0).toFixed(1)}</span>
+                </div>
+                <div class="plugin-desc">${plugin.description}</div>
+                <div class="plugin-meta">
+                    <span>👤 ${plugin.author}</span>
+                    <span>📥 ${plugin.installCount || 0}</span>
+                </div>
+                <div class="plugin-actions">
+                    ${actionBtn}
+                    <button class="btn btn-sm ${isFav ? 'btn-fav-active' : 'btn-fav'}" onclick="togglePluginFavorite('${plugin.id}')">❤️</button>
+                </div>
+            </div>`;
+        }
+
+        // 渲染已安装插件
+        function renderInstalledPlugins() {
+            const installed = Object.values(gameState.plugins.installed);
+            if (installed.length === 0) {
+                return '<div class="empty-state">暂无已安装插件<br><br>前往市场安装更多插件吧！</div>';
+            }
+
+            let html = '<div class="installed-plugins">';
+            installed.forEach(plugin => {
+                const isEnabled = gameState.plugins.enabled.includes(plugin.id);
+                const cat = PLUGIN_CATEGORIES[plugin.category] || {};
+                html += `<div class="plugin-card ${!isEnabled ? 'plugin-disabled' : ''}">
+                    <div class="plugin-card-header">
+                        <span class="plugin-icon">${plugin.icon}</span>
+                        <div class="plugin-info">
+                            <span class="plugin-name">${plugin.name}</span>
+                            <span class="plugin-version">v${plugin.version}</span>
+                            <span class="plugin-cat">${cat.icon || ''} ${cat.label || plugin.category}</span>
+                        </div>
+                        <span class="plugin-status ${isEnabled ? 'status-enabled' : 'status-disabled'}">${isEnabled ? '● 运行中' : '○ 已停止'}</span>
+                    </div>
+                    <div class="plugin-desc">${plugin.description}</div>
+                    <div class="plugin-actions">
+                        <button class="btn btn-sm ${isEnabled ? 'btn-disable' : 'btn-enable'}" onclick="togglePlugin('${plugin.id}')">${isEnabled ? '禁用' : '启用'}</button>
+                        <button class="btn btn-sm btn-uninstall" onclick="uninstallPlugin('${plugin.id}')">卸载</button>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // 在游戏主循环中调用插件钩子 (V48)
+        function callPluginHooksForDayChange(day) {
+            callPluginHook('onDayChange', day);
+        }
+
+        // ===== V50 提案系统 =====
+
+        function openProposalPanel() {
+            showModal('💡 迭代提案系统', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentProposalTab === 'list' ? 'active' : ''}" onclick="setProposalTab('list')">📋 我的提案</button>
+                    <button class="tab-btn ${currentProposalTab === 'submit' ? 'active' : ''}" onclick="setProposalTab('submit')">✏️ 提交提案</button>
+                </div>
+                <div id="proposalTabContent"></div>
+            `, 600);
+            renderProposalPanel();
+        }
+
+        let currentProposalTab = 'list';
+
+        function setProposalTab(tab) {
+            currentProposalTab = tab;
+            renderProposalPanel();
+        }
+
+        function renderProposalPanel() {
+            const content = document.getElementById('proposalTabContent');
+            if (!content) return;
+            if (currentProposalTab === 'list') {
+                content.innerHTML = renderProposalList();
+            } else {
+                content.innerHTML = renderProposalSubmitForm();
+            }
+        }
+
+        function renderProposalList() {
+            const proposals = gameState.proposals.submitted || [];
+            if (proposals.length === 0) {
+                return '<div class="empty-state">暂无提案，试试提交一个新提案吧！</div>';
+            }
+            let html = '<div class="plugin-card" style="margin-bottom:10px;">';
+            proposals.forEach((p, idx) => {
+                const dir = PROPOSAL_DIRECTIONS[p.direction] || { label: p.direction, color: '#888' };
+                const status = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#888' };
+                html += `<div style="padding:8px 0;border-bottom:1px solid #eee;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span style="background:${dir.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${dir.label}</span>
+                        <span style="background:${status.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${status.label}</span>
+                    </div>
+                    <div style="font-weight:bold;margin-bottom:4px;">${p.title}</div>
+                    <div style="font-size:12px;color:#666;">${p.description.substring(0, 60)}${p.description.length > 60 ? '...' : ''}</div>
+                    <div style="font-size:11px;color:#999;margin-top:4px;">${p.id} · ${p.date}</div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function renderProposalSubmitForm() {
+            let html = `<div style="padding:10px 0;">
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">📌 标题</label>
+                    <input type="text" id="proposalTitle" placeholder="如：仙界钓鱼系统" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">🏷️ 方向</label>
+                    <select id="proposalDirection" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">
+                        <option value="">选择方向...</option>
+                        ${Object.entries(PROPOSAL_DIRECTIONS).map(([k, v]) => `<option value="${k}">${v.label} - ${v.desc}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">📝 详细描述</label>
+                    <textarea id="proposalDesc" placeholder="描述你的功能建议..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;height:100px;resize:vertical;box-sizing:border-box;"></textarea>
+                </div>
+                <button class="btn btn-cultivate" onclick="submitProposal()">提交提案</button>
+            </div>`;
+            return html;
+        }
+
+        function submitProposal() {
+            const title = document.getElementById('proposalTitle').value.trim();
+            const direction = document.getElementById('proposalDirection').value;
+            const description = document.getElementById('proposalDesc').value.trim();
+            if (!title) { addLog('bad', '提案', '请输入标题'); return; }
+            if (!direction) { addLog('bad', '提案', '请选择方向'); return; }
+            if (!description) { addLog('bad', '提案', '请输入描述'); return; }
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const id = 'P-' + dateStr.replace(/-/g, '') + '-' + String(gameState.proposals.nextId || 1).padStart(3, '0');
+            const proposal = { id, title, direction, description, status: 'submitted', date: dateStr };
+            if (!gameState.proposals.submitted) gameState.proposals.submitted = [];
+            gameState.proposals.submitted.push(proposal);
+            gameState.proposals.nextId = (gameState.proposals.nextId || 1) + 1;
+            saveGame();
+            addLog('good', '提案', `提交成功：${title}`);
+            currentProposalTab = 'list';
+            renderProposalPanel();
         }
 
 
