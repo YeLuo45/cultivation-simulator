@@ -357,6 +357,21 @@ try {
   process.exit(1);
 }
 
+// --- Step 9: V51 Proposal CLI sync hook ---
+// After successful build, sync proposals.csv → proposal-index.md via CLI
+// This keeps the shared proposals repo in sync with game submissions
+try {
+  const cliPath = '/home/hermes/proposals/scripts/proposal_manager_cli.py';
+  const cliCmd = `python3 "${cliPath}" proposal sync-to-index`;
+  console.log('\n[V51] Syncing proposals via CLI...');
+  execSync(cliCmd, { stdio: 'inherit' });
+  console.log('[V51] Proposal sync complete');
+} catch (e) {
+  // Non-fatal: CLI sync failure should not block game build
+  const err = e.message || '';
+  console.warn('[V51] Proposal sync warning:', err.substring(0, 200));
+}
+
 console.log('\nBuild complete!');
 console.log(`  dist/game.js    — ${combinedGame.length} bytes`);
 console.log(`  dist/index.html — ${html.length} bytes`);
