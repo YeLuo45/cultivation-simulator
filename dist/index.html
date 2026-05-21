@@ -3711,6 +3711,42 @@
             color: #26c6da;
             font-size: 0.85em;
         }
+        /* V48 插件系统样式 */
+        .plugin-tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        .market-categories { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+        .plugin-card { background: rgba(0,0,0,0.3); border: 1px solid #333; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+        .plugin-card.plugin-disabled { opacity: 0.5; }
+        .plugin-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .plugin-icon { font-size: 1.5em; }
+        .plugin-info { flex: 1; display: flex; flex-direction: column; }
+        .plugin-name { font-weight: bold; color: #ffd700; }
+        .plugin-version { font-size: 0.8em; color: #888; }
+        .plugin-cat { font-size: 0.8em; color: #aaa; }
+        .plugin-rating { color: #ffd700; }
+        .plugin-desc { color: #ccc; font-size: 0.9em; margin-bottom: 8px; }
+        .plugin-meta { font-size: 0.8em; color: #888; margin-bottom: 8px; display: flex; gap: 15px; }
+        .plugin-actions { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+        .plugin-status { font-size: 0.8em; }
+        .plugin-status.status-enabled { color: #4caf50; }
+        .plugin-status.status-disabled { color: #666; }
+        .btn-sm { padding: 4px 10px; font-size: 0.8em; border-radius: 6px; cursor: pointer; border: 1px solid #555; background: rgba(50,50,50,0.8); color: #ccc; }
+        .btn-install { background: linear-gradient(135deg, #2e7d32, #4caf50) !important; color: white !important; }
+        .btn-uninstall { background: linear-gradient(135deg, #c62828, #ef5350) !important; color: white !important; }
+        .btn-disable { background: linear-gradient(135deg, #555, #888) !important; color: white !important; }
+        .btn-enable { background: linear-gradient(135deg, #1565c0, #42a5f5) !important; color: white !important; }
+        .btn-fav { background: transparent !important; border: 1px solid #555 !important; color: #666 !important; }
+        .btn-fav-active { background: rgba(244,143,177,0.2) !important; border: 1px solid #f48fb1 !important; color: #f48fb1 !important; }
+        .btn-installed { background: linear-gradient(135deg, #2e7d32, #388e3c) !important; color: white !important; }
+        .btn-disabled { background: rgba(50,50,50,0.8) !important; color: #666 !important; }
+        /* V49 NPC记忆系统样式 */
+        .npc-memory-panel { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 10px; padding: 12px; margin-top: 10px; }
+        .npc-memory-title { font-weight: bold; color: #ffd700; margin-bottom: 10px; font-size: 0.95em; }
+        .npc-mem-layer { margin-bottom: 8px; padding: 6px 8px; background: rgba(255,255,255,0.05); border-radius: 6px; }
+        .mem-label { color: #aaa; font-size: 0.8em; margin-right: 8px; }
+        .mem-item { color: #ccc; font-size: 0.85em; padding: 2px 0; }
+        .mem-item.epic { color: #ffd700; }
+        .skill-tag { display: inline-block; background: rgba(76,175,80,0.2); border: 1px solid #4CAF50; color: #4CAF50; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px; cursor: help; }
+        .evo-points { color: #bb86fc; font-size: 0.8em; }
     </style>
 </head>
 <body>
@@ -3838,6 +3874,10 @@
             <button id="beyondHeavenBtn" class="btn" style="display:none;background:linear-gradient(135deg,#1a1a2e,#0d0d1a);color:#ffd700;border:2px solid #ffd700;" onclick="openBeyondHeaven()">🌌 天外天</button>
             <!-- 仙界商行按钮 -->
             <button id="celestialEconomyBtn" class="btn" style="display:none;background:linear-gradient(135deg,#7b1fa2,#ba68c8);color:white;" onclick="openCelestialEconomy()">💎 仙界商行</button>
+            <!-- V48 插件按钮 -->
+            <button id="pluginBtn" class="btn" style="display:none;background:linear-gradient(135deg,#00897b,#4db6ac);color:white;" onclick="openPluginPanel()">📦 插件</button>
+            <!-- V50 提案按钮 -->
+            <button id="proposalBtn" class="btn" style="display:none;background:linear-gradient(135deg,#00695c,#26a69a);color:white;" onclick="openProposalPanel()">💡 提案</button>
         </div>
         <div id="moreButtons" class="buttons">
             <button class="btn btn-combat" onclick="openCombat()">⚔️ 斗法</button>

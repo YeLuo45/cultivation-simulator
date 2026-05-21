@@ -60,6 +60,21 @@
             combat: { icon: '🏟️', label: '战斗包', desc: '战斗规则修改' }
         };
 
+        // ===== PROPOSAL_SYSTEM (V50) =====
+        const PROPOSAL_DIRECTIONS = {
+            A: { label: 'A', color: '#e53935', desc: 'AI/智能系统' },
+            B: { label: 'B', color: '#1e88e5', desc: '玩法/系统' },
+            C: { label: 'C', color: '#43a047', desc: '内容/剧情' },
+            D: { label: 'D', color: '#8e24aa', desc: '界面/体验' },
+            E: { label: 'E', color: '#fb8c00', desc: '性能/架构' }
+        };
+        const PROPOSAL_STATUS = {
+            submitted: { label: '待审核', color: '#ff9800' },
+            approved: { label: '已采纳', color: '#4caf50' },
+            rejected: { label: '已拒绝', color: '#f44336' },
+            implemented: { label: '已实现', color: '#2196f3' }
+        };
+
         // ===== BUILT_IN_PLUGINS (V48) =====
         const BUILT_IN_PLUGINS = [
             {
@@ -13596,6 +13611,11 @@
                     installed: {},
                     enabled: [],
                     favorites: []
+                },
+                // V50 提案系统
+                proposals: {
+                    submitted: [],
+                    nextId: 1
                 }
             };
 
@@ -14221,6 +14241,10 @@
             if (pluginBtn) {
                 pluginBtn.style.display = 'inline-block';
             }
+            const proposalBtn = document.getElementById('proposalBtn');
+            if (proposalBtn) {
+                proposalBtn.style.display = 'inline-block';
+            }
         }
 
         // ===== V48 插件系统 =====
@@ -14463,4 +14487,99 @@
         // 在游戏主循环中调用插件钩子 (V48)
         function callPluginHooksForDayChange(day) {
             callPluginHook('onDayChange', day);
+        }
+
+        // ===== V50 提案系统 =====
+
+        function openProposalPanel() {
+            showModal('💡 迭代提案系统', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentProposalTab === 'list' ? 'active' : ''}" onclick="setProposalTab('list')">📋 我的提案</button>
+                    <button class="tab-btn ${currentProposalTab === 'submit' ? 'active' : ''}" onclick="setProposalTab('submit')">✏️ 提交提案</button>
+                </div>
+                <div id="proposalTabContent"></div>
+            `, 600);
+            renderProposalPanel();
+        }
+
+        let currentProposalTab = 'list';
+
+        function setProposalTab(tab) {
+            currentProposalTab = tab;
+            renderProposalPanel();
+        }
+
+        function renderProposalPanel() {
+            const content = document.getElementById('proposalTabContent');
+            if (!content) return;
+            if (currentProposalTab === 'list') {
+                content.innerHTML = renderProposalList();
+            } else {
+                content.innerHTML = renderProposalSubmitForm();
+            }
+        }
+
+        function renderProposalList() {
+            const proposals = gameState.proposals.submitted || [];
+            if (proposals.length === 0) {
+                return '<div class="empty-state">暂无提案，试试提交一个新提案吧！</div>';
+            }
+            let html = '<div class="plugin-card" style="margin-bottom:10px;">';
+            proposals.forEach((p, idx) => {
+                const dir = PROPOSAL_DIRECTIONS[p.direction] || { label: p.direction, color: '#888' };
+                const status = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#888' };
+                html += `<div style="padding:8px 0;border-bottom:1px solid #eee;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span style="background:${dir.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${dir.label}</span>
+                        <span style="background:${status.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${status.label}</span>
+                    </div>
+                    <div style="font-weight:bold;margin-bottom:4px;">${p.title}</div>
+                    <div style="font-size:12px;color:#666;">${p.description.substring(0, 60)}${p.description.length > 60 ? '...' : ''}</div>
+                    <div style="font-size:11px;color:#999;margin-top:4px;">${p.id} · ${p.date}</div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function renderProposalSubmitForm() {
+            let html = `<div style="padding:10px 0;">
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">📌 标题</label>
+                    <input type="text" id="proposalTitle" placeholder="如：仙界钓鱼系统" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">🏷️ 方向</label>
+                    <select id="proposalDirection" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">
+                        <option value="">选择方向...</option>
+                        ${Object.entries(PROPOSAL_DIRECTIONS).map(([k, v]) => `<option value="${k}">${v.label} - ${v.desc}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-weight:bold;margin-bottom:4px;">📝 详细描述</label>
+                    <textarea id="proposalDesc" placeholder="描述你的功能建议..." style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;height:100px;resize:vertical;box-sizing:border-box;"></textarea>
+                </div>
+                <button class="btn btn-cultivate" onclick="submitProposal()">提交提案</button>
+            </div>`;
+            return html;
+        }
+
+        function submitProposal() {
+            const title = document.getElementById('proposalTitle').value.trim();
+            const direction = document.getElementById('proposalDirection').value;
+            const description = document.getElementById('proposalDesc').value.trim();
+            if (!title) { addLog('bad', '提案', '请输入标题'); return; }
+            if (!direction) { addLog('bad', '提案', '请选择方向'); return; }
+            if (!description) { addLog('bad', '提案', '请输入描述'); return; }
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const id = 'P-' + dateStr.replace(/-/g, '') + '-' + String(gameState.proposals.nextId || 1).padStart(3, '0');
+            const proposal = { id, title, direction, description, status: 'submitted', date: dateStr };
+            if (!gameState.proposals.submitted) gameState.proposals.submitted = [];
+            gameState.proposals.submitted.push(proposal);
+            gameState.proposals.nextId = (gameState.proposals.nextId || 1) + 1;
+            saveGame();
+            addLog('good', '提案', `提交成功：${title}`);
+            currentProposalTab = 'list';
+            renderProposalPanel();
         }
