@@ -14774,7 +14774,217 @@ const ACHIEVEMENT_ID_MAP = {
             return html;
         }
 
-        // ===== V50 提案系统 =====
+        // ===== V53 悟道天梯 =====
+
+        let currentLawLadderTab = 'overview';
+
+        function openLawLadderPanel() {
+            if (!gameState.beyondHeaven || !gameState.beyondHeaven.unlocked) {
+                showModal('🏯 悟道天梯', '<div style="text-align:center;padding:20px;">天外天解锁后开放悟道天梯！</div>', 400);
+                return;
+            }
+            showModal('🏯 悟道天梯', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentLawLadderTab === 'overview' ? 'active' : ''}" onclick="setLawLadderTab('overview')">📊 天梯总览</button>
+                    <button class="tab-btn ${currentLawLadderTab === 'laws' ? 'active' : ''}" onclick="setLawLadderTab('laws')">⚖️ 法则领悟</button>
+                    <button class="tab-btn ${currentLawLadderTab === 'history' ? 'active' : ''}" onclick="setLawLadderTab('history')">📜 领悟历程</button>
+                </div>
+                <div id="lawLadderTabContent"></div>
+            `, 700);
+            renderLawLadderPanel();
+        }
+
+        function setLawLadderTab(tab) {
+            currentLawLadderTab = tab;
+            renderLawLadderPanel();
+        }
+
+        function renderLawLadderPanel() {
+            const content = document.getElementById('lawLadderTabContent');
+            if (!content) return;
+            if (currentLawLadderTab === 'overview') {
+                content.innerHTML = renderLawLadderOverview();
+            } else if (currentLawLadderTab === 'laws') {
+                content.innerHTML = renderLawLadderLaws();
+            } else {
+                content.innerHTML = renderLawLadderHistory();
+            }
+        }
+
+        function renderLawLadderOverview() {
+            const ll = gameState.lawLadder || { currentTier: 0, totalInsightGained: 0 };
+            const tth = gameState.thirtyThreeHeavens;
+            const lawsCount = tth && tth.lawsComprehended ? tth.lawsComprehended.length : 0;
+            const currentTierInfo = LAW_LADDER_TIERS[ll.currentTier] || LAW_LADDER_TIERS[0];
+            const nextTierInfo = LAW_LADDER_TIERS[ll.currentTier + 1];
+
+            let ladderHtml = '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">';
+            LAW_LADDER_TIERS.forEach((tier, idx) => {
+                const isCompleted = idx < ll.currentTier;
+                const isCurrent = idx === ll.currentTier;
+                const canProgress = idx === ll.currentTier && nextTierInfo;
+                const reqText = tier.requirement > 0 ? `需领悟${tier.requirement}法则` : '初始';
+                let rewardText = '';
+                Object.entries(tier.reward).forEach(([k, v]) => {
+                    const labels = { cultivationSpeed: '修炼速度', serendipityRate: '奇遇率', mindsetGain: '心境获取', tribulationSuccess: '渡劫成功', allStats: '全属性' };
+                    rewardText += `${labels[k] || k}+${(v * 100).toFixed(0)}% `;
+                });
+                const borderColor = isCompleted ? '#4caf50' : isCurrent ? '#ffd700' : '#333';
+                const bgColor = isCompleted ? 'rgba(76,175,80,0.1)' : isCurrent ? 'rgba(255,215,0,0.1)' : 'transparent';
+                ladderHtml += `<div style="padding:10px 12px;border-radius:8px;border:2px solid ${borderColor};background:${bgColor};display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:24px;">${isCompleted ? '✅' : isCurrent ? '🔶' : '⬜'}</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:bold;color:${borderColor};">${tier.icon} ${tier.name}</div>
+                        <div style="font-size:12px;color:#9e9e9e;">${reqText}</div>
+                    </div>
+                    <div style="font-size:12px;color:#ffd700;">${rewardText}</div>
+                </div>`;
+            });
+            ladderHtml += '</div>';
+
+            const insightToNext = nextTierInfo ? nextTierInfo.requirement - lawsCount : 0;
+            return `<div style="padding:10px;">
+                <div style="text-align:center;margin-bottom:15px;">
+                    <div style="font-size:48px;">${currentTierInfo.icon}</div>
+                    <div style="font-size:20px;font-weight:bold;color:#ffd700;margin-top:5px;">${currentTierInfo.name}</div>
+                    <div style="color:#9e9e9e;margin-top:5px;">当前悟道境界</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
+                    <div style="background:#1a1a2e;border-radius:8px;padding:12px;text-align:center;">
+                        <div style="color:#ffd700;font-size:24px;font-weight:bold;">${ll.totalInsightGained}</div>
+                        <div style="color:#9e9e9e;font-size:12px;">累计领悟点数</div>
+                    </div>
+                    <div style="background:#1a1a2e;border-radius:8px;padding:12px;text-align:center;">
+                        <div style="color:#4caf50;font-size:24px;font-weight:bold;">${lawsCount}</div>
+                        <div style="color:#9e9e9e;font-size:12px;">已悟法则数</div>
+                    </div>
+                </div>
+                ${nextTierInfo ? `<div style="text-align:center;padding:10px;background:#1a1a2e;border-radius:8px;margin-bottom:15px;">
+                    <div style="color:#9e9e9e;font-size:12px;">距离「${nextTierInfo.name}」还需领悟 ${insightToNext} 法则</div>
+                </div>` : '<div style="text-align:center;padding:10px;background:#1a1a2e;border-radius:8px;margin-bottom:15px;color:#ffd700;">🌟 已达悟道巅峰！</div>'}
+                ${ladderHtml}
+            </div>`;
+        }
+
+        function renderLawLadderLaws() {
+            const tth = gameState.thirtyThreeHeavens;
+            const comprehended = tth && tth.lawsComprehended ? tth.lawsComprehended : [];
+            const insight = tth ? tth.currentLawInsight : 0;
+            const maxInsight = tth ? tth.maxLawInsight : 100;
+
+            let html = `<div style="margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="color:#ffd700;font-weight:bold;">📊 法则领悟进度</span>
+                    <span style="color:#9e9e9e;">${insight}/${maxInsight}</span>
+                </div>
+                <div style="background:#333;border-radius:4px;height:12px;overflow:hidden;">
+                    <div style="width:${Math.min(100,(insight/maxInsight)*100)}%;height:100%;background:linear-gradient(90deg,#ffd700,#ff9800);transition:width 0.3s;"></div>
+                </div>
+                <div style="color:#757575;font-size:12px;margin-top:4px;">领悟进度达到50即可尝试领悟法则</div>
+            </div>`;
+
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+            HEAVENLY_LAWS.forEach(law => {
+                const isComp = comprehended.includes(law.id);
+                html += `<div style="background:#1a1a2e;border:2px solid ${isComp ? '#4caf50' : law.color};border-radius:10px;padding:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:24px;">${isComp ? '✅' : law.icon}</span>
+                        <div>
+                            <div style="font-weight:bold;color:${law.color};">${law.name}</div>
+                            <div style="font-size:11px;color:${law.element ? '#9e9e9e' : '#666'};">${law.element ? '元素: ' + law.element : ''} ${isComp ? '<span style="color:#4caf50;">已领悟</span>' : '<span style="color:#ff9800;">未领悟</span>'}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:#757575;margin-bottom:6px;">${law.desc}</div>
+                    ${!isComp ? `<button class="btn btn-sm" style="width:100%;background:${law.color}33;color:${law.color};border:1px solid ${law.color};" onclick="tryComprehendLaw('${law.id}')" ${insight < 50 ? 'disabled' : ''}>${insight >= 50 ? '🌟 领悟' : '🔒 需要50进度'}</button>` : ''}
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function renderLawLadderHistory() {
+            const ll = gameState.lawLadder || {};
+            const history = ll.insightHistory || [];
+            if (history.length === 0) {
+                return '<div style="text-align:center;padding:40px;color:#9e9e9e;">暂无领悟历程<br><br>领悟法则后将记录在此</div>';
+            }
+            let html = '<div style="max-height:400px;overflow-y:auto;">';
+            history.slice().reverse().forEach((entry, idx) => {
+                const law = HEAVENLY_LAWS.find(l => l.id === entry.lawId);
+                html += `<div style="background:#1a1a2e;border-radius:8px;padding:10px;margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:20px;">${law ? law.icon : '⚖️'}</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;">${law ? law.name : entry.lawId}</div>
+                            <div style="font-size:12px;color:#9e9e9e;">第${entry.day}天 · 领悟点数+${entry.insight}</div>
+                        </div>
+                        <span style="color:#ffd700;">+${entry.insight}</span>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function tryComprehendLaw(lawId) {
+            const tth = gameState.thirtyThreeHeavens;
+            if (!tth) return;
+            if (tth.currentLawInsight < 50) {
+                addLog('neutral', '法则领悟', '领悟进度不足50，无法领悟法则');
+                return;
+            }
+            if (tth.lawsComprehended.includes(lawId)) {
+                addLog('neutral', '法则领悟', '已经领悟过此法则');
+                return;
+            }
+            // 领悟成功
+            const law = HEAVENLY_LAWS.find(l => l.id === lawId);
+            tth.currentLawInsight = 0;
+            tth.lawsComprehended.push(lawId);
+            // V53: 记录领悟历程
+            if (!gameState.lawLadder) gameState.lawLadder = { currentTier: 0, totalInsightGained: 0, insightHistory: [], lastInsightDay: 0 };
+            gameState.lawLadder.totalInsightGained++;
+            gameState.lawLadder.insightHistory = gameState.lawLadder.insightHistory || [];
+            gameState.lawLadder.insightHistory.push({ lawId, day: gameState.days, insight: 1 });
+            // 检查悟道天梯升级
+            checkLawLadderPromotion();
+            // 原版法则效果
+            switch(lawId) {
+                case 'destiny': gameState.luck = (gameState.luck || 0) + 15; break;
+                case 'reincarnation': gameState.maxLifeSpan = (gameState.maxLifeSpan || 100) * 1.2; break;
+                case 'time': gameState.cultivationSpeed = (gameState.cultivationSpeed || 1) * 1.15; break;
+                case 'void': gameState.mindControlResistance = (gameState.mindControlResistance || 0) + 25; break;
+                case 'creation': gameState.breakthroughBonus = (gameState.breakthroughBonus || 0) + 20; break;
+                case 'primordial':
+                    gameState.qi = (gameState.qi || 0) * 1.1;
+                    gameState.spiritStones = (gameState.spiritStones || 0) * 1.1;
+                    break;
+            }
+            addLog('good', '法则领悟', `恭喜！你对「${law ? law.name : lawId}」有了更深的理解！`);
+            if (tth.lawsComprehended.length === HEAVENLY_LAWS.length) {
+                addLog('story', '终极成就', '你已领悟全部天道法则！距离超脱永恒只差一步之遥...');
+            }
+            saveGame();
+            updateDisplay();
+            renderLawLadderPanel();
+        }
+
+        function checkLawLadderPromotion() {
+            const ll = gameState.lawLadder;
+            const tth = gameState.thirtyThreeHeavens;
+            if (!ll || !tth) return;
+            const lawsCount = tth.lawsComprehended ? tth.lawsComprehended.length : 0;
+            for (let i = LAW_LADDER_TIERS.length - 1; i >= 0; i--) {
+                if (lawsCount >= LAW_LADDER_TIERS[i].requirement && i > ll.currentTier) {
+                    ll.currentTier = i;
+                    const tier = LAW_LADDER_TIERS[i];
+                    addLog('story', '悟道天梯', `🎉 悟道境界突破！你已晋升「${tier.name}」！`);
+                    break;
+                }
+            }
+        }
+
+
 
         function openProposalPanel() {
             showModal('💡 迭代提案系统', `
