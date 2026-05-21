@@ -12648,12 +12648,22 @@
 
         // 天道法则配置
         const HEAVENLY_LAWS = [
-            { id: 'destiny', name: '命运法则', desc: '因果循环，命运注定', progressNeeded: 100 },
-            { id: 'reincarnation', name: '轮回法则', desc: '生死轮转，永劫不灭', progressNeeded: 120 },
-            { id: 'time', name: '时空法则', desc: '过去未来，皆在一念', progressNeeded: 150 },
-            { id: 'void', name: '虚无法则', desc: '无中生有，有归于无', progressNeeded: 130 },
-            { id: 'creation', name: '造化法则', desc: '万物生长，造物之主', progressNeeded: 140 },
-            { id: 'primordial', name: '混沌法则', desc: '天地初开，混沌为源', progressNeeded: 200 }
+            { id: 'destiny', name: '命运法则', icon: '⚖️', element: '金', desc: '因果循环，命运注定', progressNeeded: 100, color: '#ffd700' },
+            { id: 'reincarnation', name: '轮回法则', icon: '🔄', element: '木', desc: '生死轮转，永劫不灭', progressNeeded: 120, color: '#4caf50' },
+            { id: 'time', name: '时空法则', icon: '⏳', element: '水', desc: '过去未来，皆在一念', progressNeeded: 150, color: '#1e88e5' },
+            { id: 'void', name: '虚无法则', icon: '🕳️', element: '火', desc: '无中生有，有归于无', progressNeeded: 130, color: '#e53935' },
+            { id: 'creation', name: '造化法则', icon: '🌱', element: '土', desc: '万物生长，造物之主', progressNeeded: 140, color: '#ff9800' },
+            { id: 'primordial', name: '混沌法则', icon: '🌌', element: '混沌', desc: '天地初开，混沌为源', progressNeeded: 200, color: '#9c27b0' }
+        ];
+
+        // V53 悟道天梯配置
+        const LAW_LADDER_TIERS = [
+            { level: 1, name: '初悟天道', icon: '🌱', requirement: 0, reward: { cultivationSpeed: 0.05 } },
+            { level: 2, name: '渐入佳境', icon: '🌿', requirement: 1, reward: { serendipityRate: 0.1 } },
+            { level: 3, name: '洞察天机', icon: '🌳', requirement: 2, reward: { mindsetGain: 0.15 } },
+            { level: 4, name: '天人合一', icon: '☀️', requirement: 3, reward: { tribulationSuccess: 0.1 } },
+            { level: 5, name: '超凡入圣', icon: '🌟', requirement: 4, reward: { allStats: 0.05 } },
+            { level: 6, name: '与道合真', icon: '🌌', requirement: 5, reward: { cultivationSpeed: 0.1, tribulationSuccess: 0.15 } }
         ];
 
         // 切换道祖遗迹Tab显示
@@ -13662,6 +13672,13 @@
                     keyword: null,
                     choices: [],
                     bonuses: {}
+                },
+                // V53 悟道天梯
+                lawLadder: {
+                    currentTier: 0,
+                    totalInsightGained: 0,
+                    insightHistory: [],
+                    lastInsightDay: 0
                 }
             };
 
@@ -13704,6 +13721,8 @@
             const saved = localStorage.getItem(CONFIG.storageKey);
             if (saved) {
                 const loaded = JSON.parse(saved);
+                // V53: Load proposals from dedicated storage before merging
+                loadProposalsFromStorage();
                 // 确保V2新增字段存在（向后兼容）
                 gameState = {
                     ...gameState,
@@ -14296,6 +14315,11 @@
             if (destinyBtn) {
                 destinyBtn.style.display = (gameState.destiny && gameState.destiny.unlocked) ? 'inline-block' : 'none';
             }
+            // 悟道天梯按钮 (V53): 天外天解锁后显示
+            const lawLadderBtn = document.getElementById('lawLadderBtn');
+            if (lawLadderBtn) {
+                lawLadderBtn.style.display = (gameState.beyondHeaven && gameState.beyondHeaven.unlocked) ? 'inline-block' : 'none';
+            }
         }
 
         // ===== V48 插件系统 =====
@@ -14704,14 +14728,26 @@
 
         function renderProposalList() {
             const proposals = gameState.proposals.submitted || [];
-            if (proposals.length === 0) {
-                return '<div class="empty-state">暂无提案，试试提交一个新提案吧！</div>';
+            const filter = window.currentProposalFilter || 'all';
+            const statusMap = { pending: 'submitted', approved: 'approved', rejected: 'rejected' };
+            const filtered = filter === 'all' ? proposals : proposals.filter(p => p.status === statusMap[filter]);
+            const counts = { all: proposals.length, pending: proposals.filter(p => p.status === 'submitted').length, approved: proposals.filter(p => p.status === 'approved').length, rejected: proposals.filter(p => p.status === 'rejected').length };
+            let html = `<div style="margin-bottom:12px;">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button class="tab-btn ${filter === 'all' ? 'active' : ''}" onclick="setProposalFilter('all')" style="padding:4px 10px;font-size:12px;border:1px solid #ccc;background:${filter === 'all' ? '#00695c' : '#fff'};color:${filter === 'all' ? '#fff' : '#333'};cursor:pointer;border-radius:6px;">全部 (${counts.all})</button>
+                    <button class="tab-btn ${filter === 'pending' ? 'active' : ''}" onclick="setProposalFilter('pending')" style="padding:4px 10px;font-size:12px;border:1px solid #ccc;background:${filter === 'pending' ? '#ff9800' : '#fff'};color:${filter === 'pending' ? '#fff' : '#333'};cursor:pointer;border-radius:6px;">待审核 (${counts.pending})</button>
+                    <button class="tab-btn ${filter === 'approved' ? 'active' : ''}" onclick="setProposalFilter('approved')" style="padding:4px 10px;font-size:12px;border:1px solid #ccc;background:${filter === 'approved' ? '#4caf50' : '#fff'};color:${filter === 'approved' ? '#fff' : '#333'};cursor:pointer;border-radius:6px;">已采纳 (${counts.approved})</button>
+                    <button class="tab-btn ${filter === 'rejected' ? 'active' : ''}" onclick="setProposalFilter('rejected')" style="padding:4px 10px;font-size:12px;border:1px solid #ccc;background:${filter === 'rejected' ? '#f44336' : '#fff'};color:${filter === 'rejected' ? '#fff' : '#333'};cursor:pointer;border-radius:6px;">已拒绝 (${counts.rejected})</button>
+                </div>
+            </div>`;
+            if (filtered.length === 0) {
+                return html + '<div class="empty-state">暂无提案，试试提交一个新提案吧！</div>';
             }
-            let html = '<div class="plugin-card" style="margin-bottom:10px;">';
-            proposals.forEach((p, idx) => {
+            html += '<div class="plugin-card" style="margin-bottom:10px;">';
+            filtered.forEach((p) => {
                 const dir = PROPOSAL_DIRECTIONS[p.direction] || { label: p.direction, color: '#888' };
                 const status = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#888' };
-                html += `<div style="padding:8px 0;border-bottom:1px solid #eee;">
+                html += `<div onclick="showProposalDetail('${p.id}')" style="padding:10px 0;border-bottom:1px solid #eee;cursor:pointer;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                         <span style="background:${dir.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${dir.label}</span>
                         <span style="background:${status.color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;">${status.label}</span>
@@ -14723,6 +14759,55 @@
             });
             html += '</div>';
             return html;
+        }
+
+        function setProposalFilter(filter) {
+            window.currentProposalFilter = filter;
+            document.getElementById('proposalTabContent').innerHTML = renderProposalList();
+        }
+
+        function showProposalDetail(id) {
+            const proposals = gameState.proposals.submitted || [];
+            const p = proposals.find(x => x.id === id);
+            if (!p) return;
+            const dir = PROPOSAL_DIRECTIONS[p.direction] || { label: p.direction, color: '#888', desc: '' };
+            const status = PROPOSAL_STATUS[p.status] || { label: p.status, color: '#888' };
+            const dirDesc = dir.desc ? ` - ${dir.desc}` : '';
+            showModal('💡 提案详情', `
+                <div style="padding:10px 0;line-height:1.8;">
+                    <div style="margin-bottom:12px;"><span style="font-weight:bold;color:#666;">编号：</span>${p.id}</div>
+                    <div style="margin-bottom:12px;"><span style="font-weight:bold;color:#666;">标题：</span>${p.title}</div>
+                    <div style="margin-bottom:12px;">
+                        <span style="font-weight:bold;color:#666;">方向：</span>
+                        <span style="background:${dir.color};color:white;padding:2px 8px;border-radius:10px;font-size:12px;margin-left:4px;">${dir.label}${dirDesc}</span>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <span style="font-weight:bold;color:#666;">状态：</span>
+                        <span style="background:${status.color};color:white;padding:2px 8px;border-radius:10px;font-size:12px;margin-left:4px;">${status.label}</span>
+                    </div>
+                    <div style="margin-bottom:12px;"><span style="font-weight:bold;color:#666;">提交日期：</span>${p.date}</div>
+                    <div style="margin-bottom:12px;"><span style="font-weight:bold;color:#666;">详细描述：</span></div>
+                    <div style="background:#f9f9f9;padding:12px;border-radius:8px;white-space:pre-wrap;">${p.description}</div>
+                </div>
+            `, 500);
+        }
+
+        function saveProposalsToStorage() {
+            try {
+                localStorage.setItem('cultivation_simulator_proposals', JSON.stringify(gameState.proposals));
+            } catch(e) { /* storage full or unavailable */ }
+        }
+
+        function loadProposalsFromStorage() {
+            try {
+                const saved = localStorage.getItem('cultivation_simulator_proposals');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && typeof parsed === 'object') {
+                        gameState.proposals = { ...gameState.proposals, ...parsed };
+                    }
+                }
+            } catch(e) { /* corrupted data */ }
         }
 
         function renderProposalSubmitForm() {
@@ -14761,6 +14846,7 @@
             if (!gameState.proposals.submitted) gameState.proposals.submitted = [];
             gameState.proposals.submitted.push(proposal);
             gameState.proposals.nextId = (gameState.proposals.nextId || 1) + 1;
+            saveProposalsToStorage();
             saveGame();
             addLog('good', '提案', `提交成功：${title}`);
             currentProposalTab = 'list';
