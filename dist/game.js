@@ -1973,6 +1973,40 @@ const ACHIEVEMENT_ID_MAP = {
             implemented: { label: '已实现', color: '#2196f3' }
         };
 
+        // ===== DESTINY_SYSTEM (V52) =====
+        const DESTINY_KEYWORDS = {
+            '逆天改命': {
+                icon: '⚡', color: '#e53935',
+                desc: '与天道对抗者，修炼速度+20%，渡劫难度+30%',
+                bonuses: { cultivationSpeed: 0.2, tribulationDifficulty: 0.3 }
+            },
+            '天道宠儿': {
+                icon: '🌟', color: '#ffd700',
+                desc: '天之骄子，奇遇触发+30%，渡劫成功率+15%',
+                bonuses: { serendipityRate: 0.3, tribulationSuccess: 0.15 }
+            },
+            '命途多舛': {
+                icon: '🌧️', color: '#78909c',
+                desc: '历经磨难者，战斗经验+25%，心境上限+20',
+                bonuses: { combatExp: 0.25, mindsetMax: 20 }
+            },
+            '仙缘深厚': {
+                icon: '🍀', color: '#43a047',
+                desc: '福缘深厚，所有优质事件概率+20%',
+                bonuses: { goodEventRate: 0.2 }
+            },
+            '道心坚定': {
+                icon: '💎', color: '#1e88e5',
+                desc: '心如止水，渡劫时心境消耗-50%，心魔入侵-40%',
+                bonuses: { mindsetConsume: -0.5, demonicInvasion: -0.4 }
+            },
+            '天命不凡': {
+                icon: '🔮', color: '#8e24aa',
+                desc: '身怀隐秘来历，所有属性+10%',
+                bonuses: { allStats: 0.1 }
+            }
+        };
+
         // ===== BUILT_IN_PLUGINS (V48) =====
         const BUILT_IN_PLUGINS = [
             {
