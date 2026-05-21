@@ -1973,6 +1973,40 @@ const ACHIEVEMENT_ID_MAP = {
             implemented: { label: '已实现', color: '#2196f3' }
         };
 
+        // ===== DESTINY_SYSTEM (V52) =====
+        const DESTINY_KEYWORDS = {
+            '逆天改命': {
+                icon: '⚡', color: '#e53935',
+                desc: '与天道对抗者，修炼速度+20%，渡劫难度+30%',
+                bonuses: { cultivationSpeed: 0.2, tribulationDifficulty: 0.3 }
+            },
+            '天道宠儿': {
+                icon: '🌟', color: '#ffd700',
+                desc: '天之骄子，奇遇触发+30%，渡劫成功率+15%',
+                bonuses: { serendipityRate: 0.3, tribulationSuccess: 0.15 }
+            },
+            '命途多舛': {
+                icon: '🌧️', color: '#78909c',
+                desc: '历经磨难者，战斗经验+25%，心境上限+20',
+                bonuses: { combatExp: 0.25, mindsetMax: 20 }
+            },
+            '仙缘深厚': {
+                icon: '🍀', color: '#43a047',
+                desc: '福缘深厚，所有优质事件概率+20%',
+                bonuses: { goodEventRate: 0.2 }
+            },
+            '道心坚定': {
+                icon: '💎', color: '#1e88e5',
+                desc: '心如止水，渡劫时心境消耗-50%，心魔入侵-40%',
+                bonuses: { mindsetConsume: -0.5, demonicInvasion: -0.4 }
+            },
+            '天命不凡': {
+                icon: '🔮', color: '#8e24aa',
+                desc: '身怀隐秘来历，所有属性+10%',
+                bonuses: { allStats: 0.1 }
+            }
+        };
+
         // ===== BUILT_IN_PLUGINS (V48) =====
         const BUILT_IN_PLUGINS = [
             {
@@ -2955,6 +2989,11 @@ const ACHIEVEMENT_ID_MAP = {
                         gameState.mindset = Math.max(0, gameState.mindset - 5);
                         // 解锁天外天
                         unlockBeyondHeaven();
+                        // V52 解锁天命系统
+                        if (!gameState.destiny.unlocked) {
+                            gameState.destiny.unlocked = true;
+                            addLog('story', '天命觉醒', '你感受到命运的牵引——天道法则在你面前展开，你可以选择属于自己的命运...');
+                        }
                         addLog('good', '白日飞升', `历经${gameState.days}天的修炼，你终于突破化神期，白日飞升！踏入天外天，探索诸天万界！`);
                         saveGame();
                         updateDisplay();
@@ -13694,6 +13733,13 @@ const ACHIEVEMENT_ID_MAP = {
                 proposals: {
                     submitted: [],
                     nextId: 1
+                },
+                // V52 天命系统
+                destiny: {
+                    unlocked: false,
+                    keyword: null,
+                    choices: [],
+                    bonuses: {}
                 }
             };
 
@@ -14323,6 +14369,11 @@ const ACHIEVEMENT_ID_MAP = {
             if (proposalBtn) {
                 proposalBtn.style.display = 'inline-block';
             }
+            // 天命按钮 (V52): 飞升后显示
+            const destinyBtn = document.getElementById('destinyBtn');
+            if (destinyBtn) {
+                destinyBtn.style.display = (gameState.destiny && gameState.destiny.unlocked) ? 'inline-block' : 'none';
+            }
         }
 
         // ===== V48 插件系统 =====
@@ -14565,6 +14616,138 @@ const ACHIEVEMENT_ID_MAP = {
         // 在游戏主循环中调用插件钩子 (V48)
         function callPluginHooksForDayChange(day) {
             callPluginHook('onDayChange', day);
+        }
+
+        // ===== V52 天命系统 =====
+
+        let currentDestinyTab = 'view';
+
+        function openDestinyPanel() {
+            if (!gameState.destiny.unlocked) {
+                showModal('🔮 天命', '<div style="text-align:center;padding:20px;">飞升后即可解锁天命系统！</div>', 400);
+                return;
+            }
+            const d = gameState.destiny;
+            const hasKeyword = d.keyword !== null;
+            showModal('🔮 天命系统', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentDestinyTab === 'view' ? 'active' : ''}" onclick="setDestinyTab('view')">📜 天命</button>
+                    ${!hasKeyword ? `<button class="tab-btn ${currentDestinyTab === 'choose' ? 'active' : ''}" onclick="setDestinyTab('choose')">✨ 选择天命</button>` : ''}
+                    <button class="tab-btn ${currentDestinyTab === 'records' ? 'active' : ''}" onclick="setDestinyTab('records')">📖 命运记录</button>
+                </div>
+                <div id="destinyTabContent"></div>
+            `, 650);
+            renderDestinyPanel();
+        }
+
+        function setDestinyTab(tab) {
+            currentDestinyTab = tab;
+            renderDestinyPanel();
+        }
+
+        function renderDestinyPanel() {
+            const content = document.getElementById('destinyTabContent');
+            if (!content) return;
+            const d = gameState.destiny;
+            if (currentDestinyTab === 'view') {
+                content.innerHTML = renderDestinyView(d);
+            } else if (currentDestinyTab === 'choose') {
+                content.innerHTML = renderDestinyChoose();
+            } else {
+                content.innerHTML = renderDestinyRecords(d);
+            }
+        }
+
+        function renderDestinyView(d) {
+            if (!d.keyword) {
+                return `<div style="text-align:center;padding:30px;">
+                    <div style="font-size:48px;margin-bottom:15px;">🔮</div>
+                    <div style="color:#9e9e9e;margin-bottom:20px;">你尚未选择自己的天命</div>
+                    <button class="btn btn-cultivate" onclick="setDestinyTab('choose')">✨ 选择天命</button>
+                </div>`;
+            }
+            const info = DESTINY_KEYWORDS[d.keyword];
+            let bonusesHtml = '';
+            Object.entries(info.bonuses).forEach(([key, val]) => {
+                const labels = {
+                    cultivationSpeed: '修炼速度',
+                    tribulationDifficulty: '渡劫难度',
+                    serendipityRate: '奇遇触发',
+                    tribulationSuccess: '渡劫成功率',
+                    combatExp: '战斗经验',
+                    mindsetMax: '心境上限',
+                    goodEventRate: '优质事件',
+                    mindsetConsume: '心境消耗',
+                    demonicInvasion: '心魔入侵',
+                    allStats: '所有属性'
+                };
+                const sign = val >= 0 ? '+' : '';
+                bonusesHtml += `<div style="margin:4px 0;">• ${labels[key] || key}: <span style="color:${val >= 0 ? '#4caf50' : '#f44336'}">${sign}${typeof val === 'number' && Math.abs(val) < 1 ? (val * 100).toFixed(0) + '%' : val}</span></div>`;
+            });
+            return `<div style="text-align:center;padding:15px;">
+                <div style="font-size:56px;margin-bottom:10px;">${info.icon}</div>
+                <div style="font-size:22px;font-weight:bold;color:${info.color};margin-bottom:8px;">「${d.keyword}」</div>
+                <div style="color:#9e9e9e;margin-bottom:15px;">${info.desc}</div>
+                <div style="background:#1e1e1e;border-radius:8px;padding:12px;text-align:left;">
+                    <div style="color:#ffd700;margin-bottom:8px;">📊 天命加成</div>
+                    ${bonusesHtml}
+                </div>
+                <div style="margin-top:12px;color:#757575;font-size:13px;">
+                    已选择次数: ${d.choices ? d.choices.length : 0} 次
+                </div>
+            </div>`;
+        }
+
+        function renderDestinyChoose() {
+            let html = '<div style="text-align:center;margin-bottom:15px;color:#ffd700;">⚠️ 天命一旦选择，将影响你的一生</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+            Object.entries(DESTINY_KEYWORDS).forEach(([key, info]) => {
+                html += `<div style="background:#1a1a2e;border:2px solid ${info.color};border-radius:10px;padding:12px;cursor:pointer;text-align:center;" onclick="selectDestiny('${key}')">
+                    <div style="font-size:32px;margin-bottom:6px;">${info.icon}</div>
+                    <div style="font-weight:bold;color:${info.color};margin-bottom:4px;">${key}</div>
+                    <div style="font-size:11px;color:#9e9e9e;">${info.desc}</div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function selectDestiny(keyword) {
+            const info = DESTINY_KEYWORDS[keyword];
+            if (!info) return;
+            gameState.destiny.keyword = keyword;
+            gameState.destiny.bonuses = { ...info.bonuses };
+            gameState.destiny.choices = gameState.destiny.choices || [];
+            gameState.destiny.choices.push({
+                keyword: keyword,
+                day: gameState.days,
+                realm: gameState.realm,
+                reason: '飞升天命觉醒'
+            });
+            addLog('story', '天命已定', `你选择了「${keyword}」，${info.desc}`);
+            saveGame();
+            updateDisplay();
+            setDestinyTab('view');
+        }
+
+        function renderDestinyRecords(d) {
+            if (!d.choices || d.choices.length === 0) {
+                return '<div style="text-align:center;padding:30px;color:#9e9e9e;">暂无命运记录</div>';
+            }
+            let html = '<div style="max-height:300px;overflow-y:auto;">';
+            d.choices.slice().reverse().forEach((choice, idx) => {
+                const info = DESTINY_KEYWORDS[choice.keyword] || {};
+                html += `<div style="background:#1a1a2e;border-radius:8px;padding:10px;margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span style="font-size:20px;">${info.icon || '🔮'}</span>
+                        <span style="font-weight:bold;color:${info.color || '#fff'};">「${choice.keyword}」</span>
+                    </div>
+                    <div style="font-size:12px;color:#9e9e9e;">第${choice.day}天 · ${CONFIG.realms[choice.realm] || choice.realm}期</div>
+                    <div style="font-size:12px;color:#757575;">${choice.reason || ''}</div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
         }
 
         // ===== V50 提案系统 =====
