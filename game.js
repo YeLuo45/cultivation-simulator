@@ -12724,6 +12724,19 @@ const ACHIEVEMENT_ID_MAP = {
             { id: 'primordial', name: '混沌印记', icon: '🌌', desc: '蕴含混沌法则的天道印记', effect: '所有属性+10%' }
         ];
 
+        // V54 仙界版图配置
+        const CELESTIAL_REGIONS = [
+            { id: 'celestialCapital', name: '天庭帝都', icon: '🏛️', level: 1, desc: '诸天万界中心，天道法则汇聚之地', reward: { reputation: 500, spiritStones: 2000 } },
+            { id: 'thunderClan', name: '雷部神族', icon: '⚡', level: 1, desc: '执掌天劫，统御九天神雷', reward: { tribulationSuccess: 0.1 } },
+            { id: 'starPavilion', name: '星辰阁', icon: '✨', level: 2, desc: '观测天机，推演命运因果', reward: { luck: 10 } },
+            { id: 'dragonPalace', name: '龙宫', icon: '🐉', level: 2, desc: '深海龙族，掌控四海之力', reward: { defense: 0.1, qi: 500 } },
+            { id: 'phoenixNest', name: '凤凰巢', icon: '🔶', level: 3, desc: '浴火重生，不死凤凰栖息之地', reward: { maxLifeSpan: 0.2, cultivationSpeed: 0.1 } },
+            { id: 'spiritValley', name: '万灵谷', icon: '🦌', level: 3, desc: '万物有灵，百草繁茂', reward: { mindsetGain: 0.2, serendipityRate: 0.1 } },
+            { id: 'voidRealm', name: '虚无境', icon: '🌑', level: 4, desc: '万物归于虚无，超脱生死', reward: { mindControlResistance: 0.2 } },
+            { id: 'primordialCave', name: '混沌洞', icon: '🕳️', level: 5, desc: '天地初开，混沌本源所在', reward: { allStats: 0.1, qi: 1000 } },
+            { id: 'transcendentPeak', name: '超脱峰', icon: '🌌', level: 6, desc: '诸天之巅，超脱永恒之路', reward: { breakthroughBonus: 0.15, luck: 20 } }
+        ];
+
         // 天道法则配置
         const HEAVENLY_LAWS = [
             { id: 'destiny', name: '命运法则', icon: '⚖️', element: '金', desc: '因果循环，命运注定', progressNeeded: 100, color: '#ffd700' },
@@ -13757,6 +13770,14 @@ const ACHIEVEMENT_ID_MAP = {
                     totalInsightGained: 0,
                     insightHistory: [],
                     lastInsightDay: 0
+                },
+                // V54 仙界版图
+                celestial: {
+                    unlocked: false,
+                    visitedRegions: [],
+                    currentRegion: null,
+                    explorationCount: 0,
+                    regionStories: {}
                 }
             };
 
@@ -14398,6 +14419,11 @@ const ACHIEVEMENT_ID_MAP = {
             if (lawLadderBtn) {
                 lawLadderBtn.style.display = (gameState.beyondHeaven && gameState.beyondHeaven.unlocked) ? 'inline-block' : 'none';
             }
+            // 仙界版图按钮 (V54): 飞升期（realm>=5）显示
+            const celestialRealmBtn = document.getElementById('celestialRealmBtn');
+            if (celestialRealmBtn) {
+                celestialRealmBtn.style.display = (gameState.realm >= 5) ? 'inline-block' : 'none';
+            }
         }
 
         // ===== V48 插件系统 =====
@@ -14985,6 +15011,204 @@ const ACHIEVEMENT_ID_MAP = {
         }
 
 
+
+        // ===== V54 仙界版图 =====
+
+        let currentCelestialTab = 'map';
+
+        function openCelestialPanel() {
+            if (gameState.realm < 5) {
+                showModal('🌌 仙界版图', '<div style="text-align:center;padding:20px;">飞升期后开放仙界版图！</div>', 400);
+                return;
+            }
+            // V54: 首次打开自动解锁仙界版图
+            if (!gameState.celestial) {
+                gameState.celestial = { unlocked: true, visitedRegions: [], currentRegion: null, explorationCount: 0, regionStories: {} };
+            } else {
+                gameState.celestial.unlocked = true;
+            }
+            showModal('🌌 仙界版图', `
+                <div class="plugin-tabs">
+                    <button class="tab-btn ${currentCelestialTab === 'map' ? 'active' : ''}" onclick="setCelestialTab('map')">🗺️ 版图</button>
+                    <button class="tab-btn ${currentCelestialTab === 'explore' ? 'active' : ''}" onclick="setCelestialTab('explore')">🔍 探索</button>
+                    <button class="tab-btn ${currentCelestialTab === 'record' ? 'active' : ''}" onclick="setCelestialTab('record')">📜 飞升档案</button>
+                </div>
+                <div id="celestialTabContent"></div>
+            `, 700);
+            renderCelestialPanel();
+        }
+
+        function setCelestialTab(tab) {
+            currentCelestialTab = tab;
+            renderCelestialPanel();
+        }
+
+        function renderCelestialPanel() {
+            const content = document.getElementById('celestialTabContent');
+            if (!content) return;
+            if (currentCelestialTab === 'map') {
+                content.innerHTML = renderCelestialMap();
+            } else if (currentCelestialTab === 'explore') {
+                content.innerHTML = renderCelestialExplore();
+            } else {
+                content.innerHTML = renderCelestialRecord();
+            }
+        }
+
+        function renderCelestialMap() {
+            const cel = gameState.celestial || {};
+            const visited = cel.visitedRegions || [];
+            let html = '<div style="padding:10px;">';
+            html += '<div style="text-align:center;margin-bottom:15px;"><div style="font-size:14px;color:#9e9e9e;">已探索 <span style="color:#e1bee7;font-weight:bold;">' + visited.length + '</span> / ' + CELESTIAL_REGIONS.length + ' 区域</div></div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+            CELESTIAL_REGIONS.forEach(region => {
+                const isVisited = visited.includes(region.id);
+                const canVisit = isVisited || visited.length >= (region.level - 1) * 2;
+                html += `<div style="background:#1a1a2e;border:2px solid ${isVisited ? '#9c27b0' : '#333'};border-radius:10px;padding:10px;cursor:${canVisit ? 'pointer' : 'not-allowed'};opacity:${canVisit || isVisited ? 1 : 0.5};" onclick="${canVisit || isVisited ? `exploreCelestialRegion('${region.id}')` : ''}">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span style="font-size:22px;">${isVisited ? '✅' : region.icon}</span>
+                        <div>
+                            <div style="font-weight:bold;color:#e1bee7;">${region.name}</div>
+                            <div style="font-size:11px;color:#9e9e9e;">所需境界: ${region.level}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:#757575;margin-bottom:4px;">${region.desc}</div>
+                    <div style="font-size:11px;color:#7b1fa2;">`;
+                Object.entries(region.reward).forEach(([k, v]) => {
+                    const labels = { reputation: '声望', spiritStones: '灵石', tribulationSuccess: '渡劫成功率', luck: '幸运', defense: '防御', qi: '灵气', maxLifeSpan: '寿命', cultivationSpeed: '修炼速度', mindsetGain: '心境获取', serendipityRate: '奇遇率', mindControlResistance: '心魔抗性', allStats: '全属性', breakthroughBonus: '突破加成' };
+                    html += `${labels[k] || k}+${typeof v === 'number' && v < 1 ? (v * 100).toFixed(0) + '%' : v} `;
+                });
+                html += `</div></div>`;
+            });
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderCelestialExplore() {
+            const cel = gameState.celestial || {};
+            const visited = cel.visitedRegions || [];
+            const unvisited = CELESTIAL_REGIONS.filter(r => !visited.includes(r.id));
+            if (unvisited.length === 0) {
+                return '<div style="text-align:center;padding:40px;color:#9e9e9e;">🌟 已探索全部仙界区域！<br><br>飞升档案中记录了你的所有探索历程</div>';
+            }
+            let html = '<div style="padding:10px;">';
+            html += '<div style="margin-bottom:10px;color:#e1bee7;font-weight:bold;">选择区域进行探索：</div>';
+            html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+            unvisited.forEach(region => {
+                const canVisit = visited.length >= (region.level - 1) * 2;
+                html += `<div style="background:#1a1a2e;border:2px solid ${canVisit ? '#7b1fa2' : '#333'};border-radius:10px;padding:12px;opacity:${canVisit ? 1 : 0.5};">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:28px;">${region.icon}</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;color:#e1bee7;">${region.name}</div>
+                            <div style="font-size:12px;color:#9e9e9e;">${region.desc}</div>
+                        </div>
+                        ${canVisit ? `<button class="btn" style="background:#7b1fa2;color:white;" onclick="exploreCelestialRegion('${region.id}')">探索</button>` : `<span style="color:#666;font-size:12px;">需先探索低级区域</span>`}
+                    </div>
+                </div>`;
+            });
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderCelestialRecord() {
+            const cel = gameState.celestial || {};
+            const visited = cel.visitedRegions || [];
+            const stories = cel.regionStories || {};
+            if (visited.length === 0) {
+                return '<div style="text-align:center;padding:40px;color:#9e9e9e;">暂无飞升档案<br><br>探索仙界区域后将记录在此</div>';
+            }
+            let html = '<div style="padding:10px;max-height:450px;overflow-y:auto;">';
+            visited.forEach(regionId => {
+                const region = CELESTIAL_REGIONS.find(r => r.id === regionId);
+                const story = stories[regionId];
+                html += `<div style="background:#1a1a2e;border:2px solid #7b1fa2;border-radius:10px;padding:12px;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <span style="font-size:24px;">${region ? region.icon : '🌌'}</span>
+                        <div style="font-weight:bold;color:#e1bee7;">${region ? region.name : regionId}</div>
+                    </div>
+                    ${story ? `<div style="font-size:12px;color:#e1bee7;margin-bottom:6px;font-style:italic;">"${story}"</div>` : ''}
+                    <div style="font-size:12px;color:#9e9e9e;">探索次数: ${cel.explorationCount || 0} | 首次探索: 第${cel.visitedRegions.indexOf(regionId) + 1}次探索</div>
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function exploreCelestialRegion(regionId) {
+            const cel = gameState.celestial;
+            const region = CELESTIAL_REGIONS.find(r => r.id === regionId);
+            if (!region || !cel) return;
+            if (cel.visitedRegions.includes(regionId)) {
+                showModal(region.name, `<div style="text-align:center;padding:20px;"><div style="font-size:48px;">${region.icon}</div><div style="margin-top:10px;color:#e1bee7;">你已经探索过${region.name}</div><div style="color:#9e9e9e;margin-top:10px;">${region.desc}</div></div>`, 400);
+                return;
+            }
+            cel.visitedRegions.push(regionId);
+            cel.explorationCount++;
+            // 生成随机故事
+            const stories = [
+                `你在${region.name}中偶遇一位神秘老者，他赠与你一句偈语：天道酬勤，唯心不易。`,
+                `${region.name}的守护者对你进行了试炼，你凭借坚定的道心通过了考验。`,
+                `你在${region.name}深处发现了一处前人遗迹，获得了珍贵的感悟。`,
+                `${region.name}的能量场令你沉浸其中，修为隐隐有所精进。`,
+                `你与${region.name}的灵兽结下了缘分，它们将成为你的助力。`
+            ];
+            const story = stories[Math.floor(Math.random() * stories.length)];
+            cel.regionStories[regionId] = story;
+            // 应用奖励
+            Object.entries(region.reward).forEach(([k, v]) => {
+                if (k === 'spiritStones') gameState.spiritStones = (gameState.spiritStones || 0) + v;
+                else if (k === 'reputation') gameState.reputation = (gameState.reputation || 0) + v;
+                else if (k === 'qi') { gameState.qi = (gameState.qi || 0) + v; gameState.maxQi = Math.max(gameState.maxQi || 0, gameState.qi); }
+                else if (k === 'luck') gameState.luck = (gameState.luck || 0) + v;
+                else if (k === 'maxLifeSpan') gameState.maxLifeSpan = (gameState.maxLifeSpan || 100) * (1 + v);
+                else if (['cultivationSpeed', 'tribulationSuccess', 'serendipityRate', 'mindsetGain', 'mindControlResistance', 'allStats', 'breakthroughBonus', 'defense'].includes(k)) {
+                    gameState.activeEffects[k] = (gameState.activeEffects[k] || 0) + v;
+                }
+            });
+            addLog('good', '仙界探索', `你在${region.name}获得了探索收获！${story}`);
+            showModal(region.name, `<div style="text-align:center;padding:20px;"><div style="font-size:48px;">${region.icon}</div><div style="margin-top:10px;color:#ffd700;font-weight:bold;">探索成功！</div><div style="color:#e1bee7;margin-top:10px;">${story}</div><div style="color:#9e9e9e;margin-top:10px;">获得奖励：${Object.entries(region.reward).map(([k,v]) => { const labels = { reputation:'声望', spiritStones:'灵石', tribulationSuccess:'渡劫成功率', luck:'幸运', defense:'防御', qi:'灵气', maxLifeSpan:'寿命', cultivationSpeed:'修炼速度', mindsetGain:'心境获取', serendipityRate:'奇遇率', mindControlResistance:'心魔抗性', allStats:'全属性', breakthroughBonus:'突破加成' }; return labels[k]||k + '+' + (typeof v==='number'&&v<1?(v*100).toFixed(0)+'%':v); }).join(' | ')}</div></div>`, 500);
+            saveGame();
+            updateDisplay();
+            renderCelestialPanel();
+        }
+
+        // ===== V54 渡劫增强 =====
+
+        const TRIBULATION_PHASES = ['酝酿期', '雷劫降临', '心魔入侵', '最后一击', '天劫消散'];
+
+        function getTribulationPhaseNarrative(phase, tribKey) {
+            const trib = TRIBULATIONS[tribKey];
+            const narratives = {
+                '酝酿期': ['乌云密布，雷云在天际翻涌...', '天地灵气骤然紊乱，天劫的威压开始聚集...', '九天神雷在云层中若隐若现...'],
+                '雷劫降临': ['第一道天雷轰然落下！', '紫霄神雷带着毁灭一切的气势劈下！', '万道雷光交织成网，向你倾泻而下！'],
+                '心魔入侵': ['天劫趁虚而入，你的心魔被激发...', '幻象丛生，前世今生的执念化作心魔...', '你仿佛看到了自己的陨落...'],
+                '最后一击': ['天劫凝聚最后的力量，准备给你致命一击！', '天道不容挑衅，最后一重考验降临！', '九重天劫的最后一击，蕴含毁天灭地之威！'],
+                '天劫消散': ['天劫散去，天地重归宁静...', '雷云消散，你感受到了天道的认可...', '天劫洗礼完成，你的身躯经过淬炼更加坚韧...']
+            };
+            const options = narratives[phase] || narratives['天劫消散'];
+            return options[Math.floor(Math.random() * options.length)];
+        }
+
+        function enhanceTribulationScene(phase, tribKey) {
+            const scene = document.getElementById('tribulationScene');
+            if (!scene) return;
+            const narrative = getTribulationPhaseNarrative(phase, tribKey);
+            const trib = TRIBULATIONS[tribKey] || {};
+            const phaseColors = { '酝酿期': '#9e9e9e', '雷劫降临': '#ff9800', '心魔入侵': '#e91e63', '最后一击': '#f44336', '天劫消散': '#4caf50' };
+            const phaseIcons = { '酝酿期': '🌫️', '雷劫降临': '⚡', '心魔入侵': '👹', '最后一击': '💥', '天劫消散': '✨' };
+            const color = phaseColors[phase] || '#ffd700';
+            const icon = phaseIcons[phase] || '⚡';
+            const typeColors = { thunder: '#1e88e5', fire: '#e53935', wind: '#4caf50' };
+            scene.style.background = `linear-gradient(180deg, ${typeColors[trib.type] || '#1a1a2e'}22 0%, #0d0d1a 100%)`;
+            scene.innerHTML = `
+                <div style="text-align:center;padding:20px;">
+                    <div style="font-size:64px;animation:pulse 1s infinite;">${icon}</div>
+                    <div style="font-size:20px;font-weight:bold;color:${color};margin-top:10px;">第 ${TRIBULATION_PHASES.indexOf(phase) + 1} / ${TRIBULATION_PHASES.length} 阶段：${phase}</div>
+                    <div style="color:#e1bee7;margin-top:15px;font-style:italic;font-size:14px;">"${narrative}"</div>
+                </div>
+            `;
+        }
 
         function openProposalPanel() {
             showModal('💡 迭代提案系统', `
