@@ -2891,9 +2891,38 @@
             }
         }
 
+        // ===== showTianjieEffect (V54 渡劫天雷效果) =====
+        function showTianjieEffect() {
+            const flash = document.createElement('div');
+            flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;opacity:0;z-index:99999;pointer-events:none';
+            document.body.appendChild(flash);
+            let opacity = 0;
+            const interval = setInterval(() => {
+                opacity += 0.1;
+                flash.style.opacity = opacity;
+                if (opacity >= 1) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        let fade = 1;
+                        const fadeInterval = setInterval(() => {
+                            fade -= 0.1;
+                            flash.style.opacity = fade;
+                            if (fade <= 0) {
+                                clearInterval(fadeInterval);
+                                flash.remove();
+                            }
+                        }, 50);
+                    }, 200);
+                }
+            }, 50);
+        }
+
         // ===== handleGreatSuccess =====
         function handleGreatSuccess() {
             const trib = TRIBULATIONS[gameState.tribulation.tribKey];
+
+            // 天雷效果
+            showTianjieEffect();
 
             // 突破成功
             gameState.realm++;
@@ -2904,9 +2933,10 @@
             gameState.mindset = Math.min(100, gameState.mindset + 20); // 心境提升
             gameState.hasTransmigrationBuff = false; // 清除转世buff
 
-            // 天劫洗礼加成
+            // 天劫洗礼加成（V54: 攻击+10%, 防御+10%, 生命+15%）
             gameState.activeEffects.attack += 0.1;
             gameState.activeEffects.defense += 0.1;
+            gameState.activeEffects.maxHp += 0.15;
 
             // 记录
             gameState.tribulationRecord.push({
@@ -2928,7 +2958,7 @@
                             <h3>✨ 大成功 ✨</h3>
                             <p style="color:#ffd700">天劫洗礼，你的修为突飞猛进！</p>
                             <p style="color:#aaa;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%</p>
+                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%，生命+15%</p>
                             <p style="color:#ff69b4;margin-top:5px">心境+20</p>
                             ${narrativeHtml}
                         </div>
@@ -2950,6 +2980,9 @@
         function handleSuccess() {
             const trib = TRIBULATIONS[gameState.tribulation.tribKey];
 
+            // 天雷效果
+            showTianjieEffect();
+
             // 突破成功
             gameState.realm++;
             gameState.stage = 0;
@@ -2959,9 +2992,10 @@
             gameState.mindset = Math.max(0, gameState.mindset - 5);
             gameState.hasTransmigrationBuff = false;
 
-            // 天劫洗礼加成（较小）
-            gameState.activeEffects.attack += 0.05;
-            gameState.activeEffects.defense += 0.05;
+            // 天劫洗礼加成（V54: 攻击+10%, 防御+10%, 生命+15%）
+            gameState.activeEffects.attack += 0.1;
+            gameState.activeEffects.defense += 0.1;
+            gameState.activeEffects.maxHp += 0.15;
 
             // 记录
             gameState.tribulationRecord.push({
@@ -2983,14 +3017,14 @@
                             <h3>🎉 渡劫成功 🎉</h3>
                             <p style="color:#aaa">你历经重重磨难，终于渡过天劫！</p>
                             <p style="color:#ffd700;margin-top:10px">突破到${CONFIG.realms[gameState.realm]}期！</p>
-                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+5%，防御+5%</p>
+                            <p style="color:#4caf50;margin-top:5px">获得天劫洗礼加成：攻击+10%，防御+10%，生命+15%</p>
                             ${narrativeHtml}
                         </div>
                     </div>
                 `;
             });
 
-            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！`);
+            addLog('good', '渡劫成功', `渡过${trib.desc}，突破到${CONFIG.realms[gameState.realm]}期！渡劫成功！属性获得天雷增幅！`);
             saveGame();
             updateDisplay();
 
@@ -10283,6 +10317,14 @@
             saveGame();
             updateDisplay();
             closeSect();
+        }
+
+        // ===== openSectPanel (V54 宗门基础框架) =====
+        function openSectPanel() {
+            const sectName = gameState.sect && gameState.sect.name ? gameState.sect.name : '青云宗';
+            const sectLevel = gameState.sect && gameState.sect.level ? gameState.sect.level : 1;
+            const memberCount = gameState.sect && gameState.sect.disciples ? gameState.sect.disciples.length + 1 : 1;
+            showModal('宗门 - ' + sectName, '<p>宗门等级: ' + sectLevel + '</p><p>成员: ' + memberCount + '</p><p>宗门界面建设中...</p>');
         }
 
         // ===== checkSectCreation =====
