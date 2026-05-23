@@ -2985,6 +2985,79 @@ const ACHIEVEMENT_ID_MAP = {
         const grandRate = grandTotal > 0 ? (grandPassed / grandTotal * 100).toFixed(1) : 0;
         console.log(`[Grand Combined] ${grandPassed}/${grandTotal} passed (${grandRate}%) - Target: 80%+`);
 
+        // ===== V66 Tests: SerendipityDAG + NPC Colla + PlayerMemory Integration =====
+        let v66Passed = 0, v66Failed = 0;
+        const v66Assert = (c, m) => { if (c) v66Passed++; else v66Failed++; };
+
+        // Test PlayerMemorySystem L0-L4
+        v66Assert(playerMemory !== undefined, 'playerMemory exists');
+        playerMemory.storeMemory('working', { content: 'test memory', importance: 0.8 });
+        const recalled = playerMemory.recallMemories('test');
+        v66Assert(Array.isArray(recalled), 'playerMemory.recallMemories returns array');
+        v66Assert(playerMemory.memories.length >= 1, 'playerMemory stores memories');
+        const episodic = playerMemory.getEpisodicSummary();
+        v66Assert(Array.isArray(episodic), 'playerMemory.getEpisodicSummary returns array');
+
+        // Test skill crystallization
+        const crystal = playerMemory.crystallizeSkill({ id: 'skill_test', name: '测试技能', proficiency: 0.9 });
+        v66Assert(crystal !== undefined, 'playerMemory.crystallizeSkill returns crystal');
+        const crystals = playerMemory.getSkillCrystals();
+        v66Assert(crystals.length >= 1, 'playerMemory stores skill crystals');
+
+        // Test SkillMarketplace integration with serendipity
+        v66Assert(skillMarketplace !== undefined, 'skillMarketplace exists');
+        const listings = skillMarketplace.listings;
+        v66Assert(listings.size >= 5, 'skillMarketplace has default listings');
+        const topRated = skillMarketplace.getTopRated(3);
+        v66Assert(topRated.length <= 3, 'skillMarketplace.getTopRated limits results');
+
+        // Test powerSync save/load cycle
+        const snap2 = powerSync.captureSnapshot({ realm: 1, cultivation: {}, spiritStones: 200, level: 10, idleTasks: [], offlineEfficiency: 0.8, activeEffects: [] });
+        powerSync.saveSnapshot(snap2);
+        const loaded = powerSync.loadSnapshot();
+        v66Assert(loaded !== null && loaded.spiritStones === 200, 'powerSync save/load works');
+        v66Assert(loaded.timestamp > 0, 'powerSync load has timestamp');
+
+        // Test NpcMessageBus message retrieval
+        const msgs = npcMessageBus.getMessages('*', Date.now() - 3600000);
+        v66Assert(Array.isArray(msgs), 'npcMessageBus.getMessages returns array');
+        const msgCount = npcMessageBus.getMessageCount();
+        v66Assert(msgCount >= 0, 'npcMessageBus.getMessageCount returns number');
+
+        // Test SerendipityDAG Kahn topological sort
+        const dag = serendipityExecutor.dag;
+        v66Assert(dag.nodes.size >= 7, 'serendipity DAG has >= 7 nodes');
+        v66Assert(Array.isArray(dag.executionOrder), 'DAG has executionOrder array');
+
+        // Test serendipity trigger with realm filter
+        const triggered2 = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
+        v66Assert(triggered2 === null || triggered2.id !== undefined, 'serendipity trigger returns valid result');
+
+        // Test NPC collab reward distribution after serendipity
+        npcCollabRewards.addToPool(500);
+        const masterShare = npcCollabRewards.distribute('master');
+        v66Assert(masterShare === 200, 'NPC collab rewards follow distribution rules (40% to master)');
+
+        // Test SkillRegistry hooks
+        v66Assert(skillHooks !== undefined, 'skillHooks exists');
+        v66Assert(Array.isArray(skillHooks.hooks.onDiscover), 'skillHooks has onDiscover array');
+
+        // V66 pass rate
+        const v66Total = v66Passed + v66Failed;
+        const v66PassRate = v66Total > 0 ? (v66Passed / v66Total * 100).toFixed(1) : 0;
+        console.log(`[V66 Tests] ${v66Passed}/${v66Total} passed (${v66PassRate}%)`);
+
+        // Overall test summary
+        const overallPassed = grandPassed + v66Passed;
+        const overallTotal = grandTotal + v66Total;
+        const overallRate = overallTotal > 0 ? (overallPassed / overallTotal * 100).toFixed(1) : 0;
+        console.log(`[Overall Tests] ${overallPassed}/${overallTotal} passed (${overallRate}%)`);
+        if (parseFloat(overallRate) >= 80) {
+            console.log(`[PASS] Test suite meets 80%+ target!`);
+        } else {
+            console.log(`[WARN] Test suite below 80% target - needs improvement`);
+        }
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
