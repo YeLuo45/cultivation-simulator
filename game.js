@@ -2711,6 +2711,186 @@ const ACHIEVEMENT_ID_MAP = {
 
         const playerMemory = new PlayerMemorySystem();
 
+        // ===== V63 Direction A: NPC Collaboration Engine (Enhanced) =====
+        // Enhanced NPC Reputation + Task Assignment + Collaboration Rewards
+
+        // --- NPC Reputation System ---
+        class NpcReputationSystem {
+            constructor() {
+                this.reputations = new Map();
+            }
+            getReputation(role) {
+                if (!this.reputations.has(role)) {
+                    this.reputations.set(role, { level: 1, exp: 0, totalInteractions: 0, successfulHelps: 0 });
+                }
+                return this.reputations.get(role);
+            }
+            addReputation(role, amount) {
+                const rep = this.getReputation(role);
+                rep.exp += amount;
+                rep.totalInteractions++;
+                while (rep.exp >= 100) { rep.exp -= 100; rep.level++; }
+                return rep;
+            }
+            getReputationLevel(role) { return this.getReputation(role).level; }
+        }
+
+        // --- NpcTaskManager: Assigns and tracks NPC tasks ---
+        class NpcTaskManager {
+            constructor() {
+                this.activeTasks = new Map();
+                this.taskIdCounter = 0;
+            }
+            assignTask(role, type, reward, durationMs) {
+                const taskId = `npc_task_${++this.taskIdCounter}`;
+                this.activeTasks.set(taskId, { role, type, progress: 0, reward, deadline: Date.now() + durationMs, startTime: Date.now() });
+                return taskId;
+            }
+            updateProgress(taskId, progress) {
+                const task = this.activeTasks.get(taskId);
+                if (task) task.progress = Math.min(progress, 100);
+            }
+            completeTask(taskId) {
+                const task = this.activeTasks.get(taskId);
+                if (task) { task.progress = 100; return task; }
+                return null;
+            }
+            getActiveTasks(role) {
+                return Array.from(this.activeTasks.values()).filter(t => t.role === role);
+            }
+        }
+
+        // --- NpcCollaborationRewards: Distributes rewards for collaboration ---
+        class NpcCollaborationRewards {
+            constructor() {
+                this.rewardPool = 0;
+                this.distributionRules = {
+                    'master': { share: 0.4, bonusOn: ['teach', 'evaluate'] },
+                    'fellow': { share: 0.3, bonusOn: ['practice_together', 'share_resource'] },
+                    'merchant': { share: 0.2, bonusOn: ['trade', 'appraise'] },
+                    'monster': { share: 0.1, bonusOn: ['challenge', 'drop_item'] }
+                };
+            }
+            addToPool(amount) { this.rewardPool += amount; }
+            distribute(role) {
+                const rule = this.distributionRules[role];
+                if (!rule) return 0;
+                return Math.floor(this.rewardPool * rule.share);
+            }
+        }
+
+        const npcReputationSystem = new NpcReputationSystem();
+        const npcTaskManager = new NpcTaskManager();
+        const npcCollabRewards = new NpcCollaborationRewards();
+
+        // --- NPC Collaboration UI Panel ---
+        function openNpcCollabPanel() {
+            showModal('🤝 NPC协作面板', `
+                <div class="npc-collab-tabs">
+                    <button class="tab-btn active" onclick="setNpcTab('roles')">👥 角色</button>
+                    <button class="tab-btn" onclick="setNpcTab('tasks')">📋 任务</button>
+                    <button class="tab-btn" onclick="setNpcTab('rewards')">🎁 奖励</button>
+                    <button class="tab-btn" onclick="setNpcTab('messages')">💬 消息</button>
+                </div>
+                <div id="npcCollabContent" style="padding:15px;">${renderNpcRolesTab()}</div>
+            `, 600);
+        }
+
+        function setNpcTab(tab) {
+            document.querySelectorAll('.npc-collab-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('npcCollabContent');
+            if (!content) return;
+            switch(tab) {
+                case 'roles': content.innerHTML = renderNpcRolesTab(); break;
+                case 'tasks': content.innerHTML = renderNpcTasksTab(); break;
+                case 'rewards': content.innerHTML = renderNpcRewardsTab(); break;
+                case 'messages': content.innerHTML = renderNpcMessagesTab(); break;
+            }
+        }
+
+        function renderNpcRolesTab() {
+            let html = '<h4>角色声望</h4><table style="width:100%;">';
+            html += '<tr><th>角色</th><th>等级</th><th>经验</th><th>互动次数</th></tr>';
+            for (const [role, data] of npcReputationSystem.reputations) {
+                html += `<tr><td>${role}</td><td>Lv${data.level}</td><td>${data.exp}/100</td><td>${data.totalInteractions}</td></tr>`;
+            }
+            html += '</table>';
+            html += '<h4 style="margin-top:20px;">协作引擎状态</h4>';
+            html += `<p>消息数: ${(gameState.npcCollab && gameState.npcCollab.pendingMessages) || 0}</p>`;
+            html += `<p>活跃链: ${(gameState.npcCollab && gameState.npcCollab.activeChains && gameState.npcCollab.activeChains.length) || 0}</p>`;
+            return html;
+        }
+
+        function renderNpcTasksTab() {
+            const tasks = Array.from(npcTaskManager.activeTasks.values());
+            if (tasks.length === 0) return '<p>暂无活跃任务</p>';
+            let html = '<table style="width:100%;"><tr><th>角色</th><th>类型</th><th>进度</th><th>奖励</th></tr>';
+            for (const t of tasks) { html += `<tr><td>${t.role}</td><td>${t.type}</td><td>${t.progress}%</td><td>${t.reward}</td></tr>`; }
+            html += '</table>'; return html;
+        }
+
+        function renderNpcRewardsTab() {
+            return `<p>奖励池: ${npcCollabRewards.rewardPool} 灵石</p><p>规则: master 40% / fellow 30% / merchant 20% / monster 10%</p>`;
+        }
+
+        function renderNpcMessagesTab() {
+            const since = Date.now() - 3600000;
+            const msgs = npcMessageBus.getMessages('*', since);
+            if (msgs.length === 0) return '<p>暂无消息</p>';
+            let html = '<table style="width:100%;"><tr><th>时间</th><th>发送方</th><th>接收方</th><th>类型</th></tr>';
+            for (const m of msgs.slice(-10)) { html += `<tr><td>${new Date(m.timestamp).toLocaleTimeString()}</td><td>${m.from}</td><td>${m.to}</td><td>${m.type}</td></tr>`; }
+            html += '</table>'; return html;
+        }
+
+        function triggerNpcCollaboration(type, payload) {
+            const roles = ['master', 'fellow', 'merchant', 'monster'];
+            for (const role of roles) { npcReputationSystem.addReputation(role, 1); }
+            npcMessageBus.broadcast('system', type, payload);
+        }
+
+// ===== V63 Test Cases =====
+        let npcTestsPassed = 0, npcTestsFailed = 0;
+        const npcAssert = (c, m) => { if (c) npcTestsPassed++; else npcTestsFailed++; };
+        npcAssert(NPC_ROLE_REGISTRY.master && NPC_ROLE_REGISTRY.master.role === 'master', 'NPC_ROLE_REGISTRY.master');
+        npcAssert(NPC_ROLE_REGISTRY.monster && NPC_ROLE_REGISTRY.monster.skills.includes('challenge'), 'NPC_ROLE_REGISTRY.monster');
+        npcAssert(NPC_ROLE_REGISTRY.merchant && NPC_ROLE_REGISTRY.merchant.skills.includes('trade'), 'NPC_ROLE_REGISTRY.merchant');
+        npcAssert(NPC_ROLE_REGISTRY.fellow && NPC_ROLE_REGISTRY.fellow.skills.includes('practice_together'), 'NPC_ROLE_REGISTRY.fellow');
+        const bus = new NpcMessageBus(); let received = null;
+        bus.subscribe('master', m => { received = m; });
+        bus.send('fellow', 'master', 'task', { content: 'test' });
+        bus.dispatch();
+        npcAssert(received !== null && received.payload.content === 'test', 'NpcMessageBus send/dispatch');
+        let bc = 0;
+        bus.subscribe('fellow', () => bc++);
+        bus.subscribe('monster', () => bc++);
+        bus.broadcast('master', 'announce', { text: 'hi' });
+        bus.dispatch();
+        npcAssert(bc >= 2, 'NpcMessageBus broadcast');
+        const graph = new NpcCollabGraph();
+        graph.addNode('n1', { type: 'publish_task', owner: 'master', prerequisites: [] });
+        graph.addNode('n2', { type: 'execute', owner: 'fellow', prerequisites: ['n1'] });
+        npcAssert(graph.getReadyNodes().includes('n1'), 'NpcCollabGraph getReadyNodes');
+        const taskId = graph.startTask('n1', 'fellow');
+        npcAssert(taskId !== null, 'NpcCollabGraph startTask');
+        graph.updateProgress(taskId, 100);
+        npcAssert(graph.nodes.get('n1')?.status === 'completed', 'NpcCollabGraph progress');
+        npcAssert(PLAN_REVIEW_GATE.shouldBlock('major_cultivation_advice') === true, 'PLAN_REVIEW_GATE block');
+        npcAssert(PLAN_REVIEW_GATE.shouldBlock('sect_mission') === false, 'PLAN_REVIEW_GATE auto-approve');
+        npcAssert(npcReputationSystem.getReputation('master') !== undefined, 'NpcReputationSystem');
+        npcReputationSystem.addReputation('fellow', 50);
+        npcAssert(npcReputationSystem.getReputationLevel('fellow') >= 1, 'NpcReputationSystem addReputation');
+        const tId = npcTaskManager.assignTask('master', 'teach', 100, 5000);
+        npcAssert(tId !== null, 'NpcTaskManager assignTask');
+        npcTaskManager.updateProgress(tId, 50);
+        npcAssert(npcTaskManager.activeTasks.get(tId)?.progress === 50, 'NpcTaskManager updateProgress');
+        npcCollabRewards.addToPool(1000);
+        npcAssert(npcCollabRewards.distribute('master') === 400, 'NpcCollaborationRewards distribute');
+        npcAssert(gameState.npcCollab && Array.isArray(gameState.npcCollab.activeChains), 'gameState.npcCollab init');
+        const npcTotal = npcTestsPassed + npcTestsFailed;
+        const npcPassRate = npcTotal > 0 ? (npcTestsPassed / npcTotal * 100).toFixed(1) : 0;
+        console.log(`[V63 NPC Tests] ${npcTestsPassed}/${npcTotal} passed (${npcPassRate}%)`);
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
