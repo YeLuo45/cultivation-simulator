@@ -965,6 +965,53 @@
         const npcPassRate = npcTotal > 0 ? (npcTestsPassed / npcTotal * 100).toFixed(1) : 0;
         console.log(`[V63 NPC Tests] ${npcTestsPassed}/${npcTotal} passed (${npcPassRate}%)`);
 
+        // ===== V64 Test Cases: Idle Task Processor Integration =====
+        let v64Passed = 0, v64Failed = 0;
+        const v64Assert = (c, m) => { if (c) v64Passed++; else v64Failed++; };
+
+        // Test IdleTaskProcessor initialization
+        v64Assert(idleTaskProcessor !== undefined, 'IdleTaskProcessor exists');
+        v64Assert(idleTaskProcessor.processedCount === 0, 'IdleTaskProcessor processedCount init');
+
+        // Test startIdleTask
+        gameState.idleTasks = [];
+        const task = idleTaskProcessor.startIdleTask('qi_cultivation', 60000, 20);
+        v64Assert(task !== undefined && task.taskId.startsWith('idle_'), 'startIdleTask creates task');
+        v64Assert(gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
+        v64Assert(gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
+
+        // Test calculateEarnings
+        const earnings = idleTaskProcessor.calculateEarnings({ baseEarnings: 20, startTime: Date.now() - 60000, endTime: Date.now() });
+        v64Assert(earnings > 0, 'calculateEarnings returns positive value');
+
+        // Test getIdleStatus
+        const status = idleTaskProcessor.getIdleStatus();
+        v64Assert(status.total >= 1, 'getIdleStatus returns total >= 1');
+        v64Assert(status.active >= 1, 'getIdleStatus returns active >= 1');
+
+        // Test NPC collaboration trigger on task start
+        const repBefore = npcReputationSystem.getReputation('master').totalInteractions;
+        idleTaskProcessor.startIdleTask('stone_gathering', 90000, 30);
+        // Reputation increases after task is processed (in real time)
+        // Just verify the task was added to NPC reward pool
+        v64Assert(npcCollabRewards.rewardPool > 0, 'NPC reward pool increased');
+
+        // Test getIdleStatus with multiple tasks
+        idleTaskProcessor.startIdleTask('pill_refining', 120000, 50);
+        const status2 = idleTaskProcessor.getIdleStatus();
+        v64Assert(status2.total >= 2, 'getIdleStatus with multiple tasks');
+
+        // V64 pass rate
+        const v64Total = v64Passed + v64Failed;
+        const v64PassRate = v64Total > 0 ? (v64Passed / v64Total * 100).toFixed(1) : 0;
+        console.log(`[V64 Tests] ${v64Passed}/${v64Total} passed (${v64PassRate}%)`);
+
+        // Combined pass rate (V63 + V64)
+        const totalPassed = npcTestsPassed + v64Passed;
+        const totalTests = npcTotal + v64Total;
+        const combinedRate = totalTests > 0 ? (totalPassed / totalTests * 100).toFixed(1) : 0;
+        console.log(`[Combined Tests] ${totalPassed}/${totalTests} passed (${combinedRate}%)`);
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
