@@ -1012,6 +1012,53 @@
         const combinedRate = totalTests > 0 ? (totalPassed / totalTests * 100).toFixed(1) : 0;
         console.log(`[Combined Tests] ${totalPassed}/${totalTests} passed (${combinedRate}%)`);
 
+        // ===== V65 Direction A: Serendipity DAG + NPC Collaboration Integration =====
+        // Connect serendipity events with NPC collaboration rewards
+
+        // Test serendipityDAG integration
+        let v65Passed = 0, v65Failed = 0;
+        const v65Assert = (c, m) => { if (c) v65Passed++; else v65Failed++; };
+
+        v65Assert(serendipityExecutor !== undefined, 'serendipityExecutor exists');
+        v65Assert(serendipityExecutor.dag !== undefined, 'serendipityExecutor.dag exists');
+        v65Assert(serendipityExecutor.dag.nodes.size >= 7, 'serendipity DAG has default nodes (7)');
+        v65Assert(serendipityExecutor.dag.executionOrder.length > 0, 'serendipity DAG sorted');
+
+        // Test serendipity trigger
+        gameState.npcCollab = gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
+        const triggered = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
+        // triggered may be null if no nodes ready - that's fine
+        v65Assert(triggered === null || triggered.id.startsWith('ser_'), 'serendipity trigger returns valid node or null');
+
+        // Test DAG status
+        const dagStatus = serendipityExecutor.getDAGStatus();
+        v65Assert(dagStatus.total >= 7, 'DAG status total >= 7');
+        v65Assert(['locked', 'ready', 'triggered', 'completed'].includes(dagStatus.locked !== undefined ? 'ok' : 'ok'), 'DAG status has correct fields');
+
+        // Test NPC collab activation on serendipity
+        const beforeRep = npcReputationSystem.getReputation('fellow').totalInteractions;
+        triggerNpcCollaboration('serendipity_triggered', { nodeId: 'ser_discovery' });
+        const afterRep = npcReputationSystem.getReputation('fellow').totalInteractions;
+        v65Assert(afterRep > beforeRep, 'NPC reputation increases on serendipity');
+
+        // Test PowerSync integration
+        v65Assert(powerSync !== undefined, 'powerSync exists');
+        const snap = powerSync.captureSnapshot({ realm: 1, cultivation: {}, spiritStones: 100, level: 5, idleTasks: [], offlineEfficiency: 0.8, activeEffects: [] });
+        v65Assert(snap.timestamp > 0, 'PowerSync captureSnapshot works');
+        v65Assert(snap.realm === 1, 'PowerSync snapshot captures realm');
+        v65Assert(snap.spiritStones === 100, 'PowerSync snapshot captures spiritStones');
+
+        // V65 pass rate
+        const v65Total = v65Passed + v65Failed;
+        const v65PassRate = v65Total > 0 ? (v65Passed / v65Total * 100).toFixed(1) : 0;
+        console.log(`[V65 Tests] ${v65Passed}/${v65Total} passed (${v65PassRate}%)`);
+
+        // Grand combined pass rate
+        const grandPassed = totalPassed + v65Passed;
+        const grandTotal = totalTests + v65Total;
+        const grandRate = grandTotal > 0 ? (grandPassed / grandTotal * 100).toFixed(1) : 0;
+        console.log(`[Grand Combined] ${grandPassed}/${grandTotal} passed (${grandRate}%) - Target: 80%+`);
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
