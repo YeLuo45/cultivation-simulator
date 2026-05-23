@@ -647,6 +647,144 @@
 
         const powerSync = new PowerSync();
 
+        // ===== Direction D: Player Memory System =====
+        // Generic-agent L0-L4 five-layer memory architecture + Skill crystallization
+
+        // --- MemoryLayer: Base class for memory tiers ---
+        class MemoryLayer {
+            constructor(level, name, capacity, ttlMs) {
+                this.level = level;
+                this.name = name;
+                this.capacity = capacity;
+                this.ttlMs = ttlMs;
+                this.items = [];
+            }
+            add(item) {
+                this.items.push({ data: item, timestamp: Date.now() });
+                if (this.items.length > this.capacity) {
+                    this.items.shift();
+                }
+            }
+            getRecent() {
+                const now = Date.now();
+                return this.items.filter(i => now - i.timestamp < this.ttlMs).map(i => i.data);
+            }
+            prune() {
+                const now = Date.now();
+                this.items = this.items.filter(i => now - i.timestamp < this.ttlMs);
+            }
+        }
+
+        // --- PlayerMemorySystem: L0-L4 five-layer memory ---
+        class PlayerMemorySystem {
+            constructor() {
+                // L0: Sensory - immediate perception, 30s TTL, 20 items
+                this.L0_sensory = new MemoryLayer(0, 'sensory', 20, 30000);
+                // L1: Working - current task context, 5min TTL, 50 items
+                this.L1_working = new MemoryLayer(1, 'working', 50, 300000);
+                // L2: Short-term - recent experiences, 1h TTL, 100 items
+                this.L2_shortTerm = new MemoryLayer(2, 'shortTerm', 100, 3600000);
+                // L3: Long-term - important events, 7d TTL, 500 items
+                this.L3_longTerm = new MemoryLayer(3, 'longTerm', 500, 604800000);
+                // L4: Program - procedural memory (skills, habits), no TTL, 200 items
+                this.L4_program = new MemoryLayer(4, 'program', 200, Infinity);
+                this.episodicBuffer = []; // L2 episodic memory
+                this.skillCrystalRegistry = new Map(); // crystallized skills
+            }
+
+            //感知记忆
+            perceive(event) {
+                this.L0_sensory.add(event);
+            }
+
+            //工作记忆
+            workInContext(task) {
+                this.L1_working.add({ type: 'task_context', task });
+            }
+
+            //情景记忆
+            encodeEpisodic(situation) {
+                const episodic = {
+                    situation,
+                    timestamp: Date.now(),
+                    emotionalValence: situation.valence || 0,
+                    importance: situation.importance || 1
+                };
+                this.episodicBuffer.push(episodic);
+                this.L2_shortTerm.add(episodic);
+                if (episodic.importance > 0.7 || Math.abs(episodic.emotionalValence) > 0.5) {
+                    this.L3_longTerm.add(episodic);
+                }
+            }
+
+            //技能结晶化
+            crystallizeSkill(skillId, skillData) {
+                const crystal = {
+                    skillId,
+                    mastery: skillData.mastery || 0,
+                    understanding: skillData.understanding || 0,
+                    crystallizationTime: Date.now(),
+                    successfulUses: skillData.successfulUses || 0,
+                    failedAttempts: skillData.failedAttempts || 0,
+                    patterns: skillData.patterns || []
+                };
+                this.skillCrystalRegistry.set(skillId, crystal);
+                this.L4_program.add({ type: 'skill_crystal', skillId, ...crystal });
+                return crystal;
+            }
+
+            //检索记忆
+            retrieve(layer, query) {
+                switch (layer) {
+                    case 0: return this.L0_sensory.getRecent().filter(e => e.includes(query));
+                    case 1: return this.L1_working.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 2: return this.L2_shortTerm.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 3: return this.L3_longTerm.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 4: return this.L4_program.items.map(i => i.data).filter(e => e.skillId && e.skillId.includes(query));
+                    default: return [];
+                }
+            }
+
+            //遗忘
+            forget(layer, itemId) {
+                if (layer === 4) return; // L4 program memory doesn't forget
+                const layerObj = this[`L${layer}_${['sensory','working','shortTerm','longTerm','program'][layer]}`];
+                if (layerObj) {
+                    layerObj.items = layerObj.items.filter(i => i.data.id !== itemId);
+                }
+            }
+
+            //整合记忆
+            consolidate() {
+                // Move important L2 memories to L3
+                for (const episodic of this.episodicBuffer) {
+                    if (episodic.importance > 0.7) {
+                        this.L3_longTerm.add(episodic);
+                    }
+                }
+                this.episodicBuffer = this.episodicBuffer.slice(-50); // keep last 50
+                // Prune expired memories
+                for (let l = 0; l < 4; l++) {
+                    const layer = this[`L${l}_${['sensory','working','shortTerm','longTerm'][l]}`];
+                    if (layer) layer.prune();
+                }
+            }
+
+            //记忆统计
+            getMemoryStats() {
+                return {
+                    L0: this.L0_sensory.items.length,
+                    L1: this.L1_working.items.length,
+                    L2: this.L2_shortTerm.items.length,
+                    L3: this.L3_longTerm.items.length,
+                    L4: this.L4_program.items.length,
+                    crystals: this.skillCrystalRegistry.size
+                };
+            }
+        }
+
+        const playerMemory = new PlayerMemorySystem();
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
