@@ -17,6 +17,213 @@
             cloudSaveToken: ''
         };
 
+        // --- IDLE_TASKS (V57 仙界挂机系统) ---
+        const IDLE_TASKS = {
+            'qi_cultivation': { name: '灵气修炼', baseReward: 10, unit: '灵气/小时', duration: 24, realmScale: true },
+            'stone_gathering': { name: '灵石采集', baseReward: 50, unit: '灵石/小时', duration: 24, realmScale: true },
+            'pill_refining': { name: '丹药炼制', baseReward: 1, unit: '丹药/小时', duration: 12, requires: 'alchemy' },
+            'technique_study': { name: '功法领悟', baseReward: 5, unit: '熟练度/小时', duration: 48, realmScale: true },
+            'secret_explore': { name: '秘境探索', baseReward: 100, unit: '探索积分/小时', duration: 6, tokenCost: 1, realmScale: true }
+        };
+
+        // --- IDLE_CONFIG (V57) ---
+        const IDLE_CONFIG = {
+            maxConcurrentTasks: 3,
+            maxOfflineHours: 24,
+            offlineEfficiency: 0.8,
+            earningsThreshold: 1000,
+            autoSuspendDays: 7
+        };
+
+        // ===== Direction A: NPC Collaboration Engine =====
+        // Nanobot MessageBus + ChatDev multi-role chain collaboration
+
+        // --- NPC_ROLE_REGISTRY: Role registration (master=training, monster=challenge, merchant=trade, fellow=practice) ---
+        const NPC_ROLE_REGISTRY = {
+            'master': {
+                role: 'master',
+                title: '师尊',
+                skills: ['teach', 'assign_task', 'evaluate', 'reward'],
+                collaborationWeight: 0.3,
+                responseSpeed: 'slow'
+            },
+            'monster': {
+                role: 'monster',
+                title: '妖兽',
+                skills: ['challenge', 'guard', 'drop_item'],
+                collaborationWeight: 0.2,
+                responseSpeed: 'fast'
+            },
+            'merchant': {
+                role: 'merchant',
+                title: '商人',
+                skills: ['trade', 'appraise', 'special_goods'],
+                collaborationWeight: 0.25,
+                responseSpeed: 'medium'
+            },
+            'fellow': {
+                role: 'fellow',
+                title: '同道',
+                skills: ['practice_together', 'share_resource', 'mutual_help'],
+                collaborationWeight: 0.25,
+                responseSpeed: 'medium'
+            }
+        };
+
+        // --- NPC_MESSAGE_BUS: Async message routing ---
+        class NpcMessageBus {
+            constructor() {
+                this.messages = [];      // pending messages
+                this.listeners = new Map(); // role -> [callback]
+                this.messageId = 0;
+            }
+            send(fromRole, toRole, type, payload) {
+                const msg = {
+                    id: ++this.messageId,
+                    from: fromRole,
+                    to: toRole,
+                    type, // 'task' | 'response' | 'broadcast'
+                    payload,
+                    timestamp: Date.now(),
+                    status: 'pending'
+                };
+                this.messages.push(msg);
+                return msg;
+            }
+            broadcast(fromRole, type, payload) {
+                const msg = {
+                    id: ++this.messageId,
+                    from: fromRole,
+                    to: '*', // wildcard = all roles
+                    type, // 'announcement' | 'emergency' | 'opportunity'
+                    payload,
+                    timestamp: Date.now(),
+                    status: 'pending'
+                };
+                this.messages.push(msg);
+                return msg;
+            }
+            subscribe(role, callback) {
+                if (!this.listeners.has(role)) this.listeners.set(role, []);
+                this.listeners.get(role).push(callback);
+            }
+            dispatch() {
+                const delivered = [];
+                for (const msg of this.messages) {
+                    if (msg.status !== 'pending') continue;
+                    const listeners = this.listeners.get(msg.to) || [];
+                    for (const cb of listeners) {
+                        cb(msg);
+                        msg.status = 'delivered';
+                    }
+                    if (msg.to === '*') {
+                        for (const [role, cbs] of this.listeners) {
+                            if (role !== msg.from) {
+                                for (const cb of cbs) { cb(msg); }
+                            }
+                        }
+                        msg.status = 'broadcast';
+                    }
+                }
+                this.messages = this.messages.filter(m => m.status === 'pending');
+                return delivered;
+            }
+            getMessages(role, since = 0) {
+                return this.messages.filter(m =>
+                    (m.from === role || m.to === role || m.to === '*') && m.timestamp > since
+                );
+            }
+        }
+
+        // --- NPC_COLLABORATION_GRAPH: Chain tasks (master publish -> fellow execute -> master review) ---
+        class NpcCollabGraph {
+            constructor() {
+                this.nodes = new Map(); // nodeId -> {type, owner, status, prerequisites, outcomes}
+                this.edges = []; // [{from, to, type}]
+                this.activeTasks = new Map(); // taskId -> {nodeId, startTime, progress, assignedTo}
+            }
+            addNode(nodeId, config) {
+                this.nodes.set(nodeId, {
+                    id: nodeId,
+                    type: config.type, // 'publish_task' | 'execute' | 'review' | 'reward'
+                    owner: config.owner,
+                    status: 'idle',
+                    prerequisites: config.prerequisites || [],
+                    outcomes: config.outcomes || {},
+                    maxProgress: config.maxProgress || 100
+                });
+            }
+            addEdge(from, to, type = 'sequence') {
+                this.edges.push({ from, to, type });
+            }
+            getReadyNodes() {
+                const ready = [];
+                for (const [nodeId, node] of this.nodes) {
+                    if (node.status !== 'idle') continue;
+                    const prereqs = node.prerequisites || [];
+                    const allMet = prereqs.every(p => {
+                        const n = this.nodes.get(p);
+                        return n && n.status === 'completed';
+                    });
+                    if (allMet) ready.push(nodeId);
+                }
+                return ready;
+            }
+            startTask(nodeId, assignedTo) {
+                const node = this.nodes.get(nodeId);
+                if (!node) return null;
+                const taskId = `task_${nodeId}_${Date.now()}`;
+                node.status = 'in_progress';
+                this.activeTasks.set(taskId, {
+                    nodeId,
+                    assignedTo,
+                    startTime: Date.now(),
+                    progress: 0
+                });
+                return taskId;
+            }
+            updateProgress(taskId, progress) {
+                const task = this.activeTasks.get(taskId);
+                if (!task) return;
+                task.progress = Math.min(progress, 100);
+                if (task.progress >= 100) {
+                    const node = this.nodes.get(task.nodeId);
+                    if (node) node.status = 'completed';
+                    task.status = 'completed';
+                }
+            }
+            getChainStatus(chainId) {
+                const nodes = Array.from(this.nodes.values()).filter(n => n.type === chainId);
+                return {
+                    total: nodes.length,
+                    completed: nodes.filter(n => n.status === 'completed').length,
+                    inProgress: nodes.filter(n => n.status === 'in_progress').length,
+                    idle: nodes.filter(n => n.status === 'idle').length
+                };
+            }
+        }
+
+        // --- PLAN_REVIEW_GATE: Key decisions require player confirmation ---
+        const PLAN_REVIEW_GATE = {
+            gates: {
+                'major_cultivation_advice': { threshold: 0.7, auto_approve: false },
+                'rare_item_trade': { threshold: 0.5, auto_approve: false },
+                'sect_mission': { threshold: 0.6, auto_approve: true },
+                'fellow_help_request': { threshold: 0.4, auto_approve: true }
+            },
+            shouldBlock(action) {
+                const gate = this.gates[action];
+                if (!gate) return false;
+                return !gate.auto_approve;
+            }
+        };
+
+        const npcMessageBus = new NpcMessageBus();
+        const npcCollabGraph = new NpcCollabGraph();
+
+        // --- NPC Collaboration state in gameState ---
+        // Initialize after IDLE_CONFIG in gameState initialization
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
@@ -1477,6 +1684,18 @@
                 lastMarketRefresh: 0,         // 上次市场刷新
                 totalEarned: 0,               // 累计收益
                 celestialReputation: 0        // 仙界声望
+            },
+            // V57 仙界挂机系统字段
+            idleTasks: [],                    // [{taskId, startTime, endTime, status}]
+            idleEarnings: 0,                  // 累计挂机收益
+            lastActiveTime: 0,                 // 上次活跃时间戳
+            offlineEarnings: 0,                // 本次离线收益
+            // Direction A: NPC协作引擎状态
+            npcCollab: {
+                activeChains: [],              // [{chainId, taskId, progress}]
+                pendingMessages: 0,            // 未处理消息数
+                roleReputation: {},            // {role: reputation}
+                lastCollaboration: 0           // 上次协作时间戳
             },
             // V3渡劫系统字段
             tribulation: {
