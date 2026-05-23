@@ -2150,6 +2150,303 @@ const ACHIEVEMENT_ID_MAP = {
         // --- NPC Collaboration state in gameState ---
         // Initialize after IDLE_CONFIG in gameState initialization
 
+        // ===== Direction B: Serendipity DAG Executor =====
+        // ChatDev DAG + Tarjan SCC detection + SuperNode abstraction
+
+        // --- SerendipityNode: Single event node in DAG ---
+        class SerendipityNode {
+            constructor(id, config) {
+                this.id = id;
+                this.type = config.type || 'event'; // 'event' | 'choice' | 'reward' | 'gate'
+                this.name = config.name || id;
+                this.description = config.description || '';
+                this.weight = config.weight || 1.0;
+                this.prerequisites = config.prerequisites || []; // prerequisite node IDs
+                this.effects = config.effects || {}; // {spiritStones: +100, reputation: +5}
+                this.probability = config.probability || 1.0; // base trigger probability
+                this.icon = config.icon || '✨';
+                this.realmRequirement = config.realmRequirement || 0;
+                this.status = 'locked'; // 'locked' | 'ready' | 'triggered' | 'completed'
+                this.triggerCount = 0;
+                this.maxTriggers = config.maxTriggers || Infinity;
+            }
+            canTrigger(playerState) {
+                if (this.status !== 'ready') return false;
+                if (this.triggerCount >= this.maxTriggers) return false;
+                if (playerState.realm < this.realmRequirement) return false;
+                return Math.random() < this.probability;
+            }
+        }
+
+        // --- SuperNode: Composite node grouping multiple related events ---
+        class SuperNode {
+            constructor(id, nodes) {
+                this.id = id;
+                this.nodes = nodes; // Array of SerendipityNode
+                this.status = 'idle'; // 'idle' | 'active' | 'completed'
+                this.currentNodeIndex = 0;
+            }
+            get currentNode() {
+                return this.nodes[this.currentNodeIndex] || null;
+            }
+            advance() {
+                this.currentNodeIndex++;
+                if (this.currentNodeIndex >= this.nodes.length) {
+                    this.status = 'completed';
+                }
+            }
+            get totalWeight() {
+                return this.nodes.reduce((sum, n) => sum + n.weight, 0);
+            }
+        }
+
+        // --- SerendipityDAG: Directed Acyclic Graph with Tarjan SCC detection ---
+        class SerendipityDAG {
+            constructor() {
+                this.nodes = new Map(); // nodeId -> SerendipityNode
+                this.superNodes = new Map(); // superId -> SuperNode
+                this.edges = []; // [{from, to}] directed edges
+                this.executionOrder = []; // topologically sorted
+                this.sccs = []; // strong connected components (Tarjan)
+            }
+
+            addNode(nodeId, config) {
+                const node = new SerendipityNode(nodeId, config);
+                this.nodes.set(nodeId, node);
+                return node;
+            }
+
+            addEdge(fromId, toId) {
+                this.edges.push({ from: fromId, to: toId });
+                const fromNode = this.nodes.get(fromId);
+                const toNode = this.nodes.get(toId);
+                if (fromNode && !fromNode.prerequisites.includes(toId)) {
+                    // to depends on from
+                }
+            }
+
+            // Topological sort using Kahn's algorithm
+            topologicalSort() {
+                const inDegree = new Map();
+                const adjacency = new Map();
+
+                // Initialize
+                for (const [nodeId] of this.nodes) {
+                    inDegree.set(nodeId, 0);
+                    adjacency.set(nodeId, []);
+                }
+                for (const [nodeId] of this.superNodes) {
+                    inDegree.set(nodeId, 0);
+                    adjacency.set(nodeId, []);
+                }
+
+                // Build graph
+                for (const { from, to } of this.edges) {
+                    adjacency.get(from)?.push(to);
+                    inDegree.set(to, (inDegree.get(to) || 0) + 1);
+                }
+
+                // Kahn's algorithm
+                const queue = [];
+                for (const [nodeId, degree] of inDegree) {
+                    if (degree === 0) queue.push(nodeId);
+                }
+
+                const sorted = [];
+                while (queue.length > 0) {
+                    const nodeId = queue.shift();
+                    sorted.push(nodeId);
+                    for (const neighbor of adjacency.get(nodeId) || []) {
+                        inDegree.set(neighbor, inDegree.get(neighbor) - 1);
+                        if (inDegree.get(neighbor) === 0) {
+                            queue.push(neighbor);
+                        }
+                    }
+                }
+
+                this.executionOrder = sorted;
+                return sorted;
+            }
+
+            // Tarjan's SCC algorithm
+            tarjanSCC() {
+                let index = 0;
+                const stack = [];
+                const onStack = new Map();
+                const indices = new Map();
+                const lowlinks = new Map();
+                const sccs = [];
+
+                const strongConnect = (nodeId) => {
+                    indices.set(nodeId, index);
+                    lowlinks.set(nodeId, index);
+                    index++;
+                    stack.push(nodeId);
+                    onStack.set(nodeId, true);
+
+                    for (const { to } of this.edges) {
+                        if (!indices.has(to)) {
+                            strongConnect(to);
+                            lowlinks.set(nodeId, Math.min(lowlinks.get(nodeId), lowlinks.get(to)));
+                        } else if (onStack.get(to)) {
+                            lowlinks.set(nodeId, Math.min(lowlinks.get(nodeId), indices.get(to)));
+                        }
+                    }
+
+                    if (lowlinks.get(nodeId) === indices.get(nodeId)) {
+                        const scc = [];
+                        let w;
+                        do {
+                            w = stack.pop();
+                            onStack.set(w, false);
+                            scc.push(w);
+                        } while (w !== nodeId);
+                        sccs.push(scc);
+                    }
+                };
+
+                for (const [nodeId] of this.nodes) {
+                    if (!indices.has(nodeId)) {
+                        strongConnect(nodeId);
+                    }
+                }
+
+                this.sccs = sccs;
+                return sccs;
+            }
+
+            getReadyNodes() {
+                const ready = [];
+                for (const [nodeId, node] of this.nodes) {
+                    if (node.status !== 'locked') continue;
+                    const prereqs = node.prerequisites || [];
+                    const allMet = prereqs.every(p => {
+                        const n = this.nodes.get(p);
+                        return n && n.status === 'completed';
+                    });
+                    if (allMet) {
+                        node.status = 'ready';
+                        ready.push(nodeId);
+                    }
+                }
+                return ready;
+            }
+
+            triggerNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (!node || node.status !== 'ready') return null;
+                node.status = 'triggered';
+                node.triggerCount++;
+                return node;
+            }
+
+            completeNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (node) node.status = 'completed';
+            }
+        }
+
+        // --- SerendipityExecutor: Executes serendipity events ---
+        class SerendipityExecutor {
+            constructor() {
+                this.dag = new SerendipityDAG();
+                this.activeSuperNodes = [];
+                this.pendingEvents = [];
+            }
+
+            initDefaultSerendipities() {
+                // Master chain: discover -> trial -> evaluate -> reward
+                this.dag.addNode('ser_discovery', {
+                    type: 'event', name: '奇遇发现', icon: '🔮', weight: 1.0,
+                    prerequisites: [], probability: 0.3,
+                    effects: { reputation: 5 }, realmRequirement: 1
+                });
+                this.dag.addNode('ser_trial', {
+                    type: 'choice', name: '试炼抉择', icon: '⚔️', weight: 0.8,
+                    prerequisites: ['ser_discovery'], probability: 0.6,
+                    effects: { spiritStones: 50 }, realmRequirement: 2
+                });
+                this.dag.addNode('ser_evaluation', {
+                    type: 'gate', name: '师尊评核', icon: '📜', weight: 0.5,
+                    prerequisites: ['ser_trial'], probability: 0.5,
+                    effects: { cultivationBase: 10 }, realmRequirement: 3
+                });
+                this.dag.addNode('ser_master_reward', {
+                    type: 'reward', name: '师尊赏赐', icon: '🎁', weight: 0.3,
+                    prerequisites: ['ser_evaluation'], probability: 0.4,
+                    effects: { spiritStones: 200, techniquePoints: 20 }, realmRequirement: 4
+                });
+
+                // Monster chain: encounter -> battle -> drop
+                this.dag.addNode('ser_monster_encounter', {
+                    type: 'event', name: '妖兽遭遇', icon: '👹', weight: 0.9,
+                    prerequisites: [], probability: 0.4,
+                    effects: {}, realmRequirement: 1
+                });
+                this.dag.addNode('ser_monster_battle', {
+                    type: 'event', name: '妖兽战斗', icon: '⚔️', weight: 0.7,
+                    prerequisites: ['ser_monster_encounter'], probability: 0.7,
+                    effects: { honor: 10 }, realmRequirement: 2
+                });
+                this.dag.addNode('ser_monster_drop', {
+                    type: 'reward', name: '妖兽掉落', icon: '💎', weight: 0.4,
+                    prerequisites: ['ser_monster_battle'], probability: 0.5,
+                    effects: { spiritStones: 100, materials: 1 }, realmRequirement: 3
+                });
+
+                // Edges
+                this.dag.addEdge('ser_discovery', 'ser_trial');
+                this.dag.addEdge('ser_trial', 'ser_evaluation');
+                this.dag.addEdge('ser_evaluation', 'ser_master_reward');
+                this.dag.addEdge('ser_monster_encounter', 'ser_monster_battle');
+                this.dag.addEdge('ser_monster_battle', 'ser_monster_drop');
+
+                // Sort
+                this.dag.topologicalSort();
+            }
+
+            triggerRandomSerendipity(playerState) {
+                const ready = this.dag.getReadyNodes();
+                if (ready.length === 0) return null;
+
+                // Weight-based selection
+                let totalWeight = 0;
+                const candidates = [];
+                for (const nodeId of ready) {
+                    const node = this.dag.nodes.get(nodeId);
+                    if (node.canTrigger(playerState)) {
+                        totalWeight += node.weight;
+                        candidates.push({ nodeId, weight: node.weight });
+                    }
+                }
+                if (candidates.length === 0) return null;
+
+                // Random weighted selection
+                let random = Math.random() * totalWeight;
+                for (const { nodeId, weight } of candidates) {
+                    random -= weight;
+                    if (random <= 0) {
+                        return this.dag.triggerNode(nodeId);
+                    }
+                }
+                return this.dag.triggerNode(candidates[0].nodeId);
+            }
+
+            getDAGStatus() {
+                const nodes = Array.from(this.dag.nodes.values());
+                return {
+                    total: nodes.length,
+                    locked: nodes.filter(n => n.status === 'locked').length,
+                    ready: nodes.filter(n => n.status === 'ready').length,
+                    triggered: nodes.filter(n => n.status === 'triggered').length,
+                    completed: nodes.filter(n => n.status === 'completed').length
+                };
+            }
+        }
+
+        const serendipityExecutor = new SerendipityExecutor();
+        serendipityExecutor.initDefaultSerendipities();
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
