@@ -3002,6 +3002,161 @@ const ACHIEVEMENT_ID_MAP = {
         const skillMarketplace = new SkillMarketplace();
         skillMarketplace.initDefaultListings();
 
+        // ===== V64 Direction A: Idle Task Processing Integration =====
+        // Process idle tasks and sync with NPC collaboration
+
+        // --- IdleTaskProcessor: Processes idle tasks with NPC collaboration ---
+        class IdleTaskProcessor {
+            constructor() {
+                this.processedCount = 0;
+            }
+
+            // Process idle tasks from gameState.idleTasks
+            processIdleTasks() {
+                const now = Date.now();
+                const tasks = gameState.idleTasks || [];
+                let totalEarnings = 0;
+
+                for (const task of tasks) {
+                    if (task.status === 'active' && task.endTime <= now) {
+                        // Task completed
+                        const earnings = this.calculateEarnings(task);
+                        totalEarnings += earnings;
+                        task.status = 'completed';
+                        this.processedCount++;
+
+                        // Trigger NPC collaboration on task completion
+                        triggerNpcCollaboration('task_completed', {
+                            taskId: task.taskId,
+                            earnings,
+                            timestamp: now
+                        });
+                    }
+                }
+
+                if (totalEarnings > 0) {
+                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
+                    gameState.spiritStones += totalEarnings;
+                }
+
+                return { processedCount: this.processedCount, totalEarnings };
+            }
+
+            calculateEarnings(task) {
+                const base = task.baseEarnings || 10;
+                const duration = (task.endTime - task.startTime) / 1000;
+                const efficiency = IDLE_CONFIG.offlineEfficiency || 0.8;
+                return Math.floor(base * (duration / 60) * efficiency);
+            }
+
+            // Start a new idle task
+            startIdleTask(taskType, durationMs, baseEarnings) {
+                const task = {
+                    taskId: `idle_${Date.now()}`,
+                    type: taskType,
+                    startTime: Date.now(),
+                    endTime: Date.now() + durationMs,
+                    status: 'active',
+                    baseEarnings: baseEarnings || 10
+                };
+                gameState.idleTasks = gameState.idleTasks || [];
+                gameState.idleTasks.push(task);
+
+                // Add reward to NPC collaboration pool
+                npcCollabRewards.addToPool(baseEarnings * 0.1);
+
+                return task;
+            }
+
+            // Get idle task status
+            getIdleStatus() {
+                const tasks = gameState.idleTasks || [];
+                return {
+                    total: tasks.length,
+                    active: tasks.filter(t => t.status === 'active').length,
+                    completed: tasks.filter(t => t.status === 'completed').length,
+                    totalEarnings: gameState.idleEarnings || 0
+                };
+            }
+        }
+
+        const idleTaskProcessor = new IdleTaskProcessor();
+
+        // --- NPC-Involved Idle Task Panel ---
+        function openIdleTaskPanel() {
+            showModal('⚙️ 挂机任务面板', `
+                <div class="idle-task-tabs">
+                    <button class="tab-btn active" onclick="setIdleTab('tasks')">📋 任务</button>
+                    <button class="tab-btn" onclick="setIdleTab('npc')">🤝 NPC协作</button>
+                    <button class="tab-btn" onclick="setIdleTab('earnings')">💰 收益</button>
+                </div>
+                <div id="idleTaskContent" style="padding:15px;">${renderIdleTasksTab()}</div>
+            `, 550);
+        }
+
+        function setIdleTab(tab) {
+            document.querySelectorAll('.idle-task-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('idleTaskContent');
+            if (!content) return;
+            switch(tab) {
+                case 'tasks': content.innerHTML = renderIdleTasksTab(); break;
+                case 'npc': content.innerHTML = renderIdleNpcTab(); break;
+                case 'earnings': content.innerHTML = renderIdleEarningsTab(); break;
+            }
+        }
+
+        function renderIdleTasksTab() {
+            const status = idleTaskProcessor.getIdleStatus();
+            let html = `<p>总任务: ${status.total} | 活跃: ${status.active} | 已完成: ${status.completed}</p>`;
+            html += `<p>累计收益: ${status.totalEarnings} 灵石</p>`;
+            html += '<h4>可开始的任务</h4>';
+            const taskTypes = [
+                { type: 'qi_cultivation', name: '灵气修炼', duration: 60000, earnings: 20 },
+                { type: 'stone_gathering', name: '灵石采集', duration: 90000, earnings: 30 },
+                { type: 'pill_refining', name: '丹药炼制', duration: 120000, earnings: 50 },
+                { type: 'technique_study', name: '功法领悟', duration: 180000, earnings: 80 }
+            ];
+            for (const t of taskTypes) {
+                html += `<button onclick="startIdleTaskByType('${t.type}')" style="margin:5px;padding:8px;">${t.name} (+${t.earnings})</button>`;
+            }
+            return html;
+        }
+
+        function renderIdleNpcTab() {
+            return `<p>NPC协作引擎已启动</p>
+                    <p>任务管理器: ${npcTaskManager.activeTasks.size} 个活跃任务</p>
+                    <p>声望系统: ${npcReputationSystem.reputations.size} 个角色</p>`;
+        }
+
+        function renderIdleEarningsTab() {
+            return `<p>累计挂机收益: ${gameState.idleEarnings || 0} 灵石</p>
+                    <p>离线收益: ${gameState.offlineEarnings || 0} 灵石</p>
+                    <p>活跃任务: ${(gameState.idleTasks || []).filter(t => t.status === 'active').length} 个</p>`;
+        }
+
+        window.startIdleTaskByType = (type) => {
+            const configs = {
+                'qi_cultivation': { duration: 60000, earnings: 20 },
+                'stone_gathering': { duration: 90000, earnings: 30 },
+                'pill_refining': { duration: 120000, earnings: 50 },
+                'technique_study': { duration: 180000, earnings: 80 }
+            };
+            const cfg = configs[type];
+            if (cfg) {
+                idleTaskProcessor.startIdleTask(type, cfg.duration, cfg.earnings);
+                showToast('挂机任务已开始');
+            }
+        };
+
+        // Process idle tasks every second when game is running
+        const originalUpdateDisplay = updateDisplay;
+        updateDisplay = function() {
+            const result = originalUpdateDisplay.apply(this, arguments);
+            idleTaskProcessor.processIdleTasks();
+            return result;
+        };
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
