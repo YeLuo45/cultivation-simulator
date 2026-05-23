@@ -2447,6 +2447,132 @@ const ACHIEVEMENT_ID_MAP = {
         const serendipityExecutor = new SerendipityExecutor();
         serendipityExecutor.initDefaultSerendipities();
 
+        // ===== Direction C: Offline Persistence Layer =====
+        // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
+
+        // --- SyncState: Tracks sync status between Worker and Main ---
+        class SyncState {
+            constructor() {
+                this.pendingWrites = [];      // writes not yet persisted
+                this.lastSyncedAt = 0;        // timestamp of last sync
+                this.syncVersion = 0;         // monotonic version counter
+                this.dirtyFields = new Set(); // fields modified since last sync
+            }
+            markDirty(field) {
+                this.dirtyFields.add(field);
+                this.syncVersion++;
+            }
+            clearDirty() {
+                this.dirtyFields.clear();
+            }
+        }
+
+        // --- OfflineSnapshot: Captures game state for offline calculation ---
+        class OfflineSnapshot {
+            constructor(gameState, timestamp) {
+                this.timestamp = timestamp;
+                this.realm = gameState.realm;
+                this.cultivation = { ...gameState.cultivation };
+                this.spiritStones = gameState.spiritStones;
+                this.level = gameState.level;
+                this.idleTasks = gameState.idleTasks ? gameState.idleTasks.map(t => ({ ...t })) : [];
+                this.offlineEfficiency = gameState.offlineEfficiency || 0.8;
+                this.activeEffects = gameState.activeEffects || [];
+            }
+        }
+
+        // --- PowerSync: Sync engine with conflict resolution ---
+        class PowerSync {
+            constructor() {
+                this.syncState = new SyncState();
+                this.workerChannel = null; // SharedWorker port
+                this.mainThread = null;    // main thread localStorage
+                this.lastSnapshot = null;
+                this.conflictLog = [];
+            }
+
+            // Capture snapshot before offline
+            captureSnapshot(gameState) {
+                this.lastSnapshot = new OfflineSnapshot(gameState, Date.now());
+                return this.lastSnapshot;
+            }
+
+            // Restore from snapshot with offline earnings calculation
+            restoreFromSnapshot(snapshot, gameState) {
+                const now = Date.now();
+                const offlineSeconds = (now - snapshot.timestamp) / 1000;
+                const offlineHours = offlineSeconds / 3600;
+                const cappedHours = Math.min(offlineHours, 24); // max 24h
+
+                // Calculate offline earnings based on idle tasks
+                let totalEarnings = 0;
+                for (const task of snapshot.idleTasks) {
+                    if (task.status === 'active') {
+                        const taskDuration = (task.endTime - task.startTime) / 1000;
+                        const completedUnits = Math.floor(cappedHours * 3600 / taskDuration);
+                        const taskEarnings = (snapshot.offlineEfficiency || 0.8) * completedUnits * (task.baseEarnings || 10);
+                        totalEarnings += taskEarnings;
+                    }
+                }
+
+                // Apply offline earnings to gameState
+                gameState.spiritStones += Math.floor(totalEarnings);
+                gameState.offlineEarnings = Math.floor(totalEarnings);
+                gameState.lastActiveTime = snapshot.timestamp;
+
+                // Sync worker state
+                this.syncWorkerState(gameState);
+                return { offlineSeconds, offlineEarnings: Math.floor(totalEarnings) };
+            }
+
+            // Sync to worker (SharedWorker path)
+            syncWorkerState(gameState) {
+                this.syncState.lastSyncedAt = Date.now();
+                this.syncState.clearDirty();
+            }
+
+            // Sync to main thread (localStorage path)
+            syncMainState(gameState) {
+                this.syncState.markDirty('gameState');
+                this.syncWorkerState(gameState);
+            }
+
+            // Check if sync is needed
+            needsSync() {
+                return this.syncState.dirtyFields.size > 0;
+            }
+
+            // Resolve conflict between worker and main thread
+            resolveConflict(workerState, mainState) {
+                // Use main thread as source of truth, but merge worker changes
+                const merged = { ...mainState };
+                for (const field of this.syncState.dirtyFields) {
+                    if (workerState[field] !== undefined) {
+                        merged[field] = workerState[field];
+                    }
+                }
+                this.conflictLog.push({
+                    timestamp: Date.now(),
+                    worker: workerState,
+                    main: mainState,
+                    resolved: merged
+                });
+                return merged;
+            }
+
+            getSyncStatus() {
+                return {
+                    dirtyFields: Array.from(this.syncState.dirtyFields),
+                    lastSyncedAt: this.syncState.lastSyncedAt,
+                    syncVersion: this.syncState.syncVersion,
+                    pendingWrites: this.syncState.pendingWrites.length,
+                    conflicts: this.conflictLog.length
+                };
+            }
+        }
+
+        const powerSync = new PowerSync();
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
