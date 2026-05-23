@@ -2711,6 +2711,117 @@ const ACHIEVEMENT_ID_MAP = {
 
         const playerMemory = new PlayerMemorySystem();
 
+        // ===== Direction E: Skill Marketplace =====
+        // Claude-code-design tool registry + ruflo plugin lifecycle
+
+        // --- SkillListing: Skill listing in marketplace ---
+        class SkillListing {
+            constructor(id, config) {
+                this.id = id;
+                this.skillId = config.skillId;
+                this.name = config.name;
+                this.category = config.category || 'misc';
+                this.price = config.price || 100;
+                this.rating = config.rating || 0;
+                this.salesCount = config.salesCount || 0;
+                this.releasedAt = config.releasedAt || Date.now();
+                this.author = config.author || 'system';
+                this.description = config.description || '';
+                this.icon = config.icon || '📦';
+                this.status = 'active'; // 'active' | 'sold_out' | 'hidden'
+            }
+        }
+
+        // --- SkillMarketplace: Trading platform for skills ---
+        class SkillMarketplace {
+            constructor() {
+                this.listings = new Map(); // listingId -> SkillListing
+                this.purchaseHistory = []; // [{buyerId, listingId, price, timestamp}]
+                this.categories = ['combat', 'cultivation', 'alchemy', 'formation', 'talisman', 'dagger', 'ultimate', 'misc'];
+                this.popularTags = ['recommended', 'hot', 'new', 'sale'];
+                this.listingIdCounter = 0;
+            }
+
+            //发布技能
+            publish(listingId, config) {
+                const listing = new SkillListing(listingId || `listing_${++this.listingIdCounter}`, config);
+                this.listings.set(listing.id, listing);
+                return listing;
+            }
+
+            //购买技能
+            purchase(listingId, buyerId) {
+                const listing = this.listings.get(listingId);
+                if (!listing || listing.status !== 'active') return { success: false, reason: 'not_available' };
+                listing.salesCount++;
+                this.purchaseHistory.push({
+                    buyerId,
+                    listingId,
+                    price: listing.price,
+                    timestamp: Date.now()
+                });
+                return { success: true, listing };
+            }
+
+            //搜索技能
+            search(query, category) {
+                const results = [];
+                for (const [, listing] of this.listings) {
+                    if (listing.status !== 'active') continue;
+                    if (category && listing.category !== category) continue;
+                    if (query) {
+                        const q = query.toLowerCase();
+                        if (!listing.name.toLowerCase().includes(q) &&
+                            !listing.description.toLowerCase().includes(q)) continue;
+                    }
+                    results.push(listing);
+                }
+                return results.sort((a, b) => b.rating - a.rating);
+            }
+
+            //获取分类
+            getByCategory(category) {
+                return Array.from(this.listings.values()).filter(l =>
+                    l.status === 'active' && l.category === category
+                );
+            }
+
+            //获取热门
+            getHot(count = 10) {
+                return Array.from(this.listings.values())
+                    .filter(l => l.status === 'active')
+                    .sort((a, b) => b.salesCount - a.salesCount)
+                    .slice(0, count);
+            }
+
+            //统计
+            getStats() {
+                return {
+                    totalListings: this.listings.size,
+                    totalSales: this.purchaseHistory.length,
+                    categories: this.categories.length,
+                    revenue: this.purchaseHistory.reduce((sum, p) => sum + p.price, 0)
+                };
+            }
+
+            //初始化市场
+            initDefaultListings() {
+                const defaults = [
+                    { skillId: 'fireball', name: '火球术', category: 'combat', price: 200, rating: 4.5, description: '基础火系法术' },
+                    { skillId: 'ice_shield', name: '冰盾术', category: 'combat', price: 250, rating: 4.3, description: '水系防御法术' },
+                    { skillId: 'wind_step', name: '风步', category: 'cultivation', price: 300, rating: 4.7, description: '提升移动速度' },
+                    { skillId: 'spirit_eyes', name: '灵眼术', category: 'cultivation', price: 400, rating: 4.6, description: '增强感知能力' },
+                    { skillId: 'health_potion', name: '补血丹方', category: 'alchemy', price: 150, rating: 4.2, description: '炼制补血丹药' }
+                ];
+                for (const d of defaults) {
+                    this.publish(null, { ...d, icon: '📦' });
+                }
+            }
+        }
+
+        const skillMarketplace = new SkillMarketplace();
+        skillMarketplace.initDefaultListings();
+
         // ===== V55: Skill System Plugin Architecture =====
 
         // --- SkillLifecycle Hooks (8 hooks) ---
