@@ -1943,6 +1943,260 @@ const ACHIEVEMENT_ID_MAP = {
 
 // [DDD Phase 1] CONFIG moved to domains/shared/constants/;
 
+        // ===== V55: Skill System Plugin Architecture =====
+
+        // --- SkillLifecycle Hooks (8 hooks) ---
+        class SkillHooks {
+            constructor() {
+                this.hooks = {
+                    onDiscover: [],
+                    onRegister: [],
+                    onPreExecute: [],
+                    onPostExecute: [],
+                    onError: [],
+                    onCooldown: [],
+                    onActivate: [],
+                    onDeactivate: []
+                };
+            }
+            register(event, callback) {
+                if (this.hooks[event]) this.hooks[event].push(callback);
+            }
+            async trigger(event, data) {
+                const results = [];
+                for (const cb of this.hooks[event] || []) {
+                    try {
+                        results.push(await cb(data));
+                    } catch(e) { console.error(`Hook ${event} error:`, e); }
+                }
+                return results;
+            }
+        }
+
+        // --- SkillRegistry: Schema + auto-discovery + category/realm indices ---
+        class SkillRegistry {
+            constructor(hooks) {
+                this.skills = new Map(); // skillId -> SkillDefinition
+                this.categories = new Map(); // category -> [skillId]
+                this.realms = new Map(); // realm -> [skillId]
+                this.byWeapon = new Map(); // weaponName -> [skillId]
+                this.hooks = hooks;
+                this.schema = ['id','name','category','grade','cost','cooldown','damage','effects','dependencies','realm','icon','description'];
+            }
+            validateSkill(skill) {
+                for (const field of this.schema) {
+                    if (!(field in skill) && field !== 'dependencies' && field !== 'cooldown' && field !== 'icon') {
+                        return { valid: false, missing: field };
+                    }
+                }
+                return { valid: true };
+            }
+            register(skillDef, pluginId = 'core') {
+                const validated = this.validateSkill(skillDef);
+                if (!validated.valid) {
+                    console.warn(`Skill ${skillDef.id || 'unknown'} missing field: ${validated.missing}`);
+                    return false;
+                }
+                skillDef.pluginId = pluginId;
+                this.skills.set(skillDef.id, skillDef);
+                // category index
+                if (!this.categories.has(skillDef.category)) this.categories.set(skillDef.category, []);
+                this.categories.get(skillDef.category).push(skillDef.id);
+                // realm index
+                const realm = skillDef.realm || 0;
+                if (!this.realms.has(realm)) this.realms.set(realm, []);
+                this.realms.get(realm).push(skillDef.id);
+                // weapon index
+                if (skillDef.weapon) {
+                    if (!this.byWeapon.has(skillDef.weapon)) this.byWeapon.set(skillDef.weapon, []);
+                    this.byWeapon.get(skillDef.weapon).push(skillDef.id);
+                }
+                this.hooks.trigger('onRegister', { skill: skillDef, pluginId });
+                return true;
+            }
+            discover(pluginContext) {
+                const exports = pluginContext.exports || pluginContext;
+                const defs = exports.skillDefinitions || exports.skills || [];
+                const pluginId = pluginContext.pluginId || 'anonymous';
+                for (const skill of defs) {
+                    this.register(skill, pluginId);
+                    this.hooks.trigger('onDiscover', { skill });
+                }
+                return defs.length;
+            }
+            get(id) { return this.skills.get(id); }
+            getByCategory(cat) { return (this.categories.get(cat) || []).map(id => this.skills.get(id)); }
+            getByRealm(realm) { return (this.realms.get(realm) || []).map(id => this.skills.get(id)); }
+            getByWeapon(weapon) { return (this.byWeapon.get(weapon) || []).map(id => this.skills.get(id)); }
+            getAll() { return Array.from(this.skills.values()); }
+            getAllCategories() { return Array.from(this.categories.keys()); }
+        }
+
+        // --- SkillGraph: DAG + Tarjan SCC cycle detection ---
+        class SkillGraph {
+            constructor() {
+                this.edges = new Map(); // skillId -> [dependencyIds]
+                this.reverse = new Map(); // dependencyId -> [skillIds]
+            }
+            addEdge(skillId, depId) {
+                if (!this.edges.has(skillId)) this.edges.set(skillId, []);
+                this.edges.get(skillId).push(depId);
+                if (!this.reverse.has(depId)) this.reverse.set(depId, []);
+                this.reverse.get(depId).push(skillId);
+            }
+            // Topological sort with maxIterations guard
+            topologicalSort(maxIterations = 100) {
+                const inDegree = new Map();
+                const allNodes = new Set(this.edges.keys());
+                for (const deps of this.edges.values()) { deps.forEach(d => allNodes.add(d)); }
+                for (const n of allNodes) inDegree.set(n, 0);
+                for (const [, deps] of this.edges) { for (const d of deps) inDegree.set(d, (inDegree.get(d) || 0)); }
+                const queue = [];
+                for (const [n, deg] of inDegree) if (deg === 0) queue.push(n);
+                const result = [];
+                let iter = 0;
+                while (queue.length && iter++ < maxIterations) {
+                    const node = queue.shift();
+                    result.push(node);
+                    for (const [skill, deps] of this.edges) {
+                        const idx = deps.indexOf(node);
+                        if (idx !== -1) {
+                            deps.splice(idx, 1);
+                            inDegree.set(skill, inDegree.get(skill) - 1);
+                            if (inDegree.get(skill) === 0) queue.push(skill);
+                        }
+                    }
+                }
+                return result;
+            }
+            // Tarjan SCC for cycle detection
+            findCycles() {
+                const index = new Map(), lowlink = new Map(), onStack = new Map();
+                const stack = [], sccs = [];
+                let idx = 0;
+                const strongconnect = (v) => {
+                    index.set(v, idx); lowlink.set(v, idx); idx++; stack.push(v); onStack.set(v, true);
+                    for (const w of (this.edges.get(v) || [])) {
+                        if (!index.has(w)) { strongconnect(w); lowlink.set(v, Math.min(lowlink.get(v), lowlink.get(w))); }
+                        else if (onStack.get(w)) { lowlink.set(v, Math.min(lowlink.get(v), index.get(w))); }
+                    }
+                    if (lowlink.get(v) === index.get(v)) {
+                        const scc = [];
+                        let w; do { w = stack.pop(); onStack.set(w, false); scc.push(w); } while (w !== v);
+                        sccs.push(scc);
+                    }
+                };
+                for (const v of this.edges.keys()) { if (!index.has(v)) strongconnect(v); }
+                return sccs.filter(s => s.length > 1);
+            }
+        }
+
+        // --- SkillMemory: L1/L3/L4 layered memory ---
+        class SkillMemory {
+            constructor() {
+                this.L1_index = new Map(); // skillId -> SkillInstance
+                this.L3_sop = new Map(); // skillId -> { execCount, avgDuration, lastExec, successRate }
+                this.L4_cooldown = new Map(); // skillId -> { currentCooldown, maxCooldown, lastUsed }
+            }
+            set(skillId, instance) { this.L1_index.set(skillId, instance); }
+            get(skillId) { return this.L1_index.get(skillId); }
+            has(skillId) { return this.L1_index.has(skillId); }
+            updateSOP(skillId, execTime, success) {
+                const prev = this.L3_sop.get(skillId) || { execCount:0, avgDuration:0, lastExec:0, successRate:1 };
+                const cnt = prev.execCount + 1;
+                const avg = (prev.avgDuration * prev.execCount + execTime) / cnt;
+                this.L3_sop.set(skillId, { execCount: cnt, avgDuration: avg, lastExec: Date.now(), successRate: (prev.successRate * prev.execCount + (success?1:0)) / cnt });
+            }
+            getSOP(skillId) { return this.L3_sop.get(skillId); }
+            setCooldown(skillId, current, max) { this.L4_cooldown.set(skillId, { currentCooldown: current, maxCooldown: max, lastUsed: Date.now() }); }
+            getCooldown(skillId) { return this.L4_cooldown.get(skillId); }
+            tickDown(skillId) {
+                const cd = this.L4_cooldown.get(skillId);
+                if (cd && cd.currentCooldown > 0) {
+                    cd.currentCooldown--;
+                    if (cd.currentCooldown === 0) return true; // cooldown complete
+                }
+                return false;
+            }
+            tickAll() {
+                const completed = [];
+                for (const [skillId] of this.L4_cooldown) {
+                    if (this.tickDown(skillId)) completed.push(skillId);
+                }
+                return completed;
+            }
+        }
+
+        // --- SkillPluginAPI: Plugin SDK with sandbox + backward compat ---
+        class SkillPluginAPI {
+            constructor(registry, graph, memory, hooks) {
+                this.registry = registry;
+                this.graph = graph;
+                this.memory = memory;
+                this.hooks = hooks;
+            }
+            registerSkills(skillDefinitions) {
+                const registered = [];
+                for (const skill of skillDefinitions) {
+                    if (this.registry.register(skill, skill.pluginId || 'plugin')) {
+                        registered.push(skill);
+                        if (skill.dependencies) {
+                            for (const dep of skill.dependencies) {
+                                this.graph.addEdge(skill.id, dep);
+                            }
+                        }
+                    }
+                }
+                return { registered, total: skillDefinitions.length };
+            }
+            createSandbox(pluginId) {
+                const self = this;
+                return {
+                    pluginId,
+                    skillState: {},
+                    querySkills: (category) => self.registry.getByCategory(category),
+                    queryRealm: (realm) => self.registry.getByRealm(realm),
+                    getMemory: (skillId) => self.memory.get(skillId),
+                    setCooldown: (skillId, cd) => self.memory.setCooldown(skillId, cd, cd)
+                };
+            }
+            migrateLegacySkills(ULTIMATE_SKILLS) {
+                const migrated = [];
+                for (const [weaponName, skills] of Object.entries(ULTIMATE_SKILLS)) {
+                    for (const skill of skills) {
+                        const def = {
+                            id: skill.id,
+                            name: skill.name,
+                            category: 'ultimate',
+                            grade: skill.grade || 1,
+                            cost: skill.cost,
+                            cooldown: skill.cooldown || 0,
+                            damage: skill.damage,
+                            effects: skill.effects || {},
+                            weapon: weaponName,
+                            maxLevel: skill.maxLevel || 5,
+                            realm: skill.realm || 0,
+                            icon: skill.icon || '⚔️',
+                            description: skill.description || `${weaponName} - ${skill.name}`
+                        };
+                        this.registry.register(def, 'legacy');
+                        migrated.push(def);
+                    }
+                }
+                return migrated;
+            }
+        }
+
+        // --- Global skill system instances ---
+        const skillHooks = new SkillHooks();
+        const skillRegistry = new SkillRegistry(skillHooks);
+        const skillGraph = new SkillGraph();
+        const skillMemory = new SkillMemory();
+        const skillPluginAPI = new SkillPluginAPI(skillRegistry, skillGraph, skillMemory, skillHooks);
+
+        // Migrate existing ULTIMATE_SKILLS to new registry
+        skillPluginAPI.migrateLegacySkills(ULTIMATE_SKILLS);
+
 // [DDD Phase 1] PET_TYPES moved to domains/shared/constants/;
 
 // [DDD Phase 1] PET_QUALITY_MULTIPLIERS moved to domains/shared/constants/;
@@ -3936,9 +4190,14 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== executeUltimateSkill =====
         function executeUltimateSkill(skill) {
+            const startTime = Date.now();
             const weaponData = combatState.player.weaponData || { name:'空手', star:1 };
             const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
             const starMultiplier = ENHANCE_CONFIG && ENHANCE_CONFIG.starMultipliers ? (ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1.0) : 1.0;
+
+            // V55: SkillLifecycle Hook - onPreExecute
+            const hookData = { skill, weaponData, level, combatState, combatEnergy };
+            skillHooks.trigger('onPreExecute', hookData);
 
             if (combatEnergy < skill.cost) return;
 
@@ -4090,6 +4349,19 @@ const ACHIEVEMENT_ID_MAP = {
 
             combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
             combatState.turn = 'opponent';
+
+            // V55: Update skill memory SOP + cooldown
+            const execTime = Date.now() - startTime;
+            const success = combatState.opponent.hp <= 0;
+            skillMemory.updateSOP(skill.id, execTime, success);
+            if (skill.cooldown && skill.cooldown > 0) {
+                skillMemory.setCooldown(skill.id, skill.cooldown, skill.cooldown);
+                skillHooks.trigger('onCooldown', { skill, cooldown: skill.cooldown });
+            }
+
+            // V55: SkillLifecycle Hook - onPostExecute
+            skillHooks.trigger('onPostExecute', { skill, damage: finalDamage, success, logText });
+
             renderCombatArena();
 
             if (combatState.opponent.hp <= 0) {
