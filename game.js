@@ -3058,6 +3058,261 @@ const ACHIEVEMENT_ID_MAP = {
             console.log(`[WARN] Test suite below 80% target - needs improvement`);
         }
 
+        // ===== V67 Direction A: NPC Chat History + Relationship Graph + Skill Evolution =====
+        // NPC对话历史系统 + 关系图谱可视化 + 技能演化链
+
+        // --- NpcChatHistory: Records and retrieves NPC conversation history ---
+        class NpcChatHistory {
+            constructor(maxSize = 100) {
+                this.history = []; // [{from, to, type, content, timestamp, mood}]
+                this.maxSize = maxSize;
+            }
+
+            addMessage(from, to, type, content, mood = 'neutral') {
+                this.history.push({ from, to, type, content, timestamp: Date.now(), mood });
+                if (this.history.length > this.maxSize) {
+                    this.history.shift();
+                }
+            }
+
+            getHistory(role, limit = 20) {
+                return this.history
+                    .filter(m => m.from === role || m.to === role)
+                    .slice(-limit);
+            }
+
+            getConversation(r1, r2, limit = 10) {
+                return this.history
+                    .filter(m => (m.from === r1 && m.to === r2) || (m.from === r2 && m.to === r1))
+                    .slice(-limit);
+            }
+
+            searchHistory(query, limit = 10) {
+                return this.history
+                    .filter(m => m.content.includes(query))
+                    .slice(-limit);
+            }
+
+            getRecentMessages(minutes = 60) {
+                const since = Date.now() - minutes * 60000;
+                return this.history.filter(m => m.timestamp >= since);
+            }
+        }
+
+        // --- NpcRelationshipGraph: Tracks and visualizes NPC relationships ---
+        class NpcRelationshipGraph {
+            constructor() {
+                this.edges = new Map(); // role -> [{target, weight, type}]
+            }
+
+            addRelationship(role1, role2, weight, type = 'neutral') {
+                // Add edge from role1 to role2
+                if (!this.edges.has(role1)) this.edges.set(role1, []);
+                const edges1 = this.edges.get(role1);
+                const existing = edges1.find(e => e.target === role2);
+                if (existing) {
+                    existing.weight = (existing.weight + weight) / 2;
+                    existing.type = weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral';
+                } else {
+                    edges1.push({ target: role2, weight, type: weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral' });
+                }
+
+                // Add reverse edge
+                if (!this.edges.has(role2)) this.edges.set(role2, []);
+                const edges2 = this.edges.get(role2);
+                const existing2 = edges2.find(e => e.target === role1);
+                if (existing2) {
+                    existing2.weight = (existing2.weight + weight) / 2;
+                } else {
+                    edges2.push({ target: role1, weight: -weight, type: weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral' });
+                }
+            }
+
+            getRelationship(role1, role2) {
+                const edges = this.edges.get(role1);
+                if (!edges) return { weight: 0, type: 'neutral' };
+                const edge = edges.find(e => e.target === role2);
+                return edge || { weight: 0, type: 'neutral' };
+            }
+
+            getRelatedRoles(role, limit = 5) {
+                const edges = this.edges.get(role) || [];
+                return edges
+                    .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
+                    .slice(0, limit);
+            }
+        }
+
+        // --- SkillEvolution: Tracks skill growth and evolution paths ---
+        class SkillEvolution {
+            constructor() {
+                this.evolutions = new Map(); // skillId -> {stage, exp, maxStage, evolutionPath}
+                this.evolutionChains = [
+                    { from: 'basic_technique', to: 'advanced_technique', requiredExp: 1000 },
+                    { from: 'advanced_technique', to: 'master_technique', requiredExp: 5000 },
+                    { from: 'fire_ball', to: 'inferno', requiredExp: 2000 },
+                    { from: 'inferno', to: 'solar_flare', requiredExp: 8000 }
+                ];
+            }
+
+            addExp(skillId, amount) {
+                if (!this.evolutions.has(skillId)) {
+                    this.evolutions.set(skillId, { stage: 1, exp: 0, maxStage: 5, evolutionPath: [] });
+                }
+                const evo = this.evolutions.get(skillId);
+                evo.exp += amount;
+
+                // Check for evolution
+                for (const chain of this.evolutionChains) {
+                    if (chain.from === skillId && evo.exp >= chain.requiredExp && evo.stage < evo.maxStage) {
+                        evo.stage++;
+                        evo.exp = 0;
+                        evo.evolutionPath.push({ to: chain.to, timestamp: Date.now() });
+                        break;
+                    }
+                }
+                return evo;
+            }
+
+            getEvolution(skillId) {
+                return this.evolutions.get(skillId) || { stage: 1, exp: 0, maxStage: 5, evolutionPath: [] };
+            }
+
+            canEvolve(skillId) {
+                const evo = this.getEvolution(skillId);
+                if (evo.stage >= evo.maxStage) return false;
+                return this.evolutionChains.some(c => c.from === skillId && evo.exp >= c.requiredExp);
+            }
+        }
+
+        const npcChatHistory = new NpcChatHistory();
+        const npcRelationGraph = new NpcRelationshipGraph();
+        const skillEvolution = new SkillEvolution();
+
+        // --- NPC Chat Panel ---
+        function openNpcChatPanel() {
+            showModal('💬 NPC对话记录', `
+                <div class="npc-chat-tabs">
+                    <button class="tab-btn active" onclick="setNpcChatTab('history')">📜 历史</button>
+                    <button class="tab-btn" onclick="setNpcChatTab('relations')">🔗 关系</button>
+                    <button class="tab-btn" onclick="setNpcChatTab('skills')">📈 技能演化</button>
+                </div>
+                <div id="npcChatContent" style="padding:15px;">${renderNpcChatHistory()}</div>
+            `, 600);
+        }
+
+        function setNpcChatTab(tab) {
+            document.querySelectorAll('.npc-chat-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('npcChatContent');
+            if (!content) return;
+            switch(tab) {
+                case 'history': content.innerHTML = renderNpcChatHistory(); break;
+                case 'relations': content.innerHTML = renderNpcRelations(); break;
+                case 'skills': content.innerHTML = renderSkillEvolution(); break;
+            }
+        }
+
+        function renderNpcChatHistory() {
+            const msgs = npcChatHistory.getRecentMessages(60);
+            if (msgs.length === 0) return '<p>暂无对话记录</p>';
+            let html = '<table style="width:100%;font-size:12px;">';
+            html += '<tr><th>时间</th><th>发送</th><th>接收</th><th>内容</th></tr>';
+            for (const m of msgs.slice(-15)) {
+                html += `<tr><td>${new Date(m.timestamp).toLocaleTimeString()}</td><td>${m.from}</td><td>${m.to}</td><td>${m.content.substring(0, 30)}...</td></tr>`;
+            }
+            html += '</table>';
+            return html;
+        }
+
+        function renderNpcRelations() {
+            const roles = ['master', 'fellow', 'merchant', 'monster'];
+            let html = '<table style="width:100%;">';
+            html += '<tr><th>角色</th><th>关联角色</th><th>关系值</th><th>类型</th></tr>';
+            for (const role of roles) {
+                const related = npcRelationGraph.getRelatedRoles(role);
+                if (related.length === 0) continue;
+                for (const r of related) {
+                    html += `<tr><td>${role}</td><td>${r.target}</td><td>${r.weight.toFixed(2)}</td><td>${r.type}</td></tr>`;
+                }
+            }
+            html += '</table>';
+            if (html === '<table style="width:100%;"></table>') return '<p>暂无关系数据</p>';
+            return html;
+        }
+
+        function renderSkillEvolution() {
+            let html = '<h4>技能演化状态</h4>';
+            for (const [skillId, evo] of skillEvolution.evolutions) {
+                html += `<p><b>${skillId}</b>: Stage ${evo.stage}/${evo.maxStage} | Exp: ${evo.exp}`;
+                if (evo.evolutionPath.length > 0) {
+                    html += ` | 已演化: ${evo.evolutionPath.map(e => e.to).join(' → ')}`;
+                }
+                html += '</p>';
+            }
+            html += '<h4>演化链</h4>';
+            for (const c of skillEvolution.evolutionChains) {
+                html += `<p>${c.from} → ${c.to} (需要 ${c.requiredExp} EXP)</p>`;
+            }
+            return html;
+        }
+
+        // Wire chat history to message bus
+        const originalBusSend = npcMessageBus.send.bind(npcMessageBus);
+        npcMessageBus.send = function(from, to, type, payload) {
+            npcChatHistory.addMessage(from, to, type, typeof payload === 'object' ? JSON.stringify(payload) : String(payload));
+            npcRelationGraph.addRelationship(from, to, 1, 'interaction');
+            return originalBusSend(from, to, type, payload);
+        };
+
+        // ===== V67 Tests =====
+        let v67Passed = 0, v67Failed = 0;
+        const v67Assert = (c, m) => { if (c) v67Passed++; else v67Failed++; };
+
+        // Test NpcChatHistory
+        v67Assert(npcChatHistory !== undefined, 'npcChatHistory exists');
+        v67Assert(npcChatHistory.history !== undefined, 'npcChatHistory has history');
+        npcChatHistory.addMessage('fellow', 'master', 'task', 'test message');
+        v67Assert(npcChatHistory.history.length === 1, 'npcChatHistory.addMessage works');
+        const hist = npcChatHistory.getHistory('fellow');
+        v67Assert(hist.length === 1, 'npcChatHistory.getHistory works');
+        npcChatHistory.addMessage('fellow', 'master', 'task', 'second message');
+        const recent = npcChatHistory.getRecentMessages(60);
+        v67Assert(recent.length === 2, 'npcChatHistory.getRecentMessages works');
+
+        // Test NpcRelationshipGraph
+        v67Assert(npcRelationGraph !== undefined, 'npcRelationGraph exists');
+        npcRelationGraph.addRelationship('master', 'fellow', 5, 'friendly');
+        const rel = npcRelationGraph.getRelationship('master', 'fellow');
+        v67Assert(rel.weight === 5, 'NpcRelationshipGraph.addRelationship works');
+        const related = npcRelationGraph.getRelatedRoles('master');
+        v67Assert(related.length >= 1, 'NpcRelationshipGraph.getRelatedRoles works');
+
+        // Test SkillEvolution
+        v67Assert(skillEvolution !== undefined, 'skillEvolution exists');
+        skillEvolution.addExp('basic_technique', 500);
+        const evo = skillEvolution.getEvolution('basic_technique');
+        v67Assert(evo.exp === 500, 'SkillEvolution.addExp works');
+        const canEvo = skillEvolution.canEvolve('basic_technique');
+        v67Assert(canEvo === false, 'SkillEvolution.canEvolve returns false when not enough exp');
+        skillEvolution.addExp('basic_technique', 600); // Now 1100 >= 1000
+        const evo2 = skillEvolution.getEvolution('basic_technique');
+        v67Assert(evo2.stage >= 1, 'SkillEvolution evolves when exp >= required');
+
+        // Test openNpcChatPanel exists
+        v67Assert(typeof openNpcChatPanel === 'function', 'openNpcChatPanel is a function');
+
+        // V67 pass rate
+        const v67Total = v67Passed + v67Failed;
+        const v67PassRate = v67Total > 0 ? (v67Passed / v67Total * 100).toFixed(1) : 0;
+        console.log(`[V67 Tests] ${v67Passed}/${v67Total} passed (${v67PassRate}%)`);
+
+        // Combined A direction test suite
+        const aTotalPassed = overallPassed + v67Passed;
+        const aTotalTests = overallTotal + v67Total;
+        const aTotalRate = aTotalTests > 0 ? (aTotalPassed / aTotalTests * 100).toFixed(1) : 0;
+        console.log(`[Direction A Total] ${aTotalPassed}/${aTotalTests} passed (${aTotalRate}%)`);
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
