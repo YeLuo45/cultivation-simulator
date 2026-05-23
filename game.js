@@ -2727,6 +2727,40 @@ const ACHIEVEMENT_ID_MAP = {
 
 // [DDD Phase 1] SECRET_REALMS moved to domains/shared/constants/;
 
+        // --- SECRET_REALM_BOSSES (V56) ---
+        const SECRET_REALM_BOSSES = {
+            '青云洞府': { name: '洞府守将·青云子', hp: 500, attack: 30, defense: 15, rewards: ['青云剑诀', '玄铁锭x5'], icon: '👹' },
+            '上古冰宫': { name: '冰宫主·霜后', hp: 1200, attack: 60, defense: 35, rewards: ['冰魄心经', '寒冰石x10'], icon: '👸' },
+            '古修士遗迹': { name: '遗迹守护者·枯骨尊者', hp: 2500, attack: 120, defense: 70, rewards: ['混沌石', '古修士残魂x3'], icon: '💀' },
+            '东海龙宫': { name: '龙宫太子·敖烈', hp: 4000, attack: 200, defense: 120, rewards: ['龙族秘法', '龙鳞x10'], icon: '🐉' },
+            '仙府': { name: '仙府灵童', hp: 6000, attack: 350, defense: 200, rewards: ['飞升金丹', '仙府令牌x3'], icon: '🧧' },
+            '飞升台': { name: '天劫雷尊', hp: 10000, attack: 600, defense: 350, rewards: ['飞升丹x3', '天劫精华x5'], icon: '⚡' },
+            '天道遗迹': { name: '天道意志·位面之主', hp: 18000, attack: 1000, defense: 600, rewards: ['天道碎片', '法则感悟x10'], icon: '🌟' },
+            '道果秘境': { name: '大道守护·因果律使', hp: 35000, attack: 2000, defense: 1200, rewards: ['大道之果', '因果律书'], icon: '☯️' }
+        };
+
+        // --- REALM_DIFFICULTY (V56) ---
+        const REALM_DIFFICULTY = {
+            '简单': { damageMultiplier: 0.5, rewardMultiplier: 1.0, bossHpMultiplier: 0.6, tokenCost: 1 },
+            '普通': { damageMultiplier: 1.0, rewardMultiplier: 1.5, bossHpMultiplier: 1.0, tokenCost: 1 },
+            '困难': { damageMultiplier: 1.5, rewardMultiplier: 2.0, bossHpMultiplier: 1.5, tokenCost: 2 },
+            '噩梦': { damageMultiplier: 2.5, rewardMultiplier: 3.5, bossHpMultiplier: 2.0, tokenCost: 3 }
+        };
+
+        // --- SECRET_REALM_EVENTS (V56) ---
+        const SECRET_REALM_EVENTS = [
+            { type: 'positive', msg: '你在秘境深处发现了一处灵气泉眼，修炼速度+50%！', effect: { qiRegenBonus: 0.5, duration: 3 } },
+            { type: 'positive', msg: '偶遇隐世前辈，获得功法传承！', effect: { techniqueBonus: 1, duration: 5 } },
+            { type: 'positive', msg: '发现前人留下的储物袋，获得灵石x1000！', effect: { spiritStones: 1000 } },
+            { type: 'positive', msg: '触发奇缘！珍稀灵草自行入体！', effect: { maxHpBonus: 50, duration: 10 } },
+            { type: 'negative', msg: '遭遇毒瘴侵袭，每次探索损失50灵气！', effect: { qiLoss: 50, duration: 2 } },
+            { type: 'negative', msg: '触发陷阱！遭遇强大守护者袭击！', effect: { hpLoss: 100, duration: 1 } },
+            { type: 'negative', msg: '迷路消耗时间，比预计多花10天！', effect: { daysLoss: 10 } },
+            { type: 'neutral', msg: '秘境能量波动，发现一处休息点。', effect: { restBonus: 1 } },
+            { type: 'neutral', msg: '遇到其他修士，交换了情报。', effect: { infoBonus: 1 } },
+            { type: 'neutral', msg: '秘境规则变化，探索进度暂时停滞。', effect: { progressPause: 1 } }
+        ];
+
 // ===== achievements.js =====
 // V28 成就系统大改版
 
