@@ -1050,6 +1050,76 @@
                 }
             }
         };
+        // V85: 灵兽系统+宠物培养
+        const MCP_TOOLS_V85 = {
+            'pet.capture': {
+                name: 'pet.capture',
+                description: 'Capture a spirit beast with bait and trap',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Pet type: wolf/tiger/fox dragon phoenix turtle' },
+                        bait: { type: 'string', description: 'Bait quality: low|medium|high|premium' }
+                    },
+                    required: ['type']
+                }
+            },
+            'pet.list': {
+                name: 'pet.list',
+                description: 'List all captured spirit beasts',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|active|released' }
+                    }
+                }
+            },
+            'pet.feed': {
+                name: 'pet.feed',
+                description: 'Feed a spirit beast to increase intimacy',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' },
+                        food: { type: 'string', description: 'Food type: basic|premium|super' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: 'Evolve a spirit beast to higher form',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' },
+                        targetForm: { type: 'string', description: 'Target form: adult|mutant|divine' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.release': {
+                name: 'pet.release',
+                description: 'Release a spirit beast back to the wild',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.stats': {
+                name: 'pet.stats',
+                description: 'Query detailed pet statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID (omit for all stats)' }
+                    }
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -1094,6 +1164,10 @@
                 }
                 // V84: Register artifact tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V84)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V85: Register pet tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V85)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1377,6 +1451,25 @@
                             break;
                         case 'artifact.transform':
                             result = this.mcpArtifactTransform(args.artifactId, args.targetTier);
+                            break;
+                        // V85: Pet spirit beast tools
+                        case 'pet.capture':
+                            result = this.mcpPetCapture(args.type, args.bait);
+                            break;
+                        case 'pet.list':
+                            result = this.mcpPetList(args.filter);
+                            break;
+                        case 'pet.feed':
+                            result = this.mcpPetFeed(args.petId, args.food);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolve(args.petId, args.targetForm);
+                            break;
+                        case 'pet.release':
+                            result = this.mcpPetRelease(args.petId);
+                            break;
+                        case 'pet.stats':
+                            result = this.mcpPetStats(args.petId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -2675,6 +2768,146 @@
                     artifact.power = TIER_POWER[targetTier];
                     artifact.attunement = 0;
                     return { success: true, artifactId, newTier: targetTier, newPower: artifact.power, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V85: Pet Spirit Beast System
+            mcpPetCapture(type, bait) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TYPES = ['wolf', 'tiger', 'fox', 'dragon', 'phoenix', 'turtle'];
+                    if (!VALID_TYPES.includes(type)) return { error: 'Invalid pet type' };
+                    const BAIT_COST = { low: 50, medium: 150, high: 400, premium: 1000 };
+                    const BAIT_SUCCESS = { low: 0.4, medium: 0.65, high: 0.85, premium: 0.95 };
+                    const b = bait || 'medium';
+                    const cost = BAIT_COST[b];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    const roll = Math.random();
+                    const successRate = BAIT_SUCCESS[b];
+                    if (roll > successRate) {
+                        gs.spiritStones -= cost;
+                        return { success: false, reason: 'Pet escaped', cost, remainingStones: gs.spiritStones };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.pets = gs.pets || [];
+                    const petId = 'PET_' + Date.now();
+                    const TIER_POWER = { wolf: 15, tiger: 20, fox: 12, dragon: 30, phoenix: 25, turtle: 10 };
+                    const INTIMACY_THRESHOLDS = [0, 20, 40, 60, 80, 100];
+                    const newPet = {
+                        id: petId, type, name: type.charAt(0).toUpperCase() + type.slice(1),
+                        form: 'child', level: 1, power: TIER_POWER[type] || 10,
+                        intimacy: 0, hunger: 0, active: true, skills: [], equipped: null,
+                        loyalty: 50, potential: Math.floor(Math.random() * 30) + 70,
+                        captureCost: cost, capturedAt: Date.now()
+                    };
+                    gs.pets.push(newPet);
+                    return { success: true, pet: newPet, cost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetList(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const f = filter || 'all';
+                    let filtered = pets;
+                    if (f === 'active') filtered = pets.filter(p => p.active);
+                    else if (f === 'released') filtered = pets.filter(p => !p.active);
+                    return { pets: filtered, total: filtered.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetFeed(petId, food) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet has been released' };
+                    const FOOD_INTIMACY = { basic: 5, premium: 15, super: 30 };
+                    const FOOD_COST = { basic: 20, premium: 80, super: 200 };
+                    const f = food || 'basic';
+                    const cost = FOOD_COST[f];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    pet.hunger = Math.max(0, pet.hunger - 20);
+                    pet.intimacy = Math.min(100, pet.intimacy + FOOD_INTIMACY[f]);
+                    pet.loyalty = Math.min(100, pet.loyalty + 2);
+                    return { success: true, petId: pet.id, intimacy: pet.intimacy, loyalty: pet.loyalty, hunger: pet.hunger, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetEvolve(petId, targetForm) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet has been released' };
+                    const VALID_FORMS = ['adult', 'mutant', 'divine'];
+                    if (!VALID_FORMS.includes(targetForm)) return { error: 'Invalid target form' };
+                    const FORM_ORDER = ['child', 'adult', 'mutant', 'divine'];
+                    const currentIdx = FORM_ORDER.indexOf(pet.form);
+                    const targetIdx = FORM_ORDER.indexOf(targetForm);
+                    if (targetIdx <= currentIdx) return { error: 'Target form must be higher than current' };
+                    const INTIMACY_REQUIRED = { adult: 30, mutant: 60, divine: 90 };
+                    if (pet.intimacy < INTIMACY_REQUIRED[targetForm]) return { error: `Intimacy ${pet.intimacy} below required ${INTIMACY_REQUIRED[targetForm]} for ${targetForm}` };
+                    const EVO_COST = { adult: 500, mutant: 2000, divine: 8000 };
+                    const cost = EVO_COST[targetForm];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    pet.form = targetForm;
+                    pet.power = Math.round(pet.power * (1 + (targetIdx - currentIdx) * 0.3));
+                    pet.level = Math.min(99, pet.level + 5);
+                    return { success: true, petId: pet.id, newForm: pet.form, newPower: pet.power, newLevel: pet.level, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetRelease(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet already released' };
+                    pet.active = false;
+                    pet.releasedAt = Date.now();
+                    return { success: true, petId, status: 'released' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetStats(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    if (petId) {
+                        const pet = pets.find(p => p.id === petId);
+                        if (!pet) return { error: 'Pet not found' };
+                        return { pet, active: pets.filter(p => p.active).length, total: pets.length };
+                    }
+                    return {
+                        pets: pets.filter(p => p.active),
+                        total: pets.length,
+                        activeCount: pets.filter(p => p.active).length,
+                        releasedCount: pets.filter(p => !p.active).length,
+                        byType: {
+                            wolf: pets.filter(p => p.type === 'wolf').length,
+                            tiger: pets.filter(p => p.type === 'tiger').length,
+                            fox: pets.filter(p => p.type === 'fox').length,
+                            dragon: pets.filter(p => p.type === 'dragon').length,
+                            phoenix: pets.filter(p => p.type === 'phoenix').length,
+                            turtle: pets.filter(p => p.type === 'turtle').length
+                        }
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -6334,6 +6567,139 @@
             return { passed, total, rate, results };
         }
         const v84Results = runV84Tests();
+
+        // ===== V85 Tests: 灵兽系统+宠物培养 =====
+        function runV85Tests() {
+            const results = [];
+            const v85Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V85 tools exist in MCP_TOOLS_V85
+            v85Assert(MCP_TOOLS_V85['pet.capture'] !== undefined, 'pet.capture defined');
+            v85Assert(MCP_TOOLS_V85['pet.list'] !== undefined, 'pet.list defined');
+            v85Assert(MCP_TOOLS_V85['pet.feed'] !== undefined, 'pet.feed defined');
+            v85Assert(MCP_TOOLS_V85['pet.evolve'] !== undefined, 'pet.evolve defined');
+            v85Assert(MCP_TOOLS_V85['pet.release'] !== undefined, 'pet.release defined');
+            v85Assert(MCP_TOOLS_V85['pet.stats'] !== undefined, 'pet.stats defined');
+
+            // Test 2: Tool registry has V85 tools
+            const server = new CultivationMCPServer();
+            v85Assert(server.toolRegistry.has('pet.capture'), 'pet.capture registered');
+            v85Assert(server.toolRegistry.has('pet.list'), 'pet.list registered');
+            v85Assert(server.toolRegistry.has('pet.evolve'), 'pet.evolve registered');
+            v85Assert(server.toolRegistry.has('pet.release'), 'pet.release registered');
+
+            // Test 3: mcpPetCapture
+            window.gameState = { spiritStones: 10000, pets: [] };
+            const capture1 = server.mcpPetCapture('wolf', 'medium');
+            v85Assert(capture1.cost === 150, 'pet.capture medium bait cost=150');
+            v85Assert(capture1.pet.type === 'wolf', 'pet.capture sets type');
+            v85Assert(capture1.pet.form === 'child', 'pet.capture default form=child');
+            v85Assert(capture1.pet.level === 1, 'pet.capture default level=1');
+            v85Assert(capture1.pet.intimacy === 0, 'pet.capture starts intimacy=0');
+            const captureDragon = server.mcpPetCapture('dragon', 'premium');
+            v85Assert(captureDragon.pet.type === 'dragon', 'pet.capture dragon works');
+            v85Assert(captureDragon.pet.power >= 25, 'pet.capture dragon power high');
+            const invalidType = server.mcpPetCapture('unicorn', 'low');
+            v85Assert(invalidType.error === 'Invalid pet type', 'pet.capture rejects invalid type');
+            window.gameState = { spiritStones: 50, pets: [] };
+            const noMoney = server.mcpPetCapture('wolf', 'premium');
+            v85Assert(noMoney.error === 'Not enough spirit stones', 'pet.capture checks money');
+
+            // Test 4: mcpPetList filter
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 0, active: true },
+                { id: 'PET_2', type: 'tiger', name: 'Tiger', form: 'adult', level: 5, power: 25, intimacy: 50, active: false }
+            ] };
+            const listAll = server.mcpPetList('all');
+            v85Assert(listAll.total === 2, 'pet.list all returns total=2');
+            const listActive = server.mcpPetList('active');
+            v85Assert(listActive.total === 1, 'pet.list active returns total=1');
+            v85Assert(listActive.pets[0].id === 'PET_1', 'pet.list active returns correct pet');
+            const listReleased = server.mcpPetList('released');
+            v85Assert(listReleased.total === 1, 'pet.list released returns total=1');
+
+            // Test 5: mcpPetFeed
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_F1', type: 'fox', name: 'Fox', form: 'child', level: 1, power: 12, intimacy: 10, hunger: 50, loyalty: 50, active: true }
+            ] };
+            const feed1 = server.mcpPetFeed('PET_F1', 'basic');
+            v85Assert(feed1.success === true, 'pet.feed returns success');
+            v85Assert(feed1.intimacy === 15, 'pet.feed basic adds 5 intimacy (10->15)');
+            v85Assert(feed1.cost === 20, 'pet.feed basic cost=20');
+            const feedPrem = server.mcpPetFeed('PET_F1', 'premium');
+            v85Assert(feedPrem.intimacy === 30, 'pet.feed premium adds 15 intimacy (15->30)');
+            v85Assert(feedPrem.cost === 80, 'pet.feed premium cost=80');
+            const feedSuper = server.mcpPetFeed('PET_F1', 'super');
+            v85Assert(feedSuper.intimacy === 60, 'pet.feed super adds 30 intimacy (30->60)');
+            const noPet = server.mcpPetFeed('PET_NONEXISTENT', 'basic');
+            v85Assert(noPet.error === 'Pet not found', 'pet.feed returns error for unknown');
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_F2', type: 'turtle', name: 'Turtle', form: 'child', level: 1, power: 10, intimacy: 0, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const notEnough = server.mcpPetFeed('PET_F2', 'super');
+            v85Assert(notEnough.error === 'Not enough spirit stones', 'pet.feed checks money');
+
+            // Test 6: mcpPetEvolve
+            window.gameState = { spiritStones: 20000, pets: [
+                { id: 'PET_E1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 90, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const evolve1 = server.mcpPetEvolve('PET_E1', 'adult');
+            v85Assert(evolve1.success === true, 'pet.evolve returns success');
+            v85Assert(evolve1.newForm === 'adult', 'pet.evolve sets form=adult');
+            v85Assert(evolve1.newPower > 15, 'pet.evolve increases power');
+            v85Assert(evolve1.cost === 500, 'pet.evolve adult cost=500');
+            const lowIntimacy = server.mcpPetEvolve('PET_E1', 'mutant');
+            v85Assert(lowIntimacy.error && lowIntimacy.error.includes('below required'), 'pet.evolve checks intimacy');
+            const invalidForm = server.mcpPetEvolve('PET_E1', 'superior');
+            v85Assert(invalidForm.error === 'Invalid target form', 'pet.evolve rejects invalid form');
+            window.gameState = { spiritStones: 500, pets: [
+                { id: 'PET_E2', type: 'tiger', name: 'Tiger', form: 'child', level: 1, power: 20, intimacy: 95, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const noMoneyEvolve = server.mcpPetEvolve('PET_E2', 'divine');
+            v85Assert(noMoneyEvolve.error === 'Not enough spirit stones', 'pet.evolve checks money');
+
+            // Test 7: mcpPetRelease
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_R1', type: 'fox', name: 'Fox', form: 'child', level: 1, power: 12, intimacy: 20, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const release1 = server.mcpPetRelease('PET_R1');
+            v85Assert(release1.success === true, 'pet.release returns success');
+            v85Assert(release1.status === 'released', 'pet.release sets status');
+            const alreadyReleased = server.mcpPetRelease('PET_R1');
+            v85Assert(alreadyReleased.error === 'Pet already released', 'pet.release prevents double release');
+            const notFound = server.mcpPetRelease('PET_NONEXISTENT');
+            v85Assert(notFound.error === 'Pet not found', 'pet.release returns error for unknown');
+
+            // Test 8: mcpPetStats
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_S1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 0, hunger: 0, loyalty: 50, active: true },
+                { id: 'PET_S2', type: 'dragon', name: 'Dragon', form: 'adult', level: 10, power: 40, intimacy: 80, hunger: 0, loyalty: 80, active: true },
+                { id: 'PET_S3', type: 'phoenix', name: 'Phoenix', form: 'divine', level: 20, power: 60, intimacy: 100, hunger: 0, loyalty: 95, active: false }
+            ] };
+            const statsAll = server.mcpPetStats();
+            v85Assert(statsAll.total === 3, 'pet.stats total=3');
+            v85Assert(statsAll.activeCount === 2, 'pet.stats activeCount=2');
+            v85Assert(statsAll.releasedCount === 1, 'pet.stats releasedCount=1');
+            v85Assert(statsAll.byType.wolf === 1, 'pet.stats byType wolf=1');
+            v85Assert(statsAll.byType.dragon === 1, 'pet.stats byType dragon=1');
+            const statsOne = server.mcpPetStats('PET_S2');
+            v85Assert(statsOne.pet.id === 'PET_S2', 'pet.stats single pet returns correct pet');
+            v85Assert(statsOne.pet.power === 40, 'pet.stats single pet power=40');
+            const statsNotFound = server.mcpPetStats('PET_NONEXISTENT');
+            v85Assert(statsNotFound.error === 'Pet not found', 'pet.stats returns error for unknown');
+
+            // Test 9: Tool count grows with V85
+            const server2 = new CultivationMCPServer();
+            v85Assert(server2.toolRegistry.size >= 84, 'toolRegistry has >= 84 tools (V73-V85)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V85 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V85 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v85Results = runV85Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
