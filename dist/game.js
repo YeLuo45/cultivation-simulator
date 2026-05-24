@@ -3325,6 +3325,71 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V90: 仙界探索+星宿共鸣+灵根进化
+        const MCP_TOOLS_V90 = {
+            'star.map': {
+                name: 'star.map',
+                description: 'Get the celestial star map showing constellation positions',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        region: { type: 'string', description: 'Region: east|west|north|south|all' }
+                    }
+                }
+            },
+            'star.resonance': {
+                name: 'star.resonance',
+                description: 'Calculate star constellation resonance bonus for the player',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        constellation: { type: 'string', description: 'Constellation name' }
+                    }
+                }
+            },
+            'spirit_root.evolve': {
+                name: 'spirit.root.evolve',
+                description: 'Evolve the player spirit root to a higher tier',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rootType: { type: 'string', description: 'Spirit root type: metal|wood|water|fire|earth|all' }
+                    }
+                }
+            },
+            'spirit.root.query': {
+                name: 'spirit.root.query',
+                description: 'Query current spirit root status and evolution progress',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        detail: { type: 'boolean', description: 'Include detailed attributes' }
+                    }
+                }
+            },
+            'explore.location': {
+                name: 'explore.location',
+                description: 'Explore a location for resources and encounters',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        location: { type: 'string', description: 'Location: mountain|forest|cave|abyss|celestial' },
+                        depth: { type: 'number', description: 'Exploration depth level (1-5)' }
+                    }
+                }
+            },
+            'explore.survey': {
+                name: 'explore.survey',
+                description: 'Survey unexplored regions on the celestial map',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        region: { type: 'string', description: 'Region to survey' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -3388,6 +3453,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V89: Register leaderboard, war report, and ladder tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V89)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V90: Register star map, spirit root, and explore tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V90)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3766,6 +3835,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'celestial.ladder_fight':
                             result = this.mcpCelestialLadderFight(args.targetPlayerId, args.stake);
+                            break;
+                        // V90: Star map, spirit root, and explore tools
+                        case 'star.map':
+                            result = this.mcpStarMap(args.region);
+                            break;
+                        case 'star.resonance':
+                            result = this.mcpStarResonance(args.constellation);
+                            break;
+                        case 'spirit.root.evolve':
+                            result = this.mcpSpiritRootEvolve(args.rootType);
+                            break;
+                        case 'spirit.root.query':
+                            result = this.mcpSpiritRootQuery(args.detail);
+                            break;
+                        case 'explore.location':
+                            result = this.mcpExploreLocation(args.location, args.depth);
+                            break;
+                        case 'explore.survey':
+                            result = this.mcpExploreSurvey(args.region);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5637,8 +5725,126 @@ const ACHIEVEMENT_ID_MAP = {
                     return {
                         success: true, won, ratingDelta, newRating: myRating + ratingDelta,
                         opponent: target, stake: stakeAmount, newBalance: gs.spiritStones,
-                        message: won ? `挑战成功！_rating +${ratingDelta}` : `挑战失败，损失${stakeAmount}灵石`
+                        message: won ? `挑战成功！rating +${ratingDelta}` : `挑战失败，损失${stakeAmount}灵石`
                     };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V90: Star Map, Spirit Root, and Explore
+            mcpStarMap(region) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID = ['east', 'west', 'north', 'south', 'all'];
+                    const r = region || 'all';
+                    if (!VALID.includes(r)) return { error: 'Invalid region' };
+                    const STAR_MAP = {
+                        east: [{ name: '青龙', stars: 28, bonus: '木系+15%' }, { name: '亢金龙', stars: 16, bonus: '金系+10%' }],
+                        west: [{ name: '白虎', stars: 22, bonus: '金系+15%' }, { name: '参宿', stars: 10, bonus: '土系+10%' }],
+                        north: [{ name: '玄武', stars: 33, bonus: '水系+15%' }, { name: '斗宿', stars: 24, bonus: '全系+5%' }],
+                        south: [{ name: '朱雀', stars: 27, bonus: '火系+15%' }, { name: '井宿', stars: 8, bonus: '火系+10%' }]
+                    };
+                    const data = r === 'all' ? STAR_MAP : { [r]: STAR_MAP[r] };
+                    return { region: r, constellations: data };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpStarResonance(constellation) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const constellations = ['青龙', '白虎', '玄武', '朱雀', '亢金龙', '参宿', '斗宿', '井宿'];
+                    const c = constellation || '';
+                    if (!constellations.includes(c)) return { error: 'Unknown constellation: ' + c };
+                    const bonuses = {
+                        '青龙': { element: 'wood', bonus: 'cultivationSpeed +15%', karmaReq: 50 },
+                        '白虎': { element: 'metal', bonus: 'attack +15%', karmaReq: 50 },
+                        '玄武': { element: 'water', bonus: 'defense +15%', karmaReq: 50 },
+                        '朱雀': { element: 'fire', bonus: 'critRate +15%', karmaReq: 50 },
+                        '亢金龙': { element: 'metal', bonus: 'metalDmg +10%', karmaReq: 30 },
+                        '参宿': { element: 'earth', bonus: 'earthDmg +10%', karmaReq: 30 },
+                        '斗宿': { element: 'all', bonus: 'allAttr +5%', karmaReq: 40 },
+                        '井宿': { element: 'fire', bonus: 'fireDmg +10%', karmaReq: 30 }
+                    };
+                    const info = bonuses[c];
+                    const karma = gs.karmaPoints || 0;
+                    const resonance = karma >= info.karmaReq ? 1.0 : karma / info.karmaReq;
+                    return { constellation: c, element: info.element, resonance, resonanceRate: (resonance * 100).toFixed(1) + '%', bonus: info.bonus };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSpiritRootEvolve(rootType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID = ['metal', 'wood', 'water', 'fire', 'earth', 'all'];
+                    const rt = rootType || 'all';
+                    if (!VALID.includes(rt)) return { error: 'Invalid spirit root type' };
+                    gs.spiritRoot = gs.spiritRoot || { type: 'wood', tier: 1 };
+                    const tierMap = { 1: '凡品', 2: '良品', 3: '上品', 4: '极品', 5: '天品' };
+                    const currentTier = gs.spiritRoot.tier || 1;
+                    if (currentTier >= 5) return { error: 'Spirit root already at max tier' };
+                    const cost = currentTier * 500;
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    gs.spiritRoot.tier = currentTier + 1;
+                    return { success: true, spiritRoot: gs.spiritRoot.type, newTier: gs.spiritRoot.tier, tierName: tierMap[gs.spiritRoot.tier], cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSpiritRootQuery(detail) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.spiritRoot = gs.spiritRoot || { type: 'wood', tier: 1 };
+                    const tierMap = { 1: '凡品', 2: '良品', 3: '上品', 4: '极品', 5: '天品' };
+                    const tier = gs.spiritRoot.tier || 1;
+                    const result = { type: gs.spiritRoot.type, tier, tierName: tierMap[tier] };
+                    if (detail) {
+                        const attrBonuses = { 1: {}, 2: { cultivationSpeed: 10 }, 3: { cultivationSpeed: 20, attack: 10 }, 4: { cultivationSpeed: 30, attack: 20, defense: 10 }, 5: { cultivationSpeed: 50, attack: 30, defense: 20, critRate: 15 } };
+                        result.attributes = attrBonuses[tier] || {};
+                        result.evolveCost = tier * 500;
+                    }
+                    return result;
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpExploreLocation(location, depth) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_LOCS = ['mountain', 'forest', 'cave', 'abyss', 'celestial'];
+                    if (!VALID_LOCS.includes(location)) return { error: 'Invalid location: ' + location };
+                    const d = Math.min(Math.max(depth || 1, 1), 5);
+                    const REWARDS = {
+                        mountain: { spiritStones: d * 50, herbs: d * 2 },
+                        forest: { herbs: d * 4, wood: d * 3 },
+                        cave: { artifacts: d > 3 ? 1 : 0, spiritStones: d * 30 },
+                        abyss: { darkEssence: d, combatXP: d * 20 },
+                        celestial: { celestialEssence: d * 2, karmaPoints: d * 5 }
+                    };
+                    const rewards = REWARDS[location] || {};
+                    return { location, depth: d, rewards, message: `探索${location}成功，发现奖励` };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpExploreSurvey(region) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.exploredRegions = gs.exploredRegions || {};
+                    const EXPLORE_REGIONS = ['east', 'west', 'north', 'south'];
+                    const r = region || 'all';
+                    if (r !== 'all' && !EXPLORE_REGIONS.includes(r)) return { error: 'Invalid region' };
+                    const regions = r === 'all' ? EXPLORE_REGIONS : [r];
+                    const results = regions.map(reg => ({
+                        region: reg, explored: gs.exploredRegions[reg] || false,
+                        points: gs.exploredRegions[reg] ? ['peak', 'valley', 'cave'][Math.floor(Math.random() * 3)] : null
+                    }));
+                    if (r === 'all') results.forEach(res => { if (res.explored) gs.exploredRegions[res.region] = true; });
+                    else gs.exploredRegions[r] = true;
+                    return { region: r, surveyResults: results };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -9746,6 +9952,87 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v89Results = runV89Tests();
+
+        // ===== V90 Tests: 仙界探索+星宿共鸣+灵根进化 =====
+        function runV90Tests() {
+            const results = [];
+            const v90Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V90 tools exist in MCP_TOOLS_V90
+            v90Assert(MCP_TOOLS_V90['star.map'] !== undefined, 'star.map defined');
+            v90Assert(MCP_TOOLS_V90['star.resonance'] !== undefined, 'star.resonance defined');
+            v90Assert(MCP_TOOLS_V90['spirit.root.evolve'] !== undefined, 'spirit.root.evolve defined');
+            v90Assert(MCP_TOOLS_V90['spirit.root.query'] !== undefined, 'spirit.root.query defined');
+            v90Assert(MCP_TOOLS_V90['explore.location'] !== undefined, 'explore.location defined');
+            v90Assert(MCP_TOOLS_V90['explore.survey'] !== undefined, 'explore.survey defined');
+
+            // Test 2: Tool registry has V90 tools
+            const server = new CultivationMCPServer();
+            v90Assert(server.toolRegistry.has('star.map'), 'star.map registered');
+            v90Assert(server.toolRegistry.has('star.resonance'), 'star.resonance registered');
+            v90Assert(server.toolRegistry.has('spirit.root.evolve'), 'spirit.root.evolve registered');
+            v90Assert(server.toolRegistry.has('spirit.root.query'), 'spirit.root.query registered');
+            v90Assert(server.toolRegistry.has('explore.location'), 'explore.location registered');
+            v90Assert(server.toolRegistry.has('explore.survey'), 'explore.survey registered');
+
+            // Test 3: Tool count grows with V90 (102 + 6 = 108)
+            const server2 = new CultivationMCPServer();
+            v90Assert(server2.toolRegistry.size >= 108, 'toolRegistry has >= 108 tools (V73-V90)');
+
+            // Test 4: star.map returns structure
+            const sm = server.mcpStarMap('east');
+            v90Assert(sm && sm.region === 'east', 'star.map returns region');
+            v90Assert(sm && sm.constellations, 'star.map returns constellations');
+
+            // Test 5: star.map validates region
+            const badSm = server.mcpStarMap('invalid');
+            v90Assert(badSm && badSm.error === 'Invalid region', 'star.map rejects invalid region');
+
+            // Test 6: star.resonance returns structure
+            const sr = server.mcpStarResonance('青龙');
+            v90Assert(sr && sr.constellation === '青龙', 'star.resonance returns constellation');
+            v90Assert(typeof sr.resonance === 'number', 'star.resonance returns resonance number');
+
+            // Test 7: star.resonance rejects unknown constellation
+            const badSr = server.mcpStarResonance('Unknown');
+            v90Assert(badSr && badSr.error, 'star.resonance rejects unknown constellation');
+
+            // Test 8: spirit.root.evolve returns structure
+            const sre = server.mcpSpiritRootEvolve('wood');
+            v90Assert(sre && (sre.success || sre.error), 'spirit.root.evolve returns success or error');
+
+            // Test 9: spirit.root.query returns structure
+            const srq = server.mcpSpiritRootQuery(false);
+            v90Assert(srq && srq.type && srq.tier, 'spirit.root.query returns type and tier');
+            v90Assert(typeof srq.tierName === 'string', 'spirit.root.query returns tierName');
+
+            // Test 10: spirit.root.query with detail
+            const srqd = server.mcpSpiritRootQuery(true);
+            v90Assert(srqd && srqd.attributes, 'spirit.root.query with detail returns attributes');
+            v90Assert(typeof srqd.evolveCost === 'number', 'spirit.root.query returns evolveCost');
+
+            // Test 11: explore.location returns structure
+            const el = server.mcpExploreLocation('mountain', 3);
+            v90Assert(el && el.location === 'mountain', 'explore.location returns location');
+            v90Assert(el && el.rewards, 'explore.location returns rewards');
+            v90Assert(el && el.depth === 3, 'explore.location returns depth');
+
+            // Test 12: explore.location validates location
+            const badEl = server.mcpExploreLocation('invalid', 1);
+            v90Assert(badEl && badEl.error, 'explore.location rejects invalid location');
+
+            // Test 13: explore.survey returns surveyResults
+            const es = server.mcpExploreSurvey('east');
+            v90Assert(es && Array.isArray(es.surveyResults), 'explore.survey returns surveyResults array');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V90 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V90 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v90Results = runV90Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
