@@ -2479,15 +2479,15 @@ const ACHIEVEMENT_ID_MAP = {
             // Provider查询
             mcpProviders() {
                 try {
-                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized', providers: [] };
-                    if (!llmRegistry) return { error: 'LLM Registry not initialized', providers: [] };
-                    const providers = llmRegistry.getAllProviders().map(p => ({
+                    let reg = window.llmRegistry;
+                    if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
+                    const providers = reg.getAllProviders().map(p => ({
                         id: p.id,
                         name: p.name,
-                        isConfigured: llmRegistry.isConfigured(p.id),
-                        isActive: p.id === llmRegistry.activeProviderId
+                        isConfigured: reg.isConfigured(p.id),
+                        isActive: p.id === reg.activeProviderId
                     }));
-                    return { providers, activeProvider: llmRegistry.activeProviderId };
+                    return { providers, activeProvider: reg.activeProviderId };
                 } catch (e) {
                     return { error: 'LLM Registry not available: ' + e.message, providers: [] };
                 }
