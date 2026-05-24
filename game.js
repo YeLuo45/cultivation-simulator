@@ -526,6 +526,60 @@
                 name: 'battle.power',
                 description: 'Calculate total player combat power',
                 inputSchema: { type: 'object', properties: {} }
+            },
+            // V77: 天道轮回增强 + 奇遇DAG深化
+            'serendipity.karma': {
+                name: 'serendipity.karma',
+                description: 'Record and query karma/causal effects',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: record|query|list' },
+                        type: { type: 'string', description: 'Karma type: good|bad|neutral' },
+                        amount: { type: 'number', description: 'Karma amount to record' }
+                    }
+                }
+            },
+            'serendipity.fate': {
+                name: 'serendipity.fate',
+                description: 'Query fate/destiny system',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        query: { type: 'string', description: 'Query: status|traits|connections' }
+                    }
+                }
+            },
+            'serendipity.branch': {
+                name: 'serendipity.branch',
+                description: 'Select branch in multi-choice serendipity event',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeId: { type: 'string', description: 'Serendipity node ID' },
+                        choice: { type: 'string', description: 'Choice: A|B|C' }
+                    }
+                }
+            },
+            'serendipity.progress': {
+                name: 'serendipity.progress',
+                description: 'Get full serendipity DAG progress',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'celestial.reincarnation': {
+                name: 'celestial.reincarnation',
+                description: 'Reincarnate or query reincarnation stats',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: stats|reincarnate|preview' }
+                    }
+                }
+            },
+            'world.cycle': {
+                name: 'world.cycle',
+                description: 'Query world cycle (天地轮回) status',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -677,6 +731,25 @@
                             break;
                         case 'battle.power':
                             result = this.mcpBattlePower();
+                            break;
+                        // V77: 天道轮回增强 + 奇遇DAG深化
+                        case 'serendipity.karma':
+                            result = this.mcpSerendipityKarma(args.action, args.type, args.amount);
+                            break;
+                        case 'serendipity.fate':
+                            result = this.mcpSerendipityFate(args.query);
+                            break;
+                        case 'serendipity.branch':
+                            result = this.mcpSerendipityBranch(args.nodeId, args.choice);
+                            break;
+                        case 'serendipity.progress':
+                            result = this.mcpSerendipityProgress();
+                            break;
+                        case 'celestial.reincarnation':
+                            result = this.mcpCelestialReincarnation(args.action);
+                            break;
+                        case 'world.cycle':
+                            result = this.mcpWorldCycle();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -973,6 +1046,98 @@
                         equipment: equipBonus,
                         skills: skillBonus,
                         realm
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V77: 天道轮回增强 + 奇遇DAG深化实现
+            mcpSerendipityKarma(action, type, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.karma) gs.karma = { good: 0, bad: 0, neutral: 0, events: [] };
+                    if (action === 'list') return { karma: gs.karma };
+                    if (action === 'query') return { total: gs.karma.good - gs.karma.bad, ...gs.karma };
+                    if (action === 'record' && type) {
+                        const t = type || 'neutral';
+                        gs.karma[t] = (gs.karma[t] || 0) + (amount || 1);
+                        gs.karma.events.push({ type: t, amount: amount || 1, time: Date.now() });
+                        return { success: true, karma: gs.karma };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityFate(query) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.fate) gs.fate = { traits: [], connections: [], destiny: 50 };
+                    if (query === 'status') return { destiny: gs.fate.destiny, level: gs.fate.destiny > 80 ? '大吉' : gs.fate.destiny > 60 ? '吉' : gs.fate.destiny > 40 ? '平' : gs.fate.destiny > 20 ? '凶' : '大凶' };
+                    if (query === 'traits') return { traits: gs.fate.traits || [] };
+                    if (query === 'connections') return { connections: gs.fate.connections || [] };
+                    return { error: 'Invalid query: ' + query };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityBranch(nodeId, choice) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
+                    if (!nodeId || !choice) return { error: 'nodeId and choice required' };
+                    gs.serendipityBranch = gs.serendipityBranch || {};
+                    gs.serendipityBranch[nodeId] = choice;
+                    return { success: true, nodeId, choice, effects: { branch_selected: true } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityProgress() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dag = gs.serendipityDAG;
+                    if (!dag || !dag.nodes) return { error: 'DAG not initialized', nodes: 0, triggered: 0, completed: 0 };
+                    let triggered = 0, completed = 0;
+                    for (const [, node] of dag.nodes) {
+                        if (node.status === 'triggered') triggered++;
+                        if (node.status === 'completed') completed++;
+                    }
+                    return { totalNodes: dag.nodes.size, triggered, completed, nodeIds: Array.from(dag.nodes.keys()) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialReincarnation(action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.reincarnation) gs.reincarnation = { times: 0, totalKarma: 0, bonuses: [] };
+                    if (action === 'stats') return { ...gs.reincarnation };
+                    if (action === 'preview') return { nextRealm: (gs.realm || 1) + 1, karmaRequired: (gs.realm || 1) * 100 };
+                    if (action === 'reincarnate') {
+                        gs.reincarnation.times++;
+                        gs.realm = 1;
+                        gs.stage = 1;
+                        gs.karma = gs.karma || {};
+                        gs.reincarnation.bonuses.push({ time: Date.now(), bonus: 'realm_reset' });
+                        return { success: true, times: gs.reincarnation.times };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpWorldCycle() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = gs.worldCycle || { phase: 'grow', day: 1, era: 1 };
+                    const PHASES = ['grow', 'peak', 'decay', 'dark', 'reborn'];
+                    return {
+                        era: cycle.era || 1,
+                        day: cycle.day || 1,
+                        phase: cycle.phase || 'grow',
+                        phaseName: cycle.phase === 'grow' ? '生机' : cycle.phase === 'peak' ? '鼎盛' : cycle.phase === 'decay' ? '衰败' : cycle.phase === 'dark' ? '至暗' : '重生',
+                        effect: cycle.phase === 'peak' ? '全属性+10%' : cycle.phase === 'decay' ? '掉落-20%' : cycle.phase === 'dark' ? '修炼-30%' : '无'
                     };
                 } catch(e) { return { error: e.message }; }
             }
@@ -3852,6 +4017,77 @@
             return { passed, total, rate, results };
         }
         const v76Results = runV76Tests();
+
+        // ===== V77 Tests: 天道轮回增强 + 奇遇DAG深化 =====
+        function runV77Tests() {
+            const results = [];
+            const v77Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V77 tools exist in MCP_TOOLS
+            v77Assert(MCP_TOOLS['serendipity.karma'] !== undefined, 'serendipity.karma tool defined');
+            v77Assert(MCP_TOOLS['serendipity.fate'] !== undefined, 'serendipity.fate tool defined');
+            v77Assert(MCP_TOOLS['serendipity.branch'] !== undefined, 'serendipity.branch tool defined');
+            v77Assert(MCP_TOOLS['serendipity.progress'] !== undefined, 'serendipity.progress tool defined');
+            v77Assert(MCP_TOOLS['celestial.reincarnation'] !== undefined, 'celestial.reincarnation tool defined');
+            v77Assert(MCP_TOOLS['world.cycle'] !== undefined, 'world.cycle tool defined');
+
+            // Test 2: Tool registry has V77 tools
+            const server = new CultivationMCPServer();
+            v77Assert(server.toolRegistry.has('serendipity.karma'), 'serendipity.karma registered');
+            v77Assert(server.toolRegistry.has('serendipity.fate'), 'serendipity.fate registered');
+            v77Assert(server.toolRegistry.has('serendipity.branch'), 'serendipity.branch registered');
+            v77Assert(server.toolRegistry.has('world.cycle'), 'world.cycle registered');
+
+            // Test 3: mcpSerendipityKarma record/query/list
+            window.gameState = {};
+            const karmaRecord = server.mcpSerendipityKarma('record', 'good', 50);
+            v77Assert(karmaRecord.success === true, 'karma.record returns success');
+            const karmaQuery = server.mcpSerendipityKarma('query', null, null);
+            v77Assert(karmaQuery.total !== undefined, 'karma.query returns total');
+            v77Assert(karmaQuery.good === 50, 'karma good = 50');
+            const karmaList = server.mcpSerendipityKarma('list', null, null);
+            v77Assert(karmaList.karma !== undefined, 'karma.list returns karma object');
+
+            // Test 4: mcpSerendipityFate queries
+            window.gameState = { fate: { traits: ['天选'], connections: ['青云宗'], destiny: 75 } };
+            const fateStatus = server.mcpSerendipityFate('status');
+            v77Assert(fateStatus.destiny === 75, 'fate status returns destiny');
+            v77Assert(fateStatus.level === '吉', 'fate level is 吉');
+            const fateTraits = server.mcpSerendipityFate('traits');
+            v77Assert(fateTraits.traits.includes('天选'), 'fate traits includes 天选');
+            const fateConn = server.mcpSerendipityFate('connections');
+            v77Assert(fateConn.connections.includes('青云宗'), 'fate connections includes 青云宗');
+
+            // Test 5: mcpCelestialReincarnation actions
+            window.gameState = { realm: 5 };
+            const reincStats = server.mcpCelestialReincarnation('stats');
+            v77Assert(reincStats.times !== undefined, 'reincarnation stats has times');
+            const reincPreview = server.mcpCelestialReincarnation('preview');
+            v77Assert(reincPreview.nextRealm === 6, 'reincarnation preview nextRealm');
+            const reincRun = server.mcpCelestialReincarnation('reincarnate');
+            v77Assert(reincRun.success === true, 'reincarnate returns success');
+            v77Assert(reincRun.times === 1, 'reincarnate times = 1');
+            v77Assert(window.gameState.realm === 1, 'reincarnate resets realm to 1');
+
+            // Test 6: mcpWorldCycle
+            window.gameState = { worldCycle: { phase: 'peak', day: 50, era: 2 } };
+            const worldCycle = server.mcpWorldCycle();
+            v77Assert(worldCycle.era === 2, 'world.cycle returns era');
+            v77Assert(worldCycle.phase === 'peak', 'world.cycle returns phase');
+            v77Assert(worldCycle.phaseName === '鼎盛', 'world.cycle phaseName is 鼎盛');
+            v77Assert(worldCycle.effect === '全属性+10%', 'world.cycle effect is +10%');
+
+            // Test 7: Tool count (V73-V77 adds 6 more = 34+)
+            v77Assert(server.toolRegistry.size >= 34, 'toolRegistry has >= 34 tools (V73-V77)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V77 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V77 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v77Results = runV77Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
