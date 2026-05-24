@@ -2772,6 +2772,75 @@ const ACHIEVEMENT_ID_MAP = {
                 }
             }
         };
+        // V82: 功法修炼系统+DAG深化
+        const MCP_TOOLS_V82 = {
+            'technique.library': {
+                name: 'technique.library',
+                description: 'Query technique library with all available techniques',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|learned|available|combat|cultivation' },
+                        realm: { type: 'number', description: 'Player realm level to filter by' }
+                    }
+                }
+            },
+            'technique.learn': {
+                name: 'technique.learn',
+                description: 'Learn a new cultivation technique',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        techniqueId: { type: 'string', description: 'Technique ID to learn' },
+                        autoAssign: { type: 'boolean', description: 'Auto-assign to equipped slot (default true)' }
+                    },
+                    required: ['techniqueId']
+                }
+            },
+            'technique.forget': {
+                name: 'technique.forget',
+                description: 'Forget a learned technique to free slot',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        techniqueId: { type: 'string', description: 'Technique ID to forget' }
+                    },
+                    required: ['techniqueId']
+                }
+            },
+            'technique.combo': {
+                name: 'technique.combo',
+                description: 'Query technique combo effects based on active techniques',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        comboType: { type: 'string', description: 'Combo type: attack|defense|buff|hybrid' }
+                    }
+                }
+            },
+            'skill.graph': {
+                name: 'skill.graph',
+                description: 'Get skill DAG graph structure with nodes and edges',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        viewMode: { type: 'string', description: 'View: full|active|locked|unlocked' }
+                    }
+                }
+            },
+            'skill.unlock': {
+                name: 'skill.unlock',
+                description: 'Unlock a skill node in the DAG',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeId: { type: 'string', description: 'Skill node ID to unlock' },
+                        cost: { type: 'number', description: 'Spirit stones cost (auto-calculated if omitted)' }
+                    },
+                    required: ['nodeId']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -2804,6 +2873,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V81: Register sect tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V81)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V82: Register technique & skill DAG tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V82)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3030,6 +3103,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'sect.mission.accept':
                             result = this.mcpSectMissionAccept(args.missionId);
+                            break;
+                        // V82: Technique & skill DAG tools
+                        case 'technique.library':
+                            result = this.mcpTechniqueLibrary(args.filter, args.realm);
+                            break;
+                        case 'technique.learn':
+                            result = this.mcpTechniqueLearn(args.techniqueId, args.autoAssign);
+                            break;
+                        case 'technique.forget':
+                            result = this.mcpTechniqueForget(args.techniqueId);
+                            break;
+                        case 'technique.combo':
+                            result = this.mcpTechniqueCombo(args.comboType);
+                            break;
+                        case 'skill.graph':
+                            result = this.mcpSkillGraph(args.viewMode);
+                            break;
+                        case 'skill.unlock':
+                            result = this.mcpSkillUnlock(args.nodeId, args.cost);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3910,6 +4002,159 @@ const ACHIEVEMENT_ID_MAP = {
                     gs.sect.missions = gs.sect.missions || [];
                     gs.sect.missions.push(missionInstance);
                     return { success: true, mission: { id: mission.id, name: mission.name, difficulty: mission.difficulty, reward: mission.reward } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V82: Technique & Skill DAG System
+            mcpTechniqueLibrary(filter, realm) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const playerRealm = realm || gs.realm || 1;
+                    const TECHNIQUES = [
+                        { id: 'TK_QY', name: '青云诀', type: 'cultivation', realmReq: 1, power: 10, description: '基础修炼功法' },
+                        { id: 'TK_TL', name: '天雷法', type: 'combat', realmReq: 2, power: 25, description: '天雷轰击术' },
+                        { id: 'TK_JG', name: '金刚经', type: 'defense', realmReq: 2, power: 20, description: '金刚护体诀' },
+                        { id: 'TK_CS', name: '长生术', type: 'cultivation', realmReq: 3, power: 15, description: '延年益寿诀' },
+                        { id: 'TK_WH', name: '万化术', type: 'hybrid', realmReq: 4, power: 30, description: '万般变化诀' },
+                        { id: 'TK_HC', name: '寒冰诀', type: 'combat', realmReq: 3, power: 28, description: '寒冰冻结术' },
+                        { id: 'TK_LQ', name: '烈焰术', type: 'combat', realmReq: 2, power: 22, description: '烈焰焚烧术' },
+                        { id: 'TK_FS', name: '飞天术', type: 'buff', realmReq: 3, power: 12, description: '腾云驾雾术' }
+                    ];
+                    const learned = gs.learnedTechniques || [];
+                    const filterType = filter || 'all';
+                    let filtered = TECHNIQUES;
+                    if (filterType === 'learned') filtered = TECHNIQUES.filter(t => learned.includes(t.id));
+                    else if (filterType === 'available') filtered = TECHNIQUES.filter(t => !learned.includes(t.id) && t.realmReq <= playerRealm);
+                    else if (filterType === 'combat') filtered = TECHNIQUES.filter(t => t.type === 'combat' || t.type === 'hybrid');
+                    else if (filterType === 'cultivation') filtered = TECHNIQUES.filter(t => t.type === 'cultivation' || t.type === 'buff');
+                    return {
+                        techniques: filtered.map(t => ({
+                            ...t,
+                            learned: learned.includes(t.id),
+                            available: !learned.includes(t.id) && t.realmReq <= playerRealm
+                        })),
+                        total: filtered.length,
+                        learnedCount: learned.length,
+                        playerRealm
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTechniqueLearn(techniqueId, autoAssign) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const TECH_IDS = ['TK_QY', 'TK_TL', 'TK_JG', 'TK_CS', 'TK_WH', 'TK_HC', 'TK_LQ', 'TK_FS'];
+                    if (!TECH_IDS.includes(techniqueId)) return { error: 'Unknown technique ID' };
+                    gs.learnedTechniques = gs.learnedTechniques || [];
+                    if (gs.learnedTechniques.includes(techniqueId)) return { error: 'Technique already learned', learned: gs.learnedTechniques };
+                    if (gs.learnedTechniques.length >= 4) return { error: 'Max techniques reached (4)' };
+                    gs.learnedTechniques.push(techniqueId);
+                    const TECH_NAMES = { TK_QY: '青云诀', TK_TL: '天雷法', TK_JG: '金刚经', TK_CS: '长生术', TK_WH: '万化术', TK_HC: '寒冰诀', TK_LQ: '烈焰术', TK_FS: '飞天术' };
+                    const result = { success: true, techniqueId, techniqueName: TECH_NAMES[techniqueId], learnedCount: gs.learnedTechniques.length };
+                    if (autoAssign !== false) {
+                        gs.equippedTechniques = gs.equippedTechniques || [];
+                        if (!gs.equippedTechniques.includes(techniqueId)) gs.equippedTechniques.push(techniqueId);
+                        result.equipped = gs.equippedTechniques;
+                    }
+                    return result;
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTechniqueForget(techniqueId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.learnedTechniques = gs.learnedTechniques || [];
+                    const idx = gs.learnedTechniques.indexOf(techniqueId);
+                    if (idx === -1) return { error: 'Technique not learned' };
+                    gs.learnedTechniques.splice(idx, 1);
+                    gs.equippedTechniques = (gs.equippedTechniques || []).filter(t => t !== techniqueId);
+                    return { success: true, techniqueId, learnedCount: gs.learnedTechniques.length, equipped: gs.equippedTechniques };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTechniqueCombo(comboType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const equipped = gs.equippedTechniques || [];
+                    const TECH_COMBOS = {
+                        attack: { name: '天雷烈火', techniques: ['TK_TL', 'TK_LQ'], bonus: { attack: 50, critRate: 15 }, description: '天雷+烈火 combo' },
+                        defense: { name: '金刚寒冰', techniques: ['TK_JG', 'TK_HC'], bonus: { defense: 40, resist: 20 }, description: '金刚+寒冰 combo' },
+                        buff: { name: '长生飞天', techniques: ['TK_CS', 'TK_FS'], bonus: { hpMax: 30, speed: 25 }, description: '长生+飞天 combo' },
+                        hybrid: { name: '万化归一', techniques: ['TK_WH', 'TK_QY'], bonus: { attack: 20, defense: 20, hpMax: 20 }, description: '万化+青云 combo' }
+                    };
+                    const type = comboType || 'hybrid';
+                    const combo = TECH_COMBOS[type];
+                    if (!combo) return { error: 'Invalid combo type' };
+                    const hasAll = combo.techniques.every(t => equipped.includes(t));
+                    const hasPartial = combo.techniques.some(t => equipped.includes(t));
+                    return {
+                        combo,
+                        active: hasAll,
+                        partialMatch: hasPartial && !hasAll,
+                        equippedTechniques: equipped,
+                        message: hasAll ? 'Combo activated!' : hasPartial ? 'Partial combo (need more techniques)' : 'No matching techniques equipped'
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSkillGraph(viewMode) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const view = viewMode || 'full';
+                    const nodes = [
+                        { id: 'N_ROOT', name: '炼气期', type: 'root', unlocked: true, x: 50, y: 80 },
+                        { id: 'N_KIRIN', name: '麒麟腿', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_KIRIN'), x: 30, y: 60, requires: ['N_ROOT'] },
+                        { id: 'N_THUNDER', name: '天雷拳', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_THUNDER'), x: 50, y: 60, requires: ['N_ROOT'] },
+                        { id: 'N_GOLD', name: '金刚身', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_GOLD'), x: 70, y: 60, requires: ['N_ROOT'] },
+                        { id: 'N_FIRE', name: '烈焰掌', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_FIRE'), x: 20, y: 40, requires: ['N_KIRIN'] },
+                        { id: 'N_ICE', name: '寒冰指', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_ICE'), x: 40, y: 40, requires: ['N_THUNDER'] },
+                        { id: 'N_LIGHT', name: '闪电拳', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_LIGHT'), x: 60, y: 40, requires: ['N_THUNDER'] },
+                        { id: 'N_STONE', name: '金刚石', type: 'skill', unlocked: gs.skills && gs.skills.includes('N_STONE'), x: 80, y: 40, requires: ['N_GOLD'] },
+                        { id: 'N_MERGE', name: '融合技', type: 'ultimate', unlocked: gs.skills && gs.skills.includes('N_MERGE'), x: 50, y: 20, requires: ['N_FIRE', 'N_ICE', 'N_LIGHT', 'N_STONE'] }
+                    ];
+                    const edges = [
+                        { from: 'N_ROOT', to: 'N_KIRIN' }, { from: 'N_ROOT', to: 'N_THUNDER' }, { from: 'N_ROOT', to: 'N_GOLD' },
+                        { from: 'N_KIRIN', to: 'N_FIRE' }, { from: 'N_THUNDER', to: 'N_ICE' }, { from: 'N_THUNDER', to: 'N_LIGHT' },
+                        { from: 'N_GOLD', to: 'N_STONE' },
+                        { from: 'N_FIRE', to: 'N_MERGE' }, { from: 'N_ICE', to: 'N_MERGE' }, { from: 'N_LIGHT', to: 'N_MERGE' }, { from: 'N_STONE', to: 'N_MERGE' }
+                    ];
+                    let filteredNodes = nodes;
+                    if (view === 'unlocked') filteredNodes = nodes.filter(n => n.unlocked);
+                    else if (view === 'locked') filteredNodes = nodes.filter(n => !n.unlocked);
+                    else if (view === 'active') filteredNodes = nodes.filter(n => gs.skills && gs.skills.includes(n.id));
+                    return {
+                        nodes: filteredNodes,
+                        edges: view === 'full' ? edges : edges.filter(e => filteredNodes.some(n => n.id === e.from || n.id === e.to)),
+                        totalNodes: nodes.length,
+                        unlockedCount: nodes.filter(n => n.unlocked).length
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSkillUnlock(nodeId, cost) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const NODE_COSTS = { N_KIRIN: 100, N_THUNDER: 100, N_GOLD: 100, N_FIRE: 300, N_ICE: 300, N_LIGHT: 300, N_STONE: 300, N_MERGE: 1000 };
+                    const NODE_NAMES = { N_KIRIN: '麒麟腿', N_THUNDER: '天雷拳', N_GOLD: '金刚身', N_FIRE: '烈焰掌', N_ICE: '寒冰指', N_LIGHT: '闪电拳', N_STONE: '金刚石', N_MERGE: '融合技' };
+                    const NODE_REQUIRES = { N_KIRIN: ['N_ROOT'], N_THUNDER: ['N_ROOT'], N_GOLD: ['N_ROOT'], N_FIRE: ['N_KIRIN'], N_ICE: ['N_THUNDER'], N_LIGHT: ['N_THUNDER'], N_STONE: ['N_GOLD'], N_MERGE: ['N_FIRE', 'N_ICE', 'N_LIGHT', 'N_STONE'] };
+                    if (!NODE_COSTS[nodeId]) return { error: 'Unknown skill node' };
+                    gs.skills = gs.skills || [];
+                    if (gs.skills.includes(nodeId)) return { error: 'Skill already unlocked', skills: gs.skills };
+                    const requires = NODE_REQUIRES[nodeId] || [];
+                    const missingReqs = requires.filter(r => !gs.skills.includes(r));
+                    if (missingReqs.length > 0) return { error: 'Prerequisites not met', missing: missingReqs };
+                    const actualCost = cost || NODE_COSTS[nodeId];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < actualCost) return { error: 'Not enough spirit stones', required: actualCost, available: gs.spiritStones };
+                    gs.spiritStones -= actualCost;
+                    gs.skills.push(nodeId);
+                    return { success: true, nodeId, nodeName: NODE_NAMES[nodeId], cost: actualCost, remainingStones: gs.spiritStones, totalSkills: gs.skills.length };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -7237,6 +7482,112 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v81Results = runV81Tests();
+
+        // ===== V82 Tests: 功法修炼系统+DAG深化 =====
+        function runV82Tests() {
+            const results = [];
+            const v82Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V82 tools exist in MCP_TOOLS_V82
+            v82Assert(MCP_TOOLS_V82['technique.library'] !== undefined, 'technique.library defined');
+            v82Assert(MCP_TOOLS_V82['technique.learn'] !== undefined, 'technique.learn defined');
+            v82Assert(MCP_TOOLS_V82['technique.forget'] !== undefined, 'technique.forget defined');
+            v82Assert(MCP_TOOLS_V82['technique.combo'] !== undefined, 'technique.combo defined');
+            v82Assert(MCP_TOOLS_V82['skill.graph'] !== undefined, 'skill.graph defined');
+            v82Assert(MCP_TOOLS_V82['skill.unlock'] !== undefined, 'skill.unlock defined');
+
+            // Test 2: Tool registry has V82 tools
+            const server = new CultivationMCPServer();
+            v82Assert(server.toolRegistry.has('technique.library'), 'technique.library registered');
+            v82Assert(server.toolRegistry.has('technique.learn'), 'technique.learn registered');
+            v82Assert(server.toolRegistry.has('skill.graph'), 'skill.graph registered');
+            v82Assert(server.toolRegistry.has('skill.unlock'), 'skill.unlock registered');
+
+            // Test 3: mcpTechniqueLibrary
+            window.gameState = { realm: 3, learnedTechniques: ['TK_QY'] };
+            const lib = server.mcpTechniqueLibrary('all', 2);
+            v82Assert(lib.techniques.length === 8, 'library returns all 8 techniques');
+            v82Assert(lib.learnedCount === 1, 'library reports learnedCount=1');
+            v82Assert(lib.playerRealm === 2, 'library uses provided realm');
+            const libAvail = server.mcpTechniqueLibrary('available', 3);
+            v82Assert(libAvail.techniques.every(t => !t.learned), 'available filter works');
+            const libCombat = server.mcpTechniqueLibrary('combat', 3);
+            v82Assert(libCombat.techniques.every(t => t.type === 'combat' || t.type === 'hybrid'), 'combat filter works');
+
+            // Test 4: mcpTechniqueLearn
+            window.gameState = { learnedTechniques: [], equippedTechniques: [] };
+            const learn1 = server.mcpTechniqueLearn('TK_QY', true);
+            v82Assert(learn1.success === true, 'technique.learn returns success');
+            v82Assert(learn1.techniqueName === '青云诀', 'technique.learn returns name');
+            v82Assert(learn1.learnedCount === 1, 'technique.learn updates count');
+            v82Assert(learn1.equipped.includes('TK_QY'), 'technique.learn auto-equips');
+            const dupLearn = server.mcpTechniqueLearn('TK_QY', false);
+            v82Assert(dupLearn.error === 'Technique already learned', 'technique.learn prevents duplicate');
+            const unknown = server.mcpTechniqueLearn('TK_UNKNOWN', false);
+            v82Assert(unknown.error === 'Unknown technique ID', 'technique.learn rejects unknown');
+            window.gameState = { learnedTechniques: ['TK_QY', 'TK_TL', 'TK_JG', 'TK_CS'], equippedTechniques: [] };
+            const maxLearn = server.mcpTechniqueLearn('TK_LQ', false);
+            v82Assert(maxLearn.error === 'Max techniques reached (4)', 'technique.learn enforces max');
+
+            // Test 5: mcpTechniqueForget
+            window.gameState = { learnedTechniques: ['TK_QY', 'TK_TL'], equippedTechniques: ['TK_QY'] };
+            const forget = server.mcpTechniqueForget('TK_QY');
+            v82Assert(forget.success === true, 'technique.forget returns success');
+            v82Assert(forget.learnedCount === 1, 'technique.forget updates learnedCount');
+            v82Assert(!forget.equipped.includes('TK_QY'), 'technique.forget removes from equipped');
+            const notLearned = server.mcpTechniqueForget('TK_LQ');
+            v82Assert(notLearned.error === 'Technique not learned', 'technique.forget rejects unlearned');
+
+            // Test 6: mcpTechniqueCombo
+            window.gameState = { equippedTechniques: ['TK_TL', 'TK_LQ'] };
+            const comboAttack = server.mcpTechniqueCombo('attack');
+            v82Assert(comboAttack.active === true, 'combo attack active when both equipped');
+            v82Assert(comboAttack.combo.name === '天雷烈火', 'combo returns correct name');
+            const comboPartial = server.mcpTechniqueCombo('defense');
+            v82Assert(comboPartial.partialMatch === true && !comboPartial.active, 'combo returns partial when 1 equipped');
+            const comboInvalid = server.mcpTechniqueCombo('invalid_type');
+            v82Assert(comboInvalid.error === 'Invalid combo type', 'combo rejects invalid type');
+
+            // Test 7: mcpSkillGraph
+            window.gameState = { skills: ['N_ROOT', 'N_THUNDER'] };
+            const graph = server.mcpSkillGraph('full');
+            v82Assert(graph.nodes.length === 9, 'skill.graph returns all 9 nodes');
+            v82Assert(graph.totalNodes === 9, 'skill.graph totalNodes=9');
+            v82Assert(graph.unlockedCount === 2, 'skill.graph unlockedCount=2');
+            v82Assert(graph.edges.length === 11, 'skill.graph edges=11');
+            const graphLocked = server.mcpSkillGraph('locked');
+            v82Assert(graphLocked.nodes.every(n => !n.unlocked), 'locked filter works');
+            const graphActive = server.mcpSkillGraph('active');
+            v82Assert(graphActive.nodes.every(n => n.unlocked), 'active filter works');
+
+            // Test 8: mcpSkillUnlock
+            window.gameState = { skills: ['N_ROOT'], spiritStones: 500 };
+            const unlock = server.mcpSkillUnlock('N_THUNDER', null);
+            v82Assert(unlock.success === true, 'skill.unlock returns success');
+            v82Assert(unlock.nodeName === '天雷拳', 'skill.unlock returns node name');
+            v82Assert(unlock.cost === 100, 'skill.unlock uses auto-cost');
+            v82Assert(unlock.totalSkills === 2, 'skill.unlock updates totalSkills');
+            const already = server.mcpSkillUnlock('N_THUNDER', null);
+            v82Assert(already.error === 'Skill already unlocked', 'skill.unlock prevents duplicate');
+            const noPrereq = server.mcpSkillUnlock('N_ICE', null);
+            v82Assert(noPrereq.error === 'Prerequisites not met', 'skill.unlock enforces prerequisites');
+            const noMoney = server.mcpSkillUnlock('N_MERGE', null);
+            v82Assert(noMoney.error === 'Not enough spirit stones', 'skill.unlock checks stones');
+            const unknownNode = server.mcpSkillUnlock('N_UNKNOWN', null);
+            v82Assert(unknownNode.error === 'Unknown skill node', 'skill.unlock rejects unknown');
+
+            // Test 9: Tool count grows with V82
+            const server2 = new CultivationMCPServer();
+            v82Assert(server2.toolRegistry.size >= 66, 'toolRegistry has >= 66 tools (V73-V82)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V82 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V82 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v82Results = runV82Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
