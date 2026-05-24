@@ -2474,10 +2474,10 @@ const ACHIEVEMENT_ID_MAP = {
 
             // Provider查询
             mcpProviders() {
-                if (typeof llmRegistry === 'undefined' || !llmRegistry) {
-                    return { error: 'LLM Registry not initialized', providers: [] };
-                }
                 try {
+                    if (typeof llmRegistry === 'undefined' || !llmRegistry) {
+                        return { error: 'LLM Registry not initialized', providers: [] };
+                    }
                     const providers = llmRegistry.getAllProviders().map(p => ({
                         id: p.id,
                         name: p.name,
@@ -2486,23 +2486,23 @@ const ACHIEVEMENT_ID_MAP = {
                     }));
                     return { providers, activeProvider: llmRegistry.activeProviderId };
                 } catch (e) {
-                    return { error: `Provider query failed: ${e.message}`, providers: [] };
+                    return { error: 'LLM Registry not available: ' + e.message, providers: [] };
                 }
             }
 
             // Provider切换
             mcpSwitchProvider(providerId) {
-                if (typeof llmRegistry === 'undefined' || !llmRegistry) {
-                    return { error: 'LLM Registry not initialized' };
-                }
                 try {
+                    if (typeof llmRegistry === 'undefined' || !llmRegistry) {
+                        return { error: 'LLM Registry not initialized' };
+                    }
                     const success = llmRegistry.setActive(providerId);
                     if (success) {
                         return { success: true, provider: providerId, message: `Switched to ${providerId}` };
                     }
                     return { error: `Failed to switch to provider: ${providerId}` };
                 } catch (e) {
-                    return { error: `Provider switch failed: ${e.message}` };
+                    return { error: 'LLM Registry not available: ' + e.message };
                 }
             }
         }
