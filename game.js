@@ -2331,7 +2331,8 @@ const ACHIEVEMENT_ID_MAP = {
 
             // NPC查询
             mcpNpcQuery(npcId, query) {
-                if (typeof gameState === 'undefined' || !gameState) return { error: 'Game state not initialized' };
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 if (!gameState.npcCollab) return { error: 'NPC system not initialized' };
                 const npc = gameState.npcCollab.npcs ? gameState.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
                 if (!npc) return { error: `NPC not found: ${npcId}` };
@@ -2369,7 +2370,8 @@ const ACHIEVEMENT_ID_MAP = {
 
             // 奇遇触发
             mcpSerendipityTrigger(nodeId) {
-                if (typeof gameState === 'undefined' || !gameState) return { error: 'Game state not initialized' };
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 if (!gameState.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
                 const node = gameState.serendipityDAG.nodes ? gameState.serendipityDAG.nodes.get(nodeId) : null;
                 if (!node) return { error: `Serendipity node not found: ${nodeId}` };
@@ -2409,7 +2411,8 @@ const ACHIEVEMENT_ID_MAP = {
 
             // 物品兑换
             mcpItemExchange(itemId, target) {
-                if (typeof gameState === 'undefined' || !gameState) return { error: 'Game state not initialized' };
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 const item = findItemById(itemId);
                 if (!item) return { error: `Item not found: ${itemId}` };
 
@@ -2424,7 +2427,8 @@ const ACHIEVEMENT_ID_MAP = {
 
             // 游戏状态查询
             mcpGameStateQuery(field) {
-                if (typeof gameState === 'undefined' || !gameState) return { error: 'Game state not initialized' };
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 switch (field) {
                     case 'realm':
                         return { realm: gameState.realm, stage: gameState.stage, level: gameState.level };
@@ -2475,9 +2479,8 @@ const ACHIEVEMENT_ID_MAP = {
             // Provider查询
             mcpProviders() {
                 try {
-                    if (typeof llmRegistry === 'undefined' || !llmRegistry) {
-                        return { error: 'LLM Registry not initialized', providers: [] };
-                    }
+                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized', providers: [] };
+                    if (!llmRegistry) return { error: 'LLM Registry not initialized', providers: [] };
                     const providers = llmRegistry.getAllProviders().map(p => ({
                         id: p.id,
                         name: p.name,
@@ -2493,9 +2496,8 @@ const ACHIEVEMENT_ID_MAP = {
             // Provider切换
             mcpSwitchProvider(providerId) {
                 try {
-                    if (typeof llmRegistry === 'undefined' || !llmRegistry) {
-                        return { error: 'LLM Registry not initialized' };
-                    }
+                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized' };
+                    if (!llmRegistry) return { error: 'LLM Registry not initialized' };
                     const success = llmRegistry.setActive(providerId);
                     if (success) {
                         return { success: true, provider: providerId, message: `Switched to ${providerId}` };
