@@ -979,6 +979,77 @@
                 }
             }
         };
+        // V84: 灵宝系统+装备进阶
+        const MCP_TOOLS_V84 = {
+            'artifact.forge': {
+                name: 'artifact.forge',
+                description: 'Forge a new artifact with materials',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'string', description: 'Artifact tier: common|rare|epic|legendary' },
+                        material: { type: 'string', description: 'Primary material used' }
+                    },
+                    required: ['tier']
+                }
+            },
+            'artifact.upgrade': {
+                name: 'artifact.upgrade',
+                description: 'Upgrade an artifact to higher level',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' },
+                        targetLevel: { type: 'number', description: 'Target upgrade level (1-15)' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.attune': {
+                name: 'artifact.attune',
+                description: 'Check artifact attunement/affinity level',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.bind': {
+                name: 'artifact.bind',
+                description: 'Bind artifact to player (ownership)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.stats': {
+                name: 'artifact.stats',
+                description: 'Query detailed artifact statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|equipped|inventory|bound|unbound' }
+                    }
+                }
+            },
+            'artifact.transform': {
+                name: 'artifact.transform',
+                description: 'Transform artifact into higher tier form',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' },
+                        targetTier: { type: 'string', description: 'Target tier: common|rare|epic|legendary|mythic' }
+                    },
+                    required: ['artifactId', 'targetTier']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -1019,6 +1090,10 @@
                 }
                 // V83: Register tribulation tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V83)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V84: Register artifact tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V84)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1283,6 +1358,25 @@
                             break;
                         case 'tribulation.talent_modify':
                             result = this.mcpTribulationTalentModify(args.talent);
+                            break;
+                        // V84: Artifact tools
+                        case 'artifact.forge':
+                            result = this.mcpArtifactForge(args.tier, args.material);
+                            break;
+                        case 'artifact.upgrade':
+                            result = this.mcpArtifactUpgrade(args.artifactId, args.targetLevel);
+                            break;
+                        case 'artifact.attune':
+                            result = this.mcpArtifactAttune(args.artifactId);
+                            break;
+                        case 'artifact.bind':
+                            result = this.mcpArtifactBind(args.artifactId);
+                            break;
+                        case 'artifact.stats':
+                            result = this.mcpArtifactStats(args.filter);
+                            break;
+                        case 'artifact.transform':
+                            result = this.mcpArtifactTransform(args.artifactId, args.targetTier);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -2449,6 +2543,138 @@
                     const oldTalent = gs.talent || 'normal';
                     gs.talent = talent;
                     return { success: true, oldTalent, newTalent: talent, realm: lastSuccess.realm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V84: Artifact & Equipment System
+            mcpArtifactForge(tier, material) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TIERS = ['common', 'rare', 'epic', 'legendary'];
+                    if (!VALID_TIERS.includes(tier)) return { error: 'Invalid artifact tier' };
+                    const TIER_POWER = { common: 10, rare: 25, epic: 50, legendary: 100 };
+                    const TIER_COST = { common: 100, rare: 500, epic: 2000, legendary: 8000 };
+                    const MATERIAL_BONUS = { iron: 1.0, jade: 1.2, gold: 1.5, spirit: 2.0 };
+                    const mat = material || 'iron';
+                    const bonus = MATERIAL_BONUS[mat] || 1.0;
+                    const cost = TIER_COST[tier];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    gs.artifacts = gs.artifacts || [];
+                    const artifactId = 'AR_' + Date.now();
+                    const power = Math.round(TIER_POWER[tier] * bonus);
+                    const newArtifact = { id: artifactId, tier, material: mat, level: 1, power, bound: false, attunement: 0, createdAt: Date.now() };
+                    gs.artifacts.push(newArtifact);
+                    return { success: true, artifact: newArtifact, cost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactUpgrade(artifactId, targetLevel) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    const target = targetLevel || (artifact.level + 1);
+                    if (target > 15) return { error: 'Max artifact level is 15' };
+                    if (target <= artifact.level) return { error: 'Target level must be higher than current' };
+                    const LEVEL_COST = (target - artifact.level) * 200 * (artifact.level + 1);
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < LEVEL_COST) return { error: 'Not enough spirit stones', required: LEVEL_COST, available: gs.spiritStones };
+                    gs.spiritStones -= LEVEL_COST;
+                    artifact.level = target;
+                    artifact.power = Math.round(artifact.power * (1 + (target - 1) * 0.1));
+                    return { success: true, artifactId, newLevel: artifact.level, newPower: artifact.power, cost: LEVEL_COST };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactAttune(artifactId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    if (!artifact.bound) return { error: 'Artifact must be bound before attunement' };
+                    const ATTUNEMENT_PER_USE = 10;
+                    artifact.attunement = Math.min(100, (artifact.attunement || 0) + ATTUNEMENT_PER_USE);
+                    const BONUS_PER_10 = { attack: 2, defense: 2, critRate: 0.5 };
+                    return {
+                        attunement: artifact.attunement,
+                        maxAttunement: 100,
+                        bonuses: {
+                            attack: Math.floor(artifact.attunement / 10) * BONUS_PER_10.attack,
+                            defense: Math.floor(artifact.attunement / 10) * BONUS_PER_10.defense,
+                            critRate: (artifact.attunement / 10) * BONUS_PER_10.critRate
+                        }
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactBind(artifactId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    if (artifact.bound) return { error: 'Artifact already bound' };
+                    artifact.bound = true;
+                    return { success: true, artifactId, bound: true };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactStats(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const artifacts = gs.artifacts || [];
+                    const f = filter || 'all';
+                    let filtered = artifacts;
+                    if (f === 'equipped') filtered = artifacts.filter(a => gs.equippedArtifacts && gs.equippedArtifacts.includes(a.id));
+                    else if (f === 'inventory') filtered = artifacts.filter(a => !gs.equippedArtifacts || !gs.equippedArtifacts.includes(a.id));
+                    else if (f === 'bound') filtered = artifacts.filter(a => a.bound);
+                    else if (f === 'unbound') filtered = artifacts.filter(a => !a.bound);
+                    return {
+                        artifacts: filtered,
+                        total: filtered.length,
+                        totalPower: filtered.reduce((sum, a) => sum + a.power, 0),
+                        byTier: {
+                            common: filtered.filter(a => a.tier === 'common').length,
+                            rare: filtered.filter(a => a.tier === 'rare').length,
+                            epic: filtered.filter(a => a.tier === 'epic').length,
+                            legendary: filtered.filter(a => a.tier === 'legendary').length
+                        }
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactTransform(artifactId, targetTier) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+                    if (!VALID_TIERS.includes(targetTier)) return { error: 'Invalid target tier' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    const TIER_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+                    const currentIdx = TIER_ORDER.indexOf(artifact.tier);
+                    const targetIdx = TIER_ORDER.indexOf(targetTier);
+                    if (targetIdx <= currentIdx) return { error: 'Target tier must be higher than current tier' };
+                    const TIER_TRANSFORM_COST = { rare: 5000, epic: 20000, legendary: 80000, mythic: 300000 };
+                    const cost = TIER_TRANSFORM_COST[targetTier];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    const TIER_POWER = { common: 10, rare: 25, epic: 50, legendary: 100, mythic: 200 };
+                    artifact.tier = targetTier;
+                    artifact.power = TIER_POWER[targetTier];
+                    artifact.attunement = 0;
+                    return { success: true, artifactId, newTier: targetTier, newPower: artifact.power, cost };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -5999,6 +6225,115 @@
             return { passed, total, rate, results };
         }
         const v83Results = runV83Tests();
+
+        // ===== V84 Tests: 灵宝系统+装备进阶 =====
+        function runV84Tests() {
+            const results = [];
+            const v84Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V84 tools exist in MCP_TOOLS_V84
+            v84Assert(MCP_TOOLS_V84['artifact.forge'] !== undefined, 'artifact.forge defined');
+            v84Assert(MCP_TOOLS_V84['artifact.upgrade'] !== undefined, 'artifact.upgrade defined');
+            v84Assert(MCP_TOOLS_V84['artifact.attune'] !== undefined, 'artifact.attune defined');
+            v84Assert(MCP_TOOLS_V84['artifact.bind'] !== undefined, 'artifact.bind defined');
+            v84Assert(MCP_TOOLS_V84['artifact.stats'] !== undefined, 'artifact.stats defined');
+            v84Assert(MCP_TOOLS_V84['artifact.transform'] !== undefined, 'artifact.transform defined');
+
+            // Test 2: Tool registry has V84 tools
+            const server = new CultivationMCPServer();
+            v84Assert(server.toolRegistry.has('artifact.forge'), 'artifact.forge registered');
+            v84Assert(server.toolRegistry.has('artifact.upgrade'), 'artifact.upgrade registered');
+            v84Assert(server.toolRegistry.has('artifact.attune'), 'artifact.attune registered');
+            v84Assert(server.toolRegistry.has('artifact.transform'), 'artifact.transform registered');
+
+            // Test 3: mcpArtifactForge
+            window.gameState = { spiritStones: 10000, artifacts: [] };
+            const forge1 = server.mcpArtifactForge('common', 'iron');
+            v84Assert(forge1.success === true, 'artifact.forge returns success');
+            v84Assert(forge1.cost === 100, 'artifact.forge common cost=100');
+            v84Assert(forge1.artifact.tier === 'common', 'artifact.forge sets tier');
+            v84Assert(forge1.artifact.level === 1, 'artifact.forge sets level=1');
+            v84Assert(forge1.artifact.bound === false, 'artifact.forge sets bound=false');
+            const forgeRare = server.mcpArtifactForge('rare', 'jade');
+            v84Assert(forgeRare.artifact.tier === 'rare', 'artifact.forge rare works');
+            v84Assert(forgeRare.artifact.power === 30, 'artifact.forge jade bonus 1.2x (25*1.2=30)');
+            const forgeLegendary = server.mcpArtifactForge('legendary', 'spirit');
+            v84Assert(forgeLegendary.artifact.power === 200, 'artifact.forge spirit bonus 2.0x (100*2=200)');
+            const noMoney = server.mcpArtifactForge('legendary', 'iron');
+            v84Assert(noMoney.error === 'Not enough spirit stones', 'artifact.forge checks money');
+            const invalidTier = server.mcpArtifactForge('super', 'iron');
+            v84Assert(invalidTier.error === 'Invalid artifact tier', 'artifact.forge rejects invalid tier');
+
+            // Test 4: mcpArtifactUpgrade
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST1', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const upgrade1 = server.mcpArtifactUpgrade('AR_TEST1', 2);
+            v84Assert(upgrade1.success === true, 'artifact.upgrade returns success');
+            v84Assert(upgrade1.newLevel === 2, 'artifact.upgrade sets newLevel');
+            v84Assert(upgrade1.newPower > 10, 'artifact.upgrade increases power');
+            const overMax = server.mcpArtifactUpgrade('AR_TEST1', 16);
+            v84Assert(overMax.error === 'Max artifact level is 15', 'artifact.upgrade enforces max level');
+            const notFound = server.mcpArtifactUpgrade('AR_NONEXISTENT', 2);
+            v84Assert(notFound.error === 'Artifact not found', 'artifact.upgrade returns error for unknown');
+
+            // Test 5: mcpArtifactAttune
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST2', tier: 'rare', level: 1, power: 25, bound: true, attunement: 0 }] };
+            const attune1 = server.mcpArtifactAttune('AR_TEST2');
+            v84Assert(attune1.attunement === 10, 'artifact.attune adds 10 attunement');
+            v84Assert(attune1.bonuses.attack === 2, 'artifact.attune gives attack bonus');
+            for (let i = 0; i < 9; i++) server.mcpArtifactAttune('AR_TEST2');
+            const attuneMax = server.mcpArtifactAttune('AR_TEST2');
+            v84Assert(attuneMax.attunement === 100, 'artifact.attune caps at 100');
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST3', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const notBound = server.mcpArtifactAttune('AR_TEST3');
+            v84Assert(notBound.error === 'Artifact must be bound before attunement', 'artifact.attune requires bound');
+
+            // Test 6: mcpArtifactBind
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST4', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const bind1 = server.mcpArtifactBind('AR_TEST4');
+            v84Assert(bind1.success === true, 'artifact.bind returns success');
+            v84Assert(bind1.bound === true, 'artifact.bind sets bound=true');
+            const alreadyBound = server.mcpArtifactBind('AR_TEST4');
+            v84Assert(alreadyBound.error === 'Artifact already bound', 'artifact.bind prevents double bind');
+
+            // Test 7: mcpArtifactStats
+            window.gameState = { spiritStones: 10000, artifacts: [
+                { id: 'AR_A', tier: 'common', level: 1, power: 10, bound: true },
+                { id: 'AR_B', tier: 'rare', level: 2, power: 25, bound: false },
+                { id: 'AR_C', tier: 'epic', level: 3, power: 50, bound: true }
+            ], equippedArtifacts: ['AR_A'] };
+            const statsAll = server.mcpArtifactStats('all');
+            v84Assert(statsAll.total === 3, 'artifact.stats returns total=3');
+            v84Assert(statsAll.totalPower === 85, 'artifact.stats sums totalPower=85');
+            v84Assert(statsAll.byTier.common === 1, 'artifact.stats byTier common=1');
+            v84Assert(statsAll.byTier.rare === 1, 'artifact.stats byTier rare=1');
+            v84Assert(statsAll.byTier.epic === 1, 'artifact.stats byTier epic=1');
+            const statsBound = server.mcpArtifactStats('bound');
+            v84Assert(statsBound.total === 2, 'artifact.stats bound filter=2');
+
+            // Test 8: mcpArtifactTransform
+            window.gameState = { spiritStones: 100000, artifacts: [{ id: 'AR_TEST5', tier: 'common', level: 1, power: 10, bound: true, attunement: 50 }] };
+            const transform1 = server.mcpArtifactTransform('AR_TEST5', 'rare');
+            v84Assert(transform1.success === true, 'artifact.transform returns success');
+            v84Assert(transform1.newTier === 'rare', 'artifact.transform sets newTier');
+            v84Assert(transform1.newPower === 25, 'artifact.transform sets newPower=25');
+            const lowerTier = server.mcpArtifactTransform('AR_TEST5', 'common');
+            v84Assert(lowerTier.error === 'Target tier must be higher', 'artifact.transform rejects lower tier');
+            window.gameState = { spiritStones: 500, artifacts: [{ id: 'AR_TEST6', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const noMoneyTransform = server.mcpArtifactTransform('AR_TEST6', 'legendary');
+            v84Assert(noMoneyTransform.error === 'Not enough spirit stones', 'artifact.transform checks money');
+
+            // Test 9: Tool count grows with V84
+            const server2 = new CultivationMCPServer();
+            v84Assert(server2.toolRegistry.size >= 78, 'toolRegistry has >= 78 tools (V73-V84)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V84 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V84 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v84Results = runV84Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
