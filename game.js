@@ -1120,6 +1120,75 @@
                 }
             }
         };
+        // V86: 炼丹系统+丹药炼制
+        const MCP_TOOLS_V86 = {
+            'alchemy.list_formulas': {
+                name: 'alchemy.list_formulas',
+                description: 'List all alchemy formulas by tier',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'string', description: 'Filter by tier: all|basic|intermediate|advanced|rare' }
+                    }
+                }
+            },
+            'alchemy.collect_herbs': {
+                name: 'alchemy.collect_herbs',
+                description: 'Collect spirit herbs for alchemy',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        location: { type: 'string', description: 'Location: forest|mountain|cave|swamp' },
+                        quality: { type: 'string', description: 'Quality: low|medium|high|premium' }
+                    },
+                    required: ['location']
+                }
+            },
+            'alchemy.refine': {
+                name: 'alchemy.refine',
+                description: 'Refine a pill using collected herbs',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        formulaId: { type: 'string', description: 'Formula ID (e.g., qi_pill_basic)' },
+                        herbSlot: { type: 'string', description: 'Herb slot: slot1|slot2|slot3' }
+                    },
+                    required: ['formulaId', 'herbSlot']
+                }
+            },
+            'alchemy.consume': {
+                name: 'alchemy.consume',
+                description: 'Consume a pill for its effect',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        pillId: { type: 'string', description: 'Pill instance ID' }
+                    },
+                    required: ['pillId']
+                }
+            },
+            'alchemy.pill_stats': {
+                name: 'alchemy.pill_stats',
+                description: 'Query pill inventory statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|consumed|inventory' }
+                    }
+                }
+            },
+            'alchemy.forget_formula': {
+                name: 'alchemy.forget_formula',
+                description: 'Forget a learned formula to free a formula slot',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        formulaId: { type: 'string', description: 'Formula ID to forget' }
+                    },
+                    required: ['formulaId']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -1168,6 +1237,10 @@
                 }
                 // V85: Register pet tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V85)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V86: Register alchemy tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V86)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1470,6 +1543,25 @@
                             break;
                         case 'pet.stats':
                             result = this.mcpPetStats(args.petId);
+                            break;
+                        // V86: Alchemy tools
+                        case 'alchemy.list_formulas':
+                            result = this.mcpAlchemyListFormulas(args.tier);
+                            break;
+                        case 'alchemy.collect_herbs':
+                            result = this.mcpAlchemyCollectHerbs(args.location, args.quality);
+                            break;
+                        case 'alchemy.refine':
+                            result = this.mcpAlchemyRefine(args.formulaId, args.herbSlot);
+                            break;
+                        case 'alchemy.consume':
+                            result = this.mcpAlchemyConsume(args.pillId);
+                            break;
+                        case 'alchemy.pill_stats':
+                            result = this.mcpAlchemyPillStats(args.filter);
+                            break;
+                        case 'alchemy.forget_formula':
+                            result = this.mcpAlchemyForgetFormula(args.formulaId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -2908,6 +3000,160 @@
                             turtle: pets.filter(p => p.type === 'turtle').length
                         }
                     };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V86: Alchemy System
+            mcpAlchemyListFormulas(tier) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const FORMULAS = [
+                        { id: 'qi_pill_basic', name: '灵气丹(初)', tier: 'basic', effect: { cultivationXP: 50 }, learnCost: 0 },
+                        { id: 'strength_pill_basic', name: '力量丹(初)', tier: 'basic', effect: { strength: 5 }, learnCost: 0 },
+                        { id: 'spirit_pill_basic', name: '灵力丹(初)', tier: 'basic', effect: { maxSpirit: 20 }, learnCost: 0 },
+                        { id: 'qi_pill_intermediate', name: '灵气丹(中)', tier: 'intermediate', effect: { cultivationXP: 200 }, learnCost: 200 },
+                        { id: 'strength_pill_intermediate', name: '力量丹(中)', tier: 'intermediate', effect: { strength: 20 }, learnCost: 200 },
+                        { id: 'spirit_pill_intermediate', name: '灵力丹(中)', tier: 'intermediate', effect: { maxSpirit: 80 }, learnCost: 200 },
+                        { id: 'qi_pill_advanced', name: '灵气丹(高)', tier: 'advanced', effect: { cultivationXP: 800 }, learnCost: 800 },
+                        { id: 'strength_pill_advanced', name: '力量丹(高)', tier: 'advanced', effect: { strength: 60 }, learnCost: 800 },
+                        { id: 'spirit_pill_advanced', name: '灵力丹(高)', tier: 'advanced', effect: { maxSpirit: 200 }, learnCost: 800 },
+                        { id: 'qi_pill_rare', name: '灵气丹(极)', tier: 'rare', effect: { cultivationXP: 3000 }, learnCost: 3000 },
+                        { id: 'strength_pill_rare', name: '力量丹(极)', tier: 'rare', effect: { strength: 150 }, learnCost: 3000 },
+                        { id: 'spirit_pill_rare', name: '灵力丹(极)', tier: 'rare', effect: { maxSpirit: 500 }, learnCost: 3000 }
+                    ];
+                    gs.learnedFormulas = gs.learnedFormulas || [];
+                    const f = tier || 'all';
+                    let filtered = FORMULAS;
+                    if (f !== 'all') filtered = FORMULAS.filter(formula => formula.tier === f);
+                    return { formulas: filtered, total: filtered.length, learnedCount: gs.learnedFormulas.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAlchemyCollectHerbs(location, quality) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_LOCATIONS = ['forest', 'mountain', 'cave', 'swamp'];
+                    if (!VALID_LOCATIONS.includes(location)) return { error: 'Invalid location' };
+                    const QUALITY_COST = { low: 30, medium: 100, high: 300, premium: 800 };
+                    const QUALITY_YIELD = { low: 1, medium: 2, high: 3, premium: 5 };
+                    const q = quality || 'medium';
+                    const cost = QUALITY_COST[q];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    gs.herbSlots = gs.herbSlots || { slot1: null, slot2: null, slot3: null };
+                    const herbId = 'HERB_' + Date.now();
+                    const HERB_POWER = { forest: 8, mountain: 12, cave: 15, swamp: 10 };
+                    const herb = { id: herbId, location, quality: q, power: HERB_POWER[location] * QUALITY_YIELD[q], slot: null };
+                    let placed = false;
+                    for (const slot of ['slot1', 'slot2', 'slot3']) {
+                        if (!gs.herbSlots[slot]) { gs.herbSlots[slot] = herb; herb.slot = slot; placed = true; break; }
+                    }
+                    if (!placed) return { success: false, reason: 'No herb slot available', cost, remainingStones: gs.spiritStones };
+                    return { success: true, herb, cost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAlchemyRefine(formulaId, herbSlot) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.herbSlots = gs.herbSlots || { slot1: null, slot2: null, slot3: null };
+                    if (!gs.herbSlots[herbSlot]) return { error: 'Herb slot is empty' };
+                    gs.learnedFormulas = gs.learnedFormulas || [];
+                    if (!gs.learnedFormulas.includes(formulaId)) {
+                        const FORMULA_LEARN_COST = { basic: 0, intermediate: 200, advanced: 800, rare: 3000 };
+                        const allFormulas = [
+                            { id: 'qi_pill_basic', tier: 'basic' }, { id: 'strength_pill_basic', tier: 'basic' }, { id: 'spirit_pill_basic', tier: 'basic' },
+                            { id: 'qi_pill_intermediate', tier: 'intermediate' }, { id: 'strength_pill_intermediate', tier: 'intermediate' }, { id: 'spirit_pill_intermediate', tier: 'intermediate' },
+                            { id: 'qi_pill_advanced', tier: 'advanced' }, { id: 'strength_pill_advanced', tier: 'advanced' }, { id: 'spirit_pill_advanced', tier: 'advanced' },
+                            { id: 'qi_pill_rare', tier: 'rare' }, { id: 'strength_pill_rare', tier: 'rare' }, { id: 'spirit_pill_rare', tier: 'rare' }
+                        ];
+                        const formula = allFormulas.find(f => f.id === formulaId);
+                        if (!formula) return { error: 'Unknown formula ID' };
+                        const learnCost = FORMULA_LEARN_COST[formula.tier];
+                        if (gs.spiritStones < learnCost) return { error: 'Not enough spirit stones to learn formula', required: learnCost };
+                        gs.spiritStones -= learnCost;
+                        gs.learnedFormulas.push(formulaId);
+                    }
+                    gs.pills = gs.pills || [];
+                    const herb = gs.herbSlots[herbSlot];
+                    gs.herbSlots[herbSlot] = null;
+                    const basePower = herb ? herb.power : 5;
+                    const craftSkill = gs.craftingSkill || 1;
+                    const successRate = Math.min(0.95, 0.5 + craftSkill * 0.05);
+                    const roll = Math.random();
+                    if (roll > successRate) return { success: false, reason: 'Refinement failed', herbUsed: !!herb, cost: 0 };
+                    const pillId = 'PILL_' + Date.now();
+                    const qualityRoll = Math.random();
+                    const pillQuality = qualityRoll > 0.9 ? 'high' : qualityRoll > 0.7 ? 'medium' : 'low';
+                    const QUALITY_MULT = { low: 1.0, medium: 1.3, high: 1.8 };
+                    const allFormulas = [
+                        { id: 'qi_pill_basic', name: '灵气丹(初)', effect: { cultivationXP: 50 } },
+                        { id: 'strength_pill_basic', name: '力量丹(初)', effect: { strength: 5 } },
+                        { id: 'spirit_pill_basic', name: '灵力丹(初)', effect: { maxSpirit: 20 } },
+                        { id: 'qi_pill_intermediate', name: '灵气丹(中)', effect: { cultivationXP: 200 } },
+                        { id: 'strength_pill_intermediate', name: '力量丹(中)', effect: { strength: 20 } },
+                        { id: 'spirit_pill_intermediate', name: '灵力丹(中)', effect: { maxSpirit: 80 } },
+                        { id: 'qi_pill_advanced', name: '灵气丹(高)', effect: { cultivationXP: 800 } },
+                        { id: 'strength_pill_advanced', name: '力量丹(高)', effect: { strength: 60 } },
+                        { id: 'spirit_pill_advanced', name: '灵力丹(高)', effect: { maxSpirit: 200 } },
+                        { id: 'qi_pill_rare', name: '灵气丹(极)', effect: { cultivationXP: 3000 } },
+                        { id: 'strength_pill_rare', name: '力量丹(极)', effect: { strength: 150 } },
+                        { id: 'spirit_pill_rare', name: '灵力丹(极)', effect: { maxSpirit: 500 } }
+                    ];
+                    const formula = allFormulas.find(frm => frm.id === formulaId);
+                    const pill = {
+                        id: pillId, formulaId, name: formula ? formula.name : formulaId,
+                        quality: pillQuality, power: Math.round(basePower * QUALITY_MULT[pillQuality]),
+                        effect: formula ? formula.effect : { cultivationXP: 50 }, consumed: false, createdAt: Date.now()
+                    };
+                    gs.pills.push(pill);
+                    return { success: true, pill, successRate: Math.round(successRate * 100) + '%' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAlchemyConsume(pillId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pills = gs.pills || [];
+                    const pill = gs.pills.find(p => p.id === pillId);
+                    if (!pill) return { error: 'Pill not found' };
+                    if (pill.consumed) return { error: 'Pill already consumed' };
+                    pill.consumed = true;
+                    pill.consumedAt = Date.now();
+                    if (pill.effect.cultivationXP) gs.cultivationXP = (gs.cultivationXP || 0) + pill.effect.cultivationXP;
+                    if (pill.effect.strength) gs.strength = (gs.strength || 0) + pill.effect.strength;
+                    if (pill.effect.maxSpirit) gs.maxSpirit = (gs.maxSpirit || 0) + pill.effect.maxSpirit;
+                    return { success: true, pillId, effect: pill.effect, cultivationXP: gs.cultivationXP };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAlchemyPillStats(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pills = gs.pills || [];
+                    const f = filter || 'all';
+                    let pills = gs.pills;
+                    if (f === 'consumed') pills = gs.pills.filter(p => p.consumed);
+                    else if (f === 'inventory') pills = gs.pills.filter(p => !p.consumed);
+                    return { pills, total: pills.length, byQuality: { low: pills.filter(p => p.quality === 'low').length, medium: pills.filter(p => p.quality === 'medium').length, high: pills.filter(p => p.quality === 'high').length } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAlchemyForgetFormula(formulaId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.learnedFormulas = gs.learnedFormulas || [];
+                    const idx = gs.learnedFormulas.indexOf(formulaId);
+                    if (idx === -1) return { error: 'Formula not learned' };
+                    gs.learnedFormulas.splice(idx, 1);
+                    return { success: true, formulaId, remainingFormulas: gs.learnedFormulas.length };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -6700,6 +6946,123 @@
             return { passed, total, rate, results };
         }
         const v85Results = runV85Tests();
+
+        // ===== V86 Tests: 炼丹系统+丹药炼制 =====
+        function runV86Tests() {
+            const results = [];
+            const v86Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V86 tools exist in MCP_TOOLS_V86
+            v86Assert(MCP_TOOLS_V86['alchemy.list_formulas'] !== undefined, 'alchemy.list_formulas defined');
+            v86Assert(MCP_TOOLS_V86['alchemy.collect_herbs'] !== undefined, 'alchemy.collect_herbs defined');
+            v86Assert(MCP_TOOLS_V86['alchemy.refine'] !== undefined, 'alchemy.refine defined');
+            v86Assert(MCP_TOOLS_V86['alchemy.consume'] !== undefined, 'alchemy.consume defined');
+            v86Assert(MCP_TOOLS_V86['alchemy.pill_stats'] !== undefined, 'alchemy.pill_stats defined');
+            v86Assert(MCP_TOOLS_V86['alchemy.forget_formula'] !== undefined, 'alchemy.forget_formula defined');
+
+            // Test 2: Tool registry has V86 tools
+            const server = new CultivationMCPServer();
+            v86Assert(server.toolRegistry.has('alchemy.list_formulas'), 'alchemy.list_formulas registered');
+            v86Assert(server.toolRegistry.has('alchemy.collect_herbs'), 'alchemy.collect_herbs registered');
+            v86Assert(server.toolRegistry.has('alchemy.refine'), 'alchemy.refine registered');
+            v86Assert(server.toolRegistry.has('alchemy.consume'), 'alchemy.consume registered');
+
+            // Test 3: mcpAlchemyListFormulas
+            window.gameState = { spiritStones: 10000, learnedFormulas: [] };
+            const listAll = server.mcpAlchemyListFormulas('all');
+            v86Assert(listAll.total === 12, 'alchemy.list_formulas returns 12 formulas');
+            v86Assert(listAll.learnedCount === 0, 'alchemy.list_formulas learnedCount=0');
+            const listBasic = server.mcpAlchemyListFormulas('basic');
+            v86Assert(listBasic.total === 3, 'alchemy.list_formulas basic filter=3');
+            v86Assert(listBasic.formulas[0].tier === 'basic', 'alchemy.list_formulas basic tier=basic');
+            const listTier = server.mcpAlchemyListFormulas('intermediate');
+            v86Assert(listTier.total === 3, 'alchemy.list_formulas intermediate filter=3');
+            const listRare = server.mcpAlchemyListFormulas('rare');
+            v86Assert(listRare.total === 3, 'alchemy.list_formulas rare filter=3');
+
+            // Test 4: mcpAlchemyCollectHerbs
+            window.gameState = { spiritStones: 10000, herbSlots: { slot1: null, slot2: null, slot3: null } };
+            const collect1 = server.mcpAlchemyCollectHerbs('forest', 'medium');
+            v86Assert(collect1.success === true, 'alchemy.collect_herbs returns success');
+            v86Assert(collect1.cost === 100, 'alchemy.collect_herbs medium cost=100');
+            v86Assert(collect1.herb.location === 'forest', 'alchemy.collect_herbs sets location');
+            v86Assert(collect1.herb.quality === 'medium', 'alchemy.collect_herbs sets quality');
+            v86Assert(collect1.herb.slot === 'slot1', 'alchemy.collect_herbs assigns slot1');
+            const collectCave = server.mcpAlchemyCollectHerbs('cave', 'premium');
+            v86Assert(collectCave.herb.location === 'cave', 'alchemy.collect_herbs cave location works');
+            v86Assert(collectCave.cost === 800, 'alchemy.collect_herbs premium cost=800');
+            const invalidLoc = server.mcpAlchemyCollectHerbs('desert', 'low');
+            v86Assert(invalidLoc.error === 'Invalid location', 'alchemy.collect_herbs rejects invalid location');
+            window.gameState = { spiritStones: 20, herbSlots: { slot1: null, slot2: null, slot3: null } };
+            const noMoney = server.mcpAlchemyCollectHerbs('mountain', 'premium');
+            v86Assert(noMoney.error === 'Not enough spirit stones', 'alchemy.collect_herbs checks money');
+            // Fill all slots
+            window.gameState = { spiritStones: 10000, herbSlots: { slot1: {}, slot2: {}, slot3: {} } };
+            const noSlot = server.mcpAlchemyCollectHerbs('mountain', 'low');
+            v86Assert(noSlot.success === false, 'alchemy.collect_herbs fails when no slot');
+            v86Assert(noSlot.reason === 'No herb slot available', 'alchemy.collect_herbs no slot reason');
+
+            // Test 5: mcpAlchemyRefine (success case - learn + refine)
+            window.gameState = { spiritStones: 10000, herbSlots: { slot1: { id: 'HERB_1', location: 'cave', quality: 'high', power: 45, slot: 'slot1' }, slot2: null, slot3: null }, learnedFormulas: [], pills: [], craftingSkill: 1 };
+            const refine1 = server.mcpAlchemyRefine('qi_pill_basic', 'slot1');
+            v86Assert(refine1.success === true, 'alchemy.refine returns success for basic pill');
+            v86Assert(refine1.pill.formulaId === 'qi_pill_basic', 'alchemy.refine sets formulaId');
+            v86Assert(refine1.pill.consumed === false, 'alchemy.refine sets consumed=false');
+            const refineIntermediate = server.mcpAlchemyRefine('qi_pill_intermediate', 'slot1');
+            v86Assert(refineIntermediate.success === true, 'alchemy.refine works for intermediate (learns automatically)');
+
+            // Test 6: mcpAlchemyRefine (empty slot)
+            window.gameState = { spiritStones: 10000, herbSlots: { slot1: null, slot2: null, slot3: null }, learnedFormulas: [], pills: [], craftingSkill: 5 };
+            const emptySlot = server.mcpAlchemyRefine('qi_pill_basic', 'slot1');
+            v86Assert(emptySlot.error === 'Herb slot is empty', 'alchemy.refine returns error for empty slot');
+
+            // Test 7: mcpAlchemyConsume
+            window.gameState = { spiritStones: 10000, pills: [{ id: 'PILL_1', formulaId: 'qi_pill_basic', name: '灵气丹(初)', quality: 'medium', power: 10, effect: { cultivationXP: 50 }, consumed: false, createdAt: Date.now() }], cultivationXP: 100 };
+            const consume1 = server.mcpAlchemyConsume('PILL_1');
+            v86Assert(consume1.success === true, 'alchemy.consume returns success');
+            v86Assert(consume1.effect.cultivationXP === 50, 'alchemy.consume returns effect cultivationXP=50');
+            v86Assert(consume1.cultivationXP === 150, 'alchemy.consume adds to cultivationXP (100+50)');
+            const alreadyConsumed = server.mcpAlchemyConsume('PILL_1');
+            v86Assert(alreadyConsumed.error === 'Pill already consumed', 'alchemy.consume prevents double consume');
+            const unknownPill = server.mcpAlchemyConsume('PILL_NONEXISTENT');
+            v86Assert(unknownPill.error === 'Pill not found', 'alchemy.consume returns error for unknown');
+
+            // Test 8: mcpAlchemyPillStats
+            window.gameState = { spiritStones: 10000, pills: [
+                { id: 'PILL_A', formulaId: 'qi_pill_basic', quality: 'low', consumed: false },
+                { id: 'PILL_B', formulaId: 'strength_pill_intermediate', quality: 'medium', consumed: false },
+                { id: 'PILL_C', formulaId: 'spirit_pill_rare', quality: 'high', consumed: true }
+            ] };
+            const statsAll = server.mcpAlchemyPillStats('all');
+            v86Assert(statsAll.total === 3, 'alchemy.pill_stats all returns total=3');
+            v86Assert(statsAll.byQuality.low === 1, 'alchemy.pill_stats byQuality low=1');
+            v86Assert(statsAll.byQuality.medium === 1, 'alchemy.pill_stats byQuality medium=1');
+            v86Assert(statsAll.byQuality.high === 1, 'alchemy.pill_stats byQuality high=1');
+            const statsInventory = server.mcpAlchemyPillStats('inventory');
+            v86Assert(statsInventory.total === 2, 'alchemy.pill_stats inventory returns 2');
+            const statsConsumed = server.mcpAlchemyPillStats('consumed');
+            v86Assert(statsConsumed.total === 1, 'alchemy.pill_stats consumed returns 1');
+
+            // Test 9: mcpAlchemyForgetFormula
+            window.gameState = { spiritStones: 10000, learnedFormulas: ['qi_pill_basic', 'strength_pill_intermediate'] };
+            const forget1 = server.mcpAlchemyForgetFormula('qi_pill_basic');
+            v86Assert(forget1.success === true, 'alchemy.forget_formula returns success');
+            v86Assert(forget1.remainingFormulas === 1, 'alchemy.forget_formula remaining=1');
+            const notLearned = server.mcpAlchemyForgetFormula('qi_pill_rare');
+            v86Assert(notLearned.error === 'Formula not learned', 'alchemy.forget_formula returns error for not learned');
+
+            // Test 10: Tool count grows with V86
+            const server2 = new CultivationMCPServer();
+            v86Assert(server2.toolRegistry.size >= 90, 'toolRegistry has >= 90 tools (V73-V86)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V86 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V86 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v86Results = runV86Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
