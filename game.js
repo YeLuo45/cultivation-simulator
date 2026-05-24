@@ -2294,6 +2294,8 @@ const ACHIEVEMENT_ID_MAP = {
                 }
 
                 try {
+                    // V73: 记录callTool到历史
+                    this.requestHistory.push({ method: 'tools.call', timestamp: Date.now(), id: name });
                     let result;
                     switch (name) {
                         case 'npc.query':
@@ -6396,6 +6398,9 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V73 MCP: 将gameState暴露到window对象，供MCP工具在初始化前访问
+        window.gameState = gameState;
+
         // --- LLM_PROVIDER_REGISTRY (V72 方向A: 多模型Provider切换引擎) ---
         // 来源: nanobot ProviderFactory + claude-code 7 Provider
         // 支持多LLM Provider注册、运行时切换、Budget Mode成本控制
@@ -6578,6 +6583,9 @@ const ACHIEVEMENT_ID_MAP = {
         }
 
         const llmRegistry = new LLMProviderRegistry();
+
+        // V73 MCP: 将llmRegistry暴露到window对象，供MCP工具访问
+        window.llmRegistry = llmRegistry;
 
         // --- callProviderAPI (V72, 替代 callMiniMaxAPI) ---
         function callProviderAPI(prompt, providerId, model, maxTokens, successCallback, errorCallback) {
