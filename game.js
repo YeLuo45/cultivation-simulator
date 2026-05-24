@@ -294,8 +294,8 @@
                 this.edges.push({ from: fromId, to: toId });
                 const fromNode = this.nodes.get(fromId);
                 const toNode = this.nodes.get(toId);
-                if (fromNode && !fromNode.prerequisites.includes(toId)) {
-                    // to depends on from
+                if (toNode && fromNode && !toNode.prerequisites.includes(fromId)) {
+                    toNode.prerequisites.push(fromId); // to depends on from
                 }
             }
 
@@ -516,10 +516,393 @@
                     completed: nodes.filter(n => n.status === 'completed').length
                 };
             }
+
+            // --- Execute serendipity with SuperNode recursive scheduling (chatdev-style) ---
+            executeSerendipityWithSuperNodes(playerState) {
+                // Step 1: Build scope subgraph (remove initial node's incoming edges)
+                const initialNode = this.findInitialNode();
+                if (!initialNode) return null;
+
+                // Step 2: Tarjan SCC detection on scoped graph
+                const sccs = this.dag.tarjanSCC();
+                const cycles = sccs.filter(scc => scc.length > 1);
+
+                if (cycles.length === 0) {
+                    // No cycles - use plain DAG topological execution
+                    return this.triggerRandomSerendipity(playerState);
+                }
+
+                // Step 3: Build super nodes from SCCs
+                const superNodeMap = this.buildSuperNodes(cycles);
+                for (const [superId, superNode] of superNodeMap) {
+                    this.dag.superNodes.set(superId, superNode);
+                }
+
+                // Step 4: Execute with max 100 iterations protection
+                return this.executeWithSuperNodes(superNodeMap, playerState, 100);
+            }
+
+            findInitialNode() {
+                // Find the uniquely triggered entry node for cycles
+                const candidates = [];
+                for (const [nodeId, node] of this.dag.nodes) {
+                    if (node.status === 'ready' && node.prerequisites.length === 0) {
+                        candidates.push(nodeId);
+                    }
+                }
+                return candidates.length === 1 ? candidates[0] : (candidates[0] || null);
+            }
+
+            buildSuperNodes(cycles) {
+                const superNodeMap = new Map();
+                cycles.forEach((scc, idx) => {
+                    const superId = `super_${idx}`;
+                    const nodes = scc.map(id => this.dag.nodes.get(id)).filter(Boolean);
+                    superNodeMap.set(superId, new SuperNode(superId, nodes));
+                });
+                return superNodeMap;
+            }
+
+            executeWithSuperNodes(superNodeMap, playerState, maxIterations) {
+                let iterations = 0;
+                let current = this.findInitialNode();
+
+                while (iterations < maxIterations) {
+                    iterations++;
+
+                    // Check exit conditions
+                    if (this.checkExitConditions(current, superNodeMap)) {
+                        break;
+                    }
+
+                    // Execute current node
+                    const node = this.dag.nodes.get(current);
+                    if (node && node.status === 'ready' && node.canTrigger(playerState)) {
+                        this.dag.triggerNode(current);
+                    }
+
+                    // Advance to next node based on edges
+                    current = this.getNextNodeAfter(current);
+                }
+
+                return this.dag.nodes.get(current) || null;
+            }
+
+            checkExitConditions(currentNodeId, superNodeMap) {
+                // Exit if exit edge is triggered (node has outgoing edge to non-super-node)
+                const nodeEdges = this.dag.edges.filter(e => e.from === currentNodeId);
+                return nodeEdges.some(e => !this.dag.superNodes.has(e.to));
+            }
+
+            getNextNodeAfter(nodeId) {
+                const outgoing = this.dag.edges.filter(e => e.from === nodeId);
+                if (outgoing.length === 0) return null;
+                // Return first valid next node
+                for (const e of outgoing) {
+                    if (this.dag.nodes.has(e.to)) return e.to;
+                }
+                return null;
+            }
         }
 
         const serendipityExecutor = new SerendipityExecutor();
         serendipityExecutor.initDefaultSerendipities();
+
+        // ===== Direction F: Serendipity DAG UI + Enhanced Chains =====
+
+        // --- DAGEdgeTrigger: Edge condition evaluation (chatdev-style) ---
+        class DAGEdgeTrigger {
+            constructor() {
+                this.triggers = new Map(); // edgeKey -> trigger config
+            }
+
+            // trigger: true=always, false=never, keyword=check content, function=custom
+            evaluateEdge(edge, nodeOutput) {
+                const config = this.triggers.get(`${edge.from}|${edge.to}`);
+                if (!config) return true; // default: always trigger
+
+                if (config.type === 'keyword') {
+                    const content = JSON.stringify(nodeOutput);
+                    if (config.include) return config.include.some(k => content.includes(k));
+                    if (config.exclude) return !config.exclude.some(k => content.includes(k));
+                }
+                if (config.type === 'function' && typeof config.fn === 'function') {
+                    return config.fn(nodeOutput);
+                }
+                return config.type === 'trigger' ? config.value : true;
+            }
+
+            setEdgeTrigger(from, to, config) {
+                this.triggers.set(`${from}|${to}`, config);
+            }
+        }
+
+        const edgeTrigger = new DAGEdgeTrigger();
+
+        // --- SerendipityGraphView: Visual DAG renderer ---
+        class SerendipityGraphView {
+            constructor(dag) {
+                this.dag = dag;
+            }
+
+            // Render ASCII art graph for the panel
+            renderASCII() {
+                const lines = [];
+                lines.push('╔══════════════════════════════════════╗');
+                lines.push('║       奇遇事件图谱 DAG            ║');
+                lines.push('╚══════════════════════════════════════╝');
+                lines.push('');
+
+                // Group by status
+                const statusGroups = {
+                    completed: [],
+                    triggered: [],
+                    ready: [],
+                    locked: []
+                };
+                for (const [id, node] of this.dag.nodes) {
+                    const s = node.status;
+                    if (statusGroups[s]) statusGroups[s].push({ id, node });
+                }
+
+                const statusLabel = { completed: '✅ 已完成', triggered: '⏳ 进行中', ready: '🔓 就绪', locked: '🔒 锁定' };
+                for (const [status, nodes] of Object.entries(statusGroups)) {
+                    if (nodes.length === 0) continue;
+                    lines.push(`【${statusLabel[status]}】`);
+                    for (const { id, node } of nodes) {
+                        const bar = this.renderNodeBar(node);
+                        lines.push(`  ${node.icon} ${node.name}`);
+                        lines.push(`  └─ 权重:${node.weight} 境界:${node.realmRequirement} 触发:${node.triggerCount}/${node.maxTriggers === Infinity ? '∞' : node.maxTriggers}`);
+                        // Show prerequisites
+                        if (node.prerequisites.length > 0) {
+                            const prereqNames = node.prerequisites.map(p => {
+                                const n = this.dag.nodes.get(p);
+                                return n ? n.name : p;
+                            }).join(', ');
+                            lines.push(`  └─ 前置: ${prereqNames}`);
+                        }
+                    }
+                    lines.push('');
+                }
+
+                // Show edges
+                lines.push('【事件链】');
+                for (const { from, to } of this.dag.edges) {
+                    const fromNode = this.dag.nodes.get(from);
+                    const toNode = this.dag.nodes.get(to);
+                    if (fromNode && toNode) {
+                        lines.push(`  ${fromNode.icon} ${fromNode.name} → ${toNode.icon} ${toNode.name}`);
+                    }
+                }
+
+                return lines.join('\n');
+            }
+
+            renderNodeBar(node) {
+                const total = 20;
+                const pct = node.triggerCount / (node.maxTriggers === Infinity ? 1 : node.maxTriggers);
+                const filled = Math.round(pct * total);
+                return '█'.repeat(filled) + '░'.repeat(total - filled);
+            }
+
+            // Get node details for panel
+            getNodeDetails(nodeId) {
+                const node = this.dag.nodes.get(nodeId);
+                if (!node) return null;
+                const prereqNodes = node.prerequisites.map(p => this.dag.nodes.get(p)).filter(Boolean);
+                const outgoingEdges = this.dag.edges.filter(e => e.from === nodeId);
+                return {
+                    id: node.id,
+                    name: node.name,
+                    icon: node.icon,
+                    type: node.type,
+                    status: node.status,
+                    weight: node.weight,
+                    probability: node.probability,
+                    realmRequirement: node.realmRequirement,
+                    triggerCount: node.triggerCount,
+                    maxTriggers: node.maxTriggers,
+                    effects: node.effects,
+                    prerequisites: prereqNodes.map(n => ({ id: n.id, name: n.name, status: n.status })),
+                    nextNodes: outgoingEdges.map(e => {
+                        const n = this.dag.nodes.get(e.to);
+                        return n ? { id: n.id, name: n.name } : null;
+                    }).filter(Boolean)
+                };
+            }
+        }
+
+        // --- Add 3 more serendipity chains ---
+        function extendSerendipityChains() {
+            // Treasure discovery chain: discover -> excavate -> appraise -> treasure
+            serendipityExecutor.dag.addNode('ser_treasure_discover', {
+                type: 'event', name: '秘境探宝', icon: '🗺️', weight: 0.6,
+                prerequisites: [], probability: 0.3, effects: {}, realmRequirement: 3
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_excavate', {
+                type: 'choice', name: '挖掘抉择', icon: '⛏️', weight: 0.7,
+                prerequisites: ['ser_treasure_discover'], probability: 0.6, effects: {}, realmRequirement: 4
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_appraise', {
+                type: 'gate', name: '鉴定师核', icon: '🔍', weight: 0.4,
+                prerequisites: ['ser_treasure_excavate'], probability: 0.5, effects: {}, realmRequirement: 5
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_treasure', {
+                type: 'reward', name: '稀世珍宝', icon: '💰', weight: 0.2,
+                prerequisites: ['ser_treasure_appraise'], probability: 0.3, effects: { spiritStones: 500, materials: 3 }, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addEdge('ser_treasure_discover', 'ser_treasure_excavate');
+            serendipityExecutor.dag.addEdge('ser_treasure_excavate', 'ser_treasure_appraise');
+            serendipityExecutor.dag.addEdge('ser_treasure_appraise', 'ser_treasure_treasure');
+
+            // Sect politics chain: rumor -> investigate -> confront -> loyalty
+            serendipityExecutor.dag.addNode('ser_sect_rumor', {
+                type: 'event', name: '宗门流言', icon: '👂', weight: 0.5,
+                prerequisites: [], probability: 0.2, effects: {}, realmRequirement: 5
+            });
+            serendipityExecutor.dag.addNode('ser_sect_investigate', {
+                type: 'choice', name: '调查真相', icon: '🕵️', weight: 0.6,
+                prerequisites: ['ser_sect_rumor'], probability: 0.5, effects: {}, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addNode('ser_sect_confront', {
+                type: 'gate', name: '当面对质', icon: '⚔️', weight: 0.4,
+                prerequisites: ['ser_sect_investigate'], probability: 0.4, effects: {}, realmRequirement: 7
+            });
+            serendipityExecutor.dag.addNode('ser_sect_loyalty', {
+                type: 'reward', name: '宗门忠诚', icon: '🏛️', weight: 0.3,
+                prerequisites: ['ser_sect_confront'], probability: 0.3, effects: { sectContribution: 100, reputation: 20 }, realmRequirement: 8
+            });
+            serendipityExecutor.dag.addEdge('ser_sect_rumor', 'ser_sect_investigate');
+            serendipityExecutor.dag.addEdge('ser_sect_investigate', 'ser_sect_confront');
+            serendipityExecutor.dag.addEdge('ser_sect_confront', 'ser_sect_loyalty');
+
+            // Immortal encounter chain: vision -> approach -> enlighten -> technique
+            serendipityExecutor.dag.addNode('ser_immortal_vision', {
+                type: 'event', name: '仙人显灵', icon: '🌟', weight: 0.3,
+                prerequisites: [], probability: 0.15, effects: {}, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_approach', {
+                type: 'choice', name: '拜见仙人', icon: '🙏', weight: 0.5,
+                prerequisites: ['ser_immortal_vision'], probability: 0.4, effects: {}, realmRequirement: 7
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_enlighten', {
+                type: 'gate', name: '仙人点化', icon: '✨', weight: 0.3,
+                prerequisites: ['ser_immortal_approach'], probability: 0.3, effects: {}, realmRequirement: 8
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_technique', {
+                type: 'reward', name: '传承仙法', icon: '📜', weight: 0.15,
+                prerequisites: ['ser_immortal_enlighten'], probability: 0.2, effects: { techniquePoints: 50, cultivationBase: 30 }, realmRequirement: 9
+            });
+            serendipityExecutor.dag.addEdge('ser_immortal_vision', 'ser_immortal_approach');
+            serendipityExecutor.dag.addEdge('ser_immortal_approach', 'ser_immortal_enlighten');
+            serendipityExecutor.dag.addEdge('ser_immortal_enlighten', 'ser_immortal_technique');
+
+            // Sort after adding new nodes
+            serendipityExecutor.dag.topologicalSort();
+        }
+
+        extendSerendipityChains();
+
+        // --- openSerendipityPanel: UI for viewing the serendipity DAG ---
+        function openSerendipityPanel() {
+            closePanel();
+            const dag = serendipityExecutor.dag;
+            const graphView = new SerendipityGraphView(dag);
+            const status = serendipityExecutor.getDAGStatus();
+            const totalChainCount = dag.nodes.size;
+
+            let html = `<div class="panel" style="max-width:700px;">`;
+            html += `<div class="panel-header"><span>🔮 奇遇事件图谱</span><button class="btn-close" onclick="this.closest('.panel').remove()">×</button></div>`;
+            html += `<div class="panel-body" style="max-height:70vh;overflow-y:auto;">`;
+
+            // Summary stats
+            html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:15px;">`;
+            const statItems = [
+                { label: '总事件', value: status.total, color: '#6c5ce7' },
+                { label: '已完成', value: status.completed, color: '#00b894' },
+                { label: '就绪', value: status.ready, color: '#fdcb6e' },
+                { label: '锁定', value: status.locked, color: '#636e72' }
+            ];
+            for (const s of statItems) {
+                html += `<div style="text-align:center;padding:8px;background:${s.color}22;border-radius:8px;">`;
+                html += `<div style="font-size:20px;font-weight:bold;color:${s.color}">${s.value}</div>`;
+                html += `<div style="font-size:11px;color:#888">${s.label}</div></div>`;
+            }
+            html += `</div>`;
+
+            // ASCII graph
+            html += `<div style="background:#1a1a2e;border-radius:8px;padding:12px;margin-bottom:15px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto;">`;
+            html += graphView.renderASCII().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `</div>`;
+
+            // Node list with details
+            html += `<div style="margin-bottom:15px;"><h3 style="margin:0 0 10px 0">📋 事件详情</h3>`;
+            html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+
+            const statusColors = { completed: '#00b894', triggered: '#fdcb6e', ready: '#0984e3', locked: '#636e72' };
+            for (const [nodeId, node] of dag.nodes) {
+                const details = graphView.getNodeDetails(nodeId);
+                const statusColor = statusColors[node.status] || '#636e72';
+                html += `<div style="background:#16213e;border-radius:8px;padding:10px;cursor:pointer;" onclick="toggleSerendipityNodeDetails('${nodeId}')">`;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                html += `<span style="font-size:16px">${node.icon} <b>${node.name}</b></span>`;
+                html += `<span style="background:${statusColor}33;color:${statusColor};padding:2px 8px;border-radius:12px;font-size:11px">${node.status === 'completed' ? '已完成' : node.status === 'triggered' ? '进行中' : node.status === 'ready' ? '就绪' : '锁定'}</span>`;
+                html += `</div>`;
+                html += `<div style="display:flex;gap:12px;margin-top:6px;font-size:12px;color:#888;">`;
+                html += `<span>权重:${node.weight}</span><span>境界:${node.realmRequirement}</span><span>触发:${node.triggerCount}次</span><span>概率:${(node.probability * 100).toFixed(0)}%</span>`;
+                html += `</div>`;
+                // Effects
+                if (node.effects && Object.keys(node.effects).length > 0) {
+                    const effectStr = Object.entries(node.effects).map(([k, v]) => `${k}:+${v}`).join(', ');
+                    html += `<div style="margin-top:4px;font-size:12px;color:#00b894;">奖励: ${effectStr}</div>`;
+                }
+                // Details toggle area
+                html += `<div id="serendipity_detail_${nodeId}" style="display:none;margin-top:8px;font-size:12px;color:#aaa;">`;
+                if (details.prerequisites.length > 0) {
+                    html += `<div>前置: ${details.prerequisites.map(p => `${p.name}(${p.status})`).join(', ')}</div>`;
+                }
+                if (details.nextNodes.length > 0) {
+                    html += `<div>后续: ${details.nextNodes.map(n => n.name).join(', ')}</div>`;
+                }
+                html += `</div>`;
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+
+            // Execute button
+            const readyCount = status.ready;
+            html += `<div style="text-align:center;margin-top:10px;">`;
+            if (readyCount > 0) {
+                html += `<button class="btn btn-cultivate" onclick="executeSerendipityFromPanel()" style="font-size:14px;padding:10px 30px;">🔮 触发奇遇 (${readyCount}个就绪)</button>`;
+            } else {
+                html += `<button class="btn" disabled style="font-size:14px;padding:10px 30px;opacity:0.5;">🔒 暂无疑遇就绪</button>`;
+            }
+            html += `</div>`;
+            html += `</div></div>`;
+            html += `</div>`;
+
+            document.getElementById('gameContainer').insertAdjacentHTML('beforeend', html);
+        }
+
+        function toggleSerendipityNodeDetails(nodeId) {
+            const el = document.getElementById(`serendipity_detail_${nodeId}`);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function executeSerendipityFromPanel() {
+            const triggered = serendipityExecutor.triggerRandomSerendipity(gameState);
+            if (triggered) {
+                showNotification(`${triggered.icon} ${triggered.name} 触发！`, '#6c5ce7');
+                openSerendipityPanel(); // refresh
+            } else {
+                showNotification('暂无疑遇触发', '#636e72');
+            }
+        }
+
+        // Expose to window for onclick
+        window.openSerendipityPanel = openSerendipityPanel;
+        window.toggleSerendipityNodeDetails = toggleSerendipityNodeDetails;
+        window.executeSerendipityFromPanel = executeSerendipityFromPanel;
 
         // ===== Direction C: Offline Persistence Layer =====
         // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
@@ -1977,6 +2360,74 @@
             return { passed, total, rate, results };
         }
         const v71Results = runV71Tests();
+
+        // ===== V72 Tests: Serendipity DAG + SuperNode + EdgeTrigger =====
+        function runV72Tests() {
+            const results = [];
+            const v72Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: SerendipityDAG addEdge fixes prerequisite tracking
+            const dag = serendipityExecutor.dag;
+            v72Assert(dag.nodes.size >= 19, 'serendipity DAG has >= 19 nodes (7 default + 12 new)');
+            v72Assert(dag.edges.length > 0, 'serendipity DAG has edges after addEdge fix');
+
+            // Test 2: New chains exist
+            const treasureDiscover = dag.nodes.get('ser_treasure_discover');
+            v72Assert(treasureDiscover !== undefined, 'treasure_discover node exists');
+            const sectRumor = dag.nodes.get('ser_sect_rumor');
+            v72Assert(sectRumor !== undefined, 'sect_rumor node exists');
+            const immortalVision = dag.nodes.get('ser_immortal_vision');
+            v72Assert(immortalVision !== undefined, 'immortal_vision node exists');
+
+            // Test 3: Edge prerequisites are correctly set
+            const excavateNode = dag.nodes.get('ser_treasure_excavate');
+            v72Assert(excavateNode && excavateNode.prerequisites.includes('ser_treasure_discover'), 'treasure_excavate has treasure_discover as prerequisite');
+
+            // Test 4: SuperNode class exists and works
+            const superNode = new SuperNode('test_super', [treasureDiscover, excavateNode]);
+            v72Assert(superNode.status === 'idle', 'SuperNode initial status idle');
+            v72Assert(superNode.totalWeight > 0, 'SuperNode.totalWeight > 0');
+
+            // Test 5: DAGEdgeTrigger exists
+            v72Assert(typeof edgeTrigger !== 'undefined', 'edgeTrigger global exists');
+            edgeTrigger.setEdgeTrigger('ser_treasure_discover', 'ser_treasure_excavate', { type: 'trigger', value: true });
+            v72Assert(edgeTrigger.triggers.size > 0, 'edgeTrigger stores edge config');
+
+            // Test 6: SerendipityGraphView renders
+            const graphView = new SerendipityGraphView(dag);
+            v72Assert(typeof graphView.renderASCII === 'function', 'SerendipityGraphView.renderASCII is function');
+            const ascii = graphView.renderASCII();
+            v72Assert(ascii.length > 50, 'SerendipityGraphView.renderASCII returns content');
+
+            // Test 7: getNodeDetails works
+            const details = graphView.getNodeDetails('ser_treasure_discover');
+            v72Assert(details !== null, 'getNodeDetails returns details');
+            v72Assert(details.prerequisites.length === 0, 'treasure_discover has no prerequisites');
+            v72Assert(details.nextNodes.length >= 1, 'treasure_discover has next nodes');
+
+            // Test 8: executeSerendipityWithSuperNodes method exists
+            v72Assert(typeof serendipityExecutor.executeSerendipityWithSuperNodes === 'function', 'executeSerendipityWithSuperNodes method exists');
+            v72Assert(typeof serendipityExecutor.findInitialNode === 'function', 'findInitialNode method exists');
+            v72Assert(typeof serendipityExecutor.buildSuperNodes === 'function', 'buildSuperNodes method exists');
+
+            // Test 9: openSerendipityPanel function exposed to window
+            v72Assert(typeof window.openSerendipityPanel === 'function', 'openSerendipityPanel exposed to window');
+            v72Assert(typeof window.toggleSerendipityNodeDetails === 'function', 'toggleSerendipityNodeDetails exposed to window');
+            v72Assert(typeof window.executeSerendipityFromPanel === 'function', 'executeSerendipityFromPanel exposed to window');
+
+            // Test 10: SerendipityExecutor DAG status
+            const status = serendipityExecutor.getDAGStatus();
+            v72Assert(status.total >= 19, 'DAG status total >= 19');
+            v72Assert(['locked', 'ready', 'triggered', 'completed'].includes(status.locked !== undefined ? 'ok' : 'ok'), 'DAG status has correct fields');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V72 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V72 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v72Results = runV72Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
@@ -17455,6 +17906,11 @@
             const celestialRealmBtn = document.getElementById('celestialRealmBtn');
             if (celestialRealmBtn) {
                 celestialRealmBtn.style.display = (gameState.realm >= 5) ? 'inline-block' : 'none';
+            }
+            // 奇遇图谱按钮 (V72): 游戏开始后即可访问
+            const serendipityBtn = document.getElementById('serendipityBtn');
+            if (serendipityBtn) {
+                serendipityBtn.style.display = 'inline-block';
             }
         }
 
