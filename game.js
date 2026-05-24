@@ -1190,6 +1190,73 @@
             }
         };
 
+        // V87: 仙界经济系统增强+天命轮回
+        const MCP_TOOLS_V87 = {
+            'economy.income_stats': {
+                name: 'economy.income_stats',
+                description: 'Query player income statistics over time period',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        period: { type: 'string', description: 'Period: day|week|month|all' }
+                    }
+                }
+            },
+            'economy.expense_stats': {
+                name: 'economy.expense_stats',
+                description: 'Query player expense statistics over time period',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        period: { type: 'string', description: 'Period: day|week|month|all' }
+                    }
+                }
+            },
+            'economy.transfer': {
+                name: 'economy.transfer',
+                description: 'Transfer spirit stones to another player',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetName: { type: 'string', description: 'Target player name' },
+                        amount: { type: 'number', description: 'Amount of spirit stones' }
+                    },
+                    required: ['targetName', 'amount']
+                }
+            },
+            'realm.tribute': {
+                name: 'realm.tribute',
+                description: 'Pay tribute to the celestial realm for buffs',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: 'Amount of spirit stones to offer' }
+                    },
+                    required: ['amount']
+                }
+            },
+            'heavenly_blessing': {
+                name: 'heavenly_blessing',
+                description: 'Receive heavenly blessing based on accumulated karma',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Blessing type: cultivation|combat|luck|realm' }
+                    }
+                }
+            },
+            'karma_point_query': {
+                name: 'karma_point_query',
+                description: 'Query karma points and recent karma history',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        limit: { type: 'number', description: 'Number of recent records to return' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -1241,6 +1308,10 @@
                 }
                 // V86: Register alchemy tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V86)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V87: Register economy and karma tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V87)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1562,6 +1633,25 @@
                             break;
                         case 'alchemy.forget_formula':
                             result = this.mcpAlchemyForgetFormula(args.formulaId);
+                            break;
+                        // V87: Economy and karma tools
+                        case 'economy.income_stats':
+                            result = this.mcpEconomyIncomeStats(args.period);
+                            break;
+                        case 'economy.expense_stats':
+                            result = this.mcpEconomyExpenseStats(args.period);
+                            break;
+                        case 'economy.transfer':
+                            result = this.mcpEconomyTransfer(args.targetName, args.amount);
+                            break;
+                        case 'realm.tribute':
+                            result = this.mcpRealmTribute(args.amount);
+                            break;
+                        case 'heavenly_blessing':
+                            result = this.mcpHeavenlyBlessing(args.type);
+                            break;
+                        case 'karma_point_query':
+                            result = this.mcpKarmaPointQuery(args.limit);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3154,6 +3244,103 @@
                     if (idx === -1) return { error: 'Formula not learned' };
                     gs.learnedFormulas.splice(idx, 1);
                     return { success: true, formulaId, remainingFormulas: gs.learnedFormulas.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V87: Economy and Karma System
+            mcpEconomyIncomeStats(period) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.economyLog = gs.economyLog || [];
+                    const now = Date.now();
+                    const PERIOD_MS = { day: 86400000, week: 604800000, month: 2592000000, all: Infinity };
+                    const ms = PERIOD_MS[period] || PERIOD_MS['all'];
+                    const since = now - ms;
+                    const incomeEntries = gs.economyLog.filter(e => e.type === 'income' && e.time > since);
+                    const total = incomeEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                    return { period, totalIncome: total, count: incomeEntries.length, entries: incomeEntries.slice(-20) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEconomyExpenseStats(period) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.economyLog = gs.economyLog || [];
+                    const now = Date.now();
+                    const PERIOD_MS = { day: 86400000, week: 604800000, month: 2592000000, all: Infinity };
+                    const ms = PERIOD_MS[period] || PERIOD_MS['all'];
+                    const since = now - ms;
+                    const expenseEntries = gs.economyLog.filter(e => e.type === 'expense' && e.time > since);
+                    const total = expenseEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                    return { period, totalExpense: total, count: expenseEntries.length, entries: expenseEntries.slice(-20) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEconomyTransfer(targetName, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!targetName || amount <= 0) return { error: 'Invalid target or amount' };
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < amount) return { error: 'Not enough spirit stones', required: amount, available: gs.spiritStones };
+                    gs.spiritStones -= amount;
+                    gs.economyLog = gs.economyLog || [];
+                    gs.economyLog.push({ type: 'expense', category: 'transfer', amount, target: targetName, time: Date.now() });
+                    return { success: true, amount, target: targetName, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpRealmTribute(amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!amount || amount <= 0) return { error: 'Invalid tribute amount' };
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < amount) return { error: 'Not enough spirit stones', required: amount, available: gs.spiritStones };
+                    gs.spiritStones -= amount;
+                    gs.realmTributeTotal = (gs.realmTributeTotal || 0) + amount;
+                    gs.economyLog = gs.economyLog || [];
+                    gs.economyLog.push({ type: 'expense', category: 'tribute', amount, time: Date.now() });
+                    // Tribute buffs scale with amount
+                    const BUFF_MULT = 0.001;
+                    const buffPower = amount * BUFF_MULT;
+                    gs.realmTributeBuff = (gs.realmTributeBuff || 0) + buffPower;
+                    return { success: true, amount, tributeTotal: gs.realmTributeTotal, buffPower: Math.round(buffPower * 100) / 100 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpHeavenlyBlessing(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const karma = gs.karmaPoints || 0;
+                    if (karma < 100) return { error: 'Insufficient karma points (need 100)', current: karma };
+                    const BLESSING_COST = { cultivation: 100, combat: 150, luck: 200, realm: 300 };
+                    const cost = BLESSING_COST[type] || 100;
+                    if (karma < cost) return { error: `Not enough karma for ${type} blessing (need ${cost})`, current: karma };
+                    gs.karmaPoints -= cost;
+                    const BLESSING_EFFECTS = {
+                        cultivation: { cultivationSpeed: 1.2, expBonus: 0.1 },
+                        combat: { attackBonus: 0.15, defenseBonus: 0.1 },
+                        luck: { dropRateBonus: 0.2, serendipityChance: 0.1 },
+                        realm: { breakthroughBonus: 0.15, tribulationResistance: 0.1 }
+                    };
+                    const effect = BLESSING_EFFECTS[type] || BLESSING_EFFECTS.cultivation;
+                    gs.heavenlyBlessingActive = gs.heavenlyBlessingActive || {};
+                    gs.heavenlyBlessingActive[type] = { effect, expiresAt: Date.now() + 3600000, cost };
+                    return { success: true, type, cost, effect, expiresIn: '1 hour' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpKarmaPointQuery(limit) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const karma = gs.karmaPoints || 0;
+                    const history = (gs.karmaHistory || []).slice(-(limit || 20));
+                    return { currentKarma: karma, totalEvents: (gs.karmaHistory || []).length, history };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -7063,6 +7250,67 @@
             return { passed, total, rate, results };
         }
         const v86Results = runV86Tests();
+
+        // ===== V87 Tests: 仙界经济系统增强+天命轮回 =====
+        function runV87Tests() {
+            const results = [];
+            const v87Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V87 tools exist in MCP_TOOLS_V87
+            v87Assert(MCP_TOOLS_V87['economy.income_stats'] !== undefined, 'economy.income_stats defined');
+            v87Assert(MCP_TOOLS_V87['economy.expense_stats'] !== undefined, 'economy.expense_stats defined');
+            v87Assert(MCP_TOOLS_V87['economy.transfer'] !== undefined, 'economy.transfer defined');
+            v87Assert(MCP_TOOLS_V87['realm.tribute'] !== undefined, 'realm.tribute defined');
+            v87Assert(MCP_TOOLS_V87['heavenly_blessing'] !== undefined, 'heavenly_blessing defined');
+            v87Assert(MCP_TOOLS_V87['karma_point_query'] !== undefined, 'karma_point_query defined');
+
+            // Test 2: Tool registry has V87 tools
+            const server = new CultivationMCPServer();
+            v87Assert(server.toolRegistry.has('economy.income_stats'), 'economy.income_stats registered');
+            v87Assert(server.toolRegistry.has('economy.expense_stats'), 'economy.expense_stats registered');
+            v87Assert(server.toolRegistry.has('economy.transfer'), 'economy.transfer registered');
+            v87Assert(server.toolRegistry.has('realm.tribute'), 'realm.tribute registered');
+            v87Assert(server.toolRegistry.has('heavenly_blessing'), 'heavenly_blessing registered');
+            v87Assert(server.toolRegistry.has('karma_point_query'), 'karma_point_query registered');
+
+            // Test 3: Tool count grows with V87 (84 + 6 = 90)
+            const server2 = new CultivationMCPServer();
+            v87Assert(server2.toolRegistry.size >= 90, 'toolRegistry has >= 90 tools (V73-V87)');
+
+            // Test 4: economy.income_stats returns structure
+            const incomeStats = server.mcpEconomyIncomeStats('all');
+            v87Assert(incomeStats && typeof incomeStats.totalIncome === 'number', 'economy.income_stats returns totalIncome number');
+            v87Assert(Array.isArray(incomeStats.entries), 'economy.income_stats returns entries array');
+
+            // Test 5: economy.expense_stats returns structure
+            const expenseStats = server.mcpEconomyExpenseStats('week');
+            v87Assert(expenseStats && typeof expenseStats.totalExpense === 'number', 'economy.expense_stats returns totalExpense number');
+
+            // Test 6: economy.transfer validates input
+            const transferNoAmount = server.mcpEconomyTransfer('TestPlayer', 0);
+            v87Assert(transferNoAmount.error === 'Invalid target or amount', 'economy.transfer rejects zero amount');
+
+            // Test 7: realm.tribute validates amount
+            const tributeBad = server.mcpRealmTribute(-100);
+            v87Assert(tributeBad.error === 'Invalid tribute amount', 'realm.tribute rejects negative amount');
+
+            // Test 8: heavenly_blessing requires karma
+            const blessingLowKarma = server.mcpHeavenlyBlessing('cultivation');
+            v87Assert(blessingLowKarma.error && blessingLowKarma.error.includes('Insufficient karma'), 'heavenly_blessing requires karma');
+
+            // Test 9: karma_point_query returns structure
+            const karmaQuery = server.mcpKarmaPointQuery(10);
+            v87Assert(karmaQuery && typeof karmaQuery.currentKarma === 'number', 'karma_point_query returns currentKarma number');
+            v87Assert(Array.isArray(karmaQuery.history), 'karma_point_query returns history array');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V87 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V87 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v87Results = runV87Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
