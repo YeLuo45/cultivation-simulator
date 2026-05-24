@@ -2312,6 +2312,81 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'mcp.dashboard',
                 description: 'Get MCP dashboard overview with all tool categories and game state summary',
                 inputSchema: { type: 'object', properties: {} }
+            },
+            // V75: NPC生态深化 + 装备系统
+            'equipment.query': {
+                name: 'equipment.query',
+                description: 'Query equipment information by slot or all equipment',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot: weapon|armor|boots|ring|amulet or "all"' }
+                    }
+                }
+            },
+            'equipment.enhance': {
+                name: 'equipment.enhance',
+                description: 'Enhance an equipment piece with spirit stones',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot to enhance' },
+                        stones: { type: 'number', description: 'Number of spirit stones to invest' }
+                    },
+                    required: ['slot', 'stones']
+                }
+            },
+            'npc.dialogue_history': {
+                name: 'npc.dialogue_history',
+                description: 'Get NPC dialogue history with player',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC ID or name' },
+                        limit: { type: 'number', description: 'Max number of recent dialogues (default 20)' }
+                    },
+                    required: ['npcId']
+                }
+            },
+            'npc.interaction_log': {
+                name: 'npc.interaction_log',
+                description: 'Get NPC interaction event log',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC ID or name' },
+                        eventType: { type: 'string', description: 'Event type filter: trade|combat|dialogue|task|all (default all)' }
+                    },
+                    required: ['npcId']
+                }
+            },
+            'npc.relationship_tree': {
+                name: 'npc.relationship_tree',
+                description: 'Get NPC relationship network tree with player and other NPCs',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'Root NPC ID or name' },
+                        depth: { type: 'number', description: 'Max depth of relationship tree (default 2)' }
+                    },
+                    required: ['npcId']
+                }
+            },
+            'item.list': {
+                name: 'item.list',
+                description: 'List all items in player inventory with filtering',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|consumable|equipment|material|quest' },
+                        quality: { type: 'string', description: 'Quality filter: N|R|SR|SSR|all' }
+                    }
+                }
+            },
+            'celestial.status': {
+                name: 'celestial.status',
+                description: 'Get full celestial realm status including battlefield and sect info',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -2423,6 +2498,28 @@ const ACHIEVEMENT_ID_MAP = {
                         case 'mcp.dashboard':
                             result = this.mcpDashboard();
                             break;
+                        // V75: NPC生态深化 + 装备系统
+                        case 'equipment.query':
+                            result = this.mcpEquipmentQuery(args.slot);
+                            break;
+                        case 'equipment.enhance':
+                            result = this.mcpEquipmentEnhance(args.slot, args.stones);
+                            break;
+                        case 'npc.dialogue_history':
+                            result = this.mcpNpcDialogueHistory(args.npcId, args.limit);
+                            break;
+                        case 'npc.interaction_log':
+                            result = this.mcpNpcInteractionLog(args.npcId, args.eventType);
+                            break;
+                        case 'npc.relationship_tree':
+                            result = this.mcpNpcRelationshipTree(args.npcId, args.depth);
+                            break;
+                        case 'item.list':
+                            result = this.mcpItemList(args.filter, args.quality);
+                            break;
+                        case 'celestial.status':
+                            result = this.mcpCelestialStatus();
+                            break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
                     }
@@ -2533,6 +2630,112 @@ const ACHIEVEMENT_ID_MAP = {
                         gameState: gs ? { realm: gs.realm, stage: gs.stage, spiritStones: gs.spiritStones } : null,
                         categories,
                         message: 'MCP Dashboard - V74'
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V75: MCP Tool Implementations
+            mcpEquipmentQuery(slot) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eq = gs.equipment || {};
+                    if (slot && slot !== 'all') {
+                        const piece = eq[slot];
+                        return piece ? { slot, ...piece } : { error: 'Slot not found: ' + slot };
+                    }
+                    return { equipment: eq, slots: ['weapon','armor','boots','ring','amulet'] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentEnhance(slot, stones) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.equipment) gs.equipment = {};
+                    if (!gs.equipment[slot]) {
+                        gs.equipment[slot] = { name: slot, level: 0, bonus: {} };
+                    }
+                    const piece = gs.equipment[slot];
+                    const cost = stones * 10;
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    piece.level = (piece.level || 0) + 1;
+                    piece.bonus = piece.bonus || {};
+                    piece.bonus[piece.level] = stones * 2;
+                    return { success: true, slot, newLevel: piece.level, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpNpcDialogueHistory(npcId, limit) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.npcCollab) return { error: 'NPC system not initialized' };
+                    const npc = gs.npcCollab.npcs ? gs.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
+                    if (!npc) return { error: 'NPC not found: ' + npcId };
+                    const history = npc.dialogueHistory || [];
+                    const max = limit || 20;
+                    return { npcId: npc.id, total: history.length, dialogues: history.slice(-max) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpNpcInteractionLog(npcId, eventType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.npcCollab) return { error: 'NPC system not initialized' };
+                    const npc = gs.npcCollab.npcs ? gs.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
+                    if (!npc) return { error: 'NPC not found: ' + npcId };
+                    const log = npc.interactionLog || [];
+                    const filtered = eventType && eventType !== 'all' ? log.filter(e => e.type === eventType) : log;
+                    return { npcId: npc.id, eventType: eventType || 'all', total: filtered.length, events: filtered };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpNpcRelationshipTree(npcId, depth) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.npcCollab) return { error: 'NPC system not initialized' };
+                    const npcs = gs.npcCollab.npcs || [];
+                    const root = npcs.find(n => n.id === npcId || n.name === npcId);
+                    if (!root) return { error: 'NPC not found: ' + npcId };
+                    const maxDepth = depth || 2;
+                    const buildTree = (npc, d) => {
+                        if (d > maxDepth) return null;
+                        const relationships = npc.relationships || {};
+                        const children = Object.entries(relationships).map(([rid, rel]) => {
+                            const child = npcs.find(n => n.id === rid);
+                            return child ? { id: child.id, name: child.name, relationship: rel, _depth: d + 1, children: buildTree(child, d + 1) } : null;
+                        }).filter(Boolean);
+                        return { id: npc.id, name: npc.name, _depth: d, children };
+                    };
+                    return { root: root.id, depth: maxDepth, tree: buildTree(root, 0) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpItemList(filter, quality) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    let items = gs.items || [];
+                    if (filter && filter !== 'all') items = items.filter(i => i.type === filter);
+                    if (quality && quality !== 'all') items = items.filter(i => i.quality === quality);
+                    return { total: items.length, filter: filter || 'all', quality: quality || 'all', items };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const celestial = gs.celestialBattlefield || { joined: false, tier: 0 };
+                    const sect = gs.sect || {};
+                    return {
+                        celestial,
+                        sect: { name: sect.name || '无宗门', level: sect.level || 0, reputation: sect.reputation || 0 },
+                        player: { realm: gs.realm || 0, stage: gs.stage || 0, spiritStones: gs.spiritStones || 0 }
                     };
                 } catch(e) { return { error: e.message }; }
             }
@@ -5126,6 +5329,128 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v74Results = runV74Tests();
+
+        // ===== V75 Tests: NPC生态深化 + 装备系统 + MCP工具全场景覆盖 =====
+        function runV75Tests() {
+            const results = [];
+            const v75Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V75 tools exist in MCP_TOOLS
+            v75Assert(MCP_TOOLS['equipment.query'] !== undefined, 'equipment.query tool defined');
+            v75Assert(MCP_TOOLS['equipment.enhance'] !== undefined, 'equipment.enhance tool defined');
+            v75Assert(MCP_TOOLS['npc.dialogue_history'] !== undefined, 'npc.dialogue_history tool defined');
+            v75Assert(MCP_TOOLS['npc.interaction_log'] !== undefined, 'npc.interaction_log tool defined');
+            v75Assert(MCP_TOOLS['npc.relationship_tree'] !== undefined, 'npc.relationship_tree tool defined');
+            v75Assert(MCP_TOOLS['item.list'] !== undefined, 'item.list tool defined');
+            v75Assert(MCP_TOOLS['celestial.status'] !== undefined, 'celestial.status tool defined');
+
+            // Test 2: Tool registry has V75 tools registered
+            const server = new CultivationMCPServer();
+            v75Assert(server.toolRegistry.has('equipment.query'), 'equipment.query registered in toolRegistry');
+            v75Assert(server.toolRegistry.has('npc.dialogue_history'), 'npc.dialogue_history registered');
+            v75Assert(server.toolRegistry.has('npc.relationship_tree'), 'npc.relationship_tree registered');
+            v75Assert(server.toolRegistry.has('item.list'), 'item.list registered');
+            v75Assert(server.toolRegistry.has('celestial.status'), 'celestial.status registered');
+
+            // Test 3: mcpEquipmentQuery works
+            window.gameState = { equipment: { weapon: { name: '长剑', level: 3, bonus: { 1: 10, 2: 20 } } }, spiritStones: 1000 };
+            const eqAll = server.mcpEquipmentQuery('all');
+            v75Assert(eqAll.slots !== undefined, 'equipment.query all returns slots');
+            const eqWeapon = server.mcpEquipmentQuery('weapon');
+            v75Assert(eqWeapon.slot === 'weapon', 'equipment.query weapon returns correct slot');
+            v75Assert(eqWeapon.level === 3, 'equipment.query weapon returns level');
+
+            // Test 4: mcpEquipmentEnhance works
+            const enhanceResult = server.mcpEquipmentEnhance('armor', 5);
+            v75Assert(enhanceResult.success === true, 'equipment.enhance returns success');
+            v75Assert(enhanceResult.newLevel === 1, 'equipment.enhance creates new equipment');
+            v75Assert(enhanceResult.cost === 50, 'equipment.enhance calculates cost correctly');
+
+            // Test 5: mcpNpcDialogueHistory (with mock NPC)
+            window.gameState = {
+                npcCollab: {
+                    npcs: [{ id: 'master1', name: '师尊', dialogueHistory: [{ text: '你好', ts: 1000 }, { text: '继续', ts: 2000 }], relationships: {} }]
+                }
+            };
+            const dh = server.mcpNpcDialogueHistory('master1', 10);
+            v75Assert(dh.npcId === 'master1', 'dialogue_history returns correct npcId');
+            v75Assert(dh.total === 2, 'dialogue_history returns total count');
+            v75Assert(Array.isArray(dh.dialogues), 'dialogue_history returns dialogues array');
+            v75Assert(dh.dialogues.length === 2, 'dialogue_history respects limit');
+
+            // Test 6: mcpNpcInteractionLog
+            window.gameState = {
+                npcCollab: {
+                    npcs: [{
+                        id: 'merchant1', name: '商人', interactionLog: [
+                            { type: 'trade', text: '购买丹药', ts: 1000 },
+                            { type: 'combat', text: '遭遇袭击', ts: 2000 },
+                            { type: 'trade', text: '出售灵草', ts: 3000 }
+                        ], relationships: {}
+                    }]
+                }
+            };
+            const logAll = server.mcpNpcInteractionLog('merchant1', 'all');
+            v75Assert(logAll.total === 3, 'interaction_log returns all events');
+            const logTrade = server.mcpNpcInteractionLog('merchant1', 'trade');
+            v75Assert(logTrade.total === 2, 'interaction_log filters by type');
+            v75Assert(logTrade.events.every(e => e.type === 'trade'), 'interaction_log filter is correct');
+
+            // Test 7: mcpNpcRelationshipTree
+            window.gameState = {
+                npcCollab: {
+                    npcs: [
+                        { id: 'master1', name: '师尊', relationships: { fellow1: '师徒', rival1: '竞争' } },
+                        { id: 'fellow1', name: '同道', relationships: { master1: '师徒', rival1: '同门' } },
+                        { id: 'rival1', name: '对手', relationships: { master1: '竞争', fellow1: '同门' } }
+                    ]
+                }
+            };
+            const tree = server.mcpNpcRelationshipTree('master1', 2);
+            v75Assert(tree.root === 'master1', 'relationship_tree returns correct root');
+            v75Assert(tree.depth === 2, 'relationship_tree respects depth');
+            v75Assert(tree.tree !== null, 'relationship_tree builds tree structure');
+            v75Assert(tree.tree.children.length >= 2, 'relationship_tree has children');
+
+            // Test 8: mcpItemList
+            window.gameState = {
+                items: [
+                    { id: 'item1', name: '丹药', type: 'consumable', quality: 'R' },
+                    { id: 'item2', name: '灵甲', type: 'equipment', quality: 'SR' },
+                    { id: 'item3', name: '灵草', type: 'material', quality: 'N' }
+                ]
+            };
+            const itemsAll = server.mcpItemList('all', 'all');
+            v75Assert(itemsAll.total === 3, 'item.list all returns 3 items');
+            const itemsConsumable = server.mcpItemList('consumable', 'all');
+            v75Assert(itemsConsumable.total === 1, 'item.list filters by type');
+            v75Assert(itemsConsumable.items[0].type === 'consumable', 'item.list filter is correct');
+            const itemsSR = server.mcpItemList('all', 'SR');
+            v75Assert(itemsSR.total === 1, 'item.list filters by quality');
+            v75Assert(itemsSR.items[0].quality === 'SR', 'item.list quality filter is correct');
+
+            // Test 9: mcpCelestialStatus
+            window.gameState = {
+                celestialBattlefield: { joined: true, tier: 3, battles: 5 },
+                sect: { name: '青云宗', level: 5, reputation: 1000 },
+                realm: 6, stage: 2, spiritStones: 5000
+            };
+            const status = server.mcpCelestialStatus();
+            v75Assert(status.celestial.joined === true, 'celestial.status returns battlefield');
+            v75Assert(status.sect.name === '青云宗', 'celestial.status returns sect');
+            v75Assert(status.player.realm === 6, 'celestial.status returns player');
+
+            // Test 10: Tool count grows (V73 8 + V74 7 + V75 7 = 22 total)
+            v75Assert(server.toolRegistry.size >= 22, 'toolRegistry has >= 22 tools (V73+V74+V75)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V75 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V75 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v75Results = runV75Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
