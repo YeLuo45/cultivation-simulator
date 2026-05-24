@@ -2479,15 +2479,17 @@ const ACHIEVEMENT_ID_MAP = {
             // Provider查询
             mcpProviders() {
                 try {
-                    let reg = window.llmRegistry;
-                    if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
-                    const providers = reg.getAllProviders().map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        isConfigured: reg.isConfigured(p.id),
-                        isActive: p.id === reg.activeProviderId
-                    }));
-                    return { providers, activeProvider: reg.activeProviderId };
+                    return (function() {
+                        let reg = llmRegistry;
+                        if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
+                        const providers = reg.getAllProviders().map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            isConfigured: reg.isConfigured(p.id),
+                            isActive: p.id === reg.activeProviderId
+                        }));
+                        return { providers, activeProvider: reg.activeProviderId };
+                    })();
                 } catch (e) {
                     return { error: 'LLM Registry not available: ' + e.message, providers: [] };
                 }
@@ -2496,13 +2498,15 @@ const ACHIEVEMENT_ID_MAP = {
             // Provider切换
             mcpSwitchProvider(providerId) {
                 try {
-                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized' };
-                    if (!llmRegistry) return { error: 'LLM Registry not initialized' };
-                    const success = llmRegistry.setActive(providerId);
-                    if (success) {
-                        return { success: true, provider: providerId, message: `Switched to ${providerId}` };
-                    }
-                    return { error: `Failed to switch to provider: ${providerId}` };
+                    return (function() {
+                        let reg = llmRegistry;
+                        if (!reg) return { error: 'LLM Registry not initialized' };
+                        const success = reg.setActive(providerId);
+                        if (success) {
+                            return { success: true, provider: providerId, message: 'Switched to ' + providerId };
+                        }
+                        return { error: 'Failed to switch to provider: ' + providerId };
+                    })();
                 } catch (e) {
                     return { error: 'LLM Registry not available: ' + e.message };
                 }
