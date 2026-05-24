@@ -7,51 +7,6 @@
 <body>
 <h1>V73 MCP Agent Bridge Tests</h1>
 <pre id="output"></pre>
-
-<!-- MOCK SETUP: 在 game.js 加载前执行，确保 window.gameState 和 window.llmRegistry 已存在 -->
-<script>
-// Mock window.gameState 如果不存在
-if (typeof window.gameState === 'undefined') {
-    window.gameState = {
-        realm: 0, stage: 0, qi: 1000,
-        spiritStones: 5000,
-        items: [
-            { id: 'test_item_1', name: '测试丹药', type: 'pill', rarity: 'common', quantity: 5, equipped: false, description: '' }
-        ],
-        inventoryCount: 1,
-        combat: { combatEnabled: true, wins: 3, losses: 1, currentOpponent: null },
-        npcCollab: null,
-        cultivation: { spiritEnergy: 800, maxSpiritEnergy: 1000 }
-    };
-}
-// Mock window.llmRegistry if not exists
-if (typeof window.llmRegistry === 'undefined') {
-    window.llmRegistry = {
-        providers: [
-            { id: 'minimax', name: 'MiniMax', endpoint: '/api/chat', model: 'MiniMax-Text-01' },
-            { id: 'openai', name: 'OpenAI', endpoint: '/api/openai', model: 'gpt-4' },
-            { id: 'claude', name: 'Claude', endpoint: '/api/claude', model: 'claude-3-5-sonnet' }
-        ],
-        currentProvider: 'minimax',
-        getAllProviders: function() { return this.providers; },
-        switchProvider: function(id) {
-            if (this.providers.find(p => p.id === id)) {
-                this.currentProvider = id;
-                return { success: true, message: 'Switched to ' + id };
-            }
-            return { error: 'Provider ' + id + ' not found' };
-        }
-    };
-}
-// Mock mcpBtn DOM element if not present
-if (!document.getElementById('mcpBtn')) {
-    var btn = document.createElement('button');
-    btn.id = 'mcpBtn';
-    btn.style.display = 'none';
-    document.body.appendChild(btn);
-}
-</script>
-
 <script src="game.js"></script>
 <script>
 const output = document.getElementById('output');
@@ -76,11 +31,11 @@ function runTests() {
             fn();
             results.push({ name, status: 'PASS' });
             passed++;
-            log('PASS: ' + name);
+            log(`PASS: ${name}`);
         } catch (e) {
             results.push({ name, status: 'FAIL', error: e.message });
             failed++;
-            log('FAIL: ' + name + ' — ' + e.message);
+            log(`FAIL: ${name} — ${e.message}`);
         }
     }
 
@@ -89,11 +44,11 @@ function runTests() {
     }
 
     function assertEqual(actual, expected, message) {
-        if (actual !== expected) throw new Error((message || '') + ' Expected ' + expected + ', got ' + actual);
+        if (actual !== expected) throw new Error(`${message || ''} Expected ${expected}, got ${actual}`);
     }
 
     function assertContains(str, substr, message) {
-        if (!str.includes(substr)) throw new Error((message || '') + ' "' + str + '" does not contain "' + substr + '"');
+        if (!str.includes(substr)) throw new Error(`${message || ''} "${str}" does not contain "${substr}"`);
     }
 
     // T1: MCP_TOOLS 定义完整性
@@ -104,9 +59,9 @@ function runTests() {
     // T2: MCP_TOOLS 每个工具都有 inputSchema
     test('T2: 所有MCP工具都有inputSchema', () => {
         for (const [name, tool] of Object.entries(MCP_TOOLS)) {
-            assert(tool.inputSchema, name + ' 缺少 inputSchema');
-            assert(tool.inputSchema.type === 'object', name + ' inputSchema.type 应为 object');
-            assert(tool.inputSchema.properties, name + ' 缺少 inputSchema.properties');
+            assert(tool.inputSchema, `${name} 缺少 inputSchema`);
+            assert(tool.inputSchema.type === 'object', `${name} inputSchema.type 应为 object`);
+            assert(tool.inputSchema.properties, `${name} 缺少 inputSchema.properties`);
         }
     });
 
@@ -190,8 +145,8 @@ function runTests() {
     // T14: gameState.query('realm') 返回境界信息
     test('T14: gameState.query(realm) 返回realm/stage/level', () => {
         const result = cultivationMCPServer.mcpGameStateQuery('realm');
-        assertEqual(result.realm, window.gameState.realm, 'realm值');
-        assertEqual(result.stage, window.gameState.stage, 'stage值');
+        assertEqual(result.realm, gameState.realm, 'realm值');
+        assertEqual(result.stage, gameState.stage, 'stage值');
     });
 
     // T15: gameState.query('spiritStones') 返回灵石信息
@@ -243,11 +198,11 @@ function runTests() {
 
     // T22: mcpNpcQuery 无NPC系统返回错误
     test('T22: 无NPC系统时mcpNpcQuery返回错误', () => {
-        const original = window.gameState.npcCollab;
-        window.gameState.npcCollab = null;
+        const original = gameState.npcCollab;
+        gameState.npcCollab = null;
         const result = cultivationMCPServer.mcpNpcQuery('test_npc', 'info');
         assert(result.error, '应返回错误');
-        window.gameState.npcCollab = original;
+        gameState.npcCollab = original;
     });
 
     // T23: MCP按钮DOM存在
@@ -305,7 +260,7 @@ function runTests() {
 
     // T31: mcpNpcQuery 查询info返回正确字段
     test('T31: mcpNpcQuery(npc_test, info) 返回NPC基本信息', () => {
-        window.gameState.npcCollab = { npcs: [{ id: 'npc_test', name: '测试NPC', role: '道友', realm: '筑基', disposition: '友善', currentTask: 'none' }] };
+        gameState.npcCollab = { npcs: [{ id: 'npc_test', name: '测试NPC', role: '道友', realm: '筑基', disposition: '友善', currentTask: 'none' }] };
         const result = cultivationMCPServer.mcpNpcQuery('npc_test', 'info');
         assertEqual(result.id, 'npc_test', 'id');
         assertEqual(result.name, '测试NPC', 'name');
@@ -355,13 +310,13 @@ function runTests() {
 
     const total = passed + failed;
     const rate = ((passed / total) * 100).toFixed(1);
-    log('\n========== V73 MCP Agent Bridge Tests ==========');
-    log('Total: ' + total + ' | Pass: ' + passed + ' | Fail: ' + failed + ' | Rate: ' + rate + '%');
-    log('==============================================');
+    log(`\n========== V73 MCP Agent Bridge Tests ==========`);
+    log(`Total: ${total} | Pass: ${passed} | Fail: ${failed} | Rate: ${rate}%`);
+    log(`==============================================`);
     if (rate >= 80) {
-        log('✓ Test coverage ' + rate + '% >= 80% — PASS');
+        log(`✓ Test coverage ${rate}% >= 80% — PASS`);
     } else {
-        log('✗ Test coverage ' + rate + '% < 80% — FAIL');
+        log(`✗ Test coverage ${rate}% < 80% — FAIL`);
     }
 }
 
