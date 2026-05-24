@@ -3786,6 +3786,69 @@ const ACHIEVEMENT_ID_MAP = {
             console.log(`[PASS] Grand test suite meets 80%+ target!`);
         }
 
+        // ===== V70 Direction A: NPC Ecosystem Tests =====
+        function runV70Tests() {
+            const results = [];
+            const v70Assert = (cond, name) => results.push({ name, pass: !!cond });
+            const pop = new NpcPopulation();
+            v70Assert(pop.getCount('monster') >= 0, 'NpcPopulation.getCount');
+            pop.adjustCount('monster', +2);
+            v70Assert(pop.getCount('monster') >= 2, 'NpcPopulation.adjustCount increase');
+            pop.adjustCount('monster', -1);
+            v70Assert(pop.getCount('monster') >= 1, 'NpcPopulation.adjustCount decrease');
+            pop.adjustCount('fellow', +10);
+            v70Assert(pop.getCount('fellow') <= NPC_ECOLOGY_CONFIG.POPULATION_CEILING, 'NpcPopulation ceiling enforced');
+            v70Assert(!pop.isExtinct('fellow'), 'NpcPopulation not extinct after adjust');
+            pop.adjustCount('fellow', -100);
+            v70Assert(pop.isExtinct('fellow'), 'NpcPopulation.isExtinct true at 0');
+            const revived = pop.reviveRole('fellow');
+            v70Assert(revived === true, 'NpcPopulation.reviveRole returns true');
+            v70Assert(pop.getCount('fellow') === 1, 'NpcPopulation.reviveRole restores 1 NPC');
+            const chain = new NpcFoodChain();
+            v70Assert(chain.getEnergy('monster') === 60, 'NpcFoodChain initial energy');
+            chain.drainEnergy('monster');
+            v70Assert(chain.getEnergy('monster') < 60, 'NpcFoodChain drain reduces energy');
+            const gain = chain.applyPredation('monster', 'fellow');
+            v70Assert(gain >= 0, 'NpcFoodChain.applyPredation returns gain');
+            v70Assert(chain.getEnergy('monster') > 40, 'NpcFoodChain.applyPredation adds energy');
+            const terr = new NpcTerritory();
+            v70Assert(terr.getTerritory('master') !== undefined, 'NpcTerritory.getTerritory');
+            const expanded = terr.expandTerritory('monster');
+            v70Assert(typeof expanded === 'boolean', 'NpcTerritory.expandTerritory returns boolean');
+            terr.claimTerritory('fellow', 'north');
+            v70Assert(terr.getTerritory('fellow') === 'north', 'NpcTerritory.claimTerritory updates');
+            const quality = terr.getQuality('north');
+            v70Assert(quality >= 0 && quality <= 1, 'NpcTerritory.getQuality in range');
+            terr.degradeQuality('north');
+            v70Assert(terr.getQuality('north') < quality, 'NpcTerritory.degradeQuality reduces');
+            const comp = new NpcResourceCompetition();
+            comp.initialize({ master: 'central', monster: 'east' });
+            const consumed = comp.consumeResource('central', 50);
+            v70Assert(consumed >= 0, 'NpcResourceCompetition.consumeResource returns amount');
+            const scarcity = comp.checkScarcity();
+            v70Assert(typeof scarcity === 'object', 'NpcResourceCompetition.checkScarcity returns object');
+            const engine = new NpcEcologyEngine();
+            engine.initialize();
+            v70Assert(engine.population instanceof NpcPopulation, 'NpcEcologyEngine.population');
+            v70Assert(engine.foodChain instanceof NpcFoodChain, 'NpcEcologyEngine.foodChain');
+            v70Assert(engine.territory instanceof NpcTerritory, 'NpcEcologyEngine.territory');
+            v70Assert(engine.competition instanceof NpcResourceCompetition, 'NpcEcologyEngine.competition');
+            engine.tick();
+            v70Assert(engine.lastTick > 0, 'NpcEcologyEngine.tick updates lastTick');
+            v70Assert(typeof openNpcEcologyPanel === 'function', 'openNpcEcologyPanel is a function');
+            const bus = new NpcMessageBus();
+            const before = bus.messages.length;
+            bus.broadcast('master', 'ecology_alert', { type: 'scarcity', zone: 'central' });
+            v70Assert(bus.messages.length > before, 'NpcMessageBus broadcasts ecology events');
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V70 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V70 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v70Results = runV70Tests();
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
@@ -3976,6 +4039,291 @@ const ACHIEVEMENT_ID_MAP = {
         }
 
         const idleTaskProcessor = new IdleTaskProcessor();
+
+        // ===== V70 Direction A: NPC Ecosystem System =====
+        // Based on nanobot MessageBus + chatdev multi-role + DAG dependencies
+        // NPC种群动态/食物链/领地/资源竞争/灭绝复兴机制
+
+        // --- NPC_ECOLOGY_CONFIG ---
+        const NPC_ECOLOGY_CONFIG = {
+            TICK_INTERVAL: 60,
+            ENERGY_DRAIN_MASTER: 0.5,
+            ENERGY_DRAIN_MONSTER: 2.0,
+            ENERGY_DRAIN_MERCHANT: 1.0,
+            ENERGY_DRAIN_FELLOW: 1.0,
+            ENERGY_GAIN_PREDATION: 20,
+            POPULATION_CEILING: 10,
+            REVIVAL_COST: 10000,
+            TERRITORY_QUALITY_DECAY: 0.01,
+            RESOURCE_SCARCITY_THRESHOLD: 0.2,
+            ZONES: ['central', 'east', 'west', 'south', 'north']
+        };
+
+        // --- NpcPopulation: Tracks NPC count per role ---
+        class NpcPopulation {
+            constructor() {
+                this.counts = { master: 3, monster: 5, merchant: 2, fellow: 4 };
+                this.birthRecords = { master: 0, monster: 0, merchant: 0, fellow: 0 };
+                this.deathRecords = { master: 0, monster: 0, merchant: 0, fellow: 0 };
+            }
+            getCount(role) { return this.counts[role] || 0; }
+            adjustCount(role, delta) {
+                const ceiling = NPC_ECOLOGY_CONFIG.POPULATION_CEILING;
+                const current = this.counts[role] || 0;
+                const newVal = Math.max(0, Math.min(current + delta, ceiling));
+                if (delta > 0) this.birthRecords[role] = (this.birthRecords[role] || 0) + delta;
+                if (delta < 0) this.deathRecords[role] = (this.deathRecords[role] || 0) + Math.abs(delta);
+                this.counts[role] = newVal;
+                return newVal;
+            }
+            isExtinct(role) { return this.counts[role] === 0; }
+            reviveRole(role) {
+                if (!this.isExtinct(role)) return false;
+                this.counts[role] = 1;
+                this.birthRecords[role] = (this.birthRecords[role] || 0) + 1;
+                return true;
+            }
+            getStats() {
+                return {
+                    counts: { ...this.counts },
+                    births: { ...this.birthRecords },
+                    deaths: { ...this.deathRecords },
+                    total: Object.values(this.counts).reduce((a, b) => a + b, 0)
+                };
+            }
+        }
+
+        // --- NpcFoodChain: Energy transfer and predation ---
+        class NpcFoodChain {
+            constructor() {
+                this.energy = { master: 80, monster: 60, merchant: 70, fellow: 50 };
+                this.drainRates = {
+                    master: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MASTER,
+                    monster: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MONSTER,
+                    merchant: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MERCHANT,
+                    fellow: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_FELLOW
+                };
+                this.predationLog = [];
+            }
+            getEnergy(role) { return this.energy[role] || 0; }
+            drainEnergy(role) {
+                const rate = this.drainRates[role] || 1;
+                this.energy[role] = Math.max(0, this.energy[role] - rate);
+                if (this.energy[role] === 0) this.predationLog.push({ role, event: 'starvation', ts: Date.now() });
+            }
+            applyPredation(predator, prey) {
+                if (this.energy[prey] <= 0) return 0;
+                const gain = NPC_ECOLOGY_CONFIG.ENERGY_GAIN_PREDATION;
+                this.energy[predator] = Math.min(100, this.energy[predator] + gain);
+                this.energy[prey] = 0;
+                this.predationLog.push({ predator, prey, gain, ts: Date.now() });
+                if (this.predationLog.length > 50) this.predationLog.shift();
+                return gain;
+            }
+            getPredationLog() { return this.predationLog.slice(-10); }
+        }
+
+        // --- NpcTerritory: Zone ownership and quality ---
+        class NpcTerritory {
+            constructor() {
+                this.claims = { master: 'central', monster: 'east', merchant: 'west', fellow: 'south' };
+                this.quality = { central: 0.8, east: 0.6, west: 0.7, south: 0.5, north: 0.4 };
+            }
+            getTerritory(role) { return this.claims[role]; }
+            expandTerritory(role) {
+                const current = this.getTerritory(role);
+                const zones = NPC_ECOLOGY_CONFIG.ZONES;
+                const idx = zones.indexOf(current);
+                if (idx < 0 || idx >= zones.length - 1) return false;
+                this.claims[role] = zones[idx + 1];
+                return true;
+            }
+            claimTerritory(role, zone) {
+                if (!NPC_ECOLOGY_CONFIG.ZONES.includes(zone)) return false;
+                this.claims[role] = zone;
+                return true;
+            }
+            getQuality(zone) { return this.quality[zone] || 0.5; }
+            degradeQuality(zone) {
+                this.quality[zone] = Math.max(0, this.getQuality(zone) - NPC_ECOLOGY_CONFIG.TERRITORY_QUALITY_DECAY);
+            }
+            resolveConflict(roleA, roleB) {
+                if (this.claims[roleA] === this.claims[roleB]) {
+                    const qualityA = this.getQuality(this.claims[roleA]);
+                    const qualityB = this.getQuality(this.claims[roleB]);
+                    return qualityA >= qualityB ? roleA : roleB;
+                }
+                return null;
+            }
+        }
+
+        // --- NpcResourceCompetition: Shared resource pool ---
+        class NpcResourceCompetition {
+            constructor() {
+                this.pool = { central: 500, east: 300, west: 400, south: 200, north: 100 };
+                this.consumption = { master: 10, monster: 15, merchant: 8, fellow: 12 };
+            }
+            initialize(roleZoneMap) {
+                for (const [role, zone] of Object.entries(roleZoneMap)) {
+                    this.pool[zone] = (this.pool[zone] || 0) + 200;
+                }
+            }
+            consumeResource(zone, amount) {
+                const available = this.pool[zone] || 0;
+                const consumed = Math.min(available, amount);
+                this.pool[zone] = available - consumed;
+                return consumed;
+            }
+            checkScarcity() {
+                const scarcity = {};
+                for (const zone of NPC_ECOLOGY_CONFIG.ZONES) {
+                    const ratio = (this.pool[zone] || 0) / 500;
+                    scarcity[zone] = ratio < NPC_ECOLOGY_CONFIG.RESOURCE_SCARCITY_THRESHOLD;
+                }
+                return scarcity;
+            }
+            getPool(zone) { return this.pool[zone] || 0; }
+        }
+
+        // --- NpcEcologyEngine: Master ecology loop ---
+        class NpcEcologyEngine {
+            constructor() {
+                this.population = new NpcPopulation();
+                this.foodChain = new NpcFoodChain();
+                this.territory = new NpcTerritory();
+                this.competition = new NpcResourceCompetition();
+                this.lastTick = 0;
+                this.tickCount = 0;
+                this.eventLog = [];
+            }
+            initialize() {
+                const roleZoneMap = {};
+                for (const [role, zone] of Object.entries(this.territory.claims)) {
+                    roleZoneMap[role] = zone;
+                }
+                this.competition.initialize(roleZoneMap);
+            }
+            tick() {
+                this.tickCount++;
+                this.lastTick = Date.now();
+                for (const role of Object.keys(this.population.counts)) {
+                    if (this.population.getCount(role) === 0) continue;
+                    this.foodChain.drainEnergy(role);
+                    if (this.foodChain.getEnergy(role) === 0) {
+                        this.population.adjustCount(role, -1);
+                        this.foodChain.energy[role] = 80;
+                    }
+                }
+                for (const zone of NPC_ECOLOGY_CONFIG.ZONES) {
+                    this.territory.degradeQuality(zone);
+                    const consumed = this.competition.consumeResource(zone, 5);
+                    if (consumed < 5) {
+                        this.eventLog.push({ type: 'scarcity', zone, ts: this.lastTick });
+                    }
+                }
+                if (this.eventLog.length > 30) this.eventLog.shift();
+            }
+            getStats() {
+                return {
+                    population: this.population.getStats(),
+                    energy: { ...this.foodChain.energy },
+                    territory: { claims: { ...this.territory.claims }, quality: { ...this.territory.quality } },
+                    pool: { ...this.competition.pool },
+                    scarcity: this.competition.checkScarcity(),
+                    tickCount: this.tickCount,
+                    eventLog: this.eventLog.slice(-10)
+                };
+            }
+        }
+
+        const npcEcologyEngine = new NpcEcologyEngine();
+        npcEcologyEngine.initialize();
+
+        // --- NPC Ecology UI Panel ---
+        function openNpcEcologyPanel() {
+            const stats = npcEcologyEngine.getStats();
+            showModal('🌿 NPC生态系统', `
+                <div class="npc-ecology-tabs">
+                    <button class="tab-btn active" onclick="setEcologyTab('population')">🐾 种群</button>
+                    <button class="tab-btn" onclick="setEcologyTab('territory')">🗺️ 领地</button>
+                    <button class="tab-btn" onclick="setEcologyTab('foodchain')">⚡ 食物链</button>
+                    <button class="tab-btn" onclick="setEcologyTab('competition')">📊 竞争</button>
+                </div>
+                <div id="ecologyContent" style="padding:15px;">${renderEcologyPopulationTab(stats)}</div>
+            `, 600);
+        }
+
+        function setEcologyTab(tab) {
+            document.querySelectorAll('.npc-ecology-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('ecologyContent');
+            if (!content) return;
+            const stats = npcEcologyEngine.getStats();
+            switch(tab) {
+                case 'population': content.innerHTML = renderEcologyPopulationTab(stats); break;
+                case 'territory': content.innerHTML = renderEcologyTerritoryTab(stats); break;
+                case 'foodchain': content.innerHTML = renderEcologyFoodChainTab(stats); break;
+                case 'competition': content.innerHTML = renderEcologyCompetitionTab(stats); break;
+            }
+        }
+
+        function renderEcologyPopulationTab(stats) {
+            let html = `<h4>🐾 NPC种群状态</h4>`;
+            html += `<p>总NPC数: ${stats.population.total} | 累计 births: ${Object.values(stats.population.births).reduce((a,b)=>a+b,0)} | deaths: ${Object.values(stats.population.deaths).reduce((a,b)=>a+b,0)}</p>`;
+            const roles = ['master', 'monster', 'merchant', 'fellow'];
+            const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+            for (const role of roles) {
+                const count = stats.population.counts[role] || 0;
+                const births = stats.population.births[role] || 0;
+                const deaths = stats.population.deaths[role] || 0;
+                const extinct = count === 0 ? ' <span style="color:red">【灭绝】</span>' : '';
+                const bar = '█'.repeat(Math.min(count, 10)) + '░'.repeat(Math.max(0, 10 - count));
+                html += `<div style="margin:5px 0;">${titles[role]}: ${bar} ${count}${extinct} <small>(+${births}/-${deaths})</small></div>`;
+            }
+            html += `<button onclick="evokeNpcEcologyTick()" style="margin-top:10px;padding:8px;">🔄 生态_tick</button>`;
+            return html;
+        }
+
+        function renderEcologyTerritoryTab(stats) {
+            let html = `<h4>🗺️ 领地分布</h4>`;
+            for (const [role, zone] of Object.entries(stats.territory.claims)) {
+                const q = (stats.territory.quality[zone] || 0.5).toFixed(2);
+                const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+                html += `<div style="margin:5px 0;">${titles[role]} → ${zone} <small>(质量:${q})</small></div>`;
+            }
+            return html;
+        }
+
+        function renderEcologyFoodChainTab(stats) {
+            let html = `<h4>⚡ 食物链能量</h4>`;
+            const roles = ['master', 'monster', 'merchant', 'fellow'];
+            const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+            for (const role of roles) {
+                const e = stats.energy[role] || 0;
+                const bar = '█'.repeat(Math.floor(e / 10)) + '░'.repeat(10 - Math.floor(e / 10));
+                html += `<div style="margin:5px 0;">${titles[role]}: ${bar} ${e.toFixed(1)}/100</div>`;
+            }
+            html += `<h4 style="margin-top:10px;">🐾 最新事件</h4>`;
+            const log = npcEcologyEngine.eventLog.slice(-5);
+            if (log.length === 0) html += `<p>暂无事件</p>`;
+            else for (const ev of log) html += `<div><small>${ev.type} @ ${ev.zone || 'N/A'}</small></div>`;
+            return html;
+        }
+
+        function renderEcologyCompetitionTab(stats) {
+            let html = `<h4>📊 资源竞争</h4>`;
+            for (const [zone, scarce] of Object.entries(stats.scarcity)) {
+                const pool = stats.pool[zone] || 0;
+                const flag = scarce ? ' ⚠️' : '';
+                html += `<div style="margin:5px 0;">${zone}: ${pool}灵气${flag}</div>`;
+            }
+            return html;
+        }
+
+        function evokeNpcEcologyTick() {
+            npcEcologyEngine.tick();
+            setEcologyTab('population');
+        }
 
         // --- NPC-Involved Idle Task Panel ---
         function openIdleTaskPanel() {
