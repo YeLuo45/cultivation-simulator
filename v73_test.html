@@ -43,7 +43,7 @@ function log(msg) {
             cultivation: { spiritEnergy: 800, maxSpiritEnergy: 1000 }
         };
     }
-    // Mock window.llmRegistry 如果不存在
+// Mock window.llmRegistry if not exists
     if (typeof window.llmRegistry === 'undefined') {
         window.llmRegistry = {
             providers: [
@@ -52,12 +52,13 @@ function log(msg) {
                 { id: 'claude', name: 'Claude', endpoint: '/api/claude', model: 'claude-3-5-sonnet' }
             ],
             currentProvider: 'minimax',
+            getAllProviders: function() { return this.providers; },
             switchProvider: function(id) {
                 if (this.providers.find(p => p.id === id)) {
                     this.currentProvider = id;
-                    return true;
+                    return { success: true, message: `Switched to ${id}` };
                 }
-                return false;
+                return { error: `Provider ${id} not found` };
             }
         };
     }
