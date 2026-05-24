@@ -4860,6 +4860,252 @@
             }
         };
 
+        // --- LLM_PROVIDER_REGISTRY (V72 方向A: 多模型Provider切换引擎) ---
+        // 来源: nanobot ProviderFactory + claude-code 7 Provider
+        // 支持多LLM Provider注册、运行时切换、Budget Mode成本控制
+        const LLM_PROVIDERS = {
+            'minimax': {
+                id: 'minimax',
+                name: 'MiniMax',
+                baseUrl: 'https://api.minimaxi.com/v1',
+                defaultModel: 'MiniMax-M2.7',
+                envKey: 'MINIMAX_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('minimax') || url.includes('api.minimaxi.com')
+            },
+            'openai': {
+                id: 'openai',
+                name: 'OpenAI',
+                baseUrl: 'https://api.openai.com/v1',
+                defaultModel: 'gpt-4o-mini',
+                envKey: 'OPENAI_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('openai') || url.includes('api.openai.com')
+            },
+            'anthropic': {
+                id: 'anthropic',
+                name: 'Anthropic',
+                baseUrl: 'https://api.anthropic.com/v1',
+                defaultModel: 'claude-sonnet-4-20250514',
+                envKey: 'ANTHROPIC_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('anthropic') || url.includes('api.anthropic.com')
+            }
+        };
+
+        // 当前激活的Provider配置
+        let activeProvider = 'minimax';
+
+        // Provider配置表（运行时从miniMaxConfig迁移）
+        let providerConfig = {
+            minimax: {
+                apiKey: '',
+                baseUrl: 'https://api.minimaxi.com/v1',
+                model: 'MiniMax-M2.7'
+            },
+            openai: {
+                apiKey: '',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-4o-mini'
+            },
+            anthropic: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com/v1',
+                model: 'claude-sonnet-4-20250514'
+            }
+        };
+
+        // --- BUDGET_TRACKER (V72) ---
+        // claude-code Budget Mode: 每次AI调用记录cost，达到阈值切换降级策略
+        const BUDGET_CONFIG = {
+            dailyLimit: 1000,      // 每日token预算（单位: 分）
+            monthlyLimit: 20000,  // 每月token预算（单位: 分）
+            warningThreshold: 0.8, // 警告阈值 80%
+            fallbackToLocal: true   // 超预算时降级到本地规则
+        };
+
+        let budgetTracker = {
+            dailySpent: 0,         // 今日已消耗（分）
+            monthlySpent: 0,       // 本月已消耗（分）
+            lastResetDay: 0,       // 上次重置日期
+            lastResetMonth: 0,      // 上次重置月份
+            callCount: 0,          // 累计调用次数
+            lastCallProvider: null  // 上次调用Provider
+        };
+
+        // 估算一次调用的token消耗（近似）
+        function estimateCallCost(promptLength, responseTokens) {
+            // 简单估算: prompt按4字符=1token，response按4字符=1token
+            return Math.ceil(promptLength / 4) + responseTokens;
+        }
+
+        // 检查预算是否允许调用
+        function checkBudget(provider) {
+            const now = new Date();
+            const day = Math.floor(now.getTime() / 86400000);
+            const month = Math.floor(now.getTime() / 2592000000);
+
+            // 日期重置
+            if (budgetTracker.lastResetDay !== day) {
+                budgetTracker.dailySpent = 0;
+                budgetTracker.lastResetDay = day;
+            }
+            // 月份重置
+            if (budgetTracker.lastResetMonth !== month) {
+                budgetTracker.monthlySpent = 0;
+                budgetTracker.lastResetMonth = month;
+            }
+
+            // 检查阈值
+            const dailyPct = budgetTracker.dailySpent / BUDGET_CONFIG.dailyLimit;
+            const monthlyPct = budgetTracker.monthlySpent / BUDGET_CONFIG.monthlyLimit;
+
+            if (monthlyPct >= 1 || dailyPct >= 1) {
+                if (BUDGET_CONFIG.fallbackToLocal) {
+                    return { allowed: false, reason: 'budget_exceeded', fallback: true };
+                }
+                return { allowed: false, reason: 'budget_exceeded', fallback: false };
+            }
+
+            if (dailyPct >= BUDGET_CONFIG.warningThreshold || monthlyPct >= BUDGET_CONFIG.warningThreshold) {
+                return { allowed: true, warning: true, dailyPct, monthlyPct };
+            }
+
+            return { allowed: true, warning: false };
+        }
+
+        // 记录一次调用消耗
+        function recordCallCost(cost) {
+            budgetTracker.dailySpent += cost;
+            budgetTracker.monthlySpent += cost;
+            budgetTracker.callCount++;
+        }
+
+        // --- LLM_PROVIDER_REGISTRY class ---
+        class LLMProviderRegistry {
+            constructor() {
+                this.providers = {};
+                this.activeProviderId = 'minimax';
+                this.init();
+            }
+
+            init() {
+                for (const [id, def] of Object.entries(LLM_PROVIDERS)) {
+                    this.providers[id] = { ...def };
+                }
+            }
+
+            getProvider(id) {
+                return this.providers[id] || null;
+            }
+
+            setActive(id) {
+                if (this.providers[id]) {
+                    this.activeProviderId = id;
+                    activeProvider = id;
+                    return true;
+                }
+                return false;
+            }
+
+            getActive() {
+                return this.providers[this.activeProviderId] || null;
+            }
+
+            getAllProviders() {
+                return Object.values(this.providers);
+            }
+
+            isConfigured(id) {
+                const cfg = providerConfig[id];
+                return cfg && cfg.apiKey && cfg.apiKey.length > 0;
+            }
+
+            getConfiguredProviders() {
+                return Object.entries(providerConfig)
+                    .filter(([id, cfg]) => cfg.apiKey && cfg.apiKey.length > 0)
+                    .map(([id]) => this.providers[id])
+                    .filter(Boolean);
+            }
+
+            configure(id, cfg) {
+                if (!providerConfig[id]) return false;
+                providerConfig[id] = { ...providerConfig[id], ...cfg };
+                // 同步到 miniMaxConfig（兼容旧代码）
+                if (id === 'minimax') {
+                    miniMaxConfig.apiKey = cfg.apiKey || miniMaxConfig.apiKey;
+                    miniMaxConfig.baseUrl = cfg.baseUrl || miniMaxConfig.baseUrl;
+                    miniMaxConfig.model = cfg.model || miniMaxConfig.model;
+                }
+                return true;
+            }
+        }
+
+        const llmRegistry = new LLMProviderRegistry();
+
+        // --- callProviderAPI (V72, 替代 callMiniMaxAPI) ---
+        function callProviderAPI(prompt, providerId, model, maxTokens, successCallback, errorCallback) {
+            const pid = providerId || activeProvider || 'minimax';
+            const cfg = providerConfig[pid];
+
+            // Budget检查
+            const budgetCheck = checkBudget(pid);
+            if (!budgetCheck.allowed) {
+                if (errorCallback) errorCallback('Budget exceeded: ' + budgetCheck.reason);
+                return;
+            }
+
+            if (!cfg || !cfg.apiKey) {
+                if (errorCallback) errorCallback('Provider not configured: ' + pid);
+                return;
+            }
+
+            const apiUrl = (cfg.baseUrl || LLM_PROVIDERS[pid].baseUrl).replace(/\/$/, '') + '/chat/completions';
+
+            // 构建请求体
+            let body = {
+                model: model || cfg.model || LLM_PROVIDERS[pid].defaultModel,
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: maxTokens || 300,
+                temperature: 0.8
+            };
+
+            // Anthropic 需要不同的格式
+            if (pid === 'anthropic') {
+                body = {
+                    model: model || cfg.model || LLM_PROVIDERS[pid].defaultModel,
+                    messages: [{ role: 'user', content: prompt }],
+                    max_tokens: maxTokens || 300
+                };
+            }
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + cfg.apiKey
+                },
+                body: JSON.stringify(body)
+            })
+            .then(r => r.json())
+            .then(data => {
+                // 预算检查（后评估）
+                const cost = estimateCallCost(prompt.length, maxTokens || 300);
+                recordCallCost(cost);
+
+                if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                    successCallback(data.choices[0].message.content);
+                } else if (data.error) {
+                    if (errorCallback) errorCallback(data.error.message || 'API error');
+                } else {
+                    if (errorCallback) errorCallback('Response format error');
+                }
+            })
+            .catch(e => {
+                if (errorCallback) errorCallback(e.message);
+            });
+        }
+
         // --- combatState (5037-5051) ---
         let combatState = {
             inProgress: false,
@@ -8389,6 +8635,8 @@
         openSettings = function() {
             originalOpenSettings();
             fillCloudSettings();
+            loadProviderConfig();
+            updateProviderPanelUI();
         };
 
         // ===== recalculateAllEffects =====
@@ -10780,42 +11028,119 @@
         }
 
         // ===== callMiniMaxAPI =====
+        // ===== callMiniMaxAPI (V72 兼容封装, 委托给 callProviderAPI) =====
         function callMiniMaxAPI(prompt, model, maxTokens, successCallback, errorCallback) {
-            if (!miniMaxConfig.apiKey) {
-                if (errorCallback) errorCallback('API未配置');
-                return;
+            // 委托给新的 callProviderAPI，复用 minimax provider 配置
+            callProviderAPI(prompt, 'minimax', model, maxTokens, successCallback, errorCallback);
+        }
+
+        // ===== switchActiveProvider (V72) =====
+        function switchActiveProvider(providerId) {
+            if (llmRegistry.setActive(providerId)) {
+                activeProvider = providerId;
+                updateProviderPanelUI();
+                addLog('good', 'Provider切换', `已切换到 ${LLM_PROVIDERS[providerId]?.name || providerId}`);
             }
-            
-            const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
-            
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + miniMaxConfig.apiKey
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [
-                        { role: 'user', content: prompt }
-                    ],
-                    max_tokens: maxTokens,
-                    temperature: 0.8
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-                    successCallback(data.choices[0].message.content);
-                } else if (data.error) {
-                    if (errorCallback) errorCallback(data.error.message || 'API错误');
-                } else {
-                    if (errorCallback) errorCallback('返回格式错误');
-                }
-            })
-            .catch(e => {
-                if (errorCallback) errorCallback(e.message);
+        }
+
+        // ===== updateProviderPanelUI (V72) =====
+        function updateProviderPanelUI() {
+            const activeSelect = document.getElementById('activeProviderSelect');
+            if (activeSelect) {
+                activeSelect.value = activeProvider;
+            }
+            // 更新各Provider配置面板的可见性
+            document.querySelectorAll('.provider-config').forEach(el => {
+                el.style.display = 'block';
             });
+            // 更新Budget状态
+            updateBudgetStatusUI();
+        }
+
+        // ===== updateBudgetStatusUI (V72) =====
+        function updateBudgetStatusUI() {
+            const budgetEl = document.getElementById('budgetStatus');
+            if (!budgetEl) return;
+
+            const dailyPct = Math.round((budgetTracker.dailySpent / BUDGET_CONFIG.dailyLimit) * 100);
+            const monthlyPct = Math.round((budgetTracker.monthlySpent / BUDGET_CONFIG.monthlyLimit) * 100);
+
+            budgetEl.innerHTML = `
+                今日消耗: ${budgetTracker.dailySpent} / ${BUDGET_CONFIG.dailyLimit} (${dailyPct}%)<br>
+                本月消耗: ${budgetTracker.monthlySpent} / ${BUDGET_CONFIG.monthlyLimit} (${monthlyPct}%)<br>
+                累计调用: ${budgetTracker.callCount} 次<br>
+                上次Provider: ${budgetTracker.lastCallProvider || '无'}
+            `;
+        }
+
+        // ===== saveProviderConfig (V72) =====
+        function saveProviderConfig() {
+            const providers = ['minimax', 'openai', 'anthropic'];
+            for (const pid of providers) {
+                const keyEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Key`);
+                const urlEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Url`);
+                const modelEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Model`);
+                if (keyEl && urlEl && modelEl) {
+                    llmRegistry.configure(pid, {
+                        apiKey: keyEl.value.trim(),
+                        baseUrl: urlEl.value.trim(),
+                        model: modelEl.value.trim()
+                    });
+                }
+            }
+            localStorage.setItem('providerConfig', JSON.stringify(providerConfig));
+            localStorage.setItem('activeProvider', activeProvider);
+            updateBudgetStatusUI();
+            addLog('good', '多模型配置', 'Provider配置已保存！');
+        }
+
+        // ===== loadProviderConfig (V72) =====
+        function loadProviderConfig() {
+            const saved = localStorage.getItem('providerConfig');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    for (const [pid, cfg] of Object.entries(parsed)) {
+                        if (providerConfig[pid]) {
+                            providerConfig[pid] = { ...providerConfig[pid], ...cfg };
+                        }
+                    }
+                } catch (e) {}
+            }
+            const savedActive = localStorage.getItem('activeProvider');
+            if (savedActive && llmRegistry.setActive(savedActive)) {
+                activeProvider = savedActive;
+            }
+            // 同步到 miniMaxConfig
+            if (providerConfig.minimax) {
+                miniMaxConfig.apiKey = providerConfig.minimax.apiKey || miniMaxConfig.apiKey;
+                miniMaxConfig.baseUrl = providerConfig.minimax.baseUrl || miniMaxConfig.baseUrl;
+                miniMaxConfig.model = providerConfig.minimax.model || miniMaxConfig.model;
+            }
+        }
+
+        // ===== testAllProviders (V72) =====
+        function testAllProviders() {
+            const testPrompt = 'Hello, respond with OK';
+            const providers = ['minimax', 'openai', 'anthropic'];
+            let results = [];
+
+            for (const pid of providers) {
+                const cfg = providerConfig[pid];
+                if (!cfg || !cfg.apiKey) {
+                    results.push(`${LLM_PROVIDERS[pid]?.name || pid}: 未配置`);
+                    continue;
+                }
+                callProviderAPI(testPrompt, pid, null, 10,
+                    (reply) => { results.push(`${LLM_PROVIDERS[pid]?.name || pid}: ✓`); },
+                    (err) => { results.push(`${LLM_PROVIDERS[pid]?.name || pid}: ✗ ${err}`); }
+                );
+            }
+
+            // 延迟显示结果
+            setTimeout(() => {
+                addLog('info', 'Provider测试', results.join(' | '));
+            }, 3000);
         }
 
         // ===== showGameOverScreen =====

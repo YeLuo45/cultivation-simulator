@@ -4129,6 +4129,7 @@
                     <div class="settings-nav-item" onclick="switchSettingsTab('features')">功能开关</div>
                     <div class="settings-nav-item" onclick="switchSettingsTab('about')">关于</div>
                     <div class="settings-nav-item" onclick="switchSettingsTab('cloud')">☁️ 云存档</div>
+                    <div class="settings-nav-item" onclick="switchSettingsTab('provider')">🔀 多模型</div>
                 </div>
                 <div class="settings-content">
                     <!-- API配置 -->
@@ -4222,6 +4223,78 @@
                             <button onclick="cloudLoad()" style="padding:10px 16px;background:#1565c0;color:white;border:none;border-radius:6px;cursor:pointer;">☁️ 从云端加载</button>
                         </div>
                         <div id="cloudStatus" style="margin-top:12px;font-size:13px;color:#aaa;"></div>
+                    </div>
+                    <!-- 多模型Provider配置 -->
+                    <div id="settingsProvider" class="settings-section">
+                        <h4>🔀 多模型Provider切换</h4>
+                        <p style="color:#888;font-size:12px;margin-bottom:12px;">支持 MiniMax / OpenAI / Anthropic 多模型切换，降低API成本</p>
+                        <!-- 激活Provider选择 -->
+                        <div class="form-group">
+                            <label>当前Provider</label>
+                            <select id="activeProviderSelect" class="settings-input" onchange="switchActiveProvider(this.value)">
+                                <option value="minimax">MiniMax</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                            </select>
+                        </div>
+                        <!-- MiniMax配置 -->
+                        <div class="provider-config" id="providerMinimax" style="margin-top:16px;padding:12px;border:1px solid #333;border-radius:8px;">
+                            <h5 style="color:#4fc3f7;margin:0 0 10px 0;">MiniMax</h5>
+                            <div class="form-group">
+                                <label>API Key</label>
+                                <input type="password" id="providerMinimaxKey" class="settings-input" placeholder="sk-...">
+                            </div>
+                            <div class="form-group">
+                                <label>Base URL</label>
+                                <input type="text" id="providerMinimaxUrl" class="settings-input" placeholder="https://api.minimaxi.com/v1" value="https://api.minimaxi.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label>Model</label>
+                                <input type="text" id="providerMinimaxModel" class="settings-input" placeholder="MiniMax-M2.7" value="MiniMax-M2.7">
+                            </div>
+                        </div>
+                        <!-- OpenAI配置 -->
+                        <div class="provider-config" id="providerOpenai" style="margin-top:16px;padding:12px;border:1px solid #333;border-radius:8px;">
+                            <h5 style="color:#4caf50;margin:0 0 10px 0;">OpenAI</h5>
+                            <div class="form-group">
+                                <label>API Key</label>
+                                <input type="password" id="providerOpenaiKey" class="settings-input" placeholder="sk-...">
+                            </div>
+                            <div class="form-group">
+                                <label>Base URL</label>
+                                <input type="text" id="providerOpenaiUrl" class="settings-input" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label>Model</label>
+                                <input type="text" id="providerOpenaiModel" class="settings-input" placeholder="gpt-4o-mini" value="gpt-4o-mini">
+                            </div>
+                        </div>
+                        <!-- Anthropic配置 -->
+                        <div class="provider-config" id="providerAnthropic" style="margin-top:16px;padding:12px;border:1px solid #333;border-radius:8px;">
+                            <h5 style="color:#ff9800;margin:0 0 10px 0;">Anthropic</h5>
+                            <div class="form-group">
+                                <label>API Key</label>
+                                <input type="password" id="providerAnthropicKey" class="settings-input" placeholder="sk-ant-...">
+                            </div>
+                            <div class="form-group">
+                                <label>Base URL</label>
+                                <input type="text" id="providerAnthropicUrl" class="settings-input" placeholder="https://api.anthropic.com/v1" value="https://api.anthropic.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label>Model</label>
+                                <input type="text" id="providerAnthropicModel" class="settings-input" placeholder="claude-sonnet-4-20250514" value="claude-sonnet-4-20250514">
+                            </div>
+                        </div>
+                        <!-- Budget状态 -->
+                        <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;">
+                            <h5 style="color:#ffd700;margin:0 0 10px 0;">💰 Budget状态</h5>
+                            <div id="budgetStatus" style="font-size:13px;color:#aaa;line-height:1.8;"></div>
+                        </div>
+                        <!-- 保存按钮 -->
+                        <div style="margin-top:16px;display:flex;gap:8px;">
+                            <button onclick="saveProviderConfig()" style="padding:10px 16px;background:#1976d2;color:white;border:none;border-radius:6px;cursor:pointer;">💾 保存配置</button>
+                            <button onclick="testAllProviders()" style="padding:10px 16px;background:#2e7d32;color:white;border:none;border-radius:6px;cursor:pointer;">🧪 测试所有Provider</button>
+                        </div>
                     </div>
                 </div>
             </div>
