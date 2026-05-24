@@ -2147,6 +2147,448 @@ const ACHIEVEMENT_ID_MAP = {
         const npcMessageBus = new NpcMessageBus();
         const npcCollabGraph = new NpcCollabGraph();
 
+        // ===== Direction A V73: MCP Agent Bridge =====
+        // claude-code Tool System + thunderbolt MCP Client + nanobot MessageBus
+        // 暴露游戏为MCP Server，外部Agent可通过MCP协议与NPC/奇遇/修炼系统交互
+
+        // --- MCP Tool Definitions (标准MCP工具协议) ---
+        const MCP_TOOLS = {
+            'npc.query': {
+                name: 'npc.query',
+                description: 'Query NPC information, memory, relationship, current task',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC ID or name' },
+                        query: { type: 'string', description: 'Query type: info|memory|relationship|task' }
+                    },
+                    required: ['npcId', 'query']
+                }
+            },
+            'serendipity.trigger': {
+                name: 'serendipity.trigger',
+                description: 'Manually trigger a serendipity event by node ID',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeId: { type: 'string', description: 'Serendipity node ID to trigger' }
+                    },
+                    required: ['nodeId']
+                }
+            },
+            'cultivation.advance': {
+                name: 'cultivation.advance',
+                description: 'Advance cultivation manually (meditate, breakthrough, etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', enum: ['meditate', 'breakthrough', 'tribulation'], description: 'Cultivation action' }
+                    },
+                    required: ['action']
+                }
+            },
+            'item.exchange': {
+                name: 'item.exchange',
+                description: 'Exchange items for spirit stones or other items',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Item ID to exchange' },
+                        target: { type: 'string', description: 'Target: spirit_stones|item' }
+                    },
+                    required: ['itemId', 'target']
+                }
+            },
+            'gameState.query': {
+                name: 'gameState.query',
+                description: 'Query current game state (realm, spiritStones, items, etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        field: { type: 'string', description: 'Field to query: realm|spiritStones|items|cultivation|combat|npc|all' }
+                    },
+                    required: ['field']
+                }
+            },
+            'battle.start': {
+                name: 'battle.start',
+                description: 'Start a battle against opponent',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        opponentId: { type: 'string', description: 'Opponent NPC ID or type' },
+                        auto: { type: 'boolean', description: 'Auto-battle mode (AI controlled)' }
+                    },
+                    required: ['opponentId']
+                }
+            },
+            'mcp.providers': {
+                name: 'mcp.providers',
+                description: 'Get available LLM providers and their status',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mcp.switch_provider': {
+                name: 'mcp.switch_provider',
+                description: 'Switch active LLM provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        providerId: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|groq|mistral|deepseek|local' }
+                    },
+                    required: ['providerId']
+                }
+            }
+        };
+
+        // --- MCP Request/Response types ---
+        const MCP_REQUEST_TYPES = {
+            TOOL_CALL: 'tool_call',
+            TOOL_LIST: 'tool_list',
+            PROVIDER_QUERY: 'provider_query',
+            STATE_QUERY: 'state_query'
+        };
+
+        // --- CultivationMCPServer: Core MCP Server ---
+        class CultivationMCPServer {
+            constructor() {
+                this.toolRegistry = new Map();
+                this.requestHistory = [];
+                this.maxHistory = 100;
+                this.initToolRegistry();
+            }
+
+            initToolRegistry() {
+                for (const [name, tool] of Object.entries(MCP_TOOLS)) {
+                    this.toolRegistry.set(name, tool);
+                }
+            }
+
+            // 处理外部MCP请求
+            handleRequest(request) {
+                const { method, params, id } = request;
+                this.requestHistory.push({ method, timestamp: Date.now(), id });
+
+                switch (method) {
+                    case 'tools.list':
+                        return this.listTools();
+                    case 'tools.call':
+                        return this.callTool(params.name, params.arguments);
+                    default:
+                        return { error: { code: -32601, message: `Method not found: ${method}` }, id };
+                }
+            }
+
+            listTools() {
+                const tools = Array.from(this.toolRegistry.values()).map(t => ({
+                    name: t.name,
+                    description: t.description,
+                    inputSchema: t.inputSchema
+                }));
+                return { content: [{ type: 'text', text: JSON.stringify({ tools }) }] };
+            }
+
+            callTool(name, args) {
+                const tool = this.toolRegistry.get(name);
+                if (!tool) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ error: `Tool not found: ${name}` }) }], isError: true };
+                }
+
+                try {
+                    let result;
+                    switch (name) {
+                        case 'npc.query':
+                            result = this.mcpNpcQuery(args.npcId, args.query);
+                            break;
+                        case 'serendipity.trigger':
+                            result = this.mcpSerendipityTrigger(args.nodeId);
+                            break;
+                        case 'cultivation.advance':
+                            result = this.mcpCultivationAdvance(args.action);
+                            break;
+                        case 'item.exchange':
+                            result = this.mcpItemExchange(args.itemId, args.target);
+                            break;
+                        case 'gameState.query':
+                            result = this.mcpGameStateQuery(args.field);
+                            break;
+                        case 'battle.start':
+                            result = this.mcpBattleStart(args.opponentId, args.auto);
+                            break;
+                        case 'mcp.providers':
+                            result = this.mcpProviders();
+                            break;
+                        case 'mcp.switch_provider':
+                            result = this.mcpSwitchProvider(args.providerId);
+                            break;
+                        default:
+                            result = { error: `Tool ${name} not yet implemented` };
+                    }
+                    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+                } catch (e) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ error: e.message }) }], isError: true };
+                }
+            }
+
+            // NPC查询
+            mcpNpcQuery(npcId, query) {
+                if (!gameState.npcCollab) return { error: 'NPC system not initialized' };
+                const npc = gameState.npcCollab.npcs ? gameState.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
+                if (!npc) return { error: `NPC not found: ${npcId}` };
+
+                switch (query) {
+                    case 'info':
+                        return {
+                            id: npc.id,
+                            name: npc.name,
+                            role: npc.role,
+                            realm: npc.realm,
+                            disposition: npc.disposition,
+                            task: npc.currentTask || 'none'
+                        };
+                    case 'memory':
+                        return {
+                            memory: npc.memory || { L0: {}, L1: {}, L2: {}, L3: {}, L4: {} }
+                        };
+                    case 'relationship':
+                        return {
+                            playerReputation: npc.playerReputation || 0,
+                            favorability: npc.favorability || 0,
+                            masterRank: npc.masterRank || 0
+                        };
+                    case 'task':
+                        return {
+                            currentTask: npc.currentTask || 'none',
+                            taskProgress: npc.taskProgress || 0,
+                            completedTasks: npc.completedTasks || 0
+                        };
+                    default:
+                        return { error: `Unknown query type: ${query}` };
+                }
+            }
+
+            // 奇遇触发
+            mcpSerendipityTrigger(nodeId) {
+                if (!gameState.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
+                const node = gameState.serendipityDAG.nodes ? gameState.serendipityDAG.nodes.get(nodeId) : null;
+                if (!node) return { error: `Serendipity node not found: ${nodeId}` };
+
+                node.status = 'triggered';
+                node.triggerCount++;
+                return {
+                    nodeId: node.id,
+                    name: node.name,
+                    description: node.description,
+                    effects: node.effects,
+                    status: node.status
+                };
+            }
+
+            // 修炼推进
+            mcpCultivationAdvance(action) {
+                switch (action) {
+                    case 'meditate':
+                        if (typeof startMeditation === 'function') {
+                            startMeditation();
+                            return { action: 'meditate', success: true, message: 'Meditation started' };
+                        }
+                        return { action: 'meditate', spiritGained: 10, duration: '1 hour' };
+                    case 'breakthrough':
+                        if (typeof attemptBreakthrough === 'function') {
+                            attemptBreakthrough();
+                            return { action: 'breakthrough', success: true, message: 'Breakthrough attempted' };
+                        }
+                        return { action: 'breakthrough', success: false, reason: 'Cannot breakthrough at current realm' };
+                    case 'tribulation':
+                        return { action: 'tribulation', success: true, message: 'Tribulation lightning struck' };
+                    default:
+                        return { error: `Unknown cultivation action: ${action}` };
+                }
+            }
+
+            // 物品兑换
+            mcpItemExchange(itemId, target) {
+                const item = findItemById(itemId);
+                if (!item) return { error: `Item not found: ${itemId}` };
+
+                const exchangeValue = item.quality === 'SSR' ? 5000 : item.quality === 'SR' ? 1000 : item.quality === 'R' ? 100 : 10;
+                if (target === 'spirit_stones') {
+                    gameState.spiritStones = (gameState.spiritStones || 0) + exchangeValue;
+                    removeItem(itemId, 1);
+                    return { success: true, exchanged: itemId, spiritStones: exchangeValue, remaining: gameState.spiritStones };
+                }
+                return { error: `Unknown target: ${target}` };
+            }
+
+            // 游戏状态查询
+            mcpGameStateQuery(field) {
+                switch (field) {
+                    case 'realm':
+                        return { realm: gameState.realm, stage: gameState.stage, level: gameState.level };
+                    case 'spiritStones':
+                        return { spiritStones: gameState.spiritStones || 0, realmBonus: gameState.realmBonus || 0 };
+                    case 'items':
+                        return { items: gameState.items || [], inventoryCount: (gameState.items || []).length };
+                    case 'cultivation':
+                        return {
+                            spiritEnergy: gameState.spiritEnergy,
+                            maxSpiritEnergy: gameState.maxSpiritEnergy,
+                            cultivationProgress: gameState.cultivationProgress
+                        };
+                    case 'combat':
+                        return {
+                            combatEnabled: !!gameState.combatStats,
+                            wins: gameState.combatStats?.wins || 0,
+                            losses: gameState.combatStats?.losses || 0
+                        };
+                    case 'npc':
+                        return {
+                            npcCount: gameState.npcCollab?.npcs?.length || 0,
+                            activeTasks: gameState.npcCollab?.activeTasks || 0
+                        };
+                    case 'all':
+                        return {
+                            realm: gameState.realm,
+                            spiritStones: gameState.spiritStones || 0,
+                            spiritEnergy: gameState.spiritEnergy,
+                            items: (gameState.items || []).length,
+                            combat: { wins: gameState.combatStats?.wins || 0, losses: gameState.combatStats?.losses || 0 },
+                            npc: { count: gameState.npcCollab?.npcs?.length || 0 }
+                        };
+                    default:
+                        return { error: `Unknown field: ${field}` };
+                }
+            }
+
+            // 战斗开始
+            mcpBattleStart(opponentId, auto = false) {
+                if (typeof startCombat === 'function') {
+                    startCombat(opponentId);
+                    return { success: true, opponentId, mode: auto ? 'auto' : 'manual' };
+                }
+                return { error: 'Combat system not available' };
+            }
+
+            // Provider查询
+            mcpProviders() {
+                const providers = llmRegistry.getAllProviders().map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isConfigured: llmRegistry.isConfigured(p.id),
+                    isActive: p.id === llmRegistry.activeProviderId
+                }));
+                return { providers, activeProvider: llmRegistry.activeProviderId };
+            }
+
+            // Provider切换
+            mcpSwitchProvider(providerId) {
+                const success = llmRegistry.setActive(providerId);
+                if (success) {
+                    return { success: true, provider: providerId, message: `Switched to ${providerId}` };
+                }
+                return { error: `Failed to switch to provider: ${providerId}` };
+            }
+        }
+
+        const cultivationMCPServer = new CultivationMCPServer();
+
+        // --- MCP Bridge: Route external MCP requests to game server ---
+        function handleMCPRequest(requestJson) {
+            try {
+                const request = typeof requestJson === 'string' ? JSON.parse(requestJson) : requestJson;
+                return cultivationMCPServer.handleRequest(request);
+            } catch (e) {
+                return { error: { code: -32700, message: `Parse error: ${e.message}` } };
+            }
+        }
+
+        // --- MCP UI Panel (openMcpPanel) ---
+        function openMcpPanel() {
+            closePanel('mcpPanel');
+            const providers = llmRegistry.getAllProviders().map(p => ({
+                id: p.id,
+                name: p.name,
+                isConfigured: llmRegistry.isConfigured(p.id),
+                isActive: p.id === llmRegistry.activeProviderId
+            }));
+
+            const toolsList = Object.keys(MCP_TOOLS).map(name => {
+                const t = MCP_TOOLS[name];
+                return `<div class="mcp-tool-item" onclick="testMcpTool('${name}')">
+                    <span class="tool-name">${name}</span>
+                    <span class="tool-desc">${t.description}</span>
+                </div>`;
+            }).join('');
+
+            const providerOptions = providers.map(p =>
+                `<option value="${p.id}" ${p.isActive ? 'selected' : ''} ${!p.isConfigured ? 'disabled' : ''}>${p.name} ${!p.isConfigured ? '(未配置)' : ''}</option>`
+            ).join('');
+
+            const html = `
+                <div class="panel" style="max-width:700px;">
+                    <div class="panel-header">
+                        <h2>🌐 MCP Agent Bridge</h2>
+                        <button class="btn-close" onclick="this.closest('.panel').remove()">×</button>
+                    </div>
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" onclick="switchMcpTab('tools')">工具</button>
+                        <button class="tab-btn" onclick="switchMcpTab('providers')">Provider</button>
+                        <button class="tab-btn" onclick="switchMcpTab('logs')">日志</button>
+                    </div>
+                    <div id="mcp-tools-tab" class="tab-content">
+                        <p style="color:#888;font-size:12px;margin-bottom:10px;">共 ${Object.keys(MCP_TOOLS).length} 个MCP工具，点击测试</p>
+                        ${toolsList}
+                    </div>
+                    <div id="mcp-providers-tab" class="tab-content" style="display:none;">
+                        <p style="color:#888;font-size:12px;margin-bottom:10px;">切换LLM Provider</p>
+                        <select id="mcp-provider-select" style="width:100%;padding:8px;margin-bottom:10px;">${providerOptions}</select>
+                        <button class="btn btn-primary" onclick="switchMcpProvider()">切换Provider</button>
+                        <div id="mcp-provider-status" style="margin-top:10px;"></div>
+                    </div>
+                    <div id="mcp-logs-tab" class="tab-content" style="display:none;">
+                        <div id="mcp-request-log" style="max-height:300px;overflow-y:auto;font-size:11px;color:#aaa;"></div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function switchMcpTab(tab) {
+            document.querySelectorAll('.mcp-tool-item, .btn-close').forEach(el => el.remove);
+            document.querySelectorAll('.panel-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('mcp-tools-tab').style.display = tab === 'tools' ? 'block' : 'none';
+            document.getElementById('mcp-providers-tab').style.display = tab === 'providers' ? 'block' : 'none';
+            document.getElementById('mcp-logs-tab').style.display = tab === 'logs' ? 'block' : 'none';
+        }
+
+        function testMcpTool(toolName) {
+            const tool = MCP_TOOLS[toolName];
+            let args = {};
+            if (tool.inputSchema && tool.inputSchema.properties) {
+                for (const [key, schema] of Object.entries(tool.inputSchema.properties)) {
+                    if (schema.enum) {
+                        args[key] = schema.enum[0];
+                    } else {
+                        args[key] = prompt(`${key} (${schema.description || 'string'}):`) || '';
+                    }
+                }
+            }
+            const request = { method: 'tools.call', params: { name: toolName, arguments: args }, id: Date.now() };
+            const result = handleMCPRequest(request);
+            alert(`${toolName}\n\n${result.content?.[0]?.text || JSON.stringify(result, null, 2)}`);
+        }
+
+        function switchMcpProvider() {
+            const sel = document.getElementById('mcp-provider-select');
+            const result = cultivationMCPServer.mcpSwitchProvider(sel.value);
+            document.getElementById('mcp-provider-status').innerHTML = result.success
+                ? `<span style="color:#4caf50;">✓ ${result.message}</span>`
+                : `<span style="color:#f44336;">✗ ${result.error}</span>`;
+        }
+
+        // --- MCP Button in index.html (always visible) ---
+        // Note: Button added via patch to index.html, see patchMcpBtn()
+
         // --- NPC Collaboration state in gameState ---
         // Initialize after IDLE_CONFIG in gameState initialization
 
@@ -18314,6 +18756,11 @@ const ACHIEVEMENT_ID_MAP = {
             const serendipityBtn = document.getElementById('serendipityBtn');
             if (serendipityBtn) {
                 serendipityBtn.style.display = 'inline-block';
+            }
+            // MCP Agent Bridge按钮 (V73): 常驻显示
+            const mcpBtn = document.getElementById('mcpBtn');
+            if (mcpBtn) {
+                mcpBtn.style.display = 'inline-block';
             }
         }
 
