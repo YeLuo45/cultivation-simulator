@@ -7431,11 +7431,11 @@ const ACHIEVEMENT_ID_MAP = {
         v64Assert(idleTaskProcessor.processedCount === 0, 'IdleTaskProcessor processedCount init');
 
         // Test startIdleTask
-        gameState.idleTasks = [];
+        window.gameState.idleTasks = [];
         const task = idleTaskProcessor.startIdleTask('qi_cultivation', 60000, 20);
         v64Assert(task !== undefined && task.taskId.startsWith('idle_'), 'startIdleTask creates task');
-        v64Assert(gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
-        v64Assert(gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
+        v64Assert(window.gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
+        v64Assert(window.gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
 
         // Test calculateEarnings
         const earnings = idleTaskProcessor.calculateEarnings({ baseEarnings: 20, startTime: Date.now() - 60000, endTime: Date.now() });
@@ -7482,7 +7482,7 @@ const ACHIEVEMENT_ID_MAP = {
         v65Assert(serendipityExecutor.dag.executionOrder.length > 0, 'serendipity DAG sorted');
 
         // Test serendipity trigger
-        gameState.npcCollab = gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
+        window.gameState.npcCollab = window.gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
         const triggered = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
         // triggered may be null if no nodes ready - that's fine
         v65Assert(triggered === null || triggered.id.startsWith('ser_'), 'serendipity trigger returns valid node or null');
