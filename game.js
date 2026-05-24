@@ -2703,6 +2703,75 @@ const ACHIEVEMENT_ID_MAP = {
                 }
             }
         };
+        // V81: 宗门系统+弟子培养
+        const MCP_TOOLS_V81 = {
+            'sect.info': {
+                name: 'sect.info',
+                description: 'Query detailed sect information',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        view: { type: 'string', description: 'View: overview|disciples|resources|missions' }
+                    }
+                }
+            },
+            'sect.disciple.list': {
+                name: 'sect.disciple.list',
+                description: 'List all sect disciples with their status',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|available|dispatched|training' }
+                    }
+                }
+            },
+            'sect.disciple.recruit': {
+                name: 'sect.disciple.recruit',
+                description: 'Recruit a new disciple into the sect',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        talent: { type: 'string', description: 'Talent tier: normal|good|genius|immortal' },
+                        name: { type: 'string', description: 'Disciple name (optional, auto-generated if empty)' }
+                    }
+                }
+            },
+            'sect.disciple.train': {
+                name: 'sect.disciple.train',
+                description: 'Train a disciple to increase their stats',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        discipleId: { type: 'string', description: 'Disciple UID' },
+                        type: { type: 'string', description: 'Training type: combat|cultivation|alchemy' }
+                    },
+                    required: ['discipleId', 'type']
+                }
+            },
+            'sect.cultivation.assign': {
+                name: 'sect.cultivation.assign',
+                description: 'Assign a cultivation technique to a disciple',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        discipleId: { type: 'string', description: 'Disciple UID' },
+                        techniqueId: { type: 'string', description: 'Technique ID' }
+                    },
+                    required: ['discipleId', 'techniqueId']
+                }
+            },
+            'sect.mission.accept': {
+                name: 'sect.mission.accept',
+                description: 'Accept a sect mission for rewards',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        missionId: { type: 'string', description: 'Mission ID' }
+                    },
+                    required: ['missionId']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -2731,6 +2800,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V80: Register arena tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V80)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V81: Register sect tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V81)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2938,6 +3011,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'battle.reward.claim':
                             result = this.mcpBattleRewardClaim(args.tier);
+                            break;
+                        // V81: Sect & disciple tools
+                        case 'sect.info':
+                            result = this.mcpSectInfo(args.view);
+                            break;
+                        case 'sect.disciple.list':
+                            result = this.mcpSectDiscipleList(args.filter);
+                            break;
+                        case 'sect.disciple.recruit':
+                            result = this.mcpSectDiscipleRecruit(args.talent, args.name);
+                            break;
+                        case 'sect.disciple.train':
+                            result = this.mcpSectDiscipleTrain(args.discipleId, args.type);
+                            break;
+                        case 'sect.cultivation.assign':
+                            result = this.mcpSectCultivationAssign(args.discipleId, args.techniqueId);
+                            break;
+                        case 'sect.mission.accept':
+                            result = this.mcpSectMissionAccept(args.missionId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3687,6 +3779,137 @@ const ACHIEVEMENT_ID_MAP = {
                         spiritStones: gs.spiritStones,
                         cultivationXP: gs.cultivationXP
                     };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V81: Sect & Disciple System
+            mcpSectInfo(view) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs || !gs.sect) return { error: 'No sect found' };
+                    const sect = gs.sect;
+                    const v = view || 'overview';
+                    switch (v) {
+                        case 'overview':
+                            return { name: sect.name || '无宗门', level: sect.level || 1, reputation: sect.reputation || 0, memberCount: sect.disciples ? sect.disciples.length : 0, maxDisciples: (sect.maxDisciples || 5) };
+                        case 'disciples':
+                            return { disciples: sect.disciples || [] };
+                        case 'resources':
+                            return { spiritStones: sect.spiritStones || 0, resources: sect.resources || {} };
+                        case 'missions':
+                            return { missions: sect.missions || [], activeMissions: (sect.missions || []).filter(m => m.status === 'active').length };
+                        default:
+                            return { error: 'Invalid view' };
+                    }
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectDiscipleList(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs || !gs.sect || !gs.sect.disciples) return { error: 'No sect or disciples' };
+                    const filterType = filter || 'all';
+                    let disciples = gs.sect.disciples;
+                    if (filterType === 'available') disciples = disciples.filter(d => d.status === 'available');
+                    else if (filterType === 'dispatched') disciples = disciples.filter(d => d.status === 'dispatched');
+                    else if (filterType === 'training') disciples = disciples.filter(d => d.status === 'training');
+                    return {
+                        disciples: disciples.map(d => ({
+                            uid: d.uid,
+                            name: d.name,
+                            talent: d.talent || 'normal',
+                            realm: d.realm || 0,
+                            status: d.status || 'available',
+                            efficiency: d.efficiency || 1.0
+                        })),
+                        total: disciples.length
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectDiscipleRecruit(talent, name) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.sect) {
+                        gs.sect = { name: '青云宗', level: 1, reputation: 100, disciples: [], spiritStones: 1000, maxDisciples: 5, missions: [] };
+                    }
+                    const maxD = gs.sect.maxDisciples || 5;
+                    if (gs.sect.disciples.length >= maxD) return { error: 'Max disciples reached for sect level' };
+                    const TALENTS = ['normal', 'good', 'genius', 'immortal'];
+                    const TALENT_NAMES = { normal: '普通', good: '优良', genius: '天才', immortal: '天生神人' };
+                    const talentTier = talent || TALENTS[Math.floor(Math.random() * TALENTS.length)];
+                    const autoName = ['弟子甲', '弟子乙', '弟子丙', '弟子丁', '弟子戊'][Math.floor(Math.random() * 5)] + Math.floor(Math.random() * 100);
+                    const discipleName = name || autoName;
+                    const uid = 'D_' + Date.now();
+                    const newDisciple = {
+                        uid,
+                        name: discipleName,
+                        talent: talentTier,
+                        talentName: TALENT_NAMES[talentTier] || '普通',
+                        realm: 1,
+                        status: 'available',
+                        efficiency: talentTier === 'immortal' ? 2.0 : talentTier === 'genius' ? 1.5 : talentTier === 'good' ? 1.2 : 1.0,
+                        assignedTechnique: null
+                    };
+                    gs.sect.disciples.push(newDisciple);
+                    return { success: true, disciple: newDisciple, sectDiscipleCount: gs.sect.disciples.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectDiscipleTrain(discipleId, type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs || !gs.sect) return { error: 'No sect' };
+                    const disciple = gs.sect.disciples.find(d => d.uid === discipleId);
+                    if (!disciple) return { error: 'Disciple not found' };
+                    const TRAIN_TYPES = ['combat', 'cultivation', 'alchemy'];
+                    const trainType = TRAIN_TYPES.includes(type) ? type : 'cultivation';
+                    const gains = {
+                        combat: { realm: 0.1, strength: Math.floor(5 + Math.random() * 10) },
+                        cultivation: { realm: 0.2, xp: Math.floor(50 + Math.random() * 100) },
+                        alchemy: { realm: 0.05, skillPoints: Math.floor(10 + Math.random() * 20) }
+                    };
+                    disciple.realm = (disciple.realm || 0) + gains[trainType].realm;
+                    disciple.status = 'training';
+                    disciple.lastTraining = { type: trainType, timestamp: Date.now(), gains: gains[trainType] };
+                    return { success: true, discipleId, type: trainType, gains: gains[trainType], newRealm: disciple.realm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectCultivationAssign(discipleId, techniqueId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs || !gs.sect) return { error: 'No sect' };
+                    const disciple = gs.sect.disciples.find(d => d.uid === discipleId);
+                    if (!disciple) return { error: 'Disciple not found' };
+// [DDD Phase 1] TECHNIQUES moved to domains/shared/constants/;
+                    const techniqueName = TECHNIQUES[techniqueId] || techniqueId || '无名功法';
+                    disciple.assignedTechnique = { id: techniqueId, name: techniqueName, assignedAt: Date.now() };
+                    return { success: true, discipleId, technique: { id: techniqueId, name: techniqueName } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectMissionAccept(missionId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.sect) {
+                        gs.sect = { name: '青云宗', level: 1, reputation: 100, disciples: [], spiritStones: 1000, maxDisciples: 5, missions: [] };
+                    }
+                    const MISSION_TEMPLATES = [
+                        { id: 'M1', name: '采集灵石', difficulty: 1, reward: { spiritStones: 100, xp: 50 }, requiredDisciples: 1 },
+                        { id: 'M2', name: '护送商队', difficulty: 2, reward: { spiritStones: 300, xp: 150 }, requiredDisciples: 2 },
+                        { id: 'M3', name: '击杀妖兽', difficulty: 3, reward: { spiritStones: 800, xp: 400 }, requiredDisciples: 3 },
+                        { id: 'M4', name: '探索秘境', difficulty: 4, reward: { spiritStones: 2000, xp: 1000, item: '灵草' }, requiredDisciples: 2 },
+                        { id: 'M5', name: '渡劫任务', difficulty: 5, reward: { spiritStones: 5000, xp: 3000, title: '渡劫成功' }, requiredDisciples: 4 }
+                    ];
+                    const mission = MISSION_TEMPLATES.find(m => m.id === missionId);
+                    if (!mission) return { error: 'Mission not found' };
+                    const missionInstance = { ...mission, status: 'active', acceptedAt: Date.now(), assignedDisciples: [] };
+                    gs.sect.missions = gs.sect.missions || [];
+                    gs.sect.missions.push(missionInstance);
+                    return { success: true, mission: { id: mission.id, name: mission.name, difficulty: mission.difficulty, reward: mission.reward } };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -6906,6 +7129,114 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v80Results = runV80Tests();
+
+        // ===== V81 Tests: 宗门系统+弟子培养 =====
+        function runV81Tests() {
+            const results = [];
+            const v81Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V81 tools exist in MCP_TOOLS_V81
+            v81Assert(MCP_TOOLS_V81['sect.info'] !== undefined, 'sect.info tool defined');
+            v81Assert(MCP_TOOLS_V81['sect.disciple.list'] !== undefined, 'sect.disciple.list defined');
+            v81Assert(MCP_TOOLS_V81['sect.disciple.recruit'] !== undefined, 'sect.disciple.recruit defined');
+            v81Assert(MCP_TOOLS_V81['sect.disciple.train'] !== undefined, 'sect.disciple.train defined');
+            v81Assert(MCP_TOOLS_V81['sect.cultivation.assign'] !== undefined, 'sect.cultivation.assign defined');
+            v81Assert(MCP_TOOLS_V81['sect.mission.accept'] !== undefined, 'sect.mission.accept defined');
+
+            // Test 2: Tool registry has V81 tools
+            const server = new CultivationMCPServer();
+            v81Assert(server.toolRegistry.has('sect.info'), 'sect.info registered');
+            v81Assert(server.toolRegistry.has('sect.disciple.list'), 'sect.disciple.list registered');
+            v81Assert(server.toolRegistry.has('sect.mission.accept'), 'sect.mission.accept registered');
+
+            // Test 3: mcpSectInfo
+            window.gameState = { sect: { name: '青云宗', level: 3, reputation: 500, disciples: [{ uid: 'D1', name: '弟子A' }], spiritStones: 3000, missions: [] } };
+            const infoOverview = server.mcpSectInfo('overview');
+            v81Assert(infoOverview.name === '青云宗', 'sect.info returns correct name');
+            v81Assert(infoOverview.level === 3, 'sect.info returns level');
+            v81Assert(infoOverview.memberCount === 1, 'sect.info returns memberCount');
+            const infoDisciples = server.mcpSectInfo('disciples');
+            v81Assert(infoDisciples.disciples.length === 1, 'sect.info disciples view works');
+            const infoMissions = server.mcpSectInfo('missions');
+            v81Assert(infoMissions.missions !== undefined, 'sect.info missions view works');
+            const noSect = server.mcpSectInfo('overview');
+            Object.defineProperty(window, 'gameState', { value: {}, writable: true });
+            const err = server.mcpSectInfo('overview');
+            v81Assert(err.error === 'No sect found', 'sect.info returns error when no sect');
+
+            // Test 4: mcpSectDiscipleList
+            window.gameState = { sect: { disciples: [
+                { uid: 'D1', name: '张三', talent: 'good', realm: 2, status: 'available', efficiency: 1.2 },
+                { uid: 'D2', name: '李四', talent: 'genius', realm: 3, status: 'dispatched', efficiency: 1.5 },
+                { uid: 'D3', name: '王五', talent: 'normal', realm: 1, status: 'training', efficiency: 1.0 }
+            ] } };
+            const allList = server.mcpSectDiscipleList('all');
+            v81Assert(allList.total === 3, 'disciple.list returns all 3');
+            v81Assert(allList.disciples.length === 3, 'disciple.list all filter works');
+            const availList = server.mcpSectDiscipleList('available');
+            v81Assert(availList.total === 1, 'disciple.list available filter = 1');
+            v81Assert(availList.disciples[0].status === 'available', 'available disciple has correct status');
+            const trainList = server.mcpSectDiscipleList('training');
+            v81Assert(trainList.total === 1, 'disciple.list training filter = 1');
+
+            // Test 5: mcpSectDiscipleRecruit
+            window.gameState = { sect: { name: '青云宗', level: 1, reputation: 100, disciples: [], spiritStones: 1000, maxDisciples: 5, missions: [] } };
+            const recruit = server.mcpSectDiscipleRecruit('genius', '新弟子');
+            v81Assert(recruit.success === true, 'disciple.recruit returns success');
+            v81Assert(recruit.disciple.name === '新弟子', 'disciple.recruit uses provided name');
+            v81Assert(recruit.disciple.talent === 'genius', 'disciple.recruit sets correct talent');
+            v81Assert(recruit.sectDiscipleCount === 1, 'disciple.recruit updates count');
+            const autoRecruit = server.mcpSectDiscipleRecruit('immortal', null);
+            v81Assert(autoRecruit.success === true, 'disciple.recruit works with null name');
+            const overMax = server.mcpSectDiscipleRecruit('normal', '第六弟子');
+            v81Assert(overMax.error !== undefined, 'disciple.recruit prevents exceeding max');
+            // Test with no sect
+            window.gameState = { sect: null };
+            const noSectRecruit = server.mcpSectDiscipleRecruit('normal', null);
+            v81Assert(noSectRecruit.success === true, 'disciple.recruit auto-creates sect');
+
+            // Test 6: mcpSectDiscipleTrain
+            window.gameState = { sect: { disciples: [{ uid: 'D1', name: '张三', realm: 1, status: 'available' }] } };
+            const train = server.mcpSectDiscipleTrain('D1', 'cultivation');
+            v81Assert(train.success === true, 'disciple.train returns success');
+            v81Assert(train.type === 'cultivation', 'disciple.train sets correct type');
+            v81Assert(train.gains.realm > 0, 'disciple.train cultivation gives realm gain');
+            v81Assert(train.newRealm > 1, 'disciple.train updates newRealm');
+            const combatTrain = server.mcpSectDiscipleTrain('D1', 'combat');
+            v81Assert(combatTrain.gains.strength !== undefined, 'disciple.train combat gives strength gain');
+            const notFound = server.mcpSectDiscipleTrain('NONEXISTENT', 'cultivation');
+            v81Assert(notFound.error === 'Disciple not found', 'disciple.train returns error for unknown disciple');
+
+            // Test 7: mcpSectCultivationAssign
+            window.gameState = { sect: { disciples: [{ uid: 'D1', name: '张三', realm: 1, status: 'available', assignedTechnique: null }] } };
+            const assign = server.mcpSectCultivationAssign('D1', 'T2');
+            v81Assert(assign.success === true, 'cultivation.assign returns success');
+            v81Assert(assign.technique.name === '天雷法', 'cultivation.assign sets correct technique');
+            const assignNotFound = server.mcpSectCultivationAssign('NONEXISTENT', 'T1');
+            v81Assert(assignNotFound.error === 'Disciple not found', 'cultivation.assign returns error for unknown disciple');
+
+            // Test 8: mcpSectMissionAccept
+            window.gameState = { sect: { name: '青云宗', level: 1, reputation: 100, disciples: [], spiritStones: 1000, maxDisciples: 5, missions: [] } };
+            const mission = server.mcpSectMissionAccept('M3');
+            v81Assert(mission.success === true, 'mission.accept returns success');
+            v81Assert(mission.mission.id === 'M3', 'mission.accept returns correct mission id');
+            v81Assert(mission.mission.name === '击杀妖兽', 'mission.accept returns mission name');
+            v81Assert(mission.mission.difficulty === 3, 'mission.accept returns difficulty');
+            const missionNotFound = server.mcpSectMissionAccept('NONEXISTENT');
+            v81Assert(missionNotFound.error === 'Mission not found', 'mission.accept returns error for unknown mission');
+
+            // Test 9: Tool count grows with V81
+            const server2 = new CultivationMCPServer();
+            v81Assert(server2.toolRegistry.size >= 60, 'toolRegistry has >= 60 tools (V73-V81)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V81 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V81 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v81Results = runV81Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
@@ -13383,6 +13714,7 @@ const ACHIEVEMENT_ID_MAP = {
                 setTimeout(() => showTribulationUI(), 1500);
             }
         }
+        const TECHNIQUES = ['雷法', '火法', '水法', '体术'];
 // [DDD Phase 1] FIXED_OPPONENTS moved to domains/shared/constants/;
         const CONTRIBUTION_SHOP_ITEMS = [
             { name: '灵阶功法·灵根培育法', cost: 500, type: 'technique', data: '灵根培育法' },
