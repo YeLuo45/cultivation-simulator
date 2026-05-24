@@ -368,6 +368,8 @@
                 }
 
                 try {
+                    // V73: 记录callTool到历史
+                    this.requestHistory.push({ method: 'tools.call', timestamp: Date.now(), id: name });
                     let result;
                     switch (name) {
                         case 'npc.query':
@@ -403,62 +405,74 @@
                 }
             }
 
-            // NPC查询
+            // NPC查询 — 延迟从window读取gameState（避免TDZ）
             mcpNpcQuery(npcId, query) {
-                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
-                if (!gameState) return { error: 'Game state not initialized' };
-                if (!gameState.npcCollab) return { error: 'NPC system not initialized' };
-                const npc = gameState.npcCollab.npcs ? gameState.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
-                if (!npc) return { error: `NPC not found: ${npcId}` };
+                try {
+                    return (function() {
+                        const gs = window.gameState;
+                        if (!gs) return { error: 'Game state not initialized' };
+                        if (!gs.npcCollab) return { error: 'NPC system not initialized' };
+                        const npc = gs.npcCollab.npcs ? gs.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
+                        if (!npc) return { error: 'NPC not found: ' + npcId };
 
-                switch (query) {
-                    case 'info':
-                        return {
-                            id: npc.id,
-                            name: npc.name,
-                            role: npc.role,
-                            realm: npc.realm,
-                            disposition: npc.disposition,
-                            task: npc.currentTask || 'none'
-                        };
-                    case 'memory':
-                        return {
-                            memory: npc.memory || { L0: {}, L1: {}, L2: {}, L3: {}, L4: {} }
-                        };
-                    case 'relationship':
-                        return {
-                            playerReputation: npc.playerReputation || 0,
-                            favorability: npc.favorability || 0,
-                            masterRank: npc.masterRank || 0
-                        };
-                    case 'task':
-                        return {
-                            currentTask: npc.currentTask || 'none',
-                            taskProgress: npc.taskProgress || 0,
-                            completedTasks: npc.completedTasks || 0
-                        };
-                    default:
-                        return { error: `Unknown query type: ${query}` };
+                        switch (query) {
+                            case 'info':
+                                return {
+                                    id: npc.id,
+                                    name: npc.name,
+                                    role: npc.role,
+                                    realm: npc.realm,
+                                    disposition: npc.disposition,
+                                    task: npc.currentTask || 'none'
+                                };
+                            case 'memory':
+                                return {
+                                    memory: npc.memory || { L0: {}, L1: {}, L2: {}, L3: {}, L4: {} }
+                                };
+                            case 'relationship':
+                                return {
+                                    playerReputation: npc.playerReputation || 0,
+                                    favorability: npc.favorability || 0,
+                                    masterRank: npc.masterRank || 0
+                                };
+                            case 'task':
+                                return {
+                                    currentTask: npc.currentTask || 'none',
+                                    taskProgress: npc.taskProgress || 0,
+                                    completedTasks: npc.completedTasks || 0
+                                };
+                            default:
+                                return { error: 'Unknown query type: ' + query };
+                        }
+                    })();
+                } catch (e) {
+                    return { error: 'NPC query failed: ' + e.message };
                 }
             }
 
-            // 奇遇触发
+            // 奇遇触发 — 延迟从window读取gameState（避免TDZ）
             mcpSerendipityTrigger(nodeId) {
-                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
-                if (!gameState) return { error: 'Game state not initialized' };
-                if (!gameState.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
-                const node = gameState.serendipityDAG.nodes ? gameState.serendipityDAG.nodes.get(nodeId) : null;
-                if (!node) return { error: `Serendipity node not found: ${nodeId}` };
+                try {
+                    return (function() {
+                        const gs = window.gameState;
+                        if (!gs) return { error: 'Game state not initialized' };
+                        if (!gs.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
+                        const node = gs.serendipityDAG.nodes ? gs.serendipityDAG.nodes.get(nodeId) : null;
+                        if (!node) return { error: 'Serendipity node not found: ' + nodeId };
 
-                node.status = 'triggered';
-                node.triggerCount++;
-                return {
-                    nodeId: node.id,
-                    name: node.name,
-                    description: node.description,
-                    effects: node.effects,
-                    status: node.status
-                };
+                        node.status = 'triggered';
+                        node.triggerCount++;
+                        return {
+                            nodeId: node.id,
+                            name: node.name,
+                            description: node.description,
+                            effects: node.effects,
+                            status: node.status
+                        };
+                    })();
+                } catch (e) {
+                    return { error: 'Serendipity trigger failed: ' + e.message };
+                }
             }
 
             // 修炼推进
@@ -483,61 +497,73 @@
                 }
             }
 
-            // 物品兑换
+            // 物品兑换 — 延迟从window读取gameState（避免TDZ）
             mcpItemExchange(itemId, target) {
-                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
-                if (!gameState) return { error: 'Game state not initialized' };
-                const item = findItemById(itemId);
-                if (!item) return { error: `Item not found: ${itemId}` };
+                try {
+                    return (function() {
+                        const gs = window.gameState;
+                        if (!gs) return { error: 'Game state not initialized' };
+                        const item = findItemById(itemId);
+                        if (!item) return { error: 'Item not found: ' + itemId };
 
-                const exchangeValue = item.quality === 'SSR' ? 5000 : item.quality === 'SR' ? 1000 : item.quality === 'R' ? 100 : 10;
-                if (target === 'spirit_stones') {
-                    gameState.spiritStones = (gameState.spiritStones || 0) + exchangeValue;
-                    removeItem(itemId, 1);
-                    return { success: true, exchanged: itemId, spiritStones: exchangeValue, remaining: gameState.spiritStones };
+                        const exchangeValue = item.quality === 'SSR' ? 5000 : item.quality === 'SR' ? 1000 : item.quality === 'R' ? 100 : 10;
+                        if (target === 'spirit_stones') {
+                            gs.spiritStones = (gs.spiritStones || 0) + exchangeValue;
+                            removeItem(itemId, 1);
+                            return { success: true, exchanged: itemId, spiritStones: exchangeValue, remaining: gs.spiritStones };
+                        }
+                        return { error: 'Unknown target: ' + target };
+                    })();
+                } catch (e) {
+                    return { error: 'Item exchange failed: ' + e.message };
                 }
-                return { error: `Unknown target: ${target}` };
             }
 
-            // 游戏状态查询
+            // 游戏状态查询 — 延迟从window读取gameState（避免TDZ）
             mcpGameStateQuery(field) {
-                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
-                if (!gameState) return { error: 'Game state not initialized' };
-                switch (field) {
-                    case 'realm':
-                        return { realm: gameState.realm, stage: gameState.stage, level: gameState.level };
-                    case 'spiritStones':
-                        return { spiritStones: gameState.spiritStones || 0, realmBonus: gameState.realmBonus || 0 };
-                    case 'items':
-                        return { items: gameState.items || [], inventoryCount: (gameState.items || []).length };
-                    case 'cultivation':
-                        return {
-                            spiritEnergy: gameState.spiritEnergy,
-                            maxSpiritEnergy: gameState.maxSpiritEnergy,
-                            cultivationProgress: gameState.cultivationProgress
-                        };
-                    case 'combat':
-                        return {
-                            combatEnabled: !!gameState.combatStats,
-                            wins: gameState.combatStats?.wins || 0,
-                            losses: gameState.combatStats?.losses || 0
-                        };
-                    case 'npc':
-                        return {
-                            npcCount: gameState.npcCollab?.npcs?.length || 0,
-                            activeTasks: gameState.npcCollab?.activeTasks || 0
-                        };
-                    case 'all':
-                        return {
-                            realm: gameState.realm,
-                            spiritStones: gameState.spiritStones || 0,
-                            spiritEnergy: gameState.spiritEnergy,
-                            items: (gameState.items || []).length,
-                            combat: { wins: gameState.combatStats?.wins || 0, losses: gameState.combatStats?.losses || 0 },
-                            npc: { count: gameState.npcCollab?.npcs?.length || 0 }
-                        };
-                    default:
-                        return { error: `Unknown field: ${field}` };
+                try {
+                    return (function() {
+                        const gs = window.gameState;
+                        if (!gs) return { error: 'Game state not initialized' };
+                        switch (field) {
+                            case 'realm':
+                                return { realm: gs.realm, stage: gs.stage, level: gs.level };
+                            case 'spiritStones':
+                                return { spiritStones: gs.spiritStones || 0, realmBonus: gs.realmBonus || 0 };
+                            case 'items':
+                                return { items: gs.items || [], inventoryCount: (gs.items || []).length };
+                            case 'cultivation':
+                                return {
+                                    spiritEnergy: gs.spiritEnergy,
+                                    maxSpiritEnergy: gs.maxSpiritEnergy,
+                                    cultivationProgress: gs.cultivationProgress
+                                };
+                            case 'combat':
+                                return {
+                                    combatEnabled: !!gs.combatStats,
+                                    wins: gs.combatStats?.wins || 0,
+                                    losses: gs.combatStats?.losses || 0
+                                };
+                            case 'npc':
+                                return {
+                                    npcCount: gs.npcCollab?.npcs?.length || 0,
+                                    activeTasks: gs.npcCollab?.activeTasks || 0
+                                };
+                            case 'all':
+                                return {
+                                    realm: gs.realm,
+                                    spiritStones: gs.spiritStones || 0,
+                                    spiritEnergy: gs.spiritEnergy,
+                                    items: (gs.items || []).length,
+                                    combat: { wins: gs.combatStats?.wins || 0, losses: gs.combatStats?.losses || 0 },
+                                    npc: { count: gs.npcCollab?.npcs?.length || 0 }
+                                };
+                            default:
+                                return { error: 'Unknown field: ' + field };
+                        }
+                    })();
+                } catch (e) {
+                    return { error: 'Game state query failed: ' + e.message };
                 }
             }
 
@@ -550,33 +576,37 @@
                 return { error: 'Combat system not available' };
             }
 
-            // Provider查询
+            // Provider查询 — 延迟从window读取llmRegistry（避免TDZ）
             mcpProviders() {
                 try {
-                    let reg = window.llmRegistry;
-                    if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
-                    const providers = reg.getAllProviders().map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        isConfigured: reg.isConfigured(p.id),
-                        isActive: p.id === reg.activeProviderId
-                    }));
-                    return { providers, activeProvider: reg.activeProviderId };
+                    return (function() {
+                        const reg = window.llmRegistry;
+                        if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
+                        const providers = reg.getAllProviders().map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            isConfigured: reg.isConfigured(p.id),
+                            isActive: p.id === reg.activeProviderId
+                        }));
+                        return { providers, activeProvider: reg.activeProviderId };
+                    })();
                 } catch (e) {
                     return { error: 'LLM Registry not available: ' + e.message, providers: [] };
                 }
             }
 
-            // Provider切换
+            // Provider切换 — 延迟从window读取llmRegistry（避免TDZ）
             mcpSwitchProvider(providerId) {
                 try {
-                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized' };
-                    if (!llmRegistry) return { error: 'LLM Registry not initialized' };
-                    const success = llmRegistry.setActive(providerId);
-                    if (success) {
-                        return { success: true, provider: providerId, message: `Switched to ${providerId}` };
-                    }
-                    return { error: `Failed to switch to provider: ${providerId}` };
+                    return (function() {
+                        const reg = window.llmRegistry;
+                        if (!reg) return { error: 'LLM Registry not initialized' };
+                        const success = reg.setActive(providerId);
+                        if (success) {
+                            return { success: true, provider: providerId, message: 'Switched to ' + providerId };
+                        }
+                        return { error: 'Failed to switch to provider: ' + providerId };
+                    })();
                 } catch (e) {
                     return { error: 'LLM Registry not available: ' + e.message };
                 }
@@ -5327,6 +5357,9 @@
             }
         };
 
+        // V73 MCP: 将gameState暴露到window对象，供MCP工具在初始化前访问
+        window.gameState = gameState;
+
         // --- LLM_PROVIDER_REGISTRY (V72 方向A: 多模型Provider切换引擎) ---
         // 来源: nanobot ProviderFactory + claude-code 7 Provider
         // 支持多LLM Provider注册、运行时切换、Budget Mode成本控制
@@ -5509,6 +5542,9 @@
         }
 
         const llmRegistry = new LLMProviderRegistry();
+
+        // V73 MCP: 将llmRegistry暴露到window对象，供MCP工具访问
+        window.llmRegistry = llmRegistry;
 
         // --- callProviderAPI (V72, 替代 callMiniMaxAPI) ---
         function callProviderAPI(prompt, providerId, model, maxTokens, successCallback, errorCallback) {
