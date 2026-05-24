@@ -2841,6 +2841,211 @@ const ACHIEVEMENT_ID_MAP = {
                 }
             }
         };
+        // V83: 天劫系统+渡劫机制
+        const MCP_TOOLS_V83 = {
+            'tribulation.start': {
+                name: 'tribulation.start',
+                description: 'Start a tribulation based on current realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realm: { type: 'number', description: 'Target realm for tribulation' }
+                    }
+                }
+            },
+            'tribulation.progress': {
+                name: 'tribulation.progress',
+                description: 'Get current tribulation progress',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'tribulation.lightning': {
+                name: 'tribulation.lightning',
+                description: 'Record a lightning strike during tribulation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        damage: { type: 'number', description: 'Lightning damage taken' },
+                        resisted: { type: 'boolean', description: 'Whether damage was resisted' }
+                    },
+                    required: ['damage']
+                }
+            },
+            'tribulation.blessing': {
+                name: 'tribulation.blessing',
+                description: 'Receive tribulation blessing reward',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Blessing type: strength|spirit|cultivation|random' }
+                    }
+                }
+            },
+            'tribulation.record': {
+                name: 'tribulation.record',
+                description: 'Query tribulation history records',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|success|failed|latest' }
+                    }
+                }
+            },
+            'tribulation.talent_modify': {
+                name: 'tribulation.talent_modify',
+                description: 'Modify player talent after tribulation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        talent: { type: 'string', description: 'New talent: normal|good|genius|immortal' }
+                    },
+                    required: ['talent']
+                }
+            }
+        };
+        // V84: 灵宝系统+装备进阶
+        const MCP_TOOLS_V84 = {
+            'artifact.forge': {
+                name: 'artifact.forge',
+                description: 'Forge a new artifact with materials',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'string', description: 'Artifact tier: common|rare|epic|legendary' },
+                        material: { type: 'string', description: 'Primary material used' }
+                    },
+                    required: ['tier']
+                }
+            },
+            'artifact.upgrade': {
+                name: 'artifact.upgrade',
+                description: 'Upgrade an artifact to higher level',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' },
+                        targetLevel: { type: 'number', description: 'Target upgrade level (1-15)' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.attune': {
+                name: 'artifact.attune',
+                description: 'Check artifact attunement/affinity level',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.bind': {
+                name: 'artifact.bind',
+                description: 'Bind artifact to player (ownership)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' }
+                    },
+                    required: ['artifactId']
+                }
+            },
+            'artifact.stats': {
+                name: 'artifact.stats',
+                description: 'Query detailed artifact statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|equipped|inventory|bound|unbound' }
+                    }
+                }
+            },
+            'artifact.transform': {
+                name: 'artifact.transform',
+                description: 'Transform artifact into higher tier form',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        artifactId: { type: 'string', description: 'Artifact instance ID' },
+                        targetTier: { type: 'string', description: 'Target tier: common|rare|epic|legendary|mythic' }
+                    },
+                    required: ['artifactId', 'targetTier']
+                }
+            }
+        };
+        // V85: 灵兽系统+宠物培养
+        const MCP_TOOLS_V85 = {
+            'pet.capture': {
+                name: 'pet.capture',
+                description: 'Capture a spirit beast with bait and trap',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Pet type: wolf/tiger/fox dragon phoenix turtle' },
+                        bait: { type: 'string', description: 'Bait quality: low|medium|high|premium' }
+                    },
+                    required: ['type']
+                }
+            },
+            'pet.list': {
+                name: 'pet.list',
+                description: 'List all captured spirit beasts',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|active|released' }
+                    }
+                }
+            },
+            'pet.feed': {
+                name: 'pet.feed',
+                description: 'Feed a spirit beast to increase intimacy',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' },
+                        food: { type: 'string', description: 'Food type: basic|premium|super' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: 'Evolve a spirit beast to higher form',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' },
+                        targetForm: { type: 'string', description: 'Target form: adult|mutant|divine' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.release': {
+                name: 'pet.release',
+                description: 'Release a spirit beast back to the wild',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.stats': {
+                name: 'pet.stats',
+                description: 'Query detailed pet statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet instance ID (omit for all stats)' }
+                    }
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -2877,6 +3082,18 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V82: Register technique & skill DAG tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V82)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V83: Register tribulation tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V83)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V84: Register artifact tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V84)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V85: Register pet tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V85)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3122,6 +3339,63 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'skill.unlock':
                             result = this.mcpSkillUnlock(args.nodeId, args.cost);
+                            break;
+                        // V83: Tribulation tools
+                        case 'tribulation.start':
+                            result = this.mcpTribulationStart(args.realm);
+                            break;
+                        case 'tribulation.progress':
+                            result = this.mcpTribulationProgress();
+                            break;
+                        case 'tribulation.lightning':
+                            result = this.mcpTribulationLightning(args.damage, args.resisted);
+                            break;
+                        case 'tribulation.blessing':
+                            result = this.mcpTribulationBlessing(args.type);
+                            break;
+                        case 'tribulation.record':
+                            result = this.mcpTribulationRecord(args.filter);
+                            break;
+                        case 'tribulation.talent_modify':
+                            result = this.mcpTribulationTalentModify(args.talent);
+                            break;
+                        // V84: Artifact tools
+                        case 'artifact.forge':
+                            result = this.mcpArtifactForge(args.tier, args.material);
+                            break;
+                        case 'artifact.upgrade':
+                            result = this.mcpArtifactUpgrade(args.artifactId, args.targetLevel);
+                            break;
+                        case 'artifact.attune':
+                            result = this.mcpArtifactAttune(args.artifactId);
+                            break;
+                        case 'artifact.bind':
+                            result = this.mcpArtifactBind(args.artifactId);
+                            break;
+                        case 'artifact.stats':
+                            result = this.mcpArtifactStats(args.filter);
+                            break;
+                        case 'artifact.transform':
+                            result = this.mcpArtifactTransform(args.artifactId, args.targetTier);
+                            break;
+                        // V85: Pet spirit beast tools
+                        case 'pet.capture':
+                            result = this.mcpPetCapture(args.type, args.bait);
+                            break;
+                        case 'pet.list':
+                            result = this.mcpPetList(args.filter);
+                            break;
+                        case 'pet.feed':
+                            result = this.mcpPetFeed(args.petId, args.food);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolve(args.petId, args.targetForm);
+                            break;
+                        case 'pet.release':
+                            result = this.mcpPetRelease(args.petId);
+                            break;
+                        case 'pet.stats':
+                            result = this.mcpPetStats(args.petId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -4155,6 +4429,411 @@ const ACHIEVEMENT_ID_MAP = {
                     gs.spiritStones -= actualCost;
                     gs.skills.push(nodeId);
                     return { success: true, nodeId, nodeName: NODE_NAMES[nodeId], cost: actualCost, remainingStones: gs.spiritStones, totalSkills: gs.skills.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V83: Tribulation System
+            mcpTribulationStart(realm) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const targetRealm = realm || (gs.realm || 1) + 1;
+                    const REALM_NAMES = { 2: '筑基期', 3: '金丹期', 4: '元婴期', 5: '化神期', 6: '渡劫期', 7: '大乘期', 8: '真仙期' };
+                    gs.tribulation = {
+                        active: true,
+                        targetRealm,
+                        realmName: REALM_NAMES[targetRealm] || '天人',
+                        phase: 'lightning',
+                        strikesTotal: targetRealm * 3,
+                        strikesCurrent: 0,
+                        damageAccumulated: 0,
+                        resistedAccumulated: 0,
+                        startTime: Date.now(),
+                        success: null
+                    };
+                    return { success: true, targetRealm, realmName: REALM_NAMES[targetRealm], strikesTotal: gs.tribulation.strikesTotal };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationProgress() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.tribulation || !gs.tribulation.active) return { error: 'No active tribulation' };
+                    const t = gs.tribulation;
+                    return {
+                        targetRealm: t.targetRealm,
+                        realmName: t.realmName,
+                        phase: t.phase,
+                        strikesCurrent: t.strikesCurrent,
+                        strikesTotal: t.strikesTotal,
+                        progress: t.strikesTotal > 0 ? (t.strikesCurrent / t.strikesTotal * 100).toFixed(1) + '%' : '0%',
+                        damageAccumulated: t.damageAccumulated,
+                        resistedAccumulated: t.resistedAccumulated,
+                        resistanceRate: t.strikesCurrent > 0 ? (t.resistedAccumulated / t.strikesCurrent * 100).toFixed(1) + '%' : '0%',
+                        success: t.success
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationLightning(damage, resisted) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.tribulation || !gs.tribulation.active) return { error: 'No active tribulation' };
+                    const t = gs.tribulation;
+                    t.strikesCurrent++;
+                    t.damageAccumulated += damage;
+                    if (resisted) t.resistedAccumulated++;
+                    if (t.strikesCurrent >= t.strikesTotal) {
+                        t.phase = 'complete';
+                        t.active = false;
+                        const resistRate = t.strikesCurrent > 0 ? t.resistedAccumulated / t.strikesCurrent : 0;
+                        t.success = resistRate >= 0.5;
+                        if (t.success) {
+                            gs.realm = t.targetRealm;
+                            gs.cultivationXP = (gs.cultivationXP || 0) + t.targetRealm * 500;
+                        }
+                    }
+                    return {
+                        strikeNumber: t.strikesCurrent,
+                        damage,
+                        resisted: resisted || false,
+                        progress: t.strikesCurrent + '/' + t.strikesTotal,
+                        tribulationComplete: !t.active,
+                        success: t.success,
+                        newRealm: t.success ? t.targetRealm : null
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationBlessing(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const record = gs.tribulationRecord || [];
+                    const lastSuccess = record.filter(r => r.success).pop();
+                    if (!lastSuccess) return { error: 'No successful tribulation to receive blessing' };
+                    const blessType = type || 'random';
+                    const BLESSINGS = {
+                        strength: { name: '天雷淬体', effect: { attack: 15, defense: 10 } },
+                        spirit: { name: '灵气灌顶', effect: { cultivationSpeed: 20, maxSpiritual: 50 } },
+                        cultivation: { name: '道心稳固', effect: { realmProgress: 10, comprehension: 15 } },
+                        random: null
+                    };
+                    let blessing;
+                    if (blessType === 'random') {
+                        const types = ['strength', 'spirit', 'cultivation'];
+                        const chosen = types[Math.floor(Math.random() * types.length)];
+                        blessing = { type: chosen, ...BLESSINGS[chosen] };
+                    } else {
+                        if (!BLESSINGS[blessType]) return { error: 'Invalid blessing type' };
+                        blessing = { type: blessType, ...BLESSINGS[blessType] };
+                    }
+                    gs.blessings = gs.blessings || [];
+                    gs.blessings.push({ ...blessing, receivedAt: Date.now(), realm: lastSuccess.realm });
+                    return { success: true, blessing };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationRecord(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const records = gs.tribulationRecord || [];
+                    const f = filter || 'all';
+                    let filtered = records;
+                    if (f === 'success') filtered = records.filter(r => r.success);
+                    else if (f === 'failed') filtered = records.filter(r => !r.success);
+                    else if (f === 'latest') filtered = [records[records.length - 1]];
+                    return { records: filtered, total: records.length, successCount: records.filter(r => r.success).length, failedCount: records.filter(r => !r.success).length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationTalentModify(talent) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TALENTS = ['normal', 'good', 'genius', 'immortal'];
+                    if (!VALID_TALENTS.includes(talent)) return { error: 'Invalid talent value' };
+                    const record = gs.tribulationRecord || [];
+                    const lastSuccess = record.filter(r => r.success).pop();
+                    if (!lastSuccess) return { error: 'No successful tribulation for talent modification' };
+                    const oldTalent = gs.talent || 'normal';
+                    gs.talent = talent;
+                    return { success: true, oldTalent, newTalent: talent, realm: lastSuccess.realm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V84: Artifact & Equipment System
+            mcpArtifactForge(tier, material) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TIERS = ['common', 'rare', 'epic', 'legendary'];
+                    if (!VALID_TIERS.includes(tier)) return { error: 'Invalid artifact tier' };
+                    const TIER_POWER = { common: 10, rare: 25, epic: 50, legendary: 100 };
+                    const TIER_COST = { common: 100, rare: 500, epic: 2000, legendary: 8000 };
+                    const MATERIAL_BONUS = { iron: 1.0, jade: 1.2, gold: 1.5, spirit: 2.0 };
+                    const mat = material || 'iron';
+                    const bonus = MATERIAL_BONUS[mat] || 1.0;
+                    const cost = TIER_COST[tier];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    gs.artifacts = gs.artifacts || [];
+                    const artifactId = 'AR_' + Date.now();
+                    const power = Math.round(TIER_POWER[tier] * bonus);
+                    const newArtifact = { id: artifactId, tier, material: mat, level: 1, power, bound: false, attunement: 0, createdAt: Date.now() };
+                    gs.artifacts.push(newArtifact);
+                    return { success: true, artifact: newArtifact, cost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactUpgrade(artifactId, targetLevel) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    const target = targetLevel || (artifact.level + 1);
+                    if (target > 15) return { error: 'Max artifact level is 15' };
+                    if (target <= artifact.level) return { error: 'Target level must be higher than current' };
+                    const LEVEL_COST = (target - artifact.level) * 200 * (artifact.level + 1);
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < LEVEL_COST) return { error: 'Not enough spirit stones', required: LEVEL_COST, available: gs.spiritStones };
+                    gs.spiritStones -= LEVEL_COST;
+                    artifact.level = target;
+                    artifact.power = Math.round(artifact.power * (1 + (target - 1) * 0.1));
+                    return { success: true, artifactId, newLevel: artifact.level, newPower: artifact.power, cost: LEVEL_COST };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactAttune(artifactId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    if (!artifact.bound) return { error: 'Artifact must be bound before attunement' };
+                    const ATTUNEMENT_PER_USE = 10;
+                    artifact.attunement = Math.min(100, (artifact.attunement || 0) + ATTUNEMENT_PER_USE);
+                    const BONUS_PER_10 = { attack: 2, defense: 2, critRate: 0.5 };
+                    return {
+                        attunement: artifact.attunement,
+                        maxAttunement: 100,
+                        bonuses: {
+                            attack: Math.floor(artifact.attunement / 10) * BONUS_PER_10.attack,
+                            defense: Math.floor(artifact.attunement / 10) * BONUS_PER_10.defense,
+                            critRate: (artifact.attunement / 10) * BONUS_PER_10.critRate
+                        }
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactBind(artifactId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    if (artifact.bound) return { error: 'Artifact already bound' };
+                    artifact.bound = true;
+                    return { success: true, artifactId, bound: true };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactStats(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const artifacts = gs.artifacts || [];
+                    const f = filter || 'all';
+                    let filtered = artifacts;
+                    if (f === 'equipped') filtered = artifacts.filter(a => gs.equippedArtifacts && gs.equippedArtifacts.includes(a.id));
+                    else if (f === 'inventory') filtered = artifacts.filter(a => !gs.equippedArtifacts || !gs.equippedArtifacts.includes(a.id));
+                    else if (f === 'bound') filtered = artifacts.filter(a => a.bound);
+                    else if (f === 'unbound') filtered = artifacts.filter(a => !a.bound);
+                    return {
+                        artifacts: filtered,
+                        total: filtered.length,
+                        totalPower: filtered.reduce((sum, a) => sum + a.power, 0),
+                        byTier: {
+                            common: filtered.filter(a => a.tier === 'common').length,
+                            rare: filtered.filter(a => a.tier === 'rare').length,
+                            epic: filtered.filter(a => a.tier === 'epic').length,
+                            legendary: filtered.filter(a => a.tier === 'legendary').length
+                        }
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArtifactTransform(artifactId, targetTier) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TIERS = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+                    if (!VALID_TIERS.includes(targetTier)) return { error: 'Invalid target tier' };
+                    gs.artifacts = gs.artifacts || [];
+                    const artifact = gs.artifacts.find(a => a.id === artifactId);
+                    if (!artifact) return { error: 'Artifact not found' };
+                    const TIER_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+                    const currentIdx = TIER_ORDER.indexOf(artifact.tier);
+                    const targetIdx = TIER_ORDER.indexOf(targetTier);
+                    if (targetIdx <= currentIdx) return { error: 'Target tier must be higher than current tier' };
+                    const TIER_TRANSFORM_COST = { rare: 5000, epic: 20000, legendary: 80000, mythic: 300000 };
+                    const cost = TIER_TRANSFORM_COST[targetTier];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    const TIER_POWER = { common: 10, rare: 25, epic: 50, legendary: 100, mythic: 200 };
+                    artifact.tier = targetTier;
+                    artifact.power = TIER_POWER[targetTier];
+                    artifact.attunement = 0;
+                    return { success: true, artifactId, newTier: targetTier, newPower: artifact.power, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V85: Pet Spirit Beast System
+            mcpPetCapture(type, bait) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TYPES = ['wolf', 'tiger', 'fox', 'dragon', 'phoenix', 'turtle'];
+                    if (!VALID_TYPES.includes(type)) return { error: 'Invalid pet type' };
+                    const BAIT_COST = { low: 50, medium: 150, high: 400, premium: 1000 };
+                    const BAIT_SUCCESS = { low: 0.4, medium: 0.65, high: 0.85, premium: 0.95 };
+                    const b = bait || 'medium';
+                    const cost = BAIT_COST[b];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    const roll = Math.random();
+                    const successRate = BAIT_SUCCESS[b];
+                    if (roll > successRate) {
+                        gs.spiritStones -= cost;
+                        return { success: false, reason: 'Pet escaped', cost, remainingStones: gs.spiritStones };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.pets = gs.pets || [];
+                    const petId = 'PET_' + Date.now();
+                    const TIER_POWER = { wolf: 15, tiger: 20, fox: 12, dragon: 30, phoenix: 25, turtle: 10 };
+                    const INTIMACY_THRESHOLDS = [0, 20, 40, 60, 80, 100];
+                    const newPet = {
+                        id: petId, type, name: type.charAt(0).toUpperCase() + type.slice(1),
+                        form: 'child', level: 1, power: TIER_POWER[type] || 10,
+                        intimacy: 0, hunger: 0, active: true, skills: [], equipped: null,
+                        loyalty: 50, potential: Math.floor(Math.random() * 30) + 70,
+                        captureCost: cost, capturedAt: Date.now()
+                    };
+                    gs.pets.push(newPet);
+                    return { success: true, pet: newPet, cost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetList(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const f = filter || 'all';
+                    let filtered = pets;
+                    if (f === 'active') filtered = pets.filter(p => p.active);
+                    else if (f === 'released') filtered = pets.filter(p => !p.active);
+                    return { pets: filtered, total: filtered.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetFeed(petId, food) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet has been released' };
+                    const FOOD_INTIMACY = { basic: 5, premium: 15, super: 30 };
+                    const FOOD_COST = { basic: 20, premium: 80, super: 200 };
+                    const f = food || 'basic';
+                    const cost = FOOD_COST[f];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    pet.hunger = Math.max(0, pet.hunger - 20);
+                    pet.intimacy = Math.min(100, pet.intimacy + FOOD_INTIMACY[f]);
+                    pet.loyalty = Math.min(100, pet.loyalty + 2);
+                    return { success: true, petId: pet.id, intimacy: pet.intimacy, loyalty: pet.loyalty, hunger: pet.hunger, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetEvolve(petId, targetForm) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet has been released' };
+                    const VALID_FORMS = ['adult', 'mutant', 'divine'];
+                    if (!VALID_FORMS.includes(targetForm)) return { error: 'Invalid target form' };
+                    const FORM_ORDER = ['child', 'adult', 'mutant', 'divine'];
+                    const currentIdx = FORM_ORDER.indexOf(pet.form);
+                    const targetIdx = FORM_ORDER.indexOf(targetForm);
+                    if (targetIdx <= currentIdx) return { error: 'Target form must be higher than current' };
+                    const INTIMACY_REQUIRED = { adult: 30, mutant: 60, divine: 90 };
+                    if (pet.intimacy < INTIMACY_REQUIRED[targetForm]) return { error: `Intimacy ${pet.intimacy} below required ${INTIMACY_REQUIRED[targetForm]} for ${targetForm}` };
+                    const EVO_COST = { adult: 500, mutant: 2000, divine: 8000 };
+                    const cost = EVO_COST[targetForm];
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < cost) return { error: 'Not enough spirit stones', required: cost, available: gs.spiritStones };
+                    gs.spiritStones -= cost;
+                    pet.form = targetForm;
+                    pet.power = Math.round(pet.power * (1 + (targetIdx - currentIdx) * 0.3));
+                    pet.level = Math.min(99, pet.level + 5);
+                    return { success: true, petId: pet.id, newForm: pet.form, newPower: pet.power, newLevel: pet.level, cost };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetRelease(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.pets = gs.pets || [];
+                    const pet = gs.pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found' };
+                    if (!pet.active) return { error: 'Pet already released' };
+                    pet.active = false;
+                    pet.releasedAt = Date.now();
+                    return { success: true, petId, status: 'released' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetStats(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    if (petId) {
+                        const pet = pets.find(p => p.id === petId);
+                        if (!pet) return { error: 'Pet not found' };
+                        return { pet, active: pets.filter(p => p.active).length, total: pets.length };
+                    }
+                    return {
+                        pets: pets.filter(p => p.active),
+                        total: pets.length,
+                        activeCount: pets.filter(p => p.active).length,
+                        releasedCount: pets.filter(p => !p.active).length,
+                        byType: {
+                            wolf: pets.filter(p => p.type === 'wolf').length,
+                            tiger: pets.filter(p => p.type === 'tiger').length,
+                            fox: pets.filter(p => p.type === 'fox').length,
+                            dragon: pets.filter(p => p.type === 'dragon').length,
+                            phoenix: pets.filter(p => p.type === 'phoenix').length,
+                            turtle: pets.filter(p => p.type === 'turtle').length
+                        }
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -7588,6 +8267,365 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v82Results = runV82Tests();
+
+        // ===== V83 Tests: 天劫系统+渡劫机制 =====
+        function runV83Tests() {
+            const results = [];
+            const v83Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V83 tools exist in MCP_TOOLS_V83
+            v83Assert(MCP_TOOLS_V83['tribulation.start'] !== undefined, 'tribulation.start defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.progress'] !== undefined, 'tribulation.progress defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.lightning'] !== undefined, 'tribulation.lightning defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.blessing'] !== undefined, 'tribulation.blessing defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.record'] !== undefined, 'tribulation.record defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.talent_modify'] !== undefined, 'tribulation.talent_modify defined');
+
+            // Test 2: Tool registry has V83 tools
+            const server = new CultivationMCPServer();
+            v83Assert(server.toolRegistry.has('tribulation.start'), 'tribulation.start registered');
+            v83Assert(server.toolRegistry.has('tribulation.progress'), 'tribulation.progress registered');
+            v83Assert(server.toolRegistry.has('tribulation.lightning'), 'tribulation.lightning registered');
+            v83Assert(server.toolRegistry.has('tribulation.record'), 'tribulation.record registered');
+            v83Assert(server.toolRegistry.has('tribulation.talent_modify'), 'tribulation.talent_modify registered');
+
+            // Test 3: mcpTribulationStart
+            window.gameState = { realm: 1, cultivationXP: 0 };
+            const start1 = server.mcpTribulationStart(null);
+            v83Assert(start1.success === true, 'tribulation.start returns success');
+            v83Assert(start1.targetRealm === 2, 'tribulation.start targets realm 2 from 1');
+            v83Assert(start1.realmName === '筑基期', 'tribulation.start returns correct name');
+            v83Assert(start1.strikesTotal === 6, 'tribulation.start strikesTotal=realm*3');
+            window.gameState = { realm: 3, cultivationXP: 0 };
+            const start3 = server.mcpTribulationStart(4);
+            v83Assert(start3.targetRealm === 4, 'tribulation.start uses provided realm');
+            v83Assert(start3.strikesTotal === 12, 'tribulation.start strikesTotal=4*3');
+
+            // Test 4: mcpTribulationProgress
+            window.gameState = { realm: 1, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 2, damageAccumulated: 30, resistedAccumulated: 1, success: null } };
+            const prog = server.mcpTribulationProgress();
+            v83Assert(prog.targetRealm === 2, 'progress returns correct realm');
+            v83Assert(prog.strikesCurrent === 2, 'progress returns strikesCurrent');
+            v83Assert(prog.progress === '33.3%', 'progress calculates percentage');
+            v83Assert(prog.resistanceRate === '50.0%', 'progress calculates resistance rate');
+            window.gameState = { realm: 1 };
+            const noActive = server.mcpTribulationProgress();
+            v83Assert(noActive.error === 'No active tribulation', 'progress returns error when no tribulation');
+
+            // Test 5: mcpTribulationLightning
+            window.gameState = { realm: 1, cultivationXP: 0, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 0, damageAccumulated: 0, resistedAccumulated: 0, success: null } };
+            const strike1 = server.mcpTribulationLightning(10, false);
+            v83Assert(strike1.strikeNumber === 1, 'lightning records strike number');
+            v83Assert(strike1.damage === 10, 'lightning records damage');
+            v83Assert(strike1.resisted === false, 'lightning records resisted=false');
+            v83Assert(strike1.progress === '1/6', 'lightning updates progress');
+            v83Assert(strike1.tribulationComplete === false, 'lightning not complete yet');
+            // Lightning 6 times with all resisted -> success
+            for (let i = 0; i < 5; i++) server.mcpTribulationLightning(5, true);
+            const strikeFinal = server.mcpTribulationLightning(5, true);
+            v83Assert(strikeFinal.tribulationComplete === true, 'lightning completes tribulation');
+            v83Assert(strikeFinal.success === true, 'lightning success when 100% resisted');
+            v83Assert(strikeFinal.newRealm === 2, 'lightning sets newRealm on success');
+            // Lightning failure test
+            window.gameState = { realm: 1, cultivationXP: 0, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 0, damageAccumulated: 0, resistedAccumulated: 0, success: null } };
+            for (let i = 0; i < 6; i++) server.mcpTribulationLightning(50, false);
+            const failed = server.mcpTribulationLightning(50, false);
+            v83Assert(failed.tribulationComplete === true && failed.success === false, 'lightning fails when resistRate < 50%');
+
+            // Test 6: mcpTribulationBlessing
+            window.gameState = { realm: 2, tribulationRecord: [{ realm: 2, success: true, timestamp: Date.now() }], blessings: [] };
+            const bless = server.mcpTribulationBlessing('strength');
+            v83Assert(bless.success === true, 'blessing returns success');
+            v83Assert(bless.blessing.type === 'strength', 'blessing returns correct type');
+            v83Assert(bless.blessing.name === '天雷淬体', 'blessing returns correct name');
+            const randBless = server.mcpTribulationBlessing('random');
+            v83Assert(randBless.success === true, 'blessing random works');
+            const invalidBless = server.mcpTribulationBlessing('invalid_type');
+            v83Assert(invalidBless.error === 'Invalid blessing type', 'blessing rejects invalid type');
+            window.gameState = { realm: 2, tribulationRecord: [], blessings: [] };
+            const noRecord = server.mcpTribulationBlessing('cultivation');
+            v83Assert(noRecord.error === 'No successful tribulation to receive blessing', 'blessing requires success record');
+
+            // Test 7: mcpTribulationRecord
+            window.gameState = { realm: 2, tribulationRecord: [{ realm: 2, success: true }, { realm: 3, success: false }, { realm: 4, success: true }] };
+            const recAll = server.mcpTribulationRecord('all');
+            v83Assert(recAll.total === 3, 'record returns all 3 records');
+            v83Assert(recAll.successCount === 2, 'record successCount=2');
+            v83Assert(recAll.failedCount === 1, 'record failedCount=1');
+            const recSuccess = server.mcpTribulationRecord('success');
+            v83Assert(recSuccess.records.length === 2, 'record filter success works');
+            const recFailed = server.mcpTribulationRecord('failed');
+            v83Assert(recFailed.records.length === 1, 'record filter failed works');
+            const recLatest = server.mcpTribulationRecord('latest');
+            v83Assert(recLatest.records.length === 1, 'record latest returns 1 record');
+            v83Assert(recLatest.records[0].realm === 4, 'record latest returns latest');
+
+            // Test 8: mcpTribulationTalentModify
+            window.gameState = { talent: 'normal', tribulationRecord: [{ realm: 2, success: true, timestamp: Date.now() }] };
+            const talent = server.mcpTribulationTalentModify('genius');
+            v83Assert(talent.success === true, 'talent_modify returns success');
+            v83Assert(talent.oldTalent === 'normal', 'talent_modify returns old talent');
+            v83Assert(talent.newTalent === 'genius', 'talent_modify sets new talent');
+            const invalidTalent = server.mcpTribulationTalentModify('super');
+            v83Assert(invalidTalent.error === 'Invalid talent value', 'talent_modify rejects invalid');
+            window.gameState = { talent: 'good', tribulationRecord: [] };
+            const noTalentRecord = server.mcpTribulationTalentModify('immortal');
+            v83Assert(noTalentRecord.error === 'No successful tribulation for talent modification', 'talent_modify requires success record');
+
+            // Test 9: Tool count grows with V83
+            const server2 = new CultivationMCPServer();
+            v83Assert(server2.toolRegistry.size >= 72, 'toolRegistry has >= 72 tools (V73-V83)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V83 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V83 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v83Results = runV83Tests();
+
+        // ===== V84 Tests: 灵宝系统+装备进阶 =====
+        function runV84Tests() {
+            const results = [];
+            const v84Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V84 tools exist in MCP_TOOLS_V84
+            v84Assert(MCP_TOOLS_V84['artifact.forge'] !== undefined, 'artifact.forge defined');
+            v84Assert(MCP_TOOLS_V84['artifact.upgrade'] !== undefined, 'artifact.upgrade defined');
+            v84Assert(MCP_TOOLS_V84['artifact.attune'] !== undefined, 'artifact.attune defined');
+            v84Assert(MCP_TOOLS_V84['artifact.bind'] !== undefined, 'artifact.bind defined');
+            v84Assert(MCP_TOOLS_V84['artifact.stats'] !== undefined, 'artifact.stats defined');
+            v84Assert(MCP_TOOLS_V84['artifact.transform'] !== undefined, 'artifact.transform defined');
+
+            // Test 2: Tool registry has V84 tools
+            const server = new CultivationMCPServer();
+            v84Assert(server.toolRegistry.has('artifact.forge'), 'artifact.forge registered');
+            v84Assert(server.toolRegistry.has('artifact.upgrade'), 'artifact.upgrade registered');
+            v84Assert(server.toolRegistry.has('artifact.attune'), 'artifact.attune registered');
+            v84Assert(server.toolRegistry.has('artifact.transform'), 'artifact.transform registered');
+
+            // Test 3: mcpArtifactForge
+            window.gameState = { spiritStones: 10000, artifacts: [] };
+            const forge1 = server.mcpArtifactForge('common', 'iron');
+            v84Assert(forge1.success === true, 'artifact.forge returns success');
+            v84Assert(forge1.cost === 100, 'artifact.forge common cost=100');
+            v84Assert(forge1.artifact.tier === 'common', 'artifact.forge sets tier');
+            v84Assert(forge1.artifact.level === 1, 'artifact.forge sets level=1');
+            v84Assert(forge1.artifact.bound === false, 'artifact.forge sets bound=false');
+            const forgeRare = server.mcpArtifactForge('rare', 'jade');
+            v84Assert(forgeRare.artifact.tier === 'rare', 'artifact.forge rare works');
+            v84Assert(forgeRare.artifact.power === 30, 'artifact.forge jade bonus 1.2x (25*1.2=30)');
+            const forgeLegendary = server.mcpArtifactForge('legendary', 'spirit');
+            v84Assert(forgeLegendary.artifact.power === 200, 'artifact.forge spirit bonus 2.0x (100*2=200)');
+            const noMoney = server.mcpArtifactForge('legendary', 'iron');
+            v84Assert(noMoney.error === 'Not enough spirit stones', 'artifact.forge checks money');
+            const invalidTier = server.mcpArtifactForge('super', 'iron');
+            v84Assert(invalidTier.error === 'Invalid artifact tier', 'artifact.forge rejects invalid tier');
+
+            // Test 4: mcpArtifactUpgrade
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST1', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const upgrade1 = server.mcpArtifactUpgrade('AR_TEST1', 2);
+            v84Assert(upgrade1.success === true, 'artifact.upgrade returns success');
+            v84Assert(upgrade1.newLevel === 2, 'artifact.upgrade sets newLevel');
+            v84Assert(upgrade1.newPower > 10, 'artifact.upgrade increases power');
+            const overMax = server.mcpArtifactUpgrade('AR_TEST1', 16);
+            v84Assert(overMax.error === 'Max artifact level is 15', 'artifact.upgrade enforces max level');
+            const notFound = server.mcpArtifactUpgrade('AR_NONEXISTENT', 2);
+            v84Assert(notFound.error === 'Artifact not found', 'artifact.upgrade returns error for unknown');
+
+            // Test 5: mcpArtifactAttune
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST2', tier: 'rare', level: 1, power: 25, bound: true, attunement: 0 }] };
+            const attune1 = server.mcpArtifactAttune('AR_TEST2');
+            v84Assert(attune1.attunement === 10, 'artifact.attune adds 10 attunement');
+            v84Assert(attune1.bonuses.attack === 2, 'artifact.attune gives attack bonus');
+            for (let i = 0; i < 9; i++) server.mcpArtifactAttune('AR_TEST2');
+            const attuneMax = server.mcpArtifactAttune('AR_TEST2');
+            v84Assert(attuneMax.attunement === 100, 'artifact.attune caps at 100');
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST3', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const notBound = server.mcpArtifactAttune('AR_TEST3');
+            v84Assert(notBound.error === 'Artifact must be bound before attunement', 'artifact.attune requires bound');
+
+            // Test 6: mcpArtifactBind
+            window.gameState = { spiritStones: 10000, artifacts: [{ id: 'AR_TEST4', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const bind1 = server.mcpArtifactBind('AR_TEST4');
+            v84Assert(bind1.success === true, 'artifact.bind returns success');
+            v84Assert(bind1.bound === true, 'artifact.bind sets bound=true');
+            const alreadyBound = server.mcpArtifactBind('AR_TEST4');
+            v84Assert(alreadyBound.error === 'Artifact already bound', 'artifact.bind prevents double bind');
+
+            // Test 7: mcpArtifactStats
+            window.gameState = { spiritStones: 10000, artifacts: [
+                { id: 'AR_A', tier: 'common', level: 1, power: 10, bound: true },
+                { id: 'AR_B', tier: 'rare', level: 2, power: 25, bound: false },
+                { id: 'AR_C', tier: 'epic', level: 3, power: 50, bound: true }
+            ], equippedArtifacts: ['AR_A'] };
+            const statsAll = server.mcpArtifactStats('all');
+            v84Assert(statsAll.total === 3, 'artifact.stats returns total=3');
+            v84Assert(statsAll.totalPower === 85, 'artifact.stats sums totalPower=85');
+            v84Assert(statsAll.byTier.common === 1, 'artifact.stats byTier common=1');
+            v84Assert(statsAll.byTier.rare === 1, 'artifact.stats byTier rare=1');
+            v84Assert(statsAll.byTier.epic === 1, 'artifact.stats byTier epic=1');
+            const statsBound = server.mcpArtifactStats('bound');
+            v84Assert(statsBound.total === 2, 'artifact.stats bound filter=2');
+
+            // Test 8: mcpArtifactTransform
+            window.gameState = { spiritStones: 100000, artifacts: [{ id: 'AR_TEST5', tier: 'common', level: 1, power: 10, bound: true, attunement: 50 }] };
+            const transform1 = server.mcpArtifactTransform('AR_TEST5', 'rare');
+            v84Assert(transform1.success === true, 'artifact.transform returns success');
+            v84Assert(transform1.newTier === 'rare', 'artifact.transform sets newTier');
+            v84Assert(transform1.newPower === 25, 'artifact.transform sets newPower=25');
+            const lowerTier = server.mcpArtifactTransform('AR_TEST5', 'common');
+            v84Assert(lowerTier.error === 'Target tier must be higher', 'artifact.transform rejects lower tier');
+            window.gameState = { spiritStones: 500, artifacts: [{ id: 'AR_TEST6', tier: 'common', level: 1, power: 10, bound: false, attunement: 0 }] };
+            const noMoneyTransform = server.mcpArtifactTransform('AR_TEST6', 'legendary');
+            v84Assert(noMoneyTransform.error === 'Not enough spirit stones', 'artifact.transform checks money');
+
+            // Test 9: Tool count grows with V84
+            const server2 = new CultivationMCPServer();
+            v84Assert(server2.toolRegistry.size >= 78, 'toolRegistry has >= 78 tools (V73-V84)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V84 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V84 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v84Results = runV84Tests();
+
+        // ===== V85 Tests: 灵兽系统+宠物培养 =====
+        function runV85Tests() {
+            const results = [];
+            const v85Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V85 tools exist in MCP_TOOLS_V85
+            v85Assert(MCP_TOOLS_V85['pet.capture'] !== undefined, 'pet.capture defined');
+            v85Assert(MCP_TOOLS_V85['pet.list'] !== undefined, 'pet.list defined');
+            v85Assert(MCP_TOOLS_V85['pet.feed'] !== undefined, 'pet.feed defined');
+            v85Assert(MCP_TOOLS_V85['pet.evolve'] !== undefined, 'pet.evolve defined');
+            v85Assert(MCP_TOOLS_V85['pet.release'] !== undefined, 'pet.release defined');
+            v85Assert(MCP_TOOLS_V85['pet.stats'] !== undefined, 'pet.stats defined');
+
+            // Test 2: Tool registry has V85 tools
+            const server = new CultivationMCPServer();
+            v85Assert(server.toolRegistry.has('pet.capture'), 'pet.capture registered');
+            v85Assert(server.toolRegistry.has('pet.list'), 'pet.list registered');
+            v85Assert(server.toolRegistry.has('pet.evolve'), 'pet.evolve registered');
+            v85Assert(server.toolRegistry.has('pet.release'), 'pet.release registered');
+
+            // Test 3: mcpPetCapture
+            window.gameState = { spiritStones: 10000, pets: [] };
+            const capture1 = server.mcpPetCapture('wolf', 'medium');
+            v85Assert(capture1.cost === 150, 'pet.capture medium bait cost=150');
+            v85Assert(capture1.pet.type === 'wolf', 'pet.capture sets type');
+            v85Assert(capture1.pet.form === 'child', 'pet.capture default form=child');
+            v85Assert(capture1.pet.level === 1, 'pet.capture default level=1');
+            v85Assert(capture1.pet.intimacy === 0, 'pet.capture starts intimacy=0');
+            const captureDragon = server.mcpPetCapture('dragon', 'premium');
+            v85Assert(captureDragon.pet.type === 'dragon', 'pet.capture dragon works');
+            v85Assert(captureDragon.pet.power >= 25, 'pet.capture dragon power high');
+            const invalidType = server.mcpPetCapture('unicorn', 'low');
+            v85Assert(invalidType.error === 'Invalid pet type', 'pet.capture rejects invalid type');
+            window.gameState = { spiritStones: 50, pets: [] };
+            const noMoney = server.mcpPetCapture('wolf', 'premium');
+            v85Assert(noMoney.error === 'Not enough spirit stones', 'pet.capture checks money');
+
+            // Test 4: mcpPetList filter
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 0, active: true },
+                { id: 'PET_2', type: 'tiger', name: 'Tiger', form: 'adult', level: 5, power: 25, intimacy: 50, active: false }
+            ] };
+            const listAll = server.mcpPetList('all');
+            v85Assert(listAll.total === 2, 'pet.list all returns total=2');
+            const listActive = server.mcpPetList('active');
+            v85Assert(listActive.total === 1, 'pet.list active returns total=1');
+            v85Assert(listActive.pets[0].id === 'PET_1', 'pet.list active returns correct pet');
+            const listReleased = server.mcpPetList('released');
+            v85Assert(listReleased.total === 1, 'pet.list released returns total=1');
+
+            // Test 5: mcpPetFeed
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_F1', type: 'fox', name: 'Fox', form: 'child', level: 1, power: 12, intimacy: 10, hunger: 50, loyalty: 50, active: true }
+            ] };
+            const feed1 = server.mcpPetFeed('PET_F1', 'basic');
+            v85Assert(feed1.success === true, 'pet.feed returns success');
+            v85Assert(feed1.intimacy === 15, 'pet.feed basic adds 5 intimacy (10->15)');
+            v85Assert(feed1.cost === 20, 'pet.feed basic cost=20');
+            const feedPrem = server.mcpPetFeed('PET_F1', 'premium');
+            v85Assert(feedPrem.intimacy === 30, 'pet.feed premium adds 15 intimacy (15->30)');
+            v85Assert(feedPrem.cost === 80, 'pet.feed premium cost=80');
+            const feedSuper = server.mcpPetFeed('PET_F1', 'super');
+            v85Assert(feedSuper.intimacy === 60, 'pet.feed super adds 30 intimacy (30->60)');
+            const noPet = server.mcpPetFeed('PET_NONEXISTENT', 'basic');
+            v85Assert(noPet.error === 'Pet not found', 'pet.feed returns error for unknown');
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_F2', type: 'turtle', name: 'Turtle', form: 'child', level: 1, power: 10, intimacy: 0, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const notEnough = server.mcpPetFeed('PET_F2', 'super');
+            v85Assert(notEnough.error === 'Not enough spirit stones', 'pet.feed checks money');
+
+            // Test 6: mcpPetEvolve
+            window.gameState = { spiritStones: 20000, pets: [
+                { id: 'PET_E1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 90, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const evolve1 = server.mcpPetEvolve('PET_E1', 'adult');
+            v85Assert(evolve1.success === true, 'pet.evolve returns success');
+            v85Assert(evolve1.newForm === 'adult', 'pet.evolve sets form=adult');
+            v85Assert(evolve1.newPower > 15, 'pet.evolve increases power');
+            v85Assert(evolve1.cost === 500, 'pet.evolve adult cost=500');
+            const lowIntimacy = server.mcpPetEvolve('PET_E1', 'mutant');
+            v85Assert(lowIntimacy.error && lowIntimacy.error.includes('below required'), 'pet.evolve checks intimacy');
+            const invalidForm = server.mcpPetEvolve('PET_E1', 'superior');
+            v85Assert(invalidForm.error === 'Invalid target form', 'pet.evolve rejects invalid form');
+            window.gameState = { spiritStones: 500, pets: [
+                { id: 'PET_E2', type: 'tiger', name: 'Tiger', form: 'child', level: 1, power: 20, intimacy: 95, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const noMoneyEvolve = server.mcpPetEvolve('PET_E2', 'divine');
+            v85Assert(noMoneyEvolve.error === 'Not enough spirit stones', 'pet.evolve checks money');
+
+            // Test 7: mcpPetRelease
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_R1', type: 'fox', name: 'Fox', form: 'child', level: 1, power: 12, intimacy: 20, hunger: 0, loyalty: 50, active: true }
+            ] };
+            const release1 = server.mcpPetRelease('PET_R1');
+            v85Assert(release1.success === true, 'pet.release returns success');
+            v85Assert(release1.status === 'released', 'pet.release sets status');
+            const alreadyReleased = server.mcpPetRelease('PET_R1');
+            v85Assert(alreadyReleased.error === 'Pet already released', 'pet.release prevents double release');
+            const notFound = server.mcpPetRelease('PET_NONEXISTENT');
+            v85Assert(notFound.error === 'Pet not found', 'pet.release returns error for unknown');
+
+            // Test 8: mcpPetStats
+            window.gameState = { spiritStones: 10000, pets: [
+                { id: 'PET_S1', type: 'wolf', name: 'Wolf', form: 'child', level: 1, power: 15, intimacy: 0, hunger: 0, loyalty: 50, active: true },
+                { id: 'PET_S2', type: 'dragon', name: 'Dragon', form: 'adult', level: 10, power: 40, intimacy: 80, hunger: 0, loyalty: 80, active: true },
+                { id: 'PET_S3', type: 'phoenix', name: 'Phoenix', form: 'divine', level: 20, power: 60, intimacy: 100, hunger: 0, loyalty: 95, active: false }
+            ] };
+            const statsAll = server.mcpPetStats();
+            v85Assert(statsAll.total === 3, 'pet.stats total=3');
+            v85Assert(statsAll.activeCount === 2, 'pet.stats activeCount=2');
+            v85Assert(statsAll.releasedCount === 1, 'pet.stats releasedCount=1');
+            v85Assert(statsAll.byType.wolf === 1, 'pet.stats byType wolf=1');
+            v85Assert(statsAll.byType.dragon === 1, 'pet.stats byType dragon=1');
+            const statsOne = server.mcpPetStats('PET_S2');
+            v85Assert(statsOne.pet.id === 'PET_S2', 'pet.stats single pet returns correct pet');
+            v85Assert(statsOne.pet.power === 40, 'pet.stats single pet power=40');
+            const statsNotFound = server.mcpPetStats('PET_NONEXISTENT');
+            v85Assert(statsNotFound.error === 'Pet not found', 'pet.stats returns error for unknown');
+
+            // Test 9: Tool count grows with V85
+            const server2 = new CultivationMCPServer();
+            v85Assert(server2.toolRegistry.size >= 84, 'toolRegistry has >= 84 tools (V73-V85)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V85 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V85 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v85Results = runV85Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
