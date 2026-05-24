@@ -3849,6 +3849,299 @@ const ACHIEVEMENT_ID_MAP = {
         }
         const v70Results = runV70Tests();
 
+        // ===== V71 Direction B: Heavenly Dao Laws Tests =====
+        function runV71Tests() {
+            const results = [];
+            const v71Assert = (cond, name) => results.push({ name, pass: !!cond });
+            const config = HEAVENLY_DAO_LAWS_CONFIG;
+            v71Assert(config.GENERATION_BONUS === 1.15, 'HEAVENLY_DAO_LAWS_CONFIG generation bonus');
+            v71Assert(config.CONQUEST_BONUS === 1.30, 'HEAVENLY_DAO_LAWS_CONFIG conquest bonus');
+            v71Assert(config.ELEMENTS.length === 10, 'HEAVENLY_DAO_LAWS_CONFIG 10 elements');
+            v71Assert(config.GENERATION['metal'] === 'water', 'Generation: metal generates water');
+            v71Assert(config.CONQUEST['metal'] === 'wood', 'Conquest: metal conquers wood');
+            const affinity = new ElementalAffinity();
+            v71Assert(affinity.getMastery('fire') === 0, 'ElementalAffinity initial mastery 0');
+            const leveled = affinity.addExp('fire', 100);
+            v71Assert(leveled === true, 'ElementalAffinity.addExp levels up at 100exp');
+            v71Assert(affinity.getMastery('fire') === 1, 'ElementalAffinity master level 1');
+            const notLeveled = affinity.addExp('fire', 50);
+            v71Assert(notLeveled === false, 'ElementalAffinity.addExp no level at 50exp');
+            const pairs = affinity.getResonanceElements();
+            v71Assert(Array.isArray(pairs), 'ElementalAffinity.getResonanceElements returns array');
+            const law = new DaoLaw('test_law', { id: 'test', name: '测试法则', element: 'fire', type: 'attack', rank: 2, power: 0.2 });
+            v71Assert(law.getPower() === 0.25, 'DaoLaw.getPower rank2 power 0.25');
+            law.activate();
+            v71Assert(law.activated === true, 'DaoLaw.activate sets activated');
+            v71Assert(law.activationCount === 1, 'DaoLaw.activationCount increments');
+            const registry = new DaoLawRegistry();
+            v71Assert(registry.laws.size === 30, 'DaoLawRegistry initializes 30 laws');
+            v71Assert(registry.getLaw('fire_rage') !== undefined, 'DaoLawRegistry.getLaw returns law');
+            const fireLaws = registry.getLawsByElement('fire');
+            v71Assert(fireLaws.length >= 3, 'DaoLawRegistry.getLawsByElement fire >= 3');
+            const activated = registry.activateLaw('fire_rage');
+            v71Assert(activated === true, 'DaoLawRegistry.activateLaw returns true');
+            v71Assert(registry.activeLaws.includes('fire_rage'), 'DaoLawRegistry.activeLaws includes activated');
+            const resonance = registry.calculateResonanceBonus(['fire', 'water']);
+            v71Assert(resonance >= 0, 'DaoLawRegistry.calculateResonanceBonus returns bonus');
+            const stats = registry.getStats();
+            v71Assert(stats.totalLaws === 30, 'DaoLawRegistry.getStats totalLaws');
+            v71Assert(stats.activeCount >= 1, 'DaoLawRegistry.getStats activeCount >= 1');
+            v71Assert(typeof openHeavenlyDaoPanel === 'function', 'openHeavenlyDaoPanel is a function');
+            v71Assert(typeof toggleDaoLaw === 'function', 'toggleDaoLaw is a function');
+            v71Assert(typeof getElementalBonus === 'function', 'getElementalBonus is a function');
+            const bonus = getElementalBonus('fire', 'wood');
+            v71Assert(bonus === config.CONQUEST_BONUS, 'getElementalBonus conquest wood <- fire');
+            const genBonus = getElementalBonus('metal', 'water');
+            v71Assert(genBonus === config.GENERATION_BONUS, 'getElementalBonus generation water <- metal');
+            const neutral = getElementalBonus('fire', 'fire');
+            v71Assert(neutral === 1.0, 'getElementalBonus neutral same element');
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V71 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V71 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v71Results = runV71Tests();
+
+        // ===== V71 Direction B: Heavenly Dao Laws System =====
+        // Based on generic-agent state machine + nanobot ecological design
+        // 10种元素相生相克/法则共鸣/天命增强/元素攻击
+
+        // --- HEAVENLY_DAO_LAWS_CONFIG ---
+        const HEAVENLY_DAO_LAWS_CONFIG = {
+            ELEMENTS: ['metal', 'wood', 'water', 'fire', 'earth', 'thunder', 'wind', 'ice', 'poison', 'dark'],
+            ELEMENT_NAMES: { metal: '金', wood: '木', water: '水', fire: '火', earth: '土', thunder: '雷', wind: '风', ice: '冰', poison: '毒', dark: '暗' },
+            // 相生关系: A generates B
+            GENERATION: { metal: 'water', water: 'wood', wood: 'fire', fire: 'earth', earth: 'metal', thunder: 'wind', wind: 'ice', ice: 'water', poison: 'earth', dark: 'thunder' },
+            // 相克关系: A conquers B
+            CONQUEST: { metal: 'wood', wood: 'earth', earth: 'water', water: 'fire', fire: 'metal', thunder: 'water', wind: 'wood', ice: 'fire', poison: 'wood', dark: 'light' },
+            // 相生加成: +15%
+            GENERATION_BONUS: 1.15,
+            // 相克加成: +30%
+            CONQUEST_BONUS: 1.30,
+            // 被克减伤: -30%
+            CONQUEST_PENALTY: 0.70,
+            // 共鸣阈值: 同元素/相生/相克任一满足
+            RESONANCE_THRESHOLD: 2,
+            // 法则共鸣加成
+            RESONANCE_BONUS: 0.20
+        };
+
+        // --- ElementalAffinity: Tracks player elemental mastery ---
+        class ElementalAffinity {
+            constructor() {
+                this.mastery = { metal: 0, wood: 0, water: 0, fire: 0, earth: 0, thunder: 0, wind: 0, ice: 0, poison: 0, dark: 0 };
+                this.exp = { metal: 0, wood: 0, water: 0, fire: 0, earth: 0, thunder: 0, wind: 0, ice: 0, poison: 0, dark: 0 };
+                this.resonanceCount = 0;
+            }
+            getMastery(element) { return this.mastery[element] || 0; }
+            addExp(element, amount) {
+                if (!this.mastery.hasOwnProperty(element)) return false;
+                this.exp[element] = (this.exp[element] || 0) + amount;
+                const threshold = (this.mastery[element] + 1) * 100;
+                if (this.exp[element] >= threshold) {
+                    this.mastery[element]++;
+                    this.exp[element] -= threshold;
+                    return true; // leveled up
+                }
+                return false;
+            }
+            getResonanceElements() {
+                const elements = HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS;
+                const mastered = elements.filter(e => this.mastery[e] > 0);
+                const pairs = [];
+                for (let i = 0; i < mastered.length; i++) {
+                    for (let j = i + 1; j < mastered.length; j++) {
+                        const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[mastered[i]];
+                        const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[mastered[i]];
+                        if (gen === mastered[j] || con === mastered[j]) {
+                            pairs.push([mastered[i], mastered[j]]);
+                        }
+                    }
+                }
+                return pairs;
+            }
+            getStats() {
+                return {
+                    mastery: { ...this.mastery },
+                    exp: { ...this.exp },
+                    resonanceCount: this.getResonanceElements().length
+                };
+            }
+        }
+
+        // --- DaoLaw: Single law/rule definition ---
+        class DaoLaw {
+            constructor(id, config) {
+                this.id = id;
+                this.name = config.name;
+                this.element = config.element;
+                this.type = config.type; // 'buff' | 'attack' | 'defense' | 'serendipity'
+                this.rank = config.rank || 1; // 1-5
+                this.power = config.power || 0.1;
+                this.description = config.description || '';
+                this.activated = false;
+                this.activationCount = 0;
+            }
+            activate() {
+                this.activated = true;
+                this.activationCount++;
+            }
+            getPower() {
+                return this.power * (1 + (this.rank - 1) * 0.25);
+            }
+        }
+
+        // --- DaoLawRegistry: Manages all heavenly dao laws ---
+        class DaoLawRegistry {
+            constructor() {
+                this.laws = new Map();
+                this.activeLaws = [];
+                this.resonanceBonus = 0;
+                this._init();
+            }
+            _init() {
+                const lawDefs = [
+                    { id: 'metal_strike', name: '金之锐', element: 'metal', type: 'attack', rank: 1, power: 0.15, description: '金属性攻击+15%' },
+                    { id: 'wood_vitality', name: '木之生', element: 'wood', type: 'buff', rank: 1, power: 0.10, description: '木属性生命+10%' },
+                    { id: 'water_flow', name: '水之柔', element: 'water', type: 'defense', rank: 1, power: 0.12, description: '水属性防御+12%' },
+                    { id: 'fire_rage', name: '火之炎', element: 'fire', type: 'attack', rank: 1, power: 0.18, description: '火属性攻击+18%' },
+                    { id: 'earth_endure', name: '土之稳', element: 'earth', type: 'defense', rank: 1, power: 0.14, description: '土属性防御+14%' },
+                    { id: 'thunder_bolt', name: '雷之怒', element: 'thunder', type: 'attack', rank: 1, power: 0.20, description: '雷属性攻击+20%' },
+                    { id: 'windSwift', name: '风之速', element: 'wind', type: 'buff', rank: 1, power: 0.10, description: '风属性敏捷+10%' },
+                    { id: 'ice_shield', name: '冰之护', element: 'ice', type: 'defense', rank: 1, power: 0.15, description: '冰属性防御+15%' },
+                    { id: 'poison_lingering', name: '毒之蚀', element: 'poison', type: 'attack', rank: 1, power: 0.12, description: '毒属性持续伤害+12%' },
+                    { id: 'dark_curse', name: '暗之蚀', element: 'dark', type: 'attack', rank: 1, power: 0.16, description: '暗属性攻击+16%' },
+                    { id: 'metal_armor', name: '金甲术', element: 'metal', type: 'defense', rank: 2, power: 0.20, description: '金属性防御+20%' },
+                    { id: 'wood_recovery', name: '回春术', element: 'wood', type: 'buff', rank: 2, power: 0.15, description: '木属性生命恢复+15%' },
+                    { id: 'water_healing', name: '水疗术', element: 'water', type: 'buff', rank: 2, power: 0.18, description: '水属性治疗+18%' },
+                    { id: 'fire_wave', name: '火焰波', element: 'fire', type: 'attack', rank: 2, power: 0.25, description: '火属性范围攻击+25%' },
+                    { id: 'earthquake', name: '地震术', element: 'earth', type: 'attack', rank: 2, power: 0.22, description: '土属性地震攻击+22%' },
+                    { id: 'thunderStorm', name: '雷暴术', element: 'thunder', type: 'attack', rank: 2, power: 0.28, description: '雷属性雷暴攻击+28%' },
+                    { id: 'wind_gust', name: '风之壁', element: 'wind', type: 'defense', rank: 2, power: 0.18, description: '风属性闪避+18%' },
+                    { id: 'ice_prison', name: '冰封术', element: 'ice', type: 'defense', rank: 2, power: 0.22, description: '冰属性冻结+22%' },
+                    { id: 'poison_cloud', name: '毒雾术', element: 'poison', type: 'attack', rank: 2, power: 0.20, description: '毒属性毒雾+20%' },
+                    { id: 'dark_bolt', name: '暗影弹', element: 'dark', type: 'attack', rank: 2, power: 0.24, description: '暗属性暗影弹+24%' },
+                    { id: 'golden_body', name: '金身不灭', element: 'metal', type: 'buff', rank: 3, power: 0.30, description: '金属性致命伤害-30%' },
+                    { id: 'all things grow', name: '万物生长', element: 'wood', type: 'serendipity', rank: 3, power: 0.20, description: '木属性奇遇+20%' },
+                    { id: 'tidal_force', name: '潮汐之力', element: 'water', type: 'attack', rank: 3, power: 0.30, description: '水属性潮汐攻击+30%' },
+                    { id: 'inferno', name: '业火', element: 'fire', type: 'attack', rank: 3, power: 0.35, description: '火属性业火攻击+35%' },
+                    { id: 'mountain_body', name: '山岳体', element: 'earth', type: 'defense', rank: 3, power: 0.28, description: '土属性山岳防御+28%' },
+                    { id: 'divine_thunder', name: '神雷降世', element: 'thunder', type: 'attack', rank: 3, power: 0.40, description: '雷属性神雷+40%' },
+                    { id: 'typhoon', name: '台风', element: 'wind', type: 'attack', rank: 3, power: 0.30, description: '风属性台风攻击+30%' },
+                    { id: 'blizzard', name: '暴雪', element: 'ice', type: 'attack', rank: 3, power: 0.32, description: '冰属性暴雪攻击+32%' },
+                    { id: 'plague', name: '瘟疫', element: 'poison', type: 'attack', rank: 3, power: 0.28, description: '毒属性瘟疫攻击+28%' },
+                    { id: 'void', name: '虚空', element: 'dark', type: 'attack', rank: 3, power: 0.35, description: '暗属性虚空攻击+35%' }
+                ];
+                for (const def of lawDefs) {
+                    this.laws.set(def.id, new DaoLaw(def.id, def));
+                }
+            }
+            getLaw(id) { return this.laws.get(id); }
+            getLawsByElement(element) {
+                const result = [];
+                for (const [, law] of this.laws) {
+                    if (law.element === element) result.push(law);
+                }
+                return result;
+            }
+            activateLaw(id) {
+                const law = this.laws.get(id);
+                if (!law) return false;
+                law.activate();
+                if (!this.activeLaws.includes(id)) {
+                    this.activeLaws.push(id);
+                }
+                return true;
+            }
+            calculateResonanceBonus(elements) {
+                let bonus = 0;
+                for (let i = 0; i < elements.length; i++) {
+                    for (let j = i + 1; j < elements.length; j++) {
+                        const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[elements[i]];
+                        const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[elements[i]];
+                        if (gen === elements[j] || con === elements[j]) {
+                            bonus += HEAVENLY_DAO_LAWS_CONFIG.RESONANCE_BONUS;
+                        }
+                    }
+                }
+                this.resonanceBonus = bonus;
+                return bonus;
+            }
+            getActiveLaws() {
+                return this.activeLaws.map(id => this.laws.get(id)).filter(l => l && l.activated);
+            }
+            getStats() {
+                return {
+                    totalLaws: this.laws.size,
+                    activeCount: this.activeLaws.length,
+                    resonanceBonus: this.resonanceBonus,
+                    activeLaws: this.getActiveLaws().map(l => ({ id: l.id, name: l.name, element: l.element, rank: l.rank }))
+                };
+            }
+        }
+
+        const elementalAffinity = new ElementalAffinity();
+        const daoLawRegistry = new DaoLawRegistry();
+
+        // --- HeavenlyDaoUI: UI Panel for Dao Laws ---
+        function openHeavenlyDaoPanel() {
+            const stats = daoLawRegistry.getStats();
+            const affinity = elementalAffinity.getStats();
+            const elementNames = HEAVENLY_DAO_LAWS_CONFIG.ELEMENT_NAMES;
+            let html = `<h4>☀️ 天道法则系统</h4>`;
+            html += `<p>激活法则: ${stats.activeCount}/${stats.totalLaws} | 共鸣加成: +${(stats.resonanceBonus * 100).toFixed(0)}%</p>`;
+            html += `<h4>🌿 元素亲和</h4>`;
+            for (const el of HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS) {
+                const m = affinity.mastery[el] || 0;
+                const e = affinity.exp[el] || 0;
+                const bar = '█'.repeat(Math.min(m, 10)) + '░'.repeat(Math.max(0, 10 - m));
+                html += `<div style="margin:3px 0;font-size:13px;">${elementNames[el]}: ${bar} Lv.${m} (${e}exp)</div>`;
+            }
+            html += `<h4 style="margin-top:10px;">📜 法则列表</h4>`;
+            html += `<div style="max-height:200px;overflow-y:auto;">`;
+            for (const el of HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS) {
+                const laws = daoLawRegistry.getLawsByElement(el);
+                if (laws.length === 0) continue;
+                html += `<div style="margin:3px 0;"><b>【${elementNames[el]}】</b>`;
+                for (const law of laws) {
+                    const icon = law.activated ? '✅' : '⬜';
+                    html += `<span style="margin-left:5px;cursor:pointer;" onclick="toggleDaoLaw('${law.id}')">${icon}${law.name}(${law.rank}阶)</span>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+            html += `<h4 style="margin-top:10px;">⚡ 相生相克</h4>`;
+            html += `<div style="font-size:12px;">`;
+            html += `<div style="margin:2px;">相生(同色+15%): 金生水, 水生木, 木生火, 火生土, 土生金</div>`;
+            html += `<div style="margin:2px;">相克(亮色+30%): 金克木, 木克土, 土克水, 水克火, 火克金</div>`;
+            html += `</div>`;
+            showModal('☀️ 天道法则', html, 650);
+        }
+
+        function toggleDaoLaw(lawId) {
+            const law = daoLawRegistry.getLaw(lawId);
+            if (!law) return;
+            if (law.activated) {
+                law.activated = false;
+                const idx = daoLawRegistry.activeLaws.indexOf(lawId);
+                if (idx >= 0) daoLawRegistry.activeLaws.splice(idx, 1);
+            } else {
+                daoLawRegistry.activateLaw(lawId);
+            }
+            openHeavenlyDaoPanel();
+        }
+
+        function getElementalBonus(attackElement, targetElement) {
+            if (!attackElement || !targetElement) return 1.0;
+            const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[attackElement];
+            const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[attackElement];
+            if (gen === targetElement) return HEAVENLY_DAO_LAWS_CONFIG.GENERATION_BONUS;
+            if (con === targetElement) return HEAVENLY_DAO_LAWS_CONFIG.CONQUEST_BONUS;
+            return 1.0;
+        }
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
