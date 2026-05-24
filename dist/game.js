@@ -2506,6 +2506,88 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'world.cycle',
                 description: 'Query world cycle (天地轮回) status',
                 inputSchema: { type: 'object', properties: {} }
+            },
+            // V78: 仙界经济系统 + 灵宠进化树
+            'market.list': {
+                name: 'market.list',
+                description: 'List items on the celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: 'Category: equipment|consumable|material|all' }
+                    }
+                }
+            },
+            'market.buy': {
+                name: 'market.buy',
+                description: 'Buy item from celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Market item ID' },
+                        quantity: { type: 'number', description: 'Quantity to buy' }
+                    },
+                    required: ['itemId']
+                }
+            },
+            'market.sell': {
+                name: 'market.sell',
+                description: 'Sell item to celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Inventory item ID to sell' },
+                        price: { type: 'number', description: 'Price per unit in spirit stones' }
+                    },
+                    required: ['itemId', 'price']
+                }
+            },
+            'pet.list': {
+                name: 'pet.list',
+                description: 'List all pets and their status',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.feed': {
+                name: 'pet.feed',
+                description: 'Feed a pet to increase affinity',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID' },
+                        food: { type: 'string', description: 'Food type: normal|premium|super' }
+                    },
+                    required: ['petId', 'food']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: 'Evolve a pet to next stage',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID to evolve' },
+                        stones: { type: 'number', description: 'Spirit stones to invest' }
+                    },
+                    required: ['petId', 'stones']
+                }
+            },
+            'pet.skill': {
+                name: 'pet.skill',
+                description: 'Teach or upgrade pet skill',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID' },
+                        action: { type: 'string', description: 'Action: learn|upgrade|forget' },
+                        skillId: { type: 'string', description: 'Skill ID' }
+                    },
+                    required: ['petId', 'action']
+                }
+            },
+            'economy.stats': {
+                name: 'economy.stats',
+                description: 'Get celestial economy statistics',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -2676,6 +2758,31 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'world.cycle':
                             result = this.mcpWorldCycle();
+                            break;
+                        // V78: 仙界经济系统 + 灵宠进化树
+                        case 'market.list':
+                            result = this.mcpMarketList(args.category);
+                            break;
+                        case 'market.buy':
+                            result = this.mcpMarketBuy(args.itemId, args.quantity);
+                            break;
+                        case 'market.sell':
+                            result = this.mcpMarketSell(args.itemId, args.price);
+                            break;
+                        case 'pet.list':
+                            result = this.mcpPetList();
+                            break;
+                        case 'pet.feed':
+                            result = this.mcpPetFeed(args.petId, args.food);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolve(args.petId, args.stones);
+                            break;
+                        case 'pet.skill':
+                            result = this.mcpPetSkill(args.petId, args.action, args.skillId);
+                            break;
+                        case 'economy.stats':
+                            result = this.mcpEconomyStats();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3049,6 +3156,128 @@ const ACHIEVEMENT_ID_MAP = {
                         return { success: true, times: gs.reincarnation.times };
                     }
                     return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V78: 仙界经济系统 + 灵宠进化树实现
+            mcpMarketList(category) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const cat = category || 'all';
+                    if (cat === 'all') return { total: market.length, items: market };
+                    return { total: market.filter(i => i.category === cat).length, items: market.filter(i => i.category === cat) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpMarketBuy(itemId, quantity) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const item = market.find(i => i.id === itemId);
+                    if (!item) return { error: 'Item not found in market: ' + itemId };
+                    const cost = (item.price || 10) * (quantity || 1);
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    if (!gs.items) gs.items = [];
+                    for (let i = 0; i < (quantity || 1); i++) gs.items.push({ ...item, id: item.id + '_' + Date.now() + i });
+                    return { success: true, item: item.name, quantity: quantity || 1, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpMarketSell(itemId, price) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.items) return { error: 'No items in inventory' };
+                    const idx = gs.items.findIndex(i => i.id === itemId);
+                    if (idx === -1) return { error: 'Item not found: ' + itemId };
+                    const [item] = gs.items.splice(idx, 1);
+                    if (!gs.market) gs.market = [];
+                    gs.market.push({ id: 'mkt_' + Date.now(), name: item.name, category: item.type, price: price || 10, seller: 'player' });
+                    return { success: true, sold: item.name, price, earned: price || 10 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    return { total: pets.length, pets };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetFeed(petId, food) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    const FOOD_BONUS = { normal: 5, premium: 15, super: 50 };
+                    pet.affinity = (pet.affinity || 0) + (FOOD_BONUS[food] || 5);
+                    return { success: true, petId, affinity: pet.affinity, bonus: FOOD_BONUS[food] || 5 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetEvolve(petId, stones) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    const cost = (stones || 1) * 50;
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    pet.stage = (pet.stage || 1) + 1;
+                    pet.evolutionCost = cost;
+                    return { success: true, petId, newStage: pet.stage, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetSkill(petId, action, skillId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    if (!pet.skills) pet.skills = [];
+                    if (action === 'learn') {
+                        if (pet.skills.length >= 4) return { error: 'Pet already has 4 skills' };
+                        pet.skills.push({ id: skillId || 'skill_' + Date.now(), level: 1 });
+                        return { success: true, skill: pet.skills[pet.skills.length - 1] };
+                    }
+                    if (action === 'upgrade') {
+                        const skill = pet.skills.find(s => s.id === skillId);
+                        if (!skill) return { error: 'Skill not found: ' + skillId };
+                        skill.level = (skill.level || 1) + 1;
+                        return { success: true, skill };
+                    }
+                    if (action === 'forget') {
+                        pet.skills = pet.skills.filter(s => s.id !== skillId);
+                        return { success: true, remaining: pet.skills.length };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEconomyStats() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const items = gs.items || [];
+                    return {
+                        spiritStones: gs.spiritStones || 0,
+                        marketListings: market.length,
+                        playerItems: items.length,
+                        totalValue: (gs.spiritStones || 0) + market.reduce((s, i) => s + (i.price || 0), 0)
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -6014,6 +6243,98 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v77Results = runV77Tests();
+
+        // ===== V78 Tests: 仙界经济系统 + 灵宠进化树 =====
+        function runV78Tests() {
+            const results = [];
+            const v78Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V78 tools exist in MCP_TOOLS
+            v78Assert(MCP_TOOLS['market.list'] !== undefined, 'market.list tool defined');
+            v78Assert(MCP_TOOLS['market.buy'] !== undefined, 'market.buy tool defined');
+            v78Assert(MCP_TOOLS['market.sell'] !== undefined, 'market.sell tool defined');
+            v78Assert(MCP_TOOLS['pet.list'] !== undefined, 'pet.list tool defined');
+            v78Assert(MCP_TOOLS['pet.feed'] !== undefined, 'pet.feed tool defined');
+            v78Assert(MCP_TOOLS['pet.evolve'] !== undefined, 'pet.evolve tool defined');
+            v78Assert(MCP_TOOLS['pet.skill'] !== undefined, 'pet.skill tool defined');
+            v78Assert(MCP_TOOLS['economy.stats'] !== undefined, 'economy.stats tool defined');
+
+            // Test 2: Tool registry has V78 tools
+            const server = new CultivationMCPServer();
+            v78Assert(server.toolRegistry.has('market.list'), 'market.list registered');
+            v78Assert(server.toolRegistry.has('pet.feed'), 'pet.feed registered');
+            v78Assert(server.toolRegistry.has('pet.evolve'), 'pet.evolve registered');
+            v78Assert(server.toolRegistry.has('economy.stats'), 'economy.stats registered');
+
+            // Test 3: mcpMarketList and mcpMarketSell
+            window.gameState = { items: [{ id: 'item1', name: '丹药', type: 'consumable' }], spiritStones: 1000 };
+            const sell = server.mcpMarketSell('item1', 200);
+            v78Assert(sell.success === true, 'market.sell returns success');
+            const list = server.mcpMarketList('all');
+            v78Assert(list.total >= 1, 'market.list returns items');
+            v78Assert(list.items.some(i => i.name === '丹药'), 'market.list includes sold item');
+
+            // Test 4: mcpMarketBuy
+            window.gameState = {
+                spiritStones: 1000,
+                market: [{ id: 'mkt1', name: '灵草', category: 'material', price: 50 }]
+            };
+            const buy = server.mcpMarketBuy('mkt1', 2);
+            v78Assert(buy.success === true, 'market.buy returns success');
+            v78Assert(buy.cost === 100, 'market.buy cost = price * quantity');
+            v78Assert(buy.remaining === 900, 'market.buy deducts spirit stones');
+            v78Assert(window.gameState.items.length >= 2, 'market.buy adds items to inventory');
+
+            // Test 5: mcpPetList
+            window.gameState = { pets: [{ id: 'pet1', name: '小狐狸', stage: 1, affinity: 30, skills: [] }] };
+            const petList = server.mcpPetList();
+            v78Assert(petList.total === 1, 'pet.list returns 1 pet');
+            v78Assert(petList.pets[0].name === '小狐狸', 'pet.list returns correct pet');
+
+            // Test 6: mcpPetFeed
+            const feed = server.mcpPetFeed('pet1', 'premium');
+            v78Assert(feed.success === true, 'pet.feed returns success');
+            v78Assert(feed.affinity === 45, 'pet.feed increases affinity by 15 for premium');
+            v78Assert(feed.bonus === 15, 'pet.feed returns bonus');
+
+            // Test 7: mcpPetEvolve
+            window.gameState = { spiritStones: 500, pets: [{ id: 'pet1', name: '小狐狸', stage: 1, skills: [] }] };
+            const evolve = server.mcpPetEvolve('pet1', 5);
+            v78Assert(evolve.success === true, 'pet.evolve returns success');
+            v78Assert(evolve.newStage === 2, 'pet.evolve increments stage');
+            v78Assert(evolve.cost === 250, 'pet.evolve cost = stones * 50');
+            v78Assert(evolve.remaining === 250, 'pet.evolve deducts stones');
+
+            // Test 8: mcpPetSkill
+            window.gameState = { pets: [{ id: 'pet1', name: '小狐狸', stage: 1, skills: [] }] };
+            const learn = server.mcpPetSkill('pet1', 'learn', 'fireball');
+            v78Assert(learn.success === true, 'pet.skill learn returns success');
+            const upgrade = server.mcpPetSkill('pet1', 'upgrade', 'fireball');
+            v78Assert(upgrade.success === true, 'pet.skill upgrade returns success');
+            v78Assert(upgrade.skill.level === 2, 'pet.skill upgrade increases level');
+            const forget = server.mcpPetSkill('pet1', 'forget', 'fireball');
+            v78Assert(forget.success === true, 'pet.skill forget returns success');
+            v78Assert(forget.remaining === 0, 'pet.skill forget removes skill');
+
+            // Test 9: mcpEconomyStats
+            window.gameState = { spiritStones: 500, market: [{ id: 'm1', name: '灵草', price: 100 }], items: [{ id: 'i1' }] };
+            const stats = server.mcpEconomyStats();
+            v78Assert(stats.spiritStones === 500, 'economy.stats spiritStones');
+            v78Assert(stats.marketListings === 1, 'economy.stats marketListings');
+            v78Assert(stats.playerItems === 1, 'economy.stats playerItems');
+            v78Assert(stats.totalValue >= 600, 'economy.stats totalValue includes market');
+
+            // Test 10: Tool count (V73-V78 = 42+)
+            v78Assert(server.toolRegistry.size >= 42, 'toolRegistry has >= 42 tools (V73-V78)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V78 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V78 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v78Results = runV78Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
