@@ -16,53 +16,6 @@ function log(msg) {
     output.textContent += msg + '\n';
 }
 
-// Mock mcpBtn DOM element if not present (T23)
-(function mockMcpBtnDOM() {
-    if (!document.getElementById('mcpBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'mcpBtn';
-        btn.style.display = 'none';
-        document.body.appendChild(btn);
-    }
-})();
-
-// V73 Mock Setup: 在测试运行前注入模拟的 gameState 和 llmRegistry
-// 这样即使不执行 init()，测试也可以正常运行
-(function setupMocks() {
-    // Mock window.gameState 如果不存在
-    if (typeof window.gameState === 'undefined') {
-        window.gameState = {
-            realm: 0, stage: 0, qi: 1000,
-            spiritStones: 5000,
-            items: [
-                { id: 'test_item_1', name: '测试丹药', type: 'pill', rarity: 'common', quantity: 5, equipped: false, description: '' }
-            ],
-            inventoryCount: 1,
-            combat: { combatEnabled: true, wins: 3, losses: 1, currentOpponent: null },
-            npcCollab: null,  // 默认为 null，让需要 NPC 的测试自己设置
-            cultivation: { spiritEnergy: 800, maxSpiritEnergy: 1000 }
-        };
-    }
-    // Mock window.llmRegistry 如果不存在
-    if (typeof window.llmRegistry === 'undefined') {
-        window.llmRegistry = {
-            providers: [
-                { id: 'minimax', name: 'MiniMax', endpoint: '/api/chat', model: 'MiniMax-Text-01' },
-                { id: 'openai', name: 'OpenAI', endpoint: '/api/openai', model: 'gpt-4' },
-                { id: 'claude', name: 'Claude', endpoint: '/api/claude', model: 'claude-3-5-sonnet' }
-            ],
-            currentProvider: 'minimax',
-            switchProvider: function(id) {
-                if (this.providers.find(p => p.id === id)) {
-                    this.currentProvider = id;
-                    return true;
-                }
-                return false;
-            }
-        };
-    }
-})();
-
 // Wait for game to initialize
 function runTests() {
     if (typeof MCP_TOOLS === 'undefined' || typeof cultivationMCPServer === 'undefined') {
