@@ -3183,6 +3183,78 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V88: 仙界贸易系统+奇遇增强
+        const MCP_TOOLS_V88 = {
+            'celestial.market.list': {
+                name: 'celestial.market.list',
+                description: 'List items available in the celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: 'Category: pills|artifacts|techniques|materials|all' }
+                    }
+                }
+            },
+            'celestial.market.buy': {
+                name: 'celestial.market.buy',
+                description: 'Purchase an item from the celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Market item ID to purchase' },
+                        quantity: { type: 'number', description: 'Quantity to buy' }
+                    },
+                    required: ['itemId']
+                }
+            },
+            'celestial.market.sell': {
+                name: 'celestial.market.sell',
+                description: 'Sell an item to the celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Player inventory item ID to sell' },
+                        price: { type: 'number', description: 'Price per unit in spirit stones' }
+                    },
+                    required: ['itemId', 'price']
+                }
+            },
+            'celestial.market.search': {
+                name: 'celestial.market.search',
+                description: 'Search celestial market for items by name keyword',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        keyword: { type: 'string', description: 'Search keyword' }
+                    },
+                    required: ['keyword']
+                }
+            },
+            'serendipity.trigger': {
+                name: 'serendipity.trigger',
+                description: 'Manually trigger a serendipity event for the player',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Serendipity type: treasure|encounter|blessing|danger|all' }
+                    }
+                }
+            },
+            'serendipity.karma_update': {
+                name: 'serendipity.karma_update',
+                description: 'Record karma changes from serendipity events',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: 'Serendipity event ID' },
+                        karmaDelta: { type: 'number', description: 'Karma change amount (+/-)' },
+                        reason: { type: 'string', description: 'Reason for karma change' }
+                    },
+                    required: ['eventId', 'karmaDelta']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -3238,6 +3310,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V87: Register economy and karma tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V87)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V88: Register celestial market and serendipity tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V88)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3578,6 +3654,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'karma_point_query':
                             result = this.mcpKarmaPointQuery(args.limit);
+                            break;
+                        // V88: Celestial market and serendipity tools
+                        case 'celestial.market.list':
+                            result = this.mcpCelestialMarketList(args.category);
+                            break;
+                        case 'celestial.market.buy':
+                            result = this.mcpCelestialMarketBuy(args.itemId, args.quantity);
+                            break;
+                        case 'celestial.market.sell':
+                            result = this.mcpCelestialMarketSell(args.itemId, args.price);
+                            break;
+                        case 'celestial.market.search':
+                            result = this.mcpCelestialMarketSearch(args.keyword);
+                            break;
+                        case 'serendipity.trigger':
+                            result = this.mcpSerendipityTrigger(args.type);
+                            break;
+                        case 'serendipity.karma_update':
+                            result = this.mcpSerendipityKarmaUpdate(args.eventId, args.karmaDelta, args.reason);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5267,6 +5362,102 @@ const ACHIEVEMENT_ID_MAP = {
                     const karma = gs.karmaPoints || 0;
                     const history = (gs.karmaHistory || []).slice(-(limit || 20));
                     return { currentKarma: karma, totalEvents: (gs.karmaHistory || []).length, history };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V88: Celestial Market and Serendipity
+            mcpCelestialMarketList(category) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.celestialMarket = gs.celestialMarket || [];
+                    const VALID_CATS = ['pills', 'artifacts', 'techniques', 'materials', 'all'];
+                    const cat = category || 'all';
+                    if (!VALID_CATS.includes(cat)) return { error: 'Invalid category' };
+                    const items = cat === 'all' ? gs.celestialMarket : gs.celestialMarket.filter(i => i.category === cat);
+                    return { items, total: items.length, category: cat };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialMarketBuy(itemId, quantity) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.celestialMarket = gs.celestialMarket || [];
+                    const item = gs.celestialMarket.find(i => i.id === itemId);
+                    if (!item) return { error: 'Item not found in market' };
+                    const qty = quantity || 1;
+                    const totalCost = item.price * qty;
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < totalCost) return { error: 'Not enough spirit stones', required: totalCost, available: gs.spiritStones };
+                    gs.spiritStones -= totalCost;
+                    gs.inventory = gs.inventory || [];
+                    for (let i = 0; i < qty; i++) gs.inventory.push({ ...item, id: item.id + '_' + Date.now() + i });
+                    gs.economyLog = gs.economyLog || [];
+                    gs.economyLog.push({ type: 'expense', category: 'market_buy', amount: totalCost, itemId, time: Date.now() });
+                    return { success: true, item: item.name, quantity: qty, totalCost, remainingStones: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialMarketSell(itemId, price) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.inventory = gs.inventory || [];
+                    const idx = gs.inventory.findIndex(i => i.id === itemId);
+                    if (idx === -1) return { error: 'Item not found in inventory' };
+                    if (!price || price <= 0) return { error: 'Invalid price' };
+                    const item = gs.inventory[idx];
+                    gs.inventory.splice(idx, 1);
+                    gs.celestialMarket = gs.celestialMarket || [];
+                    gs.celestialMarket.push({ id: 'MKT_' + Date.now(), name: item.name, category: item.category || 'materials', price, seller: gs.name || 'Player', listedAt: Date.now() });
+                    return { success: true, item: item.name, price, marketFee: Math.round(price * 0.05) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialMarketSearch(keyword) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.celestialMarket = gs.celestialMarket || [];
+                    const kw = (keyword || '').toLowerCase();
+                    const results = gs.celestialMarket.filter(i => (i.name || '').toLowerCase().includes(kw));
+                    return { results, count: results.length, keyword };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityTrigger(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const TYPES = ['treasure', 'encounter', 'blessing', 'danger', 'all'];
+                    const t = type || 'all';
+                    const SERENDIPITY_POOL = [
+                        { type: 'treasure', name: '发现古修士洞府', karma: 10, reward: { spiritStones: 500 } },
+                        { type: 'encounter', name: '遇见散仙论道', karma: 15, reward: { cultivationXP: 200 } },
+                        { type: 'blessing', name: '天降祥瑞', karma: 20, reward: { maxSpirit: 50 } },
+                        { type: 'danger', name: '遭遇妖兽袭击', karma: -10, reward: { combatXP: 100 } }
+                    ];
+                    const pool = t === 'all' ? SERENDIPITY_POOL : SERENDIPITY_POOL.filter(e => e.type === t);
+                    if (pool.length === 0) return { error: 'No serendipity events of this type' };
+                    const event = pool[Math.floor(Math.random() * pool.length)];
+                    const eventId = 'SER_' + Date.now();
+                    gs.karmaPoints = (gs.karmaPoints || 0) + event.karma;
+                    gs.karmaHistory = gs.karmaHistory || [];
+                    gs.karmaHistory.push({ eventId, type: event.type, karma: event.karma, reason: event.name, time: Date.now() });
+                    return { eventId, type: event.type, name: event.name, karmaDelta: event.karma, reward: event.reward };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityKarmaUpdate(eventId, karmaDelta, reason) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (karmaDelta === undefined) return { error: 'karmaDelta required' };
+                    gs.karmaPoints = (gs.karmaPoints || 0) + (karmaDelta || 0);
+                    gs.karmaHistory = gs.karmaHistory || [];
+                    gs.karmaHistory.push({ eventId, karma: karmaDelta, reason: reason || 'serendipity', time: Date.now() });
+                    return { success: true, eventId, newKarma: gs.karmaPoints, karmaDelta };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -9237,6 +9428,68 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v87Results = runV87Tests();
+
+        // ===== V88 Tests: 仙界贸易系统+奇遇增强 =====
+        function runV88Tests() {
+            const results = [];
+            const v88Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V88 tools exist in MCP_TOOLS_V88
+            v88Assert(MCP_TOOLS_V88['celestial.market.list'] !== undefined, 'celestial.market.list defined');
+            v88Assert(MCP_TOOLS_V88['celestial.market.buy'] !== undefined, 'celestial.market.buy defined');
+            v88Assert(MCP_TOOLS_V88['celestial.market.sell'] !== undefined, 'celestial.market.sell defined');
+            v88Assert(MCP_TOOLS_V88['celestial.market.search'] !== undefined, 'celestial.market.search defined');
+            v88Assert(MCP_TOOLS_V88['serendipity.trigger'] !== undefined, 'serendipity.trigger defined');
+            v88Assert(MCP_TOOLS_V88['serendipity.karma_update'] !== undefined, 'serendipity.karma_update defined');
+
+            // Test 2: Tool registry has V88 tools
+            const server = new CultivationMCPServer();
+            v88Assert(server.toolRegistry.has('celestial.market.list'), 'celestial.market.list registered');
+            v88Assert(server.toolRegistry.has('celestial.market.buy'), 'celestial.market.buy registered');
+            v88Assert(server.toolRegistry.has('celestial.market.sell'), 'celestial.market.sell registered');
+            v88Assert(server.toolRegistry.has('celestial.market.search'), 'celestial.market.search registered');
+            v88Assert(server.toolRegistry.has('serendipity.trigger'), 'serendipity.trigger registered');
+            v88Assert(server.toolRegistry.has('serendipity.karma_update'), 'serendipity.karma_update registered');
+
+            // Test 3: Tool count grows with V88 (90 + 6 = 96)
+            const server2 = new CultivationMCPServer();
+            v88Assert(server2.toolRegistry.size >= 96, 'toolRegistry has >= 96 tools (V73-V88)');
+
+            // Test 4: celestial.market.list returns structure
+            const marketList = server.mcpCelestialMarketList('all');
+            v88Assert(marketList && Array.isArray(marketList.items), 'celestial.market.list returns items array');
+            v88Assert(typeof marketList.total === 'number', 'celestial.market.list returns total number');
+
+            // Test 5: celestial.market.list validates category
+            const marketBadCat = server.mcpCelestialMarketList('invalid');
+            v88Assert(marketBadCat.error === 'Invalid category', 'celestial.market.list rejects invalid category');
+
+            // Test 6: celestial.market.sell validates price
+            const sellBadPrice = server.mcpCelestialMarketSell('ITEM_001', 0);
+            v88Assert(sellBadPrice.error === 'Invalid price', 'celestial.market.sell rejects zero price');
+
+            // Test 7: celestial.market.search returns results
+            const searchResult = server.mcpCelestialMarketSearch('test');
+            v88Assert(searchResult && Array.isArray(searchResult.results), 'celestial.market.search returns results array');
+
+            // Test 8: serendipity.trigger returns event
+            const serendipity = server.mcpSerendipityTrigger('all');
+            v88Assert(serendipity && serendipity.eventId, 'serendipity.trigger returns eventId');
+            v88Assert(serendipity.type, 'serendipity.trigger returns type');
+            v88Assert(typeof serendipity.karmaDelta === 'number', 'serendipity.trigger returns karmaDelta');
+
+            // Test 9: serendipity.karma_update validates
+            const karmaBad = server.mcpSerendipityKarmaUpdate('SER_001', undefined, 'test');
+            v88Assert(karmaBad.error === 'karmaDelta required', 'serendipity.karma_update requires karmaDelta');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V88 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V88 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v88Results = runV88Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
