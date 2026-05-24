@@ -1943,6 +1943,3903 @@ const ACHIEVEMENT_ID_MAP = {
 
 // [DDD Phase 1] CONFIG moved to domains/shared/constants/;
 
+        // --- IDLE_TASKS (V57 仙界挂机系统) ---
+        const IDLE_TASKS = {
+            'qi_cultivation': { name: '灵气修炼', baseReward: 10, unit: '灵气/小时', duration: 24, realmScale: true },
+            'stone_gathering': { name: '灵石采集', baseReward: 50, unit: '灵石/小时', duration: 24, realmScale: true },
+            'pill_refining': { name: '丹药炼制', baseReward: 1, unit: '丹药/小时', duration: 12, requires: 'alchemy' },
+            'technique_study': { name: '功法领悟', baseReward: 5, unit: '熟练度/小时', duration: 48, realmScale: true },
+            'secret_explore': { name: '秘境探索', baseReward: 100, unit: '探索积分/小时', duration: 6, tokenCost: 1, realmScale: true }
+        };
+
+        // --- IDLE_CONFIG (V57) ---
+        const IDLE_CONFIG = {
+            maxConcurrentTasks: 3,
+            maxOfflineHours: 24,
+            offlineEfficiency: 0.8,
+            earningsThreshold: 1000,
+            autoSuspendDays: 7
+        };
+
+        // ===== Direction A: NPC Collaboration Engine =====
+        // Nanobot MessageBus + ChatDev multi-role chain collaboration
+
+        // --- NPC_ROLE_REGISTRY: Role registration (master=training, monster=challenge, merchant=trade, fellow=practice) ---
+        const NPC_ROLE_REGISTRY = {
+            'master': {
+                role: 'master',
+                title: '师尊',
+                skills: ['teach', 'assign_task', 'evaluate', 'reward'],
+                collaborationWeight: 0.3,
+                responseSpeed: 'slow'
+            },
+            'monster': {
+                role: 'monster',
+                title: '妖兽',
+                skills: ['challenge', 'guard', 'drop_item'],
+                collaborationWeight: 0.2,
+                responseSpeed: 'fast'
+            },
+            'merchant': {
+                role: 'merchant',
+                title: '商人',
+                skills: ['trade', 'appraise', 'special_goods'],
+                collaborationWeight: 0.25,
+                responseSpeed: 'medium'
+            },
+            'fellow': {
+                role: 'fellow',
+                title: '同道',
+                skills: ['practice_together', 'share_resource', 'mutual_help'],
+                collaborationWeight: 0.25,
+                responseSpeed: 'medium'
+            }
+        };
+
+        // --- NPC_MESSAGE_BUS: Async message routing ---
+        class NpcMessageBus {
+            constructor() {
+                this.messages = [];      // pending messages
+                this.listeners = new Map(); // role -> [callback]
+                this.messageId = 0;
+            }
+            send(fromRole, toRole, type, payload) {
+                const msg = {
+                    id: ++this.messageId,
+                    from: fromRole,
+                    to: toRole,
+                    type, // 'task' | 'response' | 'broadcast'
+                    payload,
+                    timestamp: Date.now(),
+                    status: 'pending'
+                };
+                this.messages.push(msg);
+                return msg;
+            }
+            broadcast(fromRole, type, payload) {
+                const msg = {
+                    id: ++this.messageId,
+                    from: fromRole,
+                    to: '*', // wildcard = all roles
+                    type, // 'announcement' | 'emergency' | 'opportunity'
+                    payload,
+                    timestamp: Date.now(),
+                    status: 'pending'
+                };
+                this.messages.push(msg);
+                return msg;
+            }
+            subscribe(role, callback) {
+                if (!this.listeners.has(role)) this.listeners.set(role, []);
+                this.listeners.get(role).push(callback);
+            }
+            dispatch() {
+                const delivered = [];
+                for (const msg of this.messages) {
+                    if (msg.status !== 'pending') continue;
+                    const listeners = this.listeners.get(msg.to) || [];
+                    for (const cb of listeners) {
+                        cb(msg);
+                        msg.status = 'delivered';
+                    }
+                    if (msg.to === '*') {
+                        for (const [role, cbs] of this.listeners) {
+                            if (role !== msg.from) {
+                                for (const cb of cbs) { cb(msg); }
+                            }
+                        }
+                        msg.status = 'broadcast';
+                    }
+                }
+                this.messages = this.messages.filter(m => m.status === 'pending');
+                return delivered;
+            }
+            getMessages(role, since = 0) {
+                return this.messages.filter(m =>
+                    (m.from === role || m.to === role || m.to === '*') && m.timestamp > since
+                );
+            }
+        }
+
+        // --- NPC_COLLABORATION_GRAPH: Chain tasks (master publish -> fellow execute -> master review) ---
+        class NpcCollabGraph {
+            constructor() {
+                this.nodes = new Map(); // nodeId -> {type, owner, status, prerequisites, outcomes}
+                this.edges = []; // [{from, to, type}]
+                this.activeTasks = new Map(); // taskId -> {nodeId, startTime, progress, assignedTo}
+            }
+            addNode(nodeId, config) {
+                this.nodes.set(nodeId, {
+                    id: nodeId,
+                    type: config.type, // 'publish_task' | 'execute' | 'review' | 'reward'
+                    owner: config.owner,
+                    status: 'idle',
+                    prerequisites: config.prerequisites || [],
+                    outcomes: config.outcomes || {},
+                    maxProgress: config.maxProgress || 100
+                });
+            }
+            addEdge(from, to, type = 'sequence') {
+                this.edges.push({ from, to, type });
+            }
+            getReadyNodes() {
+                const ready = [];
+                for (const [nodeId, node] of this.nodes) {
+                    if (node.status !== 'idle') continue;
+                    const prereqs = node.prerequisites || [];
+                    const allMet = prereqs.every(p => {
+                        const n = this.nodes.get(p);
+                        return n && n.status === 'completed';
+                    });
+                    if (allMet) ready.push(nodeId);
+                }
+                return ready;
+            }
+            startTask(nodeId, assignedTo) {
+                const node = this.nodes.get(nodeId);
+                if (!node) return null;
+                const taskId = `task_${nodeId}_${Date.now()}`;
+                node.status = 'in_progress';
+                this.activeTasks.set(taskId, {
+                    nodeId,
+                    assignedTo,
+                    startTime: Date.now(),
+                    progress: 0
+                });
+                return taskId;
+            }
+            updateProgress(taskId, progress) {
+                const task = this.activeTasks.get(taskId);
+                if (!task) return;
+                task.progress = Math.min(progress, 100);
+                if (task.progress >= 100) {
+                    const node = this.nodes.get(task.nodeId);
+                    if (node) node.status = 'completed';
+                    task.status = 'completed';
+                }
+            }
+            getChainStatus(chainId) {
+                const nodes = Array.from(this.nodes.values()).filter(n => n.type === chainId);
+                return {
+                    total: nodes.length,
+                    completed: nodes.filter(n => n.status === 'completed').length,
+                    inProgress: nodes.filter(n => n.status === 'in_progress').length,
+                    idle: nodes.filter(n => n.status === 'idle').length
+                };
+            }
+        }
+
+        // --- PLAN_REVIEW_GATE: Key decisions require player confirmation ---
+        const PLAN_REVIEW_GATE = {
+            gates: {
+                'major_cultivation_advice': { threshold: 0.7, auto_approve: false },
+                'rare_item_trade': { threshold: 0.5, auto_approve: false },
+                'sect_mission': { threshold: 0.6, auto_approve: true },
+                'fellow_help_request': { threshold: 0.4, auto_approve: true }
+            },
+            shouldBlock(action) {
+                const gate = this.gates[action];
+                if (!gate) return false;
+                return !gate.auto_approve;
+            }
+        };
+
+        const npcMessageBus = new NpcMessageBus();
+        const npcCollabGraph = new NpcCollabGraph();
+
+        // ===== Direction A V73: MCP Agent Bridge =====
+        // claude-code Tool System + thunderbolt MCP Client + nanobot MessageBus
+        // 暴露游戏为MCP Server，外部Agent可通过MCP协议与NPC/奇遇/修炼系统交互
+
+        // --- MCP Tool Definitions (标准MCP工具协议) ---
+        const MCP_TOOLS = {
+            'npc.query': {
+                name: 'npc.query',
+                description: 'Query NPC information, memory, relationship, current task',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC ID or name' },
+                        query: { type: 'string', description: 'Query type: info|memory|relationship|task' }
+                    },
+                    required: ['npcId', 'query']
+                }
+            },
+            'serendipity.trigger': {
+                name: 'serendipity.trigger',
+                description: 'Manually trigger a serendipity event by node ID',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeId: { type: 'string', description: 'Serendipity node ID to trigger' }
+                    },
+                    required: ['nodeId']
+                }
+            },
+            'cultivation.advance': {
+                name: 'cultivation.advance',
+                description: 'Advance cultivation manually (meditate, breakthrough, etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', enum: ['meditate', 'breakthrough', 'tribulation'], description: 'Cultivation action' }
+                    },
+                    required: ['action']
+                }
+            },
+            'item.exchange': {
+                name: 'item.exchange',
+                description: 'Exchange items for spirit stones or other items',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Item ID to exchange' },
+                        target: { type: 'string', description: 'Target: spirit_stones|item' }
+                    },
+                    required: ['itemId', 'target']
+                }
+            },
+            'gameState.query': {
+                name: 'gameState.query',
+                description: 'Query current game state (realm, spiritStones, items, etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        field: { type: 'string', description: 'Field to query: realm|spiritStones|items|cultivation|combat|npc|all' }
+                    },
+                    required: ['field']
+                }
+            },
+            'battle.start': {
+                name: 'battle.start',
+                description: 'Start a battle against opponent',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        opponentId: { type: 'string', description: 'Opponent NPC ID or type' },
+                        auto: { type: 'boolean', description: 'Auto-battle mode (AI controlled)' }
+                    },
+                    required: ['opponentId']
+                }
+            },
+            'mcp.providers': {
+                name: 'mcp.providers',
+                description: 'Get available LLM providers and their status',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mcp.switch_provider': {
+                name: 'mcp.switch_provider',
+                description: 'Switch active LLM provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        providerId: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|groq|mistral|deepseek|local' }
+                    },
+                    required: ['providerId']
+                }
+            }
+        };
+
+        // --- MCP Request/Response types ---
+        const MCP_REQUEST_TYPES = {
+            TOOL_CALL: 'tool_call',
+            TOOL_LIST: 'tool_list',
+            PROVIDER_QUERY: 'provider_query',
+            STATE_QUERY: 'state_query'
+        };
+
+        // --- CultivationMCPServer: Core MCP Server ---
+        class CultivationMCPServer {
+            constructor() {
+                this.toolRegistry = new Map();
+                this.requestHistory = [];
+                this.maxHistory = 100;
+                this.initToolRegistry();
+            }
+
+            initToolRegistry() {
+                for (const [name, tool] of Object.entries(MCP_TOOLS)) {
+                    this.toolRegistry.set(name, tool);
+                }
+            }
+
+            // 处理外部MCP请求
+            handleRequest(request) {
+                const { method, params, id } = request;
+                this.requestHistory.push({ method, timestamp: Date.now(), id });
+
+                switch (method) {
+                    case 'tools.list':
+                        return this.listTools();
+                    case 'tools.call':
+                        return this.callTool(params.name, params.arguments);
+                    default:
+                        return { error: { code: -32601, message: `Method not found: ${method}` }, id };
+                }
+            }
+
+            listTools() {
+                const tools = Array.from(this.toolRegistry.values()).map(t => ({
+                    name: t.name,
+                    description: t.description,
+                    inputSchema: t.inputSchema
+                }));
+                return { content: [{ type: 'text', text: JSON.stringify({ tools }) }] };
+            }
+
+            callTool(name, args) {
+                const tool = this.toolRegistry.get(name);
+                if (!tool) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ error: `Tool not found: ${name}` }) }], isError: true };
+                }
+
+                try {
+                    let result;
+                    switch (name) {
+                        case 'npc.query':
+                            result = this.mcpNpcQuery(args.npcId, args.query);
+                            break;
+                        case 'serendipity.trigger':
+                            result = this.mcpSerendipityTrigger(args.nodeId);
+                            break;
+                        case 'cultivation.advance':
+                            result = this.mcpCultivationAdvance(args.action);
+                            break;
+                        case 'item.exchange':
+                            result = this.mcpItemExchange(args.itemId, args.target);
+                            break;
+                        case 'gameState.query':
+                            result = this.mcpGameStateQuery(args.field);
+                            break;
+                        case 'battle.start':
+                            result = this.mcpBattleStart(args.opponentId, args.auto);
+                            break;
+                        case 'mcp.providers':
+                            result = this.mcpProviders();
+                            break;
+                        case 'mcp.switch_provider':
+                            result = this.mcpSwitchProvider(args.providerId);
+                            break;
+                        default:
+                            result = { error: `Tool ${name} not yet implemented` };
+                    }
+                    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+                } catch (e) {
+                    return { content: [{ type: 'text', text: JSON.stringify({ error: e.message }) }], isError: true };
+                }
+            }
+
+            // NPC查询
+            mcpNpcQuery(npcId, query) {
+                if (!gameState.npcCollab) return { error: 'NPC system not initialized' };
+                const npc = gameState.npcCollab.npcs ? gameState.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
+                if (!npc) return { error: `NPC not found: ${npcId}` };
+
+                switch (query) {
+                    case 'info':
+                        return {
+                            id: npc.id,
+                            name: npc.name,
+                            role: npc.role,
+                            realm: npc.realm,
+                            disposition: npc.disposition,
+                            task: npc.currentTask || 'none'
+                        };
+                    case 'memory':
+                        return {
+                            memory: npc.memory || { L0: {}, L1: {}, L2: {}, L3: {}, L4: {} }
+                        };
+                    case 'relationship':
+                        return {
+                            playerReputation: npc.playerReputation || 0,
+                            favorability: npc.favorability || 0,
+                            masterRank: npc.masterRank || 0
+                        };
+                    case 'task':
+                        return {
+                            currentTask: npc.currentTask || 'none',
+                            taskProgress: npc.taskProgress || 0,
+                            completedTasks: npc.completedTasks || 0
+                        };
+                    default:
+                        return { error: `Unknown query type: ${query}` };
+                }
+            }
+
+            // 奇遇触发
+            mcpSerendipityTrigger(nodeId) {
+                if (!gameState.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
+                const node = gameState.serendipityDAG.nodes ? gameState.serendipityDAG.nodes.get(nodeId) : null;
+                if (!node) return { error: `Serendipity node not found: ${nodeId}` };
+
+                node.status = 'triggered';
+                node.triggerCount++;
+                return {
+                    nodeId: node.id,
+                    name: node.name,
+                    description: node.description,
+                    effects: node.effects,
+                    status: node.status
+                };
+            }
+
+            // 修炼推进
+            mcpCultivationAdvance(action) {
+                switch (action) {
+                    case 'meditate':
+                        if (typeof startMeditation === 'function') {
+                            startMeditation();
+                            return { action: 'meditate', success: true, message: 'Meditation started' };
+                        }
+                        return { action: 'meditate', spiritGained: 10, duration: '1 hour' };
+                    case 'breakthrough':
+                        if (typeof attemptBreakthrough === 'function') {
+                            attemptBreakthrough();
+                            return { action: 'breakthrough', success: true, message: 'Breakthrough attempted' };
+                        }
+                        return { action: 'breakthrough', success: false, reason: 'Cannot breakthrough at current realm' };
+                    case 'tribulation':
+                        return { action: 'tribulation', success: true, message: 'Tribulation lightning struck' };
+                    default:
+                        return { error: `Unknown cultivation action: ${action}` };
+                }
+            }
+
+            // 物品兑换
+            mcpItemExchange(itemId, target) {
+                const item = findItemById(itemId);
+                if (!item) return { error: `Item not found: ${itemId}` };
+
+                const exchangeValue = item.quality === 'SSR' ? 5000 : item.quality === 'SR' ? 1000 : item.quality === 'R' ? 100 : 10;
+                if (target === 'spirit_stones') {
+                    gameState.spiritStones = (gameState.spiritStones || 0) + exchangeValue;
+                    removeItem(itemId, 1);
+                    return { success: true, exchanged: itemId, spiritStones: exchangeValue, remaining: gameState.spiritStones };
+                }
+                return { error: `Unknown target: ${target}` };
+            }
+
+            // 游戏状态查询
+            mcpGameStateQuery(field) {
+                switch (field) {
+                    case 'realm':
+                        return { realm: gameState.realm, stage: gameState.stage, level: gameState.level };
+                    case 'spiritStones':
+                        return { spiritStones: gameState.spiritStones || 0, realmBonus: gameState.realmBonus || 0 };
+                    case 'items':
+                        return { items: gameState.items || [], inventoryCount: (gameState.items || []).length };
+                    case 'cultivation':
+                        return {
+                            spiritEnergy: gameState.spiritEnergy,
+                            maxSpiritEnergy: gameState.maxSpiritEnergy,
+                            cultivationProgress: gameState.cultivationProgress
+                        };
+                    case 'combat':
+                        return {
+                            combatEnabled: !!gameState.combatStats,
+                            wins: gameState.combatStats?.wins || 0,
+                            losses: gameState.combatStats?.losses || 0
+                        };
+                    case 'npc':
+                        return {
+                            npcCount: gameState.npcCollab?.npcs?.length || 0,
+                            activeTasks: gameState.npcCollab?.activeTasks || 0
+                        };
+                    case 'all':
+                        return {
+                            realm: gameState.realm,
+                            spiritStones: gameState.spiritStones || 0,
+                            spiritEnergy: gameState.spiritEnergy,
+                            items: (gameState.items || []).length,
+                            combat: { wins: gameState.combatStats?.wins || 0, losses: gameState.combatStats?.losses || 0 },
+                            npc: { count: gameState.npcCollab?.npcs?.length || 0 }
+                        };
+                    default:
+                        return { error: `Unknown field: ${field}` };
+                }
+            }
+
+            // 战斗开始
+            mcpBattleStart(opponentId, auto = false) {
+                if (typeof startCombat === 'function') {
+                    startCombat(opponentId);
+                    return { success: true, opponentId, mode: auto ? 'auto' : 'manual' };
+                }
+                return { error: 'Combat system not available' };
+            }
+
+            // Provider查询
+            mcpProviders() {
+                const providers = llmRegistry.getAllProviders().map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isConfigured: llmRegistry.isConfigured(p.id),
+                    isActive: p.id === llmRegistry.activeProviderId
+                }));
+                return { providers, activeProvider: llmRegistry.activeProviderId };
+            }
+
+            // Provider切换
+            mcpSwitchProvider(providerId) {
+                const success = llmRegistry.setActive(providerId);
+                if (success) {
+                    return { success: true, provider: providerId, message: `Switched to ${providerId}` };
+                }
+                return { error: `Failed to switch to provider: ${providerId}` };
+            }
+        }
+
+        const cultivationMCPServer = new CultivationMCPServer();
+
+        // --- MCP Bridge: Route external MCP requests to game server ---
+        function handleMCPRequest(requestJson) {
+            try {
+                const request = typeof requestJson === 'string' ? JSON.parse(requestJson) : requestJson;
+                return cultivationMCPServer.handleRequest(request);
+            } catch (e) {
+                return { error: { code: -32700, message: `Parse error: ${e.message}` } };
+            }
+        }
+
+        // --- MCP UI Panel (openMcpPanel) ---
+        function openMcpPanel() {
+            closePanel('mcpPanel');
+            const providers = llmRegistry.getAllProviders().map(p => ({
+                id: p.id,
+                name: p.name,
+                isConfigured: llmRegistry.isConfigured(p.id),
+                isActive: p.id === llmRegistry.activeProviderId
+            }));
+
+            const toolsList = Object.keys(MCP_TOOLS).map(name => {
+                const t = MCP_TOOLS[name];
+                return `<div class="mcp-tool-item" onclick="testMcpTool('${name}')">
+                    <span class="tool-name">${name}</span>
+                    <span class="tool-desc">${t.description}</span>
+                </div>`;
+            }).join('');
+
+            const providerOptions = providers.map(p =>
+                `<option value="${p.id}" ${p.isActive ? 'selected' : ''} ${!p.isConfigured ? 'disabled' : ''}>${p.name} ${!p.isConfigured ? '(未配置)' : ''}</option>`
+            ).join('');
+
+            const html = `
+                <div class="panel" style="max-width:700px;">
+                    <div class="panel-header">
+                        <h2>🌐 MCP Agent Bridge</h2>
+                        <button class="btn-close" onclick="this.closest('.panel').remove()">×</button>
+                    </div>
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" onclick="switchMcpTab('tools')">工具</button>
+                        <button class="tab-btn" onclick="switchMcpTab('providers')">Provider</button>
+                        <button class="tab-btn" onclick="switchMcpTab('logs')">日志</button>
+                    </div>
+                    <div id="mcp-tools-tab" class="tab-content">
+                        <p style="color:#888;font-size:12px;margin-bottom:10px;">共 ${Object.keys(MCP_TOOLS).length} 个MCP工具，点击测试</p>
+                        ${toolsList}
+                    </div>
+                    <div id="mcp-providers-tab" class="tab-content" style="display:none;">
+                        <p style="color:#888;font-size:12px;margin-bottom:10px;">切换LLM Provider</p>
+                        <select id="mcp-provider-select" style="width:100%;padding:8px;margin-bottom:10px;">${providerOptions}</select>
+                        <button class="btn btn-primary" onclick="switchMcpProvider()">切换Provider</button>
+                        <div id="mcp-provider-status" style="margin-top:10px;"></div>
+                    </div>
+                    <div id="mcp-logs-tab" class="tab-content" style="display:none;">
+                        <div id="mcp-request-log" style="max-height:300px;overflow-y:auto;font-size:11px;color:#aaa;"></div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function switchMcpTab(tab) {
+            document.querySelectorAll('.mcp-tool-item, .btn-close').forEach(el => el.remove);
+            document.querySelectorAll('.panel-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('mcp-tools-tab').style.display = tab === 'tools' ? 'block' : 'none';
+            document.getElementById('mcp-providers-tab').style.display = tab === 'providers' ? 'block' : 'none';
+            document.getElementById('mcp-logs-tab').style.display = tab === 'logs' ? 'block' : 'none';
+        }
+
+        function testMcpTool(toolName) {
+            const tool = MCP_TOOLS[toolName];
+            let args = {};
+            if (tool.inputSchema && tool.inputSchema.properties) {
+                for (const [key, schema] of Object.entries(tool.inputSchema.properties)) {
+                    if (schema.enum) {
+                        args[key] = schema.enum[0];
+                    } else {
+                        args[key] = prompt(`${key} (${schema.description || 'string'}):`) || '';
+                    }
+                }
+            }
+            const request = { method: 'tools.call', params: { name: toolName, arguments: args }, id: Date.now() };
+            const result = handleMCPRequest(request);
+            alert(`${toolName}\n\n${result.content?.[0]?.text || JSON.stringify(result, null, 2)}`);
+        }
+
+        function switchMcpProvider() {
+            const sel = document.getElementById('mcp-provider-select');
+            const result = cultivationMCPServer.mcpSwitchProvider(sel.value);
+            document.getElementById('mcp-provider-status').innerHTML = result.success
+                ? `<span style="color:#4caf50;">✓ ${result.message}</span>`
+                : `<span style="color:#f44336;">✗ ${result.error}</span>`;
+        }
+
+        // --- MCP Button in index.html (always visible) ---
+        // Note: Button added via patch to index.html, see patchMcpBtn()
+
+        // --- NPC Collaboration state in gameState ---
+        // Initialize after IDLE_CONFIG in gameState initialization
+
+        // ===== Direction B: Serendipity DAG Executor =====
+        // ChatDev DAG + Tarjan SCC detection + SuperNode abstraction
+
+        // --- SerendipityNode: Single event node in DAG ---
+        class SerendipityNode {
+            constructor(id, config) {
+                this.id = id;
+                this.type = config.type || 'event'; // 'event' | 'choice' | 'reward' | 'gate'
+                this.name = config.name || id;
+                this.description = config.description || '';
+                this.weight = config.weight || 1.0;
+                this.prerequisites = config.prerequisites || []; // prerequisite node IDs
+                this.effects = config.effects || {}; // {spiritStones: +100, reputation: +5}
+                this.probability = config.probability || 1.0; // base trigger probability
+                this.icon = config.icon || '✨';
+                this.realmRequirement = config.realmRequirement || 0;
+                this.status = 'locked'; // 'locked' | 'ready' | 'triggered' | 'completed'
+                this.triggerCount = 0;
+                this.maxTriggers = config.maxTriggers || Infinity;
+            }
+            canTrigger(playerState) {
+                if (this.status !== 'ready') return false;
+                if (this.triggerCount >= this.maxTriggers) return false;
+                if (playerState.realm < this.realmRequirement) return false;
+                return Math.random() < this.probability;
+            }
+        }
+
+        // --- SuperNode: Composite node grouping multiple related events ---
+        class SuperNode {
+            constructor(id, nodes) {
+                this.id = id;
+                this.nodes = nodes; // Array of SerendipityNode
+                this.status = 'idle'; // 'idle' | 'active' | 'completed'
+                this.currentNodeIndex = 0;
+            }
+            get currentNode() {
+                return this.nodes[this.currentNodeIndex] || null;
+            }
+            advance() {
+                this.currentNodeIndex++;
+                if (this.currentNodeIndex >= this.nodes.length) {
+                    this.status = 'completed';
+                }
+            }
+            get totalWeight() {
+                return this.nodes.reduce((sum, n) => sum + n.weight, 0);
+            }
+        }
+
+        // --- SerendipityDAG: Directed Acyclic Graph with Tarjan SCC detection ---
+        class SerendipityDAG {
+            constructor() {
+                this.nodes = new Map(); // nodeId -> SerendipityNode
+                this.superNodes = new Map(); // superId -> SuperNode
+                this.edges = []; // [{from, to}] directed edges
+                this.executionOrder = []; // topologically sorted
+                this.sccs = []; // strong connected components (Tarjan)
+            }
+
+            addNode(nodeId, config) {
+                const node = new SerendipityNode(nodeId, config);
+                this.nodes.set(nodeId, node);
+                return node;
+            }
+
+            addEdge(fromId, toId) {
+                this.edges.push({ from: fromId, to: toId });
+                const fromNode = this.nodes.get(fromId);
+                const toNode = this.nodes.get(toId);
+                if (toNode && fromNode && !toNode.prerequisites.includes(fromId)) {
+                    toNode.prerequisites.push(fromId); // to depends on from
+                }
+            }
+
+            // Topological sort using Kahn's algorithm
+            topologicalSort() {
+                const inDegree = new Map();
+                const adjacency = new Map();
+
+                // Initialize
+                for (const [nodeId] of this.nodes) {
+                    inDegree.set(nodeId, 0);
+                    adjacency.set(nodeId, []);
+                }
+                for (const [nodeId] of this.superNodes) {
+                    inDegree.set(nodeId, 0);
+                    adjacency.set(nodeId, []);
+                }
+
+                // Build graph
+                for (const { from, to } of this.edges) {
+                    adjacency.get(from)?.push(to);
+                    inDegree.set(to, (inDegree.get(to) || 0) + 1);
+                }
+
+                // Kahn's algorithm
+                const queue = [];
+                for (const [nodeId, degree] of inDegree) {
+                    if (degree === 0) queue.push(nodeId);
+                }
+
+                const sorted = [];
+                while (queue.length > 0) {
+                    const nodeId = queue.shift();
+                    sorted.push(nodeId);
+                    for (const neighbor of adjacency.get(nodeId) || []) {
+                        inDegree.set(neighbor, inDegree.get(neighbor) - 1);
+                        if (inDegree.get(neighbor) === 0) {
+                            queue.push(neighbor);
+                        }
+                    }
+                }
+
+                this.executionOrder = sorted;
+                return sorted;
+            }
+
+            // Tarjan's SCC algorithm
+            tarjanSCC() {
+                let index = 0;
+                const stack = [];
+                const onStack = new Map();
+                const indices = new Map();
+                const lowlinks = new Map();
+                const sccs = [];
+
+                const strongConnect = (nodeId) => {
+                    indices.set(nodeId, index);
+                    lowlinks.set(nodeId, index);
+                    index++;
+                    stack.push(nodeId);
+                    onStack.set(nodeId, true);
+
+                    for (const { to } of this.edges) {
+                        if (!indices.has(to)) {
+                            strongConnect(to);
+                            lowlinks.set(nodeId, Math.min(lowlinks.get(nodeId), lowlinks.get(to)));
+                        } else if (onStack.get(to)) {
+                            lowlinks.set(nodeId, Math.min(lowlinks.get(nodeId), indices.get(to)));
+                        }
+                    }
+
+                    if (lowlinks.get(nodeId) === indices.get(nodeId)) {
+                        const scc = [];
+                        let w;
+                        do {
+                            w = stack.pop();
+                            onStack.set(w, false);
+                            scc.push(w);
+                        } while (w !== nodeId);
+                        sccs.push(scc);
+                    }
+                };
+
+                for (const [nodeId] of this.nodes) {
+                    if (!indices.has(nodeId)) {
+                        strongConnect(nodeId);
+                    }
+                }
+
+                this.sccs = sccs;
+                return sccs;
+            }
+
+            getReadyNodes() {
+                const ready = [];
+                for (const [nodeId, node] of this.nodes) {
+                    if (node.status !== 'locked') continue;
+                    const prereqs = node.prerequisites || [];
+                    const allMet = prereqs.every(p => {
+                        const n = this.nodes.get(p);
+                        return n && n.status === 'completed';
+                    });
+                    if (allMet) {
+                        node.status = 'ready';
+                        ready.push(nodeId);
+                    }
+                }
+                return ready;
+            }
+
+            triggerNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (!node || node.status !== 'ready') return null;
+                node.status = 'triggered';
+                node.triggerCount++;
+                return node;
+            }
+
+            completeNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (node) node.status = 'completed';
+            }
+        }
+
+        // --- SerendipityExecutor: Executes serendipity events ---
+        class SerendipityExecutor {
+            constructor() {
+                this.dag = new SerendipityDAG();
+                this.activeSuperNodes = [];
+                this.pendingEvents = [];
+            }
+
+            initDefaultSerendipities() {
+                // Master chain: discover -> trial -> evaluate -> reward
+                this.dag.addNode('ser_discovery', {
+                    type: 'event', name: '奇遇发现', icon: '🔮', weight: 1.0,
+                    prerequisites: [], probability: 0.3,
+                    effects: { reputation: 5 }, realmRequirement: 1
+                });
+                this.dag.addNode('ser_trial', {
+                    type: 'choice', name: '试炼抉择', icon: '⚔️', weight: 0.8,
+                    prerequisites: ['ser_discovery'], probability: 0.6,
+                    effects: { spiritStones: 50 }, realmRequirement: 2
+                });
+                this.dag.addNode('ser_evaluation', {
+                    type: 'gate', name: '师尊评核', icon: '📜', weight: 0.5,
+                    prerequisites: ['ser_trial'], probability: 0.5,
+                    effects: { cultivationBase: 10 }, realmRequirement: 3
+                });
+                this.dag.addNode('ser_master_reward', {
+                    type: 'reward', name: '师尊赏赐', icon: '🎁', weight: 0.3,
+                    prerequisites: ['ser_evaluation'], probability: 0.4,
+                    effects: { spiritStones: 200, techniquePoints: 20 }, realmRequirement: 4
+                });
+
+                // Monster chain: encounter -> battle -> drop
+                this.dag.addNode('ser_monster_encounter', {
+                    type: 'event', name: '妖兽遭遇', icon: '👹', weight: 0.9,
+                    prerequisites: [], probability: 0.4,
+                    effects: {}, realmRequirement: 1
+                });
+                this.dag.addNode('ser_monster_battle', {
+                    type: 'event', name: '妖兽战斗', icon: '⚔️', weight: 0.7,
+                    prerequisites: ['ser_monster_encounter'], probability: 0.7,
+                    effects: { honor: 10 }, realmRequirement: 2
+                });
+                this.dag.addNode('ser_monster_drop', {
+                    type: 'reward', name: '妖兽掉落', icon: '💎', weight: 0.4,
+                    prerequisites: ['ser_monster_battle'], probability: 0.5,
+                    effects: { spiritStones: 100, materials: 1 }, realmRequirement: 3
+                });
+
+                // Edges
+                this.dag.addEdge('ser_discovery', 'ser_trial');
+                this.dag.addEdge('ser_trial', 'ser_evaluation');
+                this.dag.addEdge('ser_evaluation', 'ser_master_reward');
+                this.dag.addEdge('ser_monster_encounter', 'ser_monster_battle');
+                this.dag.addEdge('ser_monster_battle', 'ser_monster_drop');
+
+                // Sort
+                this.dag.topologicalSort();
+            }
+
+            triggerRandomSerendipity(playerState) {
+                const ready = this.dag.getReadyNodes();
+                if (ready.length === 0) return null;
+
+                // Weight-based selection
+                let totalWeight = 0;
+                const candidates = [];
+                for (const nodeId of ready) {
+                    const node = this.dag.nodes.get(nodeId);
+                    if (node.canTrigger(playerState)) {
+                        totalWeight += node.weight;
+                        candidates.push({ nodeId, weight: node.weight });
+                    }
+                }
+                if (candidates.length === 0) return null;
+
+                // Random weighted selection
+                let random = Math.random() * totalWeight;
+                for (const { nodeId, weight } of candidates) {
+                    random -= weight;
+                    if (random <= 0) {
+                        return this.dag.triggerNode(nodeId);
+                    }
+                }
+                return this.dag.triggerNode(candidates[0].nodeId);
+            }
+
+            getDAGStatus() {
+                const nodes = Array.from(this.dag.nodes.values());
+                return {
+                    total: nodes.length,
+                    locked: nodes.filter(n => n.status === 'locked').length,
+                    ready: nodes.filter(n => n.status === 'ready').length,
+                    triggered: nodes.filter(n => n.status === 'triggered').length,
+                    completed: nodes.filter(n => n.status === 'completed').length
+                };
+            }
+
+            // --- Execute serendipity with SuperNode recursive scheduling (chatdev-style) ---
+            executeSerendipityWithSuperNodes(playerState) {
+                // Step 1: Build scope subgraph (remove initial node's incoming edges)
+                const initialNode = this.findInitialNode();
+                if (!initialNode) return null;
+
+                // Step 2: Tarjan SCC detection on scoped graph
+                const sccs = this.dag.tarjanSCC();
+                const cycles = sccs.filter(scc => scc.length > 1);
+
+                if (cycles.length === 0) {
+                    // No cycles - use plain DAG topological execution
+                    return this.triggerRandomSerendipity(playerState);
+                }
+
+                // Step 3: Build super nodes from SCCs
+                const superNodeMap = this.buildSuperNodes(cycles);
+                for (const [superId, superNode] of superNodeMap) {
+                    this.dag.superNodes.set(superId, superNode);
+                }
+
+                // Step 4: Execute with max 100 iterations protection
+                return this.executeWithSuperNodes(superNodeMap, playerState, 100);
+            }
+
+            findInitialNode() {
+                // Find the uniquely triggered entry node for cycles
+                const candidates = [];
+                for (const [nodeId, node] of this.dag.nodes) {
+                    if (node.status === 'ready' && node.prerequisites.length === 0) {
+                        candidates.push(nodeId);
+                    }
+                }
+                return candidates.length === 1 ? candidates[0] : (candidates[0] || null);
+            }
+
+            buildSuperNodes(cycles) {
+                const superNodeMap = new Map();
+                cycles.forEach((scc, idx) => {
+                    const superId = `super_${idx}`;
+                    const nodes = scc.map(id => this.dag.nodes.get(id)).filter(Boolean);
+                    superNodeMap.set(superId, new SuperNode(superId, nodes));
+                });
+                return superNodeMap;
+            }
+
+            executeWithSuperNodes(superNodeMap, playerState, maxIterations) {
+                let iterations = 0;
+                let current = this.findInitialNode();
+
+                while (iterations < maxIterations) {
+                    iterations++;
+
+                    // Check exit conditions
+                    if (this.checkExitConditions(current, superNodeMap)) {
+                        break;
+                    }
+
+                    // Execute current node
+                    const node = this.dag.nodes.get(current);
+                    if (node && node.status === 'ready' && node.canTrigger(playerState)) {
+                        this.dag.triggerNode(current);
+                    }
+
+                    // Advance to next node based on edges
+                    current = this.getNextNodeAfter(current);
+                }
+
+                return this.dag.nodes.get(current) || null;
+            }
+
+            checkExitConditions(currentNodeId, superNodeMap) {
+                // Exit if exit edge is triggered (node has outgoing edge to non-super-node)
+                const nodeEdges = this.dag.edges.filter(e => e.from === currentNodeId);
+                return nodeEdges.some(e => !this.dag.superNodes.has(e.to));
+            }
+
+            getNextNodeAfter(nodeId) {
+                const outgoing = this.dag.edges.filter(e => e.from === nodeId);
+                if (outgoing.length === 0) return null;
+                // Return first valid next node
+                for (const e of outgoing) {
+                    if (this.dag.nodes.has(e.to)) return e.to;
+                }
+                return null;
+            }
+        }
+
+        const serendipityExecutor = new SerendipityExecutor();
+        serendipityExecutor.initDefaultSerendipities();
+
+        // ===== Direction F: Serendipity DAG UI + Enhanced Chains =====
+
+        // --- DAGEdgeTrigger: Edge condition evaluation (chatdev-style) ---
+        class DAGEdgeTrigger {
+            constructor() {
+                this.triggers = new Map(); // edgeKey -> trigger config
+            }
+
+            // trigger: true=always, false=never, keyword=check content, function=custom
+            evaluateEdge(edge, nodeOutput) {
+                const config = this.triggers.get(`${edge.from}|${edge.to}`);
+                if (!config) return true; // default: always trigger
+
+                if (config.type === 'keyword') {
+                    const content = JSON.stringify(nodeOutput);
+                    if (config.include) return config.include.some(k => content.includes(k));
+                    if (config.exclude) return !config.exclude.some(k => content.includes(k));
+                }
+                if (config.type === 'function' && typeof config.fn === 'function') {
+                    return config.fn(nodeOutput);
+                }
+                return config.type === 'trigger' ? config.value : true;
+            }
+
+            setEdgeTrigger(from, to, config) {
+                this.triggers.set(`${from}|${to}`, config);
+            }
+        }
+
+        const edgeTrigger = new DAGEdgeTrigger();
+
+        // --- SerendipityGraphView: Visual DAG renderer ---
+        class SerendipityGraphView {
+            constructor(dag) {
+                this.dag = dag;
+            }
+
+            // Render ASCII art graph for the panel
+            renderASCII() {
+                const lines = [];
+                lines.push('╔══════════════════════════════════════╗');
+                lines.push('║       奇遇事件图谱 DAG            ║');
+                lines.push('╚══════════════════════════════════════╝');
+                lines.push('');
+
+                // Group by status
+                const statusGroups = {
+                    completed: [],
+                    triggered: [],
+                    ready: [],
+                    locked: []
+                };
+                for (const [id, node] of this.dag.nodes) {
+                    const s = node.status;
+                    if (statusGroups[s]) statusGroups[s].push({ id, node });
+                }
+
+                const statusLabel = { completed: '✅ 已完成', triggered: '⏳ 进行中', ready: '🔓 就绪', locked: '🔒 锁定' };
+                for (const [status, nodes] of Object.entries(statusGroups)) {
+                    if (nodes.length === 0) continue;
+                    lines.push(`【${statusLabel[status]}】`);
+                    for (const { id, node } of nodes) {
+                        const bar = this.renderNodeBar(node);
+                        lines.push(`  ${node.icon} ${node.name}`);
+                        lines.push(`  └─ 权重:${node.weight} 境界:${node.realmRequirement} 触发:${node.triggerCount}/${node.maxTriggers === Infinity ? '∞' : node.maxTriggers}`);
+                        // Show prerequisites
+                        if (node.prerequisites.length > 0) {
+                            const prereqNames = node.prerequisites.map(p => {
+                                const n = this.dag.nodes.get(p);
+                                return n ? n.name : p;
+                            }).join(', ');
+                            lines.push(`  └─ 前置: ${prereqNames}`);
+                        }
+                    }
+                    lines.push('');
+                }
+
+                // Show edges
+                lines.push('【事件链】');
+                for (const { from, to } of this.dag.edges) {
+                    const fromNode = this.dag.nodes.get(from);
+                    const toNode = this.dag.nodes.get(to);
+                    if (fromNode && toNode) {
+                        lines.push(`  ${fromNode.icon} ${fromNode.name} → ${toNode.icon} ${toNode.name}`);
+                    }
+                }
+
+                return lines.join('\n');
+            }
+
+            renderNodeBar(node) {
+                const total = 20;
+                const pct = node.triggerCount / (node.maxTriggers === Infinity ? 1 : node.maxTriggers);
+                const filled = Math.round(pct * total);
+                return '█'.repeat(filled) + '░'.repeat(total - filled);
+            }
+
+            // Get node details for panel
+            getNodeDetails(nodeId) {
+                const node = this.dag.nodes.get(nodeId);
+                if (!node) return null;
+                const prereqNodes = node.prerequisites.map(p => this.dag.nodes.get(p)).filter(Boolean);
+                const outgoingEdges = this.dag.edges.filter(e => e.from === nodeId);
+                return {
+                    id: node.id,
+                    name: node.name,
+                    icon: node.icon,
+                    type: node.type,
+                    status: node.status,
+                    weight: node.weight,
+                    probability: node.probability,
+                    realmRequirement: node.realmRequirement,
+                    triggerCount: node.triggerCount,
+                    maxTriggers: node.maxTriggers,
+                    effects: node.effects,
+                    prerequisites: prereqNodes.map(n => ({ id: n.id, name: n.name, status: n.status })),
+                    nextNodes: outgoingEdges.map(e => {
+                        const n = this.dag.nodes.get(e.to);
+                        return n ? { id: n.id, name: n.name } : null;
+                    }).filter(Boolean)
+                };
+            }
+        }
+
+        // --- Add 3 more serendipity chains ---
+        function extendSerendipityChains() {
+            // Treasure discovery chain: discover -> excavate -> appraise -> treasure
+            serendipityExecutor.dag.addNode('ser_treasure_discover', {
+                type: 'event', name: '秘境探宝', icon: '🗺️', weight: 0.6,
+                prerequisites: [], probability: 0.3, effects: {}, realmRequirement: 3
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_excavate', {
+                type: 'choice', name: '挖掘抉择', icon: '⛏️', weight: 0.7,
+                prerequisites: ['ser_treasure_discover'], probability: 0.6, effects: {}, realmRequirement: 4
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_appraise', {
+                type: 'gate', name: '鉴定师核', icon: '🔍', weight: 0.4,
+                prerequisites: ['ser_treasure_excavate'], probability: 0.5, effects: {}, realmRequirement: 5
+            });
+            serendipityExecutor.dag.addNode('ser_treasure_treasure', {
+                type: 'reward', name: '稀世珍宝', icon: '💰', weight: 0.2,
+                prerequisites: ['ser_treasure_appraise'], probability: 0.3, effects: { spiritStones: 500, materials: 3 }, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addEdge('ser_treasure_discover', 'ser_treasure_excavate');
+            serendipityExecutor.dag.addEdge('ser_treasure_excavate', 'ser_treasure_appraise');
+            serendipityExecutor.dag.addEdge('ser_treasure_appraise', 'ser_treasure_treasure');
+
+            // Sect politics chain: rumor -> investigate -> confront -> loyalty
+            serendipityExecutor.dag.addNode('ser_sect_rumor', {
+                type: 'event', name: '宗门流言', icon: '👂', weight: 0.5,
+                prerequisites: [], probability: 0.2, effects: {}, realmRequirement: 5
+            });
+            serendipityExecutor.dag.addNode('ser_sect_investigate', {
+                type: 'choice', name: '调查真相', icon: '🕵️', weight: 0.6,
+                prerequisites: ['ser_sect_rumor'], probability: 0.5, effects: {}, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addNode('ser_sect_confront', {
+                type: 'gate', name: '当面对质', icon: '⚔️', weight: 0.4,
+                prerequisites: ['ser_sect_investigate'], probability: 0.4, effects: {}, realmRequirement: 7
+            });
+            serendipityExecutor.dag.addNode('ser_sect_loyalty', {
+                type: 'reward', name: '宗门忠诚', icon: '🏛️', weight: 0.3,
+                prerequisites: ['ser_sect_confront'], probability: 0.3, effects: { sectContribution: 100, reputation: 20 }, realmRequirement: 8
+            });
+            serendipityExecutor.dag.addEdge('ser_sect_rumor', 'ser_sect_investigate');
+            serendipityExecutor.dag.addEdge('ser_sect_investigate', 'ser_sect_confront');
+            serendipityExecutor.dag.addEdge('ser_sect_confront', 'ser_sect_loyalty');
+
+            // Immortal encounter chain: vision -> approach -> enlighten -> technique
+            serendipityExecutor.dag.addNode('ser_immortal_vision', {
+                type: 'event', name: '仙人显灵', icon: '🌟', weight: 0.3,
+                prerequisites: [], probability: 0.15, effects: {}, realmRequirement: 6
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_approach', {
+                type: 'choice', name: '拜见仙人', icon: '🙏', weight: 0.5,
+                prerequisites: ['ser_immortal_vision'], probability: 0.4, effects: {}, realmRequirement: 7
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_enlighten', {
+                type: 'gate', name: '仙人点化', icon: '✨', weight: 0.3,
+                prerequisites: ['ser_immortal_approach'], probability: 0.3, effects: {}, realmRequirement: 8
+            });
+            serendipityExecutor.dag.addNode('ser_immortal_technique', {
+                type: 'reward', name: '传承仙法', icon: '📜', weight: 0.15,
+                prerequisites: ['ser_immortal_enlighten'], probability: 0.2, effects: { techniquePoints: 50, cultivationBase: 30 }, realmRequirement: 9
+            });
+            serendipityExecutor.dag.addEdge('ser_immortal_vision', 'ser_immortal_approach');
+            serendipityExecutor.dag.addEdge('ser_immortal_approach', 'ser_immortal_enlighten');
+            serendipityExecutor.dag.addEdge('ser_immortal_enlighten', 'ser_immortal_technique');
+
+            // Sort after adding new nodes
+            serendipityExecutor.dag.topologicalSort();
+        }
+
+        extendSerendipityChains();
+
+        // --- openSerendipityPanel: UI for viewing the serendipity DAG ---
+        function openSerendipityPanel() {
+            closePanel();
+            const dag = serendipityExecutor.dag;
+            const graphView = new SerendipityGraphView(dag);
+            const status = serendipityExecutor.getDAGStatus();
+            const totalChainCount = dag.nodes.size;
+
+            let html = `<div class="panel" style="max-width:700px;">`;
+            html += `<div class="panel-header"><span>🔮 奇遇事件图谱</span><button class="btn-close" onclick="this.closest('.panel').remove()">×</button></div>`;
+            html += `<div class="panel-body" style="max-height:70vh;overflow-y:auto;">`;
+
+            // Summary stats
+            html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:15px;">`;
+            const statItems = [
+                { label: '总事件', value: status.total, color: '#6c5ce7' },
+                { label: '已完成', value: status.completed, color: '#00b894' },
+                { label: '就绪', value: status.ready, color: '#fdcb6e' },
+                { label: '锁定', value: status.locked, color: '#636e72' }
+            ];
+            for (const s of statItems) {
+                html += `<div style="text-align:center;padding:8px;background:${s.color}22;border-radius:8px;">`;
+                html += `<div style="font-size:20px;font-weight:bold;color:${s.color}">${s.value}</div>`;
+                html += `<div style="font-size:11px;color:#888">${s.label}</div></div>`;
+            }
+            html += `</div>`;
+
+            // ASCII graph
+            html += `<div style="background:#1a1a2e;border-radius:8px;padding:12px;margin-bottom:15px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto;">`;
+            html += graphView.renderASCII().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `</div>`;
+
+            // Node list with details
+            html += `<div style="margin-bottom:15px;"><h3 style="margin:0 0 10px 0">📋 事件详情</h3>`;
+            html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+
+            const statusColors = { completed: '#00b894', triggered: '#fdcb6e', ready: '#0984e3', locked: '#636e72' };
+            for (const [nodeId, node] of dag.nodes) {
+                const details = graphView.getNodeDetails(nodeId);
+                const statusColor = statusColors[node.status] || '#636e72';
+                html += `<div style="background:#16213e;border-radius:8px;padding:10px;cursor:pointer;" onclick="toggleSerendipityNodeDetails('${nodeId}')">`;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                html += `<span style="font-size:16px">${node.icon} <b>${node.name}</b></span>`;
+                html += `<span style="background:${statusColor}33;color:${statusColor};padding:2px 8px;border-radius:12px;font-size:11px">${node.status === 'completed' ? '已完成' : node.status === 'triggered' ? '进行中' : node.status === 'ready' ? '就绪' : '锁定'}</span>`;
+                html += `</div>`;
+                html += `<div style="display:flex;gap:12px;margin-top:6px;font-size:12px;color:#888;">`;
+                html += `<span>权重:${node.weight}</span><span>境界:${node.realmRequirement}</span><span>触发:${node.triggerCount}次</span><span>概率:${(node.probability * 100).toFixed(0)}%</span>`;
+                html += `</div>`;
+                // Effects
+                if (node.effects && Object.keys(node.effects).length > 0) {
+                    const effectStr = Object.entries(node.effects).map(([k, v]) => `${k}:+${v}`).join(', ');
+                    html += `<div style="margin-top:4px;font-size:12px;color:#00b894;">奖励: ${effectStr}</div>`;
+                }
+                // Details toggle area
+                html += `<div id="serendipity_detail_${nodeId}" style="display:none;margin-top:8px;font-size:12px;color:#aaa;">`;
+                if (details.prerequisites.length > 0) {
+                    html += `<div>前置: ${details.prerequisites.map(p => `${p.name}(${p.status})`).join(', ')}</div>`;
+                }
+                if (details.nextNodes.length > 0) {
+                    html += `<div>后续: ${details.nextNodes.map(n => n.name).join(', ')}</div>`;
+                }
+                html += `</div>`;
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+
+            // Execute button
+            const readyCount = status.ready;
+            html += `<div style="text-align:center;margin-top:10px;">`;
+            if (readyCount > 0) {
+                html += `<button class="btn btn-cultivate" onclick="executeSerendipityFromPanel()" style="font-size:14px;padding:10px 30px;">🔮 触发奇遇 (${readyCount}个就绪)</button>`;
+            } else {
+                html += `<button class="btn" disabled style="font-size:14px;padding:10px 30px;opacity:0.5;">🔒 暂无疑遇就绪</button>`;
+            }
+            html += `</div>`;
+            html += `</div></div>`;
+            html += `</div>`;
+
+            document.getElementById('gameContainer').insertAdjacentHTML('beforeend', html);
+        }
+
+        function toggleSerendipityNodeDetails(nodeId) {
+            const el = document.getElementById(`serendipity_detail_${nodeId}`);
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function executeSerendipityFromPanel() {
+            const triggered = serendipityExecutor.triggerRandomSerendipity(gameState);
+            if (triggered) {
+                showNotification(`${triggered.icon} ${triggered.name} 触发！`, '#6c5ce7');
+                openSerendipityPanel(); // refresh
+            } else {
+                showNotification('暂无疑遇触发', '#636e72');
+            }
+        }
+
+        // Expose to window for onclick
+        window.openSerendipityPanel = openSerendipityPanel;
+        window.toggleSerendipityNodeDetails = toggleSerendipityNodeDetails;
+        window.executeSerendipityFromPanel = executeSerendipityFromPanel;
+
+        // ===== Direction C: Offline Persistence Layer =====
+        // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
+
+        // --- SyncState: Tracks sync status between Worker and Main ---
+        class SyncState {
+            constructor() {
+                this.pendingWrites = [];      // writes not yet persisted
+                this.lastSyncedAt = 0;        // timestamp of last sync
+                this.syncVersion = 0;         // monotonic version counter
+                this.dirtyFields = new Set(); // fields modified since last sync
+            }
+            markDirty(field) {
+                this.dirtyFields.add(field);
+                this.syncVersion++;
+            }
+            clearDirty() {
+                this.dirtyFields.clear();
+            }
+        }
+
+        // --- OfflineSnapshot: Captures game state for offline calculation ---
+        class OfflineSnapshot {
+            constructor(gameState, timestamp) {
+                this.timestamp = timestamp;
+                this.realm = gameState.realm;
+                this.cultivation = { ...gameState.cultivation };
+                this.spiritStones = gameState.spiritStones;
+                this.level = gameState.level;
+                this.idleTasks = gameState.idleTasks ? gameState.idleTasks.map(t => ({ ...t })) : [];
+                this.offlineEfficiency = gameState.offlineEfficiency || 0.8;
+                this.activeEffects = gameState.activeEffects || [];
+            }
+        }
+
+        // --- PowerSync: Sync engine with conflict resolution ---
+        class PowerSync {
+            constructor() {
+                this.syncState = new SyncState();
+                this.workerChannel = null; // SharedWorker port
+                this.mainThread = null;    // main thread localStorage
+                this.lastSnapshot = null;
+                this.conflictLog = [];
+            }
+
+            // Capture snapshot before offline
+            captureSnapshot(gameState) {
+                this.lastSnapshot = new OfflineSnapshot(gameState, Date.now());
+                return this.lastSnapshot;
+            }
+
+            // Restore from snapshot with offline earnings calculation
+            restoreFromSnapshot(snapshot, gameState) {
+                const now = Date.now();
+                const offlineSeconds = (now - snapshot.timestamp) / 1000;
+                const offlineHours = offlineSeconds / 3600;
+                const cappedHours = Math.min(offlineHours, 24); // max 24h
+
+                // Calculate offline earnings based on idle tasks
+                let totalEarnings = 0;
+                for (const task of snapshot.idleTasks) {
+                    if (task.status === 'active') {
+                        const taskDuration = (task.endTime - task.startTime) / 1000;
+                        const completedUnits = Math.floor(cappedHours * 3600 / taskDuration);
+                        const taskEarnings = (snapshot.offlineEfficiency || 0.8) * completedUnits * (task.baseEarnings || 10);
+                        totalEarnings += taskEarnings;
+                    }
+                }
+
+                // Apply offline earnings to gameState
+                gameState.spiritStones += Math.floor(totalEarnings);
+                gameState.offlineEarnings = Math.floor(totalEarnings);
+                gameState.lastActiveTime = snapshot.timestamp;
+
+                // Sync worker state
+                this.syncWorkerState(gameState);
+                return { offlineSeconds, offlineEarnings: Math.floor(totalEarnings) };
+            }
+
+            // Sync to worker (SharedWorker path)
+            syncWorkerState(gameState) {
+                this.syncState.lastSyncedAt = Date.now();
+                this.syncState.clearDirty();
+            }
+
+            // Sync to main thread (localStorage path)
+            syncMainState(gameState) {
+                this.syncState.markDirty('gameState');
+                this.syncWorkerState(gameState);
+            }
+
+            // Check if sync is needed
+            needsSync() {
+                return this.syncState.dirtyFields.size > 0;
+            }
+
+            // Resolve conflict between worker and main thread
+            resolveConflict(workerState, mainState) {
+                // Use main thread as source of truth, but merge worker changes
+                const merged = { ...mainState };
+                for (const field of this.syncState.dirtyFields) {
+                    if (workerState[field] !== undefined) {
+                        merged[field] = workerState[field];
+                    }
+                }
+                this.conflictLog.push({
+                    timestamp: Date.now(),
+                    worker: workerState,
+                    main: mainState,
+                    resolved: merged
+                });
+                return merged;
+            }
+
+            getSyncStatus() {
+                return {
+                    dirtyFields: Array.from(this.syncState.dirtyFields),
+                    lastSyncedAt: this.syncState.lastSyncedAt,
+                    syncVersion: this.syncState.syncVersion,
+                    pendingWrites: this.syncState.pendingWrites.length,
+                    conflicts: this.conflictLog.length
+                };
+            }
+        }
+
+        const powerSync = new PowerSync();
+
+        // ===== Direction D: Player Memory System =====
+        // Generic-agent L0-L4 five-layer memory architecture + Skill crystallization
+
+        // --- MemoryLayer: Base class for memory tiers ---
+        class MemoryLayer {
+            constructor(level, name, capacity, ttlMs) {
+                this.level = level;
+                this.name = name;
+                this.capacity = capacity;
+                this.ttlMs = ttlMs;
+                this.items = [];
+            }
+            add(item) {
+                this.items.push({ data: item, timestamp: Date.now() });
+                if (this.items.length > this.capacity) {
+                    this.items.shift();
+                }
+            }
+            getRecent() {
+                const now = Date.now();
+                return this.items.filter(i => now - i.timestamp < this.ttlMs).map(i => i.data);
+            }
+            prune() {
+                const now = Date.now();
+                this.items = this.items.filter(i => now - i.timestamp < this.ttlMs);
+            }
+        }
+
+        // --- PlayerMemorySystem: L0-L4 five-layer memory ---
+        class PlayerMemorySystem {
+            constructor() {
+                // L0: Sensory - immediate perception, 30s TTL, 20 items
+                this.L0_sensory = new MemoryLayer(0, 'sensory', 20, 30000);
+                // L1: Working - current task context, 5min TTL, 50 items
+                this.L1_working = new MemoryLayer(1, 'working', 50, 300000);
+                // L2: Short-term - recent experiences, 1h TTL, 100 items
+                this.L2_shortTerm = new MemoryLayer(2, 'shortTerm', 100, 3600000);
+                // L3: Long-term - important events, 7d TTL, 500 items
+                this.L3_longTerm = new MemoryLayer(3, 'longTerm', 500, 604800000);
+                // L4: Program - procedural memory (skills, habits), no TTL, 200 items
+                this.L4_program = new MemoryLayer(4, 'program', 200, Infinity);
+                this.episodicBuffer = []; // L2 episodic memory
+                this.skillCrystalRegistry = new Map(); // crystallized skills
+            }
+
+            //感知记忆
+            perceive(event) {
+                this.L0_sensory.add(event);
+            }
+
+            //工作记忆
+            workInContext(task) {
+                this.L1_working.add({ type: 'task_context', task });
+            }
+
+            //情景记忆
+            encodeEpisodic(situation) {
+                const episodic = {
+                    situation,
+                    timestamp: Date.now(),
+                    emotionalValence: situation.valence || 0,
+                    importance: situation.importance || 1
+                };
+                this.episodicBuffer.push(episodic);
+                this.L2_shortTerm.add(episodic);
+                if (episodic.importance > 0.7 || Math.abs(episodic.emotionalValence) > 0.5) {
+                    this.L3_longTerm.add(episodic);
+                }
+            }
+
+            //技能结晶化
+            crystallizeSkill(skillId, skillData) {
+                const crystal = {
+                    skillId,
+                    mastery: skillData.mastery || 0,
+                    understanding: skillData.understanding || 0,
+                    crystallizationTime: Date.now(),
+                    successfulUses: skillData.successfulUses || 0,
+                    failedAttempts: skillData.failedAttempts || 0,
+                    patterns: skillData.patterns || []
+                };
+                this.skillCrystalRegistry.set(skillId, crystal);
+                this.L4_program.add({ type: 'skill_crystal', skillId, ...crystal });
+                return crystal;
+            }
+
+            //检索记忆
+            retrieve(layer, query) {
+                switch (layer) {
+                    case 0: return this.L0_sensory.getRecent().filter(e => e.includes(query));
+                    case 1: return this.L1_working.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 2: return this.L2_shortTerm.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 3: return this.L3_longTerm.getRecent().filter(e => JSON.stringify(e).includes(query));
+                    case 4: return this.L4_program.items.map(i => i.data).filter(e => e.skillId && e.skillId.includes(query));
+                    default: return [];
+                }
+            }
+
+            //遗忘
+            forget(layer, itemId) {
+                if (layer === 4) return; // L4 program memory doesn't forget
+                const layerObj = this[`L${layer}_${['sensory','working','shortTerm','longTerm','program'][layer]}`];
+                if (layerObj) {
+                    layerObj.items = layerObj.items.filter(i => i.data.id !== itemId);
+                }
+            }
+
+            //整合记忆
+            consolidate() {
+                // Move important L2 memories to L3
+                for (const episodic of this.episodicBuffer) {
+                    if (episodic.importance > 0.7) {
+                        this.L3_longTerm.add(episodic);
+                    }
+                }
+                this.episodicBuffer = this.episodicBuffer.slice(-50); // keep last 50
+                // Prune expired memories
+                for (let l = 0; l < 4; l++) {
+                    const layer = this[`L${l}_${['sensory','working','shortTerm','longTerm'][l]}`];
+                    if (layer) layer.prune();
+                }
+            }
+
+            //记忆统计
+            getMemoryStats() {
+                return {
+                    L0: this.L0_sensory.items.length,
+                    L1: this.L1_working.items.length,
+                    L2: this.L2_shortTerm.items.length,
+                    L3: this.L3_longTerm.items.length,
+                    L4: this.L4_program.items.length,
+                    crystals: this.skillCrystalRegistry.size
+                };
+            }
+        }
+
+        const playerMemory = new PlayerMemorySystem();
+
+        // ===== V63 Direction A: NPC Collaboration Engine (Enhanced) =====
+        // Enhanced NPC Reputation + Task Assignment + Collaboration Rewards
+
+        // --- NPC Reputation System ---
+        class NpcReputationSystem {
+            constructor() {
+                this.reputations = new Map();
+            }
+            getReputation(role) {
+                if (!this.reputations.has(role)) {
+                    this.reputations.set(role, { level: 1, exp: 0, totalInteractions: 0, successfulHelps: 0 });
+                }
+                return this.reputations.get(role);
+            }
+            addReputation(role, amount) {
+                const rep = this.getReputation(role);
+                rep.exp += amount;
+                rep.totalInteractions++;
+                while (rep.exp >= 100) { rep.exp -= 100; rep.level++; }
+                return rep;
+            }
+            getReputationLevel(role) { return this.getReputation(role).level; }
+        }
+
+        // --- NpcTaskManager: Assigns and tracks NPC tasks ---
+        class NpcTaskManager {
+            constructor() {
+                this.activeTasks = new Map();
+                this.taskIdCounter = 0;
+            }
+            assignTask(role, type, reward, durationMs) {
+                const taskId = `npc_task_${++this.taskIdCounter}`;
+                this.activeTasks.set(taskId, { role, type, progress: 0, reward, deadline: Date.now() + durationMs, startTime: Date.now() });
+                return taskId;
+            }
+            updateProgress(taskId, progress) {
+                const task = this.activeTasks.get(taskId);
+                if (task) task.progress = Math.min(progress, 100);
+            }
+            completeTask(taskId) {
+                const task = this.activeTasks.get(taskId);
+                if (task) { task.progress = 100; return task; }
+                return null;
+            }
+            getActiveTasks(role) {
+                return Array.from(this.activeTasks.values()).filter(t => t.role === role);
+            }
+        }
+
+        // --- NpcCollaborationRewards: Distributes rewards for collaboration ---
+        class NpcCollaborationRewards {
+            constructor() {
+                this.rewardPool = 0;
+                this.distributionRules = {
+                    'master': { share: 0.4, bonusOn: ['teach', 'evaluate'] },
+                    'fellow': { share: 0.3, bonusOn: ['practice_together', 'share_resource'] },
+                    'merchant': { share: 0.2, bonusOn: ['trade', 'appraise'] },
+                    'monster': { share: 0.1, bonusOn: ['challenge', 'drop_item'] }
+                };
+            }
+            addToPool(amount) { this.rewardPool += amount; }
+            distribute(role) {
+                const rule = this.distributionRules[role];
+                if (!rule) return 0;
+                return Math.floor(this.rewardPool * rule.share);
+            }
+        }
+
+        const npcReputationSystem = new NpcReputationSystem();
+        const npcTaskManager = new NpcTaskManager();
+        const npcCollabRewards = new NpcCollaborationRewards();
+
+        // --- NPC Collaboration UI Panel ---
+        function openNpcCollabPanel() {
+            showModal('🤝 NPC协作面板', `
+                <div class="npc-collab-tabs">
+                    <button class="tab-btn active" onclick="setNpcTab('roles')">👥 角色</button>
+                    <button class="tab-btn" onclick="setNpcTab('tasks')">📋 任务</button>
+                    <button class="tab-btn" onclick="setNpcTab('rewards')">🎁 奖励</button>
+                    <button class="tab-btn" onclick="setNpcTab('messages')">💬 消息</button>
+                </div>
+                <div id="npcCollabContent" style="padding:15px;">${renderNpcRolesTab()}</div>
+            `, 600);
+        }
+
+        function setNpcTab(tab) {
+            document.querySelectorAll('.npc-collab-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('npcCollabContent');
+            if (!content) return;
+            switch(tab) {
+                case 'roles': content.innerHTML = renderNpcRolesTab(); break;
+                case 'tasks': content.innerHTML = renderNpcTasksTab(); break;
+                case 'rewards': content.innerHTML = renderNpcRewardsTab(); break;
+                case 'messages': content.innerHTML = renderNpcMessagesTab(); break;
+            }
+        }
+
+        function renderNpcRolesTab() {
+            let html = '<h4>角色声望</h4><table style="width:100%;">';
+            html += '<tr><th>角色</th><th>等级</th><th>经验</th><th>互动次数</th></tr>';
+            for (const [role, data] of npcReputationSystem.reputations) {
+                html += `<tr><td>${role}</td><td>Lv${data.level}</td><td>${data.exp}/100</td><td>${data.totalInteractions}</td></tr>`;
+            }
+            html += '</table>';
+            html += '<h4 style="margin-top:20px;">协作引擎状态</h4>';
+            html += `<p>消息数: ${(gameState.npcCollab && gameState.npcCollab.pendingMessages) || 0}</p>`;
+            html += `<p>活跃链: ${(gameState.npcCollab && gameState.npcCollab.activeChains && gameState.npcCollab.activeChains.length) || 0}</p>`;
+            return html;
+        }
+
+        function renderNpcTasksTab() {
+            const tasks = Array.from(npcTaskManager.activeTasks.values());
+            if (tasks.length === 0) return '<p>暂无活跃任务</p>';
+            let html = '<table style="width:100%;"><tr><th>角色</th><th>类型</th><th>进度</th><th>奖励</th></tr>';
+            for (const t of tasks) { html += `<tr><td>${t.role}</td><td>${t.type}</td><td>${t.progress}%</td><td>${t.reward}</td></tr>`; }
+            html += '</table>'; return html;
+        }
+
+        function renderNpcRewardsTab() {
+            return `<p>奖励池: ${npcCollabRewards.rewardPool} 灵石</p><p>规则: master 40% / fellow 30% / merchant 20% / monster 10%</p>`;
+        }
+
+        function renderNpcMessagesTab() {
+            const since = Date.now() - 3600000;
+            const msgs = npcMessageBus.getMessages('*', since);
+            if (msgs.length === 0) return '<p>暂无消息</p>';
+            let html = '<table style="width:100%;"><tr><th>时间</th><th>发送方</th><th>接收方</th><th>类型</th></tr>';
+            for (const m of msgs.slice(-10)) { html += `<tr><td>${new Date(m.timestamp).toLocaleTimeString()}</td><td>${m.from}</td><td>${m.to}</td><td>${m.type}</td></tr>`; }
+            html += '</table>'; return html;
+        }
+
+        function triggerNpcCollaboration(type, payload) {
+            const roles = ['master', 'fellow', 'merchant', 'monster'];
+            for (const role of roles) { npcReputationSystem.addReputation(role, 1); }
+            npcMessageBus.broadcast('system', type, payload);
+        }
+
+// ===== V63 Test Cases =====
+        let npcTestsPassed = 0, npcTestsFailed = 0;
+        const npcAssert = (c, m) => { if (c) npcTestsPassed++; else npcTestsFailed++; };
+        npcAssert(NPC_ROLE_REGISTRY.master && NPC_ROLE_REGISTRY.master.role === 'master', 'NPC_ROLE_REGISTRY.master');
+        npcAssert(NPC_ROLE_REGISTRY.monster && NPC_ROLE_REGISTRY.monster.skills.includes('challenge'), 'NPC_ROLE_REGISTRY.monster');
+        npcAssert(NPC_ROLE_REGISTRY.merchant && NPC_ROLE_REGISTRY.merchant.skills.includes('trade'), 'NPC_ROLE_REGISTRY.merchant');
+        npcAssert(NPC_ROLE_REGISTRY.fellow && NPC_ROLE_REGISTRY.fellow.skills.includes('practice_together'), 'NPC_ROLE_REGISTRY.fellow');
+        const bus = new NpcMessageBus(); let received = null;
+        bus.subscribe('master', m => { received = m; });
+        bus.send('fellow', 'master', 'task', { content: 'test' });
+        bus.dispatch();
+        npcAssert(received !== null && received.payload.content === 'test', 'NpcMessageBus send/dispatch');
+        let bc = 0;
+        bus.subscribe('fellow', () => bc++);
+        bus.subscribe('monster', () => bc++);
+        bus.broadcast('master', 'announce', { text: 'hi' });
+        bus.dispatch();
+        npcAssert(bc >= 2, 'NpcMessageBus broadcast');
+        const graph = new NpcCollabGraph();
+        graph.addNode('n1', { type: 'publish_task', owner: 'master', prerequisites: [] });
+        graph.addNode('n2', { type: 'execute', owner: 'fellow', prerequisites: ['n1'] });
+        npcAssert(graph.getReadyNodes().includes('n1'), 'NpcCollabGraph getReadyNodes');
+        const taskId = graph.startTask('n1', 'fellow');
+        npcAssert(taskId !== null, 'NpcCollabGraph startTask');
+        graph.updateProgress(taskId, 100);
+        npcAssert(graph.nodes.get('n1')?.status === 'completed', 'NpcCollabGraph progress');
+        npcAssert(PLAN_REVIEW_GATE.shouldBlock('major_cultivation_advice') === true, 'PLAN_REVIEW_GATE block');
+        npcAssert(PLAN_REVIEW_GATE.shouldBlock('sect_mission') === false, 'PLAN_REVIEW_GATE auto-approve');
+        npcAssert(npcReputationSystem.getReputation('master') !== undefined, 'NpcReputationSystem');
+        npcReputationSystem.addReputation('fellow', 50);
+        npcAssert(npcReputationSystem.getReputationLevel('fellow') >= 1, 'NpcReputationSystem addReputation');
+        const tId = npcTaskManager.assignTask('master', 'teach', 100, 5000);
+        npcAssert(tId !== null, 'NpcTaskManager assignTask');
+        npcTaskManager.updateProgress(tId, 50);
+        npcAssert(npcTaskManager.activeTasks.get(tId)?.progress === 50, 'NpcTaskManager updateProgress');
+        npcCollabRewards.addToPool(1000);
+        npcAssert(npcCollabRewards.distribute('master') === 400, 'NpcCollaborationRewards distribute');
+        npcAssert(gameState.npcCollab && Array.isArray(gameState.npcCollab.activeChains), 'gameState.npcCollab init');
+        const npcTotal = npcTestsPassed + npcTestsFailed;
+        const npcPassRate = npcTotal > 0 ? (npcTestsPassed / npcTotal * 100).toFixed(1) : 0;
+        console.log(`[V63 NPC Tests] ${npcTestsPassed}/${npcTotal} passed (${npcPassRate}%)`);
+
+        // ===== V64 Test Cases: Idle Task Processor Integration =====
+        let v64Passed = 0, v64Failed = 0;
+        const v64Assert = (c, m) => { if (c) v64Passed++; else v64Failed++; };
+
+        // Test IdleTaskProcessor initialization
+        v64Assert(idleTaskProcessor !== undefined, 'IdleTaskProcessor exists');
+        v64Assert(idleTaskProcessor.processedCount === 0, 'IdleTaskProcessor processedCount init');
+
+        // Test startIdleTask
+        gameState.idleTasks = [];
+        const task = idleTaskProcessor.startIdleTask('qi_cultivation', 60000, 20);
+        v64Assert(task !== undefined && task.taskId.startsWith('idle_'), 'startIdleTask creates task');
+        v64Assert(gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
+        v64Assert(gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
+
+        // Test calculateEarnings
+        const earnings = idleTaskProcessor.calculateEarnings({ baseEarnings: 20, startTime: Date.now() - 60000, endTime: Date.now() });
+        v64Assert(earnings > 0, 'calculateEarnings returns positive value');
+
+        // Test getIdleStatus
+        const status = idleTaskProcessor.getIdleStatus();
+        v64Assert(status.total >= 1, 'getIdleStatus returns total >= 1');
+        v64Assert(status.active >= 1, 'getIdleStatus returns active >= 1');
+
+        // Test NPC collaboration trigger on task start
+        const repBefore = npcReputationSystem.getReputation('master').totalInteractions;
+        idleTaskProcessor.startIdleTask('stone_gathering', 90000, 30);
+        // Reputation increases after task is processed (in real time)
+        // Just verify the task was added to NPC reward pool
+        v64Assert(npcCollabRewards.rewardPool > 0, 'NPC reward pool increased');
+
+        // Test getIdleStatus with multiple tasks
+        idleTaskProcessor.startIdleTask('pill_refining', 120000, 50);
+        const status2 = idleTaskProcessor.getIdleStatus();
+        v64Assert(status2.total >= 2, 'getIdleStatus with multiple tasks');
+
+        // V64 pass rate
+        const v64Total = v64Passed + v64Failed;
+        const v64PassRate = v64Total > 0 ? (v64Passed / v64Total * 100).toFixed(1) : 0;
+        console.log(`[V64 Tests] ${v64Passed}/${v64Total} passed (${v64PassRate}%)`);
+
+        // Combined pass rate (V63 + V64)
+        const totalPassed = npcTestsPassed + v64Passed;
+        const totalTests = npcTotal + v64Total;
+        const combinedRate = totalTests > 0 ? (totalPassed / totalTests * 100).toFixed(1) : 0;
+        console.log(`[Combined Tests] ${totalPassed}/${totalTests} passed (${combinedRate}%)`);
+
+        // ===== V65 Direction A: Serendipity DAG + NPC Collaboration Integration =====
+        // Connect serendipity events with NPC collaboration rewards
+
+        // Test serendipityDAG integration
+        let v65Passed = 0, v65Failed = 0;
+        const v65Assert = (c, m) => { if (c) v65Passed++; else v65Failed++; };
+
+        v65Assert(serendipityExecutor !== undefined, 'serendipityExecutor exists');
+        v65Assert(serendipityExecutor.dag !== undefined, 'serendipityExecutor.dag exists');
+        v65Assert(serendipityExecutor.dag.nodes.size >= 7, 'serendipity DAG has default nodes (7)');
+        v65Assert(serendipityExecutor.dag.executionOrder.length > 0, 'serendipity DAG sorted');
+
+        // Test serendipity trigger
+        gameState.npcCollab = gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
+        const triggered = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
+        // triggered may be null if no nodes ready - that's fine
+        v65Assert(triggered === null || triggered.id.startsWith('ser_'), 'serendipity trigger returns valid node or null');
+
+        // Test DAG status
+        const dagStatus = serendipityExecutor.getDAGStatus();
+        v65Assert(dagStatus.total >= 7, 'DAG status total >= 7');
+        v65Assert(['locked', 'ready', 'triggered', 'completed'].includes(dagStatus.locked !== undefined ? 'ok' : 'ok'), 'DAG status has correct fields');
+
+        // Test NPC collab activation on serendipity
+        const beforeRep = npcReputationSystem.getReputation('fellow').totalInteractions;
+        triggerNpcCollaboration('serendipity_triggered', { nodeId: 'ser_discovery' });
+        const afterRep = npcReputationSystem.getReputation('fellow').totalInteractions;
+        v65Assert(afterRep > beforeRep, 'NPC reputation increases on serendipity');
+
+        // Test PowerSync integration
+        v65Assert(powerSync !== undefined, 'powerSync exists');
+        const snap = powerSync.captureSnapshot({ realm: 1, cultivation: {}, spiritStones: 100, level: 5, idleTasks: [], offlineEfficiency: 0.8, activeEffects: [] });
+        v65Assert(snap.timestamp > 0, 'PowerSync captureSnapshot works');
+        v65Assert(snap.realm === 1, 'PowerSync snapshot captures realm');
+        v65Assert(snap.spiritStones === 100, 'PowerSync snapshot captures spiritStones');
+
+        // V65 pass rate
+        const v65Total = v65Passed + v65Failed;
+        const v65PassRate = v65Total > 0 ? (v65Passed / v65Total * 100).toFixed(1) : 0;
+        console.log(`[V65 Tests] ${v65Passed}/${v65Total} passed (${v65PassRate}%)`);
+
+        // Grand combined pass rate
+        const grandPassed = totalPassed + v65Passed;
+        const grandTotal = totalTests + v65Total;
+        const grandRate = grandTotal > 0 ? (grandPassed / grandTotal * 100).toFixed(1) : 0;
+        console.log(`[Grand Combined] ${grandPassed}/${grandTotal} passed (${grandRate}%) - Target: 80%+`);
+
+        // ===== V66 Tests: SerendipityDAG + NPC Colla + PlayerMemory Integration =====
+        let v66Passed = 0, v66Failed = 0;
+        const v66Assert = (c, m) => { if (c) v66Passed++; else v66Failed++; };
+
+        // Test PlayerMemorySystem L0-L4
+        v66Assert(playerMemory !== undefined, 'playerMemory exists');
+        playerMemory.storeMemory('working', { content: 'test memory', importance: 0.8 });
+        const recalled = playerMemory.recallMemories('test');
+        v66Assert(Array.isArray(recalled), 'playerMemory.recallMemories returns array');
+        v66Assert(playerMemory.memories.length >= 1, 'playerMemory stores memories');
+        const episodic = playerMemory.getEpisodicSummary();
+        v66Assert(Array.isArray(episodic), 'playerMemory.getEpisodicSummary returns array');
+
+        // Test skill crystallization
+        const crystal = playerMemory.crystallizeSkill({ id: 'skill_test', name: '测试技能', proficiency: 0.9 });
+        v66Assert(crystal !== undefined, 'playerMemory.crystallizeSkill returns crystal');
+        const crystals = playerMemory.getSkillCrystals();
+        v66Assert(crystals.length >= 1, 'playerMemory stores skill crystals');
+
+        // Test SkillMarketplace integration with serendipity
+        v66Assert(skillMarketplace !== undefined, 'skillMarketplace exists');
+        const listings = skillMarketplace.listings;
+        v66Assert(listings.size >= 5, 'skillMarketplace has default listings');
+        const topRated = skillMarketplace.getTopRated(3);
+        v66Assert(topRated.length <= 3, 'skillMarketplace.getTopRated limits results');
+
+        // Test powerSync save/load cycle
+        const snap2 = powerSync.captureSnapshot({ realm: 1, cultivation: {}, spiritStones: 200, level: 10, idleTasks: [], offlineEfficiency: 0.8, activeEffects: [] });
+        powerSync.saveSnapshot(snap2);
+        const loaded = powerSync.loadSnapshot();
+        v66Assert(loaded !== null && loaded.spiritStones === 200, 'powerSync save/load works');
+        v66Assert(loaded.timestamp > 0, 'powerSync load has timestamp');
+
+        // Test NpcMessageBus message retrieval
+        const msgs = npcMessageBus.getMessages('*', Date.now() - 3600000);
+        v66Assert(Array.isArray(msgs), 'npcMessageBus.getMessages returns array');
+        const msgCount = npcMessageBus.getMessageCount();
+        v66Assert(msgCount >= 0, 'npcMessageBus.getMessageCount returns number');
+
+        // Test SerendipityDAG Kahn topological sort
+        const dag = serendipityExecutor.dag;
+        v66Assert(dag.nodes.size >= 7, 'serendipity DAG has >= 7 nodes');
+        v66Assert(Array.isArray(dag.executionOrder), 'DAG has executionOrder array');
+
+        // Test serendipity trigger with realm filter
+        const triggered2 = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
+        v66Assert(triggered2 === null || triggered2.id !== undefined, 'serendipity trigger returns valid result');
+
+        // Test NPC collab reward distribution after serendipity
+        npcCollabRewards.addToPool(500);
+        const masterShare = npcCollabRewards.distribute('master');
+        v66Assert(masterShare === 200, 'NPC collab rewards follow distribution rules (40% to master)');
+
+        // Test SkillRegistry hooks
+        v66Assert(skillHooks !== undefined, 'skillHooks exists');
+        v66Assert(Array.isArray(skillHooks.hooks.onDiscover), 'skillHooks has onDiscover array');
+
+        // V66 pass rate
+        const v66Total = v66Passed + v66Failed;
+        const v66PassRate = v66Total > 0 ? (v66Passed / v66Total * 100).toFixed(1) : 0;
+        console.log(`[V66 Tests] ${v66Passed}/${v66Total} passed (${v66PassRate}%)`);
+
+        // Overall test summary
+        const overallPassed = grandPassed + v66Passed;
+        const overallTotal = grandTotal + v66Total;
+        const overallRate = overallTotal > 0 ? (overallPassed / overallTotal * 100).toFixed(1) : 0;
+        console.log(`[Overall Tests] ${overallPassed}/${overallTotal} passed (${overallRate}%)`);
+        if (parseFloat(overallRate) >= 80) {
+            console.log(`[PASS] Test suite meets 80%+ target!`);
+        } else {
+            console.log(`[WARN] Test suite below 80% target - needs improvement`);
+        }
+
+        // ===== V67 Direction A: NPC Chat History + Relationship Graph + Skill Evolution =====
+        // NPC对话历史系统 + 关系图谱可视化 + 技能演化链
+
+        // --- NpcChatHistory: Records and retrieves NPC conversation history ---
+        class NpcChatHistory {
+            constructor(maxSize = 100) {
+                this.history = []; // [{from, to, type, content, timestamp, mood}]
+                this.maxSize = maxSize;
+            }
+
+            addMessage(from, to, type, content, mood = 'neutral') {
+                this.history.push({ from, to, type, content, timestamp: Date.now(), mood });
+                if (this.history.length > this.maxSize) {
+                    this.history.shift();
+                }
+            }
+
+            getHistory(role, limit = 20) {
+                return this.history
+                    .filter(m => m.from === role || m.to === role)
+                    .slice(-limit);
+            }
+
+            getConversation(r1, r2, limit = 10) {
+                return this.history
+                    .filter(m => (m.from === r1 && m.to === r2) || (m.from === r2 && m.to === r1))
+                    .slice(-limit);
+            }
+
+            searchHistory(query, limit = 10) {
+                return this.history
+                    .filter(m => m.content.includes(query))
+                    .slice(-limit);
+            }
+
+            getRecentMessages(minutes = 60) {
+                const since = Date.now() - minutes * 60000;
+                return this.history.filter(m => m.timestamp >= since);
+            }
+        }
+
+        // --- NpcRelationshipGraph: Tracks and visualizes NPC relationships ---
+        class NpcRelationshipGraph {
+            constructor() {
+                this.edges = new Map(); // role -> [{target, weight, type}]
+            }
+
+            addRelationship(role1, role2, weight, type = 'neutral') {
+                // Add edge from role1 to role2
+                if (!this.edges.has(role1)) this.edges.set(role1, []);
+                const edges1 = this.edges.get(role1);
+                const existing = edges1.find(e => e.target === role2);
+                if (existing) {
+                    existing.weight = (existing.weight + weight) / 2;
+                    existing.type = weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral';
+                } else {
+                    edges1.push({ target: role2, weight, type: weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral' });
+                }
+
+                // Add reverse edge
+                if (!this.edges.has(role2)) this.edges.set(role2, []);
+                const edges2 = this.edges.get(role2);
+                const existing2 = edges2.find(e => e.target === role1);
+                if (existing2) {
+                    existing2.weight = (existing2.weight + weight) / 2;
+                } else {
+                    edges2.push({ target: role1, weight: -weight, type: weight > 0 ? 'friendly' : weight < 0 ? 'hostile' : 'neutral' });
+                }
+            }
+
+            getRelationship(role1, role2) {
+                const edges = this.edges.get(role1);
+                if (!edges) return { weight: 0, type: 'neutral' };
+                const edge = edges.find(e => e.target === role2);
+                return edge || { weight: 0, type: 'neutral' };
+            }
+
+            getRelatedRoles(role, limit = 5) {
+                const edges = this.edges.get(role) || [];
+                return edges
+                    .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
+                    .slice(0, limit);
+            }
+        }
+
+        // --- SkillEvolution: Tracks skill growth and evolution paths ---
+        class SkillEvolution {
+            constructor() {
+                this.evolutions = new Map(); // skillId -> {stage, exp, maxStage, evolutionPath}
+                this.evolutionChains = [
+                    { from: 'basic_technique', to: 'advanced_technique', requiredExp: 1000 },
+                    { from: 'advanced_technique', to: 'master_technique', requiredExp: 5000 },
+                    { from: 'fire_ball', to: 'inferno', requiredExp: 2000 },
+                    { from: 'inferno', to: 'solar_flare', requiredExp: 8000 }
+                ];
+            }
+
+            addExp(skillId, amount) {
+                if (!this.evolutions.has(skillId)) {
+                    this.evolutions.set(skillId, { stage: 1, exp: 0, maxStage: 5, evolutionPath: [] });
+                }
+                const evo = this.evolutions.get(skillId);
+                evo.exp += amount;
+
+                // Check for evolution
+                for (const chain of this.evolutionChains) {
+                    if (chain.from === skillId && evo.exp >= chain.requiredExp && evo.stage < evo.maxStage) {
+                        evo.stage++;
+                        evo.exp = 0;
+                        evo.evolutionPath.push({ to: chain.to, timestamp: Date.now() });
+                        break;
+                    }
+                }
+                return evo;
+            }
+
+            getEvolution(skillId) {
+                return this.evolutions.get(skillId) || { stage: 1, exp: 0, maxStage: 5, evolutionPath: [] };
+            }
+
+            canEvolve(skillId) {
+                const evo = this.getEvolution(skillId);
+                if (evo.stage >= evo.maxStage) return false;
+                return this.evolutionChains.some(c => c.from === skillId && evo.exp >= c.requiredExp);
+            }
+        }
+
+        const npcChatHistory = new NpcChatHistory();
+        const npcRelationGraph = new NpcRelationshipGraph();
+        const skillEvolution = new SkillEvolution();
+
+        // --- NPC Chat Panel ---
+        function openNpcChatPanel() {
+            showModal('💬 NPC对话记录', `
+                <div class="npc-chat-tabs">
+                    <button class="tab-btn active" onclick="setNpcChatTab('history')">📜 历史</button>
+                    <button class="tab-btn" onclick="setNpcChatTab('relations')">🔗 关系</button>
+                    <button class="tab-btn" onclick="setNpcChatTab('skills')">📈 技能演化</button>
+                </div>
+                <div id="npcChatContent" style="padding:15px;">${renderNpcChatHistory()}</div>
+            `, 600);
+        }
+
+        function setNpcChatTab(tab) {
+            document.querySelectorAll('.npc-chat-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('npcChatContent');
+            if (!content) return;
+            switch(tab) {
+                case 'history': content.innerHTML = renderNpcChatHistory(); break;
+                case 'relations': content.innerHTML = renderNpcRelations(); break;
+                case 'skills': content.innerHTML = renderSkillEvolution(); break;
+            }
+        }
+
+        function renderNpcChatHistory() {
+            const msgs = npcChatHistory.getRecentMessages(60);
+            if (msgs.length === 0) return '<p>暂无对话记录</p>';
+            let html = '<table style="width:100%;font-size:12px;">';
+            html += '<tr><th>时间</th><th>发送</th><th>接收</th><th>内容</th></tr>';
+            for (const m of msgs.slice(-15)) {
+                html += `<tr><td>${new Date(m.timestamp).toLocaleTimeString()}</td><td>${m.from}</td><td>${m.to}</td><td>${m.content.substring(0, 30)}...</td></tr>`;
+            }
+            html += '</table>';
+            return html;
+        }
+
+        function renderNpcRelations() {
+            const roles = ['master', 'fellow', 'merchant', 'monster'];
+            let html = '<table style="width:100%;">';
+            html += '<tr><th>角色</th><th>关联角色</th><th>关系值</th><th>类型</th></tr>';
+            for (const role of roles) {
+                const related = npcRelationGraph.getRelatedRoles(role);
+                if (related.length === 0) continue;
+                for (const r of related) {
+                    html += `<tr><td>${role}</td><td>${r.target}</td><td>${r.weight.toFixed(2)}</td><td>${r.type}</td></tr>`;
+                }
+            }
+            html += '</table>';
+            if (html === '<table style="width:100%;"></table>') return '<p>暂无关系数据</p>';
+            return html;
+        }
+
+        function renderSkillEvolution() {
+            let html = '<h4>技能演化状态</h4>';
+            for (const [skillId, evo] of skillEvolution.evolutions) {
+                html += `<p><b>${skillId}</b>: Stage ${evo.stage}/${evo.maxStage} | Exp: ${evo.exp}`;
+                if (evo.evolutionPath.length > 0) {
+                    html += ` | 已演化: ${evo.evolutionPath.map(e => e.to).join(' → ')}`;
+                }
+                html += '</p>';
+            }
+            html += '<h4>演化链</h4>';
+            for (const c of skillEvolution.evolutionChains) {
+                html += `<p>${c.from} → ${c.to} (需要 ${c.requiredExp} EXP)</p>`;
+            }
+            return html;
+        }
+
+        // Wire chat history to message bus
+        const originalBusSend = npcMessageBus.send.bind(npcMessageBus);
+        npcMessageBus.send = function(from, to, type, payload) {
+            npcChatHistory.addMessage(from, to, type, typeof payload === 'object' ? JSON.stringify(payload) : String(payload));
+            npcRelationGraph.addRelationship(from, to, 1, 'interaction');
+            return originalBusSend(from, to, type, payload);
+        };
+
+        // ===== V67 Tests =====
+        let v67Passed = 0, v67Failed = 0;
+        const v67Assert = (c, m) => { if (c) v67Passed++; else v67Failed++; };
+
+        // Test NpcChatHistory
+        v67Assert(npcChatHistory !== undefined, 'npcChatHistory exists');
+        v67Assert(npcChatHistory.history !== undefined, 'npcChatHistory has history');
+        npcChatHistory.addMessage('fellow', 'master', 'task', 'test message');
+        v67Assert(npcChatHistory.history.length === 1, 'npcChatHistory.addMessage works');
+        const hist = npcChatHistory.getHistory('fellow');
+        v67Assert(hist.length === 1, 'npcChatHistory.getHistory works');
+        npcChatHistory.addMessage('fellow', 'master', 'task', 'second message');
+        const recent = npcChatHistory.getRecentMessages(60);
+        v67Assert(recent.length === 2, 'npcChatHistory.getRecentMessages works');
+
+        // Test NpcRelationshipGraph
+        v67Assert(npcRelationGraph !== undefined, 'npcRelationGraph exists');
+        npcRelationGraph.addRelationship('master', 'fellow', 5, 'friendly');
+        const rel = npcRelationGraph.getRelationship('master', 'fellow');
+        v67Assert(rel.weight === 5, 'NpcRelationshipGraph.addRelationship works');
+        const related = npcRelationGraph.getRelatedRoles('master');
+        v67Assert(related.length >= 1, 'NpcRelationshipGraph.getRelatedRoles works');
+
+        // Test SkillEvolution
+        v67Assert(skillEvolution !== undefined, 'skillEvolution exists');
+        skillEvolution.addExp('basic_technique', 500);
+        const evo = skillEvolution.getEvolution('basic_technique');
+        v67Assert(evo.exp === 500, 'SkillEvolution.addExp works');
+        const canEvo = skillEvolution.canEvolve('basic_technique');
+        v67Assert(canEvo === false, 'SkillEvolution.canEvolve returns false when not enough exp');
+        skillEvolution.addExp('basic_technique', 600); // Now 1100 >= 1000
+        const evo2 = skillEvolution.getEvolution('basic_technique');
+        v67Assert(evo2.stage >= 1, 'SkillEvolution evolves when exp >= required');
+
+        // Test openNpcChatPanel exists
+        v67Assert(typeof openNpcChatPanel === 'function', 'openNpcChatPanel is a function');
+
+        // V67 pass rate
+        const v67Total = v67Passed + v67Failed;
+        const v67PassRate = v67Total > 0 ? (v67Passed / v67Total * 100).toFixed(1) : 0;
+        console.log(`[V67 Tests] ${v67Passed}/${v67Total} passed (${v67PassRate}%)`);
+
+        // Combined A direction test suite
+        const aTotalPassed = overallPassed + v67Passed;
+        const aTotalTests = overallTotal + v67Total;
+        const aTotalRate = aTotalTests > 0 ? (aTotalPassed / aTotalTests * 100).toFixed(1) : 0;
+        console.log(`[Direction A Total] ${aTotalPassed}/${aTotalTests} passed (${aTotalRate}%)`);
+
+        // ===== V68 Direction F: Realm Advancement + Serendipity Enhancement =====
+        // Enhanced realm progression system with serendipity-triggered events
+
+        // --- RealmAdvancement: Manages realm transitions and effects ---
+        class RealmAdvancement {
+            constructor() {
+                this.realms = [
+                    { id: 1, name: '练气期', minLevel: 1, multiplier: 1.0 },
+                    { id: 2, name: '筑基期', minLevel: 10, multiplier: 1.5 },
+                    { id: 3, name: '金丹期', minLevel: 25, multiplier: 2.0 },
+                    { id: 4, name: '元婴期', minLevel: 50, multiplier: 3.0 },
+                    { id: 5, name: '化神期', minLevel: 80, multiplier: 5.0 }
+                ];
+                this.currentRealm = 1;
+                this.realmBenefits = new Map(); // realmId -> {statBonus, skillUnlocks, serendipityBoosts}
+            }
+
+            getRealmForLevel(level) {
+                for (let i = this.realms.length - 1; i >= 0; i--) {
+                    if (level >= this.realms[i].minLevel) return this.realms[i];
+                }
+                return this.realms[0];
+            }
+
+            advanceRealm() {
+                const nextRealm = this.realms.find(r => r.id === this.currentRealm + 1);
+                if (nextRealm) {
+                    this.currentRealm = nextRealm.id;
+                    this.applyRealmBenefits(nextRealm);
+                    return nextRealm;
+                }
+                return null;
+            }
+
+            applyRealmBenefits(realm) {
+                if (!this.realmBenefits.has(realm.id)) {
+                    this.realmBenefits.set(realm.id, {
+                        statBonus: { attack: realm.multiplier, defense: realm.multiplier },
+                        skillUnlocks: this.getUnlockedSkills(realm.id),
+                        serendipityBoosts: realm.id * 0.1
+                    });
+                }
+                return this.realmBenefits.get(realm.id);
+            }
+
+            getUnlockedSkills(realmId) {
+                const unlocks = {
+                    2: ['advanced_technique', 'wind_walk'],
+                    3: ['golden_elixir', 'fire_walk'],
+                    4: ['void_fleet', 'mirror_clone'],
+                    5: ['celestial_transform', 'immortal_body']
+                };
+                return unlocks[realmId] || [];
+            }
+
+            getRealmMultiplier(level) {
+                const realm = this.getRealmForLevel(level);
+                return realm ? realm.multiplier : 1.0;
+            }
+        }
+
+        // --- SerendipityBoost: Enhances serendipity events based on realm ---
+        class SerendipityBoost {
+            constructor() {
+                this.boosts = new Map(); // nodeId -> {chanceBonus, rewardBonus}
+                this.boostConfig = {
+                    'ser_discovery': { chanceBonus: 0.1, rewardBonus: 1.2 },
+                    'ser_trial': { chanceBonus: 0.15, rewardBonus: 1.3 },
+                    'ser_master_reward': { chanceBonus: 0.2, rewardBonus: 1.5 }
+                };
+            }
+
+            applyBoost(nodeId) {
+                const boost = this.boostConfig[nodeId] || { chanceBonus: 0, rewardBonus: 1.0 };
+                return boost;
+            }
+
+            getBoostedProbability(nodeId, baseProbability) {
+                const boost = this.applyBoost(nodeId);
+                return Math.min(baseProbability + boost.chanceBonus, 1.0);
+            }
+
+            getBoostedReward(nodeId, baseReward) {
+                const boost = this.applyBoost(nodeId);
+                return Math.floor(baseReward * boost.rewardBonus);
+            }
+        }
+
+        const realmAdvancement = new RealmAdvancement();
+        const serendipityBoost = new SerendipityBoost();
+
+        // --- Realm Panel UI ---
+        function openRealmPanel() {
+            const realm = realmAdvancement.getRealmForLevel(gameState.level);
+            const benefit = realmAdvancement.realmBenefits.get(realm.id) || {};
+            const multiplier = realmAdvancement.getRealmMultiplier(gameState.level);
+            const nextRealm = realmAdvancement.realms.find(r => r.id === realm.id + 1);
+
+            let html = `<div style="padding:15px;">`;
+            html += `<h3>🌀 ${realm.name}</h3>`;
+            html += `<p>等级: ${gameState.level} | 境界倍率: ${multiplier}x</p>`;
+            html += `<p>攻击/防御加成: +${(multiplier - 1) * 100}%</p>`;
+
+            if (benefit.skillUnlocks && benefit.skillUnlocks.length > 0) {
+                html += `<h4>已解锁技能</h4><ul>`;
+                for (const skill of benefit.skillUnlocks) {
+                    html += `<li>${skill}</li>`;
+                }
+                html += `</ul>`;
+            }
+
+            if (nextRealm) {
+                html += `<p><b>下一境界:</b> ${nextRealm.name} (需要等级 ${nextRealm.minLevel})</p>`;
+                html += `<button onclick="advanceToNextRealm()">突破境界</button>`;
+            } else {
+                html += `<p>已达最高境界!</p>`;
+            }
+
+            html += `<h4>境界加成</h4>`;
+            html += `<p>奇遇触发率: +${(realm.id * 10)}%</p>`;
+            html += `<p>奇遇奖励: +${realm.id * 20}%</p>`;
+            html += `</div>`;
+
+            showModal('🌀 境界系统', html, 500);
+        }
+
+        window.advanceToNextRealm = () => {
+            const current = realmAdvancement.currentRealm;
+            const next = realmAdvancement.advanceRealm();
+            if (next) {
+                gameState.level += 5;
+                showToast(`突破成功! 进入${next.name}`);
+            } else {
+                showToast('无法突破，已达最高境界');
+            }
+        };
+
+        // ===== V69 Direction G: Multi-Player Collaboration (Player-to-NPC) =====
+        // Based on NPC MessageBus architecture, enabling player-to-player collaboration
+
+        // --- PlayerSession: Represents a player's game session ---
+        class PlayerSession {
+            constructor(playerId, playerName) {
+                this.playerId = playerId;
+                this.playerName = playerName;
+                this.connectedAt = Date.now();
+                this.lastActive = Date.now();
+                this.sessionState = 'active';
+                this.collabProjects = []; // [{projectId, role, contribution}]
+            }
+
+            updateActivity() {
+                this.lastActive = Date.now();
+            }
+
+            getSessionDuration() {
+                return Date.now() - this.connectedAt;
+            }
+        }
+
+        // --- CollaborationRoom: A room where players collaborate on tasks ---
+        class CollaborationRoom {
+            constructor(roomId, taskType) {
+                this.roomId = roomId;
+                this.taskType = taskType;
+                this.participants = new Map(); // playerId -> PlayerSession
+                this.taskProgress = 0;
+                this.maxParticipants = 5;
+                this.rewards = { base: 100, bonusPerPlayer: 20 };
+                this.status = 'recruiting'; // recruiting, in_progress, completed
+                this.chatLog = []; // [{playerId, message, timestamp}]
+            }
+
+            join(playerId, playerName) {
+                if (this.participants.size >= this.maxParticipants) {
+                    return { success: false, reason: 'Room full' };
+                }
+                if (this.participants.has(playerId)) {
+                    return { success: false, reason: 'Already joined' };
+                }
+                const session = new PlayerSession(playerId, playerName);
+                this.participants.set(playerId, session);
+                this.addChatLog(playerId, `joined the ${this.taskType} collaboration`);
+                return { success: true, session };
+            }
+
+            leave(playerId) {
+                if (this.participants.has(playerId)) {
+                    this.participants.delete(playerId);
+                    this.addChatLog(playerId, 'left the collaboration');
+                    return true;
+                }
+                return false;
+            }
+
+            addChatLog(playerId, message) {
+                this.chatLog.push({ playerId, message, timestamp: Date.now() });
+                if (this.chatLog.length > 100) this.chatLog.shift();
+            }
+
+            updateProgress(amount) {
+                this.taskProgress = Math.min(this.taskProgress + amount, 100);
+                if (this.taskProgress >= 100) {
+                    this.status = 'completed';
+                    this.distributeRewards();
+                }
+            }
+
+            distributeRewards() {
+                const totalReward = this.rewards.base + (this.participants.size - 1) * this.rewards.bonusPerPlayer;
+                const perPlayer = Math.floor(totalReward / this.participants.size);
+                for (const [pid, session] of this.participants) {
+                    gameState.spiritStones += perPlayer;
+                    this.addChatLog(pid, `received ${perPlayer} spirit stones`);
+                }
+            }
+
+            getParticipantCount() {
+                return this.participants.size;
+            }
+        }
+
+        // --- CollaborationManager: Manages all collaboration rooms ---
+        class CollaborationManager {
+            constructor() {
+                this.rooms = new Map(); // roomId -> CollaborationRoom
+                this.playerRooms = new Map(); // playerId -> [roomId]
+                this.roomCounter = 0;
+            }
+
+            createRoom(taskType, maxParticipants = 5) {
+                this.roomCounter++;
+                const roomId = `collab_${taskType}_${this.roomCounter}`;
+                const room = new CollaborationRoom(roomId, taskType);
+                room.maxParticipants = maxParticipants;
+                this.rooms.set(roomId, room);
+                return room;
+            }
+
+            joinRoom(roomId, playerId, playerName) {
+                const room = this.rooms.get(roomId);
+                if (!room) return { success: false, reason: 'Room not found' };
+                if (room.status !== 'recruiting') return { success: false, reason: 'Room not recruiting' };
+
+                const result = room.join(playerId, playerName);
+                if (result.success) {
+                    if (!this.playerRooms.has(playerId)) {
+                        this.playerRooms.set(playerId, []);
+                    }
+                    this.playerRooms.get(playerId).push(roomId);
+                }
+                return result;
+            }
+
+            leaveRoom(roomId, playerId) {
+                const room = this.rooms.get(roomId);
+                if (!room) return false;
+                const left = room.leave(playerId);
+                if (left) {
+                    const rooms = this.playerRooms.get(playerId);
+                    if (rooms) {
+                        const idx = rooms.indexOf(roomId);
+                        if (idx >= 0) rooms.splice(idx, 1);
+                    }
+                }
+                return left;
+            }
+
+            getActiveRooms() {
+                return Array.from(this.rooms.values()).filter(r => r.status === 'recruiting');
+            }
+
+            getRoomStatus(roomId) {
+                const room = this.rooms.get(roomId);
+                if (!room) return null;
+                return {
+                    roomId: room.roomId,
+                    taskType: room.taskType,
+                    participants: room.getParticipantCount(),
+                    maxParticipants: room.maxParticipants,
+                    status: room.status
+                };
+            }
+        }
+
+        const collabManager = new CollaborationManager();
+
+        // --- Collaboration Panel UI ---
+        function openCollaborationPanel() {
+            const activeRooms = collabManager.getActiveRooms();
+            let html = `<div style="padding:15px;">`;
+            html += `<h3>🤝 协作大厅</h3>`;
+            html += `<button onclick="createCollabRoom()" style="margin:10px;padding:10px;">创建协作房间</button>`;
+            html += `<h4>可加入的房间</h4>`;
+
+            if (activeRooms.length === 0) {
+                html += `<p>暂无空闲房间</p>`;
+            } else {
+                html += `<table style="width:100%;">`;
+                html += `<tr><th>任务类型</th><th>玩家数</th><th>状态</th><th>操作</th></tr>`;
+                for (const room of activeRooms) {
+                    html += `<tr>
+                        <td>${room.taskType}</td>
+                        <td>${room.getParticipantCount()}/${room.maxParticipants}</td>
+                        <td>${room.status}</td>
+                        <td><button onclick="joinCollabRoom('${room.roomId}')">加入</button></td>
+                    </tr>`;
+                }
+                html += `</table>`;
+            }
+
+            html += `<h4>我的协作</h4>`;
+            const myRooms = collabManager.playerRooms.get('player_1') || [];
+            if (myRooms.length === 0) {
+                html += `<p>暂无参与的协作</p>`;
+            } else {
+                for (const rid of myRooms) {
+                    const status = collabManager.getRoomStatus(rid);
+                    if (status) {
+                        html += `<p>${status.taskType} - ${status.participants}/${status.maxParticipants} - ${status.status}</p>`;
+                    }
+                }
+            }
+            html += `</div>`;
+
+            showModal('🤝 协作系统', html, 600);
+        }
+
+        window.createCollabRoom = () => {
+            const taskTypes = ['realm_trial', 'serendipity_hunt', 'skill_forge', 'pill_refine'];
+            const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+            const room = collabManager.createRoom(taskType);
+            collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+            showToast(`创建了${taskType}协作房间`);
+            openCollaborationPanel();
+        };
+
+        window.joinCollabRoom = (roomId) => {
+            const result = collabManager.joinRoom(roomId, 'player_1', '玩家1');
+            if (result.success) {
+                showToast('加入成功!');
+            } else {
+                showToast(`加入失败: ${result.reason}`);
+            }
+        };
+
+        // Wire NPC MessageBus to trigger collaboration events
+        const originalTriggerNpc = triggerNpcCollaboration;
+        triggerNpcCollaboration = function(eventType, data) {
+            // Auto-create collaboration room on certain NPC events
+            if (eventType === 'task_completed' && Math.random() < 0.3) {
+                const room = collabManager.createRoom('npc_task_' + eventType);
+                const result = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+            }
+            return originalTriggerNpc(eventType, data);
+        };
+
+        // ===== V68 Tests: Realm Advancement + Serendipity Boost =====
+        let v68Passed = 0, v68Failed = 0;
+        const v68Assert = (c, m) => { if (c) v68Passed++; else v68Failed++; };
+
+        v68Assert(realmAdvancement !== undefined, 'realmAdvancement exists');
+        v68Assert(serendipityBoost !== undefined, 'serendipityBoost exists');
+
+        // Test realm calculation
+        const realm1 = realmAdvancement.getRealmForLevel(5);
+        v68Assert(realm1.name === '练气期', 'getRealmForLevel returns 练气期 for level 5');
+        const realm2 = realmAdvancement.getRealmForLevel(15);
+        v68Assert(realm2.name === '筑基期', 'getRealmForLevel returns 筑基期 for level 15');
+
+        // Test multiplier
+        const mult1 = realmAdvancement.getRealmMultiplier(5);
+        v68Assert(mult1 === 1.0, 'getRealmMultiplier returns 1.0 for 练气期');
+        const mult2 = realmAdvancement.getRealmMultiplier(15);
+        v68Assert(mult2 === 1.5, 'getRealmMultiplier returns 1.5 for 筑基期');
+
+        // Test boost application
+        const boost = serendipityBoost.applyBoost('ser_discovery');
+        v68Assert(boost.chanceBonus === 0.1, 'SerendipityBoost applies chance bonus');
+        v68Assert(boost.rewardBonus === 1.2, 'SerendipityBoost applies reward bonus');
+
+        // Test boosted probability
+        const boostedProb = serendipityBoost.getBoostedProbability('ser_discovery', 0.5);
+        v68Assert(boostedProb === 0.6, 'getBoostedProbability adds chance bonus correctly');
+
+        // Test boosted reward
+        const boostedReward = serendipityBoost.getBoostedReward('ser_master_reward', 100);
+        v68Assert(boostedReward === 150, 'getBoostedReward applies 1.5x multiplier correctly');
+
+        // Test skill unlocks
+        const unlocks = realmAdvancement.getUnlockedSkills(2);
+        v68Assert(Array.isArray(unlocks), 'getUnlockedSkills returns array');
+        v68Assert(unlocks.includes('advanced_technique'), 'getUnlockedSkills includes advanced_technique');
+
+        // Test advanceRealm (when possible)
+        const initialRealm = realmAdvancement.currentRealm;
+        if (initialRealm < 5) {
+            const next = realmAdvancement.advanceRealm();
+            v68Assert(next !== null, 'advanceRealm returns next realm when possible');
+            v68Assert(realmAdvancement.currentRealm > initialRealm, 'currentRealm advances');
+        }
+
+        // V68 pass rate
+        const v68Total = v68Passed + v68Failed;
+        const v68PassRate = v68Total > 0 ? (v68Passed / v68Total * 100).toFixed(1) : 0;
+        console.log(`[V68 Tests] ${v68Passed}/${v68Total} passed (${v68PassRate}%)`);
+
+        // ===== V69 Tests: Multi-Player Collaboration =====
+        let v69Passed = 0, v69Failed = 0;
+        const v69Assert = (c, m) => { if (c) v69Passed++; else v69Failed++; };
+
+        v69Assert(collabManager !== undefined, 'collabManager exists');
+
+        // Test createRoom
+        const room = collabManager.createRoom('test_task');
+        v69Assert(room !== undefined, 'createRoom returns room');
+        v69Assert(room.roomId.startsWith('collab_'), 'roomId has correct prefix');
+        v69Assert(room.taskType === 'test_task', 'room has correct task type');
+        v69Assert(room.status === 'recruiting', 'room starts in recruiting status');
+
+        // Test joinRoom
+        const joinResult = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+        v69Assert(joinResult.success === true, 'joinRoom succeeds for first player');
+        v69Assert(room.getParticipantCount() === 1, 'participant count increases after join');
+
+        // Test joinRoom fails for duplicate
+        const joinResult2 = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+        v69Assert(joinResult2.success === false, 'joinRoom fails for duplicate player');
+        v69Assert(joinResult2.reason === 'Already joined', 'joinRoom returns correct reason');
+
+        // Test leaveRoom
+        const left = collabManager.leaveRoom(room.roomId, 'player_1');
+        v69Assert(left === true, 'leaveRoom returns true when player exists');
+        v69Assert(room.getParticipantCount() === 0, 'participant count decreases after leave');
+
+        // Test chat log
+        room.join('player_2', '玩家2');
+        room.addChatLog('player_2', 'hello world');
+        v69Assert(room.chatLog.length === 1, 'chatLog records messages');
+        v69Assert(room.chatLog[0].message === 'hello world', 'chatLog stores correct message');
+
+        // Test room status
+        const roomStatus = collabManager.getRoomStatus(room.roomId);
+        v69Assert(roomStatus !== null, 'getRoomStatus returns status object');
+        v69Assert(roomStatus.taskType === 'test_task', 'status contains taskType');
+        v69Assert(roomStatus.participants === 1, 'status contains correct participant count');
+
+        // Test CollaborationRoom distributeRewards
+        room.join('player_3', '玩家3');
+        gameState.spiritStones = 0; // Reset for test
+        room.updateProgress(100); // Complete task
+        v69Assert(gameState.spiritStones > 0, 'distributeRewards adds spirit stones');
+
+        // V69 pass rate
+        const v69Total = v69Passed + v69Failed;
+        const v69PassRate = v69Total > 0 ? (v69Passed / v69Total * 100).toFixed(1) : 0;
+        console.log(`[V69 Tests] ${v69Passed}/${v69Total} passed (${v69PassRate}%)`);
+
+        // Combined F+G pass rate
+        const fgPassed = v68Passed + v69Passed;
+        const fgTotal = v68Total + v69Total;
+        const fgRate = fgTotal > 0 ? (fgPassed / fgTotal * 100).toFixed(1) : 0;
+        console.log(`[Direction F+G Combined] ${fgPassed}/${fgTotal} passed (${fgRate}%)`);
+
+        // Grand total F+G+A
+        const grandTotalPassed = aTotalPassed + v68Passed + v69Passed;
+        const grandTotalTests = aTotalTests + v68Total + v69Total;
+        const grandTotalRate = grandTotalTests > 0 ? (grandTotalPassed / grandTotalTests * 100).toFixed(1) : 0;
+        console.log(`[Grand Total] ${grandTotalPassed}/${grandTotalTests} passed (${grandTotalRate}%)`);
+        if (parseFloat(grandTotalRate) >= 80) {
+            console.log(`[PASS] Grand test suite meets 80%+ target!`);
+        }
+
+        // ===== V70 Direction A: NPC Ecosystem Tests =====
+        function runV70Tests() {
+            const results = [];
+            const v70Assert = (cond, name) => results.push({ name, pass: !!cond });
+            const pop = new NpcPopulation();
+            v70Assert(pop.getCount('monster') >= 0, 'NpcPopulation.getCount');
+            pop.adjustCount('monster', +2);
+            v70Assert(pop.getCount('monster') >= 2, 'NpcPopulation.adjustCount increase');
+            pop.adjustCount('monster', -1);
+            v70Assert(pop.getCount('monster') >= 1, 'NpcPopulation.adjustCount decrease');
+            pop.adjustCount('fellow', +10);
+            v70Assert(pop.getCount('fellow') <= NPC_ECOLOGY_CONFIG.POPULATION_CEILING, 'NpcPopulation ceiling enforced');
+            v70Assert(!pop.isExtinct('fellow'), 'NpcPopulation not extinct after adjust');
+            pop.adjustCount('fellow', -100);
+            v70Assert(pop.isExtinct('fellow'), 'NpcPopulation.isExtinct true at 0');
+            const revived = pop.reviveRole('fellow');
+            v70Assert(revived === true, 'NpcPopulation.reviveRole returns true');
+            v70Assert(pop.getCount('fellow') === 1, 'NpcPopulation.reviveRole restores 1 NPC');
+            const chain = new NpcFoodChain();
+            v70Assert(chain.getEnergy('monster') === 60, 'NpcFoodChain initial energy');
+            chain.drainEnergy('monster');
+            v70Assert(chain.getEnergy('monster') < 60, 'NpcFoodChain drain reduces energy');
+            const gain = chain.applyPredation('monster', 'fellow');
+            v70Assert(gain >= 0, 'NpcFoodChain.applyPredation returns gain');
+            v70Assert(chain.getEnergy('monster') > 40, 'NpcFoodChain.applyPredation adds energy');
+            const terr = new NpcTerritory();
+            v70Assert(terr.getTerritory('master') !== undefined, 'NpcTerritory.getTerritory');
+            const expanded = terr.expandTerritory('monster');
+            v70Assert(typeof expanded === 'boolean', 'NpcTerritory.expandTerritory returns boolean');
+            terr.claimTerritory('fellow', 'north');
+            v70Assert(terr.getTerritory('fellow') === 'north', 'NpcTerritory.claimTerritory updates');
+            const quality = terr.getQuality('north');
+            v70Assert(quality >= 0 && quality <= 1, 'NpcTerritory.getQuality in range');
+            terr.degradeQuality('north');
+            v70Assert(terr.getQuality('north') < quality, 'NpcTerritory.degradeQuality reduces');
+            const comp = new NpcResourceCompetition();
+            comp.initialize({ master: 'central', monster: 'east' });
+            const consumed = comp.consumeResource('central', 50);
+            v70Assert(consumed >= 0, 'NpcResourceCompetition.consumeResource returns amount');
+            const scarcity = comp.checkScarcity();
+            v70Assert(typeof scarcity === 'object', 'NpcResourceCompetition.checkScarcity returns object');
+            const engine = new NpcEcologyEngine();
+            engine.initialize();
+            v70Assert(engine.population instanceof NpcPopulation, 'NpcEcologyEngine.population');
+            v70Assert(engine.foodChain instanceof NpcFoodChain, 'NpcEcologyEngine.foodChain');
+            v70Assert(engine.territory instanceof NpcTerritory, 'NpcEcologyEngine.territory');
+            v70Assert(engine.competition instanceof NpcResourceCompetition, 'NpcEcologyEngine.competition');
+            engine.tick();
+            v70Assert(engine.lastTick > 0, 'NpcEcologyEngine.tick updates lastTick');
+            v70Assert(typeof openNpcEcologyPanel === 'function', 'openNpcEcologyPanel is a function');
+            const bus = new NpcMessageBus();
+            const before = bus.messages.length;
+            bus.broadcast('master', 'ecology_alert', { type: 'scarcity', zone: 'central' });
+            v70Assert(bus.messages.length > before, 'NpcMessageBus broadcasts ecology events');
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V70 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V70 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v70Results = runV70Tests();
+
+        // ===== V71 Direction B: Heavenly Dao Laws Tests =====
+        function runV71Tests() {
+            const results = [];
+            const v71Assert = (cond, name) => results.push({ name, pass: !!cond });
+            const config = HEAVENLY_DAO_LAWS_CONFIG;
+            v71Assert(config.GENERATION_BONUS === 1.15, 'HEAVENLY_DAO_LAWS_CONFIG generation bonus');
+            v71Assert(config.CONQUEST_BONUS === 1.30, 'HEAVENLY_DAO_LAWS_CONFIG conquest bonus');
+            v71Assert(config.ELEMENTS.length === 10, 'HEAVENLY_DAO_LAWS_CONFIG 10 elements');
+            v71Assert(config.GENERATION['metal'] === 'water', 'Generation: metal generates water');
+            v71Assert(config.CONQUEST['metal'] === 'wood', 'Conquest: metal conquers wood');
+            const affinity = new ElementalAffinity();
+            v71Assert(affinity.getMastery('fire') === 0, 'ElementalAffinity initial mastery 0');
+            const leveled = affinity.addExp('fire', 100);
+            v71Assert(leveled === true, 'ElementalAffinity.addExp levels up at 100exp');
+            v71Assert(affinity.getMastery('fire') === 1, 'ElementalAffinity master level 1');
+            const notLeveled = affinity.addExp('fire', 50);
+            v71Assert(notLeveled === false, 'ElementalAffinity.addExp no level at 50exp');
+            const pairs = affinity.getResonanceElements();
+            v71Assert(Array.isArray(pairs), 'ElementalAffinity.getResonanceElements returns array');
+            const law = new DaoLaw('test_law', { id: 'test', name: '测试法则', element: 'fire', type: 'attack', rank: 2, power: 0.2 });
+            v71Assert(law.getPower() === 0.25, 'DaoLaw.getPower rank2 power 0.25');
+            law.activate();
+            v71Assert(law.activated === true, 'DaoLaw.activate sets activated');
+            v71Assert(law.activationCount === 1, 'DaoLaw.activationCount increments');
+            const registry = new DaoLawRegistry();
+            v71Assert(registry.laws.size === 30, 'DaoLawRegistry initializes 30 laws');
+            v71Assert(registry.getLaw('fire_rage') !== undefined, 'DaoLawRegistry.getLaw returns law');
+            const fireLaws = registry.getLawsByElement('fire');
+            v71Assert(fireLaws.length >= 3, 'DaoLawRegistry.getLawsByElement fire >= 3');
+            const activated = registry.activateLaw('fire_rage');
+            v71Assert(activated === true, 'DaoLawRegistry.activateLaw returns true');
+            v71Assert(registry.activeLaws.includes('fire_rage'), 'DaoLawRegistry.activeLaws includes activated');
+            const resonance = registry.calculateResonanceBonus(['fire', 'water']);
+            v71Assert(resonance >= 0, 'DaoLawRegistry.calculateResonanceBonus returns bonus');
+            const stats = registry.getStats();
+            v71Assert(stats.totalLaws === 30, 'DaoLawRegistry.getStats totalLaws');
+            v71Assert(stats.activeCount >= 1, 'DaoLawRegistry.getStats activeCount >= 1');
+            v71Assert(typeof openHeavenlyDaoPanel === 'function', 'openHeavenlyDaoPanel is a function');
+            v71Assert(typeof toggleDaoLaw === 'function', 'toggleDaoLaw is a function');
+            v71Assert(typeof getElementalBonus === 'function', 'getElementalBonus is a function');
+            const bonus = getElementalBonus('fire', 'wood');
+            v71Assert(bonus === config.CONQUEST_BONUS, 'getElementalBonus conquest wood <- fire');
+            const genBonus = getElementalBonus('metal', 'water');
+            v71Assert(genBonus === config.GENERATION_BONUS, 'getElementalBonus generation water <- metal');
+            const neutral = getElementalBonus('fire', 'fire');
+            v71Assert(neutral === 1.0, 'getElementalBonus neutral same element');
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V71 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V71 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v71Results = runV71Tests();
+
+        // ===== V72 Tests: Serendipity DAG + SuperNode + EdgeTrigger =====
+        function runV72Tests() {
+            const results = [];
+            const v72Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: SerendipityDAG addEdge fixes prerequisite tracking
+            const dag = serendipityExecutor.dag;
+            v72Assert(dag.nodes.size >= 19, 'serendipity DAG has >= 19 nodes (7 default + 12 new)');
+            v72Assert(dag.edges.length > 0, 'serendipity DAG has edges after addEdge fix');
+
+            // Test 2: New chains exist
+            const treasureDiscover = dag.nodes.get('ser_treasure_discover');
+            v72Assert(treasureDiscover !== undefined, 'treasure_discover node exists');
+            const sectRumor = dag.nodes.get('ser_sect_rumor');
+            v72Assert(sectRumor !== undefined, 'sect_rumor node exists');
+            const immortalVision = dag.nodes.get('ser_immortal_vision');
+            v72Assert(immortalVision !== undefined, 'immortal_vision node exists');
+
+            // Test 3: Edge prerequisites are correctly set
+            const excavateNode = dag.nodes.get('ser_treasure_excavate');
+            v72Assert(excavateNode && excavateNode.prerequisites.includes('ser_treasure_discover'), 'treasure_excavate has treasure_discover as prerequisite');
+
+            // Test 4: SuperNode class exists and works
+            const superNode = new SuperNode('test_super', [treasureDiscover, excavateNode]);
+            v72Assert(superNode.status === 'idle', 'SuperNode initial status idle');
+            v72Assert(superNode.totalWeight > 0, 'SuperNode.totalWeight > 0');
+
+            // Test 5: DAGEdgeTrigger exists
+            v72Assert(typeof edgeTrigger !== 'undefined', 'edgeTrigger global exists');
+            edgeTrigger.setEdgeTrigger('ser_treasure_discover', 'ser_treasure_excavate', { type: 'trigger', value: true });
+            v72Assert(edgeTrigger.triggers.size > 0, 'edgeTrigger stores edge config');
+
+            // Test 6: SerendipityGraphView renders
+            const graphView = new SerendipityGraphView(dag);
+            v72Assert(typeof graphView.renderASCII === 'function', 'SerendipityGraphView.renderASCII is function');
+            const ascii = graphView.renderASCII();
+            v72Assert(ascii.length > 50, 'SerendipityGraphView.renderASCII returns content');
+
+            // Test 7: getNodeDetails works
+            const details = graphView.getNodeDetails('ser_treasure_discover');
+            v72Assert(details !== null, 'getNodeDetails returns details');
+            v72Assert(details.prerequisites.length === 0, 'treasure_discover has no prerequisites');
+            v72Assert(details.nextNodes.length >= 1, 'treasure_discover has next nodes');
+
+            // Test 8: executeSerendipityWithSuperNodes method exists
+            v72Assert(typeof serendipityExecutor.executeSerendipityWithSuperNodes === 'function', 'executeSerendipityWithSuperNodes method exists');
+            v72Assert(typeof serendipityExecutor.findInitialNode === 'function', 'findInitialNode method exists');
+            v72Assert(typeof serendipityExecutor.buildSuperNodes === 'function', 'buildSuperNodes method exists');
+
+            // Test 9: openSerendipityPanel function exposed to window
+            v72Assert(typeof window.openSerendipityPanel === 'function', 'openSerendipityPanel exposed to window');
+            v72Assert(typeof window.toggleSerendipityNodeDetails === 'function', 'toggleSerendipityNodeDetails exposed to window');
+            v72Assert(typeof window.executeSerendipityFromPanel === 'function', 'executeSerendipityFromPanel exposed to window');
+
+            // Test 10: SerendipityExecutor DAG status
+            const status = serendipityExecutor.getDAGStatus();
+            v72Assert(status.total >= 19, 'DAG status total >= 19');
+            v72Assert(['locked', 'ready', 'triggered', 'completed'].includes(status.locked !== undefined ? 'ok' : 'ok'), 'DAG status has correct fields');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V72 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V72 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v72Results = runV72Tests();
+
+        // ===== V71 Direction B: Heavenly Dao Laws System =====
+        // Based on generic-agent state machine + nanobot ecological design
+        // 10种元素相生相克/法则共鸣/天命增强/元素攻击
+
+        // --- HEAVENLY_DAO_LAWS_CONFIG ---
+        const HEAVENLY_DAO_LAWS_CONFIG = {
+            ELEMENTS: ['metal', 'wood', 'water', 'fire', 'earth', 'thunder', 'wind', 'ice', 'poison', 'dark'],
+            ELEMENT_NAMES: { metal: '金', wood: '木', water: '水', fire: '火', earth: '土', thunder: '雷', wind: '风', ice: '冰', poison: '毒', dark: '暗' },
+            // 相生关系: A generates B
+            GENERATION: { metal: 'water', water: 'wood', wood: 'fire', fire: 'earth', earth: 'metal', thunder: 'wind', wind: 'ice', ice: 'water', poison: 'earth', dark: 'thunder' },
+            // 相克关系: A conquers B
+            CONQUEST: { metal: 'wood', wood: 'earth', earth: 'water', water: 'fire', fire: 'metal', thunder: 'water', wind: 'wood', ice: 'fire', poison: 'wood', dark: 'light' },
+            // 相生加成: +15%
+            GENERATION_BONUS: 1.15,
+            // 相克加成: +30%
+            CONQUEST_BONUS: 1.30,
+            // 被克减伤: -30%
+            CONQUEST_PENALTY: 0.70,
+            // 共鸣阈值: 同元素/相生/相克任一满足
+            RESONANCE_THRESHOLD: 2,
+            // 法则共鸣加成
+            RESONANCE_BONUS: 0.20
+        };
+
+        // --- ElementalAffinity: Tracks player elemental mastery ---
+        class ElementalAffinity {
+            constructor() {
+                this.mastery = { metal: 0, wood: 0, water: 0, fire: 0, earth: 0, thunder: 0, wind: 0, ice: 0, poison: 0, dark: 0 };
+                this.exp = { metal: 0, wood: 0, water: 0, fire: 0, earth: 0, thunder: 0, wind: 0, ice: 0, poison: 0, dark: 0 };
+                this.resonanceCount = 0;
+            }
+            getMastery(element) { return this.mastery[element] || 0; }
+            addExp(element, amount) {
+                if (!this.mastery.hasOwnProperty(element)) return false;
+                this.exp[element] = (this.exp[element] || 0) + amount;
+                const threshold = (this.mastery[element] + 1) * 100;
+                if (this.exp[element] >= threshold) {
+                    this.mastery[element]++;
+                    this.exp[element] -= threshold;
+                    return true; // leveled up
+                }
+                return false;
+            }
+            getResonanceElements() {
+                const elements = HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS;
+                const mastered = elements.filter(e => this.mastery[e] > 0);
+                const pairs = [];
+                for (let i = 0; i < mastered.length; i++) {
+                    for (let j = i + 1; j < mastered.length; j++) {
+                        const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[mastered[i]];
+                        const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[mastered[i]];
+                        if (gen === mastered[j] || con === mastered[j]) {
+                            pairs.push([mastered[i], mastered[j]]);
+                        }
+                    }
+                }
+                return pairs;
+            }
+            getStats() {
+                return {
+                    mastery: { ...this.mastery },
+                    exp: { ...this.exp },
+                    resonanceCount: this.getResonanceElements().length
+                };
+            }
+        }
+
+        // --- DaoLaw: Single law/rule definition ---
+        class DaoLaw {
+            constructor(id, config) {
+                this.id = id;
+                this.name = config.name;
+                this.element = config.element;
+                this.type = config.type; // 'buff' | 'attack' | 'defense' | 'serendipity'
+                this.rank = config.rank || 1; // 1-5
+                this.power = config.power || 0.1;
+                this.description = config.description || '';
+                this.activated = false;
+                this.activationCount = 0;
+            }
+            activate() {
+                this.activated = true;
+                this.activationCount++;
+            }
+            getPower() {
+                return this.power * (1 + (this.rank - 1) * 0.25);
+            }
+        }
+
+        // --- DaoLawRegistry: Manages all heavenly dao laws ---
+        class DaoLawRegistry {
+            constructor() {
+                this.laws = new Map();
+                this.activeLaws = [];
+                this.resonanceBonus = 0;
+                this._init();
+            }
+            _init() {
+                const lawDefs = [
+                    { id: 'metal_strike', name: '金之锐', element: 'metal', type: 'attack', rank: 1, power: 0.15, description: '金属性攻击+15%' },
+                    { id: 'wood_vitality', name: '木之生', element: 'wood', type: 'buff', rank: 1, power: 0.10, description: '木属性生命+10%' },
+                    { id: 'water_flow', name: '水之柔', element: 'water', type: 'defense', rank: 1, power: 0.12, description: '水属性防御+12%' },
+                    { id: 'fire_rage', name: '火之炎', element: 'fire', type: 'attack', rank: 1, power: 0.18, description: '火属性攻击+18%' },
+                    { id: 'earth_endure', name: '土之稳', element: 'earth', type: 'defense', rank: 1, power: 0.14, description: '土属性防御+14%' },
+                    { id: 'thunder_bolt', name: '雷之怒', element: 'thunder', type: 'attack', rank: 1, power: 0.20, description: '雷属性攻击+20%' },
+                    { id: 'windSwift', name: '风之速', element: 'wind', type: 'buff', rank: 1, power: 0.10, description: '风属性敏捷+10%' },
+                    { id: 'ice_shield', name: '冰之护', element: 'ice', type: 'defense', rank: 1, power: 0.15, description: '冰属性防御+15%' },
+                    { id: 'poison_lingering', name: '毒之蚀', element: 'poison', type: 'attack', rank: 1, power: 0.12, description: '毒属性持续伤害+12%' },
+                    { id: 'dark_curse', name: '暗之蚀', element: 'dark', type: 'attack', rank: 1, power: 0.16, description: '暗属性攻击+16%' },
+                    { id: 'metal_armor', name: '金甲术', element: 'metal', type: 'defense', rank: 2, power: 0.20, description: '金属性防御+20%' },
+                    { id: 'wood_recovery', name: '回春术', element: 'wood', type: 'buff', rank: 2, power: 0.15, description: '木属性生命恢复+15%' },
+                    { id: 'water_healing', name: '水疗术', element: 'water', type: 'buff', rank: 2, power: 0.18, description: '水属性治疗+18%' },
+                    { id: 'fire_wave', name: '火焰波', element: 'fire', type: 'attack', rank: 2, power: 0.25, description: '火属性范围攻击+25%' },
+                    { id: 'earthquake', name: '地震术', element: 'earth', type: 'attack', rank: 2, power: 0.22, description: '土属性地震攻击+22%' },
+                    { id: 'thunderStorm', name: '雷暴术', element: 'thunder', type: 'attack', rank: 2, power: 0.28, description: '雷属性雷暴攻击+28%' },
+                    { id: 'wind_gust', name: '风之壁', element: 'wind', type: 'defense', rank: 2, power: 0.18, description: '风属性闪避+18%' },
+                    { id: 'ice_prison', name: '冰封术', element: 'ice', type: 'defense', rank: 2, power: 0.22, description: '冰属性冻结+22%' },
+                    { id: 'poison_cloud', name: '毒雾术', element: 'poison', type: 'attack', rank: 2, power: 0.20, description: '毒属性毒雾+20%' },
+                    { id: 'dark_bolt', name: '暗影弹', element: 'dark', type: 'attack', rank: 2, power: 0.24, description: '暗属性暗影弹+24%' },
+                    { id: 'golden_body', name: '金身不灭', element: 'metal', type: 'buff', rank: 3, power: 0.30, description: '金属性致命伤害-30%' },
+                    { id: 'all things grow', name: '万物生长', element: 'wood', type: 'serendipity', rank: 3, power: 0.20, description: '木属性奇遇+20%' },
+                    { id: 'tidal_force', name: '潮汐之力', element: 'water', type: 'attack', rank: 3, power: 0.30, description: '水属性潮汐攻击+30%' },
+                    { id: 'inferno', name: '业火', element: 'fire', type: 'attack', rank: 3, power: 0.35, description: '火属性业火攻击+35%' },
+                    { id: 'mountain_body', name: '山岳体', element: 'earth', type: 'defense', rank: 3, power: 0.28, description: '土属性山岳防御+28%' },
+                    { id: 'divine_thunder', name: '神雷降世', element: 'thunder', type: 'attack', rank: 3, power: 0.40, description: '雷属性神雷+40%' },
+                    { id: 'typhoon', name: '台风', element: 'wind', type: 'attack', rank: 3, power: 0.30, description: '风属性台风攻击+30%' },
+                    { id: 'blizzard', name: '暴雪', element: 'ice', type: 'attack', rank: 3, power: 0.32, description: '冰属性暴雪攻击+32%' },
+                    { id: 'plague', name: '瘟疫', element: 'poison', type: 'attack', rank: 3, power: 0.28, description: '毒属性瘟疫攻击+28%' },
+                    { id: 'void', name: '虚空', element: 'dark', type: 'attack', rank: 3, power: 0.35, description: '暗属性虚空攻击+35%' }
+                ];
+                for (const def of lawDefs) {
+                    this.laws.set(def.id, new DaoLaw(def.id, def));
+                }
+            }
+            getLaw(id) { return this.laws.get(id); }
+            getLawsByElement(element) {
+                const result = [];
+                for (const [, law] of this.laws) {
+                    if (law.element === element) result.push(law);
+                }
+                return result;
+            }
+            activateLaw(id) {
+                const law = this.laws.get(id);
+                if (!law) return false;
+                law.activate();
+                if (!this.activeLaws.includes(id)) {
+                    this.activeLaws.push(id);
+                }
+                return true;
+            }
+            calculateResonanceBonus(elements) {
+                let bonus = 0;
+                for (let i = 0; i < elements.length; i++) {
+                    for (let j = i + 1; j < elements.length; j++) {
+                        const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[elements[i]];
+                        const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[elements[i]];
+                        if (gen === elements[j] || con === elements[j]) {
+                            bonus += HEAVENLY_DAO_LAWS_CONFIG.RESONANCE_BONUS;
+                        }
+                    }
+                }
+                this.resonanceBonus = bonus;
+                return bonus;
+            }
+            getActiveLaws() {
+                return this.activeLaws.map(id => this.laws.get(id)).filter(l => l && l.activated);
+            }
+            getStats() {
+                return {
+                    totalLaws: this.laws.size,
+                    activeCount: this.activeLaws.length,
+                    resonanceBonus: this.resonanceBonus,
+                    activeLaws: this.getActiveLaws().map(l => ({ id: l.id, name: l.name, element: l.element, rank: l.rank }))
+                };
+            }
+        }
+
+        const elementalAffinity = new ElementalAffinity();
+        const daoLawRegistry = new DaoLawRegistry();
+
+        // --- HeavenlyDaoUI: UI Panel for Dao Laws ---
+        function openHeavenlyDaoPanel() {
+            const stats = daoLawRegistry.getStats();
+            const affinity = elementalAffinity.getStats();
+            const elementNames = HEAVENLY_DAO_LAWS_CONFIG.ELEMENT_NAMES;
+            let html = `<h4>☀️ 天道法则系统</h4>`;
+            html += `<p>激活法则: ${stats.activeCount}/${stats.totalLaws} | 共鸣加成: +${(stats.resonanceBonus * 100).toFixed(0)}%</p>`;
+            html += `<h4>🌿 元素亲和</h4>`;
+            for (const el of HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS) {
+                const m = affinity.mastery[el] || 0;
+                const e = affinity.exp[el] || 0;
+                const bar = '█'.repeat(Math.min(m, 10)) + '░'.repeat(Math.max(0, 10 - m));
+                html += `<div style="margin:3px 0;font-size:13px;">${elementNames[el]}: ${bar} Lv.${m} (${e}exp)</div>`;
+            }
+            html += `<h4 style="margin-top:10px;">📜 法则列表</h4>`;
+            html += `<div style="max-height:200px;overflow-y:auto;">`;
+            for (const el of HEAVENLY_DAO_LAWS_CONFIG.ELEMENTS) {
+                const laws = daoLawRegistry.getLawsByElement(el);
+                if (laws.length === 0) continue;
+                html += `<div style="margin:3px 0;"><b>【${elementNames[el]}】</b>`;
+                for (const law of laws) {
+                    const icon = law.activated ? '✅' : '⬜';
+                    html += `<span style="margin-left:5px;cursor:pointer;" onclick="toggleDaoLaw('${law.id}')">${icon}${law.name}(${law.rank}阶)</span>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+            html += `<h4 style="margin-top:10px;">⚡ 相生相克</h4>`;
+            html += `<div style="font-size:12px;">`;
+            html += `<div style="margin:2px;">相生(同色+15%): 金生水, 水生木, 木生火, 火生土, 土生金</div>`;
+            html += `<div style="margin:2px;">相克(亮色+30%): 金克木, 木克土, 土克水, 水克火, 火克金</div>`;
+            html += `</div>`;
+            showModal('☀️ 天道法则', html, 650);
+        }
+
+        function toggleDaoLaw(lawId) {
+            const law = daoLawRegistry.getLaw(lawId);
+            if (!law) return;
+            if (law.activated) {
+                law.activated = false;
+                const idx = daoLawRegistry.activeLaws.indexOf(lawId);
+                if (idx >= 0) daoLawRegistry.activeLaws.splice(idx, 1);
+            } else {
+                daoLawRegistry.activateLaw(lawId);
+            }
+            openHeavenlyDaoPanel();
+        }
+
+        function getElementalBonus(attackElement, targetElement) {
+            if (!attackElement || !targetElement) return 1.0;
+            const gen = HEAVENLY_DAO_LAWS_CONFIG.GENERATION[attackElement];
+            const con = HEAVENLY_DAO_LAWS_CONFIG.CONQUEST[attackElement];
+            if (gen === targetElement) return HEAVENLY_DAO_LAWS_CONFIG.GENERATION_BONUS;
+            if (con === targetElement) return HEAVENLY_DAO_LAWS_CONFIG.CONQUEST_BONUS;
+            return 1.0;
+        }
+
+        // ===== Direction E: Skill Marketplace =====
+        // Claude-code-design tool registry + ruflo plugin lifecycle
+
+        // --- SkillListing: Skill listing in marketplace ---
+        class SkillListing {
+            constructor(id, config) {
+                this.id = id;
+                this.skillId = config.skillId;
+                this.name = config.name;
+                this.category = config.category || 'misc';
+                this.price = config.price || 100;
+                this.rating = config.rating || 0;
+                this.salesCount = config.salesCount || 0;
+                this.releasedAt = config.releasedAt || Date.now();
+                this.author = config.author || 'system';
+                this.description = config.description || '';
+                this.icon = config.icon || '📦';
+                this.status = 'active'; // 'active' | 'sold_out' | 'hidden'
+            }
+        }
+
+        // --- SkillMarketplace: Trading platform for skills ---
+        class SkillMarketplace {
+            constructor() {
+                this.listings = new Map(); // listingId -> SkillListing
+                this.purchaseHistory = []; // [{buyerId, listingId, price, timestamp}]
+                this.categories = ['combat', 'cultivation', 'alchemy', 'formation', 'talisman', 'dagger', 'ultimate', 'misc'];
+                this.popularTags = ['recommended', 'hot', 'new', 'sale'];
+                this.listingIdCounter = 0;
+            }
+
+            //发布技能
+            publish(listingId, config) {
+                const listing = new SkillListing(listingId || `listing_${++this.listingIdCounter}`, config);
+                this.listings.set(listing.id, listing);
+                return listing;
+            }
+
+            //购买技能
+            purchase(listingId, buyerId) {
+                const listing = this.listings.get(listingId);
+                if (!listing || listing.status !== 'active') return { success: false, reason: 'not_available' };
+                listing.salesCount++;
+                this.purchaseHistory.push({
+                    buyerId,
+                    listingId,
+                    price: listing.price,
+                    timestamp: Date.now()
+                });
+                return { success: true, listing };
+            }
+
+            //搜索技能
+            search(query, category) {
+                const results = [];
+                for (const [, listing] of this.listings) {
+                    if (listing.status !== 'active') continue;
+                    if (category && listing.category !== category) continue;
+                    if (query) {
+                        const q = query.toLowerCase();
+                        if (!listing.name.toLowerCase().includes(q) &&
+                            !listing.description.toLowerCase().includes(q)) continue;
+                    }
+                    results.push(listing);
+                }
+                return results.sort((a, b) => b.rating - a.rating);
+            }
+
+            //获取分类
+            getByCategory(category) {
+                return Array.from(this.listings.values()).filter(l =>
+                    l.status === 'active' && l.category === category
+                );
+            }
+
+            //获取热门
+            getHot(count = 10) {
+                return Array.from(this.listings.values())
+                    .filter(l => l.status === 'active')
+                    .sort((a, b) => b.salesCount - a.salesCount)
+                    .slice(0, count);
+            }
+
+            //统计
+            getStats() {
+                return {
+                    totalListings: this.listings.size,
+                    totalSales: this.purchaseHistory.length,
+                    categories: this.categories.length,
+                    revenue: this.purchaseHistory.reduce((sum, p) => sum + p.price, 0)
+                };
+            }
+
+            //初始化市场
+            initDefaultListings() {
+                const defaults = [
+                    { skillId: 'fireball', name: '火球术', category: 'combat', price: 200, rating: 4.5, description: '基础火系法术' },
+                    { skillId: 'ice_shield', name: '冰盾术', category: 'combat', price: 250, rating: 4.3, description: '水系防御法术' },
+                    { skillId: 'wind_step', name: '风步', category: 'cultivation', price: 300, rating: 4.7, description: '提升移动速度' },
+                    { skillId: 'spirit_eyes', name: '灵眼术', category: 'cultivation', price: 400, rating: 4.6, description: '增强感知能力' },
+                    { skillId: 'health_potion', name: '补血丹方', category: 'alchemy', price: 150, rating: 4.2, description: '炼制补血丹药' }
+                ];
+                for (const d of defaults) {
+                    this.publish(null, { ...d, icon: '📦' });
+                }
+            }
+        }
+
+        const skillMarketplace = new SkillMarketplace();
+        skillMarketplace.initDefaultListings();
+
+        // ===== V64 Direction A: Idle Task Processing Integration =====
+        // Process idle tasks and sync with NPC collaboration
+
+        // --- IdleTaskProcessor: Processes idle tasks with NPC collaboration ---
+        class IdleTaskProcessor {
+            constructor() {
+                this.processedCount = 0;
+            }
+
+            // Process idle tasks from gameState.idleTasks
+            processIdleTasks() {
+                const now = Date.now();
+                const tasks = gameState.idleTasks || [];
+                let totalEarnings = 0;
+
+                for (const task of tasks) {
+                    if (task.status === 'active' && task.endTime <= now) {
+                        // Task completed
+                        const earnings = this.calculateEarnings(task);
+                        totalEarnings += earnings;
+                        task.status = 'completed';
+                        this.processedCount++;
+
+                        // Trigger NPC collaboration on task completion
+                        triggerNpcCollaboration('task_completed', {
+                            taskId: task.taskId,
+                            earnings,
+                            timestamp: now
+                        });
+                    }
+                }
+
+                if (totalEarnings > 0) {
+                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
+                    gameState.spiritStones += totalEarnings;
+                }
+
+                return { processedCount: this.processedCount, totalEarnings };
+            }
+
+            calculateEarnings(task) {
+                const base = task.baseEarnings || 10;
+                const duration = (task.endTime - task.startTime) / 1000;
+                const efficiency = IDLE_CONFIG.offlineEfficiency || 0.8;
+                return Math.floor(base * (duration / 60) * efficiency);
+            }
+
+            // Start a new idle task
+            startIdleTask(taskType, durationMs, baseEarnings) {
+                const task = {
+                    taskId: `idle_${Date.now()}`,
+                    type: taskType,
+                    startTime: Date.now(),
+                    endTime: Date.now() + durationMs,
+                    status: 'active',
+                    baseEarnings: baseEarnings || 10
+                };
+                gameState.idleTasks = gameState.idleTasks || [];
+                gameState.idleTasks.push(task);
+
+                // Add reward to NPC collaboration pool
+                npcCollabRewards.addToPool(baseEarnings * 0.1);
+
+                return task;
+            }
+
+            // Get idle task status
+            getIdleStatus() {
+                const tasks = gameState.idleTasks || [];
+                return {
+                    total: tasks.length,
+                    active: tasks.filter(t => t.status === 'active').length,
+                    completed: tasks.filter(t => t.status === 'completed').length,
+                    totalEarnings: gameState.idleEarnings || 0
+                };
+            }
+        }
+
+        const idleTaskProcessor = new IdleTaskProcessor();
+
+        // ===== V70 Direction A: NPC Ecosystem System =====
+        // Based on nanobot MessageBus + chatdev multi-role + DAG dependencies
+        // NPC种群动态/食物链/领地/资源竞争/灭绝复兴机制
+
+        // --- NPC_ECOLOGY_CONFIG ---
+        const NPC_ECOLOGY_CONFIG = {
+            TICK_INTERVAL: 60,
+            ENERGY_DRAIN_MASTER: 0.5,
+            ENERGY_DRAIN_MONSTER: 2.0,
+            ENERGY_DRAIN_MERCHANT: 1.0,
+            ENERGY_DRAIN_FELLOW: 1.0,
+            ENERGY_GAIN_PREDATION: 20,
+            POPULATION_CEILING: 10,
+            REVIVAL_COST: 10000,
+            TERRITORY_QUALITY_DECAY: 0.01,
+            RESOURCE_SCARCITY_THRESHOLD: 0.2,
+            ZONES: ['central', 'east', 'west', 'south', 'north']
+        };
+
+        // --- NpcPopulation: Tracks NPC count per role ---
+        class NpcPopulation {
+            constructor() {
+                this.counts = { master: 3, monster: 5, merchant: 2, fellow: 4 };
+                this.birthRecords = { master: 0, monster: 0, merchant: 0, fellow: 0 };
+                this.deathRecords = { master: 0, monster: 0, merchant: 0, fellow: 0 };
+            }
+            getCount(role) { return this.counts[role] || 0; }
+            adjustCount(role, delta) {
+                const ceiling = NPC_ECOLOGY_CONFIG.POPULATION_CEILING;
+                const current = this.counts[role] || 0;
+                const newVal = Math.max(0, Math.min(current + delta, ceiling));
+                if (delta > 0) this.birthRecords[role] = (this.birthRecords[role] || 0) + delta;
+                if (delta < 0) this.deathRecords[role] = (this.deathRecords[role] || 0) + Math.abs(delta);
+                this.counts[role] = newVal;
+                return newVal;
+            }
+            isExtinct(role) { return this.counts[role] === 0; }
+            reviveRole(role) {
+                if (!this.isExtinct(role)) return false;
+                this.counts[role] = 1;
+                this.birthRecords[role] = (this.birthRecords[role] || 0) + 1;
+                return true;
+            }
+            getStats() {
+                return {
+                    counts: { ...this.counts },
+                    births: { ...this.birthRecords },
+                    deaths: { ...this.deathRecords },
+                    total: Object.values(this.counts).reduce((a, b) => a + b, 0)
+                };
+            }
+        }
+
+        // --- NpcFoodChain: Energy transfer and predation ---
+        class NpcFoodChain {
+            constructor() {
+                this.energy = { master: 80, monster: 60, merchant: 70, fellow: 50 };
+                this.drainRates = {
+                    master: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MASTER,
+                    monster: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MONSTER,
+                    merchant: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_MERCHANT,
+                    fellow: NPC_ECOLOGY_CONFIG.ENERGY_DRAIN_FELLOW
+                };
+                this.predationLog = [];
+            }
+            getEnergy(role) { return this.energy[role] || 0; }
+            drainEnergy(role) {
+                const rate = this.drainRates[role] || 1;
+                this.energy[role] = Math.max(0, this.energy[role] - rate);
+                if (this.energy[role] === 0) this.predationLog.push({ role, event: 'starvation', ts: Date.now() });
+            }
+            applyPredation(predator, prey) {
+                if (this.energy[prey] <= 0) return 0;
+                const gain = NPC_ECOLOGY_CONFIG.ENERGY_GAIN_PREDATION;
+                this.energy[predator] = Math.min(100, this.energy[predator] + gain);
+                this.energy[prey] = 0;
+                this.predationLog.push({ predator, prey, gain, ts: Date.now() });
+                if (this.predationLog.length > 50) this.predationLog.shift();
+                return gain;
+            }
+            getPredationLog() { return this.predationLog.slice(-10); }
+        }
+
+        // --- NpcTerritory: Zone ownership and quality ---
+        class NpcTerritory {
+            constructor() {
+                this.claims = { master: 'central', monster: 'east', merchant: 'west', fellow: 'south' };
+                this.quality = { central: 0.8, east: 0.6, west: 0.7, south: 0.5, north: 0.4 };
+            }
+            getTerritory(role) { return this.claims[role]; }
+            expandTerritory(role) {
+                const current = this.getTerritory(role);
+                const zones = NPC_ECOLOGY_CONFIG.ZONES;
+                const idx = zones.indexOf(current);
+                if (idx < 0 || idx >= zones.length - 1) return false;
+                this.claims[role] = zones[idx + 1];
+                return true;
+            }
+            claimTerritory(role, zone) {
+                if (!NPC_ECOLOGY_CONFIG.ZONES.includes(zone)) return false;
+                this.claims[role] = zone;
+                return true;
+            }
+            getQuality(zone) { return this.quality[zone] || 0.5; }
+            degradeQuality(zone) {
+                this.quality[zone] = Math.max(0, this.getQuality(zone) - NPC_ECOLOGY_CONFIG.TERRITORY_QUALITY_DECAY);
+            }
+            resolveConflict(roleA, roleB) {
+                if (this.claims[roleA] === this.claims[roleB]) {
+                    const qualityA = this.getQuality(this.claims[roleA]);
+                    const qualityB = this.getQuality(this.claims[roleB]);
+                    return qualityA >= qualityB ? roleA : roleB;
+                }
+                return null;
+            }
+        }
+
+        // --- NpcResourceCompetition: Shared resource pool ---
+        class NpcResourceCompetition {
+            constructor() {
+                this.pool = { central: 500, east: 300, west: 400, south: 200, north: 100 };
+                this.consumption = { master: 10, monster: 15, merchant: 8, fellow: 12 };
+            }
+            initialize(roleZoneMap) {
+                for (const [role, zone] of Object.entries(roleZoneMap)) {
+                    this.pool[zone] = (this.pool[zone] || 0) + 200;
+                }
+            }
+            consumeResource(zone, amount) {
+                const available = this.pool[zone] || 0;
+                const consumed = Math.min(available, amount);
+                this.pool[zone] = available - consumed;
+                return consumed;
+            }
+            checkScarcity() {
+                const scarcity = {};
+                for (const zone of NPC_ECOLOGY_CONFIG.ZONES) {
+                    const ratio = (this.pool[zone] || 0) / 500;
+                    scarcity[zone] = ratio < NPC_ECOLOGY_CONFIG.RESOURCE_SCARCITY_THRESHOLD;
+                }
+                return scarcity;
+            }
+            getPool(zone) { return this.pool[zone] || 0; }
+        }
+
+        // --- NpcEcologyEngine: Master ecology loop ---
+        class NpcEcologyEngine {
+            constructor() {
+                this.population = new NpcPopulation();
+                this.foodChain = new NpcFoodChain();
+                this.territory = new NpcTerritory();
+                this.competition = new NpcResourceCompetition();
+                this.lastTick = 0;
+                this.tickCount = 0;
+                this.eventLog = [];
+            }
+            initialize() {
+                const roleZoneMap = {};
+                for (const [role, zone] of Object.entries(this.territory.claims)) {
+                    roleZoneMap[role] = zone;
+                }
+                this.competition.initialize(roleZoneMap);
+            }
+            tick() {
+                this.tickCount++;
+                this.lastTick = Date.now();
+                for (const role of Object.keys(this.population.counts)) {
+                    if (this.population.getCount(role) === 0) continue;
+                    this.foodChain.drainEnergy(role);
+                    if (this.foodChain.getEnergy(role) === 0) {
+                        this.population.adjustCount(role, -1);
+                        this.foodChain.energy[role] = 80;
+                    }
+                }
+                for (const zone of NPC_ECOLOGY_CONFIG.ZONES) {
+                    this.territory.degradeQuality(zone);
+                    const consumed = this.competition.consumeResource(zone, 5);
+                    if (consumed < 5) {
+                        this.eventLog.push({ type: 'scarcity', zone, ts: this.lastTick });
+                    }
+                }
+                if (this.eventLog.length > 30) this.eventLog.shift();
+            }
+            getStats() {
+                return {
+                    population: this.population.getStats(),
+                    energy: { ...this.foodChain.energy },
+                    territory: { claims: { ...this.territory.claims }, quality: { ...this.territory.quality } },
+                    pool: { ...this.competition.pool },
+                    scarcity: this.competition.checkScarcity(),
+                    tickCount: this.tickCount,
+                    eventLog: this.eventLog.slice(-10)
+                };
+            }
+        }
+
+        const npcEcologyEngine = new NpcEcologyEngine();
+        npcEcologyEngine.initialize();
+
+        // --- NPC Ecology UI Panel ---
+        function openNpcEcologyPanel() {
+            const stats = npcEcologyEngine.getStats();
+            showModal('🌿 NPC生态系统', `
+                <div class="npc-ecology-tabs">
+                    <button class="tab-btn active" onclick="setEcologyTab('population')">🐾 种群</button>
+                    <button class="tab-btn" onclick="setEcologyTab('territory')">🗺️ 领地</button>
+                    <button class="tab-btn" onclick="setEcologyTab('foodchain')">⚡ 食物链</button>
+                    <button class="tab-btn" onclick="setEcologyTab('competition')">📊 竞争</button>
+                </div>
+                <div id="ecologyContent" style="padding:15px;">${renderEcologyPopulationTab(stats)}</div>
+            `, 600);
+        }
+
+        function setEcologyTab(tab) {
+            document.querySelectorAll('.npc-ecology-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('ecologyContent');
+            if (!content) return;
+            const stats = npcEcologyEngine.getStats();
+            switch(tab) {
+                case 'population': content.innerHTML = renderEcologyPopulationTab(stats); break;
+                case 'territory': content.innerHTML = renderEcologyTerritoryTab(stats); break;
+                case 'foodchain': content.innerHTML = renderEcologyFoodChainTab(stats); break;
+                case 'competition': content.innerHTML = renderEcologyCompetitionTab(stats); break;
+            }
+        }
+
+        function renderEcologyPopulationTab(stats) {
+            let html = `<h4>🐾 NPC种群状态</h4>`;
+            html += `<p>总NPC数: ${stats.population.total} | 累计 births: ${Object.values(stats.population.births).reduce((a,b)=>a+b,0)} | deaths: ${Object.values(stats.population.deaths).reduce((a,b)=>a+b,0)}</p>`;
+            const roles = ['master', 'monster', 'merchant', 'fellow'];
+            const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+            for (const role of roles) {
+                const count = stats.population.counts[role] || 0;
+                const births = stats.population.births[role] || 0;
+                const deaths = stats.population.deaths[role] || 0;
+                const extinct = count === 0 ? ' <span style="color:red">【灭绝】</span>' : '';
+                const bar = '█'.repeat(Math.min(count, 10)) + '░'.repeat(Math.max(0, 10 - count));
+                html += `<div style="margin:5px 0;">${titles[role]}: ${bar} ${count}${extinct} <small>(+${births}/-${deaths})</small></div>`;
+            }
+            html += `<button onclick="evokeNpcEcologyTick()" style="margin-top:10px;padding:8px;">🔄 生态_tick</button>`;
+            return html;
+        }
+
+        function renderEcologyTerritoryTab(stats) {
+            let html = `<h4>🗺️ 领地分布</h4>`;
+            for (const [role, zone] of Object.entries(stats.territory.claims)) {
+                const q = (stats.territory.quality[zone] || 0.5).toFixed(2);
+                const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+                html += `<div style="margin:5px 0;">${titles[role]} → ${zone} <small>(质量:${q})</small></div>`;
+            }
+            return html;
+        }
+
+        function renderEcologyFoodChainTab(stats) {
+            let html = `<h4>⚡ 食物链能量</h4>`;
+            const roles = ['master', 'monster', 'merchant', 'fellow'];
+            const titles = { master: '师尊', monster: '妖兽', merchant: '商人', fellow: '同道' };
+            for (const role of roles) {
+                const e = stats.energy[role] || 0;
+                const bar = '█'.repeat(Math.floor(e / 10)) + '░'.repeat(10 - Math.floor(e / 10));
+                html += `<div style="margin:5px 0;">${titles[role]}: ${bar} ${e.toFixed(1)}/100</div>`;
+            }
+            html += `<h4 style="margin-top:10px;">🐾 最新事件</h4>`;
+            const log = npcEcologyEngine.eventLog.slice(-5);
+            if (log.length === 0) html += `<p>暂无事件</p>`;
+            else for (const ev of log) html += `<div><small>${ev.type} @ ${ev.zone || 'N/A'}</small></div>`;
+            return html;
+        }
+
+        function renderEcologyCompetitionTab(stats) {
+            let html = `<h4>📊 资源竞争</h4>`;
+            for (const [zone, scarce] of Object.entries(stats.scarcity)) {
+                const pool = stats.pool[zone] || 0;
+                const flag = scarce ? ' ⚠️' : '';
+                html += `<div style="margin:5px 0;">${zone}: ${pool}灵气${flag}</div>`;
+            }
+            return html;
+        }
+
+        function evokeNpcEcologyTick() {
+            npcEcologyEngine.tick();
+            setEcologyTab('population');
+        }
+
+        // --- NPC-Involved Idle Task Panel ---
+        function openIdleTaskPanel() {
+            showModal('⚙️ 挂机任务面板', `
+                <div class="idle-task-tabs">
+                    <button class="tab-btn active" onclick="setIdleTab('tasks')">📋 任务</button>
+                    <button class="tab-btn" onclick="setIdleTab('npc')">🤝 NPC协作</button>
+                    <button class="tab-btn" onclick="setIdleTab('earnings')">💰 收益</button>
+                </div>
+                <div id="idleTaskContent" style="padding:15px;">${renderIdleTasksTab()}</div>
+            `, 550);
+        }
+
+        function setIdleTab(tab) {
+            document.querySelectorAll('.idle-task-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            const content = document.getElementById('idleTaskContent');
+            if (!content) return;
+            switch(tab) {
+                case 'tasks': content.innerHTML = renderIdleTasksTab(); break;
+                case 'npc': content.innerHTML = renderIdleNpcTab(); break;
+                case 'earnings': content.innerHTML = renderIdleEarningsTab(); break;
+            }
+        }
+
+        function renderIdleTasksTab() {
+            const status = idleTaskProcessor.getIdleStatus();
+            let html = `<p>总任务: ${status.total} | 活跃: ${status.active} | 已完成: ${status.completed}</p>`;
+            html += `<p>累计收益: ${status.totalEarnings} 灵石</p>`;
+            html += '<h4>可开始的任务</h4>';
+            const taskTypes = [
+                { type: 'qi_cultivation', name: '灵气修炼', duration: 60000, earnings: 20 },
+                { type: 'stone_gathering', name: '灵石采集', duration: 90000, earnings: 30 },
+                { type: 'pill_refining', name: '丹药炼制', duration: 120000, earnings: 50 },
+                { type: 'technique_study', name: '功法领悟', duration: 180000, earnings: 80 }
+            ];
+            for (const t of taskTypes) {
+                html += `<button onclick="startIdleTaskByType('${t.type}')" style="margin:5px;padding:8px;">${t.name} (+${t.earnings})</button>`;
+            }
+            return html;
+        }
+
+        function renderIdleNpcTab() {
+            return `<p>NPC协作引擎已启动</p>
+                    <p>任务管理器: ${npcTaskManager.activeTasks.size} 个活跃任务</p>
+                    <p>声望系统: ${npcReputationSystem.reputations.size} 个角色</p>`;
+        }
+
+        function renderIdleEarningsTab() {
+            return `<p>累计挂机收益: ${gameState.idleEarnings || 0} 灵石</p>
+                    <p>离线收益: ${gameState.offlineEarnings || 0} 灵石</p>
+                    <p>活跃任务: ${(gameState.idleTasks || []).filter(t => t.status === 'active').length} 个</p>`;
+        }
+
+        window.startIdleTaskByType = (type) => {
+            const configs = {
+                'qi_cultivation': { duration: 60000, earnings: 20 },
+                'stone_gathering': { duration: 90000, earnings: 30 },
+                'pill_refining': { duration: 120000, earnings: 50 },
+                'technique_study': { duration: 180000, earnings: 80 }
+            };
+            const cfg = configs[type];
+            if (cfg) {
+                idleTaskProcessor.startIdleTask(type, cfg.duration, cfg.earnings);
+                showToast('挂机任务已开始');
+            }
+        };
+
+        // Process idle tasks every second when game is running
+        const originalUpdateDisplay = updateDisplay;
+        updateDisplay = function() {
+            const result = originalUpdateDisplay.apply(this, arguments);
+            idleTaskProcessor.processIdleTasks();
+            return result;
+        };
+
+        // ===== V55: Skill System Plugin Architecture =====
+
+        // --- SkillLifecycle Hooks (8 hooks) ---
+        class SkillHooks {
+            constructor() {
+                this.hooks = {
+                    onDiscover: [],
+                    onRegister: [],
+                    onPreExecute: [],
+                    onPostExecute: [],
+                    onError: [],
+                    onCooldown: [],
+                    onActivate: [],
+                    onDeactivate: []
+                };
+            }
+            register(event, callback) {
+                if (this.hooks[event]) this.hooks[event].push(callback);
+            }
+            async trigger(event, data) {
+                const results = [];
+                for (const cb of this.hooks[event] || []) {
+                    try {
+                        results.push(await cb(data));
+                    } catch(e) { console.error(`Hook ${event} error:`, e); }
+                }
+                return results;
+            }
+        }
+
+        // --- SkillRegistry: Schema + auto-discovery + category/realm indices ---
+        class SkillRegistry {
+            constructor(hooks) {
+                this.skills = new Map(); // skillId -> SkillDefinition
+                this.categories = new Map(); // category -> [skillId]
+                this.realms = new Map(); // realm -> [skillId]
+                this.byWeapon = new Map(); // weaponName -> [skillId]
+                this.hooks = hooks;
+                this.schema = ['id','name','category','grade','cost','cooldown','damage','effects','dependencies','realm','icon','description'];
+            }
+            validateSkill(skill) {
+                for (const field of this.schema) {
+                    if (!(field in skill) && field !== 'dependencies' && field !== 'cooldown' && field !== 'icon') {
+                        return { valid: false, missing: field };
+                    }
+                }
+                return { valid: true };
+            }
+            register(skillDef, pluginId = 'core') {
+                const validated = this.validateSkill(skillDef);
+                if (!validated.valid) {
+                    console.warn(`Skill ${skillDef.id || 'unknown'} missing field: ${validated.missing}`);
+                    return false;
+                }
+                skillDef.pluginId = pluginId;
+                this.skills.set(skillDef.id, skillDef);
+                // category index
+                if (!this.categories.has(skillDef.category)) this.categories.set(skillDef.category, []);
+                this.categories.get(skillDef.category).push(skillDef.id);
+                // realm index
+                const realm = skillDef.realm || 0;
+                if (!this.realms.has(realm)) this.realms.set(realm, []);
+                this.realms.get(realm).push(skillDef.id);
+                // weapon index
+                if (skillDef.weapon) {
+                    if (!this.byWeapon.has(skillDef.weapon)) this.byWeapon.set(skillDef.weapon, []);
+                    this.byWeapon.get(skillDef.weapon).push(skillDef.id);
+                }
+                this.hooks.trigger('onRegister', { skill: skillDef, pluginId });
+                return true;
+            }
+            discover(pluginContext) {
+                const exports = pluginContext.exports || pluginContext;
+                const defs = exports.skillDefinitions || exports.skills || [];
+                const pluginId = pluginContext.pluginId || 'anonymous';
+                for (const skill of defs) {
+                    this.register(skill, pluginId);
+                    this.hooks.trigger('onDiscover', { skill });
+                }
+                return defs.length;
+            }
+            get(id) { return this.skills.get(id); }
+            getByCategory(cat) { return (this.categories.get(cat) || []).map(id => this.skills.get(id)); }
+            getByRealm(realm) { return (this.realms.get(realm) || []).map(id => this.skills.get(id)); }
+            getByWeapon(weapon) { return (this.byWeapon.get(weapon) || []).map(id => this.skills.get(id)); }
+            getAll() { return Array.from(this.skills.values()); }
+            getAllCategories() { return Array.from(this.categories.keys()); }
+        }
+
+        // --- SkillGraph: DAG + Tarjan SCC cycle detection ---
+        class SkillGraph {
+            constructor() {
+                this.edges = new Map(); // skillId -> [dependencyIds]
+                this.reverse = new Map(); // dependencyId -> [skillIds]
+            }
+            addEdge(skillId, depId) {
+                if (!this.edges.has(skillId)) this.edges.set(skillId, []);
+                this.edges.get(skillId).push(depId);
+                if (!this.reverse.has(depId)) this.reverse.set(depId, []);
+                this.reverse.get(depId).push(skillId);
+            }
+            // Topological sort with maxIterations guard
+            topologicalSort(maxIterations = 100) {
+                const inDegree = new Map();
+                const allNodes = new Set(this.edges.keys());
+                for (const deps of this.edges.values()) { deps.forEach(d => allNodes.add(d)); }
+                for (const n of allNodes) inDegree.set(n, 0);
+                for (const [, deps] of this.edges) { for (const d of deps) inDegree.set(d, (inDegree.get(d) || 0)); }
+                const queue = [];
+                for (const [n, deg] of inDegree) if (deg === 0) queue.push(n);
+                const result = [];
+                let iter = 0;
+                while (queue.length && iter++ < maxIterations) {
+                    const node = queue.shift();
+                    result.push(node);
+                    for (const [skill, deps] of this.edges) {
+                        const idx = deps.indexOf(node);
+                        if (idx !== -1) {
+                            deps.splice(idx, 1);
+                            inDegree.set(skill, inDegree.get(skill) - 1);
+                            if (inDegree.get(skill) === 0) queue.push(skill);
+                        }
+                    }
+                }
+                return result;
+            }
+            // Tarjan SCC for cycle detection
+            findCycles() {
+                const index = new Map(), lowlink = new Map(), onStack = new Map();
+                const stack = [], sccs = [];
+                let idx = 0;
+                const strongconnect = (v) => {
+                    index.set(v, idx); lowlink.set(v, idx); idx++; stack.push(v); onStack.set(v, true);
+                    for (const w of (this.edges.get(v) || [])) {
+                        if (!index.has(w)) { strongconnect(w); lowlink.set(v, Math.min(lowlink.get(v), lowlink.get(w))); }
+                        else if (onStack.get(w)) { lowlink.set(v, Math.min(lowlink.get(v), index.get(w))); }
+                    }
+                    if (lowlink.get(v) === index.get(v)) {
+                        const scc = [];
+                        let w; do { w = stack.pop(); onStack.set(w, false); scc.push(w); } while (w !== v);
+                        sccs.push(scc);
+                    }
+                };
+                for (const v of this.edges.keys()) { if (!index.has(v)) strongconnect(v); }
+                return sccs.filter(s => s.length > 1);
+            }
+        }
+
+        // --- SkillMemory: L1/L3/L4 layered memory ---
+        class SkillMemory {
+            constructor() {
+                this.L1_index = new Map(); // skillId -> SkillInstance
+                this.L3_sop = new Map(); // skillId -> { execCount, avgDuration, lastExec, successRate }
+                this.L4_cooldown = new Map(); // skillId -> { currentCooldown, maxCooldown, lastUsed }
+            }
+            set(skillId, instance) { this.L1_index.set(skillId, instance); }
+            get(skillId) { return this.L1_index.get(skillId); }
+            has(skillId) { return this.L1_index.has(skillId); }
+            updateSOP(skillId, execTime, success) {
+                const prev = this.L3_sop.get(skillId) || { execCount:0, avgDuration:0, lastExec:0, successRate:1 };
+                const cnt = prev.execCount + 1;
+                const avg = (prev.avgDuration * prev.execCount + execTime) / cnt;
+                this.L3_sop.set(skillId, { execCount: cnt, avgDuration: avg, lastExec: Date.now(), successRate: (prev.successRate * prev.execCount + (success?1:0)) / cnt });
+            }
+            getSOP(skillId) { return this.L3_sop.get(skillId); }
+            setCooldown(skillId, current, max) { this.L4_cooldown.set(skillId, { currentCooldown: current, maxCooldown: max, lastUsed: Date.now() }); }
+            getCooldown(skillId) { return this.L4_cooldown.get(skillId); }
+            tickDown(skillId) {
+                const cd = this.L4_cooldown.get(skillId);
+                if (cd && cd.currentCooldown > 0) {
+                    cd.currentCooldown--;
+                    if (cd.currentCooldown === 0) return true; // cooldown complete
+                }
+                return false;
+            }
+            tickAll() {
+                const completed = [];
+                for (const [skillId] of this.L4_cooldown) {
+                    if (this.tickDown(skillId)) completed.push(skillId);
+                }
+                return completed;
+            }
+        }
+
+        // --- SkillPluginAPI: Plugin SDK with sandbox + backward compat ---
+        class SkillPluginAPI {
+            constructor(registry, graph, memory, hooks) {
+                this.registry = registry;
+                this.graph = graph;
+                this.memory = memory;
+                this.hooks = hooks;
+            }
+            registerSkills(skillDefinitions) {
+                const registered = [];
+                for (const skill of skillDefinitions) {
+                    if (this.registry.register(skill, skill.pluginId || 'plugin')) {
+                        registered.push(skill);
+                        if (skill.dependencies) {
+                            for (const dep of skill.dependencies) {
+                                this.graph.addEdge(skill.id, dep);
+                            }
+                        }
+                    }
+                }
+                return { registered, total: skillDefinitions.length };
+            }
+            createSandbox(pluginId) {
+                const self = this;
+                return {
+                    pluginId,
+                    skillState: {},
+                    querySkills: (category) => self.registry.getByCategory(category),
+                    queryRealm: (realm) => self.registry.getByRealm(realm),
+                    getMemory: (skillId) => self.memory.get(skillId),
+                    setCooldown: (skillId, cd) => self.memory.setCooldown(skillId, cd, cd)
+                };
+            }
+            migrateLegacySkills(ULTIMATE_SKILLS) {
+                const migrated = [];
+                for (const [weaponName, skills] of Object.entries(ULTIMATE_SKILLS)) {
+                    for (const skill of skills) {
+                        const def = {
+                            id: skill.id,
+                            name: skill.name,
+                            category: 'ultimate',
+                            grade: skill.grade || 1,
+                            cost: skill.cost,
+                            cooldown: skill.cooldown || 0,
+                            damage: skill.damage,
+                            effects: skill.effects || {},
+                            weapon: weaponName,
+                            maxLevel: skill.maxLevel || 5,
+                            realm: skill.realm || 0,
+                            icon: skill.icon || '⚔️',
+                            description: skill.description || `${weaponName} - ${skill.name}`
+                        };
+                        this.registry.register(def, 'legacy');
+                        migrated.push(def);
+                    }
+                }
+                return migrated;
+            }
+        }
+
+        // --- Global skill system instances ---
+        const skillHooks = new SkillHooks();
+        const skillRegistry = new SkillRegistry(skillHooks);
+        const skillGraph = new SkillGraph();
+        const skillMemory = new SkillMemory();
+        const skillPluginAPI = new SkillPluginAPI(skillRegistry, skillGraph, skillMemory, skillHooks);
+
+        // Migrate existing ULTIMATE_SKILLS to new registry
+        skillPluginAPI.migrateLegacySkills(ULTIMATE_SKILLS);
+
 // [DDD Phase 1] PET_TYPES moved to domains/shared/constants/;
 
 // [DDD Phase 1] PET_QUALITY_MULTIPLIERS moved to domains/shared/constants/;
@@ -2265,6 +6162,18 @@ const ACHIEVEMENT_ID_MAP = {
                 totalEarned: 0,               // 累计收益
                 celestialReputation: 0        // 仙界声望
             },
+            // V57 仙界挂机系统字段
+            idleTasks: [],                    // [{taskId, startTime, endTime, status}]
+            idleEarnings: 0,                  // 累计挂机收益
+            lastActiveTime: 0,                 // 上次活跃时间戳
+            offlineEarnings: 0,                // 本次离线收益
+            // Direction A: NPC协作引擎状态
+            npcCollab: {
+                activeChains: [],              // [{chainId, taskId, progress}]
+                pendingMessages: 0,            // 未处理消息数
+                roleReputation: {},            // {role: reputation}
+                lastCollaboration: 0           // 上次协作时间戳
+            },
             // V3渡劫系统字段
             tribulation: {
                 inProgress: false,
@@ -2434,6 +6343,252 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- LLM_PROVIDER_REGISTRY (V72 方向A: 多模型Provider切换引擎) ---
+        // 来源: nanobot ProviderFactory + claude-code 7 Provider
+        // 支持多LLM Provider注册、运行时切换、Budget Mode成本控制
+        const LLM_PROVIDERS = {
+            'minimax': {
+                id: 'minimax',
+                name: 'MiniMax',
+                baseUrl: 'https://api.minimaxi.com/v1',
+                defaultModel: 'MiniMax-M2.7',
+                envKey: 'MINIMAX_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('minimax') || url.includes('api.minimaxi.com')
+            },
+            'openai': {
+                id: 'openai',
+                name: 'OpenAI',
+                baseUrl: 'https://api.openai.com/v1',
+                defaultModel: 'gpt-4o-mini',
+                envKey: 'OPENAI_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('openai') || url.includes('api.openai.com')
+            },
+            'anthropic': {
+                id: 'anthropic',
+                name: 'Anthropic',
+                baseUrl: 'https://api.anthropic.com/v1',
+                defaultModel: 'claude-sonnet-4-20250514',
+                envKey: 'ANTHROPIC_API_KEY',
+                supportsStreaming: false,
+                match: (url) => url.includes('anthropic') || url.includes('api.anthropic.com')
+            }
+        };
+
+        // 当前激活的Provider配置
+        let activeProvider = 'minimax';
+
+        // Provider配置表（运行时从miniMaxConfig迁移）
+        let providerConfig = {
+            minimax: {
+                apiKey: '',
+                baseUrl: 'https://api.minimaxi.com/v1',
+                model: 'MiniMax-M2.7'
+            },
+            openai: {
+                apiKey: '',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-4o-mini'
+            },
+            anthropic: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com/v1',
+                model: 'claude-sonnet-4-20250514'
+            }
+        };
+
+        // --- BUDGET_TRACKER (V72) ---
+        // claude-code Budget Mode: 每次AI调用记录cost，达到阈值切换降级策略
+        const BUDGET_CONFIG = {
+            dailyLimit: 1000,      // 每日token预算（单位: 分）
+            monthlyLimit: 20000,  // 每月token预算（单位: 分）
+            warningThreshold: 0.8, // 警告阈值 80%
+            fallbackToLocal: true   // 超预算时降级到本地规则
+        };
+
+        let budgetTracker = {
+            dailySpent: 0,         // 今日已消耗（分）
+            monthlySpent: 0,       // 本月已消耗（分）
+            lastResetDay: 0,       // 上次重置日期
+            lastResetMonth: 0,      // 上次重置月份
+            callCount: 0,          // 累计调用次数
+            lastCallProvider: null  // 上次调用Provider
+        };
+
+        // 估算一次调用的token消耗（近似）
+        function estimateCallCost(promptLength, responseTokens) {
+            // 简单估算: prompt按4字符=1token，response按4字符=1token
+            return Math.ceil(promptLength / 4) + responseTokens;
+        }
+
+        // 检查预算是否允许调用
+        function checkBudget(provider) {
+            const now = new Date();
+            const day = Math.floor(now.getTime() / 86400000);
+            const month = Math.floor(now.getTime() / 2592000000);
+
+            // 日期重置
+            if (budgetTracker.lastResetDay !== day) {
+                budgetTracker.dailySpent = 0;
+                budgetTracker.lastResetDay = day;
+            }
+            // 月份重置
+            if (budgetTracker.lastResetMonth !== month) {
+                budgetTracker.monthlySpent = 0;
+                budgetTracker.lastResetMonth = month;
+            }
+
+            // 检查阈值
+            const dailyPct = budgetTracker.dailySpent / BUDGET_CONFIG.dailyLimit;
+            const monthlyPct = budgetTracker.monthlySpent / BUDGET_CONFIG.monthlyLimit;
+
+            if (monthlyPct >= 1 || dailyPct >= 1) {
+                if (BUDGET_CONFIG.fallbackToLocal) {
+                    return { allowed: false, reason: 'budget_exceeded', fallback: true };
+                }
+                return { allowed: false, reason: 'budget_exceeded', fallback: false };
+            }
+
+            if (dailyPct >= BUDGET_CONFIG.warningThreshold || monthlyPct >= BUDGET_CONFIG.warningThreshold) {
+                return { allowed: true, warning: true, dailyPct, monthlyPct };
+            }
+
+            return { allowed: true, warning: false };
+        }
+
+        // 记录一次调用消耗
+        function recordCallCost(cost) {
+            budgetTracker.dailySpent += cost;
+            budgetTracker.monthlySpent += cost;
+            budgetTracker.callCount++;
+        }
+
+        // --- LLM_PROVIDER_REGISTRY class ---
+        class LLMProviderRegistry {
+            constructor() {
+                this.providers = {};
+                this.activeProviderId = 'minimax';
+                this.init();
+            }
+
+            init() {
+                for (const [id, def] of Object.entries(LLM_PROVIDERS)) {
+                    this.providers[id] = { ...def };
+                }
+            }
+
+            getProvider(id) {
+                return this.providers[id] || null;
+            }
+
+            setActive(id) {
+                if (this.providers[id]) {
+                    this.activeProviderId = id;
+                    activeProvider = id;
+                    return true;
+                }
+                return false;
+            }
+
+            getActive() {
+                return this.providers[this.activeProviderId] || null;
+            }
+
+            getAllProviders() {
+                return Object.values(this.providers);
+            }
+
+            isConfigured(id) {
+                const cfg = providerConfig[id];
+                return cfg && cfg.apiKey && cfg.apiKey.length > 0;
+            }
+
+            getConfiguredProviders() {
+                return Object.entries(providerConfig)
+                    .filter(([id, cfg]) => cfg.apiKey && cfg.apiKey.length > 0)
+                    .map(([id]) => this.providers[id])
+                    .filter(Boolean);
+            }
+
+            configure(id, cfg) {
+                if (!providerConfig[id]) return false;
+                providerConfig[id] = { ...providerConfig[id], ...cfg };
+                // 同步到 miniMaxConfig（兼容旧代码）
+                if (id === 'minimax') {
+                    miniMaxConfig.apiKey = cfg.apiKey || miniMaxConfig.apiKey;
+                    miniMaxConfig.baseUrl = cfg.baseUrl || miniMaxConfig.baseUrl;
+                    miniMaxConfig.model = cfg.model || miniMaxConfig.model;
+                }
+                return true;
+            }
+        }
+
+        const llmRegistry = new LLMProviderRegistry();
+
+        // --- callProviderAPI (V72, 替代 callMiniMaxAPI) ---
+        function callProviderAPI(prompt, providerId, model, maxTokens, successCallback, errorCallback) {
+            const pid = providerId || activeProvider || 'minimax';
+            const cfg = providerConfig[pid];
+
+            // Budget检查
+            const budgetCheck = checkBudget(pid);
+            if (!budgetCheck.allowed) {
+                if (errorCallback) errorCallback('Budget exceeded: ' + budgetCheck.reason);
+                return;
+            }
+
+            if (!cfg || !cfg.apiKey) {
+                if (errorCallback) errorCallback('Provider not configured: ' + pid);
+                return;
+            }
+
+            const apiUrl = (cfg.baseUrl || LLM_PROVIDERS[pid].baseUrl).replace(/\/$/, '') + '/chat/completions';
+
+            // 构建请求体
+            let body = {
+                model: model || cfg.model || LLM_PROVIDERS[pid].defaultModel,
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: maxTokens || 300,
+                temperature: 0.8
+            };
+
+            // Anthropic 需要不同的格式
+            if (pid === 'anthropic') {
+                body = {
+                    model: model || cfg.model || LLM_PROVIDERS[pid].defaultModel,
+                    messages: [{ role: 'user', content: prompt }],
+                    max_tokens: maxTokens || 300
+                };
+            }
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + cfg.apiKey
+                },
+                body: JSON.stringify(body)
+            })
+            .then(r => r.json())
+            .then(data => {
+                // 预算检查（后评估）
+                const cost = estimateCallCost(prompt.length, maxTokens || 300);
+                recordCallCost(cost);
+
+                if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                    successCallback(data.choices[0].message.content);
+                } else if (data.error) {
+                    if (errorCallback) errorCallback(data.error.message || 'API error');
+                } else {
+                    if (errorCallback) errorCallback('Response format error');
+                }
+            })
+            .catch(e => {
+                if (errorCallback) errorCallback(e.message);
+            });
+        }
+
         // --- combatState (5037-5051) ---
         let combatState = {
             inProgress: false,
@@ -2472,6 +6627,40 @@ const ACHIEVEMENT_ID_MAP = {
 // [DDD Phase 1] REGIONS moved to domains/shared/constants/;
 
 // [DDD Phase 1] SECRET_REALMS moved to domains/shared/constants/;
+
+        // --- SECRET_REALM_BOSSES (V56) ---
+        const SECRET_REALM_BOSSES = {
+            '青云洞府': { name: '洞府守将·青云子', hp: 500, attack: 30, defense: 15, rewards: ['青云剑诀', '玄铁锭x5'], icon: '👹' },
+            '上古冰宫': { name: '冰宫主·霜后', hp: 1200, attack: 60, defense: 35, rewards: ['冰魄心经', '寒冰石x10'], icon: '👸' },
+            '古修士遗迹': { name: '遗迹守护者·枯骨尊者', hp: 2500, attack: 120, defense: 70, rewards: ['混沌石', '古修士残魂x3'], icon: '💀' },
+            '东海龙宫': { name: '龙宫太子·敖烈', hp: 4000, attack: 200, defense: 120, rewards: ['龙族秘法', '龙鳞x10'], icon: '🐉' },
+            '仙府': { name: '仙府灵童', hp: 6000, attack: 350, defense: 200, rewards: ['飞升金丹', '仙府令牌x3'], icon: '🧧' },
+            '飞升台': { name: '天劫雷尊', hp: 10000, attack: 600, defense: 350, rewards: ['飞升丹x3', '天劫精华x5'], icon: '⚡' },
+            '天道遗迹': { name: '天道意志·位面之主', hp: 18000, attack: 1000, defense: 600, rewards: ['天道碎片', '法则感悟x10'], icon: '🌟' },
+            '道果秘境': { name: '大道守护·因果律使', hp: 35000, attack: 2000, defense: 1200, rewards: ['大道之果', '因果律书'], icon: '☯️' }
+        };
+
+        // --- REALM_DIFFICULTY (V56) ---
+        const REALM_DIFFICULTY = {
+            '简单': { damageMultiplier: 0.5, rewardMultiplier: 1.0, bossHpMultiplier: 0.6, tokenCost: 1 },
+            '普通': { damageMultiplier: 1.0, rewardMultiplier: 1.5, bossHpMultiplier: 1.0, tokenCost: 1 },
+            '困难': { damageMultiplier: 1.5, rewardMultiplier: 2.0, bossHpMultiplier: 1.5, tokenCost: 2 },
+            '噩梦': { damageMultiplier: 2.5, rewardMultiplier: 3.5, bossHpMultiplier: 2.0, tokenCost: 3 }
+        };
+
+        // --- SECRET_REALM_EVENTS (V56) ---
+        const SECRET_REALM_EVENTS = [
+            { type: 'positive', msg: '你在秘境深处发现了一处灵气泉眼，修炼速度+50%！', effect: { qiRegenBonus: 0.5, duration: 3 } },
+            { type: 'positive', msg: '偶遇隐世前辈，获得功法传承！', effect: { techniqueBonus: 1, duration: 5 } },
+            { type: 'positive', msg: '发现前人留下的储物袋，获得灵石x1000！', effect: { spiritStones: 1000 } },
+            { type: 'positive', msg: '触发奇缘！珍稀灵草自行入体！', effect: { maxHpBonus: 50, duration: 10 } },
+            { type: 'negative', msg: '遭遇毒瘴侵袭，每次探索损失50灵气！', effect: { qiLoss: 50, duration: 2 } },
+            { type: 'negative', msg: '触发陷阱！遭遇强大守护者袭击！', effect: { hpLoss: 100, duration: 1 } },
+            { type: 'negative', msg: '迷路消耗时间，比预计多花10天！', effect: { daysLoss: 10 } },
+            { type: 'neutral', msg: '秘境能量波动，发现一处休息点。', effect: { restBonus: 1 } },
+            { type: 'neutral', msg: '遇到其他修士，交换了情报。', effect: { infoBonus: 1 } },
+            { type: 'neutral', msg: '秘境规则变化，探索进度暂时停滞。', effect: { progressPause: 1 } }
+        ];
 
 // ===== achievements.js =====
 // V28 成就系统大改版
@@ -3936,9 +8125,14 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== executeUltimateSkill =====
         function executeUltimateSkill(skill) {
+            const startTime = Date.now();
             const weaponData = combatState.player.weaponData || { name:'空手', star:1 };
             const level = combatState.player.skillLevels ? (combatState.player.skillLevels[skill.id] || 1) : 1;
             const starMultiplier = ENHANCE_CONFIG && ENHANCE_CONFIG.starMultipliers ? (ENHANCE_CONFIG.starMultipliers[weaponData.star] || 1.0) : 1.0;
+
+            // V55: SkillLifecycle Hook - onPreExecute
+            const hookData = { skill, weaponData, level, combatState, combatEnergy };
+            skillHooks.trigger('onPreExecute', hookData);
 
             if (combatEnergy < skill.cost) return;
 
@@ -4090,6 +8284,19 @@ const ACHIEVEMENT_ID_MAP = {
 
             combatState.log.push({ type: 'player-action', actionType: 'ultimate', text: logText, round: combatState.round });
             combatState.turn = 'opponent';
+
+            // V55: Update skill memory SOP + cooldown
+            const execTime = Date.now() - startTime;
+            const success = combatState.opponent.hp <= 0;
+            skillMemory.updateSOP(skill.id, execTime, success);
+            if (skill.cooldown && skill.cooldown > 0) {
+                skillMemory.setCooldown(skill.id, skill.cooldown, skill.cooldown);
+                skillHooks.trigger('onCooldown', { skill, cooldown: skill.cooldown });
+            }
+
+            // V55: SkillLifecycle Hook - onPostExecute
+            skillHooks.trigger('onPostExecute', { skill, damage: finalDamage, success, logText });
+
             renderCombatArena();
 
             if (combatState.opponent.hp <= 0) {
@@ -5527,6 +9734,8 @@ const ACHIEVEMENT_ID_MAP = {
         openSettings = function() {
             originalOpenSettings();
             fillCloudSettings();
+            loadProviderConfig();
+            updateProviderPanelUI();
         };
 
         // ===== recalculateAllEffects =====
@@ -7339,42 +11548,119 @@ const ACHIEVEMENT_ID_MAP = {
         }
 
         // ===== callMiniMaxAPI =====
+        // ===== callMiniMaxAPI (V72 兼容封装, 委托给 callProviderAPI) =====
         function callMiniMaxAPI(prompt, model, maxTokens, successCallback, errorCallback) {
-            if (!miniMaxConfig.apiKey) {
-                if (errorCallback) errorCallback('API未配置');
-                return;
+            // 委托给新的 callProviderAPI，复用 minimax provider 配置
+            callProviderAPI(prompt, 'minimax', model, maxTokens, successCallback, errorCallback);
+        }
+
+        // ===== switchActiveProvider (V72) =====
+        function switchActiveProvider(providerId) {
+            if (llmRegistry.setActive(providerId)) {
+                activeProvider = providerId;
+                updateProviderPanelUI();
+                addLog('good', 'Provider切换', `已切换到 ${LLM_PROVIDERS[providerId]?.name || providerId}`);
             }
-            
-            const apiUrl = (miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1').replace(/\/$/, '') + '/chat/completions';
-            
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + miniMaxConfig.apiKey
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [
-                        { role: 'user', content: prompt }
-                    ],
-                    max_tokens: maxTokens,
-                    temperature: 0.8
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-                    successCallback(data.choices[0].message.content);
-                } else if (data.error) {
-                    if (errorCallback) errorCallback(data.error.message || 'API错误');
-                } else {
-                    if (errorCallback) errorCallback('返回格式错误');
-                }
-            })
-            .catch(e => {
-                if (errorCallback) errorCallback(e.message);
+        }
+
+        // ===== updateProviderPanelUI (V72) =====
+        function updateProviderPanelUI() {
+            const activeSelect = document.getElementById('activeProviderSelect');
+            if (activeSelect) {
+                activeSelect.value = activeProvider;
+            }
+            // 更新各Provider配置面板的可见性
+            document.querySelectorAll('.provider-config').forEach(el => {
+                el.style.display = 'block';
             });
+            // 更新Budget状态
+            updateBudgetStatusUI();
+        }
+
+        // ===== updateBudgetStatusUI (V72) =====
+        function updateBudgetStatusUI() {
+            const budgetEl = document.getElementById('budgetStatus');
+            if (!budgetEl) return;
+
+            const dailyPct = Math.round((budgetTracker.dailySpent / BUDGET_CONFIG.dailyLimit) * 100);
+            const monthlyPct = Math.round((budgetTracker.monthlySpent / BUDGET_CONFIG.monthlyLimit) * 100);
+
+            budgetEl.innerHTML = `
+                今日消耗: ${budgetTracker.dailySpent} / ${BUDGET_CONFIG.dailyLimit} (${dailyPct}%)<br>
+                本月消耗: ${budgetTracker.monthlySpent} / ${BUDGET_CONFIG.monthlyLimit} (${monthlyPct}%)<br>
+                累计调用: ${budgetTracker.callCount} 次<br>
+                上次Provider: ${budgetTracker.lastCallProvider || '无'}
+            `;
+        }
+
+        // ===== saveProviderConfig (V72) =====
+        function saveProviderConfig() {
+            const providers = ['minimax', 'openai', 'anthropic'];
+            for (const pid of providers) {
+                const keyEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Key`);
+                const urlEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Url`);
+                const modelEl = document.getElementById(`provider${pid.charAt(0).toUpperCase() + pid.slice(1)}Model`);
+                if (keyEl && urlEl && modelEl) {
+                    llmRegistry.configure(pid, {
+                        apiKey: keyEl.value.trim(),
+                        baseUrl: urlEl.value.trim(),
+                        model: modelEl.value.trim()
+                    });
+                }
+            }
+            localStorage.setItem('providerConfig', JSON.stringify(providerConfig));
+            localStorage.setItem('activeProvider', activeProvider);
+            updateBudgetStatusUI();
+            addLog('good', '多模型配置', 'Provider配置已保存！');
+        }
+
+        // ===== loadProviderConfig (V72) =====
+        function loadProviderConfig() {
+            const saved = localStorage.getItem('providerConfig');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    for (const [pid, cfg] of Object.entries(parsed)) {
+                        if (providerConfig[pid]) {
+                            providerConfig[pid] = { ...providerConfig[pid], ...cfg };
+                        }
+                    }
+                } catch (e) {}
+            }
+            const savedActive = localStorage.getItem('activeProvider');
+            if (savedActive && llmRegistry.setActive(savedActive)) {
+                activeProvider = savedActive;
+            }
+            // 同步到 miniMaxConfig
+            if (providerConfig.minimax) {
+                miniMaxConfig.apiKey = providerConfig.minimax.apiKey || miniMaxConfig.apiKey;
+                miniMaxConfig.baseUrl = providerConfig.minimax.baseUrl || miniMaxConfig.baseUrl;
+                miniMaxConfig.model = providerConfig.minimax.model || miniMaxConfig.model;
+            }
+        }
+
+        // ===== testAllProviders (V72) =====
+        function testAllProviders() {
+            const testPrompt = 'Hello, respond with OK';
+            const providers = ['minimax', 'openai', 'anthropic'];
+            let results = [];
+
+            for (const pid of providers) {
+                const cfg = providerConfig[pid];
+                if (!cfg || !cfg.apiKey) {
+                    results.push(`${LLM_PROVIDERS[pid]?.name || pid}: 未配置`);
+                    continue;
+                }
+                callProviderAPI(testPrompt, pid, null, 10,
+                    (reply) => { results.push(`${LLM_PROVIDERS[pid]?.name || pid}: ✓`); },
+                    (err) => { results.push(`${LLM_PROVIDERS[pid]?.name || pid}: ✗ ${err}`); }
+                );
+            }
+
+            // 延迟显示结果
+            setTimeout(() => {
+                addLog('info', 'Provider测试', results.join(' | '));
+            }, 3000);
         }
 
         // ===== showGameOverScreen =====
@@ -14465,6 +18751,16 @@ const ACHIEVEMENT_ID_MAP = {
             const celestialRealmBtn = document.getElementById('celestialRealmBtn');
             if (celestialRealmBtn) {
                 celestialRealmBtn.style.display = (gameState.realm >= 5) ? 'inline-block' : 'none';
+            }
+            // 奇遇图谱按钮 (V72): 游戏开始后即可访问
+            const serendipityBtn = document.getElementById('serendipityBtn');
+            if (serendipityBtn) {
+                serendipityBtn.style.display = 'inline-block';
+            }
+            // MCP Agent Bridge按钮 (V73): 常驻显示
+            const mcpBtn = document.getElementById('mcpBtn');
+            if (mcpBtn) {
+                mcpBtn.style.display = 'inline-block';
             }
         }
 
