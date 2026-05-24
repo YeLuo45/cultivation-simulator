@@ -405,6 +405,8 @@
 
             // NPC查询
             mcpNpcQuery(npcId, query) {
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 if (!gameState.npcCollab) return { error: 'NPC system not initialized' };
                 const npc = gameState.npcCollab.npcs ? gameState.npcCollab.npcs.find(n => n.id === npcId || n.name === npcId) : null;
                 if (!npc) return { error: `NPC not found: ${npcId}` };
@@ -442,6 +444,8 @@
 
             // 奇遇触发
             mcpSerendipityTrigger(nodeId) {
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 if (!gameState.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
                 const node = gameState.serendipityDAG.nodes ? gameState.serendipityDAG.nodes.get(nodeId) : null;
                 if (!node) return { error: `Serendipity node not found: ${nodeId}` };
@@ -481,6 +485,8 @@
 
             // 物品兑换
             mcpItemExchange(itemId, target) {
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 const item = findItemById(itemId);
                 if (!item) return { error: `Item not found: ${itemId}` };
 
@@ -495,6 +501,8 @@
 
             // 游戏状态查询
             mcpGameStateQuery(field) {
+                if (typeof gameState === 'undefined') return { error: 'Game state not initialized' };
+                if (!gameState) return { error: 'Game state not initialized' };
                 switch (field) {
                     case 'realm':
                         return { realm: gameState.realm, stage: gameState.stage, level: gameState.level };
@@ -544,22 +552,34 @@
 
             // Provider查询
             mcpProviders() {
-                const providers = llmRegistry.getAllProviders().map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    isConfigured: llmRegistry.isConfigured(p.id),
-                    isActive: p.id === llmRegistry.activeProviderId
-                }));
-                return { providers, activeProvider: llmRegistry.activeProviderId };
+                try {
+                    let reg = window.llmRegistry;
+                    if (!reg) return { error: 'LLM Registry not initialized', providers: [] };
+                    const providers = reg.getAllProviders().map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        isConfigured: reg.isConfigured(p.id),
+                        isActive: p.id === reg.activeProviderId
+                    }));
+                    return { providers, activeProvider: reg.activeProviderId };
+                } catch (e) {
+                    return { error: 'LLM Registry not available: ' + e.message, providers: [] };
+                }
             }
 
             // Provider切换
             mcpSwitchProvider(providerId) {
-                const success = llmRegistry.setActive(providerId);
-                if (success) {
-                    return { success: true, provider: providerId, message: `Switched to ${providerId}` };
+                try {
+                    if (typeof llmRegistry === 'undefined') return { error: 'LLM Registry not initialized' };
+                    if (!llmRegistry) return { error: 'LLM Registry not initialized' };
+                    const success = llmRegistry.setActive(providerId);
+                    if (success) {
+                        return { success: true, provider: providerId, message: `Switched to ${providerId}` };
+                    }
+                    return { error: `Failed to switch to provider: ${providerId}` };
+                } catch (e) {
+                    return { error: 'LLM Registry not available: ' + e.message };
                 }
-                return { error: `Failed to switch to provider: ${providerId}` };
             }
         }
 
@@ -578,12 +598,17 @@
         // --- MCP UI Panel (openMcpPanel) ---
         function openMcpPanel() {
             closePanel('mcpPanel');
-            const providers = llmRegistry.getAllProviders().map(p => ({
-                id: p.id,
-                name: p.name,
-                isConfigured: llmRegistry.isConfigured(p.id),
-                isActive: p.id === llmRegistry.activeProviderId
-            }));
+            let providers = [];
+            try {
+                if (typeof llmRegistry !== 'undefined' && llmRegistry) {
+                    providers = llmRegistry.getAllProviders().map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        isConfigured: llmRegistry.isConfigured(p.id),
+                        isActive: p.id === llmRegistry.activeProviderId
+                    }));
+                }
+            } catch (e) { console.warn('openMcpPanel: llmRegistry not available', e); }
 
             const toolsList = Object.keys(MCP_TOOLS).map(name => {
                 const t = MCP_TOOLS[name];
