@@ -2636,6 +2636,73 @@ const ACHIEVEMENT_ID_MAP = {
                 }
             }
         };
+        // V80: 战斗系统深化 + 实时竞技场
+        const MCP_TOOLS_V80 = {
+            'battle.arena.list': {
+                name: 'battle.arena.list',
+                description: 'Query arena leaderboard and available matches',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        season: { type: 'string', description: 'Season ID (default current)' },
+                        page: { type: 'number', description: 'Page number (default 1)' }
+                    }
+                }
+            },
+            'battle.arena.join': {
+                name: 'battle.arena.join',
+                description: 'Join arena matchmaking for ranked battle',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rankTier: { type: 'string', description: 'Preferred tier: bronze|silver|gold|platinum|diamond|immortal' }
+                    }
+                }
+            },
+            'battle.arena.report': {
+                name: 'battle.arena.report',
+                description: 'Get detailed battle replay by report ID',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        reportId: { type: 'string', description: 'Battle report ID' }
+                    },
+                    required: ['reportId']
+                }
+            },
+            'battle.combat.log': {
+                name: 'battle.combat.log',
+                description: 'Query historical combat logs',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        count: { type: 'number', description: 'Number of logs to return (default 20)' },
+                        filter: { type: 'string', description: 'Filter: all|arena|pve|pvp' }
+                    }
+                }
+            },
+            'battle.rank.rise': {
+                name: 'battle.rank.rise',
+                description: 'Get ranking rise history and progress',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        period: { type: 'string', description: 'Period: daily|weekly|seasonal' }
+                    }
+                }
+            },
+            'battle.reward.claim': {
+                name: 'battle.reward.claim',
+                description: 'Claim arena season rewards by tier',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'string', description: 'Reward tier: participation|bronze|silver|gold|platinum|diamond|immortal' }
+                    },
+                    required: ['tier']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -2660,6 +2727,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V74: Register new tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V74)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V80: Register arena tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V80)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2848,6 +2919,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'save.delete':
                             result = this.mcpSaveDelete(args.slot);
+                            break;
+                        // V80: Arena battle tools
+                        case 'battle.arena.list':
+                            result = this.mcpBattleArenaList(args.season, args.page);
+                            break;
+                        case 'battle.arena.join':
+                            result = this.mcpBattleArenaJoin(args.rankTier);
+                            break;
+                        case 'battle.arena.report':
+                            result = this.mcpBattleArenaReport(args.reportId);
+                            break;
+                        case 'battle.combat.log':
+                            result = this.mcpBattleCombatLog(args.count, args.filter);
+                            break;
+                        case 'battle.rank.rise':
+                            result = this.mcpBattleRankRise(args.period);
+                            break;
+                        case 'battle.reward.claim':
+                            result = this.mcpBattleRewardClaim(args.tier);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3416,6 +3506,187 @@ const ACHIEVEMENT_ID_MAP = {
                     if (slot === 'auto') localStorage.removeItem('cultivation_sim_autosave');
                     if (gs.saveSlots[slot]) delete gs.saveSlots[slot];
                     return { success: true, deleted: slot };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V80: Arena Battle System
+            mcpBattleArenaList(season, page) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const currentSeason = season || gs.arenaSeason || 'S1';
+                    const pageNum = page || 1;
+                    const TIERS = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'immortal'];
+                    // Simulated leaderboard
+                    const entries = [];
+                    for (let i = 0; i < 20; i++) {
+                        const tierIdx = Math.min(5, Math.floor(i / 3));
+                        entries.push({
+                            rank: (pageNum - 1) * 20 + i + 1,
+                            name: ['天道宗弟子', '万灵谷修士', '散修散人', '仙盟长老', '妖族妖王'][i % 5] + (i + 1),
+                            tier: TIERS[tierIdx],
+                            rating: 2000 - i * 15,
+                            wins: 50 - i,
+                            losses: 10 + i
+                        });
+                    }
+                    return {
+                        season: currentSeason,
+                        page: pageNum,
+                        entries,
+                        totalPages: 5
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattleArenaJoin(rankTier) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const TIERS = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'immortal'];
+                    const tier = rankTier || TIERS[Math.floor(Math.random() * 3)];
+                    if (!gs.arena) {
+                        gs.arena = { season: 'S1', rank: tier, rating: 1200, wins: 0, losses: 0, reports: [] };
+                    }
+                    gs.arena.rank = tier;
+                    gs.arena.rating = gs.arena.rating || 1200;
+                    // Simulate matching
+                    const opponentTierIdx = Math.min(5, TIERS.indexOf(tier) + Math.floor(Math.random() * 3) - 1);
+                    const opponent = {
+                        name: ['挑战者甲', '挑战者乙', '金丹真人', '元婴老怪', '化神强者'][Math.floor(Math.random() * 5)],
+                        tier: TIERS[Math.max(0, opponentTierIdx)],
+                        rating: gs.arena.rating + Math.floor(Math.random() * 400) - 200
+                    };
+                    const gs2 = window.gameState;
+                    if (!gs2.battleHistory) gs2.battleHistory = [];
+                    const reportId = `ARENA_${Date.now()}`;
+                    const playerWin = Math.random() > 0.4;
+                    const damageDealt = Math.floor(500 + Math.random() * 2000);
+                    const damageTaken = Math.floor(300 + Math.random() * 1500);
+                    gs2.battleHistory.push({
+                        id: reportId,
+                        type: 'arena',
+                        timestamp: Date.now(),
+                        result: playerWin ? 'win' : 'loss',
+                        opponent: opponent.name,
+                        damageDealt,
+                        damageTaken
+                    });
+                    gs.arena.wins += playerWin ? 1 : 0;
+                    gs.arena.losses += playerWin ? 0 : 1;
+                    gs.arena.rating += playerWin ? 25 : -20;
+                    gs.arena.reports = gs.arena.reports || [];
+                    gs.arena.reports.push(reportId);
+                    return {
+                        matched: true,
+                        reportId,
+                        opponent: opponent.name,
+                        opponentTier: opponent.tier,
+                        yourTier: tier,
+                        yourRating: gs.arena.rating
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattleArenaReport(reportId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs || !gs.battleHistory) return { error: 'No battle history' };
+                    const report = gs.battleHistory.find(r => r.id === reportId);
+                    if (!report) return { error: 'Report not found' };
+                    return {
+                        id: report.id,
+                        type: report.type,
+                        timestamp: new Date(report.timestamp).toISOString(),
+                        result: report.result,
+                        opponent: report.opponent,
+                        damageDealt: report.damageDealt,
+                        damageTaken: report.damageTaken,
+                        duration: Math.floor(60 + Math.random() * 300) + 's',
+                        skills: ['天雷术', '御剑术', '金刚诀'][Math.floor(Math.random() * 3)]
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattleCombatLog(count, filter) {
+                try {
+                    const gs = window.gameState;
+                    const limit = count || 20;
+                    const filterType = filter || 'all';
+                    let logs = gs && gs.battleHistory ? gs.battleHistory : [];
+                    if (filterType !== 'all') {
+                        logs = logs.filter(l => l.type === filterType);
+                    }
+                    logs = logs.slice(-limit);
+                    return {
+                        logs: logs.map(l => ({
+                            id: l.id,
+                            type: l.type,
+                            result: l.result,
+                            opponent: l.opponent,
+                            timestamp: new Date(l.timestamp).toISOString(),
+                            damageDealt: l.damageDealt
+                        })),
+                        total: logs.length
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattleRankRise(period) {
+                try {
+                    const gs = window.gameState;
+                    const TIERS = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'immortal'];
+                    const currentTier = gs && gs.arena ? gs.arena.rank || 'bronze' : 'bronze';
+                    const currentIdx = TIERS.indexOf(currentTier);
+                    const entries = [];
+                    const counts = { daily: 7, weekly: 4, seasonal: 2 }[period || 'daily'] || 7;
+                    let prevRating = gs && gs.arena ? gs.arena.rating - 150 : 1200;
+                    for (let i = counts - 1; i >= 0; i--) {
+                        const delta = Math.floor(Math.random() * 60) - 20;
+                        prevRating += delta;
+                        entries.push({
+                            day: i === 0 ? 'today' : `${i} day${i > 1 ? 's' : ''} ago`,
+                            rating: prevRating,
+                            delta,
+                            tier: TIERS[Math.min(5, Math.max(0, Math.floor((prevRating - 1000) / 200)))]
+                        });
+                    }
+                    return {
+                        period: period || 'daily',
+                        entries,
+                        currentTier,
+                        currentRating: gs && gs.arena ? gs.arena.rating : 1200
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattleRewardClaim(tier) {
+                try {
+                    const TIERS = ['participation', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'immortal'];
+                    const REWARDS = {
+                        participation: { spiritStones: 100, xp: 50 },
+                        bronze: { spiritStones: 500, xp: 200, badge: '铜牌修士' },
+                        silver: { spiritStones: 1200, xp: 500, badge: '银牌修士' },
+                        gold: { spiritStones: 2500, xp: 1000, badge: '金牌修士' },
+                        platinum: { spiritStones: 5000, xp: 2000, badge: '铂金修士' },
+                        diamond: { spiritStones: 10000, xp: 5000, badge: '钻石修士' },
+                        immortal: { spiritStones: 25000, xp: 15000, badge: '不朽称号', title: '不朽者' }
+                    };
+                    if (!TIERS.includes(tier)) return { error: 'Invalid tier' };
+                    const reward = REWARDS[tier];
+                    const gs = window.gameState;
+                    if (!gs.claimedRewards) gs.claimedRewards = {};
+                    if (gs.claimedRewards[tier]) return { error: 'Reward already claimed for this tier', claimed: Object.keys(gs.claimedRewards) };
+                    gs.claimedRewards[tier] = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    gs.cultivationXP = (gs.cultivationXP || 0) + reward.xp;
+                    return {
+                        claimed: true,
+                        tier,
+                        rewards: reward,
+                        spiritStones: gs.spiritStones,
+                        cultivationXP: gs.cultivationXP
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -6541,6 +6812,100 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v79Results = runV79Tests();
+
+        // ===== V80 Tests: 战斗系统深化 + 实时竞技场 =====
+        function runV80Tests() {
+            const results = [];
+            const v80Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V80 tools exist in MCP_TOOLS_V80
+            v80Assert(MCP_TOOLS_V80['battle.arena.list'] !== undefined, 'battle.arena.list tool defined');
+            v80Assert(MCP_TOOLS_V80['battle.arena.join'] !== undefined, 'battle.arena.join tool defined');
+            v80Assert(MCP_TOOLS_V80['battle.arena.report'] !== undefined, 'battle.arena.report tool defined');
+            v80Assert(MCP_TOOLS_V80['battle.combat.log'] !== undefined, 'battle.combat.log tool defined');
+            v80Assert(MCP_TOOLS_V80['battle.rank.rise'] !== undefined, 'battle.rank.rise tool defined');
+            v80Assert(MCP_TOOLS_V80['battle.reward.claim'] !== undefined, 'battle.reward.claim tool defined');
+
+            // Test 2: Tool registry has V80 tools
+            const server = new CultivationMCPServer();
+            v80Assert(server.toolRegistry.has('battle.arena.list'), 'battle.arena.list registered');
+            v80Assert(server.toolRegistry.has('battle.arena.join'), 'battle.arena.join registered');
+            v80Assert(server.toolRegistry.has('battle.combat.log'), 'battle.combat.log registered');
+            v80Assert(server.toolRegistry.has('battle.reward.claim'), 'battle.reward.claim registered');
+
+            // Test 3: mcpBattleArenaList
+            window.gameState = { arenaSeason: 'S2', realm: 5, stage: 2 };
+            const arenaList = server.mcpBattleArenaList('S2', 1);
+            v80Assert(arenaList.season === 'S2', 'arena.list returns correct season');
+            v80Assert(arenaList.entries.length === 20, 'arena.list returns 20 entries');
+            v80Assert(arenaList.totalPages === 5, 'arena.list totalPages = 5');
+            v80Assert(arenaList.entries[0].rank === 1, 'arena.list first entry rank 1');
+            v80Assert(['bronze','silver','gold','platinum','diamond','immortal'].includes(arenaList.entries[0].tier), 'arena.list entry has valid tier');
+
+            // Test 4: mcpBattleArenaJoin
+            window.gameState = { arena: null, battleHistory: [] };
+            const arenaJoin = server.mcpBattleArenaJoin('gold');
+            v80Assert(arenaJoin.matched === true, 'arena.join returns matched=true');
+            v80Assert(arenaJoin.reportId.startsWith('ARENA_'), 'arena.join returns reportId');
+            v80Assert(typeof arenaJoin.opponent === 'string', 'arena.join returns opponent name');
+            v80Assert(arenaJoin.yourTier === 'gold', 'arena.join returns correct tier');
+            v80Assert(typeof arenaJoin.yourRating === 'number', 'arena.join returns rating');
+
+            // Test 5: mcpBattleCombatLog
+            window.gameState = { battleHistory: [
+                { id: 'R1', type: 'arena', result: 'win', opponent: '对手A', damageDealt: 1000, timestamp: Date.now() - 1000 },
+                { id: 'R2', type: 'pve', result: 'loss', opponent: '妖兽', damageDealt: 500, timestamp: Date.now() - 2000 }
+            ] };
+            const combatLog = server.mcpBattleCombatLog(10, 'all');
+            v80Assert(combatLog.total >= 2, 'combat.log returns total >= 2');
+            v80Assert(combatLog.logs.length >= 2, 'combat.log logs.length >= 2');
+            const arenaOnly = server.mcpBattleCombatLog(10, 'arena');
+            v80Assert(arenaOnly.logs.every(l => l.type === 'arena'), 'combat.log filter works');
+
+            // Test 6: mcpBattleArenaReport
+            window.gameState = { battleHistory: [
+                { id: 'ARENA_TEST', type: 'arena', result: 'win', opponent: '对手X', damageDealt: 1500, damageTaken: 800, timestamp: Date.now() }
+            ] };
+            const report = server.mcpBattleArenaReport('ARENA_TEST');
+            v80Assert(report.id === 'ARENA_TEST', 'arena.report returns correct id');
+            v80Assert(report.result === 'win', 'arena.report returns correct result');
+            v80Assert(report.damageDealt === 1500, 'arena.report returns damageDealt');
+            const notFound = server.mcpBattleArenaReport('NONEXISTENT');
+            v80Assert(notFound.error === 'Report not found', 'arena.report returns error for missing');
+
+            // Test 7: mcpBattleRankRise
+            window.gameState = { arena: { rank: 'gold', rating: 1500 } };
+            const rankRise = server.mcpBattleRankRise('weekly');
+            v80Assert(rankRise.period === 'weekly', 'rank.rise returns correct period');
+            v80Assert(rankRise.entries.length === 4, 'rank.rise weekly has 4 entries');
+            v80Assert(rankRise.currentTier === 'gold', 'rank.rise returns currentTier');
+            v80Assert(typeof rankRise.currentRating === 'number', 'rank.rise returns currentRating');
+
+            // Test 8: mcpBattleRewardClaim
+            window.gameState = { claimedRewards: {}, spiritStones: 0, cultivationXP: 0 };
+            const reward = server.mcpBattleRewardClaim('bronze');
+            v80Assert(reward.claimed === true, 'reward.claim returns claimed=true');
+            v80Assert(reward.tier === 'bronze', 'reward.claim returns correct tier');
+            v80Assert(reward.rewards.spiritStones === 500, 'reward.claim bronze has 500 stones');
+            v80Assert(reward.rewards.badge === '铜牌修士', 'reward.claim bronze has badge');
+            const doubleClaim = server.mcpBattleRewardClaim('bronze');
+            v80Assert(doubleClaim.error !== undefined, 'reward.claim prevents double claim');
+            const immortal = server.mcpBattleRewardClaim('immortal');
+            v80Assert(immortal.claimed === true, 'reward.claim immortal works');
+            v80Assert(immortal.rewards.title === '不朽者', 'reward.claim immortal grants title');
+
+            // Test 9: Tool count grows with V80
+            const server2 = new CultivationMCPServer();
+            v80Assert(server2.toolRegistry.size >= 54, 'toolRegistry has >= 54 tools (V73-V80)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V80 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V80 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v80Results = runV80Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
