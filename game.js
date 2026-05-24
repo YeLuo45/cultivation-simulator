@@ -915,6 +915,70 @@
                 }
             }
         };
+        // V83: 天劫系统+渡劫机制
+        const MCP_TOOLS_V83 = {
+            'tribulation.start': {
+                name: 'tribulation.start',
+                description: 'Start a tribulation based on current realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realm: { type: 'number', description: 'Target realm for tribulation' }
+                    }
+                }
+            },
+            'tribulation.progress': {
+                name: 'tribulation.progress',
+                description: 'Get current tribulation progress',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'tribulation.lightning': {
+                name: 'tribulation.lightning',
+                description: 'Record a lightning strike during tribulation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        damage: { type: 'number', description: 'Lightning damage taken' },
+                        resisted: { type: 'boolean', description: 'Whether damage was resisted' }
+                    },
+                    required: ['damage']
+                }
+            },
+            'tribulation.blessing': {
+                name: 'tribulation.blessing',
+                description: 'Receive tribulation blessing reward',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Blessing type: strength|spirit|cultivation|random' }
+                    }
+                }
+            },
+            'tribulation.record': {
+                name: 'tribulation.record',
+                description: 'Query tribulation history records',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|success|failed|latest' }
+                    }
+                }
+            },
+            'tribulation.talent_modify': {
+                name: 'tribulation.talent_modify',
+                description: 'Modify player talent after tribulation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        talent: { type: 'string', description: 'New talent: normal|good|genius|immortal' }
+                    },
+                    required: ['talent']
+                }
+            }
+        };
 
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
@@ -951,6 +1015,10 @@
                 }
                 // V82: Register technique & skill DAG tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V82)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V83: Register tribulation tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V83)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1196,6 +1264,25 @@
                             break;
                         case 'skill.unlock':
                             result = this.mcpSkillUnlock(args.nodeId, args.cost);
+                            break;
+                        // V83: Tribulation tools
+                        case 'tribulation.start':
+                            result = this.mcpTribulationStart(args.realm);
+                            break;
+                        case 'tribulation.progress':
+                            result = this.mcpTribulationProgress();
+                            break;
+                        case 'tribulation.lightning':
+                            result = this.mcpTribulationLightning(args.damage, args.resisted);
+                            break;
+                        case 'tribulation.blessing':
+                            result = this.mcpTribulationBlessing(args.type);
+                            break;
+                        case 'tribulation.record':
+                            result = this.mcpTribulationRecord(args.filter);
+                            break;
+                        case 'tribulation.talent_modify':
+                            result = this.mcpTribulationTalentModify(args.talent);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -2229,6 +2316,139 @@
                     gs.spiritStones -= actualCost;
                     gs.skills.push(nodeId);
                     return { success: true, nodeId, nodeName: NODE_NAMES[nodeId], cost: actualCost, remainingStones: gs.spiritStones, totalSkills: gs.skills.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V83: Tribulation System
+            mcpTribulationStart(realm) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const targetRealm = realm || (gs.realm || 1) + 1;
+                    const REALM_NAMES = { 2: '筑基期', 3: '金丹期', 4: '元婴期', 5: '化神期', 6: '渡劫期', 7: '大乘期', 8: '真仙期' };
+                    gs.tribulation = {
+                        active: true,
+                        targetRealm,
+                        realmName: REALM_NAMES[targetRealm] || '天人',
+                        phase: 'lightning',
+                        strikesTotal: targetRealm * 3,
+                        strikesCurrent: 0,
+                        damageAccumulated: 0,
+                        resistedAccumulated: 0,
+                        startTime: Date.now(),
+                        success: null
+                    };
+                    return { success: true, targetRealm, realmName: REALM_NAMES[targetRealm], strikesTotal: gs.tribulation.strikesTotal };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationProgress() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.tribulation || !gs.tribulation.active) return { error: 'No active tribulation' };
+                    const t = gs.tribulation;
+                    return {
+                        targetRealm: t.targetRealm,
+                        realmName: t.realmName,
+                        phase: t.phase,
+                        strikesCurrent: t.strikesCurrent,
+                        strikesTotal: t.strikesTotal,
+                        progress: t.strikesTotal > 0 ? (t.strikesCurrent / t.strikesTotal * 100).toFixed(1) + '%' : '0%',
+                        damageAccumulated: t.damageAccumulated,
+                        resistedAccumulated: t.resistedAccumulated,
+                        resistanceRate: t.strikesCurrent > 0 ? (t.resistedAccumulated / t.strikesCurrent * 100).toFixed(1) + '%' : '0%',
+                        success: t.success
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationLightning(damage, resisted) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.tribulation || !gs.tribulation.active) return { error: 'No active tribulation' };
+                    const t = gs.tribulation;
+                    t.strikesCurrent++;
+                    t.damageAccumulated += damage;
+                    if (resisted) t.resistedAccumulated++;
+                    if (t.strikesCurrent >= t.strikesTotal) {
+                        t.phase = 'complete';
+                        t.active = false;
+                        const resistRate = t.strikesCurrent > 0 ? t.resistedAccumulated / t.strikesCurrent : 0;
+                        t.success = resistRate >= 0.5;
+                        if (t.success) {
+                            gs.realm = t.targetRealm;
+                            gs.cultivationXP = (gs.cultivationXP || 0) + t.targetRealm * 500;
+                        }
+                    }
+                    return {
+                        strikeNumber: t.strikesCurrent,
+                        damage,
+                        resisted: resisted || false,
+                        progress: t.strikesCurrent + '/' + t.strikesTotal,
+                        tribulationComplete: !t.active,
+                        success: t.success,
+                        newRealm: t.success ? t.targetRealm : null
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationBlessing(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const record = gs.tribulationRecord || [];
+                    const lastSuccess = record.filter(r => r.success).pop();
+                    if (!lastSuccess) return { error: 'No successful tribulation to receive blessing' };
+                    const blessType = type || 'random';
+                    const BLESSINGS = {
+                        strength: { name: '天雷淬体', effect: { attack: 15, defense: 10 } },
+                        spirit: { name: '灵气灌顶', effect: { cultivationSpeed: 20, maxSpiritual: 50 } },
+                        cultivation: { name: '道心稳固', effect: { realmProgress: 10, comprehension: 15 } },
+                        random: null
+                    };
+                    let blessing;
+                    if (blessType === 'random') {
+                        const types = ['strength', 'spirit', 'cultivation'];
+                        const chosen = types[Math.floor(Math.random() * types.length)];
+                        blessing = { type: chosen, ...BLESSINGS[chosen] };
+                    } else {
+                        if (!BLESSINGS[blessType]) return { error: 'Invalid blessing type' };
+                        blessing = { type: blessType, ...BLESSINGS[blessType] };
+                    }
+                    gs.blessings = gs.blessings || [];
+                    gs.blessings.push({ ...blessing, receivedAt: Date.now(), realm: lastSuccess.realm });
+                    return { success: true, blessing };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationRecord(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const records = gs.tribulationRecord || [];
+                    const f = filter || 'all';
+                    let filtered = records;
+                    if (f === 'success') filtered = records.filter(r => r.success);
+                    else if (f === 'failed') filtered = records.filter(r => !r.success);
+                    else if (f === 'latest') filtered = [records[records.length - 1]];
+                    return { records: filtered, total: records.length, successCount: records.filter(r => r.success).length, failedCount: records.filter(r => !r.success).length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpTribulationTalentModify(talent) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const VALID_TALENTS = ['normal', 'good', 'genius', 'immortal'];
+                    if (!VALID_TALENTS.includes(talent)) return { error: 'Invalid talent value' };
+                    const record = gs.tribulationRecord || [];
+                    const lastSuccess = record.filter(r => r.success).pop();
+                    if (!lastSuccess) return { error: 'No successful tribulation for talent modification' };
+                    const oldTalent = gs.talent || 'normal';
+                    gs.talent = talent;
+                    return { success: true, oldTalent, newTalent: talent, realm: lastSuccess.realm };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -5662,6 +5882,123 @@
             return { passed, total, rate, results };
         }
         const v82Results = runV82Tests();
+
+        // ===== V83 Tests: 天劫系统+渡劫机制 =====
+        function runV83Tests() {
+            const results = [];
+            const v83Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V83 tools exist in MCP_TOOLS_V83
+            v83Assert(MCP_TOOLS_V83['tribulation.start'] !== undefined, 'tribulation.start defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.progress'] !== undefined, 'tribulation.progress defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.lightning'] !== undefined, 'tribulation.lightning defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.blessing'] !== undefined, 'tribulation.blessing defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.record'] !== undefined, 'tribulation.record defined');
+            v83Assert(MCP_TOOLS_V83['tribulation.talent_modify'] !== undefined, 'tribulation.talent_modify defined');
+
+            // Test 2: Tool registry has V83 tools
+            const server = new CultivationMCPServer();
+            v83Assert(server.toolRegistry.has('tribulation.start'), 'tribulation.start registered');
+            v83Assert(server.toolRegistry.has('tribulation.progress'), 'tribulation.progress registered');
+            v83Assert(server.toolRegistry.has('tribulation.lightning'), 'tribulation.lightning registered');
+            v83Assert(server.toolRegistry.has('tribulation.record'), 'tribulation.record registered');
+            v83Assert(server.toolRegistry.has('tribulation.talent_modify'), 'tribulation.talent_modify registered');
+
+            // Test 3: mcpTribulationStart
+            window.gameState = { realm: 1, cultivationXP: 0 };
+            const start1 = server.mcpTribulationStart(null);
+            v83Assert(start1.success === true, 'tribulation.start returns success');
+            v83Assert(start1.targetRealm === 2, 'tribulation.start targets realm 2 from 1');
+            v83Assert(start1.realmName === '筑基期', 'tribulation.start returns correct name');
+            v83Assert(start1.strikesTotal === 6, 'tribulation.start strikesTotal=realm*3');
+            window.gameState = { realm: 3, cultivationXP: 0 };
+            const start3 = server.mcpTribulationStart(4);
+            v83Assert(start3.targetRealm === 4, 'tribulation.start uses provided realm');
+            v83Assert(start3.strikesTotal === 12, 'tribulation.start strikesTotal=4*3');
+
+            // Test 4: mcpTribulationProgress
+            window.gameState = { realm: 1, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 2, damageAccumulated: 30, resistedAccumulated: 1, success: null } };
+            const prog = server.mcpTribulationProgress();
+            v83Assert(prog.targetRealm === 2, 'progress returns correct realm');
+            v83Assert(prog.strikesCurrent === 2, 'progress returns strikesCurrent');
+            v83Assert(prog.progress === '33.3%', 'progress calculates percentage');
+            v83Assert(prog.resistanceRate === '50.0%', 'progress calculates resistance rate');
+            window.gameState = { realm: 1 };
+            const noActive = server.mcpTribulationProgress();
+            v83Assert(noActive.error === 'No active tribulation', 'progress returns error when no tribulation');
+
+            // Test 5: mcpTribulationLightning
+            window.gameState = { realm: 1, cultivationXP: 0, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 0, damageAccumulated: 0, resistedAccumulated: 0, success: null } };
+            const strike1 = server.mcpTribulationLightning(10, false);
+            v83Assert(strike1.strikeNumber === 1, 'lightning records strike number');
+            v83Assert(strike1.damage === 10, 'lightning records damage');
+            v83Assert(strike1.resisted === false, 'lightning records resisted=false');
+            v83Assert(strike1.progress === '1/6', 'lightning updates progress');
+            v83Assert(strike1.tribulationComplete === false, 'lightning not complete yet');
+            // Lightning 6 times with all resisted -> success
+            for (let i = 0; i < 5; i++) server.mcpTribulationLightning(5, true);
+            const strikeFinal = server.mcpTribulationLightning(5, true);
+            v83Assert(strikeFinal.tribulationComplete === true, 'lightning completes tribulation');
+            v83Assert(strikeFinal.success === true, 'lightning success when 100% resisted');
+            v83Assert(strikeFinal.newRealm === 2, 'lightning sets newRealm on success');
+            // Lightning failure test
+            window.gameState = { realm: 1, cultivationXP: 0, tribulation: { active: true, targetRealm: 2, realmName: '筑基期', phase: 'lightning', strikesTotal: 6, strikesCurrent: 0, damageAccumulated: 0, resistedAccumulated: 0, success: null } };
+            for (let i = 0; i < 6; i++) server.mcpTribulationLightning(50, false);
+            const failed = server.mcpTribulationLightning(50, false);
+            v83Assert(failed.tribulationComplete === true && failed.success === false, 'lightning fails when resistRate < 50%');
+
+            // Test 6: mcpTribulationBlessing
+            window.gameState = { realm: 2, tribulationRecord: [{ realm: 2, success: true, timestamp: Date.now() }], blessings: [] };
+            const bless = server.mcpTribulationBlessing('strength');
+            v83Assert(bless.success === true, 'blessing returns success');
+            v83Assert(bless.blessing.type === 'strength', 'blessing returns correct type');
+            v83Assert(bless.blessing.name === '天雷淬体', 'blessing returns correct name');
+            const randBless = server.mcpTribulationBlessing('random');
+            v83Assert(randBless.success === true, 'blessing random works');
+            const invalidBless = server.mcpTribulationBlessing('invalid_type');
+            v83Assert(invalidBless.error === 'Invalid blessing type', 'blessing rejects invalid type');
+            window.gameState = { realm: 2, tribulationRecord: [], blessings: [] };
+            const noRecord = server.mcpTribulationBlessing('cultivation');
+            v83Assert(noRecord.error === 'No successful tribulation to receive blessing', 'blessing requires success record');
+
+            // Test 7: mcpTribulationRecord
+            window.gameState = { realm: 2, tribulationRecord: [{ realm: 2, success: true }, { realm: 3, success: false }, { realm: 4, success: true }] };
+            const recAll = server.mcpTribulationRecord('all');
+            v83Assert(recAll.total === 3, 'record returns all 3 records');
+            v83Assert(recAll.successCount === 2, 'record successCount=2');
+            v83Assert(recAll.failedCount === 1, 'record failedCount=1');
+            const recSuccess = server.mcpTribulationRecord('success');
+            v83Assert(recSuccess.records.length === 2, 'record filter success works');
+            const recFailed = server.mcpTribulationRecord('failed');
+            v83Assert(recFailed.records.length === 1, 'record filter failed works');
+            const recLatest = server.mcpTribulationRecord('latest');
+            v83Assert(recLatest.records.length === 1, 'record latest returns 1 record');
+            v83Assert(recLatest.records[0].realm === 4, 'record latest returns latest');
+
+            // Test 8: mcpTribulationTalentModify
+            window.gameState = { talent: 'normal', tribulationRecord: [{ realm: 2, success: true, timestamp: Date.now() }] };
+            const talent = server.mcpTribulationTalentModify('genius');
+            v83Assert(talent.success === true, 'talent_modify returns success');
+            v83Assert(talent.oldTalent === 'normal', 'talent_modify returns old talent');
+            v83Assert(talent.newTalent === 'genius', 'talent_modify sets new talent');
+            const invalidTalent = server.mcpTribulationTalentModify('super');
+            v83Assert(invalidTalent.error === 'Invalid talent value', 'talent_modify rejects invalid');
+            window.gameState = { talent: 'good', tribulationRecord: [] };
+            const noTalentRecord = server.mcpTribulationTalentModify('immortal');
+            v83Assert(noTalentRecord.error === 'No successful tribulation for talent modification', 'talent_modify requires success record');
+
+            // Test 9: Tool count grows with V83
+            const server2 = new CultivationMCPServer();
+            v83Assert(server2.toolRegistry.size >= 72, 'toolRegistry has >= 72 tools (V73-V83)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V83 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V83 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v83Results = runV83Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
