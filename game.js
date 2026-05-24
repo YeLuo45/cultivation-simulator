@@ -2387,6 +2387,207 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'celestial.status',
                 description: 'Get full celestial realm status including battlefield and sect info',
                 inputSchema: { type: 'object', properties: {} }
+            },
+            // V76: 装备打造系统增强 — 随机属性/精炼/装备评分
+            'equipment.forge': {
+                name: 'equipment.forge',
+                description: 'Forge a new equipment piece with random attributes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Slot: weapon|armor|boots|ring|amulet' },
+                        quality: { type: 'string', description: 'Base quality: N|R|SR|SSR (default random)' }
+                    },
+                    required: ['slot']
+                }
+            },
+            'equipment.refine': {
+                name: 'equipment.refine',
+                description: 'Refine equipment to add random bonus attributes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot to refine' },
+                        stones: { type: 'number', description: 'Spirit stones to invest (cost = stones * 20)' }
+                    },
+                    required: ['slot', 'stones']
+                }
+            },
+            'equipment.score': {
+                name: 'equipment.score',
+                description: 'Calculate equipment score (combat power rating)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot or "all"' }
+                    }
+                }
+            },
+            'equipment.gem_embed': {
+                name: 'equipment.gem_embed',
+                description: 'Embed or remove gems from equipment',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot' },
+                        gemId: { type: 'string', description: 'Gem ID to embed (or "remove")' },
+                        slotIndex: { type: 'number', description: 'Gem socket index (0-3)' }
+                    },
+                    required: ['slot', 'gemId']
+                }
+            },
+            'item.generate': {
+                name: 'item.generate',
+                description: 'Generate a random item with quality and type',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Item type: consumable|equipment|material|quest' },
+                        quality: { type: 'string', description: 'Quality: N|R|SR|SSR' },
+                        level: { type: 'number', description: 'Item level (default based on player realm)' }
+                    }
+                }
+            },
+            'battle.power': {
+                name: 'battle.power',
+                description: 'Calculate total player combat power',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            // V77: 天道轮回增强 + 奇遇DAG深化
+            'serendipity.karma': {
+                name: 'serendipity.karma',
+                description: 'Record and query karma/causal effects',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: record|query|list' },
+                        type: { type: 'string', description: 'Karma type: good|bad|neutral' },
+                        amount: { type: 'number', description: 'Karma amount to record' }
+                    }
+                }
+            },
+            'serendipity.fate': {
+                name: 'serendipity.fate',
+                description: 'Query fate/destiny system',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        query: { type: 'string', description: 'Query: status|traits|connections' }
+                    }
+                }
+            },
+            'serendipity.branch': {
+                name: 'serendipity.branch',
+                description: 'Select branch in multi-choice serendipity event',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeId: { type: 'string', description: 'Serendipity node ID' },
+                        choice: { type: 'string', description: 'Choice: A|B|C' }
+                    }
+                }
+            },
+            'serendipity.progress': {
+                name: 'serendipity.progress',
+                description: 'Get full serendipity DAG progress',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'celestial.reincarnation': {
+                name: 'celestial.reincarnation',
+                description: 'Reincarnate or query reincarnation stats',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: stats|reincarnate|preview' }
+                    }
+                }
+            },
+            'world.cycle': {
+                name: 'world.cycle',
+                description: 'Query world cycle (天地轮回) status',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            // V78: 仙界经济系统 + 灵宠进化树
+            'market.list': {
+                name: 'market.list',
+                description: 'List items on the celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: 'Category: equipment|consumable|material|all' }
+                    }
+                }
+            },
+            'market.buy': {
+                name: 'market.buy',
+                description: 'Buy item from celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Market item ID' },
+                        quantity: { type: 'number', description: 'Quantity to buy' }
+                    },
+                    required: ['itemId']
+                }
+            },
+            'market.sell': {
+                name: 'market.sell',
+                description: 'Sell item to celestial market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: 'Inventory item ID to sell' },
+                        price: { type: 'number', description: 'Price per unit in spirit stones' }
+                    },
+                    required: ['itemId', 'price']
+                }
+            },
+            'pet.list': {
+                name: 'pet.list',
+                description: 'List all pets and their status',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.feed': {
+                name: 'pet.feed',
+                description: 'Feed a pet to increase affinity',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID' },
+                        food: { type: 'string', description: 'Food type: normal|premium|super' }
+                    },
+                    required: ['petId', 'food']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: 'Evolve a pet to next stage',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID to evolve' },
+                        stones: { type: 'number', description: 'Spirit stones to invest' }
+                    },
+                    required: ['petId', 'stones']
+                }
+            },
+            'pet.skill': {
+                name: 'pet.skill',
+                description: 'Teach or upgrade pet skill',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: 'Pet ID' },
+                        action: { type: 'string', description: 'Action: learn|upgrade|forget' },
+                        skillId: { type: 'string', description: 'Skill ID' }
+                    },
+                    required: ['petId', 'action']
+                }
+            },
+            'economy.stats': {
+                name: 'economy.stats',
+                description: 'Get celestial economy statistics',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -2519,6 +2720,69 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'celestial.status':
                             result = this.mcpCelestialStatus();
+                            break;
+                        // V76: 装备打造系统增强
+                        case 'equipment.forge':
+                            result = this.mcpEquipmentForge(args.slot, args.quality);
+                            break;
+                        case 'equipment.refine':
+                            result = this.mcpEquipmentRefine(args.slot, args.stones);
+                            break;
+                        case 'equipment.score':
+                            result = this.mcpEquipmentScore(args.slot);
+                            break;
+                        case 'equipment.gem_embed':
+                            result = this.mcpEquipmentGemEmbed(args.slot, args.gemId, args.slotIndex);
+                            break;
+                        case 'item.generate':
+                            result = this.mcpItemGenerate(args.type, args.quality, args.level);
+                            break;
+                        case 'battle.power':
+                            result = this.mcpBattlePower();
+                            break;
+                        // V77: 天道轮回增强 + 奇遇DAG深化
+                        case 'serendipity.karma':
+                            result = this.mcpSerendipityKarma(args.action, args.type, args.amount);
+                            break;
+                        case 'serendipity.fate':
+                            result = this.mcpSerendipityFate(args.query);
+                            break;
+                        case 'serendipity.branch':
+                            result = this.mcpSerendipityBranch(args.nodeId, args.choice);
+                            break;
+                        case 'serendipity.progress':
+                            result = this.mcpSerendipityProgress();
+                            break;
+                        case 'celestial.reincarnation':
+                            result = this.mcpCelestialReincarnation(args.action);
+                            break;
+                        case 'world.cycle':
+                            result = this.mcpWorldCycle();
+                            break;
+                        // V78: 仙界经济系统 + 灵宠进化树
+                        case 'market.list':
+                            result = this.mcpMarketList(args.category);
+                            break;
+                        case 'market.buy':
+                            result = this.mcpMarketBuy(args.itemId, args.quantity);
+                            break;
+                        case 'market.sell':
+                            result = this.mcpMarketSell(args.itemId, args.price);
+                            break;
+                        case 'pet.list':
+                            result = this.mcpPetList();
+                            break;
+                        case 'pet.feed':
+                            result = this.mcpPetFeed(args.petId, args.food);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolve(args.petId, args.stones);
+                            break;
+                        case 'pet.skill':
+                            result = this.mcpPetSkill(args.petId, args.action, args.skillId);
+                            break;
+                        case 'economy.stats':
+                            result = this.mcpEconomyStats();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -2664,6 +2928,372 @@ const ACHIEVEMENT_ID_MAP = {
                     piece.bonus = piece.bonus || {};
                     piece.bonus[piece.level] = stones * 2;
                     return { success: true, slot, newLevel: piece.level, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V76: 装备打造系统实现
+            mcpEquipmentForge(slot, quality) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const validSlots = ['weapon','armor','boots','ring','amulet'];
+                    if (!validSlots.includes(slot)) return { error: 'Invalid slot: ' + slot };
+                    const QUALITY_MAP = { N: 0, R: 1, SR: 2, SSR: 3 };
+                    const QUALITY_NAMES = ['N','R','SR','SSR'];
+                    const qIdx = quality && QUALITY_MAP[quality] !== undefined
+                        ? QUALITY_MAP[quality]
+                        : Math.floor(Math.random() * 4);
+                    const qName = QUALITY_NAMES[qIdx];
+                    const ATTR_TYPES = ['attack','defense','hp','spirit','speed','crit'];
+                    const attrCount = qIdx + 1;
+                    const attrs = {};
+                    for (let i = 0; i < attrCount; i++) {
+                        const at = ATTR_TYPES[Math.floor(Math.random() * ATTR_TYPES.length)];
+                        const val = (Math.floor(Math.random() * 50) + 10) * (qIdx + 1);
+                        attrs[at] = (attrs[at] || 0) + val;
+                    }
+                    const NAMES = { weapon: '长剑', armor: '灵甲', boots: '战靴', ring: '戒指', amulet: '护符' };
+                    const piece = {
+                        name: NAMES[slot] || slot,
+                        slot,
+                        quality: qName,
+                        level: 1,
+                        attrs,
+                        gems: [],
+                        forgeTime: Date.now()
+                    };
+                    if (!gs.equipment) gs.equipment = {};
+                    gs.equipment[slot] = piece;
+                    return { success: true, ...piece };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentRefine(slot, stones) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.equipment || !gs.equipment[slot]) return { error: 'No equipment in slot: ' + slot };
+                    const piece = gs.equipment[slot];
+                    const cost = (stones || 1) * 20;
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    piece.refineLevel = (piece.refineLevel || 0) + 1;
+                    piece.refineBonus = piece.refineBonus || {};
+                    const bonus = Math.floor(Math.random() * 30) + 5;
+                    piece.refineBonus[piece.refineLevel] = bonus;
+                    return { success: true, slot, refineLevel: piece.refineLevel, bonus, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentScore(slot) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const calculateScore = (piece) => {
+                        if (!piece) return 0;
+                        const QUALITY_SCORES = { N: 10, R: 30, SR: 90, SSR: 270 };
+                        let score = QUALITY_SCORES[piece.quality] || 10;
+                        if (piece.attrs) {
+                            for (const v of Object.values(piece.attrs)) score += v;
+                        }
+                        score += (piece.level || 1) * 5;
+                        score += (piece.refineLevel || 0) * 20;
+                        if (piece.gems) score += piece.gems.length * 50;
+                        return score;
+                    };
+                    if (slot && slot !== 'all') {
+                        return { slot, score: calculateScore(gs.equipment ? gs.equipment[slot] : null) };
+                    }
+                    const allSlots = ['weapon','armor','boots','ring','amulet'];
+                    const scores = {};
+                    let total = 0;
+                    for (const s of allSlots) {
+                        const sc = calculateScore(gs.equipment ? gs.equipment[s] : null);
+                        scores[s] = sc;
+                        total += sc;
+                    }
+                    return { scores, total, slots: allSlots };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentGemEmbed(slot, gemId, slotIndex) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.equipment || !gs.equipment[slot]) return { error: 'No equipment in slot: ' + slot };
+                    const piece = gs.equipment[slot];
+                    piece.gems = piece.gems || [];
+                    const idx = slotIndex || 0;
+                    if (gemId === 'remove') {
+                        const removed = piece.gems[idx];
+                        piece.gems[idx] = null;
+                        return { success: true, slot, removed, gems: piece.gems };
+                    }
+                    const GEM_STATS = { 'gem_red': 50, 'gem_blue': 40, 'gem_green': 30, 'gem_gold': 100 };
+                    piece.gems[idx] = { id: gemId, stat: GEM_STATS[gemId] || 20 };
+                    return { success: true, slot, gem: piece.gems[idx], index: idx };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpItemGenerate(type, quality, level) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const QUALITY_MAP = { N: 0, R: 1, SR: 2, SSR: 3 };
+                    const QUALITY_NAMES = ['N','R','SR','SSR'];
+                    const qIdx = quality && QUALITY_MAP[quality] !== undefined
+                        ? QUALITY_MAP[quality]
+                        : Math.floor(Math.random() * 4);
+                    const qName = QUALITY_NAMES[qIdx];
+                    const TYPES = ['consumable','equipment','material','quest'];
+                    const t = type && TYPES.includes(type) ? type : TYPES[Math.floor(Math.random() * TYPES.length)];
+                    const lvl = level || (gs.realm || 1) * 3;
+                    const NAMES = {
+                        consumable: ['丹药','灵草','灵芝'], equipment: ['灵甲','灵剑'],
+                        material: ['灵石','灵矿'], quest: ['古卷','令牌']
+                    };
+                    const name = (NAMES[t] || ['物品'])[Math.floor(Math.random() * 3)] + '-' + Date.now() % 1000;
+                    const item = { id: 'item_' + Date.now(), name, type: t, quality: qName, level: lvl };
+                    if (!gs.items) gs.items = [];
+                    gs.items.push(item);
+                    return { success: true, item };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattlePower() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realm = gs.realm || 1;
+                    const basePower = realm * 100;
+                    let equipBonus = 0;
+                    if (gs.equipment) {
+                        const scoreResult = this.mcpEquipmentScore('all');
+                        equipBonus = scoreResult.total || 0;
+                    }
+                    const skillBonus = ((gs.skills || []).length) * 20;
+                    const total = basePower + equipBonus + skillBonus;
+                    return {
+                        total,
+                        base: basePower,
+                        equipment: equipBonus,
+                        skills: skillBonus,
+                        realm
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V77: 天道轮回增强 + 奇遇DAG深化实现
+            mcpSerendipityKarma(action, type, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.karma) gs.karma = { good: 0, bad: 0, neutral: 0, events: [] };
+                    if (action === 'list') return { karma: gs.karma };
+                    if (action === 'query') return { total: gs.karma.good - gs.karma.bad, ...gs.karma };
+                    if (action === 'record' && type) {
+                        const t = type || 'neutral';
+                        gs.karma[t] = (gs.karma[t] || 0) + (amount || 1);
+                        gs.karma.events.push({ type: t, amount: amount || 1, time: Date.now() });
+                        return { success: true, karma: gs.karma };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityFate(query) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.fate) gs.fate = { traits: [], connections: [], destiny: 50 };
+                    if (query === 'status') return { destiny: gs.fate.destiny, level: gs.fate.destiny > 80 ? '大吉' : gs.fate.destiny > 60 ? '吉' : gs.fate.destiny > 40 ? '平' : gs.fate.destiny > 20 ? '凶' : '大凶' };
+                    if (query === 'traits') return { traits: gs.fate.traits || [] };
+                    if (query === 'connections') return { connections: gs.fate.connections || [] };
+                    return { error: 'Invalid query: ' + query };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityBranch(nodeId, choice) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.serendipityDAG) return { error: 'Serendipity DAG not initialized' };
+                    if (!nodeId || !choice) return { error: 'nodeId and choice required' };
+                    gs.serendipityBranch = gs.serendipityBranch || {};
+                    gs.serendipityBranch[nodeId] = choice;
+                    return { success: true, nodeId, choice, effects: { branch_selected: true } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityProgress() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dag = gs.serendipityDAG;
+                    if (!dag || !dag.nodes) return { error: 'DAG not initialized', nodes: 0, triggered: 0, completed: 0 };
+                    let triggered = 0, completed = 0;
+                    for (const [, node] of dag.nodes) {
+                        if (node.status === 'triggered') triggered++;
+                        if (node.status === 'completed') completed++;
+                    }
+                    return { totalNodes: dag.nodes.size, triggered, completed, nodeIds: Array.from(dag.nodes.keys()) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialReincarnation(action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.reincarnation) gs.reincarnation = { times: 0, totalKarma: 0, bonuses: [] };
+                    if (action === 'stats') return { ...gs.reincarnation };
+                    if (action === 'preview') return { nextRealm: (gs.realm || 1) + 1, karmaRequired: (gs.realm || 1) * 100 };
+                    if (action === 'reincarnate') {
+                        gs.reincarnation.times++;
+                        gs.realm = 1;
+                        gs.stage = 1;
+                        gs.karma = gs.karma || {};
+                        gs.reincarnation.bonuses.push({ time: Date.now(), bonus: 'realm_reset' });
+                        return { success: true, times: gs.reincarnation.times };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V78: 仙界经济系统 + 灵宠进化树实现
+            mcpMarketList(category) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const cat = category || 'all';
+                    if (cat === 'all') return { total: market.length, items: market };
+                    return { total: market.filter(i => i.category === cat).length, items: market.filter(i => i.category === cat) };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpMarketBuy(itemId, quantity) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const item = market.find(i => i.id === itemId);
+                    if (!item) return { error: 'Item not found in market: ' + itemId };
+                    const cost = (item.price || 10) * (quantity || 1);
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    if (!gs.items) gs.items = [];
+                    for (let i = 0; i < (quantity || 1); i++) gs.items.push({ ...item, id: item.id + '_' + Date.now() + i });
+                    return { success: true, item: item.name, quantity: quantity || 1, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpMarketSell(itemId, price) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.items) return { error: 'No items in inventory' };
+                    const idx = gs.items.findIndex(i => i.id === itemId);
+                    if (idx === -1) return { error: 'Item not found: ' + itemId };
+                    const [item] = gs.items.splice(idx, 1);
+                    if (!gs.market) gs.market = [];
+                    gs.market.push({ id: 'mkt_' + Date.now(), name: item.name, category: item.type, price: price || 10, seller: 'player' });
+                    return { success: true, sold: item.name, price, earned: price || 10 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    return { total: pets.length, pets };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetFeed(petId, food) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    const FOOD_BONUS = { normal: 5, premium: 15, super: 50 };
+                    pet.affinity = (pet.affinity || 0) + (FOOD_BONUS[food] || 5);
+                    return { success: true, petId, affinity: pet.affinity, bonus: FOOD_BONUS[food] || 5 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetEvolve(petId, stones) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    const cost = (stones || 1) * 50;
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    pet.stage = (pet.stage || 1) + 1;
+                    pet.evolutionCost = cost;
+                    return { success: true, petId, newStage: pet.stage, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpPetSkill(petId, action, skillId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pets = gs.pets || [];
+                    const pet = pets.find(p => p.id === petId);
+                    if (!pet) return { error: 'Pet not found: ' + petId };
+                    if (!pet.skills) pet.skills = [];
+                    if (action === 'learn') {
+                        if (pet.skills.length >= 4) return { error: 'Pet already has 4 skills' };
+                        pet.skills.push({ id: skillId || 'skill_' + Date.now(), level: 1 });
+                        return { success: true, skill: pet.skills[pet.skills.length - 1] };
+                    }
+                    if (action === 'upgrade') {
+                        const skill = pet.skills.find(s => s.id === skillId);
+                        if (!skill) return { error: 'Skill not found: ' + skillId };
+                        skill.level = (skill.level || 1) + 1;
+                        return { success: true, skill };
+                    }
+                    if (action === 'forget') {
+                        pet.skills = pet.skills.filter(s => s.id !== skillId);
+                        return { success: true, remaining: pet.skills.length };
+                    }
+                    return { error: 'Invalid action: ' + action };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEconomyStats() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const market = gs.market || [];
+                    const items = gs.items || [];
+                    return {
+                        spiritStones: gs.spiritStones || 0,
+                        marketListings: market.length,
+                        playerItems: items.length,
+                        totalValue: (gs.spiritStones || 0) + market.reduce((s, i) => s + (i.price || 0), 0)
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpWorldCycle() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = gs.worldCycle || { phase: 'grow', day: 1, era: 1 };
+                    const PHASES = ['grow', 'peak', 'decay', 'dark', 'reborn'];
+                    return {
+                        era: cycle.era || 1,
+                        day: cycle.day || 1,
+                        phase: cycle.phase || 'grow',
+                        phaseName: cycle.phase === 'grow' ? '生机' : cycle.phase === 'peak' ? '鼎盛' : cycle.phase === 'decay' ? '衰败' : cycle.phase === 'dark' ? '至暗' : '重生',
+                        effect: cycle.phase === 'peak' ? '全属性+10%' : cycle.phase === 'decay' ? '掉落-20%' : cycle.phase === 'dark' ? '修炼-30%' : '无'
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -5451,6 +6081,260 @@ const ACHIEVEMENT_ID_MAP = {
             return { passed, total, rate, results };
         }
         const v75Results = runV75Tests();
+
+        // ===== V76 Tests: 装备打造系统增强 — 随机属性/精炼/装备评分 =====
+        function runV76Tests() {
+            const results = [];
+            const v76Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V76 tools exist in MCP_TOOLS
+            v76Assert(MCP_TOOLS['equipment.forge'] !== undefined, 'equipment.forge tool defined');
+            v76Assert(MCP_TOOLS['equipment.refine'] !== undefined, 'equipment.refine tool defined');
+            v76Assert(MCP_TOOLS['equipment.score'] !== undefined, 'equipment.score tool defined');
+            v76Assert(MCP_TOOLS['equipment.gem_embed'] !== undefined, 'equipment.gem_embed tool defined');
+            v76Assert(MCP_TOOLS['item.generate'] !== undefined, 'item.generate tool defined');
+            v76Assert(MCP_TOOLS['battle.power'] !== undefined, 'battle.power tool defined');
+
+            // Test 2: Tool registry has V76 tools registered
+            const server = new CultivationMCPServer();
+            v76Assert(server.toolRegistry.has('equipment.forge'), 'equipment.forge registered');
+            v76Assert(server.toolRegistry.has('equipment.refine'), 'equipment.refine registered');
+            v76Assert(server.toolRegistry.has('equipment.score'), 'equipment.score registered');
+            v76Assert(server.toolRegistry.has('item.generate'), 'item.generate registered');
+            v76Assert(server.toolRegistry.has('battle.power'), 'battle.power registered');
+
+            // Test 3: mcpEquipmentForge works
+            window.gameState = { spiritStones: 10000 };
+            const forgeN = server.mcpEquipmentForge('weapon', 'N');
+            v76Assert(forgeN.success === true, 'forge returns success');
+            v76Assert(forgeN.quality === 'N', 'forge respects quality N');
+            v76Assert(forgeN.attrs !== undefined, 'forge returns attrs');
+            v76Assert(Object.keys(forgeN.attrs).length === 1, 'N quality has 1 attr');
+
+            const forgeSSR = server.mcpEquipmentForge('armor', 'SSR');
+            v76Assert(forgeSSR.quality === 'SSR', 'forge respects quality SSR');
+            v76Assert(Object.keys(forgeSSR.attrs).length === 4, 'SSR quality has 4 attrs');
+
+            // Test 4: mcpEquipmentRefine works
+            const refine = server.mcpEquipmentRefine('weapon', 10);
+            v76Assert(refine.success === true, 'refine returns success');
+            v76Assert(refine.refineLevel === 1, 'refine sets refineLevel');
+            v76Assert(refine.bonus > 0, 'refine gives bonus');
+            v76Assert(refine.cost === 200, 'refine cost = stones * 20');
+
+            // Test 5: mcpEquipmentScore
+            window.gameState = {
+                spiritStones: 10000,
+                equipment: {
+                    weapon: { name: '长剑', quality: 'SR', level: 3, attrs: { attack: 100 }, gems: [null, null] },
+                    armor: { name: '灵甲', quality: 'R', level: 2, attrs: { defense: 50 }, gems: [] }
+                }
+            };
+            const scoreWeapon = server.mcpEquipmentScore('weapon');
+            v76Assert(scoreWeapon.score > 0, 'score for weapon > 0');
+            const scoreAll = server.mcpEquipmentScore('all');
+            v76Assert(scoreAll.total > 0, 'score total > 0');
+            v76Assert(scoreAll.scores.weapon !== undefined, 'scores has weapon slot');
+            v76Assert(scoreAll.slots !== undefined, 'scores has slots array');
+
+            // Test 6: mcpEquipmentGemEmbed
+            const embed = server.mcpEquipmentGemEmbed('weapon', 'gem_red', 0);
+            v76Assert(embed.success === true, 'gem_embed returns success');
+            v76Assert(embed.gem !== undefined, 'gem_embed returns gem');
+            const remove = server.mcpEquipmentGemEmbed('weapon', 'remove', 0);
+            v76Assert(remove.success === true, 'gem_remove returns success');
+
+            // Test 7: mcpItemGenerate
+            window.gameState = { realm: 3, items: [] };
+            const genItem = server.mcpItemGenerate('consumable', 'SR', 10);
+            v76Assert(genItem.success === true, 'item.generate returns success');
+            v76Assert(genItem.item.quality === 'SR', 'item.generate respects quality');
+            v76Assert(genItem.item.type === 'consumable', 'item.generate respects type');
+            v76Assert(genItem.item.level === 10, 'item.generate respects level');
+            v76Assert(window.gameState.items.length === 1, 'item added to inventory');
+
+            // Test 8: mcpBattlePower
+            window.gameState = { realm: 5, equipment: { weapon: { quality: 'R', level: 1, attrs: {}, gems: [] } }, skills: [1, 2, 3] };
+            const power = server.mcpBattlePower();
+            v76Assert(power.total > 0, 'battle.power total > 0');
+            v76Assert(power.base === 500, 'battle.power base = realm * 100');
+            v76Assert(power.equipment > 0, 'battle.power has equipment bonus');
+            v76Assert(power.skills === 60, 'battle.power skills = count * 20');
+
+            // Test 9: Tool count (V73 8 + V74 7 + V75 7 + V76 6 = 28+)
+            v76Assert(server.toolRegistry.size >= 28, 'toolRegistry has >= 28 tools (V73-V76)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V76 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V76 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v76Results = runV76Tests();
+
+        // ===== V77 Tests: 天道轮回增强 + 奇遇DAG深化 =====
+        function runV77Tests() {
+            const results = [];
+            const v77Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V77 tools exist in MCP_TOOLS
+            v77Assert(MCP_TOOLS['serendipity.karma'] !== undefined, 'serendipity.karma tool defined');
+            v77Assert(MCP_TOOLS['serendipity.fate'] !== undefined, 'serendipity.fate tool defined');
+            v77Assert(MCP_TOOLS['serendipity.branch'] !== undefined, 'serendipity.branch tool defined');
+            v77Assert(MCP_TOOLS['serendipity.progress'] !== undefined, 'serendipity.progress tool defined');
+            v77Assert(MCP_TOOLS['celestial.reincarnation'] !== undefined, 'celestial.reincarnation tool defined');
+            v77Assert(MCP_TOOLS['world.cycle'] !== undefined, 'world.cycle tool defined');
+
+            // Test 2: Tool registry has V77 tools
+            const server = new CultivationMCPServer();
+            v77Assert(server.toolRegistry.has('serendipity.karma'), 'serendipity.karma registered');
+            v77Assert(server.toolRegistry.has('serendipity.fate'), 'serendipity.fate registered');
+            v77Assert(server.toolRegistry.has('serendipity.branch'), 'serendipity.branch registered');
+            v77Assert(server.toolRegistry.has('world.cycle'), 'world.cycle registered');
+
+            // Test 3: mcpSerendipityKarma record/query/list
+            window.gameState = {};
+            const karmaRecord = server.mcpSerendipityKarma('record', 'good', 50);
+            v77Assert(karmaRecord.success === true, 'karma.record returns success');
+            const karmaQuery = server.mcpSerendipityKarma('query', null, null);
+            v77Assert(karmaQuery.total !== undefined, 'karma.query returns total');
+            v77Assert(karmaQuery.good === 50, 'karma good = 50');
+            const karmaList = server.mcpSerendipityKarma('list', null, null);
+            v77Assert(karmaList.karma !== undefined, 'karma.list returns karma object');
+
+            // Test 4: mcpSerendipityFate queries
+            window.gameState = { fate: { traits: ['天选'], connections: ['青云宗'], destiny: 75 } };
+            const fateStatus = server.mcpSerendipityFate('status');
+            v77Assert(fateStatus.destiny === 75, 'fate status returns destiny');
+            v77Assert(fateStatus.level === '吉', 'fate level is 吉');
+            const fateTraits = server.mcpSerendipityFate('traits');
+            v77Assert(fateTraits.traits.includes('天选'), 'fate traits includes 天选');
+            const fateConn = server.mcpSerendipityFate('connections');
+            v77Assert(fateConn.connections.includes('青云宗'), 'fate connections includes 青云宗');
+
+            // Test 5: mcpCelestialReincarnation actions
+            window.gameState = { realm: 5 };
+            const reincStats = server.mcpCelestialReincarnation('stats');
+            v77Assert(reincStats.times !== undefined, 'reincarnation stats has times');
+            const reincPreview = server.mcpCelestialReincarnation('preview');
+            v77Assert(reincPreview.nextRealm === 6, 'reincarnation preview nextRealm');
+            const reincRun = server.mcpCelestialReincarnation('reincarnate');
+            v77Assert(reincRun.success === true, 'reincarnate returns success');
+            v77Assert(reincRun.times === 1, 'reincarnate times = 1');
+            v77Assert(window.gameState.realm === 1, 'reincarnate resets realm to 1');
+
+            // Test 6: mcpWorldCycle
+            window.gameState = { worldCycle: { phase: 'peak', day: 50, era: 2 } };
+            const worldCycle = server.mcpWorldCycle();
+            v77Assert(worldCycle.era === 2, 'world.cycle returns era');
+            v77Assert(worldCycle.phase === 'peak', 'world.cycle returns phase');
+            v77Assert(worldCycle.phaseName === '鼎盛', 'world.cycle phaseName is 鼎盛');
+            v77Assert(worldCycle.effect === '全属性+10%', 'world.cycle effect is +10%');
+
+            // Test 7: Tool count (V73-V77 adds 6 more = 34+)
+            v77Assert(server.toolRegistry.size >= 34, 'toolRegistry has >= 34 tools (V73-V77)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V77 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V77 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v77Results = runV77Tests();
+
+        // ===== V78 Tests: 仙界经济系统 + 灵宠进化树 =====
+        function runV78Tests() {
+            const results = [];
+            const v78Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V78 tools exist in MCP_TOOLS
+            v78Assert(MCP_TOOLS['market.list'] !== undefined, 'market.list tool defined');
+            v78Assert(MCP_TOOLS['market.buy'] !== undefined, 'market.buy tool defined');
+            v78Assert(MCP_TOOLS['market.sell'] !== undefined, 'market.sell tool defined');
+            v78Assert(MCP_TOOLS['pet.list'] !== undefined, 'pet.list tool defined');
+            v78Assert(MCP_TOOLS['pet.feed'] !== undefined, 'pet.feed tool defined');
+            v78Assert(MCP_TOOLS['pet.evolve'] !== undefined, 'pet.evolve tool defined');
+            v78Assert(MCP_TOOLS['pet.skill'] !== undefined, 'pet.skill tool defined');
+            v78Assert(MCP_TOOLS['economy.stats'] !== undefined, 'economy.stats tool defined');
+
+            // Test 2: Tool registry has V78 tools
+            const server = new CultivationMCPServer();
+            v78Assert(server.toolRegistry.has('market.list'), 'market.list registered');
+            v78Assert(server.toolRegistry.has('pet.feed'), 'pet.feed registered');
+            v78Assert(server.toolRegistry.has('pet.evolve'), 'pet.evolve registered');
+            v78Assert(server.toolRegistry.has('economy.stats'), 'economy.stats registered');
+
+            // Test 3: mcpMarketList and mcpMarketSell
+            window.gameState = { items: [{ id: 'item1', name: '丹药', type: 'consumable' }], spiritStones: 1000 };
+            const sell = server.mcpMarketSell('item1', 200);
+            v78Assert(sell.success === true, 'market.sell returns success');
+            const list = server.mcpMarketList('all');
+            v78Assert(list.total >= 1, 'market.list returns items');
+            v78Assert(list.items.some(i => i.name === '丹药'), 'market.list includes sold item');
+
+            // Test 4: mcpMarketBuy
+            window.gameState = {
+                spiritStones: 1000,
+                market: [{ id: 'mkt1', name: '灵草', category: 'material', price: 50 }]
+            };
+            const buy = server.mcpMarketBuy('mkt1', 2);
+            v78Assert(buy.success === true, 'market.buy returns success');
+            v78Assert(buy.cost === 100, 'market.buy cost = price * quantity');
+            v78Assert(buy.remaining === 900, 'market.buy deducts spirit stones');
+            v78Assert(window.gameState.items.length >= 2, 'market.buy adds items to inventory');
+
+            // Test 5: mcpPetList
+            window.gameState = { pets: [{ id: 'pet1', name: '小狐狸', stage: 1, affinity: 30, skills: [] }] };
+            const petList = server.mcpPetList();
+            v78Assert(petList.total === 1, 'pet.list returns 1 pet');
+            v78Assert(petList.pets[0].name === '小狐狸', 'pet.list returns correct pet');
+
+            // Test 6: mcpPetFeed
+            const feed = server.mcpPetFeed('pet1', 'premium');
+            v78Assert(feed.success === true, 'pet.feed returns success');
+            v78Assert(feed.affinity === 45, 'pet.feed increases affinity by 15 for premium');
+            v78Assert(feed.bonus === 15, 'pet.feed returns bonus');
+
+            // Test 7: mcpPetEvolve
+            window.gameState = { spiritStones: 500, pets: [{ id: 'pet1', name: '小狐狸', stage: 1, skills: [] }] };
+            const evolve = server.mcpPetEvolve('pet1', 5);
+            v78Assert(evolve.success === true, 'pet.evolve returns success');
+            v78Assert(evolve.newStage === 2, 'pet.evolve increments stage');
+            v78Assert(evolve.cost === 250, 'pet.evolve cost = stones * 50');
+            v78Assert(evolve.remaining === 250, 'pet.evolve deducts stones');
+
+            // Test 8: mcpPetSkill
+            window.gameState = { pets: [{ id: 'pet1', name: '小狐狸', stage: 1, skills: [] }] };
+            const learn = server.mcpPetSkill('pet1', 'learn', 'fireball');
+            v78Assert(learn.success === true, 'pet.skill learn returns success');
+            const upgrade = server.mcpPetSkill('pet1', 'upgrade', 'fireball');
+            v78Assert(upgrade.success === true, 'pet.skill upgrade returns success');
+            v78Assert(upgrade.skill.level === 2, 'pet.skill upgrade increases level');
+            const forget = server.mcpPetSkill('pet1', 'forget', 'fireball');
+            v78Assert(forget.success === true, 'pet.skill forget returns success');
+            v78Assert(forget.remaining === 0, 'pet.skill forget removes skill');
+
+            // Test 9: mcpEconomyStats
+            window.gameState = { spiritStones: 500, market: [{ id: 'm1', name: '灵草', price: 100 }], items: [{ id: 'i1' }] };
+            const stats = server.mcpEconomyStats();
+            v78Assert(stats.spiritStones === 500, 'economy.stats spiritStones');
+            v78Assert(stats.marketListings === 1, 'economy.stats marketListings');
+            v78Assert(stats.playerItems === 1, 'economy.stats playerItems');
+            v78Assert(stats.totalValue >= 600, 'economy.stats totalValue includes market');
+
+            // Test 10: Tool count (V73-V78 = 42+)
+            v78Assert(server.toolRegistry.size >= 42, 'toolRegistry has >= 42 tools (V73-V78)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V78 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V78 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v78Results = runV78Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
