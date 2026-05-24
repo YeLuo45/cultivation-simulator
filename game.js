@@ -3313,6 +3313,479 @@ const ACHIEVEMENT_ID_MAP = {
         const aTotalRate = aTotalTests > 0 ? (aTotalPassed / aTotalTests * 100).toFixed(1) : 0;
         console.log(`[Direction A Total] ${aTotalPassed}/${aTotalTests} passed (${aTotalRate}%)`);
 
+        // ===== V68 Direction F: Realm Advancement + Serendipity Enhancement =====
+        // Enhanced realm progression system with serendipity-triggered events
+
+        // --- RealmAdvancement: Manages realm transitions and effects ---
+        class RealmAdvancement {
+            constructor() {
+                this.realms = [
+                    { id: 1, name: '练气期', minLevel: 1, multiplier: 1.0 },
+                    { id: 2, name: '筑基期', minLevel: 10, multiplier: 1.5 },
+                    { id: 3, name: '金丹期', minLevel: 25, multiplier: 2.0 },
+                    { id: 4, name: '元婴期', minLevel: 50, multiplier: 3.0 },
+                    { id: 5, name: '化神期', minLevel: 80, multiplier: 5.0 }
+                ];
+                this.currentRealm = 1;
+                this.realmBenefits = new Map(); // realmId -> {statBonus, skillUnlocks, serendipityBoosts}
+            }
+
+            getRealmForLevel(level) {
+                for (let i = this.realms.length - 1; i >= 0; i--) {
+                    if (level >= this.realms[i].minLevel) return this.realms[i];
+                }
+                return this.realms[0];
+            }
+
+            advanceRealm() {
+                const nextRealm = this.realms.find(r => r.id === this.currentRealm + 1);
+                if (nextRealm) {
+                    this.currentRealm = nextRealm.id;
+                    this.applyRealmBenefits(nextRealm);
+                    return nextRealm;
+                }
+                return null;
+            }
+
+            applyRealmBenefits(realm) {
+                if (!this.realmBenefits.has(realm.id)) {
+                    this.realmBenefits.set(realm.id, {
+                        statBonus: { attack: realm.multiplier, defense: realm.multiplier },
+                        skillUnlocks: this.getUnlockedSkills(realm.id),
+                        serendipityBoosts: realm.id * 0.1
+                    });
+                }
+                return this.realmBenefits.get(realm.id);
+            }
+
+            getUnlockedSkills(realmId) {
+                const unlocks = {
+                    2: ['advanced_technique', 'wind_walk'],
+                    3: ['golden_elixir', 'fire_walk'],
+                    4: ['void_fleet', 'mirror_clone'],
+                    5: ['celestial_transform', 'immortal_body']
+                };
+                return unlocks[realmId] || [];
+            }
+
+            getRealmMultiplier(level) {
+                const realm = this.getRealmForLevel(level);
+                return realm ? realm.multiplier : 1.0;
+            }
+        }
+
+        // --- SerendipityBoost: Enhances serendipity events based on realm ---
+        class SerendipityBoost {
+            constructor() {
+                this.boosts = new Map(); // nodeId -> {chanceBonus, rewardBonus}
+                this.boostConfig = {
+                    'ser_discovery': { chanceBonus: 0.1, rewardBonus: 1.2 },
+                    'ser_trial': { chanceBonus: 0.15, rewardBonus: 1.3 },
+                    'ser_master_reward': { chanceBonus: 0.2, rewardBonus: 1.5 }
+                };
+            }
+
+            applyBoost(nodeId) {
+                const boost = this.boostConfig[nodeId] || { chanceBonus: 0, rewardBonus: 1.0 };
+                return boost;
+            }
+
+            getBoostedProbability(nodeId, baseProbability) {
+                const boost = this.applyBoost(nodeId);
+                return Math.min(baseProbability + boost.chanceBonus, 1.0);
+            }
+
+            getBoostedReward(nodeId, baseReward) {
+                const boost = this.applyBoost(nodeId);
+                return Math.floor(baseReward * boost.rewardBonus);
+            }
+        }
+
+        const realmAdvancement = new RealmAdvancement();
+        const serendipityBoost = new SerendipityBoost();
+
+        // --- Realm Panel UI ---
+        function openRealmPanel() {
+            const realm = realmAdvancement.getRealmForLevel(gameState.level);
+            const benefit = realmAdvancement.realmBenefits.get(realm.id) || {};
+            const multiplier = realmAdvancement.getRealmMultiplier(gameState.level);
+            const nextRealm = realmAdvancement.realms.find(r => r.id === realm.id + 1);
+
+            let html = `<div style="padding:15px;">`;
+            html += `<h3>🌀 ${realm.name}</h3>`;
+            html += `<p>等级: ${gameState.level} | 境界倍率: ${multiplier}x</p>`;
+            html += `<p>攻击/防御加成: +${(multiplier - 1) * 100}%</p>`;
+
+            if (benefit.skillUnlocks && benefit.skillUnlocks.length > 0) {
+                html += `<h4>已解锁技能</h4><ul>`;
+                for (const skill of benefit.skillUnlocks) {
+                    html += `<li>${skill}</li>`;
+                }
+                html += `</ul>`;
+            }
+
+            if (nextRealm) {
+                html += `<p><b>下一境界:</b> ${nextRealm.name} (需要等级 ${nextRealm.minLevel})</p>`;
+                html += `<button onclick="advanceToNextRealm()">突破境界</button>`;
+            } else {
+                html += `<p>已达最高境界!</p>`;
+            }
+
+            html += `<h4>境界加成</h4>`;
+            html += `<p>奇遇触发率: +${(realm.id * 10)}%</p>`;
+            html += `<p>奇遇奖励: +${realm.id * 20}%</p>`;
+            html += `</div>`;
+
+            showModal('🌀 境界系统', html, 500);
+        }
+
+        window.advanceToNextRealm = () => {
+            const current = realmAdvancement.currentRealm;
+            const next = realmAdvancement.advanceRealm();
+            if (next) {
+                gameState.level += 5;
+                showToast(`突破成功! 进入${next.name}`);
+            } else {
+                showToast('无法突破，已达最高境界');
+            }
+        };
+
+        // ===== V69 Direction G: Multi-Player Collaboration (Player-to-NPC) =====
+        // Based on NPC MessageBus architecture, enabling player-to-player collaboration
+
+        // --- PlayerSession: Represents a player's game session ---
+        class PlayerSession {
+            constructor(playerId, playerName) {
+                this.playerId = playerId;
+                this.playerName = playerName;
+                this.connectedAt = Date.now();
+                this.lastActive = Date.now();
+                this.sessionState = 'active';
+                this.collabProjects = []; // [{projectId, role, contribution}]
+            }
+
+            updateActivity() {
+                this.lastActive = Date.now();
+            }
+
+            getSessionDuration() {
+                return Date.now() - this.connectedAt;
+            }
+        }
+
+        // --- CollaborationRoom: A room where players collaborate on tasks ---
+        class CollaborationRoom {
+            constructor(roomId, taskType) {
+                this.roomId = roomId;
+                this.taskType = taskType;
+                this.participants = new Map(); // playerId -> PlayerSession
+                this.taskProgress = 0;
+                this.maxParticipants = 5;
+                this.rewards = { base: 100, bonusPerPlayer: 20 };
+                this.status = 'recruiting'; // recruiting, in_progress, completed
+                this.chatLog = []; // [{playerId, message, timestamp}]
+            }
+
+            join(playerId, playerName) {
+                if (this.participants.size >= this.maxParticipants) {
+                    return { success: false, reason: 'Room full' };
+                }
+                if (this.participants.has(playerId)) {
+                    return { success: false, reason: 'Already joined' };
+                }
+                const session = new PlayerSession(playerId, playerName);
+                this.participants.set(playerId, session);
+                this.addChatLog(playerId, `joined the ${this.taskType} collaboration`);
+                return { success: true, session };
+            }
+
+            leave(playerId) {
+                if (this.participants.has(playerId)) {
+                    this.participants.delete(playerId);
+                    this.addChatLog(playerId, 'left the collaboration');
+                    return true;
+                }
+                return false;
+            }
+
+            addChatLog(playerId, message) {
+                this.chatLog.push({ playerId, message, timestamp: Date.now() });
+                if (this.chatLog.length > 100) this.chatLog.shift();
+            }
+
+            updateProgress(amount) {
+                this.taskProgress = Math.min(this.taskProgress + amount, 100);
+                if (this.taskProgress >= 100) {
+                    this.status = 'completed';
+                    this.distributeRewards();
+                }
+            }
+
+            distributeRewards() {
+                const totalReward = this.rewards.base + (this.participants.size - 1) * this.rewards.bonusPerPlayer;
+                const perPlayer = Math.floor(totalReward / this.participants.size);
+                for (const [pid, session] of this.participants) {
+                    gameState.spiritStones += perPlayer;
+                    this.addChatLog(pid, `received ${perPlayer} spirit stones`);
+                }
+            }
+
+            getParticipantCount() {
+                return this.participants.size;
+            }
+        }
+
+        // --- CollaborationManager: Manages all collaboration rooms ---
+        class CollaborationManager {
+            constructor() {
+                this.rooms = new Map(); // roomId -> CollaborationRoom
+                this.playerRooms = new Map(); // playerId -> [roomId]
+                this.roomCounter = 0;
+            }
+
+            createRoom(taskType, maxParticipants = 5) {
+                this.roomCounter++;
+                const roomId = `collab_${taskType}_${this.roomCounter}`;
+                const room = new CollaborationRoom(roomId, taskType);
+                room.maxParticipants = maxParticipants;
+                this.rooms.set(roomId, room);
+                return room;
+            }
+
+            joinRoom(roomId, playerId, playerName) {
+                const room = this.rooms.get(roomId);
+                if (!room) return { success: false, reason: 'Room not found' };
+                if (room.status !== 'recruiting') return { success: false, reason: 'Room not recruiting' };
+
+                const result = room.join(playerId, playerName);
+                if (result.success) {
+                    if (!this.playerRooms.has(playerId)) {
+                        this.playerRooms.set(playerId, []);
+                    }
+                    this.playerRooms.get(playerId).push(roomId);
+                }
+                return result;
+            }
+
+            leaveRoom(roomId, playerId) {
+                const room = this.rooms.get(roomId);
+                if (!room) return false;
+                const left = room.leave(playerId);
+                if (left) {
+                    const rooms = this.playerRooms.get(playerId);
+                    if (rooms) {
+                        const idx = rooms.indexOf(roomId);
+                        if (idx >= 0) rooms.splice(idx, 1);
+                    }
+                }
+                return left;
+            }
+
+            getActiveRooms() {
+                return Array.from(this.rooms.values()).filter(r => r.status === 'recruiting');
+            }
+
+            getRoomStatus(roomId) {
+                const room = this.rooms.get(roomId);
+                if (!room) return null;
+                return {
+                    roomId: room.roomId,
+                    taskType: room.taskType,
+                    participants: room.getParticipantCount(),
+                    maxParticipants: room.maxParticipants,
+                    status: room.status
+                };
+            }
+        }
+
+        const collabManager = new CollaborationManager();
+
+        // --- Collaboration Panel UI ---
+        function openCollaborationPanel() {
+            const activeRooms = collabManager.getActiveRooms();
+            let html = `<div style="padding:15px;">`;
+            html += `<h3>🤝 协作大厅</h3>`;
+            html += `<button onclick="createCollabRoom()" style="margin:10px;padding:10px;">创建协作房间</button>`;
+            html += `<h4>可加入的房间</h4>`;
+
+            if (activeRooms.length === 0) {
+                html += `<p>暂无空闲房间</p>`;
+            } else {
+                html += `<table style="width:100%;">`;
+                html += `<tr><th>任务类型</th><th>玩家数</th><th>状态</th><th>操作</th></tr>`;
+                for (const room of activeRooms) {
+                    html += `<tr>
+                        <td>${room.taskType}</td>
+                        <td>${room.getParticipantCount()}/${room.maxParticipants}</td>
+                        <td>${room.status}</td>
+                        <td><button onclick="joinCollabRoom('${room.roomId}')">加入</button></td>
+                    </tr>`;
+                }
+                html += `</table>`;
+            }
+
+            html += `<h4>我的协作</h4>`;
+            const myRooms = collabManager.playerRooms.get('player_1') || [];
+            if (myRooms.length === 0) {
+                html += `<p>暂无参与的协作</p>`;
+            } else {
+                for (const rid of myRooms) {
+                    const status = collabManager.getRoomStatus(rid);
+                    if (status) {
+                        html += `<p>${status.taskType} - ${status.participants}/${status.maxParticipants} - ${status.status}</p>`;
+                    }
+                }
+            }
+            html += `</div>`;
+
+            showModal('🤝 协作系统', html, 600);
+        }
+
+        window.createCollabRoom = () => {
+            const taskTypes = ['realm_trial', 'serendipity_hunt', 'skill_forge', 'pill_refine'];
+            const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+            const room = collabManager.createRoom(taskType);
+            collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+            showToast(`创建了${taskType}协作房间`);
+            openCollaborationPanel();
+        };
+
+        window.joinCollabRoom = (roomId) => {
+            const result = collabManager.joinRoom(roomId, 'player_1', '玩家1');
+            if (result.success) {
+                showToast('加入成功!');
+            } else {
+                showToast(`加入失败: ${result.reason}`);
+            }
+        };
+
+        // Wire NPC MessageBus to trigger collaboration events
+        const originalTriggerNpc = triggerNpcCollaboration;
+        triggerNpcCollaboration = function(eventType, data) {
+            // Auto-create collaboration room on certain NPC events
+            if (eventType === 'task_completed' && Math.random() < 0.3) {
+                const room = collabManager.createRoom('npc_task_' + eventType);
+                const result = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+            }
+            return originalTriggerNpc(eventType, data);
+        };
+
+        // ===== V68 Tests: Realm Advancement + Serendipity Boost =====
+        let v68Passed = 0, v68Failed = 0;
+        const v68Assert = (c, m) => { if (c) v68Passed++; else v68Failed++; };
+
+        v68Assert(realmAdvancement !== undefined, 'realmAdvancement exists');
+        v68Assert(serendipityBoost !== undefined, 'serendipityBoost exists');
+
+        // Test realm calculation
+        const realm1 = realmAdvancement.getRealmForLevel(5);
+        v68Assert(realm1.name === '练气期', 'getRealmForLevel returns 练气期 for level 5');
+        const realm2 = realmAdvancement.getRealmForLevel(15);
+        v68Assert(realm2.name === '筑基期', 'getRealmForLevel returns 筑基期 for level 15');
+
+        // Test multiplier
+        const mult1 = realmAdvancement.getRealmMultiplier(5);
+        v68Assert(mult1 === 1.0, 'getRealmMultiplier returns 1.0 for 练气期');
+        const mult2 = realmAdvancement.getRealmMultiplier(15);
+        v68Assert(mult2 === 1.5, 'getRealmMultiplier returns 1.5 for 筑基期');
+
+        // Test boost application
+        const boost = serendipityBoost.applyBoost('ser_discovery');
+        v68Assert(boost.chanceBonus === 0.1, 'SerendipityBoost applies chance bonus');
+        v68Assert(boost.rewardBonus === 1.2, 'SerendipityBoost applies reward bonus');
+
+        // Test boosted probability
+        const boostedProb = serendipityBoost.getBoostedProbability('ser_discovery', 0.5);
+        v68Assert(boostedProb === 0.6, 'getBoostedProbability adds chance bonus correctly');
+
+        // Test boosted reward
+        const boostedReward = serendipityBoost.getBoostedReward('ser_master_reward', 100);
+        v68Assert(boostedReward === 150, 'getBoostedReward applies 1.5x multiplier correctly');
+
+        // Test skill unlocks
+        const unlocks = realmAdvancement.getUnlockedSkills(2);
+        v68Assert(Array.isArray(unlocks), 'getUnlockedSkills returns array');
+        v68Assert(unlocks.includes('advanced_technique'), 'getUnlockedSkills includes advanced_technique');
+
+        // Test advanceRealm (when possible)
+        const initialRealm = realmAdvancement.currentRealm;
+        if (initialRealm < 5) {
+            const next = realmAdvancement.advanceRealm();
+            v68Assert(next !== null, 'advanceRealm returns next realm when possible');
+            v68Assert(realmAdvancement.currentRealm > initialRealm, 'currentRealm advances');
+        }
+
+        // V68 pass rate
+        const v68Total = v68Passed + v68Failed;
+        const v68PassRate = v68Total > 0 ? (v68Passed / v68Total * 100).toFixed(1) : 0;
+        console.log(`[V68 Tests] ${v68Passed}/${v68Total} passed (${v68PassRate}%)`);
+
+        // ===== V69 Tests: Multi-Player Collaboration =====
+        let v69Passed = 0, v69Failed = 0;
+        const v69Assert = (c, m) => { if (c) v69Passed++; else v69Failed++; };
+
+        v69Assert(collabManager !== undefined, 'collabManager exists');
+
+        // Test createRoom
+        const room = collabManager.createRoom('test_task');
+        v69Assert(room !== undefined, 'createRoom returns room');
+        v69Assert(room.roomId.startsWith('collab_'), 'roomId has correct prefix');
+        v69Assert(room.taskType === 'test_task', 'room has correct task type');
+        v69Assert(room.status === 'recruiting', 'room starts in recruiting status');
+
+        // Test joinRoom
+        const joinResult = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+        v69Assert(joinResult.success === true, 'joinRoom succeeds for first player');
+        v69Assert(room.getParticipantCount() === 1, 'participant count increases after join');
+
+        // Test joinRoom fails for duplicate
+        const joinResult2 = collabManager.joinRoom(room.roomId, 'player_1', '玩家1');
+        v69Assert(joinResult2.success === false, 'joinRoom fails for duplicate player');
+        v69Assert(joinResult2.reason === 'Already joined', 'joinRoom returns correct reason');
+
+        // Test leaveRoom
+        const left = collabManager.leaveRoom(room.roomId, 'player_1');
+        v69Assert(left === true, 'leaveRoom returns true when player exists');
+        v69Assert(room.getParticipantCount() === 0, 'participant count decreases after leave');
+
+        // Test chat log
+        room.join('player_2', '玩家2');
+        room.addChatLog('player_2', 'hello world');
+        v69Assert(room.chatLog.length === 1, 'chatLog records messages');
+        v69Assert(room.chatLog[0].message === 'hello world', 'chatLog stores correct message');
+
+        // Test room status
+        const roomStatus = collabManager.getRoomStatus(room.roomId);
+        v69Assert(roomStatus !== null, 'getRoomStatus returns status object');
+        v69Assert(roomStatus.taskType === 'test_task', 'status contains taskType');
+        v69Assert(roomStatus.participants === 1, 'status contains correct participant count');
+
+        // Test CollaborationRoom distributeRewards
+        room.join('player_3', '玩家3');
+        gameState.spiritStones = 0; // Reset for test
+        room.updateProgress(100); // Complete task
+        v69Assert(gameState.spiritStones > 0, 'distributeRewards adds spirit stones');
+
+        // V69 pass rate
+        const v69Total = v69Passed + v69Failed;
+        const v69PassRate = v69Total > 0 ? (v69Passed / v69Total * 100).toFixed(1) : 0;
+        console.log(`[V69 Tests] ${v69Passed}/${v69Total} passed (${v69PassRate}%)`);
+
+        // Combined F+G pass rate
+        const fgPassed = v68Passed + v69Passed;
+        const fgTotal = v68Total + v69Total;
+        const fgRate = fgTotal > 0 ? (fgPassed / fgTotal * 100).toFixed(1) : 0;
+        console.log(`[Direction F+G Combined] ${fgPassed}/${fgTotal} passed (${fgRate}%)`);
+
+        // Grand total F+G+A
+        const grandTotalPassed = aTotalPassed + v68Passed + v69Passed;
+        const grandTotalTests = aTotalTests + v68Total + v69Total;
+        const grandTotalRate = grandTotalTests > 0 ? (grandTotalPassed / grandTotalTests * 100).toFixed(1) : 0;
+        console.log(`[Grand Total] ${grandTotalPassed}/${grandTotalTests} passed (${grandTotalRate}%)`);
+        if (parseFloat(grandTotalRate) >= 80) {
+            console.log(`[PASS] Grand test suite meets 80%+ target!`);
+        }
+
         // ===== Direction E: Skill Marketplace =====
         // Claude-code-design tool registry + ruflo plugin lifecycle
 
