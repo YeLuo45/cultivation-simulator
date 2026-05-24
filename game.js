@@ -7197,6 +7197,50 @@ const ACHIEVEMENT_ID_MAP = {
 
         const playerMemory = new PlayerMemorySystem();
 
+        // ===== IdleTaskProcessor: Moved earlier to avoid TDZ in V64 tests =====
+        class IdleTaskProcessor {
+            constructor() {
+                this.processedCount = 0;
+            }
+            processIdleTasks() {
+                const now = Date.now();
+                const tasks = gameState.idleTasks || [];
+                let totalEarnings = 0;
+                for (const task of tasks) {
+                    if (task.status === 'active' && task.endTime <= now) {
+                        const earnings = this.calculateEarnings(task);
+                        totalEarnings += earnings;
+                        task.status = 'completed';
+                        this.processedCount++;
+                        if (typeof triggerNpcCollaboration === 'function') triggerNpcCollaboration('task_completed', { taskId: task.taskId, earnings, timestamp: now });
+                    }
+                }
+                if (totalEarnings > 0) {
+                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
+                    gameState.spiritStones += totalEarnings;
+                }
+                return { processedCount: this.processedCount, totalEarnings };
+            }
+            calculateEarnings(task) {
+                const base = task.baseEarnings || 10;
+                const duration = (task.endTime - task.startTime) / 1000;
+                const efficiency = IDLE_CONFIG ? IDLE_CONFIG.offlineEfficiency : 0.8;
+                return Math.floor(base * (duration / 60) * efficiency);
+            }
+            startIdleTask(taskType, durationMs, baseEarnings) {
+                const task = { taskId: `idle_${Date.now()}`, type: taskType, startTime: Date.now(), endTime: Date.now() + durationMs, status: 'active', baseEarnings: baseEarnings || 10 };
+                gameState.idleTasks = gameState.idleTasks || [];
+                gameState.idleTasks.push(task);
+                if (npcCollabRewards && typeof npcCollabRewards.addToPool === 'function') npcCollabRewards.addToPool(baseEarnings * 0.1);
+                return task;
+            }
+            getIdleStatus() {
+                const tasks = gameState.idleTasks || [];
+                return { total: tasks.length, active: tasks.filter(t => t.status === 'active').length, completed: tasks.filter(t => t.status === 'completed').length, totalEarnings: gameState.idleEarnings || 0 };
+            }
+        }
+        const idleTaskProcessor = new IdleTaskProcessor();
+
         // ===== V63 Direction A: NPC Collaboration Engine (Enhanced) =====
         // Enhanced NPC Reputation + Task Assignment + Collaboration Rewards
 
@@ -10386,82 +10430,8 @@ const ACHIEVEMENT_ID_MAP = {
         // ===== V64 Direction A: Idle Task Processing Integration =====
         // Process idle tasks and sync with NPC collaboration
 
-        // --- IdleTaskProcessor: Processes idle tasks with NPC collaboration ---
-        class IdleTaskProcessor {
-            constructor() {
-                this.processedCount = 0;
-            }
-
-            // Process idle tasks from gameState.idleTasks
-            processIdleTasks() {
-                const now = Date.now();
-                const tasks = gameState.idleTasks || [];
-                let totalEarnings = 0;
-
-                for (const task of tasks) {
-                    if (task.status === 'active' && task.endTime <= now) {
-                        // Task completed
-                        const earnings = this.calculateEarnings(task);
-                        totalEarnings += earnings;
-                        task.status = 'completed';
-                        this.processedCount++;
-
-                        // Trigger NPC collaboration on task completion
-                        triggerNpcCollaboration('task_completed', {
-                            taskId: task.taskId,
-                            earnings,
-                            timestamp: now
-                        });
-                    }
-                }
-
-                if (totalEarnings > 0) {
-                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
-                    gameState.spiritStones += totalEarnings;
-                }
-
-                return { processedCount: this.processedCount, totalEarnings };
-            }
-
-            calculateEarnings(task) {
-                const base = task.baseEarnings || 10;
-                const duration = (task.endTime - task.startTime) / 1000;
-                const efficiency = IDLE_CONFIG.offlineEfficiency || 0.8;
-                return Math.floor(base * (duration / 60) * efficiency);
-            }
-
-            // Start a new idle task
-            startIdleTask(taskType, durationMs, baseEarnings) {
-                const task = {
-                    taskId: `idle_${Date.now()}`,
-                    type: taskType,
-                    startTime: Date.now(),
-                    endTime: Date.now() + durationMs,
-                    status: 'active',
-                    baseEarnings: baseEarnings || 10
-                };
-                gameState.idleTasks = gameState.idleTasks || [];
-                gameState.idleTasks.push(task);
-
-                // Add reward to NPC collaboration pool
-                npcCollabRewards.addToPool(baseEarnings * 0.1);
-
-                return task;
-            }
-
-            // Get idle task status
-            getIdleStatus() {
-                const tasks = gameState.idleTasks || [];
-                return {
-                    total: tasks.length,
-                    active: tasks.filter(t => t.status === 'active').length,
-                    completed: tasks.filter(t => t.status === 'completed').length,
-                    totalEarnings: gameState.idleEarnings || 0
-                };
-            }
-        }
-
-        const idleTaskProcessor = new IdleTaskProcessor();
+        // (IdleTaskProcessor class moved earlier, above V63 section, to avoid TDZ)
+        // Original V70 copy removed - using earlier definition
 
         // ===== V70 Direction A: NPC Ecosystem System =====
         // Based on nanobot MessageBus + chatdev multi-role + DAG dependencies
