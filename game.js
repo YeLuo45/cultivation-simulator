@@ -461,6 +461,71 @@
                 name: 'celestial.status',
                 description: 'Get full celestial realm status including battlefield and sect info',
                 inputSchema: { type: 'object', properties: {} }
+            },
+            // V76: 装备打造系统增强 — 随机属性/精炼/装备评分
+            'equipment.forge': {
+                name: 'equipment.forge',
+                description: 'Forge a new equipment piece with random attributes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Slot: weapon|armor|boots|ring|amulet' },
+                        quality: { type: 'string', description: 'Base quality: N|R|SR|SSR (default random)' }
+                    },
+                    required: ['slot']
+                }
+            },
+            'equipment.refine': {
+                name: 'equipment.refine',
+                description: 'Refine equipment to add random bonus attributes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot to refine' },
+                        stones: { type: 'number', description: 'Spirit stones to invest (cost = stones * 20)' }
+                    },
+                    required: ['slot', 'stones']
+                }
+            },
+            'equipment.score': {
+                name: 'equipment.score',
+                description: 'Calculate equipment score (combat power rating)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot or "all"' }
+                    }
+                }
+            },
+            'equipment.gem_embed': {
+                name: 'equipment.gem_embed',
+                description: 'Embed or remove gems from equipment',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'string', description: 'Equipment slot' },
+                        gemId: { type: 'string', description: 'Gem ID to embed (or "remove")' },
+                        slotIndex: { type: 'number', description: 'Gem socket index (0-3)' }
+                    },
+                    required: ['slot', 'gemId']
+                }
+            },
+            'item.generate': {
+                name: 'item.generate',
+                description: 'Generate a random item with quality and type',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Item type: consumable|equipment|material|quest' },
+                        quality: { type: 'string', description: 'Quality: N|R|SR|SSR' },
+                        level: { type: 'number', description: 'Item level (default based on player realm)' }
+                    }
+                }
+            },
+            'battle.power': {
+                name: 'battle.power',
+                description: 'Calculate total player combat power',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -593,6 +658,25 @@
                             break;
                         case 'celestial.status':
                             result = this.mcpCelestialStatus();
+                            break;
+                        // V76: 装备打造系统增强
+                        case 'equipment.forge':
+                            result = this.mcpEquipmentForge(args.slot, args.quality);
+                            break;
+                        case 'equipment.refine':
+                            result = this.mcpEquipmentRefine(args.slot, args.stones);
+                            break;
+                        case 'equipment.score':
+                            result = this.mcpEquipmentScore(args.slot);
+                            break;
+                        case 'equipment.gem_embed':
+                            result = this.mcpEquipmentGemEmbed(args.slot, args.gemId, args.slotIndex);
+                            break;
+                        case 'item.generate':
+                            result = this.mcpItemGenerate(args.type, args.quality, args.level);
+                            break;
+                        case 'battle.power':
+                            result = this.mcpBattlePower();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -738,6 +822,158 @@
                     piece.bonus = piece.bonus || {};
                     piece.bonus[piece.level] = stones * 2;
                     return { success: true, slot, newLevel: piece.level, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V76: 装备打造系统实现
+            mcpEquipmentForge(slot, quality) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const validSlots = ['weapon','armor','boots','ring','amulet'];
+                    if (!validSlots.includes(slot)) return { error: 'Invalid slot: ' + slot };
+                    const QUALITY_MAP = { N: 0, R: 1, SR: 2, SSR: 3 };
+                    const QUALITY_NAMES = ['N','R','SR','SSR'];
+                    const qIdx = quality && QUALITY_MAP[quality] !== undefined
+                        ? QUALITY_MAP[quality]
+                        : Math.floor(Math.random() * 4);
+                    const qName = QUALITY_NAMES[qIdx];
+                    const ATTR_TYPES = ['attack','defense','hp','spirit','speed','crit'];
+                    const attrCount = qIdx + 1;
+                    const attrs = {};
+                    for (let i = 0; i < attrCount; i++) {
+                        const at = ATTR_TYPES[Math.floor(Math.random() * ATTR_TYPES.length)];
+                        const val = (Math.floor(Math.random() * 50) + 10) * (qIdx + 1);
+                        attrs[at] = (attrs[at] || 0) + val;
+                    }
+                    const NAMES = { weapon: '长剑', armor: '灵甲', boots: '战靴', ring: '戒指', amulet: '护符' };
+                    const piece = {
+                        name: NAMES[slot] || slot,
+                        slot,
+                        quality: qName,
+                        level: 1,
+                        attrs,
+                        gems: [],
+                        forgeTime: Date.now()
+                    };
+                    if (!gs.equipment) gs.equipment = {};
+                    gs.equipment[slot] = piece;
+                    return { success: true, ...piece };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentRefine(slot, stones) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.equipment || !gs.equipment[slot]) return { error: 'No equipment in slot: ' + slot };
+                    const piece = gs.equipment[slot];
+                    const cost = (stones || 1) * 20;
+                    if ((gs.spiritStones || 0) < cost) return { error: 'Not enough spirit stones' };
+                    gs.spiritStones -= cost;
+                    piece.refineLevel = (piece.refineLevel || 0) + 1;
+                    piece.refineBonus = piece.refineBonus || {};
+                    const bonus = Math.floor(Math.random() * 30) + 5;
+                    piece.refineBonus[piece.refineLevel] = bonus;
+                    return { success: true, slot, refineLevel: piece.refineLevel, bonus, cost, remaining: gs.spiritStones };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentScore(slot) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const calculateScore = (piece) => {
+                        if (!piece) return 0;
+                        const QUALITY_SCORES = { N: 10, R: 30, SR: 90, SSR: 270 };
+                        let score = QUALITY_SCORES[piece.quality] || 10;
+                        if (piece.attrs) {
+                            for (const v of Object.values(piece.attrs)) score += v;
+                        }
+                        score += (piece.level || 1) * 5;
+                        score += (piece.refineLevel || 0) * 20;
+                        if (piece.gems) score += piece.gems.length * 50;
+                        return score;
+                    };
+                    if (slot && slot !== 'all') {
+                        return { slot, score: calculateScore(gs.equipment ? gs.equipment[slot] : null) };
+                    }
+                    const allSlots = ['weapon','armor','boots','ring','amulet'];
+                    const scores = {};
+                    let total = 0;
+                    for (const s of allSlots) {
+                        const sc = calculateScore(gs.equipment ? gs.equipment[s] : null);
+                        scores[s] = sc;
+                        total += sc;
+                    }
+                    return { scores, total, slots: allSlots };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpEquipmentGemEmbed(slot, gemId, slotIndex) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!gs.equipment || !gs.equipment[slot]) return { error: 'No equipment in slot: ' + slot };
+                    const piece = gs.equipment[slot];
+                    piece.gems = piece.gems || [];
+                    const idx = slotIndex || 0;
+                    if (gemId === 'remove') {
+                        const removed = piece.gems[idx];
+                        piece.gems[idx] = null;
+                        return { success: true, slot, removed, gems: piece.gems };
+                    }
+                    const GEM_STATS = { 'gem_red': 50, 'gem_blue': 40, 'gem_green': 30, 'gem_gold': 100 };
+                    piece.gems[idx] = { id: gemId, stat: GEM_STATS[gemId] || 20 };
+                    return { success: true, slot, gem: piece.gems[idx], index: idx };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpItemGenerate(type, quality, level) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const QUALITY_MAP = { N: 0, R: 1, SR: 2, SSR: 3 };
+                    const QUALITY_NAMES = ['N','R','SR','SSR'];
+                    const qIdx = quality && QUALITY_MAP[quality] !== undefined
+                        ? QUALITY_MAP[quality]
+                        : Math.floor(Math.random() * 4);
+                    const qName = QUALITY_NAMES[qIdx];
+                    const TYPES = ['consumable','equipment','material','quest'];
+                    const t = type && TYPES.includes(type) ? type : TYPES[Math.floor(Math.random() * TYPES.length)];
+                    const lvl = level || (gs.realm || 1) * 3;
+                    const NAMES = {
+                        consumable: ['丹药','灵草','灵芝'], equipment: ['灵甲','灵剑'],
+                        material: ['灵石','灵矿'], quest: ['古卷','令牌']
+                    };
+                    const name = (NAMES[t] || ['物品'])[Math.floor(Math.random() * 3)] + '-' + Date.now() % 1000;
+                    const item = { id: 'item_' + Date.now(), name, type: t, quality: qName, level: lvl };
+                    if (!gs.items) gs.items = [];
+                    gs.items.push(item);
+                    return { success: true, item };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBattlePower() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realm = gs.realm || 1;
+                    const basePower = realm * 100;
+                    let equipBonus = 0;
+                    if (gs.equipment) {
+                        const scoreResult = this.mcpEquipmentScore('all');
+                        equipBonus = scoreResult.total || 0;
+                    }
+                    const skillBonus = ((gs.skills || []).length) * 20;
+                    const total = basePower + equipBonus + skillBonus;
+                    return {
+                        total,
+                        base: basePower,
+                        equipment: equipBonus,
+                        skills: skillBonus,
+                        realm
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -3525,6 +3761,97 @@
             return { passed, total, rate, results };
         }
         const v75Results = runV75Tests();
+
+        // ===== V76 Tests: 装备打造系统增强 — 随机属性/精炼/装备评分 =====
+        function runV76Tests() {
+            const results = [];
+            const v76Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V76 tools exist in MCP_TOOLS
+            v76Assert(MCP_TOOLS['equipment.forge'] !== undefined, 'equipment.forge tool defined');
+            v76Assert(MCP_TOOLS['equipment.refine'] !== undefined, 'equipment.refine tool defined');
+            v76Assert(MCP_TOOLS['equipment.score'] !== undefined, 'equipment.score tool defined');
+            v76Assert(MCP_TOOLS['equipment.gem_embed'] !== undefined, 'equipment.gem_embed tool defined');
+            v76Assert(MCP_TOOLS['item.generate'] !== undefined, 'item.generate tool defined');
+            v76Assert(MCP_TOOLS['battle.power'] !== undefined, 'battle.power tool defined');
+
+            // Test 2: Tool registry has V76 tools registered
+            const server = new CultivationMCPServer();
+            v76Assert(server.toolRegistry.has('equipment.forge'), 'equipment.forge registered');
+            v76Assert(server.toolRegistry.has('equipment.refine'), 'equipment.refine registered');
+            v76Assert(server.toolRegistry.has('equipment.score'), 'equipment.score registered');
+            v76Assert(server.toolRegistry.has('item.generate'), 'item.generate registered');
+            v76Assert(server.toolRegistry.has('battle.power'), 'battle.power registered');
+
+            // Test 3: mcpEquipmentForge works
+            window.gameState = { spiritStones: 10000 };
+            const forgeN = server.mcpEquipmentForge('weapon', 'N');
+            v76Assert(forgeN.success === true, 'forge returns success');
+            v76Assert(forgeN.quality === 'N', 'forge respects quality N');
+            v76Assert(forgeN.attrs !== undefined, 'forge returns attrs');
+            v76Assert(Object.keys(forgeN.attrs).length === 1, 'N quality has 1 attr');
+
+            const forgeSSR = server.mcpEquipmentForge('armor', 'SSR');
+            v76Assert(forgeSSR.quality === 'SSR', 'forge respects quality SSR');
+            v76Assert(Object.keys(forgeSSR.attrs).length === 4, 'SSR quality has 4 attrs');
+
+            // Test 4: mcpEquipmentRefine works
+            const refine = server.mcpEquipmentRefine('weapon', 10);
+            v76Assert(refine.success === true, 'refine returns success');
+            v76Assert(refine.refineLevel === 1, 'refine sets refineLevel');
+            v76Assert(refine.bonus > 0, 'refine gives bonus');
+            v76Assert(refine.cost === 200, 'refine cost = stones * 20');
+
+            // Test 5: mcpEquipmentScore
+            window.gameState = {
+                spiritStones: 10000,
+                equipment: {
+                    weapon: { name: '长剑', quality: 'SR', level: 3, attrs: { attack: 100 }, gems: [null, null] },
+                    armor: { name: '灵甲', quality: 'R', level: 2, attrs: { defense: 50 }, gems: [] }
+                }
+            };
+            const scoreWeapon = server.mcpEquipmentScore('weapon');
+            v76Assert(scoreWeapon.score > 0, 'score for weapon > 0');
+            const scoreAll = server.mcpEquipmentScore('all');
+            v76Assert(scoreAll.total > 0, 'score total > 0');
+            v76Assert(scoreAll.scores.weapon !== undefined, 'scores has weapon slot');
+            v76Assert(scoreAll.slots !== undefined, 'scores has slots array');
+
+            // Test 6: mcpEquipmentGemEmbed
+            const embed = server.mcpEquipmentGemEmbed('weapon', 'gem_red', 0);
+            v76Assert(embed.success === true, 'gem_embed returns success');
+            v76Assert(embed.gem !== undefined, 'gem_embed returns gem');
+            const remove = server.mcpEquipmentGemEmbed('weapon', 'remove', 0);
+            v76Assert(remove.success === true, 'gem_remove returns success');
+
+            // Test 7: mcpItemGenerate
+            window.gameState = { realm: 3, items: [] };
+            const genItem = server.mcpItemGenerate('consumable', 'SR', 10);
+            v76Assert(genItem.success === true, 'item.generate returns success');
+            v76Assert(genItem.item.quality === 'SR', 'item.generate respects quality');
+            v76Assert(genItem.item.type === 'consumable', 'item.generate respects type');
+            v76Assert(genItem.item.level === 10, 'item.generate respects level');
+            v76Assert(window.gameState.items.length === 1, 'item added to inventory');
+
+            // Test 8: mcpBattlePower
+            window.gameState = { realm: 5, equipment: { weapon: { quality: 'R', level: 1, attrs: {}, gems: [] } }, skills: [1, 2, 3] };
+            const power = server.mcpBattlePower();
+            v76Assert(power.total > 0, 'battle.power total > 0');
+            v76Assert(power.base === 500, 'battle.power base = realm * 100');
+            v76Assert(power.equipment > 0, 'battle.power has equipment bonus');
+            v76Assert(power.skills === 60, 'battle.power skills = count * 20');
+
+            // Test 9: Tool count (V73 8 + V74 7 + V75 7 + V76 6 = 28+)
+            v76Assert(server.toolRegistry.size >= 28, 'toolRegistry has >= 28 tools (V73-V76)');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V76 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V76 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v76Results = runV76Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
