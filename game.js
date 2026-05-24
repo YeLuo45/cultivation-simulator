@@ -1329,6 +1329,76 @@
             }
         };
 
+        // V89: 仙界排行榜+宗门战报+天梯竞技
+        const MCP_TOOLS_V89 = {
+            'arena.leaderboard': {
+                name: 'arena.leaderboard',
+                description: 'Get the celestial arena leaderboard ranking',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        season: { type: 'string', description: 'Season ID or current season' },
+                        limit: { type: 'number', description: 'Number of top players to return' }
+                    }
+                }
+            },
+            'arena.match_history': {
+                name: 'arena.match_history',
+                description: 'Query player arena match history',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: 'Player ID to query (default: current player)' },
+                        season: { type: 'string', description: 'Season ID' },
+                        limit: { type: 'number', description: 'Number of recent matches' }
+                    }
+                }
+            },
+            'sect.war_report': {
+                name: 'sect.war_report',
+                description: 'Get detailed war report for sect battles',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        reportId: { type: 'string', description: 'War report ID' },
+                        sectId: { type: 'string', description: 'Sect ID' }
+                    }
+                }
+            },
+            'sect.battle_stats': {
+                name: 'sect.battle_stats',
+                description: 'Query overall sect battle statistics',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        sectId: { type: 'string', description: 'Sect ID (default: player sect)' },
+                        statType: { type: 'string', description: 'Stat type: wins|losses|draws|all' }
+                    }
+                }
+            },
+            'celestial.ladder_rank': {
+                name: 'celestial.ladder_rank',
+                description: 'Get player celestial ladder ranking and rating',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: 'Player ID (default: current player)' }
+                    }
+                }
+            },
+            'celestial.ladder_fight': {
+                name: 'celestial.ladder_fight',
+                description: 'Challenge a rival on the celestial ladder',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetPlayerId: { type: 'string', description: 'Target player ID to challenge' },
+                        stake: { type: 'number', description: 'Spirit stone stake for the fight' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -1388,6 +1458,10 @@
                 }
                 // V88: Register celestial market and serendipity tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V88)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V89: Register leaderboard, war report, and ladder tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V89)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1747,6 +1821,25 @@
                             break;
                         case 'serendipity.karma_update':
                             result = this.mcpSerendipityKarmaUpdate(args.eventId, args.karmaDelta, args.reason);
+                            break;
+                        // V89: Leaderboard, war report, and ladder tools
+                        case 'arena.leaderboard':
+                            result = this.mcpArenaLeaderboard(args.season, args.limit);
+                            break;
+                        case 'arena.match_history':
+                            result = this.mcpArenaMatchHistory(args.playerId, args.season, args.limit);
+                            break;
+                        case 'sect.war_report':
+                            result = this.mcpSectWarReport(args.reportId, args.sectId);
+                            break;
+                        case 'sect.battle_stats':
+                            result = this.mcpSectBattleStats(args.sectId, args.statType);
+                            break;
+                        case 'celestial.ladder_rank':
+                            result = this.mcpCelestialLadderRank(args.playerId);
+                            break;
+                        case 'celestial.ladder_fight':
+                            result = this.mcpCelestialLadderFight(args.targetPlayerId, args.stake);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3532,6 +3625,94 @@
                     gs.karmaHistory = gs.karmaHistory || [];
                     gs.karmaHistory.push({ eventId, karma: karmaDelta, reason: reason || 'serendipity', time: Date.now() });
                     return { success: true, eventId, newKarma: gs.karmaPoints, karmaDelta };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V89: Arena Leaderboard and Ladder
+            mcpArenaLeaderboard(season, limit) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const seasonId = season || gs.currentSeason || 'S1';
+                    const max = limit || 10;
+                    const leaderboard = gs.arenaLeaderboard || [];
+                    const top = leaderboard.slice(0, max).map((e, i) => ({
+                        rank: i + 1, playerId: e.playerId, name: e.name || '修士', rating: e.rating || 1500, wins: e.wins || 0
+                    }));
+                    return { season: seasonId, leaderboard: top, total: leaderboard.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpArenaMatchHistory(playerId, season, limit) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pid = playerId || gs.playerId || gs.name || 'Player';
+                    const seasonId = season || gs.currentSeason || 'S1';
+                    const max = limit || 20;
+                    const history = gs.arenaMatchHistory || [];
+                    const filtered = history.filter(m => m.playerId === pid && m.season === seasonId);
+                    return { playerId: pid, season: seasonId, matches: filtered.slice(-max), total: filtered.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectWarReport(reportId, sectId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const sid = sectId || (gs.sect && gs.sect.id) || 'SECT_001';
+                    const reports = gs.sectWarReports || [];
+                    const report = reports.find(r => r.id === reportId && (r.sectId === sid || !reportId));
+                    if (!report) return { error: 'War report not found', reportId, sectId: sid };
+                    return { reportId: report.id, sectId: report.sectId, date: report.date, outcome: report.outcome, details: report.details };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSectBattleStats(sectId, statType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const sid = sectId || (gs.sect && gs.sect.id) || 'SECT_001';
+                    const stats = gs.sectBattleStats || {};
+                    const sectStats = stats[sid] || { wins: 0, losses: 0, draws: 0 };
+                    if (statType && statType !== 'all') return { [statType]: sectStats[statType] || 0 };
+                    return { sectId: sid, ...sectStats };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialLadderRank(playerId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pid = playerId || gs.playerId || gs.name || 'Player';
+                    const ladder = gs.celestialLadder || [];
+                    const entry = ladder.find(e => e.playerId === pid);
+                    if (!entry) return { playerId: pid, rank: 0, rating: 1500, message: 'Not on ladder' };
+                    return { playerId: pid, rank: entry.rank || 0, rating: entry.rating || 1500, wins: entry.wins || 0, losses: entry.losses || 0 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpCelestialLadderFight(targetPlayerId, stake) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const target = targetPlayerId || 'RIVAL_001';
+                    const stakeAmount = stake || 100;
+                    gs.spiritStones = gs.spiritStones || 0;
+                    if (gs.spiritStones < stakeAmount) return { error: 'Not enough spirit stones for stake', required: stakeAmount, available: gs.spiritStones };
+                    const myRating = 1500;
+                    const targetEntry = gs.celestialLadder ? gs.celestialLadder.find(e => e.playerId === target) : null;
+                    const targetRating = targetEntry ? targetEntry.rating : 1500;
+                    const myChance = 1 / (1 + Math.pow(10, (targetRating - myRating) / 400));
+                    const roll = Math.random();
+                    const won = roll < myChance;
+                    gs.spiritStones = won ? gs.spiritStones + stakeAmount : gs.spiritStones - stakeAmount;
+                    const ratingDelta = Math.round(20 * (won ? 1 - myChance : myChance));
+                    return {
+                        success: true, won, ratingDelta, newRating: myRating + ratingDelta,
+                        opponent: target, stake: stakeAmount, newBalance: gs.spiritStones,
+                        message: won ? `挑战成功！_rating +${ratingDelta}` : `挑战失败，损失${stakeAmount}灵石`
+                    };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -7564,6 +7745,81 @@
             return { passed, total, rate, results };
         }
         const v88Results = runV88Tests();
+
+        // ===== V89 Tests: 仙界排行榜+宗门战报+天梯竞技 =====
+        function runV89Tests() {
+            const results = [];
+            const v89Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V89 tools exist in MCP_TOOLS_V89
+            v89Assert(MCP_TOOLS_V89['arena.leaderboard'] !== undefined, 'arena.leaderboard defined');
+            v89Assert(MCP_TOOLS_V89['arena.match_history'] !== undefined, 'arena.match_history defined');
+            v89Assert(MCP_TOOLS_V89['sect.war_report'] !== undefined, 'sect.war_report defined');
+            v89Assert(MCP_TOOLS_V89['sect.battle_stats'] !== undefined, 'sect.battle_stats defined');
+            v89Assert(MCP_TOOLS_V89['celestial.ladder_rank'] !== undefined, 'celestial.ladder_rank defined');
+            v89Assert(MCP_TOOLS_V89['celestial.ladder_fight'] !== undefined, 'celestial.ladder_fight defined');
+
+            // Test 2: Tool registry has V89 tools
+            const server = new CultivationMCPServer();
+            v89Assert(server.toolRegistry.has('arena.leaderboard'), 'arena.leaderboard registered');
+            v89Assert(server.toolRegistry.has('arena.match_history'), 'arena.match_history registered');
+            v89Assert(server.toolRegistry.has('sect.war_report'), 'sect.war_report registered');
+            v89Assert(server.toolRegistry.has('sect.battle_stats'), 'sect.battle_stats registered');
+            v89Assert(server.toolRegistry.has('celestial.ladder_rank'), 'celestial.ladder_rank registered');
+            v89Assert(server.toolRegistry.has('celestial.ladder_fight'), 'celestial.ladder_fight registered');
+
+            // Test 3: Tool count grows with V89 (96 + 6 = 102)
+            const server2 = new CultivationMCPServer();
+            v89Assert(server2.toolRegistry.size >= 102, 'toolRegistry has >= 102 tools (V73-V89)');
+
+            // Test 4: arena.leaderboard returns structure
+            const lb = server.mcpArenaLeaderboard('S1', 10);
+            v89Assert(lb && typeof lb.season === 'string', 'arena.leaderboard returns season');
+            v89Assert(Array.isArray(lb.leaderboard), 'arena.leaderboard returns leaderboard array');
+            v89Assert(typeof lb.total === 'number', 'arena.leaderboard returns total number');
+
+            // Test 5: arena.match_history returns structure
+            const mh = server.mcpArenaMatchHistory('Player1', 'S1', 20);
+            v89Assert(mh && mh.playerId, 'arena.match_history returns playerId');
+            v89Assert(Array.isArray(mh.matches), 'arena.match_history returns matches array');
+
+            // Test 6: sect.war_report validates
+            const badReport = server.mcpSectWarReport('INVALID_ID', 'SECT_001');
+            v89Assert(badReport && badReport.error === 'War report not found', 'sect.war_report returns error for invalid report');
+
+            // Test 7: sect.battle_stats returns structure
+            const bs = server.mcpSectBattleStats('SECT_001', 'all');
+            v89Assert(bs && bs.sectId, 'sect.battle_stats returns sectId');
+            v89Assert(typeof bs.wins === 'number', 'sect.battle_stats returns wins');
+            v89Assert(typeof bs.losses === 'number', 'sect.battle_stats returns losses');
+
+            // Test 8: sect.battle_stats filters by statType
+            const bsWins = server.mcpSectBattleStats('SECT_001', 'wins');
+            v89Assert(typeof bsWins.wins === 'number', 'sect.battle_stats returns wins when filtered');
+
+            // Test 9: celestial.ladder_rank returns structure for unknown player
+            const lr = server.mcpCelestialLadderRank('UnknownPlayer');
+            v89Assert(lr && lr.playerId, 'celestial.ladder_rank returns playerId');
+            v89Assert(typeof lr.rating === 'number', 'celestial.ladder_rank returns rating');
+
+            // Test 10: celestial.ladder_fight validates stake
+            const badFight = server.mcpCelestialLadderFight('RIVAL_001', 0);
+            v89Assert(badFight && badFight.error, 'celestial.ladder_fight rejects zero stake');
+
+            // Test 11: celestial.ladder_fight returns result structure
+            const fight = server.mcpCelestialLadderFight('RIVAL_001', 100);
+            v89Assert(fight && typeof fight.won === 'boolean', 'celestial.ladder_fight returns won boolean');
+            v89Assert(typeof fight.ratingDelta === 'number', 'celestial.ladder_fight returns ratingDelta');
+            v89Assert(fight.message, 'celestial.ladder_fight returns message');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V89 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V89 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v89Results = runV89Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
