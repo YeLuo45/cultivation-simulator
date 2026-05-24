@@ -21244,8 +21244,10 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== initWorldMap =====
         function initWorldMap() {
-            if (!gameState.worldMap) {
-                gameState.worldMap = {
+            const gs = window.gameState;
+            if (!gs) return;
+            if (!gs.worldMap) {
+                gs.worldMap = {
                     currentContinent: '中州',
                     currentRegion: '中州城',
                     exploredContinents: ['中州'],
@@ -23099,6 +23101,8 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== startNewGame =====
         function startNewGame(fromReincarnation = false) {
+            const gs = window.gameState;
+            if (!gs) return;
             let reincarnationData = null;
             
             // 如果是从轮回转世来的，恢复转世数据
@@ -23359,6 +23363,8 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== loadGame =====
         function loadGame() {
+            const gs = window.gameState;
+            if (!gs) return;
             const saved = localStorage.getItem(CONFIG.storageKey);
             if (saved) {
                 const loaded = JSON.parse(saved);
@@ -24942,10 +24948,12 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderAchievements =====
         function renderAchievements() {
+            const gs = window.gameState;
+            if (!gs) return;
             const content = document.getElementById('achievementContent');
             if (!content) return;
 
-            const ach = gameState.achievements || { 
+            const ach = gs.achievements || { 
                 unlocked: [], 
                 titles: [], 
                 stats: {},
@@ -25434,10 +25442,12 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderCombatHome =====
         function renderCombatHome() {
-            const wins = gameState.combat?.wins || 0;
-            const losses = gameState.combat?.losses || 0;
-            const honor = gameState.combat?.honor || 0;
-            const fame = gameState.combat?.fame || 0;
+            const gs = window.gameState;
+            if (!gs) return;
+            const wins = gs.combat?.wins || 0;
+            const losses = gs.combat?.losses || 0;
+            const honor = gs.combat?.honor || 0;
+            const fame = gs.combat?.fame || 0;
             const total = wins + losses;
 
             let html = `
@@ -26968,10 +26978,12 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderPetHome =====
         function renderPetHome(tab) {
+            const gs = window.gameState;
+            if (!gs) return;
             const content = document.getElementById('petContent');
-            const petCount = gameState.pets.length;
+            const petCount = gs.pets.length;
             const maxPets = 5;
-            const eggCount = gameState.petEggs ? gameState.petEggs.length : 0;
+            const eggCount = gs.petEggs ? gs.petEggs.length : 0;
 
             let tabsHtml = `
                 <div class="pet-tabs">
@@ -28255,7 +28267,9 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== openSerendipityLog =====
         function openSerendipityLog() {
-            const serendipity = gameState.serendipity;
+            const gs = window.gameState;
+            if (!gs) return;
+            const serendipity = gs.serendipity;
             const modal = document.getElementById('serendipityModal');
             const titleEl = document.getElementById('serendipityTitle');
             const content = document.getElementById('serendipityContent');
@@ -29002,6 +29016,8 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== openSettings =====
         function openSettings() {
+            const gs = window.gameState;
+            if (!gs) return;
             // 填充当前配置
             document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
             document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
