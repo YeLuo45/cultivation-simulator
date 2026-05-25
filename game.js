@@ -3380,12 +3380,154 @@ const ACHIEVEMENT_ID_MAP = {
             },
             'explore.survey': {
                 name: 'explore.survey',
-                description: 'Survey unexplored regions on the celestial map',
+                description: 'Survey a region for exploration opportunities',
                 inputSchema: {
                     type: 'object',
                     properties: {
-                        region: { type: 'string', description: 'Region to survey' }
+                        region: { type: 'string', description: 'Region: east|west|north|south' }
                     }
+                }
+            }
+        };
+
+        // ===== V91 Direction A: AI Budget Control System =====
+        // claude-code Budget Mode: call quota + rate limit + daily/monthly budgets
+
+        const MCP_TOOLS_V91 = {
+            'budget.query': {
+                name: 'budget.query',
+                description: 'Query current budget status for a provider or all providers',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all providers.' }
+                    }
+                }
+            },
+            'budget.configure': {
+                name: 'budget.configure',
+                description: 'Update budget limits and warning thresholds for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        dailyLimit: { type: 'number', description: 'Daily token budget limit (points)' },
+                        monthlyLimit: { type: 'number', description: 'Monthly token budget limit (points)' },
+                        warningThreshold: { type: 'number', description: 'Warning threshold (0.0-1.0, e.g. 0.8 for 80%)' },
+                        fallbackToLocal: { type: 'boolean', description: 'Fallback to local rules when budget exceeded' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'budget.reset': {
+                name: 'budget.reset',
+                description: 'Reset daily/monthly budget counters for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        scope: { type: 'string', description: 'Reset scope: daily|monthly|both' }
+                    },
+                    required: ['provider', 'scope']
+                }
+            },
+            'budget.stats': {
+                name: 'budget.stats',
+                description: 'Get detailed budget statistics and call history',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all.' },
+                        days: { type: 'number', description: 'Number of days of history (default 7, max 30)' }
+                    }
+                }
+            },
+            'budget.alerts': {
+                name: 'budget.alerts',
+                description: 'Get active budget warnings and alerts',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID. Omit for all.' }
+                    }
+                }
+            },
+            'budget.rate_limit': {
+                name: 'budget.rate_limit',
+                description: 'Get or set rate limiting configuration for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        maxCallsPerMinute: { type: 'number', description: 'Max API calls per minute (0 = unlimited)' },
+                        maxTokensPerDay: { type: 'number', description: 'Max tokens per day (0 = unlimited)' }
+                    },
+                    required: ['provider']
+                }
+            }
+        };
+
+        // V92: 仙界秘境探索系统 — thunderbolt 双路径同步 + 随机事件
+        const MCP_TOOLS_V92 = {
+            'secret_realm.list': {
+                name: 'secret_realm.list',
+                description: 'List all secret realms available in the current cycle',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        region: { type: 'string', description: 'Filter by region: east|west|north|south|all (default: all)' }
+                    }
+                }
+            },
+            'secret_realm.enter': {
+                name: 'secret_realm.enter',
+                description: 'Enter and explore a secret realm using a dungeon token',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (e.g. jade_palace, dragon_tomb)' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'secret_realm.progress': {
+                name: 'secret_realm.progress',
+                description: 'Get current exploration progress in active secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (omit for active realm)' }
+                    }
+                }
+            },
+            'secret_realm.encounter': {
+                name: 'secret_realm.encounter',
+                description: 'Resolve a random encounter within a secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: engage|avoid|investigate|retreat' }
+                    },
+                    required: ['action']
+                }
+            },
+            'secret_realm.claim': {
+                name: 'secret_realm.claim',
+                description: 'Claim exploration rewards from a completed secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID to claim' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'dungeon_token.status': {
+                name: 'dungeon_token.status',
+                description: 'Query dungeon token count and next reset timer',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
                 }
             }
         };
@@ -3457,6 +3599,14 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V90: Register star map, spirit root, and explore tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V90)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V91: Register budget control tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V91)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V92: Register secret realm exploration tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V92)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3854,6 +4004,42 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'explore.survey':
                             result = this.mcpExploreSurvey(args.region);
+                            break;
+                        case 'budget.query':
+                            result = this.mcpBudgetQuery(args.provider);
+                            break;
+                        case 'budget.configure':
+                            result = this.mcpBudgetConfigure(args);
+                            break;
+                        case 'budget.reset':
+                            result = this.mcpBudgetReset(args.provider, args.scope);
+                            break;
+                        case 'budget.stats':
+                            result = this.mcpBudgetStats(args.provider, args.days);
+                            break;
+                        case 'budget.alerts':
+                            result = this.mcpBudgetAlerts(args.provider);
+                            break;
+                        case 'budget.rate_limit':
+                            result = this.mcpBudgetRateLimit(args);
+                            break;
+                        case 'secret_realm.list':
+                            result = this.mcpSecretRealmList(args.region);
+                            break;
+                        case 'secret_realm.enter':
+                            result = this.mcpSecretRealmEnter(args.realmId);
+                            break;
+                        case 'secret_realm.progress':
+                            result = this.mcpSecretRealmProgress(args.realmId);
+                            break;
+                        case 'secret_realm.encounter':
+                            result = this.mcpSecretRealmEncounter(args.action);
+                            break;
+                        case 'secret_realm.claim':
+                            result = this.mcpSecretRealmClaim(args.realmId);
+                            break;
+                        case 'dungeon_token.status':
+                            result = this.mcpDungeonTokenStatus();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5848,6 +6034,247 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch(e) { return { error: e.message }; }
             }
 
+            // ===== V91 Budget Control MCP Methods =====
+            mcpBudgetQuery(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] };
+                        // Auto-reset if day changed
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? (bt.dailySpent / cfg.dailyLimit * 100).toFixed(1) : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? (bt.monthlySpent / cfg.monthlyLimit * 100).toFixed(1) : 0;
+                        const isWarning = dailyPct >= cfg.warningThreshold * 100 || monthlyPct >= cfg.warningThreshold * 100;
+                        results[p] = {
+                            daily: { spent: bt.dailySpent, limit: cfg.dailyLimit, percent: dailyPct },
+                            monthly: { spent: bt.monthlySpent, limit: cfg.monthlyLimit, percent: monthlyPct },
+                            callCount: bt.callCount,
+                            isWarning,
+                            lastCallProvider: bt.lastCallProvider || null,
+                            rateLimit: {
+                                maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                                maxTokensPerDay: cfg.maxTokensPerDay || 0
+                            }
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetConfigure(args) {
+                try {
+                    const { provider, dailyLimit, monthlyLimit, warningThreshold, fallbackToLocal, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = { ...BUDGET_CONFIG };
+                    const cfg = budgetProviderConfig[provider];
+                    if (dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, dailyLimit);
+                    if (monthlyLimit !== undefined) cfg.monthlyLimit = Math.max(0, monthlyLimit);
+                    if (warningThreshold !== undefined) cfg.warningThreshold = Math.min(1, Math.max(0, warningThreshold));
+                    if (fallbackToLocal !== undefined) cfg.fallbackToLocal = fallbackToLocal;
+                    if (maxCallsPerMinute !== undefined) cfg.maxCallsPerMinute = maxCallsPerMinute;
+                    if (maxTokensPerDay !== undefined) cfg.maxTokensPerDay = maxTokensPerDay;
+                    return { success: true, provider, config: cfg };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetReset(providerId, scope) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    if (!providerId) return { error: 'provider is required' };
+                    if (!scope || !['daily', 'monthly', 'both'].includes(scope)) return { error: 'scope must be daily|monthly|both' };
+                    let bt = budgetProviderTracker[providerId];
+                    if (!bt) { bt = { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] }; budgetProviderTracker[providerId] = bt; }
+                    if (scope === 'daily' || scope === 'both') { bt.dailySpent = 0; bt.lastResetDay = day; }
+                    if (scope === 'monthly' || scope === 'both') { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                    return { success: true, provider: providerId, scope, dailySpent: bt.dailySpent, monthlySpent: bt.monthlySpent };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetStats(providerId, days) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const numDays = Math.min(Math.max(days || 7, 1), 30);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderTracker) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, callHistory: [] };
+                        const history = bt.callHistory || [];
+                        const cutoff = now.getTime() - numDays * 86400000;
+                        const recentCalls = history.filter(c => c.timestamp > cutoff);
+                        const dailyBreakdown = [];
+                        for (let i = numDays - 1; i >= 0; i--) {
+                            const d = day - i;
+                            const dayCalls = recentCalls.filter(c => Math.floor(c.timestamp / 86400000) === d);
+                            dailyBreakdown.push({ day: d, calls: dayCalls.length, tokens: dayCalls.reduce((s, c) => s + (c.tokens || 0), 0) });
+                        }
+                        results[p] = {
+                            totalCalls: bt.callCount,
+                            recentCalls: recentCalls.length,
+                            dailyBreakdown,
+                            avgCallsPerDay: numDays > 0 ? (recentCalls.length / numDays).toFixed(1) : 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetAlerts(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const alerts = [];
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, lastResetDay: day, lastResetMonth: month };
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? bt.dailySpent / cfg.dailyLimit : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? bt.monthlySpent / cfg.monthlyLimit : 0;
+                        if (dailyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'daily_exceeded', percent: (dailyPct * 100).toFixed(1) });
+                        else if (dailyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'daily_threshold', percent: (dailyPct * 100).toFixed(1) });
+                        if (monthlyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'monthly_exceeded', percent: (monthlyPct * 100).toFixed(1) });
+                        else if (monthlyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'monthly_threshold', percent: (monthlyPct * 100).toFixed(1) });
+                        // Rate limit alert
+                        if (cfg.maxCallsPerMinute > 0 && bt.rateLimitCalls) {
+                            const recentMinuteCalls = bt.rateLimitCalls.filter(t => now.getTime() - t < 60000);
+                            if (recentMinuteCalls.length >= cfg.maxCallsPerMinute) alerts.push({ provider: p, level: 'critical', type: 'rate_limit_exceeded', count: recentMinuteCalls.length, limit: cfg.maxCallsPerMinute });
+                        }
+                    }
+                    return { provider: pid, alerts, hasAlerts: alerts.length > 0 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetRateLimit(args) {
+                try {
+                    const { provider, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    const cfg = budgetProviderConfig[provider] || { ...BUDGET_CONFIG, maxCallsPerMinute: 0, maxTokensPerDay: 0 };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = cfg;
+                    if (maxCallsPerMinute !== undefined) { cfg.maxCallsPerMinute = maxCallsPerMinute; }
+                    if (maxTokensPerDay !== undefined) { cfg.maxTokensPerDay = maxTokensPerDay; }
+                    return { success: true, provider, rateLimit: { maxCallsPerMinute: cfg.maxCallsPerMinute, maxTokensPerDay: cfg.maxTokensPerDay } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V92: Secret Realm Exploration
+            mcpSecretRealmList(region) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const cycle = gs2.cycle || 1;
+                    const REALMS = {
+                        'jade_palace': { id: 'jade_palace', name: '碧玉仙宫', region: 'east', difficulty: 3, tokens: 1, description: '上古仙人洞府', rewards: ['灵石', '仙草'] },
+                        'dragon_tomb': { id: 'dragon_tomb', name: '龙墓深渊', region: 'south', difficulty: 4, tokens: 2, description: '远古龙族遗迹', rewards: ['龙鳞', '龙魂'] },
+                        'thunder_shrine': { id: 'thunder_shrine', name: '雷霆神祠', region: 'west', difficulty: 3, tokens: 1, description: '雷霆法则圣地', rewards: ['雷劫珠', '天雷符'] },
+                        'celestial_garden': { id: 'celestial_garden', name: '天界药园', region: 'north', difficulty: 2, tokens: 1, description: '仙界灵药园', rewards: ['灵芝', '蟠桃'] },
+                        'spirit_valley': { id: 'spirit_valley', name: '幽魂谷', region: 'south', difficulty: 3, tokens: 1, description: '鬼修圣地', rewards: ['幽魂石', '冥晶'] },
+                        'bamboo_cave': { id: 'bamboo_cave', name: '翠竹林', region: 'east', difficulty: 1, tokens: 1, description: '隐士清修地', rewards: ['翠竹', '清心露'] }
+                    };
+                    const r = region && region !== 'all' ? region : null;
+                    const list = Object.values(REALMS).filter(x => !r || x.region === r);
+                    return { cycle, tokens: gs2.tokens ?? 3, realms: list, nextReset: gs2.nextReset || '10天后重置' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEnter(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    if (gs.secretRealm.tokens <= 0) return { error: 'No dungeon tokens remaining', tokens: 0 };
+                    const REALMS = ['jade_palace','dragon_tomb','thunder_shrine','celestial_garden','spirit_valley','bamboo_cave'];
+                    if (!REALMS.includes(realmId)) return { error: 'Invalid realmId: ' + realmId + '. Available: ' + REALMS.join(', ') };
+                    gs.secretRealm.tokens--;
+                    gs.secretRealm.activeRealm = realmId;
+                    gs.secretRealm.progress = 0;
+                    gs.secretRealm.waves = 3;
+                    gs.secretRealm.completed = false;
+                    return { success: true, realmId, tokens: gs.secretRealm.tokens, waves: 3, message: '进入秘境成功，当前波次：1/3' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmProgress(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const active = gs2.activeRealm || realmId;
+                    if (!active) return { error: 'No active exploration' };
+                    const ENCOUNTERS = ['珍稀灵草', '守护妖兽', '上古禁制', '失落宝箱', '神秘商人', '天劫降临'];
+                    const encounter = ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)];
+                    return { realmId: active, progress: gs2.progress || 0, waves: gs2.waves || 0, encounter, status: gs2.completed ? 'completed' : 'in_progress' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEncounter(action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const valid = ['engage','avoid','investigate','retreat'];
+                    if (!valid.includes(action)) return { error: 'Invalid action: ' + action + '. Must be one of: ' + valid.join(', ') };
+                    if (!gs2.activeRealm) return { error: 'No active realm. Call secret_realm.enter first.' };
+                    const roll = Math.random();
+                    const outcomes = {
+                        engage: roll > 0.4 ? { success: true, message: '战斗胜利，获得奖励', reward: '灵石x10' } : { success: false, message: '战斗失败，受轻伤', reward: null },
+                        avoid: roll > 0.2 ? { success: true, message: '成功避开威胁', reward: null } : { success: false, message: '躲避不及，受到波及', reward: null },
+                        investigate: roll > 0.3 ? { success: true, message: '发现隐藏区域', reward: '仙草x2' } : { success: false, message: '调查无果，浪费了时间', reward: null },
+                        retreat: { success: true, message: '成功撤退，保留令牌', reward: null }
+                    };
+                    const result = outcomes[action] || outcomes.investigate;
+                    gs2.progress = (gs2.progress || 0) + (result.success ? 1 : 0);
+                    if (gs2.progress >= (gs2.waves || 3)) { gs2.completed = true; gs2.progress = gs2.waves || 3; }
+                    return { action, ...result, progress: gs2.progress, waves: gs2.waves || 3, realmId: gs2.activeRealm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmClaim(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    if (!gs2.completed) return { error: 'Realm not completed. Progress: ' + (gs2.progress || 0) + '/' + (gs2.waves || 3) };
+                    const claimed = gs2.claimed || [];
+                    if (claimed.includes(realmId)) return { error: 'Already claimed this realm', realmId };
+                    claimed.push(realmId);
+                    gs2.claimed = claimed;
+                    gs2.activeRealm = null;
+                    gs2.progress = 0;
+                    gs2.completed = false;
+                    const REWARDS = { jade_palace: ['灵石x50','仙草x3'], dragon_tomb: ['龙鳞x2','龙魂x1'], thunder_shrine: ['雷劫珠x1','天雷符x5'], celestial_garden: ['灵芝x5','蟠桃x1'], spirit_valley: ['幽魂石x3','冥晶x2'], bamboo_cave: ['翠竹x10','清心露x2'] };
+                    return { success: true, realmId, rewards: REWARDS[realmId] || ['随机灵石x20'], message: '奖励已发放至背包' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpDungeonTokenStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    const TOKENS_MAX = 3;
+                    const CYCLE_DAYS = 10;
+                    const cycle = gs.secretRealm.cycle || 1;
+                    return { tokens: gs.secretRealm.tokens, maxTokens: TOKENS_MAX, cycle, nextReset: CYCLE_DAYS + '天后重置', status: gs.secretRealm.tokens > 0 ? 'available' : 'depleted' };
+                } catch(e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -7197,50 +7624,6 @@ const ACHIEVEMENT_ID_MAP = {
 
         const playerMemory = new PlayerMemorySystem();
 
-        // ===== IdleTaskProcessor: Moved earlier to avoid TDZ in V64 tests =====
-        class IdleTaskProcessor {
-            constructor() {
-                this.processedCount = 0;
-            }
-            processIdleTasks() {
-                const now = Date.now();
-                const tasks = gameState.idleTasks || [];
-                let totalEarnings = 0;
-                for (const task of tasks) {
-                    if (task.status === 'active' && task.endTime <= now) {
-                        const earnings = this.calculateEarnings(task);
-                        totalEarnings += earnings;
-                        task.status = 'completed';
-                        this.processedCount++;
-                        if (typeof triggerNpcCollaboration === 'function') triggerNpcCollaboration('task_completed', { taskId: task.taskId, earnings, timestamp: now });
-                    }
-                }
-                if (totalEarnings > 0) {
-                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
-                    gameState.spiritStones += totalEarnings;
-                }
-                return { processedCount: this.processedCount, totalEarnings };
-            }
-            calculateEarnings(task) {
-                const base = task.baseEarnings || 10;
-                const duration = (task.endTime - task.startTime) / 1000;
-                const efficiency = IDLE_CONFIG ? IDLE_CONFIG.offlineEfficiency : 0.8;
-                return Math.floor(base * (duration / 60) * efficiency);
-            }
-            startIdleTask(taskType, durationMs, baseEarnings) {
-                const task = { taskId: `idle_${Date.now()}`, type: taskType, startTime: Date.now(), endTime: Date.now() + durationMs, status: 'active', baseEarnings: baseEarnings || 10 };
-                gameState.idleTasks = gameState.idleTasks || [];
-                gameState.idleTasks.push(task);
-                if (npcCollabRewards && typeof npcCollabRewards.addToPool === 'function') npcCollabRewards.addToPool(baseEarnings * 0.1);
-                return task;
-            }
-            getIdleStatus() {
-                const tasks = gameState.idleTasks || [];
-                return { total: tasks.length, active: tasks.filter(t => t.status === 'active').length, completed: tasks.filter(t => t.status === 'completed').length, totalEarnings: gameState.idleEarnings || 0 };
-            }
-        }
-        const idleTaskProcessor = new IdleTaskProcessor();
-
         // ===== V63 Direction A: NPC Collaboration Engine (Enhanced) =====
         // Enhanced NPC Reputation + Task Assignment + Collaboration Rewards
 
@@ -7431,11 +7814,11 @@ const ACHIEVEMENT_ID_MAP = {
         v64Assert(idleTaskProcessor.processedCount === 0, 'IdleTaskProcessor processedCount init');
 
         // Test startIdleTask
-        window.gameState.idleTasks = [];
+        gameState.idleTasks = [];
         const task = idleTaskProcessor.startIdleTask('qi_cultivation', 60000, 20);
         v64Assert(task !== undefined && task.taskId.startsWith('idle_'), 'startIdleTask creates task');
-        v64Assert(window.gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
-        v64Assert(window.gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
+        v64Assert(gameState.idleTasks.length === 1, 'startIdleTask adds to gameState');
+        v64Assert(gameState.idleTasks[0].status === 'active', 'startIdleTask sets active status');
 
         // Test calculateEarnings
         const earnings = idleTaskProcessor.calculateEarnings({ baseEarnings: 20, startTime: Date.now() - 60000, endTime: Date.now() });
@@ -7482,7 +7865,7 @@ const ACHIEVEMENT_ID_MAP = {
         v65Assert(serendipityExecutor.dag.executionOrder.length > 0, 'serendipity DAG sorted');
 
         // Test serendipity trigger
-        window.gameState.npcCollab = window.gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
+        gameState.npcCollab = gameState.npcCollab || { activeChains: [], pendingMessages: 0, roleReputation: {}, lastCollaboration: 0 };
         const triggered = serendipityExecutor.triggerRandomSerendipity({ realm: 1 });
         // triggered may be null if no nodes ready - that's fine
         v65Assert(triggered === null || triggered.id.startsWith('ser_'), 'serendipity trigger returns valid node or null');
@@ -10078,6 +10461,206 @@ const ACHIEVEMENT_ID_MAP = {
         }
         const v90Results = runV90Tests();
 
+        // ===== V91 Direction A: Budget Control System (Per-Provider) =====
+        // 6 MCP tools: budget.query/configure/reset/stats/alerts/rate_limit
+        // Per-provider budget tracking via budgetProviderTracker + budgetProviderConfig
+
+        function runV91Tests() {
+            const results = [];
+            const v91Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V91 tools exist in MCP_TOOLS_V91
+            v91Assert(MCP_TOOLS_V91['budget.query'] !== undefined, 'budget.query defined');
+            v91Assert(MCP_TOOLS_V91['budget.configure'] !== undefined, 'budget.configure defined');
+            v91Assert(MCP_TOOLS_V91['budget.reset'] !== undefined, 'budget.reset defined');
+            v91Assert(MCP_TOOLS_V91['budget.stats'] !== undefined, 'budget.stats defined');
+            v91Assert(MCP_TOOLS_V91['budget.alerts'] !== undefined, 'budget.alerts defined');
+            v91Assert(MCP_TOOLS_V91['budget.rate_limit'] !== undefined, 'budget.rate_limit defined');
+
+            // Test 2: Tool registry has V91 tools
+            const server = new CultivationMCPServer();
+            v91Assert(server.toolRegistry.has('budget.query'), 'budget.query registered');
+            v91Assert(server.toolRegistry.has('budget.configure'), 'budget.configure registered');
+            v91Assert(server.toolRegistry.has('budget.reset'), 'budget.reset registered');
+            v91Assert(server.toolRegistry.has('budget.stats'), 'budget.stats registered');
+            v91Assert(server.toolRegistry.has('budget.alerts'), 'budget.alerts registered');
+            v91Assert(server.toolRegistry.has('budget.rate_limit'), 'budget.rate_limit registered');
+
+            // Test 3: Tool count grows with V91 (108 + 6 = 114)
+            const server2 = new CultivationMCPServer();
+            v91Assert(server2.toolRegistry.size >= 114, 'toolRegistry has >= 114 tools (V73-V91)');
+
+            // Test 4: budget.query returns structure for all providers
+            const bq = server.mcpBudgetQuery();
+            v91Assert(bq && bq.providers, 'budget.query returns providers');
+            v91Assert(Array.isArray(Object.keys(bq.providers)), 'budget.query providers is object');
+
+            // Test 5: budget.query with specific provider
+            const bqp = server.mcpBudgetQuery('minimax');
+            v91Assert(bqp && bqp.provider === 'minimax', 'budget.query returns specific provider');
+            v91Assert(bqp && typeof bqp.daily === 'object', 'budget.query returns daily stats');
+            v91Assert(bqp && typeof bqp.monthly === 'object', 'budget.query returns monthly stats');
+
+            // Test 6: budget.configure sets config
+            const bc = server.mcpBudgetConfigure({ provider: 'minimax', dailyLimit: 5000 });
+            v91Assert(bc && bc.success === true, 'budget.configure returns success');
+            v91Assert(bc && bc.config && bc.config.dailyLimit === 5000, 'budget.configure sets dailyLimit');
+
+            // Test 7: budget.configure requires provider
+            const bcBad = server.mcpBudgetConfigure({ dailyLimit: 5000 });
+            v91Assert(bcBad && bcBad.error, 'budget.configure requires provider');
+
+            // Test 8: budget.reset resets counters
+            const br = server.mcpBudgetReset('minimax', 'daily');
+            v91Assert(br && br.success === true, 'budget.reset returns success');
+            v91Assert(br && br.scope === 'daily', 'budget.reset returns scope');
+            v91Assert(br && br.dailySpent === 0, 'budget.reset clears dailySpent');
+
+            // Test 9: budget.reset validates scope
+            const brBad = server.mcpBudgetReset('minimax', 'invalid');
+            v91Assert(brBad && brBad.error, 'budget.reset validates scope');
+
+            // Test 10: budget.stats returns daily breakdown
+            const bs = server.mcpBudgetStats('minimax', 7);
+            v91Assert(bs && bs.provider === 'minimax', 'budget.stats returns provider');
+            v91Assert(bs && Array.isArray(bs.dailyBreakdown), 'budget.stats returns dailyBreakdown');
+            v91Assert(bs && typeof bs.avgCallsPerDay === 'string', 'budget.stats returns avgCallsPerDay');
+
+            // Test 11: budget.alerts returns alerts array
+            const ba = server.mcpBudgetAlerts('minimax');
+            v91Assert(ba && Array.isArray(ba.alerts), 'budget.alerts returns alerts');
+            v91Assert(ba && typeof ba.hasAlerts === 'boolean', 'budget.alerts returns hasAlerts');
+            v91Assert(ba && ba.provider === 'minimax', 'budget.alerts returns provider');
+
+            // Test 12: budget.rate_limit sets rate limits
+            const brl = server.mcpBudgetRateLimit({ provider: 'minimax', maxCallsPerMinute: 60 });
+            v91Assert(brl && brl.success === true, 'budget.rate_limit returns success');
+            v91Assert(brl && brl.rateLimit && brl.rateLimit.maxCallsPerMinute === 60, 'budget.rate_limit sets maxCallsPerMinute');
+
+            // Test 13: budget.rate_limit requires provider
+            const brlBad = server.mcpBudgetRateLimit({ maxCallsPerMinute: 60 });
+            v91Assert(brlBad && brlBad.error, 'budget.rate_limit requires provider');
+
+            // Test 14: budgetProviderTracker is per-provider
+            budgetProviderTracker['testprovider'] = { dailySpent: 100, monthlySpent: 500, callCount: 10, lastResetDay: 0, lastResetMonth: 0, rateLimitCalls: [], callHistory: [] };
+            const bqt = server.mcpBudgetQuery('testprovider');
+            v91Assert(bqt && bqt.daily && bqt.daily.spent === 100, 'budgetProviderTracker stores per-provider data');
+
+            // Test 15: budgetProviderConfig persists config
+            budgetProviderConfig['testprovider'] = { dailyLimit: 2000, monthlyLimit: 40000, warningThreshold: 0.8, fallbackToLocal: true };
+            const bqc = server.mcpBudgetConfigure({ provider: 'testprovider', dailyLimit: 3000 });
+            v91Assert(bqc && bqc.config && bqc.config.dailyLimit === 3000, 'budgetProviderConfig persists per-provider config');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V91 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V91 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v91Results = runV91Tests();
+
+        // ============================================================================
+        // V92: Secret Realm Exploration TDD Tests
+        // ============================================================================
+        function runV92Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = { secretRealm: { tokens: 3, cycle: 1, nextReset: '10天后重置' } };
+            const results = [];
+            function v92Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V92 tools defined
+            v92Assert(MCP_TOOLS_V92['secret_realm.list'] !== undefined, 'secret_realm.list defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.enter'] !== undefined, 'secret_realm.enter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.progress'] !== undefined, 'secret_realm.progress defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.encounter'] !== undefined, 'secret_realm.encounter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.claim'] !== undefined, 'secret_realm.claim defined');
+            v92Assert(MCP_TOOLS_V92['dungeon_token.status'] !== undefined, 'dungeon_token.status defined');
+
+            // Test 2: secret_realm.list
+            const list = server.mcpSecretRealmList('east');
+            v92Assert(list.realms && list.realms.length > 0, 'secret_realm.list returns realms');
+            v92Assert(list.tokens === 3, 'secret_realm.list returns tokens=3');
+
+            // Test 3: dungeon_token.status
+            const tok = server.mcpDungeonTokenStatus();
+            v92Assert(tok.tokens === 3, 'dungeon_token.status returns tokens=3');
+            v92Assert(tok.maxTokens === 3, 'dungeon_token.status maxTokens=3');
+
+            // Test 4: secret_realm.enter success
+            const enter = server.mcpSecretRealmEnter('jade_palace');
+            v92Assert(enter.success === true, 'secret_realm.enter returns success');
+            v92Assert(enter.tokens === 2, 'secret_realm.enter reduces tokens 3->2');
+
+            // Test 5: secret_realm.enter no tokens
+            window.gameState.secretRealm.tokens = 0;
+            const noTok = server.mcpSecretRealmEnter('dragon_tomb');
+            v92Assert(noTok.error && noTok.error.includes('No dungeon tokens'), 'secret_realm.enter errors on no tokens');
+            window.gameState.secretRealm.tokens = 2; // restore
+
+            // Test 6: secret_realm.enter invalid realm
+            const badRealm = server.mcpSecretRealmEnter('invalid_realm');
+            v92Assert(badRealm.error && badRealm.error.includes('Invalid realmId'), 'secret_realm.enter rejects invalid realmId');
+
+            // Test 7: secret_realm.progress
+            const prog = server.mcpSecretRealmProgress(null);
+            v92Assert(prog.realmId === 'jade_palace', 'secret_realm.progress returns active realm');
+            v92Assert(typeof prog.progress === 'number', 'secret_realm.progress returns progress number');
+
+            // Test 8: secret_realm.encounter engage
+            const enc1 = server.mcpSecretRealmEncounter('engage');
+            v92Assert(typeof enc1.success === 'boolean', 'secret_realm.encounter engage returns success boolean');
+            v92Assert(enc1.progress >= 0, 'secret_realm.encounter returns progress');
+
+            // Test 9: secret_realm.encounter invalid action
+            const badAction = server.mcpSecretRealmEncounter('dance');
+            v92Assert(badAction.error && badAction.error.includes('Invalid action'), 'secret_realm.encounter rejects invalid action');
+
+            // Test 10: secret_realm.encounter no active realm
+            window.gameState.secretRealm.activeRealm = null;
+            const noActive = server.mcpSecretRealmEncounter('engage');
+            v92Assert(noActive.error && noActive.error.includes('No active realm'), 'secret_realm.encounter errors when no active realm');
+            window.gameState.secretRealm.activeRealm = 'jade_palace'; // restore
+
+            // Test 11: secret_realm.encounter progress completes
+            for (let i = 0; i < 5; i++) { server.mcpSecretRealmEncounter('engage'); }
+            const claimed = server.mcpSecretRealmClaim('jade_palace');
+            v92Assert(claimed.success === true, 'secret_realm.claim succeeds after completion');
+            v92Assert(Array.isArray(claimed.rewards), 'secret_realm.claim returns rewards array');
+
+            // Test 12: secret_realm.claim not completed
+            window.gameState.secretRealm.activeRealm = 'dragon_tomb';
+            window.gameState.secretRealm.completed = false;
+            window.gameState.secretRealm.progress = 0;
+            window.gameState.secretRealm.waves = 3;
+            const notDone = server.mcpSecretRealmClaim('dragon_tomb');
+            v92Assert(notDone.error && notDone.error.includes('not completed'), 'secret_realm.claim errors when not completed');
+
+            // Test 13: secret_realm.list all regions
+            const all = server.mcpSecretRealmList('all');
+            v92Assert(all.realms && all.realms.length >= 6, 'secret_realm.list all returns all realms');
+
+            // Test 14: secret_realm.list filter
+            const east = server.mcpSecretRealmList('east');
+            if (east.realms && east.realms.length > 0) v92Assert(east.realms.every(r => r.region === 'east'), 'secret_realm.list east filter works');
+
+            // Test 15: dungeon_token.status depleted
+            window.gameState.secretRealm.tokens = 0;
+            const depleted = server.mcpDungeonTokenStatus();
+            v92Assert(depleted.status === 'depleted', 'dungeon_token.status shows depleted');
+            v92Assert(depleted.tokens === 0, 'dungeon_token.status tokens=0');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V92', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V92 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v92Results = runV92Tests();
+
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
         // 10种元素相生相克/法则共鸣/天命增强/元素攻击
@@ -10430,8 +11013,82 @@ const ACHIEVEMENT_ID_MAP = {
         // ===== V64 Direction A: Idle Task Processing Integration =====
         // Process idle tasks and sync with NPC collaboration
 
-        // (IdleTaskProcessor class moved earlier, above V63 section, to avoid TDZ)
-        // Original V70 copy removed - using earlier definition
+        // --- IdleTaskProcessor: Processes idle tasks with NPC collaboration ---
+        class IdleTaskProcessor {
+            constructor() {
+                this.processedCount = 0;
+            }
+
+            // Process idle tasks from gameState.idleTasks
+            processIdleTasks() {
+                const now = Date.now();
+                const tasks = gameState.idleTasks || [];
+                let totalEarnings = 0;
+
+                for (const task of tasks) {
+                    if (task.status === 'active' && task.endTime <= now) {
+                        // Task completed
+                        const earnings = this.calculateEarnings(task);
+                        totalEarnings += earnings;
+                        task.status = 'completed';
+                        this.processedCount++;
+
+                        // Trigger NPC collaboration on task completion
+                        triggerNpcCollaboration('task_completed', {
+                            taskId: task.taskId,
+                            earnings,
+                            timestamp: now
+                        });
+                    }
+                }
+
+                if (totalEarnings > 0) {
+                    gameState.idleEarnings = (gameState.idleEarnings || 0) + totalEarnings;
+                    gameState.spiritStones += totalEarnings;
+                }
+
+                return { processedCount: this.processedCount, totalEarnings };
+            }
+
+            calculateEarnings(task) {
+                const base = task.baseEarnings || 10;
+                const duration = (task.endTime - task.startTime) / 1000;
+                const efficiency = IDLE_CONFIG.offlineEfficiency || 0.8;
+                return Math.floor(base * (duration / 60) * efficiency);
+            }
+
+            // Start a new idle task
+            startIdleTask(taskType, durationMs, baseEarnings) {
+                const task = {
+                    taskId: `idle_${Date.now()}`,
+                    type: taskType,
+                    startTime: Date.now(),
+                    endTime: Date.now() + durationMs,
+                    status: 'active',
+                    baseEarnings: baseEarnings || 10
+                };
+                gameState.idleTasks = gameState.idleTasks || [];
+                gameState.idleTasks.push(task);
+
+                // Add reward to NPC collaboration pool
+                npcCollabRewards.addToPool(baseEarnings * 0.1);
+
+                return task;
+            }
+
+            // Get idle task status
+            getIdleStatus() {
+                const tasks = gameState.idleTasks || [];
+                return {
+                    total: tasks.length,
+                    active: tasks.filter(t => t.status === 'active').length,
+                    completed: tasks.filter(t => t.status === 'completed').length,
+                    totalEarnings: gameState.idleEarnings || 0
+                };
+            }
+        }
+
+        const idleTaskProcessor = new IdleTaskProcessor();
 
         // ===== V70 Direction A: NPC Ecosystem System =====
         // Based on nanobot MessageBus + chatdev multi-role + DAG dependencies
@@ -11625,6 +12282,12 @@ const ACHIEVEMENT_ID_MAP = {
             callCount: 0,          // 累计调用次数
             lastCallProvider: null  // 上次调用Provider
         };
+
+        // V91: Per-provider budget tracking (keyed by providerId)
+        const budgetProviderTracker = {};
+
+        // V91: Per-provider budget config (keyed by providerId)
+        const budgetProviderConfig = {};
 
         // 估算一次调用的token消耗（近似）
         function estimateCallCost(promptLength, responseTokens) {
@@ -21244,10 +21907,8 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== initWorldMap =====
         function initWorldMap() {
-            const gs = window.gameState;
-            if (!gs) return;
-            if (!gs.worldMap) {
-                gs.worldMap = {
+            if (!gameState.worldMap) {
+                gameState.worldMap = {
                     currentContinent: '中州',
                     currentRegion: '中州城',
                     exploredContinents: ['中州'],
@@ -23101,8 +23762,6 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== startNewGame =====
         function startNewGame(fromReincarnation = false) {
-            const gs = window.gameState;
-            if (!gs) return;
             let reincarnationData = null;
             
             // 如果是从轮回转世来的，恢复转世数据
@@ -23363,8 +24022,6 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== loadGame =====
         function loadGame() {
-            const gs = window.gameState;
-            if (!gs) return;
             const saved = localStorage.getItem(CONFIG.storageKey);
             if (saved) {
                 const loaded = JSON.parse(saved);
@@ -24948,12 +25605,10 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderAchievements =====
         function renderAchievements() {
-            const gs = window.gameState;
-            if (!gs) return;
             const content = document.getElementById('achievementContent');
             if (!content) return;
 
-            const ach = gs.achievements || { 
+            const ach = gameState.achievements || { 
                 unlocked: [], 
                 titles: [], 
                 stats: {},
@@ -25442,12 +26097,10 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderCombatHome =====
         function renderCombatHome() {
-            const gs = window.gameState;
-            if (!gs) return;
-            const wins = gs.combat?.wins || 0;
-            const losses = gs.combat?.losses || 0;
-            const honor = gs.combat?.honor || 0;
-            const fame = gs.combat?.fame || 0;
+            const wins = gameState.combat?.wins || 0;
+            const losses = gameState.combat?.losses || 0;
+            const honor = gameState.combat?.honor || 0;
+            const fame = gameState.combat?.fame || 0;
             const total = wins + losses;
 
             let html = `
@@ -26978,12 +27631,10 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== renderPetHome =====
         function renderPetHome(tab) {
-            const gs = window.gameState;
-            if (!gs) return;
             const content = document.getElementById('petContent');
-            const petCount = gs.pets.length;
+            const petCount = gameState.pets.length;
             const maxPets = 5;
-            const eggCount = gs.petEggs ? gs.petEggs.length : 0;
+            const eggCount = gameState.petEggs ? gameState.petEggs.length : 0;
 
             let tabsHtml = `
                 <div class="pet-tabs">
@@ -28267,9 +28918,7 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== openSerendipityLog =====
         function openSerendipityLog() {
-            const gs = window.gameState;
-            if (!gs) return;
-            const serendipity = gs.serendipity;
+            const serendipity = gameState.serendipity;
             const modal = document.getElementById('serendipityModal');
             const titleEl = document.getElementById('serendipityTitle');
             const content = document.getElementById('serendipityContent');
@@ -29016,8 +29665,6 @@ const ACHIEVEMENT_ID_MAP = {
 
         // ===== openSettings =====
         function openSettings() {
-            const gs = window.gameState;
-            if (!gs) return;
             // 填充当前配置
             document.getElementById('settingsApiKey').value = miniMaxConfig.apiKey || '';
             document.getElementById('settingsBaseUrl').value = miniMaxConfig.baseUrl || 'https://api.minimaxi.com/v1';
