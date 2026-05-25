@@ -1454,12 +1454,89 @@
             },
             'explore.survey': {
                 name: 'explore.survey',
-                description: 'Survey unexplored regions on the celestial map',
+                description: 'Survey a region for exploration opportunities',
                 inputSchema: {
                     type: 'object',
                     properties: {
-                        region: { type: 'string', description: 'Region to survey' }
+                        region: { type: 'string', description: 'Region: east|west|north|south' }
                     }
+                }
+            }
+        };
+
+        // ===== V91 Direction A: AI Budget Control System =====
+        // claude-code Budget Mode: call quota + rate limit + daily/monthly budgets
+
+        const MCP_TOOLS_V91 = {
+            'budget.query': {
+                name: 'budget.query',
+                description: 'Query current budget status for a provider or all providers',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all providers.' }
+                    }
+                }
+            },
+            'budget.configure': {
+                name: 'budget.configure',
+                description: 'Update budget limits and warning thresholds for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        dailyLimit: { type: 'number', description: 'Daily token budget limit (points)' },
+                        monthlyLimit: { type: 'number', description: 'Monthly token budget limit (points)' },
+                        warningThreshold: { type: 'number', description: 'Warning threshold (0.0-1.0, e.g. 0.8 for 80%)' },
+                        fallbackToLocal: { type: 'boolean', description: 'Fallback to local rules when budget exceeded' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'budget.reset': {
+                name: 'budget.reset',
+                description: 'Reset daily/monthly budget counters for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        scope: { type: 'string', description: 'Reset scope: daily|monthly|both' }
+                    },
+                    required: ['provider', 'scope']
+                }
+            },
+            'budget.stats': {
+                name: 'budget.stats',
+                description: 'Get detailed budget statistics and call history',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all.' },
+                        days: { type: 'number', description: 'Number of days of history (default 7, max 30)' }
+                    }
+                }
+            },
+            'budget.alerts': {
+                name: 'budget.alerts',
+                description: 'Get active budget warnings and alerts',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID. Omit for all.' }
+                    }
+                }
+            },
+            'budget.rate_limit': {
+                name: 'budget.rate_limit',
+                description: 'Get or set rate limiting configuration for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        maxCallsPerMinute: { type: 'number', description: 'Max API calls per minute (0 = unlimited)' },
+                        maxTokensPerDay: { type: 'number', description: 'Max tokens per day (0 = unlimited)' }
+                    },
+                    required: ['provider']
                 }
             }
         };
@@ -1531,6 +1608,10 @@
                 }
                 // V90: Register star map, spirit root, and explore tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V90)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V91: Register budget control tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V91)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -1928,6 +2009,24 @@
                             break;
                         case 'explore.survey':
                             result = this.mcpExploreSurvey(args.region);
+                            break;
+                        case 'budget.query':
+                            result = this.mcpBudgetQuery(args.provider);
+                            break;
+                        case 'budget.configure':
+                            result = this.mcpBudgetConfigure(args);
+                            break;
+                        case 'budget.reset':
+                            result = this.mcpBudgetReset(args.provider, args.scope);
+                            break;
+                        case 'budget.stats':
+                            result = this.mcpBudgetStats(args.provider, args.days);
+                            break;
+                        case 'budget.alerts':
+                            result = this.mcpBudgetAlerts(args.provider);
+                            break;
+                        case 'budget.rate_limit':
+                            result = this.mcpBudgetRateLimit(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -3919,6 +4018,142 @@
                     if (r === 'all') results.forEach(res => { if (res.explored) gs.exploredRegions[res.region] = true; });
                     else gs.exploredRegions[r] = true;
                     return { region: r, surveyResults: results };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // ===== V91 Budget Control MCP Methods =====
+            mcpBudgetQuery(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] };
+                        // Auto-reset if day changed
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? (bt.dailySpent / cfg.dailyLimit * 100).toFixed(1) : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? (bt.monthlySpent / cfg.monthlyLimit * 100).toFixed(1) : 0;
+                        const isWarning = dailyPct >= cfg.warningThreshold * 100 || monthlyPct >= cfg.warningThreshold * 100;
+                        results[p] = {
+                            daily: { spent: bt.dailySpent, limit: cfg.dailyLimit, percent: dailyPct },
+                            monthly: { spent: bt.monthlySpent, limit: cfg.monthlyLimit, percent: monthlyPct },
+                            callCount: bt.callCount,
+                            isWarning,
+                            lastCallProvider: bt.lastCallProvider || null,
+                            rateLimit: {
+                                maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                                maxTokensPerDay: cfg.maxTokensPerDay || 0
+                            }
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetConfigure(args) {
+                try {
+                    const { provider, dailyLimit, monthlyLimit, warningThreshold, fallbackToLocal, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = { ...BUDGET_CONFIG };
+                    const cfg = budgetProviderConfig[provider];
+                    if (dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, dailyLimit);
+                    if (monthlyLimit !== undefined) cfg.monthlyLimit = Math.max(0, monthlyLimit);
+                    if (warningThreshold !== undefined) cfg.warningThreshold = Math.min(1, Math.max(0, warningThreshold));
+                    if (fallbackToLocal !== undefined) cfg.fallbackToLocal = fallbackToLocal;
+                    if (maxCallsPerMinute !== undefined) cfg.maxCallsPerMinute = maxCallsPerMinute;
+                    if (maxTokensPerDay !== undefined) cfg.maxTokensPerDay = maxTokensPerDay;
+                    return { success: true, provider, config: cfg };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetReset(providerId, scope) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    if (!providerId) return { error: 'provider is required' };
+                    if (!scope || !['daily', 'monthly', 'both'].includes(scope)) return { error: 'scope must be daily|monthly|both' };
+                    let bt = budgetProviderTracker[providerId];
+                    if (!bt) { bt = { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] }; budgetProviderTracker[providerId] = bt; }
+                    if (scope === 'daily' || scope === 'both') { bt.dailySpent = 0; bt.lastResetDay = day; }
+                    if (scope === 'monthly' || scope === 'both') { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                    return { success: true, provider: providerId, scope, dailySpent: bt.dailySpent, monthlySpent: bt.monthlySpent };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetStats(providerId, days) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const numDays = Math.min(Math.max(days || 7, 1), 30);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderTracker) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, callHistory: [] };
+                        const history = bt.callHistory || [];
+                        const cutoff = now.getTime() - numDays * 86400000;
+                        const recentCalls = history.filter(c => c.timestamp > cutoff);
+                        const dailyBreakdown = [];
+                        for (let i = numDays - 1; i >= 0; i--) {
+                            const d = day - i;
+                            const dayCalls = recentCalls.filter(c => Math.floor(c.timestamp / 86400000) === d);
+                            dailyBreakdown.push({ day: d, calls: dayCalls.length, tokens: dayCalls.reduce((s, c) => s + (c.tokens || 0), 0) });
+                        }
+                        results[p] = {
+                            totalCalls: bt.callCount,
+                            recentCalls: recentCalls.length,
+                            dailyBreakdown,
+                            avgCallsPerDay: numDays > 0 ? (recentCalls.length / numDays).toFixed(1) : 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetAlerts(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const alerts = [];
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, lastResetDay: day, lastResetMonth: month };
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? bt.dailySpent / cfg.dailyLimit : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? bt.monthlySpent / cfg.monthlyLimit : 0;
+                        if (dailyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'daily_exceeded', percent: (dailyPct * 100).toFixed(1) });
+                        else if (dailyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'daily_threshold', percent: (dailyPct * 100).toFixed(1) });
+                        if (monthlyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'monthly_exceeded', percent: (monthlyPct * 100).toFixed(1) });
+                        else if (monthlyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'monthly_threshold', percent: (monthlyPct * 100).toFixed(1) });
+                        // Rate limit alert
+                        if (cfg.maxCallsPerMinute > 0 && bt.rateLimitCalls) {
+                            const recentMinuteCalls = bt.rateLimitCalls.filter(t => now.getTime() - t < 60000);
+                            if (recentMinuteCalls.length >= cfg.maxCallsPerMinute) alerts.push({ provider: p, level: 'critical', type: 'rate_limit_exceeded', count: recentMinuteCalls.length, limit: cfg.maxCallsPerMinute });
+                        }
+                    }
+                    return { provider: pid, alerts, hasAlerts: alerts.length > 0 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetRateLimit(args) {
+                try {
+                    const { provider, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    const cfg = budgetProviderConfig[provider] || { ...BUDGET_CONFIG, maxCallsPerMinute: 0, maxTokensPerDay: 0 };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = cfg;
+                    if (maxCallsPerMinute !== undefined) { cfg.maxCallsPerMinute = maxCallsPerMinute; }
+                    if (maxTokensPerDay !== undefined) { cfg.maxTokensPerDay = maxTokensPerDay; }
+                    return { success: true, provider, rateLimit: { maxCallsPerMinute: cfg.maxCallsPerMinute, maxTokensPerDay: cfg.maxTokensPerDay } };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -8108,6 +8343,105 @@
         }
         const v90Results = runV90Tests();
 
+        // ===== V91 Direction A: Budget Control System (Per-Provider) =====
+        // 6 MCP tools: budget.query/configure/reset/stats/alerts/rate_limit
+        // Per-provider budget tracking via budgetProviderTracker + budgetProviderConfig
+
+        function runV91Tests() {
+            const results = [];
+            const v91Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V91 tools exist in MCP_TOOLS_V91
+            v91Assert(MCP_TOOLS_V91['budget.query'] !== undefined, 'budget.query defined');
+            v91Assert(MCP_TOOLS_V91['budget.configure'] !== undefined, 'budget.configure defined');
+            v91Assert(MCP_TOOLS_V91['budget.reset'] !== undefined, 'budget.reset defined');
+            v91Assert(MCP_TOOLS_V91['budget.stats'] !== undefined, 'budget.stats defined');
+            v91Assert(MCP_TOOLS_V91['budget.alerts'] !== undefined, 'budget.alerts defined');
+            v91Assert(MCP_TOOLS_V91['budget.rate_limit'] !== undefined, 'budget.rate_limit defined');
+
+            // Test 2: Tool registry has V91 tools
+            const server = new CultivationMCPServer();
+            v91Assert(server.toolRegistry.has('budget.query'), 'budget.query registered');
+            v91Assert(server.toolRegistry.has('budget.configure'), 'budget.configure registered');
+            v91Assert(server.toolRegistry.has('budget.reset'), 'budget.reset registered');
+            v91Assert(server.toolRegistry.has('budget.stats'), 'budget.stats registered');
+            v91Assert(server.toolRegistry.has('budget.alerts'), 'budget.alerts registered');
+            v91Assert(server.toolRegistry.has('budget.rate_limit'), 'budget.rate_limit registered');
+
+            // Test 3: Tool count grows with V91 (108 + 6 = 114)
+            const server2 = new CultivationMCPServer();
+            v91Assert(server2.toolRegistry.size >= 114, 'toolRegistry has >= 114 tools (V73-V91)');
+
+            // Test 4: budget.query returns structure for all providers
+            const bq = server.mcpBudgetQuery();
+            v91Assert(bq && bq.providers, 'budget.query returns providers');
+            v91Assert(Array.isArray(Object.keys(bq.providers)), 'budget.query providers is object');
+
+            // Test 5: budget.query with specific provider
+            const bqp = server.mcpBudgetQuery('minimax');
+            v91Assert(bqp && bqp.provider === 'minimax', 'budget.query returns specific provider');
+            v91Assert(bqp && typeof bqp.daily === 'object', 'budget.query returns daily stats');
+            v91Assert(bqp && typeof bqp.monthly === 'object', 'budget.query returns monthly stats');
+
+            // Test 6: budget.configure sets config
+            const bc = server.mcpBudgetConfigure({ provider: 'minimax', dailyLimit: 5000 });
+            v91Assert(bc && bc.success === true, 'budget.configure returns success');
+            v91Assert(bc && bc.config && bc.config.dailyLimit === 5000, 'budget.configure sets dailyLimit');
+
+            // Test 7: budget.configure requires provider
+            const bcBad = server.mcpBudgetConfigure({ dailyLimit: 5000 });
+            v91Assert(bcBad && bcBad.error, 'budget.configure requires provider');
+
+            // Test 8: budget.reset resets counters
+            const br = server.mcpBudgetReset('minimax', 'daily');
+            v91Assert(br && br.success === true, 'budget.reset returns success');
+            v91Assert(br && br.scope === 'daily', 'budget.reset returns scope');
+            v91Assert(br && br.dailySpent === 0, 'budget.reset clears dailySpent');
+
+            // Test 9: budget.reset validates scope
+            const brBad = server.mcpBudgetReset('minimax', 'invalid');
+            v91Assert(brBad && brBad.error, 'budget.reset validates scope');
+
+            // Test 10: budget.stats returns daily breakdown
+            const bs = server.mcpBudgetStats('minimax', 7);
+            v91Assert(bs && bs.provider === 'minimax', 'budget.stats returns provider');
+            v91Assert(bs && Array.isArray(bs.dailyBreakdown), 'budget.stats returns dailyBreakdown');
+            v91Assert(bs && typeof bs.avgCallsPerDay === 'string', 'budget.stats returns avgCallsPerDay');
+
+            // Test 11: budget.alerts returns alerts array
+            const ba = server.mcpBudgetAlerts('minimax');
+            v91Assert(ba && Array.isArray(ba.alerts), 'budget.alerts returns alerts');
+            v91Assert(ba && typeof ba.hasAlerts === 'boolean', 'budget.alerts returns hasAlerts');
+            v91Assert(ba && ba.provider === 'minimax', 'budget.alerts returns provider');
+
+            // Test 12: budget.rate_limit sets rate limits
+            const brl = server.mcpBudgetRateLimit({ provider: 'minimax', maxCallsPerMinute: 60 });
+            v91Assert(brl && brl.success === true, 'budget.rate_limit returns success');
+            v91Assert(brl && brl.rateLimit && brl.rateLimit.maxCallsPerMinute === 60, 'budget.rate_limit sets maxCallsPerMinute');
+
+            // Test 13: budget.rate_limit requires provider
+            const brlBad = server.mcpBudgetRateLimit({ maxCallsPerMinute: 60 });
+            v91Assert(brlBad && brlBad.error, 'budget.rate_limit requires provider');
+
+            // Test 14: budgetProviderTracker is per-provider
+            budgetProviderTracker['testprovider'] = { dailySpent: 100, monthlySpent: 500, callCount: 10, lastResetDay: 0, lastResetMonth: 0, rateLimitCalls: [], callHistory: [] };
+            const bqt = server.mcpBudgetQuery('testprovider');
+            v91Assert(bqt && bqt.daily && bqt.daily.spent === 100, 'budgetProviderTracker stores per-provider data');
+
+            // Test 15: budgetProviderConfig persists config
+            budgetProviderConfig['testprovider'] = { dailyLimit: 2000, monthlyLimit: 40000, warningThreshold: 0.8, fallbackToLocal: true };
+            const bqc = server.mcpBudgetConfigure({ provider: 'testprovider', dailyLimit: 3000 });
+            v91Assert(bqc && bqc.config && bqc.config.dailyLimit === 3000, 'budgetProviderConfig persists per-provider config');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V91 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V91 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v91Results = runV91Tests();
+
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
         // 10种元素相生相克/法则共鸣/天命增强/元素攻击
@@ -10614,6 +10948,12 @@
             callCount: 0,          // 累计调用次数
             lastCallProvider: null  // 上次调用Provider
         };
+
+        // V91: Per-provider budget tracking (keyed by providerId)
+        const budgetProviderTracker = {};
+
+        // V91: Per-provider budget config (keyed by providerId)
+        const budgetProviderConfig = {};
 
         // 估算一次调用的token消耗（近似）
         function estimateCallCost(promptLength, responseTokens) {
