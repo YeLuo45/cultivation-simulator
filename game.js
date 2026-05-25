@@ -1541,6 +1541,71 @@
             }
         };
 
+        // V92: 仙界秘境探索系统 — thunderbolt 双路径同步 + 随机事件
+        const MCP_TOOLS_V92 = {
+            'secret_realm.list': {
+                name: 'secret_realm.list',
+                description: 'List all secret realms available in the current cycle',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        region: { type: 'string', description: 'Filter by region: east|west|north|south|all (default: all)' }
+                    }
+                }
+            },
+            'secret_realm.enter': {
+                name: 'secret_realm.enter',
+                description: 'Enter and explore a secret realm using a dungeon token',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (e.g. jade_palace, dragon_tomb)' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'secret_realm.progress': {
+                name: 'secret_realm.progress',
+                description: 'Get current exploration progress in active secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (omit for active realm)' }
+                    }
+                }
+            },
+            'secret_realm.encounter': {
+                name: 'secret_realm.encounter',
+                description: 'Resolve a random encounter within a secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: engage|avoid|investigate|retreat' }
+                    },
+                    required: ['action']
+                }
+            },
+            'secret_realm.claim': {
+                name: 'secret_realm.claim',
+                description: 'Claim exploration rewards from a completed secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID to claim' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'dungeon_token.status': {
+                name: 'dungeon_token.status',
+                description: 'Query dungeon token count and next reset timer',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -1612,6 +1677,10 @@
                 }
                 // V91: Register budget control tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V91)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V92: Register secret realm exploration tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V92)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2027,6 +2096,24 @@
                             break;
                         case 'budget.rate_limit':
                             result = this.mcpBudgetRateLimit(args);
+                            break;
+                        case 'secret_realm.list':
+                            result = this.mcpSecretRealmList(args.region);
+                            break;
+                        case 'secret_realm.enter':
+                            result = this.mcpSecretRealmEnter(args.realmId);
+                            break;
+                        case 'secret_realm.progress':
+                            result = this.mcpSecretRealmProgress(args.realmId);
+                            break;
+                        case 'secret_realm.encounter':
+                            result = this.mcpSecretRealmEncounter(args.action);
+                            break;
+                        case 'secret_realm.claim':
+                            result = this.mcpSecretRealmClaim(args.realmId);
+                            break;
+                        case 'dungeon_token.status':
+                            result = this.mcpDungeonTokenStatus();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -4154,6 +4241,111 @@
                     if (maxCallsPerMinute !== undefined) { cfg.maxCallsPerMinute = maxCallsPerMinute; }
                     if (maxTokensPerDay !== undefined) { cfg.maxTokensPerDay = maxTokensPerDay; }
                     return { success: true, provider, rateLimit: { maxCallsPerMinute: cfg.maxCallsPerMinute, maxTokensPerDay: cfg.maxTokensPerDay } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V92: Secret Realm Exploration
+            mcpSecretRealmList(region) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const cycle = gs2.cycle || 1;
+                    const REALMS = {
+                        'jade_palace': { id: 'jade_palace', name: '碧玉仙宫', region: 'east', difficulty: 3, tokens: 1, description: '上古仙人洞府', rewards: ['灵石', '仙草'] },
+                        'dragon_tomb': { id: 'dragon_tomb', name: '龙墓深渊', region: 'south', difficulty: 4, tokens: 2, description: '远古龙族遗迹', rewards: ['龙鳞', '龙魂'] },
+                        'thunder_shrine': { id: 'thunder_shrine', name: '雷霆神祠', region: 'west', difficulty: 3, tokens: 1, description: '雷霆法则圣地', rewards: ['雷劫珠', '天雷符'] },
+                        'celestial_garden': { id: 'celestial_garden', name: '天界药园', region: 'north', difficulty: 2, tokens: 1, description: '仙界灵药园', rewards: ['灵芝', '蟠桃'] },
+                        'spirit_valley': { id: 'spirit_valley', name: '幽魂谷', region: 'south', difficulty: 3, tokens: 1, description: '鬼修圣地', rewards: ['幽魂石', '冥晶'] },
+                        'bamboo_cave': { id: 'bamboo_cave', name: '翠竹林', region: 'east', difficulty: 1, tokens: 1, description: '隐士清修地', rewards: ['翠竹', '清心露'] }
+                    };
+                    const r = region && region !== 'all' ? region : null;
+                    const list = Object.values(REALMS).filter(x => !r || x.region === r);
+                    return { cycle, tokens: gs2.tokens ?? 3, realms: list, nextReset: gs2.nextReset || '10天后重置' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEnter(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    if (gs.secretRealm.tokens <= 0) return { error: 'No dungeon tokens remaining', tokens: 0 };
+                    const REALMS = ['jade_palace','dragon_tomb','thunder_shrine','celestial_garden','spirit_valley','bamboo_cave'];
+                    if (!REALMS.includes(realmId)) return { error: 'Invalid realmId: ' + realmId + '. Available: ' + REALMS.join(', ') };
+                    gs.secretRealm.tokens--;
+                    gs.secretRealm.activeRealm = realmId;
+                    gs.secretRealm.progress = 0;
+                    gs.secretRealm.waves = 3;
+                    gs.secretRealm.completed = false;
+                    return { success: true, realmId, tokens: gs.secretRealm.tokens, waves: 3, message: '进入秘境成功，当前波次：1/3' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmProgress(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const active = gs2.activeRealm || realmId;
+                    if (!active) return { error: 'No active exploration' };
+                    const ENCOUNTERS = ['珍稀灵草', '守护妖兽', '上古禁制', '失落宝箱', '神秘商人', '天劫降临'];
+                    const encounter = ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)];
+                    return { realmId: active, progress: gs2.progress || 0, waves: gs2.waves || 0, encounter, status: gs2.completed ? 'completed' : 'in_progress' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEncounter(action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const valid = ['engage','avoid','investigate','retreat'];
+                    if (!valid.includes(action)) return { error: 'Invalid action: ' + action + '. Must be one of: ' + valid.join(', ') };
+                    if (!gs2.activeRealm) return { error: 'No active realm. Call secret_realm.enter first.' };
+                    const roll = Math.random();
+                    const outcomes = {
+                        engage: roll > 0.4 ? { success: true, message: '战斗胜利，获得奖励', reward: '灵石x10' } : { success: false, message: '战斗失败，受轻伤', reward: null },
+                        avoid: roll > 0.2 ? { success: true, message: '成功避开威胁', reward: null } : { success: false, message: '躲避不及，受到波及', reward: null },
+                        investigate: roll > 0.3 ? { success: true, message: '发现隐藏区域', reward: '仙草x2' } : { success: false, message: '调查无果，浪费了时间', reward: null },
+                        retreat: { success: true, message: '成功撤退，保留令牌', reward: null }
+                    };
+                    const result = outcomes[action] || outcomes.investigate;
+                    gs2.progress = (gs2.progress || 0) + (result.success ? 1 : 0);
+                    if (gs2.progress >= (gs2.waves || 3)) { gs2.completed = true; gs2.progress = gs2.waves || 3; }
+                    return { action, ...result, progress: gs2.progress, waves: gs2.waves || 3, realmId: gs2.activeRealm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmClaim(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    if (!gs2.completed) return { error: 'Realm not completed. Progress: ' + (gs2.progress || 0) + '/' + (gs2.waves || 3) };
+                    const claimed = gs2.claimed || [];
+                    if (claimed.includes(realmId)) return { error: 'Already claimed this realm', realmId };
+                    claimed.push(realmId);
+                    gs2.claimed = claimed;
+                    gs2.activeRealm = null;
+                    gs2.progress = 0;
+                    gs2.completed = false;
+                    const REWARDS = { jade_palace: ['灵石x50','仙草x3'], dragon_tomb: ['龙鳞x2','龙魂x1'], thunder_shrine: ['雷劫珠x1','天雷符x5'], celestial_garden: ['灵芝x5','蟠桃x1'], spirit_valley: ['幽魂石x3','冥晶x2'], bamboo_cave: ['翠竹x10','清心露x2'] };
+                    return { success: true, realmId, rewards: REWARDS[realmId] || ['随机灵石x20'], message: '奖励已发放至背包' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpDungeonTokenStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    const TOKENS_MAX = 3;
+                    const CYCLE_DAYS = 10;
+                    const cycle = gs.secretRealm.cycle || 1;
+                    return { tokens: gs.secretRealm.tokens, maxTokens: TOKENS_MAX, cycle, nextReset: CYCLE_DAYS + '天后重置', status: gs.secretRealm.tokens > 0 ? 'available' : 'depleted' };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -8441,6 +8633,107 @@
             return { passed, total, rate, results };
         }
         const v91Results = runV91Tests();
+
+        // ============================================================================
+        // V92: Secret Realm Exploration TDD Tests
+        // ============================================================================
+        function runV92Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = { secretRealm: { tokens: 3, cycle: 1, nextReset: '10天后重置' } };
+            const results = [];
+            function v92Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V92 tools defined
+            v92Assert(MCP_TOOLS_V92['secret_realm.list'] !== undefined, 'secret_realm.list defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.enter'] !== undefined, 'secret_realm.enter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.progress'] !== undefined, 'secret_realm.progress defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.encounter'] !== undefined, 'secret_realm.encounter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.claim'] !== undefined, 'secret_realm.claim defined');
+            v92Assert(MCP_TOOLS_V92['dungeon_token.status'] !== undefined, 'dungeon_token.status defined');
+
+            // Test 2: secret_realm.list
+            const list = server.mcpSecretRealmList('east');
+            v92Assert(list.realms && list.realms.length > 0, 'secret_realm.list returns realms');
+            v92Assert(list.tokens === 3, 'secret_realm.list returns tokens=3');
+
+            // Test 3: dungeon_token.status
+            const tok = server.mcpDungeonTokenStatus();
+            v92Assert(tok.tokens === 3, 'dungeon_token.status returns tokens=3');
+            v92Assert(tok.maxTokens === 3, 'dungeon_token.status maxTokens=3');
+
+            // Test 4: secret_realm.enter success
+            const enter = server.mcpSecretRealmEnter('jade_palace');
+            v92Assert(enter.success === true, 'secret_realm.enter returns success');
+            v92Assert(enter.tokens === 2, 'secret_realm.enter reduces tokens 3->2');
+
+            // Test 5: secret_realm.enter no tokens
+            window.gameState.secretRealm.tokens = 0;
+            const noTok = server.mcpSecretRealmEnter('dragon_tomb');
+            v92Assert(noTok.error && noTok.error.includes('No dungeon tokens'), 'secret_realm.enter errors on no tokens');
+            window.gameState.secretRealm.tokens = 2; // restore
+
+            // Test 6: secret_realm.enter invalid realm
+            const badRealm = server.mcpSecretRealmEnter('invalid_realm');
+            v92Assert(badRealm.error && badRealm.error.includes('Invalid realmId'), 'secret_realm.enter rejects invalid realmId');
+
+            // Test 7: secret_realm.progress
+            const prog = server.mcpSecretRealmProgress(null);
+            v92Assert(prog.realmId === 'jade_palace', 'secret_realm.progress returns active realm');
+            v92Assert(typeof prog.progress === 'number', 'secret_realm.progress returns progress number');
+
+            // Test 8: secret_realm.encounter engage
+            const enc1 = server.mcpSecretRealmEncounter('engage');
+            v92Assert(typeof enc1.success === 'boolean', 'secret_realm.encounter engage returns success boolean');
+            v92Assert(enc1.progress >= 0, 'secret_realm.encounter returns progress');
+
+            // Test 9: secret_realm.encounter invalid action
+            const badAction = server.mcpSecretRealmEncounter('dance');
+            v92Assert(badAction.error && badAction.error.includes('Invalid action'), 'secret_realm.encounter rejects invalid action');
+
+            // Test 10: secret_realm.encounter no active realm
+            window.gameState.secretRealm.activeRealm = null;
+            const noActive = server.mcpSecretRealmEncounter('engage');
+            v92Assert(noActive.error && noActive.error.includes('No active realm'), 'secret_realm.encounter errors when no active realm');
+            window.gameState.secretRealm.activeRealm = 'jade_palace'; // restore
+
+            // Test 11: secret_realm.encounter progress completes
+            for (let i = 0; i < 5; i++) { server.mcpSecretRealmEncounter('engage'); }
+            const claimed = server.mcpSecretRealmClaim('jade_palace');
+            v92Assert(claimed.success === true, 'secret_realm.claim succeeds after completion');
+            v92Assert(Array.isArray(claimed.rewards), 'secret_realm.claim returns rewards array');
+
+            // Test 12: secret_realm.claim not completed
+            window.gameState.secretRealm.activeRealm = 'dragon_tomb';
+            window.gameState.secretRealm.completed = false;
+            window.gameState.secretRealm.progress = 0;
+            window.gameState.secretRealm.waves = 3;
+            const notDone = server.mcpSecretRealmClaim('dragon_tomb');
+            v92Assert(notDone.error && notDone.error.includes('not completed'), 'secret_realm.claim errors when not completed');
+
+            // Test 13: secret_realm.list all regions
+            const all = server.mcpSecretRealmList('all');
+            v92Assert(all.realms && all.realms.length >= 6, 'secret_realm.list all returns all realms');
+
+            // Test 14: secret_realm.list filter
+            const east = server.mcpSecretRealmList('east');
+            if (east.realms && east.realms.length > 0) v92Assert(east.realms.every(r => r.region === 'east'), 'secret_realm.list east filter works');
+
+            // Test 15: dungeon_token.status depleted
+            window.gameState.secretRealm.tokens = 0;
+            const depleted = server.mcpDungeonTokenStatus();
+            v92Assert(depleted.status === 'depleted', 'dungeon_token.status shows depleted');
+            v92Assert(depleted.tokens === 0, 'dungeon_token.status tokens=0');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V92', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V92 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v92Results = runV92Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
