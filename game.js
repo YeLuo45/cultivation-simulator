@@ -2017,6 +2017,83 @@
             }
         };
 
+        // --- MCP_TOOLS_V97: NPC Skill Market + Crystallized SOP Trading + Cross-Server Sect War Seeds ---
+        const MCP_TOOLS_V97 = {
+            'market.skills.list': {
+                name: 'market.skills.list',
+                description: 'List all crystallized SOP skills available for purchase in the NPC Skill Market',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter by tag or rarity: common|uncommon|rare|epic|legendary' },
+                        sortBy: { type: 'string', description: 'Sort order: price_asc|price_desc|rarity|recent' }
+                    }
+                }
+            },
+            'market.skills.buy': {
+                name: 'market.skills.buy',
+                description: 'Purchase a crystallized SOP skill from the market into player skill library',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        skillId: { type: 'string', description: 'Skill ID to purchase' },
+                        buyerNpcId: { type: 'string', description: 'NPC acting as buyer (optional, defaults to player)' }
+                    },
+                    required: ['skillId']
+                }
+            },
+            'market.skills.sell': {
+                name: 'market.skills.sell',
+                description: 'List a crystallized NPC skill on the market for sale',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        skillId: { type: 'string', description: 'Crystallized skill ID to sell' },
+                        price: { type: 'number', description: 'Listing price in spirit stones' },
+                        sellerNpcId: { type: 'string', description: 'NPC selling the skill' }
+                    },
+                    required: ['skillId', 'price']
+                }
+            },
+            'skill.learn': {
+                name: 'skill.learn',
+                description: 'Player learns a purchased SOP skill, gaining the ability to invoke it',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        skillId: { type: 'string', description: 'Purchased skill ID to learn' },
+                        playerId: { type: 'string', description: 'Player learning the skill' }
+                    },
+                    required: ['skillId']
+                }
+            },
+            'skill.invoke': {
+                name: 'skill.invoke',
+                description: 'Player invokes a learned SOP skill for execution (player-side, different from npc.skill.invoke)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        skillId: { type: 'string', description: 'Learned skill ID to invoke' },
+                        playerId: { type: 'string', description: 'Player invoking the skill' },
+                        params: { type: 'object', description: 'Skill execution parameters' }
+                    },
+                    required: ['skillId', 'playerId']
+                }
+            },
+            'sect.war.preview': {
+                name: 'sect.war.preview',
+                description: 'Preview cross-server sect war opponent info and skill synergies',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        sectId: { type: 'string', description: 'Sect to preview' },
+                        warType: { type: 'string', description: 'War type: skirmish|territory|elimination' }
+                    },
+                    required: ['sectId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -2108,6 +2185,10 @@
                 }
                 // V96: Register Quest Deepening + NPC Collaboration + Five-Layer Memory Crystallization tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V96)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V97: Register NPC Skill Market + Crystallized SOP Trading + Cross-Server Sect War tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V97)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2617,6 +2698,25 @@
                             break;
                         case 'quest.state.query':
                             result = this.mcpQuestStateQuery(args);
+                            break;
+                        // V97: NPC Skill Market + Crystallized SOP Trading + Cross-Server Sect War tools
+                        case 'market.skills.list':
+                            result = this.mcpMarketSkillsList(args);
+                            break;
+                        case 'market.skills.buy':
+                            result = this.mcpMarketSkillsBuy(args);
+                            break;
+                        case 'market.skills.sell':
+                            result = this.mcpMarketSkillsSell(args);
+                            break;
+                        case 'skill.learn':
+                            result = this.mcpSkillLearn(args);
+                            break;
+                        case 'skill.invoke':
+                            result = this.mcpSkillInvoke(args);
+                            break;
+                        case 'sect.war.preview':
+                            result = this.mcpSectWarPreview(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5885,6 +5985,347 @@
 
                     return result;
                 } catch (e) { return { error: e.message }; }
+            }
+
+            // ===== V97: NPC Skill Market + Crystallized SOP Trading + Cross-Server Sect War =====
+
+            // V97: MCP: market.skills.list - List crystallized SOP skills in marketplace
+            mcpMarketSkillsList(args) {
+                try {
+                    const { filter, sortBy } = args || {};
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    // Initialize market if not exists
+                    if (!gs.skillMarket) {
+                        gs.skillMarket = {
+                            listings: [],
+                            totalVolume: 0,
+                            transactionCount: 0
+                        };
+                    }
+
+                    const market = gs.skillMarket;
+                    let listings = [...market.listings];
+
+                    // Filter by rarity/tag
+                    if (filter && ['common', 'uncommon', 'rare', 'epic', 'legendary'].includes(filter)) {
+                        listings = listings.filter(l => l.rarity === filter);
+                    } else if (filter) {
+                        listings = listings.filter(l => l.tags?.includes(filter));
+                    }
+
+                    // Sort
+                    switch (sortBy) {
+                        case 'price_asc':
+                            listings.sort((a, b) => a.price - b.price);
+                            break;
+                        case 'price_desc':
+                            listings.sort((a, b) => b.price - a.price);
+                            break;
+                        case 'rarity':
+                            const RARITY_ORDER = { legendary: 5, epic: 4, rare: 3, uncommon: 2, common: 1 };
+                            listings.sort((a, b) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
+                            break;
+                        case 'recent':
+                            listings.sort((a, b) => (b.listedAt || 0) - (a.listedAt || 0));
+                            break;
+                    }
+
+                    return {
+                        listings,
+                        totalListings: listings.length,
+                        marketStats: {
+                            totalVolume: market.totalVolume || 0,
+                            transactionCount: market.transactionCount || 0
+                        },
+                        filter: filter || 'all',
+                        sortBy: sortBy || 'recent'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: MCP: market.skills.buy - Purchase crystallized skill from market
+            mcpMarketSkillsBuy(args) {
+                try {
+                    const { skillId, buyerNpcId } = args;
+                    if (!skillId) return { error: 'skillId required' };
+
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    if (!gs.skillMarket) return { error: 'Skill market not initialized' };
+
+                    const listingIndex = gs.skillMarket.listings.findIndex(l => l.skillId === skillId);
+                    if (listingIndex === -1) return { error: `Skill ${skillId} not found in market`, status: 'not_listed' };
+
+                    const listing = gs.skillMarket.listings[listingIndex];
+                    const price = listing.price;
+
+                    // Check player spirit stones
+                    if ((gs.spiritStones || 0) < price) {
+                        return { error: 'Not enough spirit stones', required: price, available: gs.spiritStones || 0 };
+                    }
+
+                    // Execute purchase
+                    gs.spiritStones -= price;
+                    gs.skillMarket.listings.splice(listingIndex, 1);
+                    gs.skillMarket.totalVolume = (gs.skillMarket.totalVolume || 0) + price;
+                    gs.skillMarket.transactionCount = (gs.skillMarket.transactionCount || 0) + 1;
+
+                    // Add to player's purchased skills (if not already there)
+                    if (!gs.purchasedSkills) gs.purchasedSkills = [];
+                    gs.purchasedSkills.push({
+                        skillId: listing.skillId,
+                        skillName: listing.skillName,
+                        sourceNpc: listing.sourceNpc,
+                        experience: listing.experience,
+                        rarity: listing.rarity,
+                        tags: listing.tags,
+                        purchasedAt: Date.now(),
+                        price
+                    });
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: listing.skillName,
+                        price,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: `Purchased skill "${listing.skillName}" for ${price} spirit stones`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: MCP: market.skills.sell - List crystallized skill on market
+            mcpMarketSkillsSell(args) {
+                try {
+                    const { skillId, price, sellerNpcId } = args;
+                    if (!skillId || price === undefined) return { error: 'skillId and price required' };
+                    if (price < 1) return { error: 'Price must be at least 1 spirit stone' };
+
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    // Get skill from global registry
+                    const skill = this.constructor.skillRegistry?.get(skillId);
+                    if (!skill) return { error: `Skill ${skillId} not found in registry`, status: 'not_found' };
+
+                    // Calculate rarity based on skill properties
+                    const rarity = this._calculateSkillRarity(skill);
+
+                    // Initialize market
+                    if (!gs.skillMarket) {
+                        gs.skillMarket = { listings: [], totalVolume: 0, transactionCount: 0 };
+                    }
+
+                    // Check if already listed
+                    if (gs.skillMarket.listings.some(l => l.skillId === skillId)) {
+                        return { error: 'Skill already listed on market', status: 'already_listed' };
+                    }
+
+                    // Add to market
+                    gs.skillMarket.listings.push({
+                        skillId,
+                        skillName: skill.name,
+                        sourceNpc: skill.sourceNpc,
+                        experience: skill.experience,
+                        rarity,
+                        tags: skill.tags || [],
+                        price,
+                        sellerNpcId: sellerNpcId || 'player',
+                        listedAt: Date.now()
+                    });
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: skill.name,
+                        price,
+                        rarity,
+                        message: `Skill "${skill.name}" listed for ${price} spirit stones`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: Helper: Calculate skill rarity based on complexity and usage
+            _calculateSkillRarity(skill) {
+                const usageCount = skill.usageCount || 0;
+                const level = skill.level || 1;
+                const tagCount = (skill.tags || []).length;
+
+                // Calculate complexity score
+                const complexity = (usageCount * 0.1) + (level * 0.5) + (tagCount * 0.3);
+
+                if (complexity >= 5) return 'legendary';
+                if (complexity >= 3.5) return 'epic';
+                if (complexity >= 2) return 'rare';
+                if (complexity >= 1) return 'uncommon';
+                return 'common';
+            }
+
+            // V97: MCP: skill.learn - Player learns purchased skill
+            mcpSkillLearn(args) {
+                try {
+                    const { skillId, playerId } = args;
+                    if (!skillId) return { error: 'skillId required' };
+
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    // Find purchased skill
+                    const purchasedIdx = gs.purchasedSkills?.findIndex(s => s.skillId === skillId);
+                    if (purchasedIdx === undefined || purchasedIdx === -1) {
+                        return { error: 'Skill not purchased. Buy it from market first.', status: 'not_purchased' };
+                    }
+
+                    const purchasedSkill = gs.purchasedSkills[purchasedIdx];
+
+                    // Check if already learned
+                    if (gs.learnedSkills?.some(s => s.skillId === skillId)) {
+                        return { error: 'Skill already learned', status: 'already_learned' };
+                    }
+
+                    // Initialize learned skills array
+                    if (!gs.learnedSkills) gs.learnedSkills = [];
+
+                    // Learn the skill
+                    gs.learnedSkills.push({
+                        skillId,
+                        skillName: purchasedSkill.skillName,
+                        sourceNpc: purchasedSkill.sourceNpc,
+                        experience: purchasedSkill.experience,
+                        rarity: purchasedSkill.rarity,
+                        tags: purchasedSkill.tags,
+                        learnedAt: Date.now(),
+                        masteryLevel: 1,
+                        maxMastery: 5
+                    });
+
+                    // Remove from purchased
+                    gs.purchasedSkills.splice(purchasedIdx, 1);
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: purchasedSkill.skillName,
+                        masteryLevel: 1,
+                        message: `Learned skill "${purchasedSkill.skillName}"`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: MCP: skill.invoke - Player invokes learned skill
+            mcpSkillInvoke(args) {
+                try {
+                    const { skillId, playerId, params = {} } = args;
+                    if (!skillId) return { error: 'skillId required' };
+
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    // Find learned skill
+                    const skill = gs.learnedSkills?.find(s => s.skillId === skillId);
+                    if (!skill) return { error: 'Skill not learned. Learn it first.', status: 'not_learned' };
+
+                    // Check budget
+                    const bc = this.constructor.budgetController;
+                    const cost = params.budget || 50;
+                    if (bc.usedBudget + cost > bc.globalBudget) {
+                        return { error: 'Budget exceeded', status: 'budget_exceeded', budget: cost };
+                    }
+
+                    // Execute skill
+                    bc.usedBudget += cost;
+                    skill.masteryLevel = Math.min((skill.masteryLevel || 1) + 1, skill.maxMastery || 5);
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: skill.skillName,
+                        masteryLevel: skill.masteryLevel,
+                        executionResult: {
+                            output: `Skill "${skill.skillName}" executed successfully`,
+                            params,
+                            budgetUsed: cost
+                        }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: MCP: sect.war.preview - Preview sect war opponent
+            mcpSectWarPreview(args) {
+                try {
+                    const { sectId, warType = 'skirmish' } = args;
+                    if (!sectId) return { error: 'sectId required' };
+
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    // Simulated sect war preview data
+                    const SECT_TEMPLATES = {
+                        'celestial_peak': { name: '天道峰', reputation: 8500, memberCount: 120, topSkills: ['Heavenly Strike', 'Star Fall'], weakness: 'slow_start' },
+                        'jade_pavilion': { name: '玉楼阁', reputation: 7200, memberCount: 85, topSkills: ['Jade Shield', 'Serpent Blade'], weakness: 'low_defense' },
+                        'dark_veil': { name: '暗幕宗', reputation: 6800, memberCount: 95, topSkills: ['Shadow Step', 'Venom Burst'], weakness: 'light_domain' },
+                        'iron_horn': { name: '铁角门', reputation: 5500, memberCount: 150, topSkills: ['Bull Charge', 'Iron Skin'], weakness: 'magic_resistance' }
+                    };
+
+                    const targetSect = SECT_TEMPLATES[sectId] || {
+                        name: sectId,
+                        reputation: Math.floor(Math.random() * 5000) + 3000,
+                        memberCount: Math.floor(Math.random() * 100) + 50,
+                        topSkills: ['Basic Attack', 'Defend'],
+                        weakness: 'standard'
+                    };
+
+                    // Generate skill synergies for war type
+                    const synergies = this._calculateSectWarSynergies(targetSect, warType);
+
+                    return {
+                        sectId,
+                        sectName: targetSect.name,
+                        reputation: targetSect.reputation,
+                        memberCount: targetSect.memberCount,
+                        topSkills: targetSect.topSkills,
+                        weakness: targetSect.weakness,
+                        warType,
+                        estimatedStrength: Math.floor(targetSect.reputation / 100),
+                        synergies,
+                        recommendedCounter: this._getCounterStrategy(targetSect, warType),
+                        message: `Preview for ${targetSect.name} in ${warType} war`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V97: Helper: Calculate skill synergies for sect war
+            _calculateSectWarSynergies(sect, warType) {
+                const synergyMap = {
+                    skirmish: [
+                        { skill: 'Quick Strike', bonus: '+15% attack speed', applicable: true },
+                        { skill: 'Flanking', bonus: '+20% damage when outnumbered', applicable: sect.memberCount < 100 }
+                    ],
+                    territory: [
+                        { skill: 'Territory Mark', bonus: '+25% defense in owned zone', applicable: true },
+                        { skill: 'Fortify', bonus: '+30% resistance to displacement', applicable: sect.weakness !== 'low_defense' }
+                    ],
+                    elimination: [
+                        { skill: 'Focus Fire', bonus: '+40% damage to marked targets', applicable: true },
+                        { skill: 'Team Rush', bonus: '+35% coordinated attack bonus', applicable: sect.memberCount > 80 }
+                    ]
+                };
+                return synergyMap[warType] || synergyMap.skirmish;
+            }
+
+            // V97: Helper: Get counter strategy for sect war
+            _getCounterStrategy(sect, warType) {
+                const counters = {
+                    slow_start: 'Rush early, exploit delayed formation',
+                    low_defense: 'Sustained pressure, break through防线',
+                    light_domain: 'Darkness skills negated, use light attacks',
+                    magic_resistance: 'Physical attacks bypass absorption',
+                    standard: 'Balanced approach, outlast opponent'
+                };
+                return counters[sect.weakness] || counters.standard;
             }
 
             mcpPetList() {
