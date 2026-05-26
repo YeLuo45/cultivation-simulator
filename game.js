@@ -2094,6 +2094,83 @@
             }
         };
 
+        // --- MCP_TOOLS_V98: Cross-Server Sect War + Multi-Agent Coordination + Skill Combo System ---
+        const MCP_TOOLS_V98 = {
+            'sect.war.register': {
+                name: 'sect.war.register',
+                description: 'Register a team (3-5 players) for cross-server sect war',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        teamName: { type: 'string', description: 'Team name' },
+                        playerIds: { type: 'array', items: { type: 'string' }, description: 'Player IDs (3-5 players)', minItems: 3, maxItems: 5 },
+                        sectId: { type: 'string', description: 'Player sect ID' },
+                        warType: { type: 'string', description: 'War type: skirmish|territory|elimination' }
+                    },
+                    required: ['teamName', 'playerIds', 'sectId']
+                }
+            },
+            'sect.war.start': {
+                name: 'sect.war.start',
+                description: 'Start cross-server sect war, DAG-based multi-agent action execution',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        matchId: { type: 'string', description: 'Match ID from registration' },
+                        actions: { type: 'array', description: 'Array of {playerId, skillId, target} actions in DAG order' }
+                    },
+                    required: ['matchId']
+                }
+            },
+            'sect.war.skill.combo': {
+                name: 'sect.war.skill.combo',
+                description: 'Detect and trigger skill combo effects based on adjacent positions and element properties',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: 'Player triggering combo' },
+                        skillId: { type: 'string', description: 'Skill being invoked' },
+                        adjacentPlayerIds: { type: 'array', items: { type: 'string' }, description: 'Adjacent team members for combo' }
+                    },
+                    required: ['playerId', 'skillId']
+                }
+            },
+            'sect.war.status': {
+                name: 'sect.war.status',
+                description: 'Real-time query of battle status including action queues for both teams',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        matchId: { type: 'string', description: 'Match ID' }
+                    },
+                    required: ['matchId']
+                }
+            },
+            'sect.war.result': {
+                name: 'sect.war.result',
+                description: 'Get battle result, winner, and damage statistics after match ends',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        matchId: { type: 'string', description: 'Match ID' }
+                    },
+                    required: ['matchId']
+                }
+            },
+            'sect.war.reward': {
+                name: 'sect.war.reward',
+                description: 'Distribute war loot based on contribution scores after battle ends',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        matchId: { type: 'string', description: 'Match ID' },
+                        contributionMode: { type: 'string', description: 'Distribution mode: equal|contribution|rank' }
+                    },
+                    required: ['matchId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -2189,6 +2266,10 @@
                 }
                 // V97: Register NPC Skill Market + Crystallized SOP Trading + Cross-Server Sect War tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V97)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V98: Register Cross-Server Sect War + Multi-Agent Coordination + Skill Combo tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V98)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2717,6 +2798,25 @@
                             break;
                         case 'sect.war.preview':
                             result = this.mcpSectWarPreview(args);
+                            break;
+                        // V98: Cross-Server Sect War + Multi-Agent Coordination + Skill Combo
+                        case 'sect.war.register':
+                            result = this.mcpSectWarRegister(args);
+                            break;
+                        case 'sect.war.start':
+                            result = this.mcpSectWarStart(args);
+                            break;
+                        case 'sect.war.skill.combo':
+                            result = this.mcpSectWarSkillCombo(args);
+                            break;
+                        case 'sect.war.status':
+                            result = this.mcpSectWarStatus(args);
+                            break;
+                        case 'sect.war.result':
+                            result = this.mcpSectWarResult(args);
+                            break;
+                        case 'sect.war.reward':
+                            result = this.mcpSectWarReward(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -6326,6 +6426,407 @@
                     standard: 'Balanced approach, outlast opponent'
                 };
                 return counters[sect.weakness] || counters.standard;
+            }
+
+            // V98: Cross-Server Sect War + Multi-Agent Coordination + Skill Combo System
+            // State management for cross-server wars
+            _initSectWarState() {
+                if (!window.gameState.sectWars) {
+                    window.gameState.sectWars = {
+                        matches: {},
+                        teams: {},
+                        combos: [],
+                        leaderboard: []
+                    };
+                }
+                return window.gameState.sectWars;
+            }
+
+            // V98: sect.war.register - Register a team for cross-server sect war
+            mcpSectWarRegister(args) {
+                try {
+                    const { teamName, playerIds, sectId, warType = 'skirmish' } = args;
+                    if (!teamName || !playerIds || !sectId) {
+                        return { error: 'teamName, playerIds, and sectId are required' };
+                    }
+                    if (!Array.isArray(playerIds) || playerIds.length < 3 || playerIds.length > 5) {
+                        return { error: 'playerIds must be an array of 3-5 players' };
+                    }
+
+                    const sw = this._initSectWarState();
+                    const matchId = 'war_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    
+                    // Generate enemy team for simulation
+                    const enemyPlayerIds = ['enemy_1', 'enemy_2', 'enemy_3', 'enemy_4'].slice(0, playerIds.length);
+                    const enemyTeamName = 'Enemy_' + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+                    const match = {
+                        matchId,
+                        teamName,
+                        playerIds,
+                        sectId,
+                        warType,
+                        status: 'registered',
+                        startTime: null,
+                        endTime: null,
+                        teamAPower: playerIds.length * 100 + Math.floor(Math.random() * 200),
+                        teamBPower: enemyPlayerIds.length * 100 + Math.floor(Math.random() * 200),
+                        enemyTeamName,
+                        enemyPlayerIds,
+                        actions: [],
+                        damage: {},
+                        contributions: {},
+                        winner: null
+                    };
+
+                    sw.matches[matchId] = match;
+                    
+                    // Initialize damage tracking
+                    [...playerIds, ...enemyPlayerIds].forEach(pid => {
+                        match.damage[pid] = { dealt: 0, taken: 0 };
+                        match.contributions[pid] = 0;
+                    });
+
+                    return {
+                        success: true,
+                        matchId,
+                        message: `Team ${teamName} registered for ${warType}`,
+                        teamSize: playerIds.length,
+                        enemyTeamName,
+                        enemySize: enemyPlayerIds.length,
+                        estimatedDuration: warType === 'elimination' ? '15 min' : warType === 'territory' ? '10 min' : '5 min',
+                        powerComparison: {
+                            teamPower: match.teamAPower,
+                            enemyPower: match.teamBPower
+                        }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V98: sect.war.start - Start cross-server sect war with DAG action execution
+            mcpSectWarStart(args) {
+                try {
+                    const { matchId, actions = [] } = args;
+                    if (!matchId) return { error: 'matchId required' };
+
+                    const sw = this._initSectWarState();
+                    const match = sw.matches[matchId];
+                    if (!match) return { error: 'Match not found: ' + matchId };
+                    if (match.status !== 'registered') return { error: 'Match already started or ended' };
+
+                    match.status = 'active';
+                    match.startTime = Date.now();
+
+                    // Execute actions in DAG order (topological sort based on dependencies)
+                    const executedActions = [];
+                    const dagResults = this._executeDAGActions(match, actions);
+
+                    // Simulate combat rounds based on war type
+                    const rounds = warType === 'elimination' ? 10 : warType === 'territory' ? 7 : 5;
+                    for (let round = 1; round <= rounds; round++) {
+                        match.actions.push({
+                            round,
+                            timestamp: Date.now(),
+                            events: [
+                                `Round ${round}: ${match.playerIds[0 % match.playerIds.length]} attacks enemy ${match.enemyPlayerIds[0 % match.enemyPlayerIds.length]}`,
+                                `Round ${round}: Combo triggered - Fire + Wind = Blazing Storm (+30% damage)`
+                            ]
+                        });
+
+                        // Simulate damage
+                        const attacker = match.playerIds[round % match.playerIds.length];
+                        const defender = match.enemyPlayerIds[round % match.enemyPlayerIds.length];
+                        const dmg = Math.floor(Math.random() * 50) + 20;
+                        if (match.damage[attacker]) match.damage[attacker].dealt += dmg;
+                        if (match.damage[defender]) match.damage[defender].taken += dmg;
+                        if (match.contributions[attacker] !== undefined) match.contributions[attacker] += dmg;
+                    }
+
+                    // Determine winner based on accumulated damage
+                    const teamADamage = match.playerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+                    const teamBDamage = match.enemyPlayerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+                    
+                    match.winner = teamADamage > teamBDamage ? 'teamA' : 'teamB';
+                    match.status = 'completed';
+                    match.endTime = Date.now();
+
+                    return {
+                        success: true,
+                        matchId,
+                        status: 'active',
+                        round: rounds,
+                        dagExecuted: dagResults.executed,
+                        currentScore: { teamA: teamADamage, teamB: teamBDamage },
+                        damageDealt: { teamA: teamADamage, teamB: teamBDamage },
+                        message: `War started with ${rounds} rounds. DAG execution complete.`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V98: Helper - Execute actions in DAG order
+            _executeDAGActions(match, actions) {
+                const executed = [];
+                const dag = new Map();
+                const inDegree = new Map();
+                const warType = match.warType;
+
+                // Build DAG from actions
+                actions.forEach((action, index) => {
+                    dag.set(index, []);
+                    inDegree.set(index, 0);
+                });
+
+                // Simple DAG: actions with same playerId are sequential, different playerIds are parallel
+                actions.forEach((action, index) => {
+                    actions.forEach((prevAction, prevIndex) => {
+                        if (prevIndex < index && prevAction.playerId === action.playerId) {
+                            dag.get(prevIndex).push(index);
+                            inDegree.set(index, inDegree.get(index) + 1);
+                        }
+                    });
+                });
+
+                // Topological sort (Kahn's algorithm)
+                const queue = [];
+                for (let [idx, degree] of inDegree) {
+                    if (degree === 0) queue.push(idx);
+                }
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    executed.push({ index: current, action: actions[current] });
+                    
+                    for (const next of dag.get(current)) {
+                        inDegree.set(next, inDegree.get(next) - 1);
+                        if (inDegree.get(next) === 0) queue.push(next);
+                    }
+                }
+
+                return { executed: executed.length, total: actions.length };
+            }
+
+            // V98: sect.war.skill.combo - Detect and trigger skill combo effects
+            mcpSectWarSkillCombo(args) {
+                try {
+                    const { playerId, skillId, adjacentPlayerIds = [] } = args;
+                    if (!playerId || !skillId) return { error: 'playerId and skillId required' };
+
+                    const sw = this._initSectWarState();
+
+                    // Element types for combo calculation
+                    const ELEMENT_MAP = {
+                        fire: { strong: 'wind', weak: 'water' },
+                        water: { strong: 'fire', weak: 'lightning' },
+                        wind: { strong: 'earth', weak: 'ice' },
+                        earth: { strong: 'lightning', weak: 'wind' },
+                        lightning: { strong: 'wind', weak: 'earth' },
+                        ice: { strong: 'wind', weak: 'fire' },
+                        light: { strong: 'dark', weak: 'shadow' },
+                        shadow: { strong: 'light', weak: 'light' }
+                    };
+
+                    // Combo recipes
+                    const COMBO_RECIPES = [
+                        { elements: ['fire', 'wind'], name: 'Blazing Storm', damageBonus: 1.3, description: 'Fire + Wind = Blazing Storm (+30% damage)' },
+                        { elements: ['water', 'lightning'], name: 'Thunder Surge', damageBonus: 1.25, description: 'Water + Lightning = Thunder Surge (+25% damage)' },
+                        { elements: ['earth', 'fire'], name: 'Molten Cascade', damageBonus: 1.35, description: 'Earth + Fire = Molten Cascade (+35% damage)' },
+                        { elements: ['ice', 'wind'], name: 'Frozen Tempest', damageBonus: 1.28, description: 'Ice + Wind = Frozen Tempest (+28% damage)' },
+                        { elements: ['light', 'shadow'], name: 'Celestial Paradox', damageBonus: 1.4, description: 'Light + Shadow = Celestial Paradox (+40% damage)' },
+                        { elements: ['fire', 'fire'], name: 'Inferno King', damageBonus: 1.5, description: 'Fire + Fire = Inferno King (+50% damage)' },
+                        { elements: ['water', 'water'], name: 'Ocean Depths', damageBonus: 1.45, description: 'Water + Water = Ocean Depths (+45% damage)' },
+                        { elements: ['wind', 'wind'], name: 'Tempest Lord', damageBonus: 1.42, description: 'Wind + Wind = Tempest Lord (+42% damage)' }
+                    ];
+
+                    // Get player skills to determine element
+                    const playerSkills = window.gameState.playerSkills || {};
+                    const playerSkill = playerSkills[skillId] || { element: 'fire', name: skillId };
+                    const playerElement = playerSkill.element || 'fire';
+
+                    // Check for combo with adjacent players
+                    let comboTriggered = null;
+                    let comboBonus = 1.0;
+
+                    for (const adjPlayerId of adjacentPlayerIds) {
+                        const adjSkills = window.gameState.playerSkills || {};
+                        const adjSkill = Object.values(adjSkills)[0];
+                        const adjElement = adjSkill?.element || 'wind';
+
+                        // Check if combo exists
+                        for (const recipe of COMBO_RECIPES) {
+                            const [e1, e2] = recipe.elements;
+                            if ((playerElement === e1 && adjElement === e2) || (playerElement === e2 && adjElement === e1)) {
+                                comboTriggered = recipe;
+                                comboBonus = recipe.damageBonus;
+                                break;
+                            }
+                        }
+                        if (comboTriggered) break;
+                    }
+
+                    // Position-based combo detection
+                    const POSITION_COMBOS = [
+                        { positions: [0, 1], name: 'Flanking Surge', bonus: 1.15 },
+                        { positions: [1, 2], name: 'Pincer Attack', bonus: 1.2 },
+                        { positions: [0, 2], name: 'Triangle Strike', bonus: 1.25 }
+                    ];
+
+                    // Calculate combo synergy factor
+                    const synergyFactor = comboTriggered ? comboBonus : (adjacentPlayerIds.length >= 2 ? 1.1 : 1.0);
+                    const positionBonus = adjacentPlayerIds.length >= 2 ? 1.08 : 1.0;
+
+                    const result = {
+                        playerId,
+                        skillId,
+                        adjacentCount: adjacentPlayerIds.length,
+                        comboTriggered: comboTriggered ? true : false,
+                        comboName: comboTriggered?.name || null,
+                        comboDescription: comboTriggered?.description || 'No combo',
+                        damageMultiplier: synergyFactor * positionBonus,
+                        effectiveBonus: Math.round((synergyFactor * positionBonus - 1) * 100),
+                        message: comboTriggered 
+                            ? `Combo triggered: ${comboTriggered.description}` 
+                            : 'No combo detected, base damage applies'
+                    };
+
+                    // Store combo in state for tracking
+                    if (comboTriggered) {
+                        sw.combos.push({
+                            timestamp: Date.now(),
+                            playerId,
+                            skillId,
+                            comboName: comboTriggered.name,
+                            bonus: comboTriggered.damageBonus
+                        });
+                    }
+
+                    return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V98: sect.war.status - Real-time query of battle status
+            mcpSectWarStatus(args) {
+                try {
+                    const { matchId } = args;
+                    if (!matchId) return { error: 'matchId required' };
+
+                    const sw = this._initSectWarState();
+                    const match = sw.matches[matchId];
+                    if (!match) return { error: 'Match not found: ' + matchId };
+
+                    const teamADamage = match.playerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+                    const teamBDamage = match.enemyPlayerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+
+                    return {
+                        matchId,
+                        status: match.status,
+                        warType: match.warType,
+                        teamName: match.teamName,
+                        enemyTeamName: match.enemyTeamName,
+                        round: match.actions.length,
+                        teamAPlayers: match.playerIds,
+                        teamBPlayers: match.enemyPlayerIds,
+                        score: { teamA: teamADamage, teamB: teamBDamage },
+                        actionQueue: match.actions.slice(-5),
+                        elapsed: match.startTime ? Math.floor((Date.now() - match.startTime) / 1000) + 's' : '0s',
+                        energyLeft: {
+                            teamA: Math.max(0, 100 - teamBDamage / 10),
+                            teamB: Math.max(0, 100 - teamADamage / 10)
+                        },
+                        recentCombos: sw.combos.filter(c => Date.now() - c.timestamp < 30000).slice(-3)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V98: sect.war.result - Get battle result and statistics
+            mcpSectWarResult(args) {
+                try {
+                    const { matchId } = args;
+                    if (!matchId) return { error: 'matchId required' };
+
+                    const sw = this._initSectWarState();
+                    const match = sw.matches[matchId];
+                    if (!match) return { error: 'Match not found: ' + matchId };
+                    if (match.status !== 'completed') return { error: 'Match not yet completed. Status: ' + match.status };
+
+                    const teamADamage = match.playerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+                    const teamBDamage = match.enemyPlayerIds.reduce((sum, pid) => sum + (match.damage[pid]?.dealt || 0), 0);
+
+                    return {
+                        matchId,
+                        winner: match.winner === 'teamA' ? match.teamName : match.enemyTeamName,
+                        winnerSide: match.winner,
+                        teamAName: match.teamName,
+                        teamBName: match.enemyTeamName,
+                        totalDamage: { teamA: teamADamage, teamB: teamBDamage },
+                        playerStats: match.playerIds.map((pid, idx) => ({
+                            playerId: pid,
+                            damageDealt: match.damage[pid]?.dealt || 0,
+                            damageTaken: match.damage[pid]?.taken || 0,
+                            contribution: match.contributions[pid] || 0,
+                            contributionPercent: Math.round((match.contributions[pid] || 0) / Math.max(teamADamage, 1) * 100)
+                        })),
+                        duration: match.endTime && match.startTime ? Math.floor((match.endTime - match.startTime) / 1000) + 's' : 'N/A',
+                        warType: match.warType,
+                        mvpPlayer: match.playerIds.reduce((best, pid) => 
+                            (!best || (match.contributions[pid] || 0) > (match.contributions[best] || 0)) ? pid : best, null),
+                        totalRounds: match.actions.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V98: sect.war.reward - Distribute war loot based on contribution
+            mcpSectWarReward(args) {
+                try {
+                    const { matchId, contributionMode = 'contribution' } = args;
+                    if (!matchId) return { error: 'matchId required' };
+
+                    const sw = this._initSectWarState();
+                    const match = sw.matches[matchId];
+                    if (!match) return { error: 'Match not found: ' + matchId };
+                    if (match.status !== 'completed') return { error: 'Match not yet completed' };
+
+                    const REWARD_POOL = {
+                        victory: { spiritStones: 5000, reputation: 200, exp: 1000 },
+                        defeat: { spiritStones: 2000, reputation: 50, exp: 400 }
+                    };
+
+                    const isVictory = match.winner === 'teamA';
+                    const baseReward = isVictory ? REWARD_POOL.victory : REWARD_POOL.defeat;
+                    const totalDamage = match.playerIds.reduce((sum, pid) => sum + (match.contributions[pid] || 0), 0);
+
+                    const rewards = match.playerIds.map(pid => {
+                        let share = 0;
+                        if (contributionMode === 'equal') {
+                            share = 1 / match.playerIds.length;
+                        } else if (contributionMode === 'contribution') {
+                            share = totalDamage > 0 ? (match.contributions[pid] || 0) / totalDamage : 1 / match.playerIds.length;
+                        } else if (contributionMode === 'rank') {
+                            const sorted = [...match.playerIds].sort((a, b) => (match.contributions[b] || 0) - (match.contributions[a] || 0));
+                            const rank = sorted.indexOf(pid) + 1;
+                            const rankWeights = [0.4, 0.25, 0.15, 0.12, 0.08];
+                            share = rankWeights[rank - 1] || 0.05;
+                        }
+
+                        return {
+                            playerId: pid,
+                            mode: contributionMode,
+                            sharePercent: Math.round(share * 100),
+                            spiritStones: Math.floor(baseReward.spiritStones * share),
+                            reputation: Math.floor(baseReward.reputation * share),
+                            exp: Math.floor(baseReward.exp * share)
+                        };
+                    });
+
+                    return {
+                        matchId,
+                        result: isVictory ? 'victory' : 'defeat',
+                        contributionMode,
+                        baseReward,
+                        rewards,
+                        totalDistributed: rewards.reduce((sum, r) => sum + r.spiritStones, 0),
+                        message: `Reward distributed to ${match.playerIds.length} players via ${contributionMode} mode`
+                    };
+                } catch (e) { return { error: e.message }; }
             }
 
             mcpPetList() {
