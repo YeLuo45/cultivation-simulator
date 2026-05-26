@@ -3610,6 +3610,94 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V94: AI Budget Control System — AI API Budget tracking state
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        const AI_PROVIDER_CONFIG = {
+            'minimax': { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false },
+            'openai': { dailyLimit: 500, monthlyLimit: 10000, warningThreshold: 0.8, maxCallsPerMinute: 30, maxTokensPerDay: 50000, fallbackToLocal: false },
+            'anthropic': { dailyLimit: 500, monthlyLimit: 10000, warningThreshold: 0.8, maxCallsPerMinute: 30, maxTokensPerDay: 50000, fallbackToLocal: false },
+            'grok': { dailyLimit: 800, monthlyLimit: 15000, warningThreshold: 0.8, maxCallsPerMinute: 45, maxTokensPerDay: 80000, fallbackToLocal: false }
+        };
+        const AI_BUDGET_TRACKER = {};
+
+        // V94: AI Budget Control System Phase 1 — LLM API Budget + Rate Limiting
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        const MCP_TOOLS_V94 = {
+            'ai_budget.query': {
+                name: 'ai_budget.query',
+                description: 'Query current AI API key budget and usage stats for LLM providers (minimax/openai/anthropic/etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|all (default: all)' }
+                    }
+                }
+            },
+            'ai_budget.configure': {
+                name: 'ai_budget.configure',
+                description: 'Configure budget limits per AI provider (daily/monthly limits, warning thresholds, rate limits)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|grok (required)' },
+                        dailyLimit: { type: 'number', description: 'Daily spend limit in credits (0 = unlimited)' },
+                        monthlyLimit: { type: 'number', description: 'Monthly spend limit in credits (0 = unlimited)' },
+                        warningThreshold: { type: 'number', description: 'Warning threshold 0-1 (default: 0.8)' },
+                        fallbackToLocal: { type: 'boolean', description: 'Fallback to local model when budget exhausted' },
+                        maxCallsPerMinute: { type: 'number', description: 'Rate limit: max calls per minute' },
+                        maxTokensPerDay: { type: 'number', description: 'Rate limit: max tokens per day' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'ai_budget.reset': {
+                name: 'ai_budget.reset',
+                description: 'Reset usage counters for a specific AI provider (daily/monthly/both)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (required)' },
+                        scope: { type: 'string', description: 'Reset scope: daily|monthly|both (default: both)' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'ai_budget.stats': {
+                name: 'ai_budget.stats',
+                description: 'Get detailed usage statistics per AI model/endpoint (calls, tokens, cost breakdown)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|all (default: all)' },
+                        days: { type: 'number', description: 'Number of days to analyze: 1-30 (default: 7)' }
+                    }
+                }
+            },
+            'ai_budget.alerts': {
+                name: 'ai_budget.alerts',
+                description: 'Query or set budget alert thresholds for AI providers',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|all (default: all)' },
+                        threshold: { type: 'number', description: 'Set warning threshold (0-1)' }
+                    }
+                }
+            },
+            'ai_budget.rate_limit': {
+                name: 'ai_budget.rate_limit',
+                description: 'Query and configure rate limits per AI provider (calls/minute, tokens/day)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|all (default: all)' },
+                        maxCallsPerMinute: { type: 'number', description: 'Set max calls per minute' },
+                        maxTokensPerDay: { type: 'number', description: 'Set max tokens per day' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -3689,6 +3777,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V93: Register MCP Agent Bridge tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V93)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V94: Register AI Budget Control tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V94)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4141,6 +4233,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'mcp_bridge.sync_state':
                             result = this.mcpBridgeSyncState(args.mode, args.since, args.include);
+                            break;
+                        // V94: AI Budget Control tools
+                        case 'ai_budget.query':
+                            result = this.mcpAIBudgetQuery(args.provider);
+                            break;
+                        case 'ai_budget.configure':
+                            result = this.mcpAIBudgetConfigure(args);
+                            break;
+                        case 'ai_budget.reset':
+                            result = this.mcpAIBudgetReset(args.provider, args.scope);
+                            break;
+                        case 'ai_budget.stats':
+                            result = this.mcpAIBudgetStats(args.provider, args.days);
+                            break;
+                        case 'ai_budget.alerts':
+                            result = this.mcpAIBudgetAlerts(args.provider, args.threshold);
+                            break;
+                        case 'ai_budget.rate_limit':
+                            result = this.mcpAIBudgetRateLimit(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -6716,6 +6827,174 @@ const ACHIEVEMENT_ID_MAP = {
                             message: 'Full state sync completed'
                         };
                     }
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // ===== V94: AI Budget Control MCP Methods =====
+            // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+            mcpAIBudgetQuery(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const results = {};
+                    const providerIds = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    
+                    for (const p of providerIds) {
+                        const cfg = aiProviders[p] || { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false };
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] };
+                        // Auto-reset if day/month changed
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? (bt.dailySpent / cfg.dailyLimit * 100).toFixed(1) : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? (bt.monthlySpent / cfg.monthlyLimit * 100).toFixed(1) : 0;
+                        const isWarning = dailyPct >= cfg.warningThreshold * 100 || monthlyPct >= cfg.warningThreshold * 100;
+                        results[p] = {
+                            daily: { spent: bt.dailySpent, limit: cfg.dailyLimit, percent: dailyPct },
+                            monthly: { spent: bt.monthlySpent, limit: cfg.monthlyLimit, percent: monthlyPct },
+                            callCount: bt.callCount,
+                            isWarning,
+                            rateLimit: {
+                                maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                                maxTokensPerDay: cfg.maxTokensPerDay || 0
+                            },
+                            fallbackToLocal: cfg.fallbackToLocal || false
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetConfigure(args) {
+                try {
+                    const { provider, dailyLimit, monthlyLimit, warningThreshold, fallbackToLocal, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    if (!AI_PROVIDER_CONFIG) return { error: 'AI_PROVIDER_CONFIG not initialized' };
+                    if (!AI_PROVIDER_CONFIG[provider]) {
+                        AI_PROVIDER_CONFIG[provider] = { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false };
+                    }
+                    const cfg = AI_PROVIDER_CONFIG[provider];
+                    if (dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, dailyLimit);
+                    if (monthlyLimit !== undefined) cfg.monthlyLimit = Math.max(0, monthlyLimit);
+                    if (warningThreshold !== undefined) cfg.warningThreshold = Math.min(1, Math.max(0, warningThreshold));
+                    if (fallbackToLocal !== undefined) cfg.fallbackToLocal = fallbackToLocal;
+                    if (maxCallsPerMinute !== undefined) cfg.maxCallsPerMinute = maxCallsPerMinute;
+                    if (maxTokensPerDay !== undefined) cfg.maxTokensPerDay = maxTokensPerDay;
+                    return { success: true, provider, config: cfg };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetReset(providerId, scope) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    if (!providerId) return { error: 'provider is required' };
+                    const validScopes = ['daily', 'monthly', 'both'];
+                    if (!scope || !validScopes.includes(scope)) return { error: 'scope must be daily|monthly|both' };
+                    if (!AI_BUDGET_TRACKER) AI_BUDGET_TRACKER = {};
+                    let bt = AI_BUDGET_TRACKER[providerId];
+                    if (!bt) { bt = { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] }; AI_BUDGET_TRACKER[providerId] = bt; }
+                    if (scope === 'daily' || scope === 'both') { bt.dailySpent = 0; bt.lastResetDay = day; }
+                    if (scope === 'monthly' || scope === 'both') { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                    return { success: true, provider: providerId, scope, dailySpent: bt.dailySpent, monthlySpent: bt.monthlySpent };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetStats(providerId, days) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const numDays = Math.min(Math.max(days || 7, 1), 30);
+                    const pid = providerId || 'all';
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const providers = pid === 'all' ? Object.keys(aiTracker) : [pid];
+                    const results = {};
+                    
+                    for (const p of providers) {
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, callHistory: [] };
+                        const history = bt.callHistory || [];
+                        const cutoff = now.getTime() - numDays * 86400000;
+                        const recentCalls = history.filter(c => c.timestamp > cutoff);
+                        const dailyBreakdown = [];
+                        for (let i = numDays - 1; i >= 0; i--) {
+                            const d = day - i;
+                            const dayCalls = recentCalls.filter(c => Math.floor(c.timestamp / 86400000) === d);
+                            dailyBreakdown.push({ day: d, calls: dayCalls.length, tokens: dayCalls.reduce((s, c) => s + (c.tokens || 0), 0) });
+                        }
+                        const totalTokens = recentCalls.reduce((s, c) => s + (c.tokens || 0), 0);
+                        results[p] = {
+                            totalCalls: bt.callCount,
+                            recentCalls: recentCalls.length,
+                            totalTokens,
+                            dailyBreakdown,
+                            avgCallsPerDay: numDays > 0 ? (recentCalls.length / numDays).toFixed(1) : 0,
+                            avgTokensPerDay: numDays > 0 ? (totalTokens / numDays).toFixed(0) : 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetAlerts(providerId, threshold) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const providers = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    
+                    // If threshold is set, update it
+                    if (threshold !== undefined && pid !== 'all') {
+                        if (!aiProviders[pid]) aiProviders[pid] = {};
+                        aiProviders[pid].warningThreshold = Math.min(1, Math.max(0, threshold));
+                    }
+                    
+                    const alerts = [];
+                    for (const p of providers) {
+                        const cfg = aiProviders[p] || { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8 };
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, lastResetDay: day, lastResetMonth: month };
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? bt.dailySpent / cfg.dailyLimit : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? bt.monthlySpent / cfg.monthlyLimit : 0;
+                        if (dailyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'daily_exceeded', percent: (dailyPct * 100).toFixed(1) });
+                        else if (dailyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'daily_threshold', percent: (dailyPct * 100).toFixed(1) });
+                        if (monthlyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'monthly_exceeded', percent: (monthlyPct * 100).toFixed(1) });
+                        else if (monthlyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'monthly_threshold', percent: (monthlyPct * 100).toFixed(1) });
+                    }
+                    return { provider: pid, alerts, count: alerts.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetRateLimit(args) {
+                try {
+                    const { provider, maxCallsPerMinute, maxTokensPerDay } = args;
+                    const pid = provider || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    
+                    // If configuring, update the limits
+                    if ((maxCallsPerMinute !== undefined || maxTokensPerDay !== undefined) && pid !== 'all') {
+                        if (!aiProviders[pid]) aiProviders[pid] = { maxCallsPerMinute: 60, maxTokensPerDay: 100000 };
+                        if (maxCallsPerMinute !== undefined) aiProviders[pid].maxCallsPerMinute = maxCallsPerMinute;
+                        if (maxTokensPerDay !== undefined) aiProviders[pid].maxTokensPerDay = maxTokensPerDay;
+                    }
+                    
+                    const results = {};
+                    const providers = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    for (const p of providers) {
+                        const cfg = aiProviders[p] || { maxCallsPerMinute: 60, maxTokensPerDay: 100000 };
+                        results[p] = {
+                            maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                            maxTokensPerDay: cfg.maxTokensPerDay || 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
                 } catch(e) { return { error: e.message }; }
             }
 
@@ -11239,6 +11518,149 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v93Results = runV93Tests();
+
+        // ============================================================================
+        // V94: AI Budget Control System TDD Tests
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        // ============================================================================
+        function runV94Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = {
+                realm: 2, stage: 1, qi: 500, maxQi: 1000,
+                cultivationPath: '道家', cultivationSpeed: 1.2, cultivationEfficiency: 1.0,
+                totalDays: 100, achievements: [], battleRank: 50, sectContribution: 200,
+                npcCollab: { npcs: [] }, secretRealm: { tokens: 3 }
+            };
+            const results = [];
+            function v94Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V94 tools defined
+            v94Assert(MCP_TOOLS_V94['ai_budget.query'] !== undefined, 'ai_budget.query defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.configure'] !== undefined, 'ai_budget.configure defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.reset'] !== undefined, 'ai_budget.reset defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.stats'] !== undefined, 'ai_budget.stats defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.alerts'] !== undefined, 'ai_budget.alerts defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.rate_limit'] !== undefined, 'ai_budget.rate_limit defined');
+
+            // Test 2: ai_budget.query all providers
+            const queryAll = server.mcpAIBudgetQuery();
+            v94Assert(queryAll.providers !== undefined, 'ai_budget.query returns providers object');
+            v94Assert(queryAll.providers.minimax !== undefined, 'ai_budget.query includes minimax');
+            v94Assert(queryAll.providers.openai !== undefined, 'ai_budget.query includes openai');
+            v94Assert(queryAll.providers.anthropic !== undefined, 'ai_budget.query includes anthropic');
+
+            // Test 3: ai_budget.query specific provider
+            const queryMinimax = server.mcpAIBudgetQuery('minimax');
+            v94Assert(queryMinimax.provider === 'minimax', 'ai_budget.query returns correct provider');
+            v94Assert(queryMinimax.daily !== undefined, 'ai_budget.query returns daily stats');
+            v94Assert(queryMinimax.monthly !== undefined, 'ai_budget.query returns monthly stats');
+
+            // Test 4: ai_budget.query has rate limit info
+            const queryRate = server.mcpAIBudgetQuery('openai');
+            v94Assert(queryRate.rateLimit !== undefined, 'ai_budget.query returns rateLimit');
+            v94Assert(queryRate.rateLimit.maxCallsPerMinute > 0, 'ai_budget.query has maxCallsPerMinute');
+
+            // Test 5: ai_budget.configure new provider
+            const configureNew = server.mcpAIBudgetConfigure({ provider: 'test_provider', dailyLimit: 500, monthlyLimit: 5000 });
+            v94Assert(configureNew.success === true, 'ai_budget.configure returns success');
+            v94Assert(configureNew.provider === 'test_provider', 'ai_budget.configure returns provider');
+            v94Assert(configureNew.config.dailyLimit === 500, 'ai_budget.configure sets dailyLimit');
+
+            // Test 6: ai_budget.configure update existing
+            const configureUpdate = server.mcpAIBudgetConfigure({ provider: 'minimax', dailyLimit: 2000 });
+            v94Assert(configureUpdate.success === true, 'ai_budget.configure update returns success');
+            v94Assert(configureUpdate.config.dailyLimit === 2000, 'ai_budget.configure updates dailyLimit');
+
+            // Test 7: ai_budget.configure missing provider
+            const configureBad = server.mcpAIBudgetConfigure({ dailyLimit: 100 });
+            v94Assert(configureBad.error && configureBad.error.includes('provider is required'), 'ai_budget.configure errors on missing provider');
+
+            // Test 8: ai_budget.reset success
+            const resetResult = server.mcpAIBudgetReset('minimax', 'daily');
+            v94Assert(resetResult.success === true, 'ai_budget.reset returns success');
+            v94Assert(resetResult.provider === 'minimax', 'ai_budget.reset returns provider');
+            v94Assert(resetResult.scope === 'daily', 'ai_budget.reset returns scope');
+
+            // Test 9: ai_budget.reset both scope
+            const resetBoth = server.mcpAIBudgetReset('openai', 'both');
+            v94Assert(resetBoth.success === true, 'ai_budget.reset both returns success');
+            v94Assert(resetBoth.dailySpent === 0, 'ai_budget.reset both clears dailySpent');
+            v94Assert(resetBoth.monthlySpent === 0, 'ai_budget.reset both clears monthlySpent');
+
+            // Test 10: ai_budget.reset invalid scope
+            const resetBad = server.mcpAIBudgetReset('minimax', 'invalid');
+            v94Assert(resetBad.error && resetBad.error.includes('scope must be daily|monthly|both'), 'ai_budget.reset errors on invalid scope');
+
+            // Test 11: ai_budget.reset missing provider
+            const resetBad2 = server.mcpAIBudgetReset(null, 'daily');
+            v94Assert(resetBad2.error && resetBad2.error.includes('provider is required'), 'ai_budget.reset errors on missing provider');
+
+            // Test 12: ai_budget.stats all providers
+            const statsAll = server.mcpAIBudgetStats();
+            v94Assert(statsAll.providers !== undefined, 'ai_budget.stats returns providers');
+            v94Assert(statsAll.providers.minimax !== undefined, 'ai_budget.stats includes minimax');
+
+            // Test 13: ai_budget.stats specific provider with days
+            const statsDays = server.mcpAIBudgetStats('minimax', 7);
+            v94Assert(statsDays.provider === 'minimax', 'ai_budget.stats returns correct provider');
+            v94Assert(statsDays.totalCalls !== undefined, 'ai_budget.stats returns totalCalls');
+            v94Assert(statsDays.dailyBreakdown !== undefined, 'ai_budget.stats returns dailyBreakdown');
+
+            // Test 14: ai_budget.stats days parameter clamped
+            const statsClamped = server.mcpAIBudgetStats('minimax', 100);
+            v94Assert(statsClamped.dailyBreakdown.length <= 30, 'ai_budget.stats clamps days to 30');
+
+            // Test 15: ai_budget.alerts all providers
+            const alertsAll = server.mcpAIBudgetAlerts();
+            v94Assert(alertsAll.provider === 'all', 'ai_budget.alerts returns all');
+            v94Assert(alertsAll.alerts !== undefined, 'ai_budget.alerts returns alerts array');
+            v94Assert(typeof alertsAll.count === 'number', 'ai_budget.alerts returns count');
+
+            // Test 16: ai_budget.alerts set threshold
+            const alertsSet = server.mcpAIBudgetAlerts('minimax', 0.9);
+            v94Assert(alertsSet.provider === 'minimax', 'ai_budget.alerts returns provider');
+
+            // Test 17: ai_budget.alerts specific provider
+            const alertsProv = server.mcpAIBudgetAlerts('openai');
+            v94Assert(alertsProv.provider === 'openai', 'ai_budget.alerts returns specific provider');
+
+            // Test 18: ai_budget.rate_limit query all
+            const rateAll = server.mcpAIBudgetRateLimit({});
+            v94Assert(rateAll.providers !== undefined, 'ai_budget.rate_limit returns providers');
+
+            // Test 19: ai_budget.rate_limit configure
+            const rateConfig = server.mcpAIBudgetRateLimit({ provider: 'minimax', maxCallsPerMinute: 100 });
+            v94Assert(rateConfig.provider === 'minimax', 'ai_budget.rate_limit returns provider');
+            v94Assert(rateConfig.maxCallsPerMinute === 100, 'ai_budget.rate_limit sets maxCallsPerMinute');
+
+            // Test 20: ai_budget.rate_limit query specific
+            const rateQuery = server.mcpAIBudgetRateLimit({ provider: 'openai' });
+            v94Assert(rateQuery.provider === 'openai', 'ai_budget.rate_limit returns specific provider');
+            v94Assert(rateQuery.maxCallsPerMinute > 0, 'ai_budget.rate_limit has maxCallsPerMinute');
+
+            // Test 21: ai_budget.query unknown provider returns defaults
+            const queryUnknown = server.mcpAIBudgetQuery('unknown_provider');
+            v94Assert(queryUnknown.provider === 'unknown_provider', 'ai_budget.query returns unknown provider');
+            v94Assert(queryUnknown.daily !== undefined, 'ai_budget.query returns daily for unknown');
+
+            // Test 22: ai_budget.configure warningThreshold bounds
+            const configureBounds = server.mcpAIBudgetConfigure({ provider: 'test_bounds', warningThreshold: 1.5 });
+            v94Assert(configureBounds.config.warningThreshold <= 1, 'ai_budget.configure clamps warningThreshold to 1');
+            
+            // Test 23: ai_budget.stats with empty tracker uses defaults
+            const statsEmpty = server.mcpAIBudgetStats('new_provider', 3);
+            v94Assert(statsEmpty.provider === 'new_provider', 'ai_budget.stats handles new provider');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V94', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V94 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v94Results = runV94Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
