@@ -3380,11 +3380,440 @@ const ACHIEVEMENT_ID_MAP = {
             },
             'explore.survey': {
                 name: 'explore.survey',
-                description: 'Survey unexplored regions on the celestial map',
+                description: 'Survey a region for exploration opportunities',
                 inputSchema: {
                     type: 'object',
                     properties: {
-                        region: { type: 'string', description: 'Region to survey' }
+                        region: { type: 'string', description: 'Region: east|west|north|south' }
+                    }
+                }
+            }
+        };
+
+        // ===== V91 Direction A: AI Budget Control System =====
+        // claude-code Budget Mode: call quota + rate limit + daily/monthly budgets
+
+        const MCP_TOOLS_V91 = {
+            'budget.query': {
+                name: 'budget.query',
+                description: 'Query current budget status for a provider or all providers',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all providers.' }
+                    }
+                }
+            },
+            'budget.configure': {
+                name: 'budget.configure',
+                description: 'Update budget limits and warning thresholds for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        dailyLimit: { type: 'number', description: 'Daily token budget limit (points)' },
+                        monthlyLimit: { type: 'number', description: 'Monthly token budget limit (points)' },
+                        warningThreshold: { type: 'number', description: 'Warning threshold (0.0-1.0, e.g. 0.8 for 80%)' },
+                        fallbackToLocal: { type: 'boolean', description: 'Fallback to local rules when budget exceeded' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'budget.reset': {
+                name: 'budget.reset',
+                description: 'Reset daily/monthly budget counters for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        scope: { type: 'string', description: 'Reset scope: daily|monthly|both' }
+                    },
+                    required: ['provider', 'scope']
+                }
+            },
+            'budget.stats': {
+                name: 'budget.stats',
+                description: 'Get detailed budget statistics and call history',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax). Omit for all.' },
+                        days: { type: 'number', description: 'Number of days of history (default 7, max 30)' }
+                    }
+                }
+            },
+            'budget.alerts': {
+                name: 'budget.alerts',
+                description: 'Get active budget warnings and alerts',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID. Omit for all.' }
+                    }
+                }
+            },
+            'budget.rate_limit': {
+                name: 'budget.rate_limit',
+                description: 'Get or set rate limiting configuration for a provider',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (e.g. minimax)' },
+                        maxCallsPerMinute: { type: 'number', description: 'Max API calls per minute (0 = unlimited)' },
+                        maxTokensPerDay: { type: 'number', description: 'Max tokens per day (0 = unlimited)' }
+                    },
+                    required: ['provider']
+                }
+            }
+        };
+
+        // V92: 仙界秘境探索系统 — thunderbolt 双路径同步 + 随机事件
+        const MCP_TOOLS_V92 = {
+            'secret_realm.list': {
+                name: 'secret_realm.list',
+                description: 'List all secret realms available in the current cycle',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        region: { type: 'string', description: 'Filter by region: east|west|north|south|all (default: all)' }
+                    }
+                }
+            },
+            'secret_realm.enter': {
+                name: 'secret_realm.enter',
+                description: 'Enter and explore a secret realm using a dungeon token',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (e.g. jade_palace, dragon_tomb)' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'secret_realm.progress': {
+                name: 'secret_realm.progress',
+                description: 'Get current exploration progress in active secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID (omit for active realm)' }
+                    }
+                }
+            },
+            'secret_realm.encounter': {
+                name: 'secret_realm.encounter',
+                description: 'Resolve a random encounter within a secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: 'Action: engage|avoid|investigate|retreat' }
+                    },
+                    required: ['action']
+                }
+            },
+            'secret_realm.claim': {
+                name: 'secret_realm.claim',
+                description: 'Claim exploration rewards from a completed secret realm',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'string', description: 'Secret realm ID to claim' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'dungeon_token.status': {
+                name: 'dungeon_token.status',
+                description: 'Query dungeon token count and next reset timer',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
+        // V93: MCP Agent Bridge Phase 1 — nanobot MessageBus + thunderbolt dual sync + claude-code-design tool system
+        // External agents can interact with NPCs, encounters, and cultivation system via MCP protocol
+        const MCP_TOOLS_V93 = {
+            'mcp_bridge.status': {
+                name: 'mcp_bridge.status',
+                description: 'Query MCP Agent Bridge status, registered agents, active sessions, and server health',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        detail: { type: 'string', description: 'Detail level: summary|full|agents (default: summary)' }
+                    }
+                }
+            },
+            'mcp_bridge.send_message': {
+                name: 'mcp_bridge.send_message',
+                description: 'Send message to NPC via external agent bridge (nanobot-style async routing)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        agentId: { type: 'string', description: 'External agent ID sending the message' },
+                        npcRole: { type: 'string', description: 'NPC role: master|monster|merchant|fellow' },
+                        message: { type: 'string', description: 'Message content to send' },
+                        context: { type: 'string', description: 'Optional context: cultivation|battle|trade|social' }
+                    },
+                    required: ['agentId', 'npcRole', 'message']
+                }
+            },
+            'mcp_bridge.trigger_encounter': {
+                name: 'mcp_bridge.trigger_encounter',
+                description: 'Trigger a random cultivation encounter from external agent signal (serendipity/ruflo hook system)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        agentId: { type: 'string', description: 'External agent triggering the encounter' },
+                        intensity: { type: 'string', description: 'Encounter intensity: low|medium|high|catastrophic (default: medium)' },
+                        type: { type: 'string', description: 'Encounter type: serendipity|tribulation|monster|treasure|all (default: all)' }
+                    },
+                    required: ['agentId']
+                }
+            },
+            'mcp_bridge.query_realm': {
+                name: 'mcp_bridge.query_realm',
+                description: 'Query current realm, stage, cultivation progress, and cultivation path (generic-agent L2 memory)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fields: { type: 'array', description: 'Fields to query: realm|stage|cultivation|progress|all (default: all)', items: { type: 'string' } }
+                    }
+                }
+            },
+            'mcp_bridge.register_agent': {
+                name: 'mcp_bridge.register_agent',
+                description: 'Register external agent identity with MCP bridge (nanobot-style channel auto-discovery)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        agentId: { type: 'string', description: 'Unique agent identifier' },
+                        agentName: { type: 'string', description: 'Human-readable agent name' },
+                        capabilities: { type: 'array', description: 'Agent capabilities: tool_call|memory|reasoning|execution', items: { type: 'string' } },
+                        trustLevel: { type: 'string', description: 'Trust level: L1(local)|L2(team)|L3(org)|L4(public) (default: L2)' }
+                    },
+                    required: ['agentId', 'agentName']
+                }
+            },
+            'mcp_bridge.sync_state': {
+                name: 'mcp_bridge.sync_state',
+                description: 'Bidirectional state sync — thunderbolt-style dual path: full dump or delta stream',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mode: { type: 'string', description: 'Sync mode: full|delta (default: full)' },
+                        since: { type: 'number', description: 'Timestamp for delta sync (Unix ms)' },
+                        include: { type: 'array', description: 'State sections to include: cultivation|npc|inventory|achievements|all', items: { type: 'string' } }
+                    }
+                }
+            }
+        };
+
+        // V94: AI Budget Control System — AI API Budget tracking state
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        const AI_PROVIDER_CONFIG = {
+            'minimax': { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false },
+            'openai': { dailyLimit: 500, monthlyLimit: 10000, warningThreshold: 0.8, maxCallsPerMinute: 30, maxTokensPerDay: 50000, fallbackToLocal: false },
+            'anthropic': { dailyLimit: 500, monthlyLimit: 10000, warningThreshold: 0.8, maxCallsPerMinute: 30, maxTokensPerDay: 50000, fallbackToLocal: false },
+            'grok': { dailyLimit: 800, monthlyLimit: 15000, warningThreshold: 0.8, maxCallsPerMinute: 45, maxTokensPerDay: 80000, fallbackToLocal: false }
+        };
+        const AI_BUDGET_TRACKER = {};
+
+        // V94: AI Budget Control System Phase 1 — LLM API Budget + Rate Limiting
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        const MCP_TOOLS_V94 = {
+            'ai_budget.query': {
+                name: 'ai_budget.query',
+                description: 'Query current AI API key budget and usage stats for LLM providers (minimax/openai/anthropic/etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|all (default: all)' }
+                    }
+                }
+            },
+            'ai_budget.configure': {
+                name: 'ai_budget.configure',
+                description: 'Configure budget limits per AI provider (daily/monthly limits, warning thresholds, rate limits)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|grok (required)' },
+                        dailyLimit: { type: 'number', description: 'Daily spend limit in credits (0 = unlimited)' },
+                        monthlyLimit: { type: 'number', description: 'Monthly spend limit in credits (0 = unlimited)' },
+                        warningThreshold: { type: 'number', description: 'Warning threshold 0-1 (default: 0.8)' },
+                        fallbackToLocal: { type: 'boolean', description: 'Fallback to local model when budget exhausted' },
+                        maxCallsPerMinute: { type: 'number', description: 'Rate limit: max calls per minute' },
+                        maxTokensPerDay: { type: 'number', description: 'Rate limit: max tokens per day' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'ai_budget.reset': {
+                name: 'ai_budget.reset',
+                description: 'Reset usage counters for a specific AI provider (daily/monthly/both)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID (required)' },
+                        scope: { type: 'string', description: 'Reset scope: daily|monthly|both (default: both)' }
+                    },
+                    required: ['provider']
+                }
+            },
+            'ai_budget.stats': {
+                name: 'ai_budget.stats',
+                description: 'Get detailed usage statistics per AI model/endpoint (calls, tokens, cost breakdown)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|all (default: all)' },
+                        days: { type: 'number', description: 'Number of days to analyze: 1-30 (default: 7)' }
+                    }
+                }
+            },
+            'ai_budget.alerts': {
+                name: 'ai_budget.alerts',
+                description: 'Query or set budget alert thresholds for AI providers',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|all (default: all)' },
+                        threshold: { type: 'number', description: 'Set warning threshold (0-1)' }
+                    }
+                }
+            },
+            'ai_budget.rate_limit': {
+                name: 'ai_budget.rate_limit',
+                description: 'Query and configure rate limits per AI provider (calls/minute, tokens/day)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        provider: { type: 'string', description: 'Provider ID: minimax|openai|anthropic|all (default: all)' },
+                        maxCallsPerMinute: { type: 'number', description: 'Set max calls per minute' },
+                        maxTokensPerDay: { type: 'number', description: 'Set max tokens per day' }
+                    }
+                }
+            }
+        };
+
+        // V95: Multi-Agent Quest Orchestration System
+        // 6 MCP tools: quest.create/execute, npc.spawn/memory_update, hook.register, budget.query
+        const MCP_TOOLS_V95 = {
+            'quest.create': {
+                name: 'quest.create',
+                description: 'Create a DAG-based quest with parallel nodes, hooks and budget allocation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: 'Unique quest identifier' },
+                        name: { type: 'string', description: 'Quest name' },
+                        nodes: {
+                            type: 'array',
+                            description: 'DAG nodes with id, type, requires[], npcAssignment[]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    type: { type: 'string' },
+                                    requires: { type: 'array', items: { type: 'string' } },
+                                    npcAssignment: { type: 'array', items: { type: 'string' } },
+                                    budget: { type: 'number' }
+                                },
+                                required: ['id', 'type']
+                            }
+                        },
+                        budget: { type: 'number', description: 'Total budget allocation' },
+                        hooks: {
+                            type: 'array',
+                            description: 'Hook configurations: [{event, script}]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    event: { type: 'string' },
+                                    script: { type: 'string' }
+                                }
+                            }
+                        }
+                    },
+                    required: ['questId', 'nodes']
+                }
+            },
+            'quest.execute': {
+                name: 'quest.execute',
+                description: 'Execute a quest DAG with maxConcurrent concurrency limit. Returns: running/completed/paused/budget_exceeded',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: 'Quest to execute' },
+                        context: { type: 'object', description: 'Execution context variables' },
+                        maxConcurrent: { type: 'number', description: 'Max parallel nodes (default: 3)' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'npc.spawn': {
+                name: 'npc.spawn',
+                description: 'Spawn an NPC with five-layer memory system (L0-L4)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC unique identifier' },
+                        template: { type: 'string', description: 'NPC template: guard/explorer/combat/support' },
+                        mission: { type: 'object', description: 'Initial mission parameters' },
+                        memoryLayers: {
+                            type: 'object',
+                            description: 'Pre-configured L0-L4 memory',
+                            properties: {
+                                L0: { type: 'array', description: 'Meta rules' },
+                                L1: { type: 'array', description: 'Insight index' },
+                                L2: { type: 'array', description: 'Global facts' },
+                                L3: { type: 'array', description: 'Task skills' },
+                                L4: { type: 'array', description: 'Session archive' }
+                            }
+                        }
+                    },
+                    required: ['npcId', 'template']
+                }
+            },
+            'npc.memory_update': {
+                name: 'npc.memory_update',
+                description: 'Update NPC five-layer memory. Supports crystallize to convert execution path to reusable SOP',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC identifier' },
+                        layer: { type: 'string', description: 'Layer: L0|L1|L2|L3|L4' },
+                        content: { type: 'string', description: 'Memory content to add' },
+                        tags: { type: 'array', description: 'Index tags for L1', items: { type: 'string' } },
+                        crystallize: { type: 'boolean', description: 'Convert to SOP skill' }
+                    },
+                    required: ['npcId', 'layer', 'content']
+                }
+            },
+            'hook.register': {
+                name: 'hook.register',
+                description: 'Register a quest event hook (pre_quest/post_quest/npc_spawn/npc_despawn/loop_detected/budget_exceeded)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        hookName: { type: 'string', description: 'Hook event name' },
+                        callback: { type: 'string', description: 'Callback function name or script' },
+                        priority: { type: 'number', description: 'Execution priority (higher first, default: 50)' },
+                        async: { type: 'boolean', description: 'Async execution (default: true)' }
+                    },
+                    required: ['hookName', 'callback']
+                }
+            },
+            'budget.query': {
+                name: 'budget.query',
+                description: 'Query quest execution budget status (total/used/available/rateLimited)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        scope: { type: 'string', description: 'Scope: quest|npc|global' },
+                        entityId: { type: 'string', description: 'Entity ID for entity-specific budget' }
                     }
                 }
             }
@@ -3457,6 +3886,26 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V90: Register star map, spirit root, and explore tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V90)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V91: Register budget control tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V91)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V92: Register secret realm exploration tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V92)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V93: Register MCP Agent Bridge tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V93)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V94: Register AI Budget Control tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V94)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V95: Register Multi-Agent Quest Orchestration tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V95)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3854,6 +4303,99 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'explore.survey':
                             result = this.mcpExploreSurvey(args.region);
+                            break;
+                        case 'budget.query':
+                            result = this.mcpBudgetQuery(args.provider);
+                            break;
+                        case 'budget.configure':
+                            result = this.mcpBudgetConfigure(args);
+                            break;
+                        case 'budget.reset':
+                            result = this.mcpBudgetReset(args.provider, args.scope);
+                            break;
+                        case 'budget.stats':
+                            result = this.mcpBudgetStats(args.provider, args.days);
+                            break;
+                        case 'budget.alerts':
+                            result = this.mcpBudgetAlerts(args.provider);
+                            break;
+                        case 'budget.rate_limit':
+                            result = this.mcpBudgetRateLimit(args);
+                            break;
+                        case 'secret_realm.list':
+                            result = this.mcpSecretRealmList(args.region);
+                            break;
+                        case 'secret_realm.enter':
+                            result = this.mcpSecretRealmEnter(args.realmId);
+                            break;
+                        case 'secret_realm.progress':
+                            result = this.mcpSecretRealmProgress(args.realmId);
+                            break;
+                        case 'secret_realm.encounter':
+                            result = this.mcpSecretRealmEncounter(args.action);
+                            break;
+                        case 'secret_realm.claim':
+                            result = this.mcpSecretRealmClaim(args.realmId);
+                            break;
+                        case 'dungeon_token.status':
+                            result = this.mcpDungeonTokenStatus();
+                            break;
+                        // V93: MCP Agent Bridge tools
+                        case 'mcp_bridge.status':
+                            result = this.mcpBridgeStatus(args.detail);
+                            break;
+                        case 'mcp_bridge.send_message':
+                            result = this.mcpBridgeSendMessage(args.agentId, args.npcRole, args.message, args.context);
+                            break;
+                        case 'mcp_bridge.trigger_encounter':
+                            result = this.mcpBridgeTriggerEncounter(args.agentId, args.intensity, args.type);
+                            break;
+                        case 'mcp_bridge.query_realm':
+                            result = this.mcpBridgeQueryRealm(args.fields);
+                            break;
+                        case 'mcp_bridge.register_agent':
+                            result = this.mcpBridgeRegisterAgent(args.agentId, args.agentName, args.capabilities, args.trustLevel);
+                            break;
+                        case 'mcp_bridge.sync_state':
+                            result = this.mcpBridgeSyncState(args.mode, args.since, args.include);
+                            break;
+                        // V94: AI Budget Control tools
+                        case 'ai_budget.query':
+                            result = this.mcpAIBudgetQuery(args.provider);
+                            break;
+                        case 'ai_budget.configure':
+                            result = this.mcpAIBudgetConfigure(args);
+                            break;
+                        case 'ai_budget.reset':
+                            result = this.mcpAIBudgetReset(args.provider, args.scope);
+                            break;
+                        case 'ai_budget.stats':
+                            result = this.mcpAIBudgetStats(args.provider, args.days);
+                            break;
+                        case 'ai_budget.alerts':
+                            result = this.mcpAIBudgetAlerts(args.provider, args.threshold);
+                            break;
+                        case 'ai_budget.rate_limit':
+                            result = this.mcpAIBudgetRateLimit(args);
+                            break;
+                        // V95: Multi-Agent Quest Orchestration tools
+                        case 'quest.create':
+                            result = this.mcpQuestCreate(args);
+                            break;
+                        case 'quest.execute':
+                            result = this.mcpQuestExecute(args);
+                            break;
+                        case 'npc.spawn':
+                            result = this.mcpNpcSpawn(args);
+                            break;
+                        case 'npc.memory_update':
+                            result = this.mcpNpcMemoryUpdate(args);
+                            break;
+                        case 'hook.register':
+                            result = this.mcpHookRegister(args);
+                            break;
+                        case 'budget.query':
+                            result = this.mcpBudgetQuery(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5846,6 +6388,1014 @@ const ACHIEVEMENT_ID_MAP = {
                     else gs.exploredRegions[r] = true;
                     return { region: r, surveyResults: results };
                 } catch(e) { return { error: e.message }; }
+            }
+
+            // ===== V91 Budget Control MCP Methods =====
+            mcpBudgetQuery(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] };
+                        // Auto-reset if day changed
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? (bt.dailySpent / cfg.dailyLimit * 100).toFixed(1) : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? (bt.monthlySpent / cfg.monthlyLimit * 100).toFixed(1) : 0;
+                        const isWarning = dailyPct >= cfg.warningThreshold * 100 || monthlyPct >= cfg.warningThreshold * 100;
+                        results[p] = {
+                            daily: { spent: bt.dailySpent, limit: cfg.dailyLimit, percent: dailyPct },
+                            monthly: { spent: bt.monthlySpent, limit: cfg.monthlyLimit, percent: monthlyPct },
+                            callCount: bt.callCount,
+                            isWarning,
+                            lastCallProvider: bt.lastCallProvider || null,
+                            rateLimit: {
+                                maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                                maxTokensPerDay: cfg.maxTokensPerDay || 0
+                            }
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetConfigure(args) {
+                try {
+                    const { provider, dailyLimit, monthlyLimit, warningThreshold, fallbackToLocal, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = { ...BUDGET_CONFIG };
+                    const cfg = budgetProviderConfig[provider];
+                    if (dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, dailyLimit);
+                    if (monthlyLimit !== undefined) cfg.monthlyLimit = Math.max(0, monthlyLimit);
+                    if (warningThreshold !== undefined) cfg.warningThreshold = Math.min(1, Math.max(0, warningThreshold));
+                    if (fallbackToLocal !== undefined) cfg.fallbackToLocal = fallbackToLocal;
+                    if (maxCallsPerMinute !== undefined) cfg.maxCallsPerMinute = maxCallsPerMinute;
+                    if (maxTokensPerDay !== undefined) cfg.maxTokensPerDay = maxTokensPerDay;
+                    return { success: true, provider, config: cfg };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetReset(providerId, scope) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    if (!providerId) return { error: 'provider is required' };
+                    if (!scope || !['daily', 'monthly', 'both'].includes(scope)) return { error: 'scope must be daily|monthly|both' };
+                    let bt = budgetProviderTracker[providerId];
+                    if (!bt) { bt = { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] }; budgetProviderTracker[providerId] = bt; }
+                    if (scope === 'daily' || scope === 'both') { bt.dailySpent = 0; bt.lastResetDay = day; }
+                    if (scope === 'monthly' || scope === 'both') { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                    return { success: true, provider: providerId, scope, dailySpent: bt.dailySpent, monthlySpent: bt.monthlySpent };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetStats(providerId, days) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const numDays = Math.min(Math.max(days || 7, 1), 30);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderTracker) : [pid];
+                    const results = {};
+                    for (const p of providers) {
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, callHistory: [] };
+                        const history = bt.callHistory || [];
+                        const cutoff = now.getTime() - numDays * 86400000;
+                        const recentCalls = history.filter(c => c.timestamp > cutoff);
+                        const dailyBreakdown = [];
+                        for (let i = numDays - 1; i >= 0; i--) {
+                            const d = day - i;
+                            const dayCalls = recentCalls.filter(c => Math.floor(c.timestamp / 86400000) === d);
+                            dailyBreakdown.push({ day: d, calls: dayCalls.length, tokens: dayCalls.reduce((s, c) => s + (c.tokens || 0), 0) });
+                        }
+                        results[p] = {
+                            totalCalls: bt.callCount,
+                            recentCalls: recentCalls.length,
+                            dailyBreakdown,
+                            avgCallsPerDay: numDays > 0 ? (recentCalls.length / numDays).toFixed(1) : 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetAlerts(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const providers = pid === 'all' ? Object.keys(budgetProviderConfig) : [pid];
+                    const alerts = [];
+                    for (const p of providers) {
+                        const cfg = budgetProviderConfig[p] || BUDGET_CONFIG;
+                        const bt = budgetProviderTracker[p] || { dailySpent: 0, monthlySpent: 0, lastResetDay: day, lastResetMonth: month };
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? bt.dailySpent / cfg.dailyLimit : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? bt.monthlySpent / cfg.monthlyLimit : 0;
+                        if (dailyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'daily_exceeded', percent: (dailyPct * 100).toFixed(1) });
+                        else if (dailyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'daily_threshold', percent: (dailyPct * 100).toFixed(1) });
+                        if (monthlyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'monthly_exceeded', percent: (monthlyPct * 100).toFixed(1) });
+                        else if (monthlyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'monthly_threshold', percent: (monthlyPct * 100).toFixed(1) });
+                        // Rate limit alert
+                        if (cfg.maxCallsPerMinute > 0 && bt.rateLimitCalls) {
+                            const recentMinuteCalls = bt.rateLimitCalls.filter(t => now.getTime() - t < 60000);
+                            if (recentMinuteCalls.length >= cfg.maxCallsPerMinute) alerts.push({ provider: p, level: 'critical', type: 'rate_limit_exceeded', count: recentMinuteCalls.length, limit: cfg.maxCallsPerMinute });
+                        }
+                    }
+                    return { provider: pid, alerts, hasAlerts: alerts.length > 0 };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBudgetRateLimit(args) {
+                try {
+                    const { provider, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    const cfg = budgetProviderConfig[provider] || { ...BUDGET_CONFIG, maxCallsPerMinute: 0, maxTokensPerDay: 0 };
+                    if (!budgetProviderConfig[provider]) budgetProviderConfig[provider] = cfg;
+                    if (maxCallsPerMinute !== undefined) { cfg.maxCallsPerMinute = maxCallsPerMinute; }
+                    if (maxTokensPerDay !== undefined) { cfg.maxTokensPerDay = maxTokensPerDay; }
+                    return { success: true, provider, rateLimit: { maxCallsPerMinute: cfg.maxCallsPerMinute, maxTokensPerDay: cfg.maxTokensPerDay } };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V92: Secret Realm Exploration
+            mcpSecretRealmList(region) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const cycle = gs2.cycle || 1;
+                    const REALMS = {
+                        'jade_palace': { id: 'jade_palace', name: '碧玉仙宫', region: 'east', difficulty: 3, tokens: 1, description: '上古仙人洞府', rewards: ['灵石', '仙草'] },
+                        'dragon_tomb': { id: 'dragon_tomb', name: '龙墓深渊', region: 'south', difficulty: 4, tokens: 2, description: '远古龙族遗迹', rewards: ['龙鳞', '龙魂'] },
+                        'thunder_shrine': { id: 'thunder_shrine', name: '雷霆神祠', region: 'west', difficulty: 3, tokens: 1, description: '雷霆法则圣地', rewards: ['雷劫珠', '天雷符'] },
+                        'celestial_garden': { id: 'celestial_garden', name: '天界药园', region: 'north', difficulty: 2, tokens: 1, description: '仙界灵药园', rewards: ['灵芝', '蟠桃'] },
+                        'spirit_valley': { id: 'spirit_valley', name: '幽魂谷', region: 'south', difficulty: 3, tokens: 1, description: '鬼修圣地', rewards: ['幽魂石', '冥晶'] },
+                        'bamboo_cave': { id: 'bamboo_cave', name: '翠竹林', region: 'east', difficulty: 1, tokens: 1, description: '隐士清修地', rewards: ['翠竹', '清心露'] }
+                    };
+                    const r = region && region !== 'all' ? region : null;
+                    const list = Object.values(REALMS).filter(x => !r || x.region === r);
+                    return { cycle, tokens: gs2.tokens ?? 3, realms: list, nextReset: gs2.nextReset || '10天后重置' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEnter(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    if (gs.secretRealm.tokens <= 0) return { error: 'No dungeon tokens remaining', tokens: 0 };
+                    const REALMS = ['jade_palace','dragon_tomb','thunder_shrine','celestial_garden','spirit_valley','bamboo_cave'];
+                    if (!REALMS.includes(realmId)) return { error: 'Invalid realmId: ' + realmId + '. Available: ' + REALMS.join(', ') };
+                    gs.secretRealm.tokens--;
+                    gs.secretRealm.activeRealm = realmId;
+                    gs.secretRealm.progress = 0;
+                    gs.secretRealm.waves = 3;
+                    gs.secretRealm.completed = false;
+                    return { success: true, realmId, tokens: gs.secretRealm.tokens, waves: 3, message: '进入秘境成功，当前波次：1/3' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmProgress(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const active = gs2.activeRealm || realmId;
+                    if (!active) return { error: 'No active exploration' };
+                    const ENCOUNTERS = ['珍稀灵草', '守护妖兽', '上古禁制', '失落宝箱', '神秘商人', '天劫降临'];
+                    const encounter = ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)];
+                    return { realmId: active, progress: gs2.progress || 0, waves: gs2.waves || 0, encounter, status: gs2.completed ? 'completed' : 'in_progress' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmEncounter(action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    const valid = ['engage','avoid','investigate','retreat'];
+                    if (!valid.includes(action)) return { error: 'Invalid action: ' + action + '. Must be one of: ' + valid.join(', ') };
+                    if (!gs2.activeRealm) return { error: 'No active realm. Call secret_realm.enter first.' };
+                    const roll = Math.random();
+                    const outcomes = {
+                        engage: roll > 0.4 ? { success: true, message: '战斗胜利，获得奖励', reward: '灵石x10' } : { success: false, message: '战斗失败，受轻伤', reward: null },
+                        avoid: roll > 0.2 ? { success: true, message: '成功避开威胁', reward: null } : { success: false, message: '躲避不及，受到波及', reward: null },
+                        investigate: roll > 0.3 ? { success: true, message: '发现隐藏区域', reward: '仙草x2' } : { success: false, message: '调查无果，浪费了时间', reward: null },
+                        retreat: { success: true, message: '成功撤退，保留令牌', reward: null }
+                    };
+                    const result = outcomes[action] || outcomes.investigate;
+                    gs2.progress = (gs2.progress || 0) + (result.success ? 1 : 0);
+                    if (gs2.progress >= (gs2.waves || 3)) { gs2.completed = true; gs2.progress = gs2.waves || 3; }
+                    return { action, ...result, progress: gs2.progress, waves: gs2.waves || 3, realmId: gs2.activeRealm };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpSecretRealmClaim(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gs2 = gs.secretRealm || {};
+                    if (!gs2.completed) return { error: 'Realm not completed. Progress: ' + (gs2.progress || 0) + '/' + (gs2.waves || 3) };
+                    const claimed = gs2.claimed || [];
+                    if (claimed.includes(realmId)) return { error: 'Already claimed this realm', realmId };
+                    claimed.push(realmId);
+                    gs2.claimed = claimed;
+                    gs2.activeRealm = null;
+                    gs2.progress = 0;
+                    gs2.completed = false;
+                    const REWARDS = { jade_palace: ['灵石x50','仙草x3'], dragon_tomb: ['龙鳞x2','龙魂x1'], thunder_shrine: ['雷劫珠x1','天雷符x5'], celestial_garden: ['灵芝x5','蟠桃x1'], spirit_valley: ['幽魂石x3','冥晶x2'], bamboo_cave: ['翠竹x10','清心露x2'] };
+                    return { success: true, realmId, rewards: REWARDS[realmId] || ['随机灵石x20'], message: '奖励已发放至背包' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpDungeonTokenStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    gs.secretRealm = gs.secretRealm || {};
+                    gs.secretRealm.tokens = gs.secretRealm.tokens ?? 3;
+                    const TOKENS_MAX = 3;
+                    const CYCLE_DAYS = 10;
+                    const cycle = gs.secretRealm.cycle || 1;
+                    return { tokens: gs.secretRealm.tokens, maxTokens: TOKENS_MAX, cycle, nextReset: CYCLE_DAYS + '天后重置', status: gs.secretRealm.tokens > 0 ? 'available' : 'depleted' };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V93: MCP Agent Bridge — nanobot MessageBus + thunderbolt dual sync + claude-code-design tool system
+            // External agent bridge for NPCs, encounters, and cultivation system
+
+            // MCP Agent Registry (nanobot-style channel auto-discovery)
+            static agentRegistry = new Map();
+
+            mcpBridgeStatus(detail) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const detailLevel = detail || 'summary';
+                    const server = this;
+
+                    // Collect registered agents
+                    const agents = Array.from(CultivationMCPServer.agentRegistry.values()).map(a => ({
+                        agentId: a.agentId,
+                        agentName: a.agentName,
+                        trustLevel: a.trustLevel,
+                        capabilities: a.capabilities,
+                        registeredAt: a.registeredAt,
+                        lastSeen: a.lastSeen
+                    }));
+
+                    const result = {
+                        version: 'V93',
+                        status: 'operational',
+                        timestamp: Date.now(),
+                        server: 'cultivation-simulator MCP Bridge',
+                        totalTools: server.toolRegistry ? server.toolRegistry.size : 0,
+                        totalAgents: agents.length,
+                        agents: detailLevel === 'agents' || detailLevel === 'full' ? agents : undefined,
+                        capabilities: ['tool_call', 'state_sync', 'message_routing', 'encounter_trigger']
+                    };
+
+                    if (detailLevel === 'full') {
+                        result.requestHistory = server.requestHistory ? server.requestHistory.slice(-10) : [];
+                        result.toolList = Array.from(server.toolRegistry.keys()).slice(-20);
+                    }
+
+                    return result;
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBridgeSendMessage(agentId, npcRole, message, context) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!agentId || !npcRole || !message) {
+                        return { error: 'Missing required parameters: agentId, npcRole, message' };
+                    }
+                    const validRoles = ['master', 'monster', 'merchant', 'fellow'];
+                    if (!validRoles.includes(npcRole)) {
+                        return { error: 'Invalid npcRole: ' + npcRole + '. Must be one of: ' + validRoles.join(', ') };
+                    }
+
+                    // Update agent last seen
+                    const agent = CultivationMCPServer.agentRegistry.get(agentId);
+                    if (agent) agent.lastSeen = Date.now();
+
+                    // Initialize message bus if needed
+                    if (!gs.mcpBridge) gs.mcpBridge = { messages: [], sessions: new Map() };
+                    if (!gs.mcpBridge.messages) gs.mcpBridge.messages = [];
+
+                    // Route message via NpcMessageBus (nanobot-style)
+                    const msgId = gs.mcpBridge.messages.length + 1;
+                    const routingContext = context || 'social';
+
+                    // NPC role responses based on role type
+                    const npcConfig = NPC_ROLE_REGISTRY[npcRole] || {};
+                    const responses = {
+                        master: ['吾观你根骨不错，当勤加修炼', '道法自然，需循序渐进', '今日传你一门功法，望你善加研习'],
+                        monster: ['吼！闯入者死！', '受死吧！', '你的气息...很美味'],
+                        merchant: ['欢迎光临，请问需要什么？', '本店商品齐全，物美价廉', '若有珍稀之物，我亦可高价收购'],
+                        fellow: ['道友，多日不见', '不如一同探索秘境？', '我近日有所领悟，愿与君分享']
+                    };
+                    const roleResponses = responses[npcRole] || ['...'];
+                    const response = roleResponses[Math.floor(Math.random() * roleResponses.length)];
+
+                    // Create message record
+                    const msgRecord = {
+                        id: msgId,
+                        agentId,
+                        npcRole,
+                        message,
+                        context: routingContext,
+                        response,
+                        timestamp: Date.now(),
+                        status: 'delivered'
+                    };
+                    gs.mcpBridge.messages.push(msgRecord);
+
+                    return {
+                        success: true,
+                        msgId,
+                        npcRole,
+                        npcTitle: npcConfig.title || npcRole,
+                        message,
+                        response,
+                        routingContext
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBridgeTriggerEncounter(agentId, intensity, type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!agentId) return { error: 'Missing required parameter: agentId' };
+
+                    const validIntensities = ['low', 'medium', 'high', 'catastrophic'];
+                    const validTypes = ['serendipity', 'tribulation', 'monster', 'treasure', 'all'];
+                    const encIntensity = intensity || 'medium';
+                    const encType = type || 'all';
+
+                    if (!validIntensities.includes(encIntensity)) {
+                        return { error: 'Invalid intensity: ' + encIntensity + '. Must be one of: ' + validIntensities.join(', ') };
+                    }
+                    if (!validTypes.includes(encType)) {
+                        return { error: 'Invalid type: ' + encType + '. Must be one of: ' + validTypes.join(', ') };
+                    }
+
+                    // Update agent last seen
+                    const agent = CultivationMCPServer.agentRegistry.get(agentId);
+                    if (agent) agent.lastSeen = Date.now();
+
+                    // Initialize serendipity system if needed
+                    if (!gs.serendipity) gs.serendipity = { encounters: [], activeNode: null };
+                    if (!gs.serendipity.encounters) gs.serendipity.encounters = [];
+
+                    // Encounter tables based on type and intensity
+                    const encounterTables = {
+                        serendipity: {
+                            low: ['灵草发现', '古简碎片', '灵石小矿'],
+                            medium: ['上古遗迹', '仙人遗泽', '顿悟契机'],
+                            high: ['天命传承', '证道机缘', '飞升预兆'],
+                            catastrophic: ['天道召唤', '大乘雷劫', '破碎虚空']
+                        },
+                        tribulation: {
+                            low: ['心魔初现', '小天劫', '妖兽来袭'],
+                            medium: ['雷劫降临', '心魔劫', '血脉觉醒'],
+                            high: ['九重雷劫', '生死大劫', '道心崩溃'],
+                            catastrophic: ['天罚之眼', '末法浩劫', '万劫不复']
+                        },
+                        monster: {
+                            low: ['野兽侵袭', '妖兽幼崽', '蜂群攻击'],
+                            medium: ['妖兽领主', '魔兽群潮', '万年古妖'],
+                            high: ['上古凶兽', '妖兽王者', '妖皇降临'],
+                            catastrophic: ['混沌魔兽', '灭世妖祖', '万妖朝拜']
+                        },
+                        treasure: {
+                            low: ['灵石散落', '破损法器', '普通灵材'],
+                            medium: ['上品灵石', '玄阶功法', '珍稀灵药'],
+                            high: ['仙阶至宝', '远古神兵', '天材地宝'],
+                            catastrophic: ['开天至宝', '混沌至宝', '大道之基']
+                        }
+                    };
+
+                    // Select encounter
+                    let selectedType = encType === 'all' ? validTypes.slice(0, 4)[Math.floor(Math.random() * 4)] : encType;
+                    const table = encounterTables[selectedType] || encounterTables.serendipity;
+                    const encounters = table[encIntensity] || table.medium;
+                    const encounter = encounters[Math.floor(Math.random() * encounters.length)];
+
+                    // Intensity multipliers
+                    const multipliers = { low: 0.5, medium: 1.0, high: 1.5, catastrophic: 2.0 };
+                    const baseReward = 100 * (multipliers[encIntensity] || 1);
+
+                    // Create encounter record
+                    const encounterId = gs.serendipity.encounters.length + 1;
+                    gs.serendipity.encounters.push({
+                        id: encounterId,
+                        agentId,
+                        type: selectedType,
+                        intensity: encIntensity,
+                        name: encounter,
+                        timestamp: Date.now(),
+                        resolved: false,
+                        baseReward
+                    });
+
+                    return {
+                        success: true,
+                        encounterId,
+                        type: selectedType,
+                        intensity: encIntensity,
+                        name: encounter,
+                        message: '外部智能体触发了机缘: ' + encounter,
+                        reward: Math.floor(baseReward),
+                        warning: encIntensity === 'catastrophic' ? '警告：极高强度机缘，可能伴随危险' : undefined
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBridgeQueryRealm(fields) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const queryFields = fields || ['all'];
+                    const includeAll = queryFields.includes('all');
+
+                    const result = {};
+
+                    // Realm info
+                    if (includeAll || queryFields.includes('realm')) {
+                        const REALMS = ['凡界', '筑基境', '金丹境', '元婴境', '化神境', '炼虚境', '合体境', '大乘境', '渡劫境', '真仙境', '金仙境', '太乙境', '大罗境', '混元大罗境', '天道境'];
+                        result.realm = {
+                            current: gs.realm || 0,
+                            name: REALMS[gs.realm || 0] || '凡界',
+                            progress: gs.stage !== undefined ? gs.stage * 33.3 : 0
+                        };
+                    }
+
+                    // Stage info
+                    if (includeAll || queryFields.includes('stage')) {
+                        const STAGES = ['初期', '中期', '后期', '圆满'];
+                        result.stage = {
+                            current: gs.stage || 0,
+                            name: STAGES[gs.stage || 0] || '初期',
+                            progress: gs.stageProgress || 0
+                        };
+                    }
+
+                    // Cultivation info (generic-agent L2 memory)
+                    if (includeAll || queryFields.includes('cultivation')) {
+                        result.cultivation = {
+                            path: gs.cultivationPath || '道家',
+                            speed: gs.cultivationSpeed || 1.0,
+                            efficiency: gs.cultivationEfficiency || 1.0,
+                            qi: gs.qi || 0,
+                            maxQi: gs.maxQi || 100
+                        };
+                    }
+
+                    // Progress summary
+                    if (includeAll || queryFields.includes('progress')) {
+                        result.progress = {
+                            totalDays: gs.totalDays || 0,
+                            achievements: gs.achievements ? gs.achievements.length : 0,
+                            sectContribution: gs.sectContribution || 0,
+                            battleRank: gs.battleRank || 0
+                        };
+                    }
+
+                    return result;
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBridgeRegisterAgent(agentId, agentName, capabilities, trustLevel) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!agentId || !agentName) {
+                        return { error: 'Missing required parameters: agentId, agentName' };
+                    }
+
+                    const validTrustLevels = ['L1', 'L2', 'L3', 'L4'];
+                    const trust = trustLevel || 'L2';
+                    if (!validTrustLevels.includes(trust)) {
+                        return { error: 'Invalid trustLevel: ' + trust + '. Must be one of: ' + validTrustLevels.join(', ') };
+                    }
+
+                    const caps = capabilities || ['tool_call'];
+                    const agentRecord = {
+                        agentId,
+                        agentName,
+                        trustLevel: trust,
+                        capabilities: caps,
+                        registeredAt: Date.now(),
+                        lastSeen: Date.now(),
+                        status: 'active'
+                    };
+
+                    CultivationMCPServer.agentRegistry.set(agentId, agentRecord);
+
+                    // Initialize agent session in game state
+                    if (!gs.mcpBridge) gs.mcpBridge = { agents: new Map(), messages: [], sessions: new Map() };
+                    gs.mcpBridge.agents = gs.mcpBridge.agents || new Map();
+                    gs.mcpBridge.agents.set(agentId, agentRecord);
+
+                    return {
+                        success: true,
+                        agentId,
+                        agentName,
+                        trustLevel: trust,
+                        capabilities: caps,
+                        registeredAt: agentRecord.registeredAt,
+                        message: 'Agent ' + agentName + ' (ID: ' + agentId + ') registered successfully with trust level ' + trust
+                    };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpBridgeSyncState(mode, since, include) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const syncMode = mode || 'full';
+                    const syncSince = since || 0;
+                    const sections = include || ['all'];
+
+                    if (syncMode === 'delta') {
+                        // Delta sync: only changes since timestamp
+                        const deltaState = {};
+                        const sectionsToInclude = sections.includes('all')
+                            ? ['cultivation', 'npc', 'inventory', 'achievements', 'sect', 'battle', 'secretRealm']
+                            : sections;
+
+                        for (const section of sectionsToInclude) {
+                            if (gs[section]) {
+                                // Filter to only updated fields
+                                deltaState[section] = gs[section];
+                            }
+                        }
+
+                        return {
+                            mode: 'delta',
+                            since: syncSince,
+                            timestamp: Date.now(),
+                            delta: deltaState,
+                            message: 'Delta sync completed'
+                        };
+                    } else {
+                        // Full sync: complete state dump
+                        const fullState = {};
+                        const sectionsToInclude = sections.includes('all')
+                            ? ['realm', 'stage', 'qi', 'maxQi', 'cultivationPath', 'cultivationSpeed', 'cultivationEfficiency', 'totalDays', 'achievements', 'battleRank', 'sectContribution', 'npcCollab', 'inventory', 'secretRealm', 'worldCycle']
+                            : sections;
+
+                        for (const key of sectionsToInclude) {
+                            if (gs[key] !== undefined) {
+                                fullState[key] = gs[key];
+                            }
+                        }
+
+                        return {
+                            mode: 'full',
+                            timestamp: Date.now(),
+                            state: fullState,
+                            message: 'Full state sync completed'
+                        };
+                    }
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // ===== V94: AI Budget Control MCP Methods =====
+            // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+            mcpAIBudgetQuery(providerId) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const results = {};
+                    const providerIds = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    
+                    for (const p of providerIds) {
+                        const cfg = aiProviders[p] || { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false };
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] };
+                        // Auto-reset if day/month changed
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? (bt.dailySpent / cfg.dailyLimit * 100).toFixed(1) : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? (bt.monthlySpent / cfg.monthlyLimit * 100).toFixed(1) : 0;
+                        const isWarning = dailyPct >= cfg.warningThreshold * 100 || monthlyPct >= cfg.warningThreshold * 100;
+                        results[p] = {
+                            daily: { spent: bt.dailySpent, limit: cfg.dailyLimit, percent: dailyPct },
+                            monthly: { spent: bt.monthlySpent, limit: cfg.monthlyLimit, percent: monthlyPct },
+                            callCount: bt.callCount,
+                            isWarning,
+                            rateLimit: {
+                                maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                                maxTokensPerDay: cfg.maxTokensPerDay || 0
+                            },
+                            fallbackToLocal: cfg.fallbackToLocal || false
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetConfigure(args) {
+                try {
+                    const { provider, dailyLimit, monthlyLimit, warningThreshold, fallbackToLocal, maxCallsPerMinute, maxTokensPerDay } = args;
+                    if (!provider) return { error: 'provider is required' };
+                    if (!AI_PROVIDER_CONFIG) return { error: 'AI_PROVIDER_CONFIG not initialized' };
+                    if (!AI_PROVIDER_CONFIG[provider]) {
+                        AI_PROVIDER_CONFIG[provider] = { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8, maxCallsPerMinute: 60, maxTokensPerDay: 100000, fallbackToLocal: false };
+                    }
+                    const cfg = AI_PROVIDER_CONFIG[provider];
+                    if (dailyLimit !== undefined) cfg.dailyLimit = Math.max(0, dailyLimit);
+                    if (monthlyLimit !== undefined) cfg.monthlyLimit = Math.max(0, monthlyLimit);
+                    if (warningThreshold !== undefined) cfg.warningThreshold = Math.min(1, Math.max(0, warningThreshold));
+                    if (fallbackToLocal !== undefined) cfg.fallbackToLocal = fallbackToLocal;
+                    if (maxCallsPerMinute !== undefined) cfg.maxCallsPerMinute = maxCallsPerMinute;
+                    if (maxTokensPerDay !== undefined) cfg.maxTokensPerDay = maxTokensPerDay;
+                    return { success: true, provider, config: cfg };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetReset(providerId, scope) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    if (!providerId) return { error: 'provider is required' };
+                    const validScopes = ['daily', 'monthly', 'both'];
+                    if (!scope || !validScopes.includes(scope)) return { error: 'scope must be daily|monthly|both' };
+                    if (!AI_BUDGET_TRACKER) AI_BUDGET_TRACKER = {};
+                    let bt = AI_BUDGET_TRACKER[providerId];
+                    if (!bt) { bt = { dailySpent: 0, monthlySpent: 0, callCount: 0, lastResetDay: day, lastResetMonth: month, rateLimitCalls: [], callHistory: [] }; AI_BUDGET_TRACKER[providerId] = bt; }
+                    if (scope === 'daily' || scope === 'both') { bt.dailySpent = 0; bt.lastResetDay = day; }
+                    if (scope === 'monthly' || scope === 'both') { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                    return { success: true, provider: providerId, scope, dailySpent: bt.dailySpent, monthlySpent: bt.monthlySpent };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetStats(providerId, days) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const numDays = Math.min(Math.max(days || 7, 1), 30);
+                    const pid = providerId || 'all';
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const providers = pid === 'all' ? Object.keys(aiTracker) : [pid];
+                    const results = {};
+                    
+                    for (const p of providers) {
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, callCount: 0, callHistory: [] };
+                        const history = bt.callHistory || [];
+                        const cutoff = now.getTime() - numDays * 86400000;
+                        const recentCalls = history.filter(c => c.timestamp > cutoff);
+                        const dailyBreakdown = [];
+                        for (let i = numDays - 1; i >= 0; i--) {
+                            const d = day - i;
+                            const dayCalls = recentCalls.filter(c => Math.floor(c.timestamp / 86400000) === d);
+                            dailyBreakdown.push({ day: d, calls: dayCalls.length, tokens: dayCalls.reduce((s, c) => s + (c.tokens || 0), 0) });
+                        }
+                        const totalTokens = recentCalls.reduce((s, c) => s + (c.tokens || 0), 0);
+                        results[p] = {
+                            totalCalls: bt.callCount,
+                            recentCalls: recentCalls.length,
+                            totalTokens,
+                            dailyBreakdown,
+                            avgCallsPerDay: numDays > 0 ? (recentCalls.length / numDays).toFixed(1) : 0,
+                            avgTokensPerDay: numDays > 0 ? (totalTokens / numDays).toFixed(0) : 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetAlerts(providerId, threshold) {
+                try {
+                    const now = new Date();
+                    const day = Math.floor(now.getTime() / 86400000);
+                    const month = Math.floor(now.getTime() / 2592000000);
+                    const pid = providerId || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    const aiTracker = AI_BUDGET_TRACKER || {};
+                    const providers = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    
+                    // If threshold is set, update it
+                    if (threshold !== undefined && pid !== 'all') {
+                        if (!aiProviders[pid]) aiProviders[pid] = {};
+                        aiProviders[pid].warningThreshold = Math.min(1, Math.max(0, threshold));
+                    }
+                    
+                    const alerts = [];
+                    for (const p of providers) {
+                        const cfg = aiProviders[p] || { dailyLimit: 1000, monthlyLimit: 20000, warningThreshold: 0.8 };
+                        const bt = aiTracker[p] || { dailySpent: 0, monthlySpent: 0, lastResetDay: day, lastResetMonth: month };
+                        if (bt.lastResetDay !== day) { bt.dailySpent = 0; bt.lastResetDay = day; }
+                        if (bt.lastResetMonth !== month) { bt.monthlySpent = 0; bt.lastResetMonth = month; }
+                        const dailyPct = cfg.dailyLimit > 0 ? bt.dailySpent / cfg.dailyLimit : 0;
+                        const monthlyPct = cfg.monthlyLimit > 0 ? bt.monthlySpent / cfg.monthlyLimit : 0;
+                        if (dailyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'daily_exceeded', percent: (dailyPct * 100).toFixed(1) });
+                        else if (dailyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'daily_threshold', percent: (dailyPct * 100).toFixed(1) });
+                        if (monthlyPct >= 1) alerts.push({ provider: p, level: 'critical', type: 'monthly_exceeded', percent: (monthlyPct * 100).toFixed(1) });
+                        else if (monthlyPct >= cfg.warningThreshold) alerts.push({ provider: p, level: 'warning', type: 'monthly_threshold', percent: (monthlyPct * 100).toFixed(1) });
+                    }
+                    return { provider: pid, alerts, count: alerts.length };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            mcpAIBudgetRateLimit(args) {
+                try {
+                    const { provider, maxCallsPerMinute, maxTokensPerDay } = args;
+                    const pid = provider || 'all';
+                    const aiProviders = AI_PROVIDER_CONFIG || {};
+                    
+                    // If configuring, update the limits
+                    if ((maxCallsPerMinute !== undefined || maxTokensPerDay !== undefined) && pid !== 'all') {
+                        if (!aiProviders[pid]) aiProviders[pid] = { maxCallsPerMinute: 60, maxTokensPerDay: 100000 };
+                        if (maxCallsPerMinute !== undefined) aiProviders[pid].maxCallsPerMinute = maxCallsPerMinute;
+                        if (maxTokensPerDay !== undefined) aiProviders[pid].maxTokensPerDay = maxTokensPerDay;
+                    }
+                    
+                    const results = {};
+                    const providers = pid === 'all' ? Object.keys(aiProviders) : [pid];
+                    for (const p of providers) {
+                        const cfg = aiProviders[p] || { maxCallsPerMinute: 60, maxTokensPerDay: 100000 };
+                        results[p] = {
+                            maxCallsPerMinute: cfg.maxCallsPerMinute || 0,
+                            maxTokensPerDay: cfg.maxTokensPerDay || 0
+                        };
+                    }
+                    return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
+                } catch(e) { return { error: e.message }; }
+            }
+
+            // V95: Multi-Agent Quest Orchestration System Implementations
+
+            // Quest Graph Storage
+            static questGraphs = new Map();
+
+            // NPC Memory Systems
+            static npcMemorySystems = new Map();
+
+            // Hook Engine
+            static hookEngine = {
+                hooks: new Map(),
+                register(hookName, callback, priority = 50, async = true) {
+                    if (!this.hooks.has(hookName)) this.hooks.set(hookName, []);
+                    this.hooks.get(hookName).push({ callback, priority, async });
+                    this.hooks.get(hookName).sort((a, b) => b.priority - a.priority);
+                },
+                async emit(hookName, context) {
+                    const callbacks = this.hooks.get(hookName) || [];
+                    const results = [];
+                    for (const cb of callbacks) {
+                        try {
+                            if (cb.async) results.push(await Promise.resolve(cb.callback(context)));
+                            else results.push(cb.callback(context));
+                        } catch (e) { results.push({ error: e.message }); }
+                    }
+                    return results;
+                }
+            };
+
+            // Budget Controller
+            static budgetController = {
+                globalBudget: 100000,
+                usedBudget: 0,
+                rateLimits: new Map(),
+                checkBudget(required) { return (this.globalBudget - this.usedBudget) >= required; },
+                allocate(amount) {
+                    if (!this.checkBudget(amount)) return { success: false, reason: 'budget_exceeded' };
+                    this.usedBudget += amount;
+                    return { success: true, remaining: this.globalBudget - this.usedBudget };
+                },
+                release(amount) { this.usedBudget = Math.max(0, this.usedBudget - amount); },
+                query() { return { total: this.globalBudget, used: this.usedBudget, available: this.globalBudget - this.usedBudget }; }
+            };
+
+            // DAG Executor with cycle detection
+            static dagExecutor = {
+                detectCycle(nodeId, graph, visited = new Set(), recStack = new Set()) {
+                    visited.add(nodeId);
+                    recStack.add(nodeId);
+                    const node = graph.get(nodeId);
+                    if (!node) return false;
+                    for (const dep of node.dependencies || []) {
+                        if (!visited.has(dep)) {
+                            if (this.detectCycle(dep, graph, visited, recStack)) return true;
+                        } else if (recStack.has(dep)) return true;
+                    }
+                    recStack.delete(nodeId);
+                    return false;
+                },
+                getExecutableNodes(graph, completed) {
+                    return Array.from(graph.keys()).filter(id => {
+                        if (completed.has(id)) return false;
+                        const deps = graph.get(id)?.dependencies || [];
+                        return deps.every(d => completed.has(d));
+                    });
+                }
+            };
+
+            // MCP: quest.create - Create DAG-based quest
+            mcpQuestCreate(args) {
+                try {
+                    const { questId, name, nodes, budget, hooks } = args;
+                    if (!questId || !nodes) return { error: 'questId and nodes required' };
+
+                    // Build DAG graph
+                    const graph = new Map();
+                    for (const n of nodes) {
+                        graph.set(n.id, { dependencies: n.requires || [], status: 'pending', npcs: n.npcAssignment || [] });
+                    }
+
+                    // Cycle detection
+                    for (const nodeId of graph.keys()) {
+                        if (this.constructor.dagExecutor.detectCycle(nodeId, graph)) {
+                            return { error: `Cycle detected at node ${nodeId}`, status: 'rejected' };
+                        }
+                    }
+
+                    // Store quest
+                    const quest = { questId, name: name || questId, graph, nodes, budget: budget || 5000, hooks: hooks || [], status: 'created' };
+                    this.constructor.questGraphs.set(questId, quest);
+
+                    // Register hooks if provided
+                    if (hooks) {
+                        for (const h of hooks) {
+                            this.constructor.hookEngine.register(h.event, new Function('ctx', h.script), 50, true);
+                        }
+                    }
+
+                    return { success: true, questId, status: 'created', nodeCount: nodes.length };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: quest.execute - Execute quest DAG with concurrency
+            mcpQuestExecute(args) {
+                try {
+                    const { questId, context = {}, maxConcurrent = 3 } = args;
+                    const quest = this.constructor.questGraphs.get(questId);
+                    if (!quest) return { error: `Quest ${questId} not found`, status: 'not_found' };
+
+                    const completed = new Set();
+                    const running = [];
+                    let budgetUsed = 0;
+                    const totalBudget = quest.budget || 5000;
+                    let status = 'running';
+
+                    // Emit pre_quest hook
+                    this.constructor.hookEngine.emit('pre_quest', { questId, context });
+
+                    // Simulate execution (in real impl, this would be async)
+                    const executable = this.constructor.dagExecutor.getExecutableNodes(quest.graph, completed);
+                    let executed = 0;
+                    for (const nodeId of executable) {
+                        if (executed >= maxConcurrent) break;
+                        if (budgetUsed + 100 > totalBudget) {
+                            status = 'budget_exceeded';
+                            break;
+                        }
+                        budgetUsed += 100;
+                        completed.add(nodeId);
+                        running.push(nodeId);
+                        executed++;
+                    }
+
+                    if (executable.length === 0 && completed.size === quest.nodes.length) status = 'completed';
+                    else if (status === 'running' && completed.size < quest.nodes.length) status = 'running';
+
+                    // Emit post_quest hook
+                    this.constructor.hookEngine.emit('post_quest', { questId, completed: Array.from(completed), budgetUsed });
+
+                    return {
+                        status,
+                        completedNodes: Array.from(completed),
+                        remainingNodes: quest.nodes.filter(n => !completed.has(n.id)).map(n => n.id),
+                        budgetUsed
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: npc.spawn - Spawn NPC with five-layer memory
+            mcpNpcSpawn(args) {
+                try {
+                    const { npcId, template, mission, memoryLayers } = args;
+                    if (!npcId || !template) return { error: 'npcId and template required' };
+
+                    const layers = memoryLayers || {
+                        L0: template === 'guard' ? ['不会主动攻击玩家', '始终保护宗门'] :
+                            template === 'combat' ? ['优先攻击敌人', '不惜代价完成任务'] :
+                            ['中立的修仙者行为准则'],
+                        L1: [],
+                        L2: [],
+                        L3: [],
+                        L4: []
+                    };
+
+                    const npc = {
+                        npcId,
+                        template,
+                        mission: mission || {},
+                        layers,
+                        status: 'active',
+                        spawnedAt: Date.now()
+                    };
+
+                    this.constructor.npcMemorySystems.set(npcId, npc);
+                    this.constructor.hookEngine.emit('npc_spawn', { npcId, template, layers });
+
+                    return { success: true, npcId, template, memoryLayers: layers };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: npc.memory_update - Update NPC five-layer memory
+            mcpNpcMemoryUpdate(args) {
+                try {
+                    const { npcId, layer, content, tags, crystallize } = args;
+                    if (!npcId || !layer || !content) return { error: 'npcId, layer, content required' };
+
+                    const validLayers = ['L0', 'L1', 'L2', 'L3', 'L4'];
+                    if (!validLayers.includes(layer)) return { error: `Invalid layer ${layer}. Use L0-L4` };
+
+                    const npc = this.constructor.npcMemorySystems.get(npcId);
+                    if (!npc) return { error: `NPC ${npcId} not found` };
+
+                    // Add content to layer
+                    const layerData = npc.layers[layer] || [];
+                    const entry = layer === 'L3' && crystallize ? {
+                        id: `skill_${Date.now()}`,
+                        path: content,
+                        created: Date.now(),
+                        usageCount: 0
+                    } : { content, timestamp: Date.now(), tags: tags || [] };
+                    layerData.push(entry);
+                    npc.layers[layer] = layerData;
+
+                    // If crystallize, also update L1 index
+                    if (crystallize && layer === 'L3') {
+                        const l1Index = npc.layers.L1 || [];
+                        l1Index.push({ skillId: entry.id, tags: tags || [], confidence: 1.0 });
+                        npc.layers.L1 = l1Index;
+                    }
+
+                    return {
+                        success: true,
+                        npcId,
+                        layer,
+                        memorySize: layerData.length,
+                        newSkillAvailable: crystallize && layer === 'L3'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: hook.register - Register quest event hooks
+            mcpHookRegister(args) {
+                try {
+                    const { hookName, callback, priority = 50, async = true } = args;
+                    if (!hookName || !callback) return { error: 'hookName and callback required' };
+
+                    this.constructor.hookEngine.register(hookName, new Function('ctx', callback), priority, async);
+
+                    return { success: true, hookName, active: true };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: budget.query - Query budget status
+            mcpBudgetQuery(args) {
+                try {
+                    const { scope, entityId } = args || {};
+                    const bc = this.constructor.budgetController;
+
+                    if (scope === 'quest' && entityId) {
+                        const quest = this.constructor.questGraphs.get(entityId);
+                        if (!quest) return { error: `Quest ${entityId} not found` };
+                        const completed = Array.from(this.constructor.questGraphs.get(entityId)?.graph?.keys() || []).length;
+                        return { scope: 'quest', entityId, totalBudget: quest.budget, used: completed * 100, available: quest.budget - completed * 100 };
+                    }
+
+                    if (scope === 'npc' && entityId) {
+                        const npc = this.constructor.npcMemorySystems.get(entityId);
+                        if (!npc) return { error: `NPC ${entityId} not found` };
+                        return { scope: 'npc', entityId, totalBudget: 5000, used: 0, available: 5000, rateLimited: false };
+                    }
+
+                    // Default: global budget
+                    return { scope: 'global', ...bc.query(), rateLimited: bc.usedBudget > bc.globalBudget * 0.9 };
+                } catch (e) { return { error: e.message }; }
             }
 
             mcpPetList() {
@@ -10034,6 +11584,484 @@ const ACHIEVEMENT_ID_MAP = {
         }
         const v90Results = runV90Tests();
 
+        // ===== V91 Direction A: Budget Control System (Per-Provider) =====
+        // 6 MCP tools: budget.query/configure/reset/stats/alerts/rate_limit
+        // Per-provider budget tracking via budgetProviderTracker + budgetProviderConfig
+
+        function runV91Tests() {
+            const results = [];
+            const v91Assert = (cond, name) => results.push({ name, pass: !!cond });
+
+            // Test 1: V91 tools exist in MCP_TOOLS_V91
+            v91Assert(MCP_TOOLS_V91['budget.query'] !== undefined, 'budget.query defined');
+            v91Assert(MCP_TOOLS_V91['budget.configure'] !== undefined, 'budget.configure defined');
+            v91Assert(MCP_TOOLS_V91['budget.reset'] !== undefined, 'budget.reset defined');
+            v91Assert(MCP_TOOLS_V91['budget.stats'] !== undefined, 'budget.stats defined');
+            v91Assert(MCP_TOOLS_V91['budget.alerts'] !== undefined, 'budget.alerts defined');
+            v91Assert(MCP_TOOLS_V91['budget.rate_limit'] !== undefined, 'budget.rate_limit defined');
+
+            // Test 2: Tool registry has V91 tools
+            const server = new CultivationMCPServer();
+            v91Assert(server.toolRegistry.has('budget.query'), 'budget.query registered');
+            v91Assert(server.toolRegistry.has('budget.configure'), 'budget.configure registered');
+            v91Assert(server.toolRegistry.has('budget.reset'), 'budget.reset registered');
+            v91Assert(server.toolRegistry.has('budget.stats'), 'budget.stats registered');
+            v91Assert(server.toolRegistry.has('budget.alerts'), 'budget.alerts registered');
+            v91Assert(server.toolRegistry.has('budget.rate_limit'), 'budget.rate_limit registered');
+
+            // Test 3: Tool count grows with V91 (108 + 6 = 114)
+            const server2 = new CultivationMCPServer();
+            v91Assert(server2.toolRegistry.size >= 114, 'toolRegistry has >= 114 tools (V73-V91)');
+
+            // Test 4: budget.query returns structure for all providers
+            const bq = server.mcpBudgetQuery();
+            v91Assert(bq && bq.providers, 'budget.query returns providers');
+            v91Assert(Array.isArray(Object.keys(bq.providers)), 'budget.query providers is object');
+
+            // Test 5: budget.query with specific provider
+            const bqp = server.mcpBudgetQuery('minimax');
+            v91Assert(bqp && bqp.provider === 'minimax', 'budget.query returns specific provider');
+            v91Assert(bqp && typeof bqp.daily === 'object', 'budget.query returns daily stats');
+            v91Assert(bqp && typeof bqp.monthly === 'object', 'budget.query returns monthly stats');
+
+            // Test 6: budget.configure sets config
+            const bc = server.mcpBudgetConfigure({ provider: 'minimax', dailyLimit: 5000 });
+            v91Assert(bc && bc.success === true, 'budget.configure returns success');
+            v91Assert(bc && bc.config && bc.config.dailyLimit === 5000, 'budget.configure sets dailyLimit');
+
+            // Test 7: budget.configure requires provider
+            const bcBad = server.mcpBudgetConfigure({ dailyLimit: 5000 });
+            v91Assert(bcBad && bcBad.error, 'budget.configure requires provider');
+
+            // Test 8: budget.reset resets counters
+            const br = server.mcpBudgetReset('minimax', 'daily');
+            v91Assert(br && br.success === true, 'budget.reset returns success');
+            v91Assert(br && br.scope === 'daily', 'budget.reset returns scope');
+            v91Assert(br && br.dailySpent === 0, 'budget.reset clears dailySpent');
+
+            // Test 9: budget.reset validates scope
+            const brBad = server.mcpBudgetReset('minimax', 'invalid');
+            v91Assert(brBad && brBad.error, 'budget.reset validates scope');
+
+            // Test 10: budget.stats returns daily breakdown
+            const bs = server.mcpBudgetStats('minimax', 7);
+            v91Assert(bs && bs.provider === 'minimax', 'budget.stats returns provider');
+            v91Assert(bs && Array.isArray(bs.dailyBreakdown), 'budget.stats returns dailyBreakdown');
+            v91Assert(bs && typeof bs.avgCallsPerDay === 'string', 'budget.stats returns avgCallsPerDay');
+
+            // Test 11: budget.alerts returns alerts array
+            const ba = server.mcpBudgetAlerts('minimax');
+            v91Assert(ba && Array.isArray(ba.alerts), 'budget.alerts returns alerts');
+            v91Assert(ba && typeof ba.hasAlerts === 'boolean', 'budget.alerts returns hasAlerts');
+            v91Assert(ba && ba.provider === 'minimax', 'budget.alerts returns provider');
+
+            // Test 12: budget.rate_limit sets rate limits
+            const brl = server.mcpBudgetRateLimit({ provider: 'minimax', maxCallsPerMinute: 60 });
+            v91Assert(brl && brl.success === true, 'budget.rate_limit returns success');
+            v91Assert(brl && brl.rateLimit && brl.rateLimit.maxCallsPerMinute === 60, 'budget.rate_limit sets maxCallsPerMinute');
+
+            // Test 13: budget.rate_limit requires provider
+            const brlBad = server.mcpBudgetRateLimit({ maxCallsPerMinute: 60 });
+            v91Assert(brlBad && brlBad.error, 'budget.rate_limit requires provider');
+
+            // Test 14: budgetProviderTracker is per-provider
+            budgetProviderTracker['testprovider'] = { dailySpent: 100, monthlySpent: 500, callCount: 10, lastResetDay: 0, lastResetMonth: 0, rateLimitCalls: [], callHistory: [] };
+            const bqt = server.mcpBudgetQuery('testprovider');
+            v91Assert(bqt && bqt.daily && bqt.daily.spent === 100, 'budgetProviderTracker stores per-provider data');
+
+            // Test 15: budgetProviderConfig persists config
+            budgetProviderConfig['testprovider'] = { dailyLimit: 2000, monthlyLimit: 40000, warningThreshold: 0.8, fallbackToLocal: true };
+            const bqc = server.mcpBudgetConfigure({ provider: 'testprovider', dailyLimit: 3000 });
+            v91Assert(bqc && bqc.config && bqc.config.dailyLimit === 3000, 'budgetProviderConfig persists per-provider config');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const rate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            console.log(`\n=== V91 Tests: ${passed}/${total} passed (${rate}%) ===`);
+            if (parseFloat(rate) >= 80) console.log('[PASS] V91 meets 80%+ target!');
+            return { passed, total, rate, results };
+        }
+        const v91Results = runV91Tests();
+
+        // ============================================================================
+        // V92: Secret Realm Exploration TDD Tests
+        // ============================================================================
+        function runV92Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = { secretRealm: { tokens: 3, cycle: 1, nextReset: '10天后重置' } };
+            const results = [];
+            function v92Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V92 tools defined
+            v92Assert(MCP_TOOLS_V92['secret_realm.list'] !== undefined, 'secret_realm.list defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.enter'] !== undefined, 'secret_realm.enter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.progress'] !== undefined, 'secret_realm.progress defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.encounter'] !== undefined, 'secret_realm.encounter defined');
+            v92Assert(MCP_TOOLS_V92['secret_realm.claim'] !== undefined, 'secret_realm.claim defined');
+            v92Assert(MCP_TOOLS_V92['dungeon_token.status'] !== undefined, 'dungeon_token.status defined');
+
+            // Test 2: secret_realm.list
+            const list = server.mcpSecretRealmList('east');
+            v92Assert(list.realms && list.realms.length > 0, 'secret_realm.list returns realms');
+            v92Assert(list.tokens === 3, 'secret_realm.list returns tokens=3');
+
+            // Test 3: dungeon_token.status
+            const tok = server.mcpDungeonTokenStatus();
+            v92Assert(tok.tokens === 3, 'dungeon_token.status returns tokens=3');
+            v92Assert(tok.maxTokens === 3, 'dungeon_token.status maxTokens=3');
+
+            // Test 4: secret_realm.enter success
+            const enter = server.mcpSecretRealmEnter('jade_palace');
+            v92Assert(enter.success === true, 'secret_realm.enter returns success');
+            v92Assert(enter.tokens === 2, 'secret_realm.enter reduces tokens 3->2');
+
+            // Test 5: secret_realm.enter no tokens
+            window.gameState.secretRealm.tokens = 0;
+            const noTok = server.mcpSecretRealmEnter('dragon_tomb');
+            v92Assert(noTok.error && noTok.error.includes('No dungeon tokens'), 'secret_realm.enter errors on no tokens');
+            window.gameState.secretRealm.tokens = 2; // restore
+
+            // Test 6: secret_realm.enter invalid realm
+            const badRealm = server.mcpSecretRealmEnter('invalid_realm');
+            v92Assert(badRealm.error && badRealm.error.includes('Invalid realmId'), 'secret_realm.enter rejects invalid realmId');
+
+            // Test 7: secret_realm.progress
+            const prog = server.mcpSecretRealmProgress(null);
+            v92Assert(prog.realmId === 'jade_palace', 'secret_realm.progress returns active realm');
+            v92Assert(typeof prog.progress === 'number', 'secret_realm.progress returns progress number');
+
+            // Test 8: secret_realm.encounter engage
+            const enc1 = server.mcpSecretRealmEncounter('engage');
+            v92Assert(typeof enc1.success === 'boolean', 'secret_realm.encounter engage returns success boolean');
+            v92Assert(enc1.progress >= 0, 'secret_realm.encounter returns progress');
+
+            // Test 9: secret_realm.encounter invalid action
+            const badAction = server.mcpSecretRealmEncounter('dance');
+            v92Assert(badAction.error && badAction.error.includes('Invalid action'), 'secret_realm.encounter rejects invalid action');
+
+            // Test 10: secret_realm.encounter no active realm
+            window.gameState.secretRealm.activeRealm = null;
+            const noActive = server.mcpSecretRealmEncounter('engage');
+            v92Assert(noActive.error && noActive.error.includes('No active realm'), 'secret_realm.encounter errors when no active realm');
+            window.gameState.secretRealm.activeRealm = 'jade_palace'; // restore
+
+            // Test 11: secret_realm.encounter progress completes
+            for (let i = 0; i < 5; i++) { server.mcpSecretRealmEncounter('engage'); }
+            const claimed = server.mcpSecretRealmClaim('jade_palace');
+            v92Assert(claimed.success === true, 'secret_realm.claim succeeds after completion');
+            v92Assert(Array.isArray(claimed.rewards), 'secret_realm.claim returns rewards array');
+
+            // Test 12: secret_realm.claim not completed
+            window.gameState.secretRealm.activeRealm = 'dragon_tomb';
+            window.gameState.secretRealm.completed = false;
+            window.gameState.secretRealm.progress = 0;
+            window.gameState.secretRealm.waves = 3;
+            const notDone = server.mcpSecretRealmClaim('dragon_tomb');
+            v92Assert(notDone.error && notDone.error.includes('not completed'), 'secret_realm.claim errors when not completed');
+
+            // Test 13: secret_realm.list all regions
+            const all = server.mcpSecretRealmList('all');
+            v92Assert(all.realms && all.realms.length >= 6, 'secret_realm.list all returns all realms');
+
+            // Test 14: secret_realm.list filter
+            const east = server.mcpSecretRealmList('east');
+            if (east.realms && east.realms.length > 0) v92Assert(east.realms.every(r => r.region === 'east'), 'secret_realm.list east filter works');
+
+            // Test 15: dungeon_token.status depleted
+            window.gameState.secretRealm.tokens = 0;
+            const depleted = server.mcpDungeonTokenStatus();
+            v92Assert(depleted.status === 'depleted', 'dungeon_token.status shows depleted');
+            v92Assert(depleted.tokens === 0, 'dungeon_token.status tokens=0');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V92', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V92 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v92Results = runV92Tests();
+
+        // ============================================================================
+        // V93: MCP Agent Bridge Phase 1 TDD Tests
+        // nanobot MessageBus + thunderbolt dual sync + claude-code-design tool system
+        // ============================================================================
+        function runV93Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = {
+                realm: 2, stage: 1, qi: 500, maxQi: 1000,
+                cultivationPath: '道家', cultivationSpeed: 1.2, cultivationEfficiency: 1.0,
+                totalDays: 100, achievements: [], battleRank: 50, sectContribution: 200,
+                npcCollab: { npcs: [] }, secretRealm: { tokens: 3 }
+            };
+            const results = [];
+            function v93Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V93 tools defined
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.status'] !== undefined, 'mcp_bridge.status defined');
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.send_message'] !== undefined, 'mcp_bridge.send_message defined');
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.trigger_encounter'] !== undefined, 'mcp_bridge.trigger_encounter defined');
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.query_realm'] !== undefined, 'mcp_bridge.query_realm defined');
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.register_agent'] !== undefined, 'mcp_bridge.register_agent defined');
+            v93Assert(MCP_TOOLS_V93['mcp_bridge.sync_state'] !== undefined, 'mcp_bridge.sync_state defined');
+
+            // Test 2: mcp_bridge.status returns correct structure
+            const status = server.mcpBridgeStatus('summary');
+            v93Assert(status.version === 'V93', 'mcp_bridge.status returns version V93');
+            v93Assert(status.status === 'operational', 'mcp_bridge.status returns operational status');
+            v93Assert(Array.isArray(status.capabilities), 'mcp_bridge.status returns capabilities array');
+
+            // Test 3: mcp_bridge.status with full detail
+            const statusFull = server.mcpBridgeStatus('full');
+            v93Assert(statusFull.requestHistory !== undefined, 'mcp_bridge.status full returns requestHistory');
+            v93Assert(statusFull.toolList !== undefined, 'mcp_bridge.status full returns toolList');
+
+            // Test 4: mcp_bridge.register_agent success
+            const reg = server.mcpBridgeRegisterAgent('agent_001', 'TestAgent', ['tool_call', 'memory'], 'L2');
+            v93Assert(reg.success === true, 'mcp_bridge.register_agent returns success');
+            v93Assert(reg.agentId === 'agent_001', 'mcp_bridge.register_agent returns correct agentId');
+            v93Assert(reg.trustLevel === 'L2', 'mcp_bridge.register_agent returns correct trustLevel');
+
+            // Test 5: mcp_bridge.register_agent duplicate is idempotent
+            const reg2 = server.mcpBridgeRegisterAgent('agent_001', 'TestAgent', ['tool_call'], 'L2');
+            v93Assert(reg2.success === true, 'mcp_bridge.register_agent duplicate returns success');
+
+            // Test 6: mcp_bridge.register_agent missing params
+            const regBad = server.mcpBridgeRegisterAgent(null, null);
+            v93Assert(regBad.error && regBad.error.includes('Missing required'), 'mcp_bridge.register_agent errors on missing params');
+
+            // Test 7: mcp_bridge.register_agent invalid trust level
+            const regBadTrust = server.mcpBridgeRegisterAgent('agent_002', 'BadAgent', [], 'L5');
+            v93Assert(regBadTrust.error && regBadTrust.error.includes('Invalid trustLevel'), 'mcp_bridge.register_agent errors on invalid trustLevel');
+
+            // Test 8: mcp_bridge.send_message success
+            const msg = server.mcpBridgeSendMessage('agent_001', 'master', '前辈好', 'cultivation');
+            v93Assert(msg.success === true, 'mcp_bridge.send_message returns success');
+            v93Assert(msg.msgId === 1, 'mcp_bridge.send_message returns msgId');
+            v93Assert(msg.response && typeof msg.response === 'string', 'mcp_bridge.send_message returns response string');
+
+            // Test 9: mcp_bridge.send_message invalid role
+            const msgBadRole = server.mcpBridgeSendMessage('agent_001', 'invalid_role', 'test');
+            v93Assert(msgBadRole.error && msgBadRole.error.includes('Invalid npcRole'), 'mcp_bridge.send_message errors on invalid role');
+
+            // Test 10: mcp_bridge.send_message missing params
+            const msgBad = server.mcpBridgeSendMessage(null, 'master', null);
+            v93Assert(msgBad.error && msgBad.error.includes('Missing required'), 'mcp_bridge.send_message errors on missing params');
+
+            // Test 11: mcp_bridge.trigger_encounter success
+            const enc = server.mcpBridgeTriggerEncounter('agent_001', 'medium', 'serendipity');
+            v93Assert(enc.success === true, 'mcp_bridge.trigger_encounter returns success');
+            v93Assert(enc.encounterId === 1, 'mcp_bridge.trigger_encounter returns encounterId');
+            v93Assert(enc.type === 'serendipity', 'mcp_bridge.trigger_encounter returns correct type');
+            v93Assert(enc.intensity === 'medium', 'mcp_bridge.trigger_encounter returns correct intensity');
+
+            // Test 12: mcp_bridge.trigger_encounter invalid intensity
+            const encBad = server.mcpBridgeTriggerEncounter('agent_001', 'super', 'serendipity');
+            v93Assert(encBad.error && encBad.error.includes('Invalid intensity'), 'mcp_bridge.trigger_encounter errors on invalid intensity');
+
+            // Test 13: mcp_bridge.trigger_encounter invalid type
+            const encBadType = server.mcpBridgeTriggerEncounter('agent_001', 'medium', 'magic');
+            v93Assert(encBadType.error && encBadType.error.includes('Invalid type'), 'mcp_bridge.trigger_encounter errors on invalid type');
+
+            // Test 14: mcp_bridge.query_realm all fields
+            const realm = server.mcpBridgeQueryRealm(['all']);
+            v93Assert(realm.realm !== undefined, 'mcp_bridge.query_realm returns realm info');
+            v93Assert(realm.stage !== undefined, 'mcp_bridge.query_realm returns stage info');
+            v93Assert(realm.cultivation !== undefined, 'mcp_bridge.query_realm returns cultivation info');
+            v93Assert(realm.progress !== undefined, 'mcp_bridge.query_realm returns progress info');
+
+            // Test 15: mcp_bridge.query_realm specific fields
+            const realmSpecific = server.mcpBridgeQueryRealm(['realm', 'cultivation']);
+            v93Assert(realmSpecific.realm !== undefined, 'mcp_bridge.query_realm returns realm when requested');
+            v93Assert(realmSpecific.cultivation !== undefined, 'mcp_bridge.query_realm returns cultivation when requested');
+            v93Assert(realmSpecific.stage === undefined, 'mcp_bridge.query_realm excludes stage when not requested');
+
+            // Test 16: mcp_bridge.sync_state full mode
+            const syncFull = server.mcpBridgeSyncState('full', null, ['all']);
+            v93Assert(syncFull.mode === 'full', 'mcp_bridge.sync_state full returns correct mode');
+            v93Assert(syncFull.state !== undefined, 'mcp_bridge.sync_state full returns state');
+            v93Assert(syncFull.timestamp > 0, 'mcp_bridge.sync_state full returns timestamp');
+
+            // Test 17: mcp_bridge.sync_state delta mode
+            const syncDelta = server.mcpBridgeSyncState('delta', Date.now() - 60000, ['cultivation']);
+            v93Assert(syncDelta.mode === 'delta', 'mcp_bridge.sync_state delta returns correct mode');
+            v93Assert(syncDelta.since > 0, 'mcp_bridge.sync_state delta returns since timestamp');
+            v93Assert(syncDelta.delta !== undefined, 'mcp_bridge.sync_state delta returns delta');
+
+            // Test 18: mcp_bridge.sync_state default mode (full)
+            const syncDefault = server.mcpBridgeSyncState();
+            v93Assert(syncDefault.mode === 'full', 'mcp_bridge.sync_state default is full mode');
+
+            // Test 19: mcp_bridge.send_message different roles get different responses
+            const msgMaster = server.mcpBridgeSendMessage('agent_001', 'master', '请教修炼', 'cultivation');
+            const msgMonster = server.mcpBridgeSendMessage('agent_001', 'monster', '来战', 'battle');
+            const msgMerchant = server.mcpBridgeSendMessage('agent_001', 'merchant', '我要买', 'trade');
+            const msgFellow = server.mcpBridgeSendMessage('agent_001', 'fellow', '道友好', 'social');
+            v93Assert(msgMaster.npcRole === 'master', 'mcp_bridge.send_message master role correct');
+            v93Assert(msgMonster.npcRole === 'monster', 'mcp_bridge.send_message monster role correct');
+            v93Assert(msgMerchant.npcRole === 'merchant', 'mcp_bridge.send_message merchant role correct');
+            v93Assert(msgFellow.npcRole === 'fellow', 'mcp_bridge.send_message fellow role correct');
+
+            // Test 20: mcp_bridge.trigger_encounter catastrophic warning
+            const encCat = server.mcpBridgeTriggerEncounter('agent_001', 'catastrophic', 'tribulation');
+            v93Assert(encCat.warning !== undefined, 'mcp_bridge.trigger_encounter catastrophic returns warning');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V93', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V93 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v93Results = runV93Tests();
+
+        // ============================================================================
+        // V94: AI Budget Control System TDD Tests
+        // claude-code-design TOKEN_BUDGET + thunderbolt rate limiting + nanobot cost tracking
+        // ============================================================================
+        function runV94Tests() {
+            const server = new CultivationMCPServer();
+            // Init game state
+            window.gameState = {
+                realm: 2, stage: 1, qi: 500, maxQi: 1000,
+                cultivationPath: '道家', cultivationSpeed: 1.2, cultivationEfficiency: 1.0,
+                totalDays: 100, achievements: [], battleRank: 50, sectContribution: 200,
+                npcCollab: { npcs: [] }, secretRealm: { tokens: 3 }
+            };
+            const results = [];
+            function v94Assert(cond, msg) { results.push({ pass: cond, msg }); }
+
+            // Test 1: V94 tools defined
+            v94Assert(MCP_TOOLS_V94['ai_budget.query'] !== undefined, 'ai_budget.query defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.configure'] !== undefined, 'ai_budget.configure defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.reset'] !== undefined, 'ai_budget.reset defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.stats'] !== undefined, 'ai_budget.stats defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.alerts'] !== undefined, 'ai_budget.alerts defined');
+            v94Assert(MCP_TOOLS_V94['ai_budget.rate_limit'] !== undefined, 'ai_budget.rate_limit defined');
+
+            // Test 2: ai_budget.query all providers
+            const queryAll = server.mcpAIBudgetQuery();
+            v94Assert(queryAll.providers !== undefined, 'ai_budget.query returns providers object');
+            v94Assert(queryAll.providers.minimax !== undefined, 'ai_budget.query includes minimax');
+            v94Assert(queryAll.providers.openai !== undefined, 'ai_budget.query includes openai');
+            v94Assert(queryAll.providers.anthropic !== undefined, 'ai_budget.query includes anthropic');
+
+            // Test 3: ai_budget.query specific provider
+            const queryMinimax = server.mcpAIBudgetQuery('minimax');
+            v94Assert(queryMinimax.provider === 'minimax', 'ai_budget.query returns correct provider');
+            v94Assert(queryMinimax.daily !== undefined, 'ai_budget.query returns daily stats');
+            v94Assert(queryMinimax.monthly !== undefined, 'ai_budget.query returns monthly stats');
+
+            // Test 4: ai_budget.query has rate limit info
+            const queryRate = server.mcpAIBudgetQuery('openai');
+            v94Assert(queryRate.rateLimit !== undefined, 'ai_budget.query returns rateLimit');
+            v94Assert(queryRate.rateLimit.maxCallsPerMinute > 0, 'ai_budget.query has maxCallsPerMinute');
+
+            // Test 5: ai_budget.configure new provider
+            const configureNew = server.mcpAIBudgetConfigure({ provider: 'test_provider', dailyLimit: 500, monthlyLimit: 5000 });
+            v94Assert(configureNew.success === true, 'ai_budget.configure returns success');
+            v94Assert(configureNew.provider === 'test_provider', 'ai_budget.configure returns provider');
+            v94Assert(configureNew.config.dailyLimit === 500, 'ai_budget.configure sets dailyLimit');
+
+            // Test 6: ai_budget.configure update existing
+            const configureUpdate = server.mcpAIBudgetConfigure({ provider: 'minimax', dailyLimit: 2000 });
+            v94Assert(configureUpdate.success === true, 'ai_budget.configure update returns success');
+            v94Assert(configureUpdate.config.dailyLimit === 2000, 'ai_budget.configure updates dailyLimit');
+
+            // Test 7: ai_budget.configure missing provider
+            const configureBad = server.mcpAIBudgetConfigure({ dailyLimit: 100 });
+            v94Assert(configureBad.error && configureBad.error.includes('provider is required'), 'ai_budget.configure errors on missing provider');
+
+            // Test 8: ai_budget.reset success
+            const resetResult = server.mcpAIBudgetReset('minimax', 'daily');
+            v94Assert(resetResult.success === true, 'ai_budget.reset returns success');
+            v94Assert(resetResult.provider === 'minimax', 'ai_budget.reset returns provider');
+            v94Assert(resetResult.scope === 'daily', 'ai_budget.reset returns scope');
+
+            // Test 9: ai_budget.reset both scope
+            const resetBoth = server.mcpAIBudgetReset('openai', 'both');
+            v94Assert(resetBoth.success === true, 'ai_budget.reset both returns success');
+            v94Assert(resetBoth.dailySpent === 0, 'ai_budget.reset both clears dailySpent');
+            v94Assert(resetBoth.monthlySpent === 0, 'ai_budget.reset both clears monthlySpent');
+
+            // Test 10: ai_budget.reset invalid scope
+            const resetBad = server.mcpAIBudgetReset('minimax', 'invalid');
+            v94Assert(resetBad.error && resetBad.error.includes('scope must be daily|monthly|both'), 'ai_budget.reset errors on invalid scope');
+
+            // Test 11: ai_budget.reset missing provider
+            const resetBad2 = server.mcpAIBudgetReset(null, 'daily');
+            v94Assert(resetBad2.error && resetBad2.error.includes('provider is required'), 'ai_budget.reset errors on missing provider');
+
+            // Test 12: ai_budget.stats all providers
+            const statsAll = server.mcpAIBudgetStats();
+            v94Assert(statsAll.providers !== undefined, 'ai_budget.stats returns providers');
+            v94Assert(statsAll.providers.minimax !== undefined, 'ai_budget.stats includes minimax');
+
+            // Test 13: ai_budget.stats specific provider with days
+            const statsDays = server.mcpAIBudgetStats('minimax', 7);
+            v94Assert(statsDays.provider === 'minimax', 'ai_budget.stats returns correct provider');
+            v94Assert(statsDays.totalCalls !== undefined, 'ai_budget.stats returns totalCalls');
+            v94Assert(statsDays.dailyBreakdown !== undefined, 'ai_budget.stats returns dailyBreakdown');
+
+            // Test 14: ai_budget.stats days parameter clamped
+            const statsClamped = server.mcpAIBudgetStats('minimax', 100);
+            v94Assert(statsClamped.dailyBreakdown.length <= 30, 'ai_budget.stats clamps days to 30');
+
+            // Test 15: ai_budget.alerts all providers
+            const alertsAll = server.mcpAIBudgetAlerts();
+            v94Assert(alertsAll.provider === 'all', 'ai_budget.alerts returns all');
+            v94Assert(alertsAll.alerts !== undefined, 'ai_budget.alerts returns alerts array');
+            v94Assert(typeof alertsAll.count === 'number', 'ai_budget.alerts returns count');
+
+            // Test 16: ai_budget.alerts set threshold
+            const alertsSet = server.mcpAIBudgetAlerts('minimax', 0.9);
+            v94Assert(alertsSet.provider === 'minimax', 'ai_budget.alerts returns provider');
+
+            // Test 17: ai_budget.alerts specific provider
+            const alertsProv = server.mcpAIBudgetAlerts('openai');
+            v94Assert(alertsProv.provider === 'openai', 'ai_budget.alerts returns specific provider');
+
+            // Test 18: ai_budget.rate_limit query all
+            const rateAll = server.mcpAIBudgetRateLimit({});
+            v94Assert(rateAll.providers !== undefined, 'ai_budget.rate_limit returns providers');
+
+            // Test 19: ai_budget.rate_limit configure
+            const rateConfig = server.mcpAIBudgetRateLimit({ provider: 'minimax', maxCallsPerMinute: 100 });
+            v94Assert(rateConfig.provider === 'minimax', 'ai_budget.rate_limit returns provider');
+            v94Assert(rateConfig.maxCallsPerMinute === 100, 'ai_budget.rate_limit sets maxCallsPerMinute');
+
+            // Test 20: ai_budget.rate_limit query specific
+            const rateQuery = server.mcpAIBudgetRateLimit({ provider: 'openai' });
+            v94Assert(rateQuery.provider === 'openai', 'ai_budget.rate_limit returns specific provider');
+            v94Assert(rateQuery.maxCallsPerMinute > 0, 'ai_budget.rate_limit has maxCallsPerMinute');
+
+            // Test 21: ai_budget.query unknown provider returns defaults
+            const queryUnknown = server.mcpAIBudgetQuery('unknown_provider');
+            v94Assert(queryUnknown.provider === 'unknown_provider', 'ai_budget.query returns unknown provider');
+            v94Assert(queryUnknown.daily !== undefined, 'ai_budget.query returns daily for unknown');
+
+            // Test 22: ai_budget.configure warningThreshold bounds
+            const configureBounds = server.mcpAIBudgetConfigure({ provider: 'test_bounds', warningThreshold: 1.5 });
+            v94Assert(configureBounds.config.warningThreshold <= 1, 'ai_budget.configure clamps warningThreshold to 1');
+            
+            // Test 23: ai_budget.stats with empty tracker uses defaults
+            const statsEmpty = server.mcpAIBudgetStats('new_provider', 3);
+            v94Assert(statsEmpty.provider === 'new_provider', 'ai_budget.stats handles new provider');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V94', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V94 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v94Results = runV94Tests();
+
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
         // 10种元素相生相克/法则共鸣/天命增强/元素攻击
@@ -11655,6 +13683,12 @@ const ACHIEVEMENT_ID_MAP = {
             callCount: 0,          // 累计调用次数
             lastCallProvider: null  // 上次调用Provider
         };
+
+        // V91: Per-provider budget tracking (keyed by providerId)
+        const budgetProviderTracker = {};
+
+        // V91: Per-provider budget config (keyed by providerId)
+        const budgetProviderConfig = {};
 
         // 估算一次调用的token消耗（近似）
         function estimateCallCost(promptLength, responseTokens) {
