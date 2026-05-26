@@ -4097,6 +4097,89 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V99: 天道编辑器 DAG任务链系统 ---
+        const MCP_TOOLS_V99 = {
+            'task.chain.create': {
+                name: 'task.chain.create',
+                description: 'Create a new DAG task chain (天道编辑器-创建任务链)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: 'Task chain name' },
+                        description: { type: 'string', description: 'Chain description' },
+                        priority: { type: 'string', description: 'Priority: low|normal|high|critical', default: 'normal' }
+                    },
+                    required: ['name']
+                }
+            },
+            'task.chain.add': {
+                name: 'task.chain.add',
+                description: 'Add task nodes to an existing DAG chain (天道编辑器-添加节点)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain ID' },
+                        taskId: { type: 'string', description: 'Unique task ID' },
+                        taskType: { type: 'string', description: 'Task type: action|condition|transform|merge' },
+                        payload: { type: 'object', description: 'Task payload data' },
+                        position: { type: 'object', description: 'Visual position {x, y}' }
+                    },
+                    required: ['chainId', 'taskId', 'taskType']
+                }
+            },
+            'task.chain.link': {
+                name: 'task.chain.link',
+                description: 'Create dependencies between tasks in a DAG chain (天道编辑器-链接依赖)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain ID' },
+                        fromTaskId: { type: 'string', description: 'Source task ID' },
+                        toTaskId: { type: 'string', description: 'Target task ID (dependent on source)' },
+                        condition: { type: 'string', description: 'Link condition: always|success|failure', default: 'success' }
+                    },
+                    required: ['chainId', 'fromTaskId', 'toTaskId']
+                }
+            },
+            'task.chain.execute': {
+                name: 'task.chain.execute',
+                description: 'Execute a DAG task chain with topological sort (天道编辑器-执行链)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain ID to execute' },
+                        context: { type: 'object', description: 'Execution context data' },
+                        parallelMode: { type: 'boolean', description: 'Enable parallel execution for independent tasks', default: true }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'task.chain.status': {
+                name: 'task.chain.status',
+                description: 'Query real-time execution status of a DAG chain (天道编辑器-状态监控)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain ID' },
+                        includeSubtasks: { type: 'boolean', description: 'Include detailed subtask status', default: true }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'task.chain.result': {
+                name: 'task.chain.result',
+                description: 'Get execution results after chain completion (天道编辑器-结果收集)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain ID' },
+                        format: { type: 'string', description: 'Result format: summary|detailed|json', default: 'summary' }
+                    },
+                    required: ['chainId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4196,6 +4279,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V98: Register Cross-Server Sect War + Multi-Agent Coordination + Skill Combo tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V98)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V99: Register 天道编辑器 DAG任务链 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V99)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4743,6 +4830,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'sect.war.reward':
                             result = this.mcpSectWarReward(args);
+                            break;
+                        // V99: 天道编辑器 DAG任务链系统
+                        case 'task.chain.create':
+                            result = this.mcpTaskChainCreate(args);
+                            break;
+                        case 'task.chain.add':
+                            result = this.mcpTaskChainAdd(args);
+                            break;
+                        case 'task.chain.link':
+                            result = this.mcpTaskChainLink(args);
+                            break;
+                        case 'task.chain.execute':
+                            result = this.mcpTaskChainExecute(args);
+                            break;
+                        case 'task.chain.status':
+                            result = this.mcpTaskChainStatus(args);
+                            break;
+                        case 'task.chain.result':
+                            result = this.mcpTaskChainResult(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -8752,6 +8858,397 @@ const ACHIEVEMENT_ID_MAP = {
                         totalDistributed: rewards.reduce((sum, r) => sum + r.spiritStones, 0),
                         message: `Reward distributed to ${match.playerIds.length} players via ${contributionMode} mode`
                     };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: 天道编辑器 DAG任务链系统 - 状态管理
+            _initTaskChainState() {
+                if (!window.gameState.taskChains) {
+                    window.gameState.taskChains = {};
+                }
+                return window.gameState.taskChains;
+            }
+
+            // V99: task.chain.create - 创建新任务链
+            mcpTaskChainCreate(args) {
+                try {
+                    const { name, description = '', priority = 'normal' } = args;
+                    if (!name) return { error: 'name is required' };
+                    const VALID_PRIORITIES = ['low', 'normal', 'high', 'critical'];
+                    if (!VALID_PRIORITIES.includes(priority)) {
+                        return { error: 'priority must be low|normal|high|critical' };
+                    }
+
+                    const tc = this._initTaskChainState();
+                    const chainId = 'chain_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+                    tc[chainId] = {
+                        id: chainId,
+                        name,
+                        description,
+                        priority,
+                        status: 'idle',
+                        createdAt: Date.now(),
+                        nodes: {},
+                        executionOrder: [],
+                        results: []
+                    };
+
+                    return {
+                        success: true,
+                        chainId,
+                        name,
+                        priority,
+                        message: `Task chain "${name}" created successfully`,
+                        nodeCount: 0
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: task.chain.add - 添加任务节点
+            mcpTaskChainAdd(args) {
+                try {
+                    const { chainId, taskId, taskType, payload = {}, position = { x: 0, y: 0 } } = args;
+                    if (!chainId || !taskId || !taskType) {
+                        return { error: 'chainId, taskId, and taskType are required' };
+                    }
+                    const VALID_TYPES = ['action', 'condition', 'transform', 'merge'];
+                    if (!VALID_TYPES.includes(taskType)) {
+                        return { error: 'taskType must be action|condition|transform|merge' };
+                    }
+
+                    const tc = this._initTaskChainState();
+                    const chain = tc[chainId];
+                    if (!chain) return { error: 'Chain not found: ' + chainId };
+                    if (chain.status === 'running') return { error: 'Cannot add nodes to a running chain' };
+                    if (chain.nodes[taskId]) return { error: 'Task ID already exists: ' + taskId };
+
+                    chain.nodes[taskId] = {
+                        id: taskId,
+                        type: taskType,
+                        payload,
+                        position,
+                        status: 'pending',
+                        dependencies: [],
+                        dependents: [],
+                        result: null,
+                        executedAt: null
+                    };
+
+                    return {
+                        success: true,
+                        chainId,
+                        taskId,
+                        taskType,
+                        nodeCount: Object.keys(chain.nodes).length,
+                        message: `Task "${taskId}" added to chain`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: task.chain.link - 创建任务依赖
+            mcpTaskChainLink(args) {
+                try {
+                    const { chainId, fromTaskId, toTaskId, condition = 'success' } = args;
+                    if (!chainId || !fromTaskId || !toTaskId) {
+                        return { error: 'chainId, fromTaskId, and toTaskId are required' };
+                    }
+                    const VALID_CONDITIONS = ['always', 'success', 'failure'];
+                    if (!VALID_CONDITIONS.includes(condition)) {
+                        return { error: 'condition must be always|success|failure' };
+                    }
+
+                    const tc = this._initTaskChainState();
+                    const chain = tc[chainId];
+                    if (!chain) return { error: 'Chain not found: ' + chainId };
+                    if (!chain.nodes[fromTaskId]) return { error: 'Source task not found: ' + fromTaskId };
+                    if (!chain.nodes[toTaskId]) return { error: 'Target task not found: ' + toTaskId };
+                    if (fromTaskId === toTaskId) return { error: 'Cannot create self-dependency' };
+
+                    // Check for cycle
+                    if (this._wouldCreateCycle(chain, fromTaskId, toTaskId)) {
+                        return { error: 'Cannot create link: would result in circular dependency' };
+                    }
+
+                    chain.nodes[fromTaskId].dependents.push(toTaskId);
+                    chain.nodes[toTaskId].dependencies.push(fromTaskId);
+
+                    return {
+                        success: true,
+                        chainId,
+                        fromTaskId,
+                        toTaskId,
+                        condition,
+                        message: `Link created: ${fromTaskId} → ${toTaskId}`,
+                        dependencyCount: chain.nodes[toTaskId].dependencies.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: Helper - 检测循环依赖
+            _wouldCreateCycle(chain, fromTaskId, toTaskId) {
+                const visited = new Set();
+                const stack = [toTaskId];
+                while (stack.length > 0) {
+                    const current = stack.pop();
+                    if (current === fromTaskId) return true;
+                    if (visited.has(current)) continue;
+                    visited.add(current);
+                    const node = chain.nodes[current];
+                    if (node) {
+                        stack.push(...node.dependencies);
+                    }
+                }
+                return false;
+            }
+
+            // V99: task.chain.execute - 执行任务链
+            mcpTaskChainExecute(args) {
+                try {
+                    const { chainId, context = {}, parallelMode = true } = args;
+                    if (!chainId) return { error: 'chainId is required' };
+
+                    const tc = this._initTaskChainState();
+                    const chain = tc[chainId];
+                    if (!chain) return { error: 'Chain not found: ' + chainId };
+                    if (chain.status === 'running') return { error: 'Chain is already running' };
+                    if (Object.keys(chain.nodes).length === 0) return { error: 'Chain has no nodes' };
+
+                    chain.status = 'running';
+                    chain.executionOrder = this._topologicalSort(chain);
+
+                    const results = {};
+                    let executed = 0;
+                    let failed = 0;
+                    const MAX_PARALLEL = 5;
+
+                    // Execute in topological order
+                    for (let i = 0; i < chain.executionOrder.length; i++) {
+                        const taskId = chain.executionOrder[i];
+                        const node = chain.nodes[taskId];
+
+                        // Check if all dependencies succeeded (if condition is 'success')
+                        const canExecute = node.dependencies.every(depId => {
+                            const depNode = chain.nodes[depId];
+                            return depNode.status === 'completed';
+                        });
+
+                        if (!canExecute) {
+                            node.status = 'pending';
+                            continue;
+                        }
+
+                        node.status = 'running';
+                        node.executedAt = Date.now();
+
+                        // Simulate task execution
+                        const taskResult = this._executeTask(node, context);
+                        node.result = taskResult;
+                        node.status = taskResult.success ? 'completed' : 'failed';
+                        results[taskId] = taskResult;
+
+                        if (taskResult.success) executed++;
+                        else failed++;
+                    }
+
+                    chain.status = failed > 0 ? 'failed' : 'completed';
+                    chain.results.push({
+                        timestamp: Date.now(),
+                        executed,
+                        failed,
+                        context
+                    });
+
+                    return {
+                        success: true,
+                        chainId,
+                        status: chain.status,
+                        executed,
+                        failed,
+                        totalNodes: chain.executionOrder.length,
+                        executionOrder: chain.executionOrder,
+                        message: `Chain executed: ${executed} succeeded, ${failed} failed`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: Helper - 拓扑排序 (Kahn算法)
+            _topologicalSort(chain) {
+                const inDegree = {};
+                const dag = {};
+
+                Object.keys(chain.nodes).forEach(taskId => {
+                    inDegree[taskId] = 0;
+                    dag[taskId] = [];
+                });
+
+                Object.keys(chain.nodes).forEach(taskId => {
+                    const node = chain.nodes[taskId];
+                    node.dependents.forEach(depId => {
+                        if (dag[taskId]) dag[taskId].push(depId);
+                    });
+                    node.dependencies.forEach(depId => {
+                        if (inDegree[taskId] !== undefined) inDegree[taskId]++;
+                    });
+                });
+
+                const queue = Object.keys(inDegree).filter(k => inDegree[k] === 0);
+                const result = [];
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    result.push(current);
+
+                    const node = chain.nodes[current];
+                    if (node) {
+                        node.dependents.forEach(depId => {
+                            if (inDegree[depId] !== undefined) {
+                                inDegree[depId]--;
+                                if (inDegree[depId] === 0) queue.push(depId);
+                            }
+                        });
+                    }
+                }
+
+                return result;
+            }
+
+            // V99: Helper - 执行单个任务
+            _executeTask(node, context) {
+                try {
+                    const { type, payload, id } = node;
+                    let output = { success: true, taskId: id };
+
+                    switch (type) {
+                        case 'action':
+                            output.result = `Action "${id}" executed`;
+                            output.value = payload.value || Math.floor(Math.random() * 100);
+                            break;
+                        case 'condition':
+                            output.result = `Condition "${id}" evaluated`;
+                            output.value = payload.expected ? true : false;
+                            break;
+                        case 'transform':
+                            output.result = `Transform "${id}" applied`;
+                            output.value = payload.data ? JSON.stringify(payload.data).length : 0;
+                            break;
+                        case 'merge':
+                            output.result = `Merge "${id}" completed`;
+                            output.value = payload.weight || 1;
+                            break;
+                        default:
+                            output.result = `Task "${id}" completed`;
+                            output.value = 0;
+                    }
+
+                    return output;
+                } catch (e) {
+                    return { success: false, error: e.message };
+                }
+            }
+
+            // V99: task.chain.status - 查询执行状态
+            mcpTaskChainStatus(args) {
+                try {
+                    const { chainId, includeSubtasks = true } = args;
+                    if (!chainId) return { error: 'chainId is required' };
+
+                    const tc = this._initTaskChainState();
+                    const chain = tc[chainId];
+                    if (!chain) return { error: 'Chain not found: ' + chainId };
+
+                    const nodeStatuses = {};
+                    if (includeSubtasks) {
+                        Object.keys(chain.nodes).forEach(taskId => {
+                            const node = chain.nodes[taskId];
+                            nodeStatuses[taskId] = {
+                                type: node.type,
+                                status: node.status,
+                                dependencies: node.dependencies.length,
+                                dependents: node.dependents.length,
+                                executedAt: node.executedAt
+                            };
+                        });
+                    }
+
+                    const stats = {
+                        total: Object.keys(chain.nodes).length,
+                        pending: 0,
+                        running: 0,
+                        completed: 0,
+                        failed: 0
+                    };
+
+                    Object.values(chain.nodes).forEach(node => {
+                        stats[node.status]++;
+                    });
+
+                    return {
+                        chainId,
+                        name: chain.name,
+                        status: chain.status,
+                        priority: chain.priority,
+                        nodeCount: stats.total,
+                        stats,
+                        nodeStatuses: includeSubtasks ? nodeStatuses : undefined,
+                        executionOrder: chain.executionOrder,
+                        createdAt: chain.createdAt,
+                        message: `Chain "${chain.name}" has status: ${chain.status}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V99: task.chain.result - 获取执行结果
+            mcpTaskChainResult(args) {
+                try {
+                    const { chainId, format = 'summary' } = args;
+                    if (!chainId) return { error: 'chainId is required' };
+
+                    const tc = this._initTaskChainState();
+                    const chain = tc[chainId];
+                    if (!chain) return { error: 'Chain not found: ' + chainId };
+                    if (chain.status !== 'completed' && chain.status !== 'failed') {
+                        return { error: 'Chain has not completed execution. Status: ' + chain.status };
+                    }
+
+                    const nodeResults = {};
+                    Object.keys(chain.nodes).forEach(taskId => {
+                        const node = chain.nodes[taskId];
+                        nodeResults[taskId] = {
+                            type: node.type,
+                            status: node.status,
+                            result: node.result,
+                            executedAt: node.executedAt
+                        };
+                    });
+
+                    const summary = {
+                        chainId,
+                        name: chain.name,
+                        status: chain.status,
+                        totalNodes: Object.keys(chain.nodes).length,
+                        completed: Object.values(chain.nodes).filter(n => n.status === 'completed').length,
+                        failed: Object.values(chain.nodes).filter(n => n.status === 'failed').length
+                    };
+
+                    if (format === 'summary') {
+                        return summary;
+                    } else if (format === 'detailed') {
+                        return {
+                            ...summary,
+                            nodeResults,
+                            executionOrder: chain.executionOrder,
+                            createdAt: chain.createdAt
+                        };
+                    } else if (format === 'json') {
+                        return JSON.stringify({
+                            chain,
+                            summary,
+                            nodeResults
+                        }, null, 2);
+                    }
+
+                    return summary;
                 } catch (e) { return { error: e.message }; }
             }
 
