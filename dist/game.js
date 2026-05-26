@@ -4180,6 +4180,77 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V100: 仙界纪元系统 多纪元轮回 ---
+        const MCP_TOOLS_V100 = {
+            'era.info': {
+                name: 'era.info',
+                description: 'Get current celestial era information (仙界纪元-当前纪元信息)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        detail: { type: 'boolean', description: 'Include detailed phase effects', default: false }
+                    }
+                }
+            },
+            'era.enter': {
+                name: 'era.enter',
+                description: 'Enter/focus on a specific era (仙界纪元-进入纪元)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eraId: { type: 'number', description: 'Era ID to enter (1-based)' },
+                        mode: { type: 'string', description: 'Entry mode: observe|participate|dominate', default: 'observe' }
+                    },
+                    required: ['eraId']
+                }
+            },
+            'era.event.trigger': {
+                name: 'era.event.trigger',
+                description: 'Trigger a celestial era event (仙界纪元-触发纪元事件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventType: { type: 'string', description: 'Event type: heaven_shake|dragon_rise|spirit_storm|blood_moon|star_fall' },
+                        intensity: { type: 'number', description: 'Event intensity 1-10', default: 5 }
+                    },
+                    required: ['eventType']
+                }
+            },
+            'era.cycle.advance': {
+                name: 'era.cycle.advance',
+                description: 'Advance world cycle to next phase (仙界纪元-推进纪元周期)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        steps: { type: 'number', description: 'Number of cycle steps to advance', default: 1 }
+                    }
+                }
+            },
+            'era.rankings': {
+                name: 'era.rankings',
+                description: 'Get current era rankings (仙界纪元-纪元排行榜)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: 'Ranking category: power|cultivation|combat|wealth', default: 'power' },
+                        limit: { type: 'number', description: 'Number of entries to return', default: 10 }
+                    }
+                }
+            },
+            'era.reward.claim': {
+                name: 'era.reward.claim',
+                description: 'Claim rewards from era milestones (仙界纪元-领取纪元奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        milestoneId: { type: 'string', description: 'Milestone ID to claim' },
+                        eraId: { type: 'number', description: 'Era ID for milestone' }
+                    },
+                    required: ['milestoneId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4283,6 +4354,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V99: Register 天道编辑器 DAG任务链 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V99)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V100: Register 仙界纪元系统 多纪元轮回 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V100)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4849,6 +4924,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'task.chain.result':
                             result = this.mcpTaskChainResult(args);
+                            break;
+                        // V100: 仙界纪元系统 多纪元轮回
+                        case 'era.info':
+                            result = this.mcpEraInfo(args);
+                            break;
+                        case 'era.enter':
+                            result = this.mcpEraEnter(args);
+                            break;
+                        case 'era.event.trigger':
+                            result = this.mcpEraEventTrigger(args);
+                            break;
+                        case 'era.cycle.advance':
+                            result = this.mcpEraCycleAdvance(args);
+                            break;
+                        case 'era.rankings':
+                            result = this.mcpEraRankings(args);
+                            break;
+                        case 'era.reward.claim':
+                            result = this.mcpEraRewardClaim(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -9249,6 +9343,220 @@ const ACHIEVEMENT_ID_MAP = {
                     }
 
                     return summary;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V100: 仙界纪元系统 多纪元轮回
+            _initEraState() {
+                const gs = window.gameState;
+                if (!gs.celestialEra) {
+                    gs.celestialEra = {
+                        currentEra: 1,
+                        phase: 'grow',
+                        day: 1,
+                        phases: ['grow', 'peak', 'decay', 'dark', 'reborn'],
+                        activeEvents: [],
+                        milestones: {},
+                        rankings: {
+                            power: [],
+                            cultivation: [],
+                            combat: [],
+                            wealth: []
+                        }
+                    };
+                }
+                return gs.celestialEra;
+            }
+
+            mcpEraInfo(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { detail = false } = args;
+                    const PHASE_EFFECTS = {
+                        grow: { name: '生机', effect: '无', bonus: {} },
+                        peak: { name: '鼎盛', effect: '全属性+10%', bonus: { attack: 10, defense: 10, cultivationSpeed: 10 } },
+                        decay: { name: '衰败', effect: '掉落-20%', bonus: { dropRate: -20 } },
+                        dark: { name: '至暗', effect: '修炼-30%', bonus: { cultivationSpeed: -30 } },
+                        reborn: { name: '重生', effect: '全属性+5%', bonus: { all: 5 } }
+                    };
+                    const result = {
+                        era: era.currentEra,
+                        day: era.day,
+                        phase: era.phase,
+                        phaseName: PHASE_EFFECTS[era.phase]?.name || '未知',
+                        activeEvents: era.activeEvents || [],
+                        isMultiEra: era.currentEra > 1
+                    };
+                    if (detail) {
+                        result.phaseEffects = PHASE_EFFECTS[era.phase];
+                        result.milestones = era.milestones || {};
+                        result.cycleLength = 100;
+                        result.daysUntilPhaseChange = Math.max(0, 100 - (era.day % 100));
+                    }
+                    return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpEraEnter(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { eraId, mode = 'observe' } = args;
+                    if (!eraId) return { error: 'eraId is required' };
+                    if (eraId < 1) return { error: 'eraId must be >= 1' };
+                    const VALID_MODES = ['observe', 'participate', 'dominate'];
+                    if (!VALID_MODES.includes(mode)) return { error: 'mode must be observe|participate|dominate' };
+                    era.currentEra = eraId;
+                    if (!era.rankings) era.rankings = { power: [], cultivation: [], combat: [], wealth: [] };
+                    return {
+                        success: true,
+                        era: eraId,
+                        mode,
+                        message: `Entered era ${eraId} in ${mode} mode`,
+                        availablePhases: era.phases
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpEraEventTrigger(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { eventType, intensity = 5 } = args;
+                    if (!eventType) return { error: 'eventType is required' };
+                    const VALID_EVENTS = ['heaven_shake', 'dragon_rise', 'spirit_storm', 'blood_moon', 'star_fall'];
+                    if (!VALID_EVENTS.includes(eventType)) return { error: 'eventType must be ' + VALID_EVENTS.join('|') };
+                    if (intensity < 1 || intensity > 10) return { error: 'intensity must be 1-10' };
+                    const EVENT_EFFECTS = {
+                        heaven_shake: { name: '天道震荡', effect: '全服灵气波动，修炼效率±50%随机' },
+                        dragon_rise: { name: '真龙崛起', effect: '幸运玩家获得龙族传承' },
+                        spirit_storm: { name: '灵潮风暴', effect: '灵宠捕捉率+50%' },
+                        blood_moon: { name: '血月降临', effect: 'PVP伤害+30%' },
+                        star_fall: { name: '星辰陨落', effect: '获得星尘结晶，稀有材料' }
+                    };
+                    const event = {
+                        id: 'evt_' + Date.now(),
+                        type: eventType,
+                        intensity,
+                        name: EVENT_EFFECTS[eventType].name,
+                        effect: EVENT_EFFECTS[eventType].effect,
+                        triggeredAt: Date.now(),
+                        duration: intensity * 10000
+                    };
+                    if (!era.activeEvents) era.activeEvents = [];
+                    era.activeEvents.push(event);
+                    return {
+                        success: true,
+                        event: event,
+                        message: `Event ${event.name} triggered with intensity ${intensity}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpEraCycleAdvance(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { steps = 1 } = args;
+                    if (steps < 1) return { error: 'steps must be >= 1' };
+                    era.day += steps;
+                    const CYCLE_LENGTH = 100;
+                    const oldPhase = era.phase;
+                    const phaseIndex = era.phases.indexOf(era.phase);
+                    const newDayInCycle = era.day % CYCLE_LENGTH;
+                    const phaseProgress = newDayInCycle / CYCLE_LENGTH;
+                    let newPhaseIndex = Math.floor(phaseProgress * era.phases.length);
+                    if (newPhaseIndex >= era.phases.length) newPhaseIndex = era.phases.length - 1;
+                    era.phase = era.phases[newPhaseIndex];
+                    if (oldPhase !== era.phase) {
+                        era.phaseChangedAt = Date.now();
+                        era.phaseHistory = era.phaseHistory || [];
+                        era.phaseHistory.push({ from: oldPhase, to: era.phase, at: Date.now() });
+                    }
+                    if (era.day > 0 && era.day % 500 === 0) {
+                        era.currentEra++;
+                    }
+                    return {
+                        success: true,
+                        era: era.currentEra,
+                        day: era.day,
+                        phase: era.phase,
+                        phaseChanged: oldPhase !== era.phase,
+                        stepsAdvanced: steps,
+                        message: `Cycle advanced ${steps} step(s), now day ${era.day} of era ${era.currentEra}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpEraRankings(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { category = 'power', limit = 10 } = args;
+                    const VALID_CATEGORIES = ['power', 'cultivation', 'combat', 'wealth'];
+                    if (!VALID_CATEGORIES.includes(category)) return { error: 'category must be ' + VALID_CATEGORIES.join('|') };
+                    let rankings = era.rankings?.[category] || [];
+                    if (rankings.length === 0) {
+                        rankings = [
+                            { rank: 1, playerId: 'player_1', name: '天道化身', value: 100000 },
+                            { rank: 2, playerId: 'player_2', name: '真龙天子', value: 85000 },
+                            { rank: 3, playerId: 'player_3', name: '灵尊', value: 72000 },
+                            { rank: 4, playerId: 'player_4', name: '剑圣', value: 60000 },
+                            { rank: 5, playerId: 'player_5', name: '丹皇', value: 50000 }
+                        ];
+                        if (!era.rankings) era.rankings = {};
+                        era.rankings[category] = rankings;
+                    }
+                    const limited = rankings.slice(0, limit);
+                    const playerRank = rankings.findIndex(r => r.playerId === 'current_player') + 1 || null;
+                    return {
+                        era: era.currentEra,
+                        category,
+                        rankings: limited,
+                        total: rankings.length,
+                        playerRank,
+                        updatedAt: Date.now()
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpEraRewardClaim(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const era = this._initEraState();
+                    const { milestoneId, eraId } = args;
+                    if (!milestoneId) return { error: 'milestoneId is required' };
+                    const targetEra = eraId || era.currentEra;
+                    if (!era.milestones) era.milestones = {};
+                    if (!era.milestones[targetEra]) era.milestones[targetEra] = {};
+                    const milestone = era.milestones[targetEra][milestoneId];
+                    if (!milestone) {
+                        return { error: 'Milestone not found: ' + milestoneId + ' for era ' + targetEra };
+                    }
+                    if (milestone.claimed) return { error: 'Milestone already claimed: ' + milestoneId };
+                    milestone.claimed = true;
+                    milestone.claimedAt = Date.now();
+                    const REWARDS = {
+                        'first_kill': { type: 'spirit_stones', amount: 1000, name: '首杀奖励' },
+                        'boss_defeat': { type: 'equipment', quality: 'SR', name: 'Boss击杀奖励' },
+                        'era_clear': { type: 'title', name: '纪元霸主', name_cn: '纪元霸主' },
+                        'rank_top10': { type: 'badge', name: '前十名', effect: '全属性+5%' }
+                    };
+                    const reward = REWARDS[milestoneId] || { type: 'misc', name: milestoneId };
+                    return {
+                        success: true,
+                        milestoneId,
+                        era: targetEra,
+                        reward,
+                        message: `Claimed ${reward.name} reward`
+                    };
                 } catch (e) { return { error: e.message }; }
             }
 
