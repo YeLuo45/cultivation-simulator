@@ -1893,6 +1893,130 @@
             }
         };
 
+        // --- MCP_TOOLS_V96: Quest Deepening + NPC Collaboration + Five-Layer Memory Crystallization ---
+        const MCP_TOOLS_V96 = {
+            'quest.chain.create': {
+                name: 'quest.chain.create',
+                description: 'Create NPC collaboration quest chain with parallel DAG execution and multi-NPC coordination',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Unique chain identifier' },
+                        name: { type: 'string', description: 'Chain name' },
+                        npcs: {
+                            type: 'array',
+                            description: 'NPC participants with roles',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    npcId: { type: 'string' },
+                                    role: { type: 'string' },
+                                    skills: { type: 'array', items: { type: 'string' } }
+                                },
+                                required: ['npcId', 'role']
+                            }
+                        },
+                        nodes: {
+                            type: 'array',
+                            description: 'DAG nodes with parallel execution support',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    type: { type: 'string' },
+                                    requires: { type: 'array', items: { type: 'string' } },
+                                    assignedNpcs: { type: 'array', items: { type: 'string' } },
+                                    budget: { type: 'number' }
+                                },
+                                required: ['id', 'type']
+                            }
+                        },
+                        hooks: {
+                            type: 'array',
+                            description: 'Hook configurations: [{event, script}]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    event: { type: 'string' },
+                                    script: { type: 'string' }
+                                }
+                            }
+                        }
+                    },
+                    required: ['chainId', 'npcs', 'nodes']
+                }
+            },
+            'quest.chain.execute': {
+                name: 'quest.chain.execute',
+                description: 'Execute NPC collaboration quest chain with state synchronization and budget awareness',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain to execute' },
+                        context: { type: 'object', description: 'Execution context variables' },
+                        maxConcurrent: { type: 'number', description: 'Max parallel nodes (default: 3)' },
+                        syncMode: { type: 'string', description: 'Sync mode: strict|relaxed (default: relaxed)' }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'npc.skill.crystallize': {
+                name: 'npc.skill.crystallize',
+                description: 'Crystallize NPC execution experience into reusable SOP skill that other NPCs can learn',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC source' },
+                        experienceData: { type: 'object', description: 'Experience to crystallize' },
+                        layer: { type: 'string', description: 'Memory layer: L3 (task skills)' },
+                        tags: { type: 'array', description: 'Index tags for L1 retrieval', items: { type: 'string' } },
+                        skillName: { type: 'string', description: 'Name for the crystallized skill' }
+                    },
+                    required: ['npcId', 'experienceData', 'layer', 'skillName']
+                }
+            },
+            'npc.skill.invoke': {
+                name: 'npc.skill.invoke',
+                description: 'Invoke crystallized NPC SOP skill for execution',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC invoking the skill' },
+                        skillId: { type: 'string', description: 'Skill ID to invoke' },
+                        params: { type: 'object', description: 'Skill parameters' },
+                        budget: { type: 'number', description: 'Budget allocation for skill execution' }
+                    },
+                    required: ['npcId', 'skillId']
+                }
+            },
+            'hook.trigger': {
+                name: 'hook.trigger',
+                description: 'Manually trigger a quest event hook with context',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        event: { type: 'string', description: 'Hook event name' },
+                        context: { type: 'object', description: 'Hook context data' },
+                        source: { type: 'string', description: 'Source identifier' }
+                    },
+                    required: ['event']
+                }
+            },
+            'quest.state.query': {
+                name: 'quest.state.query',
+                description: 'Query quest chain execution state with budget information and NPC collaboration status',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: 'Chain to query' },
+                        includeNpcs: { type: 'boolean', description: 'Include NPC collaboration status' },
+                        includeBudget: { type: 'boolean', description: 'Include budget details' }
+                    },
+                    required: ['chainId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -1980,6 +2104,10 @@
                 }
                 // V95: Register Multi-Agent Quest Orchestration tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V95)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V96: Register Quest Deepening + NPC Collaboration + Five-Layer Memory Crystallization tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V96)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -2470,6 +2598,25 @@
                             break;
                         case 'budget.query':
                             result = this.mcpBudgetQuery(args);
+                            break;
+                        // V96: Quest Deepening + NPC Collaboration + Five-Layer Memory Crystallization tools
+                        case 'quest.chain.create':
+                            result = this.mcpQuestChainCreate(args);
+                            break;
+                        case 'quest.chain.execute':
+                            result = this.mcpQuestChainExecute(args);
+                            break;
+                        case 'npc.skill.crystallize':
+                            result = this.mcpNpcSkillCrystallize(args);
+                            break;
+                        case 'npc.skill.invoke':
+                            result = this.mcpNpcSkillInvoke(args);
+                            break;
+                        case 'hook.trigger':
+                            result = this.mcpHookTrigger(args);
+                            break;
+                        case 'quest.state.query':
+                            result = this.mcpQuestStateQuery(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -5469,6 +5616,274 @@
 
                     // Default: global budget
                     return { scope: 'global', ...bc.query(), rateLimited: bc.usedBudget > bc.globalBudget * 0.9 };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: quest.chain.create - Create NPC collaboration quest chain
+            mcpQuestChainCreate(args) {
+                try {
+                    const { chainId, name, npcs, nodes, hooks } = args;
+                    if (!chainId || !npcs || !nodes) return { error: 'chainId, npcs, and nodes required' };
+
+                    // Validate NPCs exist
+                    for (const npc of npcs) {
+                        if (!this.constructor.npcMemorySystems.has(npc.npcId)) {
+                            return { error: `NPC ${npc.npcId} not found. Spawn it first with npc.spawn.` };
+                        }
+                    }
+
+                    // Build DAG graph with NPC assignment
+                    const graph = new Map();
+                    for (const n of nodes) {
+                        graph.set(n.id, {
+                            dependencies: n.requires || [],
+                            status: 'pending',
+                            assignedNpcs: n.assignedNpcs || [],
+                            budget: n.budget || 100,
+                            progress: 0
+                        });
+                    }
+
+                    // Cycle detection
+                    for (const nodeId of graph.keys()) {
+                        if (this.constructor.dagExecutor.detectCycle(nodeId, graph)) {
+                            return { error: `Cycle detected at node ${nodeId}`, status: 'rejected' };
+                        }
+                    }
+
+                    // Store quest chain
+                    const chain = {
+                        chainId,
+                        name: name || chainId,
+                        npcs,
+                        graph,
+                        nodes,
+                        budget: nodes.reduce((sum, n) => sum + (n.budget || 100), 0),
+                        hooks: hooks || [],
+                        status: 'created',
+                        createdAt: Date.now()
+                    };
+                    this.constructor.questChains = this.constructor.questChains || new Map();
+                    this.constructor.questChains.set(chainId, chain);
+
+                    // Emit quest_start hook
+                    this.constructor.hookEngine.emit('quest_start', { chainId, npcs, nodeCount: nodes.length });
+
+                    return { success: true, chainId, status: 'created', nodeCount: nodes.length, npcCount: npcs.length };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: quest.chain.execute - Execute NPC collaboration quest chain
+            mcpQuestChainExecute(args) {
+                try {
+                    const { chainId, context = {}, maxConcurrent = 3, syncMode = 'relaxed' } = args;
+                    const chain = this.constructor.questChains?.get(chainId);
+                    if (!chain) return { error: `Chain ${chainId} not found`, status: 'not_found' };
+
+                    const completed = new Set();
+                    const running = [];
+                    let budgetUsed = 0;
+                    const totalBudget = chain.budget || 5000;
+                    let status = 'running';
+
+                    // Emit quest_start hook
+                    this.constructor.hookEngine.emit('quest_start', { chainId, context });
+
+                    // Get executable nodes respecting dependencies
+                    const executable = this.constructor.dagExecutor.getExecutableNodes(chain.graph, completed);
+                    let executed = 0;
+
+                    for (const nodeId of executable) {
+                        if (executed >= maxConcurrent) break;
+                        if (budgetUsed + 100 > totalBudget) {
+                            status = 'budget_exceeded';
+                            break;
+                        }
+                        budgetUsed += 100;
+                        completed.add(nodeId);
+                        running.push(nodeId);
+                        executed++;
+                    }
+
+                    if (executable.length === 0 && completed.size === chain.nodes.length) {
+                        status = 'completed';
+                        this.constructor.hookEngine.emit('quest_complete', { chainId, completed: Array.from(completed), budgetUsed });
+                    } else if (status === 'running' && completed.size < chain.nodes.length) {
+                        status = 'running';
+                    } else if (completed.size === 0 && executable.length === 0) {
+                        status = 'paused';
+                    }
+
+                    return {
+                        status,
+                        completedNodes: Array.from(completed),
+                        remainingNodes: chain.nodes.filter(n => !completed.has(n.id)).map(n => n.id),
+                        budgetUsed,
+                        totalBudget,
+                        runningNodes: running
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: npc.skill.crystallize - Crystallize NPC experience into SOP
+            mcpNpcSkillCrystallize(args) {
+                try {
+                    const { npcId, experienceData, layer, tags, skillName } = args;
+                    if (!npcId || !experienceData || !layer || !skillName) {
+                        return { error: 'npcId, experienceData, layer, and skillName required' };
+                    }
+                    if (layer !== 'L3') return { error: 'Crystallization only supported for L3 (task skills)' };
+
+                    const npc = this.constructor.npcMemorySystems.get(npcId);
+                    if (!npc) return { error: `NPC ${npcId} not found. Spawn it first.` };
+
+                    const skillId = `skill_${npcId}_${Date.now()}`;
+                    const skill = {
+                        id: skillId,
+                        name: skillName,
+                        sourceNpc: npcId,
+                        experience: experienceData,
+                        layer,
+                        tags: tags || [],
+                        created: Date.now(),
+                        usageCount: 0,
+                        crystallizedAt: Date.now(),
+                        level: 1,
+                        maxLevel: 5
+                    };
+
+                    // Store in NPC's L3 layer
+                    const l3Skills = npc.layers.L3 || [];
+                    l3Skills.push(skill);
+                    npc.layers.L3 = l3Skills;
+
+                    // Index in L1 for fast retrieval
+                    const l1Index = npc.layers.L1 || [];
+                    l1Index.push({ skillId, tags, confidence: 1.0, type: 'crystallized_skill' });
+                    npc.layers.L1 = l1Index;
+
+                    // Also store in global skill registry for other NPCs to invoke
+                    this.constructor.skillRegistry = this.constructor.skillRegistry || new Map();
+                    this.constructor.skillRegistry.set(skillId, skill);
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName,
+                        sourceNpc: npcId,
+                        layer,
+                        tags,
+                        message: `Skill "${skillName}" crystallized from NPC ${npcId} experience`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: npc.skill.invoke - Invoke crystallized NPC SOP skill
+            mcpNpcSkillInvoke(args) {
+                try {
+                    const { npcId, skillId, params = {}, budget = 100 } = args;
+                    if (!npcId || !skillId) return { error: 'npcId and skillId required' };
+
+                    const npc = this.constructor.npcMemorySystems.get(npcId);
+                    if (!npc) return { error: `NPC ${npcId} not found` };
+
+                    const skill = this.constructor.skillRegistry?.get(skillId);
+                    if (!skill) return { error: `Skill ${skillId} not found in registry` };
+
+                    // Check budget
+                    const bc = this.constructor.budgetController;
+                    if (bc.usedBudget + budget > bc.globalBudget) {
+                        return { error: 'Budget exceeded', status: 'budget_exceeded', budget };
+                    }
+
+                    // Execute skill
+                    bc.usedBudget += budget;
+                    skill.usageCount++;
+
+                    // Update NPC memory with invocation record (L4 - session archive)
+                    const l4Archive = npc.layers.L4 || [];
+                    l4Archive.push({
+                        type: 'skill_invocation',
+                        skillId,
+                        skillName: skill.name,
+                        params,
+                        budget,
+                        timestamp: Date.now()
+                    });
+                    npc.layers.L4 = l4Archive;
+
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: skill.name,
+                        invokingNpc: npcId,
+                        params,
+                        budgetUsed: budget,
+                        executionResult: {
+                            output: `Skill "${skill.name}" executed successfully`,
+                            skillLevel: skill.level,
+                            totalUsages: skill.usageCount
+                        }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: hook.trigger - Manually trigger a quest event hook
+            mcpHookTrigger(args) {
+                try {
+                    const { event, context = {}, source } = args;
+                    if (!event) return { error: 'event required' };
+
+                    this.constructor.hookEngine.emit(event, { ...context, source: source || 'manual_trigger', triggeredAt: Date.now() });
+
+                    return {
+                        success: true,
+                        event,
+                        source: source || 'manual_trigger',
+                        triggeredAt: Date.now(),
+                        message: `Hook "${event}" triggered successfully`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V96: MCP: quest.state.query - Query quest chain execution state
+            mcpQuestStateQuery(args) {
+                try {
+                    const { chainId, includeNpcs = false, includeBudget = true } = args;
+                    if (!chainId) return { error: 'chainId required' };
+
+                    const chain = this.constructor.questChains?.get(chainId);
+                    if (!chain) return { error: `Chain ${chainId} not found`, status: 'not_found' };
+
+                    const result = {
+                        chainId,
+                        name: chain.name,
+                        status: chain.status,
+                        nodeCount: chain.nodes.length,
+                        createdAt: chain.createdAt
+                    };
+
+                    if (includeNpcs) {
+                        result.npcs = chain.npcs.map(npc => {
+                            const npcData = this.constructor.npcMemorySystems.get(npc.npcId);
+                            return {
+                                npcId: npc.npcId,
+                                role: npc.role,
+                                status: npcData?.status || 'unknown',
+                                skills: npc.skills || []
+                            };
+                        });
+                    }
+
+                    if (includeBudget) {
+                        result.budget = {
+                            total: chain.budget,
+                            used: 0,
+                            available: chain.budget
+                        };
+                    }
+
+                    return result;
                 } catch (e) { return { error: e.message }; }
             }
 
