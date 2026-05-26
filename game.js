@@ -3698,6 +3698,127 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V95: Multi-Agent Quest Orchestration System
+        // 6 MCP tools: quest.create/execute, npc.spawn/memory_update, hook.register, budget.query
+        const MCP_TOOLS_V95 = {
+            'quest.create': {
+                name: 'quest.create',
+                description: 'Create a DAG-based quest with parallel nodes, hooks and budget allocation',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: 'Unique quest identifier' },
+                        name: { type: 'string', description: 'Quest name' },
+                        nodes: {
+                            type: 'array',
+                            description: 'DAG nodes with id, type, requires[], npcAssignment[]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: { type: 'string' },
+                                    type: { type: 'string' },
+                                    requires: { type: 'array', items: { type: 'string' } },
+                                    npcAssignment: { type: 'array', items: { type: 'string' } },
+                                    budget: { type: 'number' }
+                                },
+                                required: ['id', 'type']
+                            }
+                        },
+                        budget: { type: 'number', description: 'Total budget allocation' },
+                        hooks: {
+                            type: 'array',
+                            description: 'Hook configurations: [{event, script}]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    event: { type: 'string' },
+                                    script: { type: 'string' }
+                                }
+                            }
+                        }
+                    },
+                    required: ['questId', 'nodes']
+                }
+            },
+            'quest.execute': {
+                name: 'quest.execute',
+                description: 'Execute a quest DAG with maxConcurrent concurrency limit. Returns: running/completed/paused/budget_exceeded',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: 'Quest to execute' },
+                        context: { type: 'object', description: 'Execution context variables' },
+                        maxConcurrent: { type: 'number', description: 'Max parallel nodes (default: 3)' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'npc.spawn': {
+                name: 'npc.spawn',
+                description: 'Spawn an NPC with five-layer memory system (L0-L4)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC unique identifier' },
+                        template: { type: 'string', description: 'NPC template: guard/explorer/combat/support' },
+                        mission: { type: 'object', description: 'Initial mission parameters' },
+                        memoryLayers: {
+                            type: 'object',
+                            description: 'Pre-configured L0-L4 memory',
+                            properties: {
+                                L0: { type: 'array', description: 'Meta rules' },
+                                L1: { type: 'array', description: 'Insight index' },
+                                L2: { type: 'array', description: 'Global facts' },
+                                L3: { type: 'array', description: 'Task skills' },
+                                L4: { type: 'array', description: 'Session archive' }
+                            }
+                        }
+                    },
+                    required: ['npcId', 'template']
+                }
+            },
+            'npc.memory_update': {
+                name: 'npc.memory_update',
+                description: 'Update NPC five-layer memory. Supports crystallize to convert execution path to reusable SOP',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        npcId: { type: 'string', description: 'NPC identifier' },
+                        layer: { type: 'string', description: 'Layer: L0|L1|L2|L3|L4' },
+                        content: { type: 'string', description: 'Memory content to add' },
+                        tags: { type: 'array', description: 'Index tags for L1', items: { type: 'string' } },
+                        crystallize: { type: 'boolean', description: 'Convert to SOP skill' }
+                    },
+                    required: ['npcId', 'layer', 'content']
+                }
+            },
+            'hook.register': {
+                name: 'hook.register',
+                description: 'Register a quest event hook (pre_quest/post_quest/npc_spawn/npc_despawn/loop_detected/budget_exceeded)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        hookName: { type: 'string', description: 'Hook event name' },
+                        callback: { type: 'string', description: 'Callback function name or script' },
+                        priority: { type: 'number', description: 'Execution priority (higher first, default: 50)' },
+                        async: { type: 'boolean', description: 'Async execution (default: true)' }
+                    },
+                    required: ['hookName', 'callback']
+                }
+            },
+            'budget.query': {
+                name: 'budget.query',
+                description: 'Query quest execution budget status (total/used/available/rateLimited)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        scope: { type: 'string', description: 'Scope: quest|npc|global' },
+                        entityId: { type: 'string', description: 'Entity ID for entity-specific budget' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -3781,6 +3902,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V94: Register AI Budget Control tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V94)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V95: Register Multi-Agent Quest Orchestration tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V95)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4252,6 +4377,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'ai_budget.rate_limit':
                             result = this.mcpAIBudgetRateLimit(args);
+                            break;
+                        // V95: Multi-Agent Quest Orchestration tools
+                        case 'quest.create':
+                            result = this.mcpQuestCreate(args);
+                            break;
+                        case 'quest.execute':
+                            result = this.mcpQuestExecute(args);
+                            break;
+                        case 'npc.spawn':
+                            result = this.mcpNpcSpawn(args);
+                            break;
+                        case 'npc.memory_update':
+                            result = this.mcpNpcMemoryUpdate(args);
+                            break;
+                        case 'hook.register':
+                            result = this.mcpHookRegister(args);
+                            break;
+                        case 'budget.query':
+                            result = this.mcpBudgetQuery(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -6996,6 +7140,262 @@ const ACHIEVEMENT_ID_MAP = {
                     }
                     return pid === 'all' ? { providers: results } : { provider: pid, ...results[pid] };
                 } catch(e) { return { error: e.message }; }
+            }
+
+            // V95: Multi-Agent Quest Orchestration System Implementations
+
+            // Quest Graph Storage
+            static questGraphs = new Map();
+
+            // NPC Memory Systems
+            static npcMemorySystems = new Map();
+
+            // Hook Engine
+            static hookEngine = {
+                hooks: new Map(),
+                register(hookName, callback, priority = 50, async = true) {
+                    if (!this.hooks.has(hookName)) this.hooks.set(hookName, []);
+                    this.hooks.get(hookName).push({ callback, priority, async });
+                    this.hooks.get(hookName).sort((a, b) => b.priority - a.priority);
+                },
+                async emit(hookName, context) {
+                    const callbacks = this.hooks.get(hookName) || [];
+                    const results = [];
+                    for (const cb of callbacks) {
+                        try {
+                            if (cb.async) results.push(await Promise.resolve(cb.callback(context)));
+                            else results.push(cb.callback(context));
+                        } catch (e) { results.push({ error: e.message }); }
+                    }
+                    return results;
+                }
+            };
+
+            // Budget Controller
+            static budgetController = {
+                globalBudget: 100000,
+                usedBudget: 0,
+                rateLimits: new Map(),
+                checkBudget(required) { return (this.globalBudget - this.usedBudget) >= required; },
+                allocate(amount) {
+                    if (!this.checkBudget(amount)) return { success: false, reason: 'budget_exceeded' };
+                    this.usedBudget += amount;
+                    return { success: true, remaining: this.globalBudget - this.usedBudget };
+                },
+                release(amount) { this.usedBudget = Math.max(0, this.usedBudget - amount); },
+                query() { return { total: this.globalBudget, used: this.usedBudget, available: this.globalBudget - this.usedBudget }; }
+            };
+
+            // DAG Executor with cycle detection
+            static dagExecutor = {
+                detectCycle(nodeId, graph, visited = new Set(), recStack = new Set()) {
+                    visited.add(nodeId);
+                    recStack.add(nodeId);
+                    const node = graph.get(nodeId);
+                    if (!node) return false;
+                    for (const dep of node.dependencies || []) {
+                        if (!visited.has(dep)) {
+                            if (this.detectCycle(dep, graph, visited, recStack)) return true;
+                        } else if (recStack.has(dep)) return true;
+                    }
+                    recStack.delete(nodeId);
+                    return false;
+                },
+                getExecutableNodes(graph, completed) {
+                    return Array.from(graph.keys()).filter(id => {
+                        if (completed.has(id)) return false;
+                        const deps = graph.get(id)?.dependencies || [];
+                        return deps.every(d => completed.has(d));
+                    });
+                }
+            };
+
+            // MCP: quest.create - Create DAG-based quest
+            mcpQuestCreate(args) {
+                try {
+                    const { questId, name, nodes, budget, hooks } = args;
+                    if (!questId || !nodes) return { error: 'questId and nodes required' };
+
+                    // Build DAG graph
+                    const graph = new Map();
+                    for (const n of nodes) {
+                        graph.set(n.id, { dependencies: n.requires || [], status: 'pending', npcs: n.npcAssignment || [] });
+                    }
+
+                    // Cycle detection
+                    for (const nodeId of graph.keys()) {
+                        if (this.constructor.dagExecutor.detectCycle(nodeId, graph)) {
+                            return { error: `Cycle detected at node ${nodeId}`, status: 'rejected' };
+                        }
+                    }
+
+                    // Store quest
+                    const quest = { questId, name: name || questId, graph, nodes, budget: budget || 5000, hooks: hooks || [], status: 'created' };
+                    this.constructor.questGraphs.set(questId, quest);
+
+                    // Register hooks if provided
+                    if (hooks) {
+                        for (const h of hooks) {
+                            this.constructor.hookEngine.register(h.event, new Function('ctx', h.script), 50, true);
+                        }
+                    }
+
+                    return { success: true, questId, status: 'created', nodeCount: nodes.length };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: quest.execute - Execute quest DAG with concurrency
+            mcpQuestExecute(args) {
+                try {
+                    const { questId, context = {}, maxConcurrent = 3 } = args;
+                    const quest = this.constructor.questGraphs.get(questId);
+                    if (!quest) return { error: `Quest ${questId} not found`, status: 'not_found' };
+
+                    const completed = new Set();
+                    const running = [];
+                    let budgetUsed = 0;
+                    const totalBudget = quest.budget || 5000;
+                    let status = 'running';
+
+                    // Emit pre_quest hook
+                    this.constructor.hookEngine.emit('pre_quest', { questId, context });
+
+                    // Simulate execution (in real impl, this would be async)
+                    const executable = this.constructor.dagExecutor.getExecutableNodes(quest.graph, completed);
+                    let executed = 0;
+                    for (const nodeId of executable) {
+                        if (executed >= maxConcurrent) break;
+                        if (budgetUsed + 100 > totalBudget) {
+                            status = 'budget_exceeded';
+                            break;
+                        }
+                        budgetUsed += 100;
+                        completed.add(nodeId);
+                        running.push(nodeId);
+                        executed++;
+                    }
+
+                    if (executable.length === 0 && completed.size === quest.nodes.length) status = 'completed';
+                    else if (status === 'running' && completed.size < quest.nodes.length) status = 'running';
+
+                    // Emit post_quest hook
+                    this.constructor.hookEngine.emit('post_quest', { questId, completed: Array.from(completed), budgetUsed });
+
+                    return {
+                        status,
+                        completedNodes: Array.from(completed),
+                        remainingNodes: quest.nodes.filter(n => !completed.has(n.id)).map(n => n.id),
+                        budgetUsed
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: npc.spawn - Spawn NPC with five-layer memory
+            mcpNpcSpawn(args) {
+                try {
+                    const { npcId, template, mission, memoryLayers } = args;
+                    if (!npcId || !template) return { error: 'npcId and template required' };
+
+                    const layers = memoryLayers || {
+                        L0: template === 'guard' ? ['不会主动攻击玩家', '始终保护宗门'] :
+                            template === 'combat' ? ['优先攻击敌人', '不惜代价完成任务'] :
+                            ['中立的修仙者行为准则'],
+                        L1: [],
+                        L2: [],
+                        L3: [],
+                        L4: []
+                    };
+
+                    const npc = {
+                        npcId,
+                        template,
+                        mission: mission || {},
+                        layers,
+                        status: 'active',
+                        spawnedAt: Date.now()
+                    };
+
+                    this.constructor.npcMemorySystems.set(npcId, npc);
+                    this.constructor.hookEngine.emit('npc_spawn', { npcId, template, layers });
+
+                    return { success: true, npcId, template, memoryLayers: layers };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: npc.memory_update - Update NPC five-layer memory
+            mcpNpcMemoryUpdate(args) {
+                try {
+                    const { npcId, layer, content, tags, crystallize } = args;
+                    if (!npcId || !layer || !content) return { error: 'npcId, layer, content required' };
+
+                    const validLayers = ['L0', 'L1', 'L2', 'L3', 'L4'];
+                    if (!validLayers.includes(layer)) return { error: `Invalid layer ${layer}. Use L0-L4` };
+
+                    const npc = this.constructor.npcMemorySystems.get(npcId);
+                    if (!npc) return { error: `NPC ${npcId} not found` };
+
+                    // Add content to layer
+                    const layerData = npc.layers[layer] || [];
+                    const entry = layer === 'L3' && crystallize ? {
+                        id: `skill_${Date.now()}`,
+                        path: content,
+                        created: Date.now(),
+                        usageCount: 0
+                    } : { content, timestamp: Date.now(), tags: tags || [] };
+                    layerData.push(entry);
+                    npc.layers[layer] = layerData;
+
+                    // If crystallize, also update L1 index
+                    if (crystallize && layer === 'L3') {
+                        const l1Index = npc.layers.L1 || [];
+                        l1Index.push({ skillId: entry.id, tags: tags || [], confidence: 1.0 });
+                        npc.layers.L1 = l1Index;
+                    }
+
+                    return {
+                        success: true,
+                        npcId,
+                        layer,
+                        memorySize: layerData.length,
+                        newSkillAvailable: crystallize && layer === 'L3'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: hook.register - Register quest event hooks
+            mcpHookRegister(args) {
+                try {
+                    const { hookName, callback, priority = 50, async = true } = args;
+                    if (!hookName || !callback) return { error: 'hookName and callback required' };
+
+                    this.constructor.hookEngine.register(hookName, new Function('ctx', callback), priority, async);
+
+                    return { success: true, hookName, active: true };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // MCP: budget.query - Query budget status
+            mcpBudgetQuery(args) {
+                try {
+                    const { scope, entityId } = args || {};
+                    const bc = this.constructor.budgetController;
+
+                    if (scope === 'quest' && entityId) {
+                        const quest = this.constructor.questGraphs.get(entityId);
+                        if (!quest) return { error: `Quest ${entityId} not found` };
+                        const completed = Array.from(this.constructor.questGraphs.get(entityId)?.graph?.keys() || []).length;
+                        return { scope: 'quest', entityId, totalBudget: quest.budget, used: completed * 100, available: quest.budget - completed * 100 };
+                    }
+
+                    if (scope === 'npc' && entityId) {
+                        const npc = this.constructor.npcMemorySystems.get(entityId);
+                        if (!npc) return { error: `NPC ${entityId} not found` };
+                        return { scope: 'npc', entityId, totalBudget: 5000, used: 0, available: 5000, rateLimited: false };
+                    }
+
+                    // Default: global budget
+                    return { scope: 'global', ...bc.query(), rateLimited: bc.usedBudget > bc.globalBudget * 0.9 };
+                } catch (e) { return { error: e.message }; }
             }
 
             mcpPetList() {
