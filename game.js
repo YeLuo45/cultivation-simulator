@@ -4603,6 +4603,75 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V106: 天道轮回+因果律系统 ---
+        const MCP_TOOLS_V106 = {
+            'heaven.cycle.open': {
+                name: 'heaven.cycle.open',
+                description: '开启天道轮回，消耗大量灵石开启一个纪元的轮回 (天道轮回系统-开启轮回)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        cycleType: { type: 'string', description: '轮回类型: small|medium|large (default medium)', default: 'medium' }
+                    }
+                }
+            },
+            'heaven.cycle.settle': {
+                name: 'heaven.cycle.settle',
+                description: '结算当前天道轮回的因果，评估善恶因果并给予奖励或惩罚 (天道轮回系统-结算因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        force: { type: 'boolean', description: '强制结算当前因果 (default false)' }
+                    }
+                }
+            },
+            'heaven.cycle.reset': {
+                name: 'heaven.cycle.reset',
+                description: '重置天道轮回，清除当前纪元记录，重新开始新纪元 (天道轮回系统-重置轮回)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        confirm: { type: 'boolean', description: '确认重置 (required true)' }
+                    }
+                }
+            },
+            'karma.law.query': {
+                name: 'karma.law.query',
+                description: '查询因果律记录，查看善恶因果和业力值 (因果律系统-查询因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '过滤类型: all|good|evil|neutral (default all)' }
+                    }
+                }
+            },
+            'karma.law.attribute': {
+                name: 'karma.law.attribute',
+                description: '为行为添加因果 Attribution，记录善行或恶行 (因果律系统-添加因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: '行为类型: good|evil|neutral' },
+                        desc: { type: 'string', description: '行为描述' },
+                        weight: { type: 'number', description: '因果权重: 1-10 (default 5)' }
+                    },
+                    required: ['action', 'desc']
+                }
+            },
+            'karma.law.reverse': {
+                name: 'karma.law.reverse',
+                description: '逆转因果，消耗大量资源改变因果记录 (因果律系统-逆转因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        karmaId: { type: 'string', description: '因果记录ID' },
+                        cost: { type: 'integer', description: '消耗灵石数量 (min 5000)' }
+                    },
+                    required: ['karmaId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4730,6 +4799,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V105: Register 秘境争夺+混沌灵宝系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V105)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V106: Register 天道轮回+因果律系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V106)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5410,6 +5483,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'artifact.chaos.resonance':
                             result = this.mcpArtifactChaosResonance(args);
+                            break;
+                        // V106: 天道轮回+因果律系统
+                        case 'heaven.cycle.open':
+                            result = this.mcpHeavenCycleOpen(args);
+                            break;
+                        case 'heaven.cycle.settle':
+                            result = this.mcpHeavenCycleSettle(args);
+                            break;
+                        case 'heaven.cycle.reset':
+                            result = this.mcpHeavenCycleReset(args);
+                            break;
+                        case 'karma.law.query':
+                            result = this.mcpKarmaLawQuery(args);
+                            break;
+                        case 'karma.law.attribute':
+                            result = this.mcpKarmaLawAttribute(args);
+                            break;
+                        case 'karma.law.reverse':
+                            result = this.mcpKarmaLawReverse(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -11316,6 +11408,234 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V106: 天道轮回+因果律系统 MCP Methods
+            _initHeavenCycleState() {
+                const gs = window.gameState;
+                if (!gs.heavenCycle) {
+                    gs.heavenCycle = {
+                        isActive: false,
+                        cycleType: 'medium',
+                        openedAt: null,
+                        era: 1,
+                        karmaRecords: [],
+                        goodKarma: 0,
+                        evilKarma: 0,
+                        settleCount: 0
+                    };
+                }
+                return gs.heavenCycle;
+            }
+
+            mcpHeavenCycleOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (cycle.isActive) {
+                        return { error: 'Heaven cycle already active. Settle or reset first.' };
+                    }
+                    const { cycleType = 'medium' } = args || {};
+                    const costs = { small: 5000, medium: 20000, large: 50000 };
+                    const cost = costs[cycleType] || costs.medium;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: 'Not enough spirit stones. Required: ' + cost };
+                    }
+                    gs.spiritStones -= cost;
+                    cycle.isActive = true;
+                    cycle.cycleType = cycleType;
+                    cycle.openedAt = Date.now();
+                    cycle.karmaRecords = [];
+                    cycle.goodKarma = 0;
+                    cycle.evilKarma = 0;
+                    cycle.settleCount = 0;
+                    return {
+                        success: true,
+                        cycleType,
+                        cost,
+                        remaining: gs.spiritStones,
+                        era: cycle.era,
+                        openedAt: cycle.openedAt,
+                        message: 'Heaven cycle opened! Type: ' + cycleType + ', Cost: ' + cost + ' spirit stones.'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenCycleSettle(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (!cycle.isActive && !args?.force) {
+                        return { error: 'No active heaven cycle. Open one first.' };
+                    }
+                    const { force = false } = args || {};
+                    const totalGood = cycle.goodKarma || 0;
+                    const totalEvil = cycle.evilKarma || 0;
+                    const netKarma = totalGood - totalEvil;
+                    let reward = 0;
+                    let message = '';
+                    if (netKarma > 10) {
+                        reward = Math.floor(netKarma * 100);
+                        message = 'Blessed by heaven! Good karma exceeds evil. Reward: ' + reward + ' spirit stones.';
+                    } else if (netKarma < -10) {
+                        reward = Math.floor(netKarma * 50);
+                        message = 'Punished by heaven! Evil karma exceeds good. Penalty: ' + Math.abs(reward) + ' spirit stones.';
+                    } else {
+                        reward = 0;
+                        message = 'Karma balanced. No reward or penalty.';
+                    }
+                    if (reward > 0) {
+                        gs.spiritStones = (gs.spiritStones || 0) + reward;
+                    } else if (reward < 0) {
+                        gs.spiritStones = Math.max(0, (gs.spiritStones || 0) + reward);
+                    }
+                    cycle.settleCount++;
+                    return {
+                        success: true,
+                        goodKarma: totalGood,
+                        evilKarma: totalEvil,
+                        netKarma,
+                        reward,
+                        settleCount: cycle.settleCount,
+                        message
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenCycleReset(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (!args?.confirm) {
+                        return { error: 'Confirmation required. Set confirm: true to reset.' };
+                    }
+                    cycle.isActive = false;
+                    cycle.cycleType = 'medium';
+                    cycle.openedAt = null;
+                    cycle.era++;
+                    cycle.karmaRecords = [];
+                    cycle.goodKarma = 0;
+                    cycle.evilKarma = 0;
+                    cycle.settleCount = 0;
+                    return {
+                        success: true,
+                        era: cycle.era,
+                        message: 'Heaven cycle reset. New era: ' + cycle.era + ' begins.'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { filter = 'all' } = args || {};
+                    let records = cycle.karmaRecords || [];
+                    if (filter === 'good') {
+                        records = records.filter(r => r.action === 'good');
+                    } else if (filter === 'evil') {
+                        records = records.filter(r => r.action === 'evil');
+                    } else if (filter === 'neutral') {
+                        records = records.filter(r => r.action === 'neutral');
+                    }
+                    return {
+                        total: records.length,
+                        filter,
+                        goodKarma: cycle.goodKarma || 0,
+                        evilKarma: cycle.evilKarma || 0,
+                        records: records.map(r => ({
+                            id: r.id,
+                            action: r.action,
+                            desc: r.desc,
+                            weight: r.weight,
+                            createdAt: r.createdAt
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawAttribute(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { action, desc, weight = 5 } = args || {};
+                    if (!action || !desc) {
+                        return { error: 'action and desc are required' };
+                    }
+                    if (!['good', 'evil', 'neutral'].includes(action)) {
+                        return { error: 'action must be: good, evil, or neutral' };
+                    }
+                    if (weight < 1 || weight > 10) {
+                        return { error: 'weight must be between 1 and 10' };
+                    }
+                    const record = {
+                        id: 'karma_' + Date.now(),
+                        action,
+                        desc,
+                        weight,
+                        createdAt: Date.now()
+                    };
+                    cycle.karmaRecords.push(record);
+                    if (action === 'good') {
+                        cycle.goodKarma = (cycle.goodKarma || 0) + weight;
+                    } else if (action === 'evil') {
+                        cycle.evilKarma = (cycle.evilKarma || 0) + weight;
+                    }
+                    return {
+                        success: true,
+                        id: record.id,
+                        action,
+                        desc,
+                        weight,
+                        goodKarma: cycle.goodKarma,
+                        evilKarma: cycle.evilKarma,
+                        message: 'Karma recorded: ' + action + ' - ' + desc + ' (weight: ' + weight + ')'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawReverse(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { karmaId, cost = 5000 } = args || {};
+                    if (!karmaId) {
+                        return { error: 'karmaId is required' };
+                    }
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: 'Not enough spirit stones. Required: ' + cost };
+                    }
+                    const recordIndex = cycle.karmaRecords.findIndex(r => r.id === karmaId);
+                    if (recordIndex === -1) {
+                        return { error: 'Karma record not found: ' + karmaId };
+                    }
+                    const record = cycle.karmaRecords[recordIndex];
+                    gs.spiritStones -= cost;
+                    // Reverse the karma effect
+                    if (record.action === 'good') {
+                        cycle.goodKarma = Math.max(0, (cycle.goodKarma || 0) - record.weight);
+                    } else if (record.action === 'evil') {
+                        cycle.evilKarma = Math.max(0, (cycle.evilKarma || 0) - record.weight);
+                    }
+                    // Mark as reversed instead of removing
+                    cycle.karmaRecords[recordIndex].reversed = true;
+                    cycle.karmaRecords[recordIndex].reversedAt = Date.now();
+                    return {
+                        success: true,
+                        karmaId,
+                        cost,
+                        remaining: gs.spiritStones,
+                        originalAction: record.action,
+                        originalWeight: record.weight,
+                        message: 'Karma reversed: ' + record.action + ' - ' + record.desc
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -16256,6 +16576,362 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v105Results = runV105Tests();
+
+        // ===== V106: 天道轮回+因果律系统 Tests =====
+        function runV106Tests() {
+            const results = [];
+            function v106Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                realm: 2,
+                stage: 1,
+                playerId: 'player_1',
+                heavenCycle: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: heaven.cycle.open small type costs 5000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openSmall = server.mcpHeavenCycleOpen({ cycleType: 'small' });
+            v106Assert(openSmall.success === true, 'heaven.cycle.open small succeeds');
+            v106Assert(openSmall.cost === 5000, 'heaven.cycle.open small costs 5000');
+            v106Assert(openSmall.cycleType === 'small', 'heaven.cycle.open returns small type');
+
+            // Test 2: heaven.cycle.open medium type costs 20000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openMedium = server.mcpHeavenCycleOpen({ cycleType: 'medium' });
+            v106Assert(openMedium.success === true, 'heaven.cycle.open medium succeeds');
+            v106Assert(openMedium.cost === 20000, 'heaven.cycle.open medium costs 20000');
+            v106Assert(openMedium.cycleType === 'medium', 'heaven.cycle.open returns medium type');
+
+            // Test 3: heaven.cycle.open large type costs 50000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openLarge = server.mcpHeavenCycleOpen({ cycleType: 'large' });
+            v106Assert(openLarge.success === true, 'heaven.cycle.open large succeeds');
+            v106Assert(openLarge.cost === 50000, 'heaven.cycle.open large costs 50000');
+            v106Assert(openLarge.cycleType === 'large', 'heaven.cycle.open returns large type');
+
+            // Test 4: heaven.cycle.open fails with not enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenCycle = null;
+            const openLow = server.mcpHeavenCycleOpen({});
+            v106Assert(openLow.error && openLow.error.includes('Not enough'), 'heaven.cycle.open fails with low spirit stones');
+
+            // Test 5: heaven.cycle.open fails if already active
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = { isActive: true, cycleType: 'medium' };
+            const openAgain = server.mcpHeavenCycleOpen({});
+            v106Assert(openAgain.error && openAgain.error.includes('already active'), 'heaven.cycle.open fails when already active');
+
+            // Test 6: karma.law.attribute adds good karma
+            mockGameState.heavenCycle = null;
+            mockGameState.spiritStones = 100000;
+            server.mcpHeavenCycleOpen({});
+            const attrGood = server.mcpKarmaLawAttribute({ action: 'good', desc: '救人有功', weight: 8 });
+            v106Assert(attrGood.success === true, 'karma.law.attribute good succeeds');
+            v106Assert(attrGood.action === 'good', 'karma.law.attribute returns good action');
+            v106Assert(attrGood.weight === 8, 'karma.law.attribute returns weight 8');
+            v106Assert(attrGood.goodKarma === 8, 'karma.law.attribute increases goodKarma');
+
+            // Test 7: karma.law.attribute adds evil karma
+            const attrEvil = server.mcpKarmaLawAttribute({ action: 'evil', desc: '杀伤无辜', weight: 6 });
+            v106Assert(attrEvil.success === true, 'karma.law.attribute evil succeeds');
+            v106Assert(attrEvil.evilKarma === 6, 'karma.law.attribute increases evilKarma');
+
+            // Test 8: karma.law.attribute requires action and desc
+            const attrNoParams = server.mcpKarmaLawAttribute({});
+            v106Assert(attrNoParams.error && attrNoParams.error.includes('required'), 'karma.law.attribute requires params');
+
+            // Test 9: karma.law.attribute validates action type
+            const attrInvalid = server.mcpKarmaLawAttribute({ action: 'invalid', desc: 'test' });
+            v106Assert(attrInvalid.error && attrInvalid.error.includes('good, evil'), 'karma.law.attribute validates action');
+
+            // Test 10: karma.law.attribute validates weight range
+            const attrWeightLow = server.mcpKarmaLawAttribute({ action: 'good', desc: 'test', weight: 0 });
+            v106Assert(attrWeightLow.error && attrWeightLow.error.includes('weight'), 'karma.law.attribute rejects low weight');
+
+            // Test 11: karma.law.query returns all records
+            const queryAll = server.mcpKarmaLawQuery({});
+            v106Assert(queryAll.total === 2, 'karma.law.query returns all records');
+            v106Assert(queryAll.filter === 'all', 'karma.law.query filter is all');
+
+            // Test 12: karma.law.query filter good
+            const queryGood = server.mcpKarmaLawQuery({ filter: 'good' });
+            v106Assert(queryGood.total === 1, 'karma.law.query filter good returns 1');
+            v106Assert(queryGood.records[0].action === 'good', 'karma.law.query good record is good');
+
+            // Test 13: karma.law.query filter evil
+            const queryEvil = server.mcpKarmaLawQuery({ filter: 'evil' });
+            v106Assert(queryEvil.total === 1, 'karma.law.query filter evil returns 1');
+            v106Assert(queryEvil.records[0].action === 'evil', 'karma.law.query evil record is evil');
+
+            // Test 14: karma.law.query filter neutral (empty)
+            const queryNeutral = server.mcpKarmaLawQuery({ filter: 'neutral' });
+            v106Assert(queryNeutral.total === 0, 'karma.law.query filter neutral returns 0');
+
+            // Test 15: heaven.cycle.settle with positive karma gives reward
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 50,
+                evilKarma: 10,
+                settleCount: 0
+            };
+            const settlePos = server.mcpHeavenCycleSettle({});
+            v106Assert(settlePos.success === true, 'heaven.cycle.settle succeeds');
+            v106Assert(settlePos.netKarma === 40, 'heaven.cycle.settle netKarma is 40');
+            v106Assert(settlePos.reward > 0, 'heaven.cycle.settle gives positive reward');
+            v106Assert(settlePos.message.includes('Blessed'), 'heaven.cycle.settle blessed message');
+
+            // Test 16: heaven.cycle.settle with negative karma gives penalty
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 5,
+                evilKarma: 60,
+                settleCount: 0
+            };
+            const settleNeg = server.mcpHeavenCycleSettle({});
+            v106Assert(settleNeg.reward < 0, 'heaven.cycle.settle gives negative reward');
+            v106Assert(settleNeg.message.includes('Punished'), 'heaven.cycle.settle punished message');
+
+            // Test 17: heaven.cycle.settle with balanced karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 20,
+                evilKarma: 15,
+                settleCount: 0
+            };
+            const settleBal = server.mcpHeavenCycleSettle({});
+            v106Assert(settleBal.reward === 0, 'heaven.cycle.settle balanced karma gives 0 reward');
+            v106Assert(settleBal.message.includes('balanced'), 'heaven.cycle.settle balanced message');
+
+            // Test 18: heaven.cycle.settle fails without active cycle
+            mockGameState.heavenCycle = { isActive: false };
+            const settleNoActive = server.mcpHeavenCycleSettle({});
+            v106Assert(settleNoActive.error && settleNoActive.error.includes('No active'), 'heaven.cycle.settle fails without active cycle');
+
+            // Test 19: heaven.cycle.settle force works without active cycle
+            const settleForce = server.mcpHeavenCycleSettle({ force: true });
+            v106Assert(settleForce.success === true, 'heaven.cycle.settle force succeeds');
+
+            // Test 20: heaven.cycle.reset requires confirmation
+            mockGameState.heavenCycle = { isActive: true };
+            const resetNoConfirm = server.mcpHeavenCycleReset({});
+            v106Assert(resetNoConfirm.error && resetNoConfirm.error.includes('Confirmation'), 'heaven.cycle.reset requires confirm');
+
+            // Test 21: heaven.cycle.reset succeeds with confirm
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'large',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 30,
+                evilKarma: 20
+            };
+            const resetOk = server.mcpHeavenCycleReset({ confirm: true });
+            v106Assert(resetOk.success === true, 'heaven.cycle.reset succeeds');
+            v106Assert(resetOk.era === 2, 'heaven.cycle.reset increments era');
+            v106Assert(resetOk.message.includes('New era'), 'heaven.cycle.reset message has new era');
+
+            // Test 22: karma.law.reverse requires karmaId
+            const reverseNoId = server.mcpKarmaLawReverse({});
+            v106Assert(reverseNoId.error && reverseNoId.error.includes('karmaId'), 'karma.law.reverse requires karmaId');
+
+            // Test 23: karma.law.reverse not enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_1', action: 'good', desc: 'test', weight: 5 }]
+            };
+            const reverseLow = server.mcpKarmaLawReverse({ karmaId: 'karma_1', cost: 5000 });
+            v106Assert(reverseLow.error && reverseLow.error.includes('Not enough'), 'karma.law.reverse fails with low spirit stones');
+
+            // Test 24: karma.law.reverse karma record not found
+            mockGameState.spiritStones = 100000;
+            const reverseNotFound = server.mcpKarmaLawReverse({ karmaId: 'nonexistent', cost: 5000 });
+            v106Assert(reverseNotFound.error && reverseNotFound.error.includes('not found'), 'karma.law.reverse returns error for unknown id');
+
+            // Test 25: karma.law.reverse successfully reverses good karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_test_1', action: 'good', desc: '救人有功', weight: 10, reversed: false }],
+                goodKarma: 10,
+                evilKarma: 0
+            };
+            const reverseGood = server.mcpKarmaLawReverse({ karmaId: 'karma_test_1', cost: 5000 });
+            v106Assert(reverseGood.success === true, 'karma.law.reverse succeeds');
+            v106Assert(reverseGood.cost === 5000, 'karma.law.reverse deducts correct cost');
+            v106Assert(reverseGood.originalAction === 'good', 'karma.law.reverse returns original action');
+            v106Assert(reverseGood.originalWeight === 10, 'karma.law.reverse returns original weight');
+            v106Assert(mockGameState.heavenCycle.goodKarma === 0, 'karma.law.goodKarma reduced to 0 after reverse');
+
+            // Test 26: karma.law.reverse successfully reverses evil karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_test_2', action: 'evil', desc: '杀伤无辜', weight: 8, reversed: false }],
+                goodKarma: 0,
+                evilKarma: 8
+            };
+            const reverseEvil = server.mcpKarmaLawReverse({ karmaId: 'karma_test_2', cost: 6000 });
+            v106Assert(reverseEvil.success === true, 'karma.law.reverse evil succeeds');
+            v106Assert(mockGameState.heavenCycle.evilKarma === 0, 'karma.law.evilKarma reduced to 0 after reverse');
+
+            // Test 27: heaven.cycle.open deducts correct amount
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const beforeOpen = mockGameState.spiritStones;
+            server.mcpHeavenCycleOpen({ cycleType: 'medium' });
+            v106Assert(mockGameState.spiritStones === beforeOpen - 20000, 'heaven.cycle.open deducts 20000');
+
+            // Test 28: karma.law.attribute returns record id
+            mockGameState.heavenCycle = null;
+            mockGameState.spiritStones = 100000;
+            server.mcpHeavenCycleOpen({});
+            const attrRecord = server.mcpKarmaLawAttribute({ action: 'good', desc: '测试', weight: 5 });
+            v106Assert(attrRecord.id && attrRecord.id.startsWith('karma_'), 'karma.law.attribute returns karma id');
+
+            // Test 29: karma.law.query returns correct goodKarma and evilKarma totals
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [
+                    { id: 'karma_1', action: 'good', desc: '善1', weight: 5, createdAt: Date.now() },
+                    { id: 'karma_2', action: 'evil', desc: '恶1', weight: 3, createdAt: Date.now() }
+                ],
+                goodKarma: 5,
+                evilKarma: 3
+            };
+            const queryKarma = server.mcpKarmaLawQuery({});
+            v106Assert(queryKarma.goodKarma === 5, 'karma.law.query returns correct goodKarma');
+            v106Assert(queryKarma.evilKarma === 3, 'karma.law.query returns correct evilKarma');
+
+            // Test 30: heaven.cycle.settle increments settleCount
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [],
+                goodKarma: 50,
+                evilKarma: 10,
+                settleCount: 0
+            };
+            const settleCount1 = server.mcpHeavenCycleSettle({});
+            v106Assert(settleCount1.settleCount === 1, 'heaven.cycle.settle increments settleCount');
+            const settleCount2 = server.mcpHeavenCycleSettle({});
+            v106Assert(settleCount2.settleCount === 2, 'heaven.cycle.settle increments settleCount again');
+
+            // Test 31: karma.law.reverse marks record as reversed
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_rev_1', action: 'good', desc: 'test', weight: 5, reversed: false }],
+                goodKarma: 5,
+                evilKarma: 0
+            };
+            server.mcpKarmaLawReverse({ karmaId: 'karma_rev_1', cost: 5000 });
+            v106Assert(mockGameState.heavenCycle.karmaRecords[0].reversed === true, 'karma.law.reverse marks record as reversed');
+            v106Assert(mockGameState.heavenCycle.karmaRecords[0].reversedAt > 0, 'karma.law.reverse sets reversedAt');
+
+            // Test 32: karma.law.attribute default weight is 5
+            const attrDefault = server.mcpKarmaLawAttribute({ action: 'neutral', desc: 'test' });
+            v106Assert(attrDefault.weight === 5, 'karma.law.attribute default weight is 5');
+
+            // Test 33: heaven.cycle.open returns era
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openEra = server.mcpHeavenCycleOpen({});
+            v106Assert(openEra.era === 1, 'heaven.cycle.open returns era 1');
+            v106Assert(openEra.openedAt > 0, 'heaven.cycle.open returns openedAt');
+
+            // Test 34: karma.law.query returns record descriptions
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_desc_1', action: 'good', desc: '救助贫苦', weight: 7, createdAt: Date.now() }],
+                goodKarma: 7,
+                evilKarma: 0
+            };
+            const queryDesc = server.mcpKarmaLawQuery({});
+            v106Assert(queryDesc.records[0].desc === '救助贫苦', 'karma.law.query returns desc');
+
+            // Test 35: heaven.cycle.reset clears karma records
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_1', action: 'good', desc: 'test', weight: 5 }],
+                goodKarma: 5,
+                evilKarma: 0
+            };
+            server.mcpHeavenCycleReset({ confirm: true });
+            v106Assert(mockGameState.heavenCycle.karmaRecords.length === 0, 'heaven.cycle.reset clears karmaRecords');
+            v106Assert(mockGameState.heavenCycle.goodKarma === 0, 'heaven.cycle.reset clears goodKarma');
+            v106Assert(mockGameState.heavenCycle.evilKarma === 0, 'heaven.cycle.reset clears evilKarma');
+
+            // Test 36: karma.law.reverse deducts cost from spirit stones
+            mockGameState.spiritStones = 50000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_cost_1', action: 'evil', desc: 'test', weight: 5, reversed: false }],
+                goodKarma: 0,
+                evilKarma: 5
+            };
+            const beforeReverse = mockGameState.spiritStones;
+            server.mcpKarmaLawReverse({ karmaId: 'karma_cost_1', cost: 7000 });
+            v106Assert(mockGameState.spiritStones === beforeReverse - 7000, 'karma.law.reverse deducts cost');
+
+            // Test 37: heaven.cycle.settle with default cost 5000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [],
+                goodKarma: 0,
+                evilKarma: 0
+            };
+            const reverseDefault = server.mcpKarmaLawReverse({ karmaId: 'karma_default_1', cost: 5000 });
+            v106Assert(reverseDefault.cost === 5000, 'karma.law.reverse default cost is 5000');
+
+            // Test 38: karma.law.attribute with weight 10
+            const attrMax = server.mcpKarmaLawAttribute({ action: 'good', desc: '最大善行', weight: 10 });
+            v106Assert(attrMax.success === true, 'karma.law.attribute weight 10 succeeds');
+            v106Assert(attrMax.goodKarma === 10, 'karma.law.attribute weight 10 adds 10');
+
+            // Test 39: karma.law.attribute with weight 1
+            const attrMin = server.mcpKarmaLawAttribute({ action: 'evil', desc: '最小恶行', weight: 1 });
+            v106Assert(attrMin.success === true, 'karma.law.attribute weight 1 succeeds');
+            v106Assert(attrMin.evilKarma === 1, 'karma.law.attribute weight 1 adds 1');
+
+            // Test 40: heaven.cycle.open with default type is medium
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openDefault = server.mcpHeavenCycleOpen({});
+            v106Assert(openDefault.cycleType === 'medium', 'heaven.cycle.open default type is medium');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V106', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V106 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v106Results = runV106Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
