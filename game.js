@@ -4807,6 +4807,77 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V110: 天道誓言+因果誓约系统 ---
+        const MCP_TOOLS_V110 = {
+            'heaven.oath.take': {
+                name: 'heaven.oath.take',
+                description: '向天道立下誓言 (天道誓言系统-立誓)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        oathText: { type: 'string', description: '誓言内容' },
+                        severity: { type: 'string', description: '誓言严重程度 (minor/major/critical)', default: 'minor' }
+                    },
+                    required: ['oathText']
+                }
+            },
+            'heaven.oath.pledge': {
+                name: 'heaven.oath.pledge',
+                description: '查询/遵守誓言 (天道誓言系统-遵守)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        oathId: { type: 'string', description: '誓言ID' }
+                    },
+                    required: ['oathId']
+                }
+            },
+            'heaven.oath.break': {
+                name: 'heaven.oath.break',
+                description: '违背誓言承受惩罚 (天道誓言系统-违背)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        oathId: { type: 'string', description: '誓言ID' }
+                    },
+                    required: ['oathId']
+                }
+            },
+            'karma.oath.query': {
+                name: 'karma.oath.query',
+                description: '查询因果誓约 (因果誓约系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '筛选条件 (all/active/broken)', default: 'all' }
+                    }
+                }
+            },
+            'karma.oath.bind': {
+                name: 'karma.oath.bind',
+                description: '绑定誓约与因果 (因果誓约系统-绑定)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        oathId: { type: 'string', description: '誓言ID' },
+                        karmaRecordId: { type: 'string', description: '因果记录ID' }
+                    },
+                    required: ['oathId', 'karmaRecordId']
+                }
+            },
+            'karma.oath.release': {
+                name: 'karma.oath.release',
+                description: '解除誓约 (因果誓约系统-解除)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        oathId: { type: 'string', description: '誓言ID' }
+                    },
+                    required: ['oathId']
+                }
+            }
+        };
+
         // --- MCP_TOOLS_V109: 仙界试炼+飞升系统 ---
         const MCP_TOOLS_V109 = {
             'trial.open': {
@@ -5013,6 +5084,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V109: Register 仙界试炼+飞升系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V109)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V110: Register 天道誓言+因果誓约系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V110)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5769,6 +5844,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'ascend.channel':
                             result = this.mcpAscendChannel(args);
+                            break;
+                        // V110: 天道誓言+因果誓约系统
+                        case 'heaven.oath.take':
+                            result = this.mcpHeavenOathTake(args);
+                            break;
+                        case 'heaven.oath.pledge':
+                            result = this.mcpHeavenOathPledge(args);
+                            break;
+                        case 'heaven.oath.break':
+                            result = this.mcpHeavenOathBreak(args);
+                            break;
+                        case 'karma.oath.query':
+                            result = this.mcpKarmaOathQuery(args);
+                            break;
+                        case 'karma.oath.bind':
+                            result = this.mcpKarmaOathBind(args);
+                            break;
+                        case 'karma.oath.release':
+                            result = this.mcpKarmaOathRelease(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12553,6 +12647,190 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V110: 天道誓言+因果誓约系统
+            _initHeavenOathState() {
+                const gs = window.gameState;
+                if (!gs.heavenOath) {
+                    gs.heavenOath = {
+                        oaths: [],
+                        oathIdCounter: 0
+                    };
+                }
+                return gs.heavenOath;
+            }
+
+            _initKarmaOathState() {
+                const gs = window.gameState;
+                if (!gs.karmaOath) {
+                    gs.karmaOath = {
+                        binds: [],
+                        bindIdCounter: 0
+                    };
+                }
+                return gs.karmaOath;
+            }
+
+            mcpHeavenOathTake(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { oathText, severity = 'minor' } = args || {};
+                    if (!oathText) return { error: '誓言内容不能为空' };
+                    if (!['minor', 'major', 'critical'].includes(severity)) {
+                        return { error: '严重程度必须是 minor/major/critical 之一' };
+                    }
+                    const state = this._initHeavenOathState();
+                    const oathId = 'oath_' + (++state.oathIdCounter);
+                    const oath = {
+                        id: oathId,
+                        oathText,
+                        severity,
+                        status: 'active',
+                        createdAt: Date.now(),
+                        pledgedAt: null,
+                        brokenAt: null
+                    };
+                    state.oaths.push(oath);
+                    return {
+                        success: true,
+                        oathId,
+                        severity,
+                        status: 'active',
+                        message: '天道誓言 "' + oathText + '" 已立下'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenOathPledge(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { oathId } = args || {};
+                    if (!oathId) return { error: '誓言ID不能为空' };
+                    const state = this._initHeavenOathState();
+                    const oath = state.oaths.find(o => o.id === oathId);
+                    if (!oath) return { error: '誓言不存在: ' + oathId };
+                    if (oath.status === 'broken') return { error: '誓言已违背，无法遵守' };
+                    oath.pledgedAt = Date.now();
+                    return {
+                        success: true,
+                        oathId,
+                        status: 'pledged',
+                        message: '誓言已遵守'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenOathBreak(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { oathId } = args || {};
+                    if (!oathId) return { error: '誓言ID不能为空' };
+                    const state = this._initHeavenOathState();
+                    const oath = state.oaths.find(o => o.id === oathId);
+                    if (!oath) return { error: '誓言不存在: ' + oathId };
+                    if (oath.status === 'broken') return { error: '誓言已违背' };
+                    oath.brokenAt = Date.now();
+                    oath.status = 'broken';
+                    // 惩罚根据severity
+                    let penalty = { type: 'none' };
+                    if (oath.severity === 'minor') {
+                        gs.reputation = (gs.reputation || 50) - 10;
+                        penalty = { type: 'reputation', amount: 10 };
+                    } else if (oath.severity === 'major') {
+                        gs.spiritStones = (gs.spiritStones || 0) - 1000;
+                        penalty = { type: 'spiritStones', amount: 1000 };
+                    } else if (oath.severity === 'critical') {
+                        gs.realm = Math.max(0, (gs.realm || 0) - 1);
+                        penalty = { type: 'realm', amount: 1 };
+                    }
+                    return {
+                        success: true,
+                        oathId,
+                        severity: oath.severity,
+                        penalty,
+                        message: '违背誓言，遭受天道惩罚'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaOathQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { filter = 'all' } = args || {};
+                    const state = this._initKarmaOathState();
+                    let binds = state.binds || [];
+                    if (filter === 'active') {
+                        binds = binds.filter(b => b.status === 'active');
+                    } else if (filter === 'broken') {
+                        binds = binds.filter(b => b.status === 'broken');
+                    }
+                    return {
+                        filter,
+                        total: binds.length,
+                        binds
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaOathBind(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { oathId, karmaRecordId } = args || {};
+                    if (!oathId) return { error: '誓言ID不能为空' };
+                    if (!karmaRecordId) return { error: '因果记录ID不能为空' };
+                    const karmaState = this._initKarmaOathState();
+                    const heavenState = this._initHeavenOathState();
+                    const oath = heavenState.oaths.find(o => o.id === oathId);
+                    if (!oath) return { error: '誓言不存在: ' + oathId };
+                    // Check if karma record exists
+                    const karmaRecords = gs.heavenCycle?.karmaRecords || [];
+                    const karmaRecord = karmaRecords.find(r => r.id === karmaRecordId);
+                    if (!karmaRecord) return { error: '因果记录不存在: ' + karmaRecordId };
+                    const bindId = 'bind_' + (++karmaState.bindIdCounter);
+                    const bind = {
+                        id: bindId,
+                        oathId,
+                        karmaRecordId,
+                        status: 'active',
+                        createdAt: Date.now(),
+                        releasedAt: null
+                    };
+                    karmaState.binds.push(bind);
+                    return {
+                        success: true,
+                        bindId,
+                        oathId,
+                        karmaRecordId,
+                        status: 'active',
+                        message: '誓约已绑定因果'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaOathRelease(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { oathId } = args || {};
+                    if (!oathId) return { error: '誓言ID不能为空' };
+                    const state = this._initKarmaOathState();
+                    const bind = state.binds.find(b => b.oathId === oathId && b.status === 'active');
+                    if (!bind) return { error: '不存在的誓约或已解除: ' + oathId };
+                    bind.releasedAt = Date.now();
+                    bind.status = 'broken';
+                    return {
+                        success: true,
+                        oathId,
+                        status: 'released',
+                        message: '誓约已解除'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -18698,6 +18976,279 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v109Results = runV109Tests();
+
+        // ===== V110: 天道誓言+因果誓约系统 Tests =====
+        function runV110Tests() {
+            const results = [];
+            function v110Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 3,
+                stage: 1,
+                reputation: 50,
+                heavenOath: null,
+                karmaOath: null,
+                heavenCycle: {
+                    karmaRecords: [
+                        { id: 'karma_1', action: 'good', desc: '救人有功', weight: 10 }
+                    ]
+                }
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: heaven.oath.take creates oath with minor severity
+            mockGameState.heavenOath = null;
+            const take1 = server.mcpHeavenOathTake({ oathText: '永不杀生', severity: 'minor' });
+            v110Assert(take1.success === true, 'heaven.oath.take succeeds');
+            v110Assert(take1.oathId && take1.oathId.startsWith('oath_'), 'heaven.oath.take returns oathId');
+            v110Assert(take1.severity === 'minor', 'heaven.oath.take minor severity');
+            v110Assert(take1.status === 'active', 'heaven.oath.take status active');
+
+            // Test 2: heaven.oath.take creates oath with major severity
+            mockGameState.heavenOath = null;
+            const take2 = server.mcpHeavenOathTake({ oathText: '永不欺师', severity: 'major' });
+            v110Assert(take2.severity === 'major', 'heaven.oath.take major severity');
+
+            // Test 3: heaven.oath.take creates oath with critical severity
+            mockGameState.heavenOath = null;
+            const take3 = server.mcpHeavenOathTake({ oathText: '永不叛道', severity: 'critical' });
+            v110Assert(take3.severity === 'critical', 'heaven.oath.take critical severity');
+
+            // Test 4: heaven.oath.take fails without oathText
+            mockGameState.heavenOath = null;
+            const take4 = server.mcpHeavenOathTake({});
+            v110Assert(take4.error && take4.error.includes('不能为空'), 'heaven.oath.take fails without oathText');
+
+            // Test 5: heaven.oath.take fails with invalid severity
+            mockGameState.heavenOath = null;
+            const take5 = server.mcpHeavenOathTake({ oathText: 'test', severity: 'invalid' });
+            v110Assert(take5.error && take5.error.includes('minor/major/critical'), 'heaven.oath.take rejects invalid severity');
+
+            // Test 6: heaven.oath.pledge succeeds for active oath
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_1', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 1 };
+            const pledge6 = server.mcpHeavenOathPledge({ oathId: 'oath_1' });
+            v110Assert(pledge6.success === true, 'heaven.oath.pledge succeeds');
+            v110Assert(pledge6.status === 'pledged', 'heaven.oath.pledge status pledged');
+
+            // Test 7: heaven.oath.pledge fails for non-existent oath
+            const pledge7 = server.mcpHeavenOathPledge({ oathId: 'oath_999' });
+            v110Assert(pledge7.error && pledge7.error.includes('不存在'), 'heaven.oath.pledge fails for non-existent oath');
+
+            // Test 8: heaven.oath.pledge fails for broken oath
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_2', oathText: 'test', severity: 'minor', status: 'broken' }], oathIdCounter: 2 };
+            const pledge8 = server.mcpHeavenOathPledge({ oathId: 'oath_2' });
+            v110Assert(pledge8.error && pledge8.error.includes('已违背'), 'heaven.oath.pledge fails for broken oath');
+
+            // Test 9: heaven.oath.break applies minor penalty (reputation)
+            mockGameState.reputation = 50;
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_3', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 3 };
+            const break9 = server.mcpHeavenOathBreak({ oathId: 'oath_3' });
+            v110Assert(break9.success === true, 'heaven.oath.break succeeds');
+            v110Assert(break9.penalty && break9.penalty.type === 'reputation', 'heaven.oath.break minor penalty is reputation');
+            v110Assert(mockGameState.reputation === 40, 'heaven.oath.break minor penalty -10 reputation');
+
+            // Test 10: heaven.oath.break applies major penalty (spirit stones)
+            mockGameState.spiritStones = 10000;
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_4', oathText: 'test', severity: 'major', status: 'active' }], oathIdCounter: 4 };
+            const break10 = server.mcpHeavenOathBreak({ oathId: 'oath_4' });
+            v110Assert(break10.penalty && break10.penalty.type === 'spiritStones', 'heaven.oath.break major penalty is spiritStones');
+            v110Assert(mockGameState.spiritStones === 9000, 'heaven.oath.break major penalty -1000 stones');
+
+            // Test 11: heaven.oath.break applies critical penalty (realm)
+            mockGameState.realm = 3;
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_5', oathText: 'test', severity: 'critical', status: 'active' }], oathIdCounter: 5 };
+            const break11 = server.mcpHeavenOathBreak({ oathId: 'oath_5' });
+            v110Assert(break11.penalty && break11.penalty.type === 'realm', 'heaven.oath.break critical penalty is realm');
+            v110Assert(mockGameState.realm === 2, 'heaven.oath.break critical penalty realm -1');
+
+            // Test 12: heaven.oath.break fails for non-existent oath
+            const break12 = server.mcpHeavenOathBreak({ oathId: 'oath_999' });
+            v110Assert(break12.error && break12.error.includes('不存在'), 'heaven.oath.break fails for non-existent oath');
+
+            // Test 13: heaven.oath.break fails for already broken oath
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_6', oathText: 'test', severity: 'minor', status: 'broken' }], oathIdCounter: 6 };
+            const break13 = server.mcpHeavenOathBreak({ oathId: 'oath_6' });
+            v110Assert(break13.error && break13.error.includes('已违背'), 'heaven.oath.break fails for already broken oath');
+
+            // Test 14: karma.oath.query returns all binds
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            const query14 = server.mcpKarmaOathQuery({});
+            v110Assert(query14.filter === 'all', 'karma.oath.query default filter all');
+            v110Assert(query14.total === 0, 'karma.oath.query returns 0 binds');
+            v110Assert(Array.isArray(query14.binds), 'karma.oath.query returns binds array');
+
+            // Test 15: karma.oath.query filter active
+            mockGameState.karmaOath = { binds: [{ id: 'bind_1', oathId: 'oath_1', status: 'active' }], bindIdCounter: 1 };
+            const query15 = server.mcpKarmaOathQuery({ filter: 'active' });
+            v110Assert(query15.filter === 'active', 'karma.oath.query filter active');
+            v110Assert(query15.total === 1, 'karma.oath.query active returns 1');
+
+            // Test 16: karma.oath.query filter broken
+            const query16 = server.mcpKarmaOathQuery({ filter: 'broken' });
+            v110Assert(query16.filter === 'broken', 'karma.oath.query filter broken');
+            v110Assert(query16.total === 0, 'karma.oath.query broken returns 0');
+
+            // Test 17: karma.oath.bind succeeds
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_7', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 7 };
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            const bind17 = server.mcpKarmaOathBind({ oathId: 'oath_7', karmaRecordId: 'karma_1' });
+            v110Assert(bind17.success === true, 'karma.oath.bind succeeds');
+            v110Assert(bind17.bindId && bind17.bindId.startsWith('bind_'), 'karma.oath.bind returns bindId');
+            v110Assert(bind17.status === 'active', 'karma.oath.bind status active');
+
+            // Test 18: karma.oath.bind fails without oathId
+            const bind18 = server.mcpKarmaOathBind({ karmaRecordId: 'karma_1' });
+            v110Assert(bind18.error && bind18.error.includes('誓言ID不能为空'), 'karma.oath.bind fails without oathId');
+
+            // Test 19: karma.oath.bind fails without karmaRecordId
+            const bind19 = server.mcpKarmaOathBind({ oathId: 'oath_1' });
+            v110Assert(bind19.error && bind19.error.includes('因果记录ID不能为空'), 'karma.oath.bind fails without karmaRecordId');
+
+            // Test 20: karma.oath.bind fails for non-existent oath
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            const bind20 = server.mcpKarmaOathBind({ oathId: 'oath_999', karmaRecordId: 'karma_1' });
+            v110Assert(bind20.error && bind20.error.includes('誓言不存在'), 'karma.oath.bind fails for non-existent oath');
+
+            // Test 21: karma.oath.bind fails for non-existent karma record
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_8', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 8 };
+            const bind21 = server.mcpKarmaOathBind({ oathId: 'oath_8', karmaRecordId: 'karma_999' });
+            v110Assert(bind21.error && bind21.error.includes('因果记录不存在'), 'karma.oath.bind fails for non-existent karma record');
+
+            // Test 22: karma.oath.release succeeds
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_9', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 9 };
+            mockGameState.karmaOath = { binds: [{ id: 'bind_2', oathId: 'oath_9', karmaRecordId: 'karma_1', status: 'active' }], bindIdCounter: 2 };
+            const release22 = server.mcpKarmaOathRelease({ oathId: 'oath_9' });
+            v110Assert(release22.success === true, 'karma.oath.release succeeds');
+            v110Assert(release22.status === 'released', 'karma.oath.release status released');
+
+            // Test 23: karma.oath.release fails without oathId
+            const release23 = server.mcpKarmaOathRelease({});
+            v110Assert(release23.error && release23.error.includes('誓言ID不能为空'), 'karma.oath.release fails without oathId');
+
+            // Test 24: karma.oath.release fails for non-existent bind
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            const release24 = server.mcpKarmaOathRelease({ oathId: 'oath_999' });
+            v110Assert(release24.error && release24.error.includes('不存在'), 'karma.oath.release fails for non-existent bind');
+
+            // Test 25: karma.oath.release fails for already released bind
+            mockGameState.karmaOath = { binds: [{ id: 'bind_3', oathId: 'oath_10', karmaRecordId: 'karma_1', status: 'broken' }], bindIdCounter: 3 };
+            const release25 = server.mcpKarmaOathRelease({ oathId: 'oath_10' });
+            v110Assert(release25.error && release25.error.includes('已解除'), 'karma.oath.release fails for already released bind');
+
+            // Test 26: heaven.oath.take increments oathIdCounter
+            mockGameState.heavenOath = { oaths: [], oathIdCounter: 0 };
+            server.mcpHeavenOathTake({ oathText: 'test1', severity: 'minor' });
+            server.mcpHeavenOathTake({ oathText: 'test2', severity: 'minor' });
+            v110Assert(mockGameState.heavenOath.oathIdCounter === 2, 'heaven.oath.take increments counter');
+
+            // Test 27: karma.oath.bind increments bindIdCounter
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_11', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 11 };
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            server.mcpKarmaOathBind({ oathId: 'oath_11', karmaRecordId: 'karma_1' });
+            server.mcpKarmaOathBind({ oathId: 'oath_11', karmaRecordId: 'karma_1' });
+            v110Assert(mockGameState.karmaOath.bindIdCounter === 2, 'karma.oath.bind increments counter');
+
+            // Test 28: karma.oath.query returns multiple binds
+            mockGameState.karmaOath = {
+                binds: [
+                    { id: 'bind_4', oathId: 'oath_a', karmaRecordId: 'karma_1', status: 'active' },
+                    { id: 'bind_5', oathId: 'oath_b', karmaRecordId: 'karma_1', status: 'broken' }
+                ],
+                bindIdCounter: 5
+            };
+            const query28 = server.mcpKarmaOathQuery({});
+            v110Assert(query28.total === 2, 'karma.oath.query returns 2 binds');
+
+            // Test 29: heaven.oath.break critical penalty cannot go below realm 0
+            mockGameState.realm = 0;
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_12', oathText: 'test', severity: 'critical', status: 'active' }], oathIdCounter: 12 };
+            const break29 = server.mcpHeavenOathBreak({ oathId: 'oath_12' });
+            v110Assert(mockGameState.realm === 0, 'heaven.oath.break critical penalty realm stays at 0');
+
+            // Test 30: karma.oath.bind creates bind with correct oathId and karmaRecordId
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_13', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 13 };
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            const bind30 = server.mcpKarmaOathBind({ oathId: 'oath_13', karmaRecordId: 'karma_1' });
+            v110Assert(bind30.oathId === 'oath_13', 'karma.oath.bind returns correct oathId');
+            v110Assert(bind30.karmaRecordId === 'karma_1', 'karma.oath.bind returns correct karmaRecordId');
+
+            // Test 31: heaven.oath.pledge sets pledgedAt timestamp
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_14', oathText: 'test', severity: 'minor', status: 'active', pledgedAt: null }], oathIdCounter: 14 };
+            const pledge31 = server.mcpHeavenOathPledge({ oathId: 'oath_14' });
+            v110Assert(mockGameState.heavenOath.oaths[0].pledgedAt > 0, 'heaven.oath.pledge sets pledgedAt');
+
+            // Test 32: heaven.oath.break sets brokenAt timestamp
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_15', oathText: 'test', severity: 'minor', status: 'active', brokenAt: null }], oathIdCounter: 15 };
+            const break32 = server.mcpHeavenOathBreak({ oathId: 'oath_15' });
+            v110Assert(mockGameState.heavenOath.oaths[0].brokenAt > 0, 'heaven.oath.break sets brokenAt');
+
+            // Test 33: karma.oath.release sets releasedAt timestamp
+            mockGameState.karmaOath = { binds: [{ id: 'bind_6', oathId: 'oath_16', karmaRecordId: 'karma_1', status: 'active', releasedAt: null }], bindIdCounter: 6 };
+            const release33 = server.mcpKarmaOathRelease({ oathId: 'oath_16' });
+            v110Assert(mockGameState.karmaOath.binds[0].releasedAt > 0, 'karma.oath.release sets releasedAt');
+
+            // Test 34: heaven.oath.take stores correct oathText
+            mockGameState.heavenOath = null;
+            const take34 = server.mcpHeavenOathTake({ oathText: '永不淫邪', severity: 'minor' });
+            v110Assert(mockGameState.heavenOath.oaths[0].oathText === '永不淫邪', 'heaven.oath.take stores correct oathText');
+
+            // Test 35: heaven.oath.take default severity is minor
+            mockGameState.heavenOath = null;
+            const take35 = server.mcpHeavenOathTake({ oathText: 'test' });
+            v110Assert(take35.severity === 'minor', 'heaven.oath.take default severity minor');
+
+            // Test 36: karma.oath.query filter all returns all statuses
+            mockGameState.karmaOath = {
+                binds: [
+                    { id: 'bind_7', oathId: 'oath_a', karmaRecordId: 'karma_1', status: 'active' },
+                    { id: 'bind_8', oathId: 'oath_b', karmaRecordId: 'karma_1', status: 'broken' }
+                ],
+                bindIdCounter: 8
+            };
+            const query36 = server.mcpKarmaOathQuery({ filter: 'all' });
+            v110Assert(query36.total === 2, 'karma.oath.query filter all returns both');
+
+            // Test 37: _initHeavenOathState initializes when null
+            mockGameState.heavenOath = null;
+            const state37 = server._initHeavenOathState();
+            v110Assert(state37.oaths && Array.isArray(state37.oaths), '_initHeavenOathState creates oaths array');
+            v110Assert(state37.oathIdCounter === 0, '_initHeavenOathState initializes counter');
+
+            // Test 38: _initKarmaOathState initializes when null
+            mockGameState.karmaOath = null;
+            const state38 = server._initKarmaOathState();
+            v110Assert(state38.binds && Array.isArray(state38.binds), '_initKarmaOathState creates binds array');
+            v110Assert(state38.bindIdCounter === 0, '_initKarmaOathState initializes counter');
+
+            // Test 39: karma.oath.bind fails when karma record id is valid but record not found in heavenCycle
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_17', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 17 };
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            mockGameState.heavenCycle.karmaRecords = [];
+            const bind39 = server.mcpKarmaOathBind({ oathId: 'oath_17', karmaRecordId: 'karma_1' });
+            v110Assert(bind39.error && bind39.error.includes('因果记录不存在'), 'karma.oath.bind fails when karma record not found');
+
+            // Test 40: karma.oath.bind succeeds when karma record exists
+            mockGameState.heavenOath = { oaths: [{ id: 'oath_18', oathText: 'test', severity: 'minor', status: 'active' }], oathIdCounter: 18 };
+            mockGameState.karmaOath = { binds: [], bindIdCounter: 0 };
+            mockGameState.heavenCycle.karmaRecords = [{ id: 'karma_test', action: 'good', desc: 'test', weight: 5 }];
+            const bind40 = server.mcpKarmaOathBind({ oathId: 'oath_18', karmaRecordId: 'karma_test' });
+            v110Assert(bind40.success === true, 'karma.oath.bind succeeds with valid karma record');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V110', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V110 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v110Results = runV110Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
