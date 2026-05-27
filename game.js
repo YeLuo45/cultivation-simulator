@@ -4251,6 +4251,83 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V101: 仙盟系统 仙盟创建+领地争夺 ---
+        const MCP_TOOLS_V101 = {
+            'alliance.create': {
+                name: 'alliance.create',
+                description: 'Create a new alliance/guild (仙盟-创建仙盟)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: 'Alliance name' },
+                        tag: { type: 'string', description: 'Alliance tag (3-5 characters)', maxLength: 5 },
+                        level: { type: 'number', description: 'Alliance level', default: 1 }
+                    },
+                    required: ['name']
+                }
+            },
+            'alliance.join': {
+                name: 'alliance.join',
+                description: 'Join an existing alliance (仙盟-加入仙盟)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        allianceId: { type: 'string', description: 'Alliance ID to join' },
+                        autoApprove: { type: 'boolean', description: 'Auto-approve if requirements met', default: false }
+                    },
+                    required: ['allianceId']
+                }
+            },
+            'alliance.contribute': {
+                name: 'alliance.contribute',
+                description: 'Contribute resources to alliance (仙盟-贡献资源)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Contribution type: spirit_stones|resources|cultivation', enum: ['spirit_stones', 'resources', 'cultivation'] },
+                        amount: { type: 'number', description: 'Amount to contribute' }
+                    },
+                    required: ['type', 'amount']
+                }
+            },
+            'alliance.territory.claim': {
+                name: 'alliance.territory.claim',
+                description: 'Claim or battle for territory (仙盟-争夺领地)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        territoryId: { type: 'string', description: 'Territory ID to claim' },
+                        battleMode: { type: 'boolean', description: 'Use battle to claim', default: false }
+                    },
+                    required: ['territoryId']
+                }
+            },
+            'alliance.skill.unlock': {
+                name: 'alliance.skill.unlock',
+                description: 'Unlock alliance skills (仙盟-解锁仙盟技能)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        skillId: { type: 'string', description: 'Skill ID to unlock' },
+                        useContributionPoints: { type: 'boolean', description: 'Use contribution points', default: true }
+                    },
+                    required: ['skillId']
+                }
+            },
+            'alliance.members.list': {
+                name: 'alliance.members.list',
+                description: 'List alliance members (仙盟-成员列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        allianceId: { type: 'string', description: 'Alliance ID (current player if not specified)' },
+                        role: { type: 'string', description: 'Filter by role: leader|elder|member', enum: ['leader', 'elder', 'member'] },
+                        limit: { type: 'number', description: 'Number of members to return', default: 50 }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4358,6 +4435,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V100: Register 仙界纪元系统 多纪元轮回 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V100)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V101: Register 仙盟系统 仙盟创建+领地争夺 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V101)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4943,6 +5024,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'era.reward.claim':
                             result = this.mcpEraRewardClaim(args);
+                            break;
+                        // V101: 仙盟系统 仙盟创建+领地争夺
+                        case 'alliance.create':
+                            result = this.mcpAllianceCreate(args);
+                            break;
+                        case 'alliance.join':
+                            result = this.mcpAllianceJoin(args);
+                            break;
+                        case 'alliance.contribute':
+                            result = this.mcpAllianceContribute(args);
+                            break;
+                        case 'alliance.territory.claim':
+                            result = this.mcpAllianceTerritoryClaim(args);
+                            break;
+                        case 'alliance.skill.unlock':
+                            result = this.mcpAllianceSkillUnlock(args);
+                            break;
+                        case 'alliance.members.list':
+                            result = this.mcpAllianceMembersList(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -9558,6 +9658,263 @@ const ACHIEVEMENT_ID_MAP = {
                         message: `Claimed ${reward.name} reward`
                     };
                 } catch (e) { return { error: e.message }; }
+            }
+
+            // V101: 仙盟系统 仙盟创建+领地争夺
+            _initAllianceState() {
+                const gs = window.gameState;
+                if (!gs.alliances) {
+                    gs.alliances = {
+                        byId: {},
+                        list: [],
+                        territories: {},
+                        skills: {}
+                    };
+                }
+                return gs.alliances;
+            }
+
+            mcpAllianceCreate(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { name, tag, level = 1 } = args;
+                    if (!name) return { error: 'name is required' };
+                    if (name.length < 2) return { error: 'name must be at least 2 characters' };
+                    if (tag && (tag.length < 3 || tag.length > 5)) return { error: 'tag must be 3-5 characters' };
+                    const alliances = this._initAllianceState();
+                    const id = 'ally_' + Date.now();
+                    const leaderId = gs.playerId || 'player_1';
+                    const alliance = {
+                        id,
+                        name,
+                        tag: tag || name.substring(0, 3).toUpperCase(),
+                        level,
+                        leaderId,
+                        leaderName: gs.playerName || '盟主',
+                        members: [{ id: leaderId, name: gs.playerName || '盟主', role: 'leader', joinedAt: Date.now(), contribution: 0 }],
+                        resources: { spiritStones: 0, resources: 0, cultivation: 0 },
+                        territories: [],
+                        skills: [],
+                        createdAt: Date.now(),
+                        levelUps: 0
+                    };
+                    alliances.byId[id] = alliance;
+                    alliances.list.push(alliance);
+                    return {
+                        success: true,
+                        alliance,
+                        message: `Alliance "${name}" created successfully`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAllianceJoin(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { allianceId, autoApprove = false } = args;
+                    if (!allianceId) return { error: 'allianceId is required' };
+                    const alliances = this._initAllianceState();
+                    const alliance = alliances.byId[allianceId];
+                    if (!alliance) return { error: 'Alliance not found: ' + allianceId };
+                    const playerId = gs.playerId || 'player_1';
+                    const playerName = gs.playerName || '成员';
+                    if (alliance.members.find(m => m.id === playerId)) {
+                        return { error: 'Already a member of this alliance' };
+                    }
+                    if (autoApprove) {
+                        alliance.members.push({
+                            id: playerId,
+                            name: playerName,
+                            role: 'member',
+                            joinedAt: Date.now(),
+                            contribution: 0
+                        });
+                        return {
+                            success: true,
+                            allianceId,
+                            role: 'member',
+                            message: `Joined alliance "${alliance.name}" as member`
+                        };
+                    }
+                    return {
+                        success: true,
+                        pending: true,
+                        allianceId,
+                        allianceName: alliance.name,
+                        requirements: { level: alliance.level * 5 },
+                        message: 'Join request submitted for approval'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAllianceContribute(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { type, amount } = args;
+                    if (!type) return { error: 'type is required' };
+                    if (!amount || amount <= 0) return { error: 'amount must be positive' };
+                    const VALID_TYPES = ['spirit_stones', 'resources', 'cultivation'];
+                    if (!VALID_TYPES.includes(type)) return { error: 'type must be ' + VALID_TYPES.join('|') };
+                    const alliances = this._initAllianceState();
+                    const playerAlliance = this._getPlayerAlliance(alliances);
+                    if (!playerAlliance) return { error: 'Player not in any alliance' };
+                    if (!playerAlliance.resources) playerAlliance.resources = { spiritStones: 0, resources: 0, cultivation: 0 };
+                    playerAlliance.resources[type] = (playerAlliance.resources[type] || 0) + amount;
+                    const member = playerAlliance.members.find(m => m.id === (gs.playerId || 'player_1'));
+                    if (member) {
+                        member.contribution = (member.contribution || 0) + amount;
+                    }
+                    return {
+                        success: true,
+                        type,
+                        amount,
+                        totalContributed: playerAlliance.resources[type],
+                        contributionPoints: member ? member.contribution : 0,
+                        message: `Contributed ${amount} ${type} to alliance`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAllianceTerritoryClaim(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { territoryId, battleMode = false } = args;
+                    if (!territoryId) return { error: 'territoryId is required' };
+                    const alliances = this._initAllianceState();
+                    const playerAlliance = this._getPlayerAlliance(alliances);
+                    if (!playerAlliance) return { error: 'Player not in any alliance' };
+                    if (!alliances.territories) alliances.territories = {};
+                    const territory = alliances.territories[territoryId] || {
+                        id: territoryId,
+                        name: 'Territory ' + territoryId,
+                        level: 1,
+                        ownerId: null,
+                        resources: { spiritStones: 100, cultivation: 50 }
+                    };
+                    const previousOwner = territory.ownerId ? alliances.byId[territory.ownerId] : null;
+                    if (territory.ownerId && territory.ownerId !== playerAlliance.id && !battleMode) {
+                        return {
+                            success: false,
+                            error: 'Territory already claimed by another alliance. Use battleMode to contest.',
+                            currentOwner: previousOwner ? previousOwner.name : 'Unknown'
+                        };
+                    }
+                    if (battleMode && territory.ownerId && territory.ownerId !== playerAlliance.id) {
+                        const battlePower = (playerAlliance.level * 100) + (playerAlliance.members.length * 20);
+                        const defenderPower = (previousOwner ? previousOwner.level * 100 : 50) + 30;
+                        if (battlePower <= defenderPower) {
+                            return {
+                                success: false,
+                                error: 'Battle failed. Insufficient power.',
+                                yourPower: battlePower,
+                                defenderPower: defenderPower
+                            };
+                        }
+                        if (previousOwner) {
+                            previousOwner.territories = previousOwner.territories.filter(t => t !== territoryId);
+                        }
+                    }
+                    territory.ownerId = playerAlliance.id;
+                    territory.claimedAt = Date.now();
+                    alliances.territories[territoryId] = territory;
+                    if (!playerAlliance.territories.includes(territoryId)) {
+                        playerAlliance.territories.push(territoryId);
+                    }
+                    return {
+                        success: true,
+                        territory,
+                        battleMode,
+                        previousOwner: previousOwner ? previousOwner.name : null,
+                        message: `Claimed territory "${territory.name}" for alliance`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAllianceSkillUnlock(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { skillId, useContributionPoints = true } = args;
+                    if (!skillId) return { error: 'skillId is required' };
+                    const alliances = this._initAllianceState();
+                    const playerAlliance = this._getPlayerAlliance(alliances);
+                    if (!playerAlliance) return { error: 'Player not in any alliance' };
+                    const ALLIANCE_SKILLS = {
+                        'buff_attack': { name: '攻击增强', cost: 1000, effect: '全体攻击+10%' },
+                        'buff_defense': { name: '防御增强', cost: 1000, effect: '全体防御+10%' },
+                        'buff_cultivation': { name: '修炼加速', cost: 1500, effect: '修炼效率+15%' },
+                        'buff_drop': { name: '掉落加成', cost: 1200, effect: '物品掉落+20%' },
+                        'territory_defense': { name: '领地守护', cost: 2000, effect: '领地防御+30%' },
+                        'resurrection': { name: '复活术', cost: 5000, effect: '死亡后原地复活' }
+                    };
+                    const skill = ALLIANCE_SKILLS[skillId];
+                    if (!skill) return { error: 'Unknown skill: ' + skillId };
+                    if (playerAlliance.skills.includes(skillId)) {
+                        return { error: 'Skill already unlocked: ' + skillId };
+                    }
+                    const member = playerAlliance.members.find(m => m.id === (gs.playerId || 'player_1'));
+                    const contribution = member ? member.contribution || 0 : 0;
+                    if (useContributionPoints && contribution < skill.cost) {
+                        return { error: `Insufficient contribution points. Have: ${contribution}, Need: ${skill.cost}` };
+                    }
+                    playerAlliance.skills.push(skillId);
+                    if (!alliances.skills[playerAlliance.id]) alliances.skills[playerAlliance.id] = [];
+                    alliances.skills[playerAlliance.id].push({ skillId, unlockedAt: Date.now() });
+                    return {
+                        success: true,
+                        skillId,
+                        skillName: skill.name,
+                        cost: skill.cost,
+                        effect: skill.effect,
+                        message: `Unlocked alliance skill "${skill.name}"`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAllianceMembersList(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { allianceId, role, limit = 50 } = args;
+                    const alliances = this._initAllianceState();
+                    let alliance;
+                    if (allianceId) {
+                        alliance = alliances.byId[allianceId];
+                        if (!alliance) return { error: 'Alliance not found: ' + allianceId };
+                    } else {
+                        alliance = this._getPlayerAlliance(alliances);
+                        if (!alliance) return { error: 'Player not in any alliance and no allianceId specified' };
+                    }
+                    let members = alliance.members || [];
+                    if (role) {
+                        const VALID_ROLES = ['leader', 'elder', 'member'];
+                        if (!VALID_ROLES.includes(role)) return { error: 'role must be ' + VALID_ROLES.join('|') };
+                        members = members.filter(m => m.role === role);
+                    }
+                    const limited = members.slice(0, limit);
+                    const result = {
+                        allianceId: alliance.id,
+                        allianceName: alliance.name,
+                        totalMembers: alliance.members.length,
+                        members: limited.map(m => ({
+                            id: m.id,
+                            name: m.name,
+                            role: m.role,
+                            contribution: m.contribution || 0,
+                            joinedAt: m.joinedAt
+                        }))
+                    };
+                    return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            _getPlayerAlliance(alliances) {
+                const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
+                return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
             }
 
             mcpPetList() {
