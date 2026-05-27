@@ -5303,6 +5303,18 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V113)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V114: Register 仙界任务+成就系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V114)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V115: Register 仙界图鉴+收集系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V115)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V116: Register 仙界排行榜+荣耀系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V116)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6133,6 +6145,63 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'exchange.charge':
                             result = this.mcpExchangeCharge(args);
+                            break;
+                        // V114: 仙界任务+成就系统
+                        case 'quest.list':
+                            result = this.mcpQuestList(args);
+                            break;
+                        case 'quest.accept':
+                            result = this.mcpQuestAccept(args);
+                            break;
+                        case 'quest.submit':
+                            result = this.mcpQuestSubmit(args);
+                            break;
+                        case 'achievement.query':
+                            result = this.mcpAchievementQuery(args);
+                            break;
+                        case 'achievement.unlock':
+                            result = this.mcpAchievementUnlock(args);
+                            break;
+                        case 'achievement.reward':
+                            result = this.mcpAchievementReward(args);
+                            break;
+                        // V115: 仙界图鉴+收集系统
+                        case 'codex.browse':
+                            result = this.mcpCodexBrowse(args);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlock(args);
+                            break;
+                        case 'codex.detail':
+                            result = this.mcpCodexDetail(args);
+                            break;
+                        case 'collection.progress':
+                            result = this.mcpCollectionProgress(args);
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionReward(args);
+                            break;
+                        case 'collection.share':
+                            result = this.mcpCollectionShare(args);
+                            break;
+                        // V116: 仙界排行榜+荣耀系统
+                        case 'rank.query':
+                            result = this.mcpRankQuery(args.type, args.page, args.pageSize);
+                            break;
+                        case 'rank.refresh':
+                            result = this.mcpRankRefresh(args.type);
+                            break;
+                        case 'rank.detail':
+                            result = this.mcpRankDetail(args.playerId);
+                            break;
+                        case 'glory.query':
+                            result = this.mcpGloryQuery();
+                            break;
+                        case 'glory.level':
+                            result = this.mcpGloryLevel();
+                            break;
+                        case 'glory.claim':
+                            result = this.mcpGloryClaim(args.levelId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -13708,6 +13777,831 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V114: _initQuestState - 初始化仙界任务系统状态
+            _initQuestState() {
+                const gs = window.gameState;
+                if (!gs.quest) {
+                    gs.quest = {
+                        available: [...QUEST_POOL],
+                        active: [],
+                        completed: [],
+                        questPool: [...QUEST_POOL]
+                    };
+                }
+                return gs.quest;
+            }
+
+            // V114: _initAchievementState - 初始化成就系统状态
+            _initAchievementState() {
+                const gs = window.gameState;
+                if (!gs.achievement) {
+                    gs.achievement = {
+                        unlocked: [],
+                        rewardsClaimed: [],
+                        achievementPool: [...ACHIEVEMENT_POOL]
+                    };
+                }
+                return gs.achievement;
+            }
+
+            // V115: _initCodexState - 初始化仙界图鉴系统状态
+            _initCodexState() {
+                const gs = window.gameState;
+                if (!gs.codex) {
+                    gs.codex = {
+                        entries: [],
+                        categories: {
+                            recipe: [],
+                            pet: [],
+                            item: [],
+                            realm: []
+                        },
+                        unlockedCount: 0
+                    };
+                }
+                return gs.codex;
+            }
+
+            // V115: _initCollectionState - 初始化收集系统状态
+            _initCollectionState() {
+                const gs = window.gameState;
+                if (!gs.collection) {
+                    gs.collection = {
+                        progress: { recipe: 0, pet: 0, item: 0, realm: 0 },
+                        rewardsClaimed: [],
+                        tierRewards: {
+                            tier1: { need: 5, reward: { spiritStones: 1000, exp: 100 }, claimed: false },
+                            tier2: { need: 10, reward: { spiritStones: 3000, exp: 300 }, claimed: false },
+                            tier3: { need: 20, reward: { spiritStones: 10000, exp: 1000 }, claimed: false },
+                            tier4: { need: 30, reward: { spiritStones: 30000, exp: 3000 }, claimed: false }
+                        }
+                    };
+                }
+                return gs.collection;
+            }
+
+            // V115: mcpCodexBrowse - 浏览图鉴条目
+            mcpCodexBrowse(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const { category = 'all', page = 1 } = args || {};
+                    const pageSize = 10;
+                    
+                    let allEntries = [];
+                    if (category === 'all') {
+                        for (const [cat, entries] of Object.entries(CODEX_POOL)) {
+                            allEntries = allEntries.concat(entries.map(e => ({ ...e, category: cat })));
+                        }
+                    } else if (CODEX_POOL[category]) {
+                        allEntries = CODEX_POOL[category].map(e => ({ ...e, category }));
+                    }
+                    
+                    const total = allEntries.length;
+                    const start = (page - 1) * pageSize;
+                    const pagedEntries = allEntries.slice(start, start + pageSize);
+                    
+                    // Mark which ones are unlocked
+                    const unlockedIds = codex.entries.map(e => e.id);
+                    const entriesWithStatus = pagedEntries.map(e => ({
+                        ...e,
+                        isUnlocked: unlockedIds.includes(e.id)
+                    }));
+                    
+                    return {
+                        success: true,
+                        category,
+                        page,
+                        total,
+                        totalPages: Math.ceil(total / pageSize),
+                        entries: entriesWithStatus
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V115: mcpCodexUnlock - 解锁图鉴条目
+            mcpCodexUnlock(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const { codexId } = args || {};
+                    if (!codexId) return { error: '图鉴ID不能为空' };
+                    
+                    // Find the codex entry in pool
+                    let foundEntry = null;
+                    let entryCategory = null;
+                    for (const [cat, entries] of Object.entries(CODEX_POOL)) {
+                        const entry = entries.find(e => e.id === codexId);
+                        if (entry) {
+                            foundEntry = entry;
+                            entryCategory = cat;
+                            break;
+                        }
+                    }
+                    if (!foundEntry) return { error: '图鉴条目不存在: ' + codexId };
+                    
+                    // Check if already unlocked
+                    if (codex.entries.some(e => e.id === codexId)) {
+                        return { error: '该图鉴已解锁' };
+                    }
+                    
+                    // Check cost and deduct
+                    const cost = foundEntry.unlockCost;
+                    if (gs.spiritStones < cost) {
+                        return { error: '灵石不足，需要' + cost + '灵石' };
+                    }
+                    gs.spiritStones -= cost;
+                    
+                    // Add to unlocked
+                    codex.entries.push({ ...foundEntry, category: entryCategory });
+                    codex.unlockedCount++;
+                    
+                    // Update collection progress
+                    const collection = this._initCollectionState();
+                    collection.progress[entryCategory]++;
+                    
+                    return {
+                        success: true,
+                        codexId,
+                        name: foundEntry.name,
+                        cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '解锁图鉴[' + foundEntry.name + ']成功，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V115: mcpCodexDetail - 查看图鉴详情
+            mcpCodexDetail(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const { codexId } = args || {};
+                    if (!codexId) return { error: '图鉴ID不能为空' };
+                    
+                    // Check if unlocked
+                    const unlockedEntry = codex.entries.find(e => e.id === codexId);
+                    if (unlockedEntry) {
+                        return {
+                            success: true,
+                            codexId,
+                            name: unlockedEntry.name,
+                            description: unlockedEntry.description,
+                            effect: unlockedEntry.effect,
+                            category: unlockedEntry.category,
+                            isUnlocked: true
+                        };
+                    }
+                    
+                    // Find in pool to show locked info
+                    let foundEntry = null;
+                    let entryCategory = null;
+                    for (const [cat, entries] of Object.entries(CODEX_POOL)) {
+                        const entry = entries.find(e => e.id === codexId);
+                        if (entry) {
+                            foundEntry = entry;
+                            entryCategory = cat;
+                            break;
+                        }
+                    }
+                    if (!foundEntry) return { error: '图鉴条目不存在: ' + codexId };
+                    
+                    return {
+                        success: true,
+                        codexId,
+                        name: foundEntry.name,
+                        description: foundEntry.description,
+                        effect: foundEntry.effect,
+                        category: entryCategory,
+                        unlockCost: foundEntry.unlockCost,
+                        isUnlocked: false,
+                        message: '图鉴未解锁，需要' + foundEntry.unlockCost + '灵石解锁'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V115: mcpCollectionProgress - 查询收集进度
+            mcpCollectionProgress(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    const { category = 'all' } = args || {};
+                    
+                    const totalByCategory = {
+                        recipe: CODEX_POOL.recipe.length,
+                        pet: CODEX_POOL.pet.length,
+                        item: CODEX_POOL.item.length,
+                        realm: CODEX_POOL.realm.length
+                    };
+                    
+                    const progressByCategory = {
+                        recipe: codex.categories.recipe ? codex.categories.recipe.length : 0,
+                        pet: codex.categories.pet ? codex.categories.pet.length : 0,
+                        item: codex.categories.item ? codex.categories.item.length : 0,
+                        realm: codex.categories.realm ? codex.categories.realm.length : 0
+                    };
+                    
+                    // Recalculate from entries
+                    for (const entry of codex.entries) {
+                        if (entry.category && progressByCategory.hasOwnProperty(entry.category)) {
+                            progressByCategory[entry.category]++;
+                        }
+                    }
+                    
+                    const totalCollected = codex.entries.length;
+                    const totalItems = totalByCategory.recipe + totalByCategory.pet + totalByCategory.item + totalByCategory.realm;
+                    
+                    if (category === 'all') {
+                        return {
+                            success: true,
+                            totalCollected,
+                            totalItems,
+                            progress: progressByCategory,
+                            totals: totalByCategory,
+                            tierRewards: Object.entries(collection.tierRewards).map(([tier, data]) => ({
+                                tier,
+                                need: data.need,
+                                current: totalCollected,
+                                canClaim: totalCollected >= data.need && !data.claimed,
+                                claimed: data.claimed
+                            }))
+                        };
+                    } else {
+                        if (!totalByCategory[category]) return { error: '未知分类: ' + category };
+                        return {
+                            success: true,
+                            category,
+                            collected: progressByCategory[category],
+                            total: totalByCategory[category],
+                            canClaim: false
+                        };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V115: mcpCollectionReward - 领取收集奖励
+            mcpCollectionReward(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    const { tierId } = args || {};
+                    if (!tierId) return { error: '奖励档位ID不能为空' };
+                    
+                    const tierData = collection.tierRewards[tierId];
+                    if (!tierData) return { error: '奖励档位不存在: ' + tierId };
+                    
+                    if (tierData.claimed) return { error: '该奖励已领取' };
+                    
+                    const totalCollected = codex.entries.length;
+                    if (totalCollected < tierData.need) {
+                        return { error: '收集进度不足，需要收集' + tierData.need + '个图鉴，当前' + totalCollected + '个' };
+                    }
+                    
+                    // Claim reward
+                    tierData.claimed = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + tierData.reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + tierData.reward.exp;
+                    collection.rewardsClaimed.push(tierId);
+                    
+                    return {
+                        success: true,
+                        tierId,
+                        reward: tierData.reward,
+                        totalSpiritStones: gs.spiritStones,
+                        totalExp: gs.exp,
+                        message: '领取' + tierId + '奖励成功，获得' + tierData.reward.spiritStones + '灵石和' + tierData.reward.exp + '经验'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V115: mcpCollectionShare - 分享收集进度
+            mcpCollectionShare(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    
+                    const totalCollected = codex.entries.length;
+                    const totalItems = CODEX_POOL.recipe.length + CODEX_POOL.pet.length + CODEX_POOL.item.length + CODEX_POOL.realm.length;
+                    const progressByCategory = { recipe: 0, pet: 0, item: 0, realm: 0 };
+                    for (const entry of codex.entries) {
+                        if (entry.category && progressByCategory.hasOwnProperty(entry.category)) {
+                            progressByCategory[entry.category]++;
+                        }
+                    }
+                    
+                    const shareText = '【修仙图鉴分享】我的仙界图鉴收集进度：' +
+                        '已解锁' + totalCollected + '/' + totalItems + '个图鉴' +
+                        '（食谱' + progressByCategory.recipe + '/' + CODEX_POOL.recipe.length +
+                        '，灵宠' + progressByCategory.pet + '/' + CODEX_POOL.pet.length +
+                        '，道具' + progressByCategory.item + '/' + CODEX_POOL.item.length +
+                        '，境界' + progressByCategory.realm + '/' + CODEX_POOL.realm.length +
+                        '）灵石:' + (gs.spiritStones || 0) + ' 境界:' + (CONFIG.realms[gs.realm] || '炼气');
+                    
+                    return {
+                        success: true,
+                        shareText,
+                        totalCollected,
+                        totalItems,
+                        progress: progressByCategory
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: _initRankState - 初始化仙界排行榜系统状态
+            _initRankState() {
+                const gs = window.gameState;
+                if (!gs.rank) {
+                    gs.rank = {
+                        leaderboards: {
+                            spiritStones: [],
+                            realm: [],
+                            reputation: [],
+                            pvp: []
+                        },
+                        lastRefresh: 0
+                    };
+                }
+                // Ensure player is always on the list
+                this._refreshLeaderboard('spiritStones');
+                this._refreshLeaderboard('realm');
+                this._refreshLeaderboard('reputation');
+                this._refreshLeaderboard('pvp');
+                return gs.rank;
+            }
+
+            // V116: _refreshLeaderboard - 刷新单个排行榜
+            _refreshLeaderboard(type) {
+                const gs = window.gameState;
+                const lb = gs.rank.leaderboards[type];
+                
+                // Generate NPC data based on player stats
+                const playerRealm = gs.realm || 0;
+                const playerStones = gs.spiritStones || 0;
+                const playerRep = gs.reputation || 0;
+                const playerPvp = gs.pvpRating || 1200;
+                
+                // Create NPC entries
+                const npcs = NPC_NAMES.map((name, i) => {
+                    let value;
+                    switch(type) {
+                        case 'spiritStones': value = Math.floor(playerStones * (0.3 + Math.random() * 1.4) * (1 - i * 0.03)); break;
+                        case 'realm': value = Math.max(0, Math.min(5, playerRealm + Math.floor(Math.random() * 7 - 3))); break;
+                        case 'reputation': value = Math.floor(playerRep * (0.3 + Math.random() * 1.4) * (1 - i * 0.03)); break;
+                        case 'pvp': value = Math.floor(playerPvp * (0.85 + Math.random() * 0.3) - i * 15); break;
+                    }
+                    return { id: 'npc_' + i, name, value };
+                });
+                
+                // Add player as position 1, then sort NPCs above and below
+                const playerEntry = { id: 'player', name: '你', value: type === 'realm' ? playerRealm : 
+                    (type === 'spiritStones' ? playerStones : 
+                    (type === 'reputation' ? playerRep : playerPvp)) };
+                
+                // Build final list with player always at position 1
+                lb.length = 0;
+                lb.push(playerEntry);
+                // Sort NPCs by value descending
+                npcs.sort((a, b) => b.value - a.value);
+                // Insert NPCs around player's "real" position
+                const playerRank = this._calculatePlayerRank(type, playerEntry.value, npcs);
+                const insertPos = Math.min(Math.max(1, playerRank), npcs.length + 1);
+                npcs.forEach((npc, i) => {
+                    if (i === insertPos - 1) lb.push(npc);
+                    else if (i < insertPos - 1) lb.splice(i + 1, 0, npc);
+                    else lb.push(npc);
+                });
+                
+                gs.rank.lastRefresh = Date.now();
+            }
+
+            // V116: _calculatePlayerRank - 计算玩家在排行榜中的真实位置
+            _calculatePlayerRank(type, playerValue, npcs) {
+                let rank = 1;
+                for (const npc of npcs) {
+                    if (npc.value > playerValue) rank++;
+                }
+                return rank;
+            }
+
+            // V116: _initGloryState - 初始化荣耀系统状态
+            _initGloryState() {
+                const gs = window.gameState;
+                if (!gs.glory) {
+                    gs.glory = {
+                        points: 0,
+                        level: 'bronze',
+                        levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS))
+                    };
+                }
+                // Update glory level based on points
+                const pts = gs.glory.points || 0;
+                if (pts >= 20000) gs.glory.level = 'diamond';
+                else if (pts >= 5000) gs.glory.level = 'gold';
+                else if (pts >= 1000) gs.glory.level = 'silver';
+                else gs.glory.level = 'bronze';
+                return gs.glory;
+            }
+
+            // V116: mcpRankQuery - 查询排行榜
+            mcpRankQuery(type = 'spiritStones', page = 1, pageSize = 10) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['spiritStones', 'realm', 'reputation', 'pvp'].includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    const rank = this._initRankState();
+                    const lb = rank.leaderboards[type] || [];
+                    
+                    // Pagination
+                    const start = (page - 1) * pageSize;
+                    const end = start + pageSize;
+                    const entries = lb.slice(start, end).map((e, i) => ({
+                        rank: start + i + 1,
+                        id: e.id,
+                        name: e.name,
+                        value: e.value,
+                        isPlayer: e.id === 'player'
+                    }));
+                    
+                    return {
+                        success: true,
+                        type,
+                        page,
+                        pageSize,
+                        total: lb.length,
+                        entries
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpRankRefresh - 刷新排行数据
+            mcpRankRefresh(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['spiritStones', 'realm', 'reputation', 'pvp'].includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    this._initRankState();
+                    this._refreshLeaderboard(type);
+                    return {
+                        success: true,
+                        message: type + '排行榜已刷新',
+                        lastRefresh: gs.rank.lastRefresh
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpRankDetail - 查看玩家排行详情
+            mcpRankDetail(playerId = 'player') {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rank = this._initRankState();
+                    
+                    const results = [];
+                    for (const type of ['spiritStones', 'realm', 'reputation', 'pvp']) {
+                        const lb = rank.leaderboards[type] || [];
+                        const idx = lb.findIndex(e => e.id === (playerId || 'player'));
+                        results.push({
+                            type,
+                            rank: idx >= 0 ? idx + 1 : -1,
+                            value: idx >= 0 ? lb[idx].value : null
+                        });
+                    }
+                    
+                    return {
+                        success: true,
+                        playerId: playerId || 'player',
+                        rankings: results
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryQuery - 查询玩家荣耀值
+            mcpGloryQuery() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const glory = this._initGloryState();
+                    return {
+                        success: true,
+                        points: glory.points || 0,
+                        level: glory.level || 'bronze'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryLevel - 查询荣耀等级信息
+            mcpGloryLevel() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const glory = this._initGloryState();
+                    const levels = ['bronze', 'silver', 'gold', 'diamond'];
+                    const currentIdx = levels.indexOf(glory.level || 'bronze');
+                    
+                    const nextLevel = currentIdx < levels.length - 1 ? levels[currentIdx + 1] : null;
+                    const nextNeed = nextLevel ? GLORY_LEVEL_REWARDS[nextLevel].need : null;
+                    
+                    return {
+                        success: true,
+                        currentLevel: glory.level || 'bronze',
+                        points: glory.points || 0,
+                        nextLevel,
+                        nextNeed,
+                        progress: nextNeed ? Math.min(100, Math.floor((glory.points || 0) / nextNeed * 100)) : 100
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryClaim - 领取荣耀等级奖励
+            mcpGloryClaim(levelId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!levelId) return { error: '等级ID不能为空' };
+                    if (!GLORY_LEVEL_REWARDS[levelId]) return { error: '荣耀等级不存在: ' + levelId };
+                    
+                    const glory = this._initGloryState();
+                    const tierData = glory.levelRewards[levelId];
+                    
+                    if (!tierData) return { error: '荣耀等级数据不存在' };
+                    if (tierData.claimed) return { error: '该等级奖励已领取' };
+                    
+                    if ((glory.points || 0) < tierData.need) {
+                        return { error: '荣耀值不足，需要' + tierData.need + '点，当前' + glory.points + '点' };
+                    }
+                    
+                    tierData.claimed = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + tierData.reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + tierData.reward.exp;
+                    
+                    return {
+                        success: true,
+                        message: '领取' + levelId + '荣耀奖励成功',
+                        reward: tierData.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: mcpQuestList - 获取可接任务列表
+            mcpQuestList(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const quest = this._initQuestState();
+                    const { filter = 'available' } = args || {};
+                    let quests = [];
+                    switch (filter) {
+                        case 'available':
+                            quests = quest.available || [];
+                            break;
+                        case 'active':
+                            quests = quest.active || [];
+                            break;
+                        case 'completed':
+                            quests = quest.completed || [];
+                            break;
+                        case 'all':
+                            quests = [...(quest.available || []), ...(quest.active || []), ...(quest.completed || [])];
+                            break;
+                        default:
+                            quests = quest.available || [];
+                    }
+                    return {
+                        success: true,
+                        filter,
+                        total: quests.length,
+                        quests: quests.map(q => ({
+                            id: q.id,
+                            name: q.name,
+                            description: q.description,
+                            type: q.type,
+                            difficulty: q.difficulty,
+                            realmRequired: q.realmRequired,
+                            reward: q.reward
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: mcpQuestAccept - 接受任务
+            mcpQuestAccept(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { questId } = args || {};
+                    if (!questId) return { error: '任务ID不能为空' };
+                    const quest = this._initQuestState();
+                    // Check if active quest limit reached (max 5)
+                    if (quest.active.length >= 5) {
+                        return { error: '进行中的任务已达上限(5)' };
+                    }
+                    // Find quest in available pool
+                    const questIndex = quest.available.findIndex(q => q.id === questId);
+                    if (questIndex === -1) {
+                        return { error: '任务不存在或已不可接取: ' + questId };
+                    }
+                    const questData = quest.available[questIndex];
+                    // Check realm requirement
+                    if (questData.realmRequired && (gs.realm || 0) < questData.realmRequired) {
+                        return { error: '境界不足，需要炼气' + (questData.realmRequired + 1) + '期' };
+                    }
+                    // Move from available to active
+                    quest.available.splice(questIndex, 1);
+                    quest.active.push({
+                        id: questData.id,
+                        name: questData.name,
+                        progress: 0,
+                        startTime: Date.now()
+                    });
+                    return {
+                        success: true,
+                        questId,
+                        message: '任务已接受: ' + questData.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: mcpQuestSubmit - 提交已完成任务
+            mcpQuestSubmit(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { questId } = args || {};
+                    if (!questId) return { error: '任务ID不能为空' };
+                    const quest = this._initQuestState();
+                    // Find quest in active
+                    const activeIndex = quest.active.findIndex(q => q.id === questId);
+                    if (activeIndex === -1) {
+                        return { error: '任务不在进行中: ' + questId };
+                    }
+                    const activeQuest = quest.active[activeIndex];
+                    // Find quest reward from pool
+                    const questPoolData = QUEST_POOL.find(q => q.id === questId) || {};
+                    const reward = questPoolData.reward || { spiritStones: 100, exp: 10 };
+                    // Move from active to completed
+                    quest.active.splice(activeIndex, 1);
+                    quest.completed.push({
+                        id: activeQuest.id,
+                        name: activeQuest.name,
+                        completedAt: Date.now()
+                    });
+                    // Give reward
+                    gs.spiritStones = (gs.spiritStones || 0) + (reward.spiritStones || 0);
+                    gs.totalQuestCompleted = (gs.totalQuestCompleted || 0) + 1;
+                    return {
+                        success: true,
+                        questId,
+                        reward,
+                        message: '任务已完成: ' + activeQuest.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: mcpAchievementQuery - 查询玩家成就
+            mcpAchievementQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const achievement = this._initAchievementState();
+                    const { filter = 'all' } = args || {};
+                    const allAchievements = ACHIEVEMENT_POOL;
+                    let achievements = [];
+                    switch (filter) {
+                        case 'all':
+                            achievements = allAchievements;
+                            break;
+                        case 'unlocked':
+                            achievements = allAchievements.filter(a => achievement.unlocked.includes(a.id));
+                            break;
+                        case 'locked':
+                            achievements = allAchievements.filter(a => !achievement.unlocked.includes(a.id));
+                            break;
+                        default:
+                            achievements = allAchievements;
+                    }
+                    return {
+                        success: true,
+                        filter,
+                        total: achievements.length,
+                        achievements: achievements.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            description: a.description,
+                            unlocked: achievement.unlocked.includes(a.id),
+                            rewardClaimed: achievement.rewardsClaimed.includes(a.id)
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: _checkAchievementCondition - 检查成就条件是否满足
+            _checkAchievementCondition(condition) {
+                const gs = window.gameState;
+                if (!condition || !condition.type) return false;
+                switch (condition.type) {
+                    case 'questCompleted':
+                        return (gs.totalQuestCompleted || 0) >= condition.amount;
+                    case 'totalStone':
+                        return (gs.totalStone || 0) >= condition.amount;
+                    case 'realm':
+                        return (gs.realm || 0) >= condition.level;
+                    case 'rank':
+                        return (gs.rank || 999999) <= condition.position;
+                    case 'pillCrafted':
+                        return (gs.pillCrafted || 0) >= condition.amount;
+                    case 'skillLearned':
+                        return (gs.skillLearned || 0) >= condition.amount;
+                    case 'equipmentEnhanced':
+                        return (gs.equipmentEnhanced || 0) >= condition.amount;
+                    case 'serendipity':
+                        return (gs.serendipity || 0) >= condition.amount;
+                    case 'inSect':
+                        return gs.sect && gs.sect.name;
+                    case 'sectContribution':
+                        return (gs.sect?.contribution || 0) >= condition.amount;
+                    default:
+                        return false;
+                }
+            }
+
+            // V114: mcpAchievementUnlock - 解锁成就
+            mcpAchievementUnlock(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { achievementId } = args || {};
+                    if (!achievementId) return { error: '成就ID不能为空' };
+                    const achievement = this._initAchievementState();
+                    // Find achievement in pool
+                    const achData = ACHIEVEMENT_POOL.find(a => a.id === achievementId);
+                    if (!achData) {
+                        return { error: '成就不存在: ' + achievementId };
+                    }
+                    // Check if already unlocked
+                    if (achievement.unlocked.includes(achievementId)) {
+                        return { success: true, message: '成就已解锁: ' + achData.name };
+                    }
+                    // Check condition
+                    if (!this._checkAchievementCondition(achData.condition)) {
+                        return { error: '成就条件未满足: ' + achData.name };
+                    }
+                    // Unlock
+                    achievement.unlocked.push(achievementId);
+                    return {
+                        success: true,
+                        achievementId,
+                        message: '成就已解锁: ' + achData.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V114: mcpAchievementReward - 领取成就奖励
+            mcpAchievementReward(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { achievementId } = args || {};
+                    if (!achievementId) return { error: '成就ID不能为空' };
+                    const achievement = this._initAchievementState();
+                    // Find achievement in pool
+                    const achData = ACHIEVEMENT_POOL.find(a => a.id === achievementId);
+                    if (!achData) {
+                        return { error: '成就不存在: ' + achievementId };
+                    }
+                    // Check if unlocked
+                    if (!achievement.unlocked.includes(achievementId)) {
+                        return { error: '成就未解锁: ' + achData.name };
+                    }
+                    // Check if already claimed
+                    if (achievement.rewardsClaimed.includes(achievementId)) {
+                        return { error: '奖励已领取: ' + achData.name };
+                    }
+                    // Claim reward
+                    achievement.rewardsClaimed.push(achievementId);
+                    const reward = achData.reward || { spiritStones: 100, exp: 10 };
+                    gs.spiritStones = (gs.spiritStones || 0) + (reward.spiritStones || 0);
+                    return {
+                        success: true,
+                        achievementId,
+                        reward,
+                        message: '奖励已领取: ' + achData.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -20955,6 +21849,1156 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v113Results = runV113Tests();
+
+        // ===== V115: 仙界图鉴+收集系统 =====
+        // --- MCP_TOOLS_V115: 仙界图鉴+收集系统 ---
+        const MCP_TOOLS_V115 = {
+            'codex.browse': {
+                name: 'codex.browse',
+                description: '浏览图鉴条目 (仙界图鉴系统-浏览)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: '分类 (all/recipe/pet/item/realm)', default: 'all' },
+                        page: { type: 'number', description: '页码', default: 1 }
+                    }
+                }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴条目 (仙界图鉴系统-解锁, 扣灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'codex.detail': {
+                name: 'codex.detail',
+                description: '查看图鉴详情 (仙界图鉴系统-详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'collection.progress': {
+                name: 'collection.progress',
+                description: '查询收集进度 (收集系统-进度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: '分类 (all/recipe/pet/item/realm)', default: 'all' }
+                    }
+                }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集系统-奖励, 需达到条件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tierId: { type: 'string', description: '奖励档位ID' }
+                    },
+                    required: ['tierId']
+                }
+            },
+            'collection.share': {
+                name: 'collection.share',
+                description: '分享收集进度 (收集系统-分享)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
+        // ===== V116: 仙界排行榜+荣耀系统 =====
+        // --- MCP_TOOLS_V116: 仙界排行榜+荣耀系统 ---
+        const MCP_TOOLS_V116 = {
+            'rank.query': {
+                name: 'rank.query',
+                description: '查询排行榜 (仙界排行榜-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型 (spiritStones/realm/reputation/pvp)', default: 'spiritStones' },
+                        page: { type: 'number', description: '页码', default: 1 },
+                        pageSize: { type: 'number', description: '每页数量', default: 10 }
+                    }
+                }
+            },
+            'rank.refresh': {
+                name: 'rank.refresh',
+                description: '刷新排行数据 (仙界排行榜-刷新)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型 (spiritStones/realm/reputation/pvp)' }
+                    },
+                    required: ['type']
+                }
+            },
+            'rank.detail': {
+                name: 'rank.detail',
+                description: '查看玩家排行详情 (仙界排行榜-详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: '玩家ID', default: 'player' }
+                    }
+                }
+            },
+            'glory.query': {
+                name: 'glory.query',
+                description: '查询玩家荣耀值 (荣耀系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'glory.level': {
+                name: 'glory.level',
+                description: '查询荣耀等级信息 (荣耀系统-等级)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'glory.claim': {
+                name: 'glory.claim',
+                description: '领取荣耀等级奖励 (荣耀系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        levelId: { type: 'string', description: '等级ID (bronze/silver/gold/diamond)' }
+                    },
+                    required: ['levelId']
+                }
+            }
+        };
+
+        // V116: Glory Level Rewards
+        const GLORY_LEVEL_REWARDS = {
+            bronze: { need: 0, reward: { spiritStones: 500, exp: 50 }, claimed: false },
+            silver: { need: 1000, reward: { spiritStones: 2000, exp: 200 }, claimed: false },
+            gold: { need: 5000, reward: { spiritStones: 10000, exp: 1000 }, claimed: false },
+            diamond: { need: 20000, reward: { spiritStones: 50000, exp: 5000 }, claimed: false }
+        };
+
+        // V116: NPC Names for leaderboards
+        const NPC_NAMES = [
+            '太虚真人', '天道仙尊', '玄冥魔君', '九天神帝', '万妖女王',
+            '剑圣无名', '丹王华佗', '器神欧冶', '阵仙诸葛亮', '符圣张陵',
+            '灵兽仙君', '幽冥鬼帝', '紫霄雷尊', '青云剑仙', '赤焰魔尊',
+            '寒冰仙子', '金刚罗汉', '菩提佛祖', '太上老君', '元始天尊'
+        ];
+
+        // V116: Codex Pool - 仙界图鉴池
+        const CODEX_POOL = {
+            recipe: [
+                { id: 'recipe_001', name: '筑基丹', description: '服用后大幅提升筑基成功率', effect: '筑基成功率+20%', unlockCost: 500 },
+                { id: 'recipe_002', name: '金丹丹', description: '服用后可提升金丹期修为', effect: '金丹期修为+15%', unlockCost: 1500 },
+                { id: 'recipe_003', name: '元婴丹', description: '服用后可提升元婴期修为', effect: '元婴期修为+15%', unlockCost: 5000 },
+                { id: 'recipe_004', name: '化神丹', description: '服用后可加速化神突破', effect: '化神突破+10%', unlockCost: 15000 },
+                { id: 'recipe_005', name: '聚灵丹', description: '加速灵气聚集', effect: '灵气聚集速度+25%', unlockCost: 800 },
+                { id: 'recipe_006', name: '破境丹', description: '提升境界突破率', effect: '境界突破+15%', unlockCost: 2000 },
+                { id: 'recipe_007', name: '养神丹', description: '恢复神识损伤', effect: '神识恢复+30%', unlockCost: 600 },
+                { id: 'recipe_008', name: '淬体丹', description: '强化肉身强度', effect: '防御+20%', unlockCost: 1000 }
+            ],
+            pet: [
+                { id: 'pet_001', name: '灵狐', description: '灵性十足的狐狸,擅长魅惑', effect: '魅惑技能+15%', unlockCost: 800 },
+                { id: 'pet_002', name: '玄蛇', description: '剧毒之蛇,攻击带毒', effect: '毒伤+20%', unlockCost: 1000 },
+                { id: 'pet_003', name: '灵鹤', description: '优雅的仙鹤,速度极快', effect: '速度+15%', unlockCost: 600 },
+                { id: 'pet_004', name: '玄虎', description: '威猛的白虎,战力惊人', effect: '攻击+25%', unlockCost: 2000 },
+                { id: 'pet_005', name: '青龙', description: '神兽青龙,呼风唤雨', effect: '水系技能+30%', unlockCost: 10000 },
+                { id: 'pet_006', name: '朱雀', description: '神兽朱雀,浴火重生', effect: '火系技能+30%', unlockCost: 10000 },
+                { id: 'pet_007', name: '白虎', description: '神兽白虎,杀伐果断', effect: '金属性攻击+35%', unlockCost: 12000 },
+                { id: 'pet_008', name: '玄武', description: '神兽玄武,寿与天齐', effect: '生命+40%', unlockCost: 12000 }
+            ],
+            item: [
+                { id: 'item_001', name: '玄铁剑', description: '以玄铁锻造的神兵', effect: '攻击+50', unlockCost: 3000 },
+                { id: 'item_002', name: '玄武甲', description: '玄武壳制成的护甲', effect: '防御+40', unlockCost: 3000 },
+                { id: 'item_003', name: '灵玉佩', description: '蕴含灵气的玉佩', effect: '灵力+100', unlockCost: 1500 },
+                { id: 'item_004', name: '天机镜', description: '可窥探天机的宝镜', effect: '机缘+20%', unlockCost: 8000 },
+                { id: 'item_005', name: '封神塔', description: '镇压诸神的古塔', effect: '境界压制+15%', unlockCost: 20000 },
+                { id: 'item_006', name: '炼妖壶', description: '炼制妖物的神器', effect: '宠物进化速度+30%', unlockCost: 5000 },
+                { id: 'item_007', name: '移山符', description: '搬山填海的符箓', effect: '灵石获取+25%', unlockCost: 4000 },
+                { id: 'item_008', name: '避水珠', description: '分水避海的明珠', effect: '水下探索效率+50%', unlockCost: 2500 }
+            ],
+            realm: [
+                { id: 'realm_001', name: '炼气期', description: '修真起始阶段,吸纳灵气', effect: '灵气上限+500', unlockCost: 200 },
+                { id: 'realm_002', name: '筑基期', description: '稳固根基,铸就道基', effect: '筑基加成+10%', unlockCost: 800 },
+                { id: 'realm_003', name: '金丹期', description: '凝结金丹,大道初成', effect: '金丹加成+15%', unlockCost: 3000 },
+                { id: 'realm_004', name: '元婴期', description: '元婴出窍,神游太虚', effect: '元婴加成+20%', unlockCost: 10000 },
+                { id: 'realm_005', name: '化神期', description: '化腐朽为神奇', effect: '化神加成+25%', unlockCost: 30000 },
+                { id: 'realm_006', name: '飞升期', description: '白日飞升,位列仙班', effect: '飞升加成+30%', unlockCost: 80000 }
+            ]
+        };
+
+        // V115: Collection Tier Rewards
+        const COLLECTION_TIER_REWARDS = {
+            tier1: { need: 5, reward: { spiritStones: 1000, exp: 100 }, claimed: false },
+            tier2: { need: 10, reward: { spiritStones: 3000, exp: 300 }, claimed: false },
+            tier3: { need: 20, reward: { spiritStones: 10000, exp: 1000 }, claimed: false },
+            tier4: { need: 30, reward: { spiritStones: 30000, exp: 3000 }, claimed: false }
+        };
+
+        // ===== V114: 仙界任务+成就系统 =====
+        // --- MCP_TOOLS_V114: 仙界任务+成就系统 ---
+        const MCP_TOOLS_V114 = {
+            'quest.list': {
+                name: 'quest.list',
+                description: '获取可接任务列表 (仙界任务系统-列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '筛选条件 (available/active/completed)', default: 'available' }
+                    }
+                }
+            },
+            'quest.accept': {
+                name: 'quest.accept',
+                description: '接受任务 (仙界任务系统-接受, 从available移到active)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'quest.submit': {
+                name: 'quest.submit',
+                description: '提交已完成任务 (仙界任务系统-提交, 从active移到completed，发放奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'achievement.query': {
+                name: 'achievement.query',
+                description: '查询玩家成就 (成就系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '筛选条件 (all/unlocked/locked)', default: 'all' }
+                    }
+                }
+            },
+            'achievement.unlock': {
+                name: 'achievement.unlock',
+                description: '解锁成就 (成就系统-解锁, 需满足条件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        achievementId: { type: 'string', description: '成就ID' }
+                    },
+                    required: ['achievementId']
+                }
+            },
+            'achievement.reward': {
+                name: 'achievement.reward',
+                description: '领取成就奖励 (成就系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        achievementId: { type: 'string', description: '成就ID' }
+                    },
+                    required: ['achievementId']
+                }
+            }
+        };
+
+        // V114: Quest Pool - 仙界任务池
+        const QUEST_POOL = [
+            { id: 'q_001', name: '灵气收集', description: '收集100点灵气', type: 'collect', requirement: { type: 'spirit', amount: 100 }, reward: { spiritStones: 500, exp: 50 }, difficulty: 1, realmRequired: 0 },
+            { id: 'q_002', name: '灵石采集', description: '采集50点灵石', type: 'collect', requirement: { type: 'stone', amount: 50 }, reward: { spiritStones: 1000, exp: 100 }, difficulty: 1, realmRequired: 0 },
+            { id: 'q_003', name: '丹药炼制', description: '炼制1枚筑基丹', type: 'craft', requirement: { type: 'pill', id: 'zhulian_dan', amount: 1 }, reward: { spiritStones: 2000, exp: 200 }, difficulty: 2, realmRequired: 1 },
+            { id: 'q_004', name: '技能领悟', description: '领悟1个技能', type: 'learn', requirement: { type: 'skill', amount: 1 }, reward: { spiritStones: 1500, exp: 150 }, difficulty: 1, realmRequired: 0 },
+            { id: 'q_005', name: '秘境探索', description: '探索1次秘境', type: 'explore', requirement: { type: 'secretRealm', amount: 1 }, reward: { spiritStones: 3000, exp: 300 }, difficulty: 2, realmRequired: 2 },
+            { id: 'q_006', name: '装备强化', description: '强化装备到+3', type: 'enhance', requirement: { type: 'equipment', level: 3 }, reward: { spiritStones: 2500, exp: 250 }, difficulty: 2, realmRequired: 1 },
+            { id: 'q_007', name: '灵石矿脉', description: '积累1000点灵石', type: 'collect', requirement: { type: 'stone', amount: 1000 }, reward: { spiritStones: 5000, exp: 500 }, difficulty: 3, realmRequired: 2 },
+            { id: 'q_008', name: '突破境界', description: '突破到金丹期', type: 'breakthrough', requirement: { type: 'realm', level: 2 }, reward: { spiritStones: 10000, exp: 1000 }, difficulty: 4, realmRequired: 3 },
+            { id: 'q_009', name: '天榜挑战', description: '进入天榜前100', type: 'battle', requirement: { type: 'rank', position: 100 }, reward: { spiritStones: 8000, exp: 800 }, difficulty: 3, realmRequired: 3 },
+            { id: 'q_010', name: '仙盟贡献', description: '为仙盟贡献5000资源', type: 'contribute', requirement: { type: 'contribution', amount: 5000 }, reward: { spiritStones: 4000, exp: 400 }, difficulty: 3, realmRequired: 2 }
+        ];
+
+        // V114: Achievement Pool - 成就池
+        const ACHIEVEMENT_POOL = [
+            { id: 'ach_001', name: '初入仙途', description: '完成第1个任务', condition: { type: 'questCompleted', amount: 1 }, reward: { spiritStones: 100, exp: 50 } },
+            { id: 'ach_002', name: '小有成就', description: '完成10个任务', condition: { type: 'questCompleted', amount: 10 }, reward: { spiritStones: 500, exp: 200 } },
+            { id: 'ach_003', name: '仙道初成', description: '完成50个任务', condition: { type: 'questCompleted', amount: 50 }, reward: { spiritStones: 2000, exp: 500 } },
+            { id: 'ach_004', name: '一方霸主', description: '完成100个任务', condition: { type: 'questCompleted', amount: 100 }, reward: { spiritStones: 5000, exp: 1000 } },
+            { id: 'ach_005', name: '灵石富翁', description: '累计拥有10000灵石', condition: { type: 'totalStone', amount: 10000 }, reward: { spiritStones: 1000, exp: 100 } },
+            { id: 'ach_006', name: '灵石巨头', description: '累计拥有100000灵石', condition: { type: 'totalStone', amount: 100000 }, reward: { spiritStones: 5000, exp: 500 } },
+            { id: 'ach_007', name: '筑基成功', description: '达到筑基期', condition: { type: 'realm', level: 1 }, reward: { spiritStones: 500, exp: 200 } },
+            { id: 'ach_008', name: '金丹大道', description: '达到金丹期', condition: { type: 'realm', level: 2 }, reward: { spiritStones: 2000, exp: 500 } },
+            { id: 'ach_009', name: '元婴真君', description: '达到元婴期', condition: { type: 'realm', level: 3 }, reward: { spiritStones: 5000, exp: 1000 } },
+            { id: 'ach_010', name: '化神大能', description: '达到化神期', condition: { type: 'realm', level: 4 }, reward: { spiritStones: 10000, exp: 2000 } },
+            { id: 'ach_011', name: '首登天榜', description: '首次进入天榜', condition: { type: 'rank', position: 1000 }, reward: { spiritStones: 1000, exp: 300 } },
+            { id: 'ach_012', name: '天榜高手', description: '天榜前100', condition: { type: 'rank', position: 100 }, reward: { spiritStones: 3000, exp: 500 } },
+            { id: 'ach_013', name: '天榜至尊', description: '天榜前10', condition: { type: 'rank', position: 10 }, reward: { spiritStones: 10000, exp: 2000 } },
+            { id: 'ach_014', name: '炼丹新手', description: '炼制10枚丹药', condition: { type: 'pillCrafted', amount: 10 }, reward: { spiritStones: 500, exp: 150 } },
+            { id: 'ach_015', name: '炼丹大师', description: '炼制100枚丹药', condition: { type: 'pillCrafted', amount: 100 }, reward: { spiritStones: 3000, exp: 500 } },
+            { id: 'ach_016', name: '技能博学', description: '学会10个技能', condition: { type: 'skillLearned', amount: 10 }, reward: { spiritStones: 1000, exp: 300 } },
+            { id: 'ach_017', name: '装备强化专家', description: '强化装备50次', condition: { type: 'equipmentEnhanced', amount: 50 }, reward: { spiritStones: 2000, exp: 400 } },
+            { id: 'ach_018', name: '运气加身', description: '触发10次机缘', condition: { type: 'serendipity', amount: 10 }, reward: { spiritStones: 1000, exp: 200 } },
+            { id: 'ach_019', name: '仙盟成员', description: '加入仙盟', condition: { type: 'inSect', amount: 1 }, reward: { spiritStones: 500, exp: 100 } },
+            { id: 'ach_020', name: '仙盟精英', description: '仙盟贡献10000', condition: { type: 'sectContribution', amount: 10000 }, reward: { spiritStones: 3000, exp: 600 } }
+        ];
+
+        // V114 Tests
+        function runV114Tests() {
+            const results = [];
+            function v114Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                reputation: 100,
+                items: [],
+                quest: null,
+                achievement: null,
+                totalStone: 0,
+                totalQuestCompleted: 0,
+                pillCrafted: 0,
+                skillLearned: 0,
+                equipmentEnhanced: 0,
+                serendipity: 0,
+                sect: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: quest.list returns available quests
+            const questList1 = server.mcpQuestList({ filter: 'available' });
+            v114Assert(questList1.success === true, 'quest.list available succeeds');
+            v114Assert(questList1.total >= 5, 'quest.list returns available quests');
+
+            // Test 2: quest.list with active filter
+            const questList2 = server.mcpQuestList({ filter: 'active' });
+            v114Assert(questList2.success === true, 'quest.list active succeeds');
+            v114Assert(questList2.total === 0, 'quest.list active initially 0');
+
+            // Test 3: quest.list with completed filter
+            const questList3 = server.mcpQuestList({ filter: 'completed' });
+            v114Assert(questList3.success === true, 'quest.list completed succeeds');
+            v114Assert(questList3.total === 0, 'quest.list completed initially 0');
+
+            // Test 4: quest.accept moves quest from available to active
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL];
+            mockGameState.quest.active = [];
+            const accept1 = server.mcpQuestAccept({ questId: 'q_001' });
+            v114Assert(accept1.success === true, 'quest.accept succeeds');
+            v114Assert(accept1.questId === 'q_001', 'quest.accept returns correct id');
+            v114Assert(mockGameState.quest.active.length === 1, 'quest.accept moves to active');
+            v114Assert(mockGameState.quest.available.length === QUEST_POOL.length - 1, 'quest.accept removes from available');
+
+            // Test 5: quest.accept fails with invalid questId
+            const acceptInvalid = server.mcpQuestAccept({ questId: 'invalid_quest' });
+            v114Assert(acceptInvalid.error && acceptInvalid.error.includes('任务不存在'), 'quest.accept fails with invalid id');
+
+            // Test 6: quest.accept fails with missing questId
+            const acceptNoId = server.mcpQuestAccept({});
+            v114Assert(acceptNoId.error && acceptNoId.error.includes('任务ID不能为空'), 'quest.accept requires questId');
+
+            // Test 7: quest.submit moves quest from active to completed and gives reward
+            server._initQuestState();
+            mockGameState.quest.available = [];
+            mockGameState.quest.active = [{ id: 'q_001', name: '灵气收集', progress: 100, startTime: Date.now() - 3600000 }];
+            mockGameState.quest.completed = [];
+            const submit1 = server.mcpQuestSubmit({ questId: 'q_001' });
+            v114Assert(submit1.success === true, 'quest.submit succeeds');
+            v114Assert(submit1.reward, 'quest.submit returns reward');
+            v114Assert(mockGameState.quest.completed.length === 1, 'quest.submit moves to completed');
+            v114Assert(mockGameState.quest.active.length === 0, 'quest.submit removes from active');
+            v114Assert(mockGameState.spiritStones === 50500, 'quest.submit gives spirit stones reward');
+
+            // Test 8: quest.submit fails with quest not in active
+            server._initQuestState();
+            mockGameState.quest.active = [];
+            const submitNotActive = server.mcpQuestSubmit({ questId: 'q_001' });
+            v114Assert(submitNotActive.error && submitNotActive.error.includes('任务不在进行中'), 'quest.submit fails when not active');
+
+            // Test 9: quest.submit fails with missing questId
+            const submitNoId = server.mcpQuestSubmit({});
+            v114Assert(submitNoId.error && submitNoId.error.includes('任务ID不能为空'), 'quest.submit requires questId');
+
+            // Test 10: achievement.query returns all achievements
+            const achQuery1 = server.mcpAchievementQuery({ filter: 'all' });
+            v114Assert(achQuery1.success === true, 'achievement.query all succeeds');
+            v114Assert(achQuery1.total === 20, 'achievement.query returns 20 achievements');
+
+            // Test 11: achievement.query with unlocked filter
+            const achQuery2 = server.mcpAchievementQuery({ filter: 'unlocked' });
+            v114Assert(achQuery2.success === true, 'achievement.query unlocked succeeds');
+            v114Assert(achQuery2.total === 0, 'achievement.query unlocked initially 0');
+
+            // Test 12: achievement.query with locked filter
+            const achQuery3 = server.mcpAchievementQuery({ filter: 'locked' });
+            v114Assert(achQuery3.success === true, 'achievement.query locked succeeds');
+            v114Assert(achQuery3.total === 20, 'achievement.query locked initially 20');
+
+            // Test 13: achievement.unlock succeeds when condition met
+            server._initAchievementState();
+            mockGameState.totalQuestCompleted = 1;
+            const unlock1 = server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            v114Assert(unlock1.success === true, 'achievement.unlock succeeds');
+            v114Assert(mockGameState.achievement.unlocked.includes('ach_001'), 'achievement.unlocked adds to list');
+
+            // Test 14: achievement.unlock fails when condition not met
+            server._initAchievementState();
+            mockGameState.totalQuestCompleted = 0;
+            const unlockFail = server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            v114Assert(unlockFail.error && unlockFail.error.includes('成就条件未满足'), 'achievement.unlock fails when condition not met');
+
+            // Test 15: achievement.unlock fails with invalid id
+            server._initAchievementState();
+            const unlockInvalid = server.mcpAchievementUnlock({ achievementId: 'invalid_ach' });
+            v114Assert(unlockInvalid.error && unlockInvalid.error.includes('成就不存在'), 'achievement.unlock fails with invalid id');
+
+            // Test 16: achievement.unlock fails with missing id
+            const unlockNoId = server.mcpAchievementUnlock({});
+            v114Assert(unlockNoId.error && unlockNoId.error.includes('成就ID不能为空'), 'achievement.unlock requires id');
+
+            // Test 17: achievement.reward claims reward for unlocked achievement
+            server._initAchievementState();
+            mockGameState.achievement.unlocked = ['ach_001'];
+            mockGameState.achievement.rewardsClaimed = [];
+            const reward1 = server.mcpAchievementReward({ achievementId: 'ach_001' });
+            v114Assert(reward1.success === true, 'achievement.reward succeeds');
+            v114Assert(reward1.reward, 'achievement.reward returns reward');
+            v114Assert(mockGameState.achievement.rewardsClaimed.includes('ach_001'), 'achievement.reward marks as claimed');
+
+            // Test 18: achievement.reward fails when achievement not unlocked
+            server._initAchievementState();
+            mockGameState.achievement.unlocked = [];
+            const rewardNotUnlocked = server.mcpAchievementReward({ achievementId: 'ach_001' });
+            v114Assert(rewardNotUnlocked.error && rewardNotUnlocked.error.includes('成就未解锁'), 'achievement.reward fails when not unlocked');
+
+            // Test 19: achievement.reward fails when reward already claimed
+            server._initAchievementState();
+            mockGameState.achievement.unlocked = ['ach_001'];
+            mockGameState.achievement.rewardsClaimed = ['ach_001'];
+            const rewardClaimed = server.mcpAchievementReward({ achievementId: 'ach_001' });
+            v114Assert(rewardClaimed.error && rewardClaimed.error.includes('奖励已领取'), 'achievement.reward fails when already claimed');
+
+            // Test 20: achievement.reward fails with missing id
+            const rewardNoId = server.mcpAchievementReward({});
+            v114Assert(rewardNoId.error && rewardNoId.error.includes('成就ID不能为空'), 'achievement.reward requires id');
+
+            // Test 21: quest.list returns quests with correct structure
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL];
+            const questListStruct = server.mcpQuestList({ filter: 'available' });
+            v114Assert(questListStruct.quests[0].id !== undefined, 'quest has id');
+            v114Assert(questListStruct.quests[0].name !== undefined, 'quest has name');
+            v114Assert(questListStruct.quests[0].difficulty !== undefined, 'quest has difficulty');
+
+            // Test 22: quest.accept respects realm requirement
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL];
+            mockGameState.realm = 0; // 炼气期
+            const acceptRealmFail = server.mcpQuestAccept({ questId: 'q_008' }); // requires realm 3
+            v114Assert(acceptRealmFail.error && acceptRealmFail.error.includes('境界不足'), 'quest.accept fails when realm too low');
+
+            // Test 23: achievement.query locked count decreases after unlock
+            server._initAchievementState();
+            mockGameState.totalQuestCompleted = 1;
+            server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            const achQueryAfter = server.mcpAchievementQuery({ filter: 'locked' });
+            v114Assert(achQueryAfter.total === 19, 'achievement.locked count decreases after unlock');
+
+            // Test 24: quest.submit gives exp reward
+            server._initQuestState();
+            mockGameState.quest.active = [{ id: 'q_001', name: '灵气收集', progress: 100, startTime: Date.now() - 3600000 }];
+            mockGameState.quest.completed = [];
+            const submitExp = server.mcpQuestSubmit({ questId: 'q_001' });
+            v114Assert(submitExp.reward.exp === 50, 'quest.submit gives correct exp');
+
+            // Test 25: achievement.reward gives spirit stones
+            server._initAchievementState();
+            mockGameState.achievement.unlocked = ['ach_001'];
+            mockGameState.achievement.rewardsClaimed = [];
+            mockGameState.spiritStones = 0;
+            server.mcpAchievementReward({ achievementId: 'ach_001' });
+            v114Assert(mockGameState.spiritStones === 100, 'achievement.reward gives spirit stones');
+
+            // Test 26: quest.list with all filter returns all quest pools
+            const questListAll = server.mcpQuestList({ filter: 'all' });
+            v114Assert(questListAll.success === true, 'quest.list all succeeds');
+
+            // Test 27: quest can be accepted and submitted multiple times if repeatable
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL.filter(q => q.id === 'q_001')];
+            mockGameState.quest.active = [];
+            server.mcpQuestAccept({ questId: 'q_001' });
+            mockGameState.quest.active = [{ id: 'q_001', name: '灵气收集', progress: 100, startTime: Date.now() - 3600000 }];
+            server.mcpQuestSubmit({ questId: 'q_001' });
+            v114Assert(mockGameState.quest.completed.length === 1, 'quest completed after submit');
+
+            // Test 28: achievement.unlock is idempotent (unlocking already unlocked does not error)
+            server._initAchievementState();
+            mockGameState.totalQuestCompleted = 1;
+            server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            const unlockDup = server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            v114Assert(unlockDup.success === true, 'achievement.unlock is idempotent');
+
+            // Test 29: achievement.query shows unlocked achievement
+            server._initAchievementState();
+            mockGameState.totalQuestCompleted = 1;
+            server.mcpAchievementUnlock({ achievementId: 'ach_001' });
+            const achQueryUnlocked = server.mcpAchievementQuery({ filter: 'unlocked' });
+            v114Assert(achQueryUnlocked.total === 1, 'achievement.query shows unlocked');
+
+            // Test 30: quest.list shows correct filter count
+            server._initQuestState();
+            mockGameState.quest.available = QUEST_POOL.slice(0, 5);
+            mockGameState.quest.active = [{ id: 'q_001' }];
+            const questCountAvailable = server.mcpQuestList({ filter: 'available' });
+            v114Assert(questCountAvailable.total === 5, 'quest.list available count correct');
+            const questCountActive = server.mcpQuestList({ filter: 'active' });
+            v114Assert(questCountActive.total === 1, 'quest.list active count correct');
+
+            // Test 31: quest.submit without progress 100 still allows submit (for testing)
+            server._initQuestState();
+            mockGameState.quest.active = [{ id: 'q_002', name: '灵石采集', progress: 50, startTime: Date.now() - 3600000 }];
+            const submitPartial = server.mcpQuestSubmit({ questId: 'q_002' });
+            v114Assert(submitPartial.success === true, 'quest.submit allows submit regardless of progress');
+
+            // Test 32: achievement.reward cannot claim twice
+            server._initAchievementState();
+            mockGameState.achievement.unlocked = ['ach_001'];
+            mockGameState.achievement.rewardsClaimed = ['ach_001'];
+            const rewardTwice = server.mcpAchievementReward({ achievementId: 'ach_001' });
+            v114Assert(rewardTwice.error && rewardTwice.error.includes('奖励已领取'), 'achievement.reward fails twice');
+
+            // Test 33: quest.accept when active quest limit reached (max 5)
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL];
+            mockGameState.quest.active = Array(5).fill({ id: 'dummy' });
+            const acceptLimit = server.mcpQuestAccept({ questId: 'q_002' });
+            v114Assert(acceptLimit.error && acceptLimit.error.includes('进行中的任务已达上限'), 'quest.accept fails at limit');
+
+            // Test 34: achievement.condition check for realm achievement
+            server._initAchievementState();
+            mockGameState.realm = 1; // 筑基
+            const unlockRealm = server.mcpAchievementUnlock({ achievementId: 'ach_007' });
+            v114Assert(unlockRealm.success === true, 'achievement.unlock succeeds for realm condition');
+
+            // Test 35: achievement.condition check for rank achievement
+            server._initAchievementState();
+            mockGameState.rank = 50;
+            const unlockRank = server.mcpAchievementUnlock({ achievementId: 'ach_012' });
+            v114Assert(unlockRank.success === true, 'achievement.unlock succeeds for rank condition');
+
+            // Test 36: quest list pagination returns correct structure
+            server._initQuestState();
+            mockGameState.quest.available = [...QUEST_POOL];
+            const questPaged = server.mcpQuestList({ filter: 'available' });
+            v114Assert(questPaged.quests instanceof Array, 'quest.list returns array');
+
+            // Test 37: achievement.unlock checks totalStone condition
+            server._initAchievementState();
+            mockGameState.totalStone = 15000;
+            const unlockStone = server.mcpAchievementUnlock({ achievementId: 'ach_005' });
+            v114Assert(unlockStone.success === true, 'achievement.unlock succeeds for totalStone condition');
+
+            // Test 38: quest.submit adds to totalQuestCompleted
+            server._initQuestState();
+            mockGameState.totalQuestCompleted = 5;
+            mockGameState.quest.active = [{ id: 'q_001', progress: 100, startTime: Date.now() - 3600000 }];
+            server.mcpQuestSubmit({ questId: 'q_001' });
+            v114Assert(mockGameState.totalQuestCompleted === 6, 'quest.submit increments totalQuestCompleted');
+
+            // Test 39: achievement.condition check for pillCrafted
+            server._initAchievementState();
+            mockGameState.pillCrafted = 15;
+            const unlockPill = server.mcpAchievementUnlock({ achievementId: 'ach_014' });
+            v114Assert(unlockPill.success === true, 'achievement.unlock succeeds for pillCrafted condition');
+
+            // Test 40: quest.list and achievement.query with default filter
+            const questListDefault = server.mcpQuestList({});
+            v114Assert(questListDefault.filter === 'available', 'quest.list default filter is available');
+            const achQueryDefault = server.mcpAchievementQuery({});
+            v114Assert(achQueryDefault.filter === 'all', 'achievement.query default filter is all');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V114', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V114 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v114Results = runV114Tests();
+
+        // ===== V115: 仙界图鉴+收集系统 Tests =====
+        function runV115Tests() {
+            const results = [];
+            function v115Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                exp: 0,
+                codex: null,
+                collection: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: codex.browse with all category returns entries
+            const browse1 = server.mcpCodexBrowse({ category: 'all' });
+            v115Assert(browse1.success === true, 'codex.browse all succeeds');
+            v115Assert(browse1.total > 0, 'codex.browse all returns entries');
+            v115Assert(Array.isArray(browse1.entries), 'codex.browse returns entries array');
+
+            // Test 2: codex.browse with specific category
+            const browse2 = server.mcpCodexBrowse({ category: 'recipe' });
+            v115Assert(browse2.success === true, 'codex.browse recipe succeeds');
+            v115Assert(browse2.category === 'recipe', 'codex.browse returns recipe category');
+
+            // Test 3: codex.browse with pet category
+            const browse3 = server.mcpCodexBrowse({ category: 'pet' });
+            v115Assert(browse3.success === true, 'codex.browse pet succeeds');
+            v115Assert(browse3.total === 8, 'codex.browse pet has 8 entries');
+
+            // Test 4: codex.browse with item category
+            const browse4 = server.mcpCodexBrowse({ category: 'item' });
+            v115Assert(browse4.success === true, 'codex.browse item succeeds');
+            v115Assert(browse4.total === 8, 'codex.browse item has 8 entries');
+
+            // Test 5: codex.browse with realm category
+            const browse5 = server.mcpCodexBrowse({ category: 'realm' });
+            v115Assert(browse5.success === true, 'codex.browse realm succeeds');
+            v115Assert(browse5.total === 6, 'codex.browse realm has 6 entries');
+
+            // Test 6: codex.unlock unlocks a codex entry
+            const unlock1 = server.mcpCodexUnlock({ codexId: 'recipe_001' });
+            v115Assert(unlock1.success === true, 'codex.unlock succeeds');
+            v115Assert(unlock1.codexId === 'recipe_001', 'codex.unlock returns correct id');
+            v115Assert(unlock1.cost === 500, 'codex.unlock costs 500');
+            v115Assert(mockGameState.spiritStones === 49500, 'codex.unlock deducts spirit stones');
+
+            // Test 7: codex.unlock fails with invalid id
+            const unlockInvalid = server.mcpCodexUnlock({ codexId: 'invalid_id' });
+            v115Assert(unlockInvalid.error && unlockInvalid.error.includes('不存在'), 'codex.unlock fails with invalid id');
+
+            // Test 8: codex.unlock fails if already unlocked
+            const unlockDup = server.mcpCodexUnlock({ codexId: 'recipe_001' });
+            v115Assert(unlockDup.error && unlockDup.error.includes('已解锁'), 'codex.unlock fails if already unlocked');
+
+            // Test 9: codex.unlock fails with insufficient spirit stones
+            mockGameState.spiritStones = 100;
+            const unlockLow = server.mcpCodexUnlock({ codexId: 'recipe_002' });
+            v115Assert(unlockLow.error && unlockLow.error.includes('灵石不足'), 'codex.unlock fails with low spirit stones');
+
+            // Test 10: codex.detail returns unlocked entry details
+            mockGameState.spiritStones = 50000;
+            server._initCodexState();
+            mockGameState.codex.entries = [{ id: 'recipe_001', name: '筑基丹', category: 'recipe' }];
+            const detail1 = server.mcpCodexDetail({ codexId: 'recipe_001' });
+            v115Assert(detail1.success === true, 'codex.detail succeeds');
+            v115Assert(detail1.isUnlocked === true, 'codex.detail shows unlocked');
+            v115Assert(detail1.name === '筑基丹', 'codex.detail returns name');
+
+            // Test 11: codex.detail returns locked entry info
+            const detail2 = server.mcpCodexDetail({ codexId: 'pet_001' });
+            v115Assert(detail2.success === true, 'codex.detail succeeds for locked');
+            v115Assert(detail2.isUnlocked === false, 'codex.detail shows locked');
+            v115Assert(detail2.unlockCost === 800, 'codex.detail shows unlock cost');
+
+            // Test 12: codex.detail fails with invalid id
+            const detailInvalid = server.mcpCodexDetail({ codexId: 'invalid_id' });
+            v115Assert(detailInvalid.error && detailInvalid.error.includes('不存在'), 'codex.detail fails with invalid id');
+
+            // Test 13: collection.progress returns progress
+            server._initCodexState();
+            server._initCollectionState();
+            mockGameState.codex.entries = [{ id: 'recipe_001', category: 'recipe' }];
+            const progress1 = server.mcpCollectionProgress({ category: 'all' });
+            v115Assert(progress1.success === true, 'collection.progress succeeds');
+            v115Assert(progress1.totalCollected === 1, 'collection.progress shows 1 collected');
+            v115Assert(progress1.totalItems === 30, 'collection.progress shows 30 total items');
+
+            // Test 14: collection.progress with specific category
+            const progress2 = server.mcpCollectionProgress({ category: 'recipe' });
+            v115Assert(progress2.success === true, 'collection.progress recipe succeeds');
+            v115Assert(progress2.category === 'recipe', 'collection.progress returns recipe');
+
+            // Test 15: collection.reward fails when not enough collected
+            const reward1 = server.mcpCollectionReward({ tierId: 'tier1' });
+            v115Assert(reward1.error && reward1.error.includes('收集进度不足'), 'collection.reward fails with low progress');
+
+            // Test 16: collection.reward succeeds when tier requirement met
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            for (let i = 0; i < 5; i++) {
+                mockGameState.codex.entries.push({ id: 'recipe_00' + (i+1), category: 'recipe' });
+            }
+            const reward2 = server.mcpCollectionReward({ tierId: 'tier1' });
+            v115Assert(reward2.success === true, 'collection.reward tier1 succeeds');
+            v115Assert(reward2.reward.spiritStones === 1000, 'collection.reward gives 1000 spirit stones');
+            v115Assert(reward2.reward.exp === 100, 'collection.reward gives 100 exp');
+            v115Assert(mockGameState.spiritStones === 51000, 'collection.reward adds spirit stones');
+            v115Assert(mockGameState.exp === 100, 'collection.reward adds exp');
+
+            // Test 17: collection.reward fails if already claimed
+            const rewardDup = server.mcpCollectionReward({ tierId: 'tier1' });
+            v115Assert(rewardDup.error && rewardDup.error.includes('已领取'), 'collection.reward fails if claimed');
+
+            // Test 18: collection.reward fails with invalid tier
+            const rewardInvalid = server.mcpCollectionReward({ tierId: 'tier99' });
+            v115Assert(rewardInvalid.error && rewardInvalid.error.includes('不存在'), 'collection.reward fails with invalid tier');
+
+            // Test 19: collection.share returns share text
+            const share1 = server.mcpCollectionShare({});
+            v115Assert(share1.success === true, 'collection.share succeeds');
+            v115Assert(share1.shareText && share1.shareText.length > 0, 'collection.share returns text');
+            v115Assert(share1.totalCollected === 5, 'collection.share shows 5 collected');
+
+            // Test 20: codex.browse shows unlocked status correctly
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            mockGameState.codex.entries.push({ id: 'recipe_001', name: '筑基丹', category: 'recipe' });
+            const browseUnlocked = server.mcpCodexBrowse({ category: 'recipe' });
+            const unlockedEntry = browseUnlocked.entries.find(e => e.id === 'recipe_001');
+            const lockedEntry = browseUnlocked.entries.find(e => e.id === 'recipe_002');
+            v115Assert(unlockedEntry && unlockedEntry.isUnlocked === true, 'codex.browse shows unlocked entry');
+            v115Assert(lockedEntry && lockedEntry.isUnlocked === false, 'codex.browse shows locked entry');
+
+            // Test 21: collection.progress tier rewards show canClaim correctly
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            for (let i = 0; i < 10; i++) {
+                mockGameState.codex.entries.push({ id: 'recipe_00' + (i+1), category: 'recipe' });
+            }
+            const progress3 = server.mcpCollectionProgress({ category: 'all' });
+            const tier2 = progress3.tierRewards.find(t => t.tier === 'tier2');
+            v115Assert(tier2 && tier2.canClaim === true, 'collection.progress tier2 canClaim when 10 collected');
+            const tier3 = progress3.tierRewards.find(t => t.tier === 'tier3');
+            v115Assert(tier3 && tier3.canClaim === false, 'collection.progress tier3 cannot claim when only 10');
+
+            // Test 22: codex.unlock updates collection progress
+            server._initCodexState();
+            server._initCollectionState();
+            mockGameState.codex.entries = [];
+            mockGameState.codex.categories = { recipe: [], pet: [], item: [], realm: [] };
+            mockGameState.collection.progress = { recipe: 0, pet: 0, item: 0, realm: 0 };
+            mockGameState.spiritStones = 50000;
+            const unlock4 = server.mcpCodexUnlock({ codexId: 'pet_001' });
+            v115Assert(unlock4.success === true, 'codex.unlock pet succeeds');
+            v115Assert(mockGameState.collection.progress.pet === 1, 'codex.unlock updates pet collection progress');
+
+            // Test 23: codex.browse with pagination
+            const browsePage1 = server.mcpCodexBrowse({ category: 'all', page: 1 });
+            v115Assert(browsePage1.page === 1, 'codex.browse page 1');
+            v115Assert(browsePage1.totalPages > 1, 'codex.browse has multiple pages');
+
+            // Test 24: codex.browse with page 2
+            const browsePage2 = server.mcpCodexBrowse({ category: 'all', page: 2 });
+            v115Assert(browsePage2.page === 2, 'codex.browse page 2');
+
+            // Test 25: mcpCodexUnlock with item category
+            const unlockItem = server.mcpCodexUnlock({ codexId: 'item_001' });
+            v115Assert(unlockItem.success === true, 'codex.unlock item succeeds');
+            v115Assert(unlockItem.cost === 3000, 'codex.unlock item costs 3000');
+
+            // Test 26: mcpCodexUnlock with realm category
+            const unlockRealm = server.mcpCodexUnlock({ codexId: 'realm_002' });
+            v115Assert(unlockRealm.success === true, 'codex.unlock realm succeeds');
+            v115Assert(unlockRealm.cost === 800, 'codex.unlock realm costs 800');
+
+            // Test 27: collection.progress returns correct totals per category
+            server._initCodexState();
+            const progress4 = server.mcpCollectionProgress({ category: 'all' });
+            v115Assert(progress4.totals.recipe === 8, 'totals.recipe is 8');
+            v115Assert(progress4.totals.pet === 8, 'totals.pet is 8');
+            v115Assert(progress4.totals.item === 8, 'totals.item is 8');
+            v115Assert(progress4.totals.realm === 6, 'totals.realm is 6');
+
+            // Test 28: collection.reward tier2
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            for (let i = 0; i < 10; i++) {
+                mockGameState.codex.entries.push({ id: 'item_00' + (i+1), category: 'item' });
+            }
+            const rewardTier2 = server.mcpCollectionReward({ tierId: 'tier2' });
+            v115Assert(rewardTier2.success === true, 'collection.reward tier2 succeeds');
+            v115Assert(rewardTier2.reward.spiritStones === 3000, 'tier2 gives 3000 spirit stones');
+
+            // Test 29: collection.reward tier3
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            for (let i = 0; i < 20; i++) {
+                mockGameState.codex.entries.push({ id: 'realm_00' + (i+1), category: 'realm' });
+            }
+            const rewardTier3 = server.mcpCollectionReward({ tierId: 'tier3' });
+            v115Assert(rewardTier3.success === true, 'collection.reward tier3 succeeds');
+            v115Assert(rewardTier3.reward.spiritStones === 10000, 'tier3 gives 10000 spirit stones');
+
+            // Test 30: collection.reward tier4
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            for (let i = 0; i < 30; i++) {
+                mockGameState.codex.entries.push({ id: 'pet_00' + (i+1), category: 'pet' });
+            }
+            const rewardTier4 = server.mcpCollectionReward({ tierId: 'tier4' });
+            v115Assert(rewardTier4.success === true, 'collection.reward tier4 succeeds');
+            v115Assert(rewardTier4.reward.spiritStones === 30000, 'tier4 gives 30000 spirit stones');
+
+            // Test 31: codex.detail returns effect for unlocked entry
+            server._initCodexState();
+            mockGameState.codex.entries = [{ id: 'recipe_001', name: '筑基丹', description: '服用后大幅提升筑基成功率', effect: '筑基成功率+20%', category: 'recipe' }];
+            const detailEffect = server.mcpCodexDetail({ codexId: 'recipe_001' });
+            v115Assert(detailEffect.effect === '筑基成功率+20%', 'codex.detail returns effect');
+
+            // Test 32: codex.browse unknown category returns empty
+            const browseUnknown = server.mcpCodexBrowse({ category: 'unknown' });
+            v115Assert(browseUnknown.success === true, 'codex.browse unknown category succeeds');
+            v115Assert(browseUnknown.entries.length === 0, 'codex.browse unknown returns empty');
+
+            // Test 33: collection.share includes all categories
+            const shareAll = server.mcpCollectionShare({});
+            v115Assert(shareAll.progress.recipe !== undefined, 'share includes recipe progress');
+            v115Assert(shareAll.progress.pet !== undefined, 'share includes pet progress');
+            v115Assert(shareAll.progress.item !== undefined, 'share includes item progress');
+            v115Assert(shareAll.progress.realm !== undefined, 'share includes realm progress');
+
+            // Test 34: codex.unlock fails with missing codexId
+            const unlockNoId = server.mcpCodexUnlock({});
+            v115Assert(unlockNoId.error && unlockNoId.error.includes('ID不能为空'), 'codex.unlock requires codexId');
+
+            // Test 35: codex.detail fails with missing codexId
+            const detailNoId = server.mcpCodexDetail({});
+            v115Assert(detailNoId.error && detailNoId.error.includes('ID不能为空'), 'codex.detail requires codexId');
+
+            // Test 36: collection.reward fails with missing tierId
+            const rewardNoId = server.mcpCollectionReward({});
+            v115Assert(rewardNoId.error && rewardNoId.error.includes('ID不能为空'), 'collection.reward requires tierId');
+
+            // Test 37: codex.browse default category is all
+            const browseDefault = server.mcpCodexBrowse({});
+            v115Assert(browseDefault.category === 'all', 'codex.browse default category is all');
+
+            // Test 38: collection.progress default category is all
+            const progressDefault = server.mcpCollectionProgress({});
+            v115Assert(progressDefault.totalCollected !== undefined, 'collection.progress default returns all');
+
+            // Test 39: codex.unlock updates codex.unlockedCount
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            mockGameState.codex.unlockedCount = 0;
+            mockGameState.spiritStones = 50000;
+            const unlockCount1 = server.mcpCodexUnlock({ codexId: 'recipe_005' });
+            v115Assert(mockGameState.codex.unlockedCount === 1, 'codex.unlock increments unlockedCount');
+
+            // Test 40: multiple unlocks and progress tracking
+            server._initCodexState();
+            mockGameState.codex.entries = [];
+            mockGameState.codex.unlockedCount = 0;
+            mockGameState.spiritStones = 100000;
+            server.mcpCodexUnlock({ codexId: 'recipe_001' });
+            server.mcpCodexUnlock({ codexId: 'pet_001' });
+            server.mcpCodexUnlock({ codexId: 'item_001' });
+            server.mcpCodexUnlock({ codexId: 'realm_001' });
+            const progressMulti = server.mcpCollectionProgress({ category: 'all' });
+            v115Assert(progressMulti.totalCollected === 4, 'collection tracks 4 unlocked');
+            v115Assert(progressMulti.progress.recipe === 1, 'recipe progress is 1');
+            v115Assert(progressMulti.progress.pet === 1, 'pet progress is 1');
+            v115Assert(progressMulti.progress.item === 1, 'item progress is 1');
+            v115Assert(progressMulti.progress.realm === 1, 'realm progress is 1');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V115', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V115 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v115Results = runV115Tests();
+
+        // ===== V116: 仙界排行榜+荣耀系统 Tests =====
+        function runV116Tests() {
+            const results = [];
+            function v116Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                reputation: 100,
+                pvpRating: 1500,
+                rank: null,
+                glory: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: rank.query returns spiritStones leaderboard by default
+            server._initRankState();
+            const query1 = server.mcpRankQuery();
+            v116Assert(query1.success === true, 'rank.query succeeds');
+            v116Assert(query1.type === 'spiritStones', 'rank.query defaults to spiritStones');
+            v116Assert(query1.entries && query1.entries.length > 0, 'rank.query returns entries');
+
+            // Test 2: rank.query with realm type
+            const query2 = server.mcpRankQuery('realm');
+            v116Assert(query2.success === true, 'rank.query realm succeeds');
+            v116Assert(query2.type === 'realm', 'rank.query returns realm type');
+
+            // Test 3: rank.query with pagination
+            const query3 = server.mcpRankQuery('spiritStones', 1, 5);
+            v116Assert(query3.success === true, 'rank.query pagination succeeds');
+            v116Assert(query3.page === 1, 'rank.query returns page 1');
+            v116Assert(query3.pageSize === 5, 'rank.query returns pageSize 5');
+
+            // Test 4: rank.query invalid type fails
+            const queryInvalid = server.mcpRankQuery('invalid');
+            v116Assert(queryInvalid.error && queryInvalid.error.includes('无效的排行榜类型'), 'rank.query fails with invalid type');
+
+            // Test 5: rank.refresh updates leaderboard
+            const refresh1 = server.mcpRankRefresh('spiritStones');
+            v116Assert(refresh1.success === true, 'rank.refresh succeeds');
+            v116Assert(refresh1.message && refresh1.message.includes('spiritStones'), 'rank.refresh returns message');
+
+            // Test 6: rank.refresh invalid type fails
+            const refreshInvalid = server.mcpRankRefresh('invalid');
+            v116Assert(refreshInvalid.error && refreshInvalid.error.includes('无效的排行榜类型'), 'rank.refresh fails with invalid type');
+
+            // Test 7: rank.detail returns player rankings across all types
+            server._initRankState();
+            const detail1 = server.mcpRankDetail();
+            v116Assert(detail1.success === true, 'rank.detail succeeds');
+            v116Assert(detail1.rankings && detail1.rankings.length === 4, 'rank.detail returns 4 rankings');
+            v116Assert(detail1.playerId === 'player', 'rank.detail returns player id');
+
+            // Test 8: rank.detail with specific playerId
+            const detail2 = server.mcpRankDetail('player');
+            v116Assert(detail2.success === true, 'rank.detail with player id succeeds');
+
+            // Test 9: player is always at rank 1 in spiritStones initially (high stones)
+            const queryP = server.mcpRankQuery('spiritStones');
+            v116Assert(queryP.entries && queryP.entries[0].isPlayer === true, 'player is at rank 1');
+
+            // Test 10: glory.query returns initial state
+            const glory1 = server.mcpGloryQuery();
+            v116Assert(glory1.success === true, 'glory.query succeeds');
+            v116Assert(glory1.points === 0, 'glory.query initial points is 0');
+            v116Assert(glory1.level === 'bronze', 'glory.query initial level is bronze');
+
+            // Test 11: glory.level returns level info
+            const gloryLvl = server.mcpGloryLevel();
+            v116Assert(gloryLvl.success === true, 'glory.level succeeds');
+            v116Assert(gloryLvl.currentLevel === 'bronze', 'glory.level current level is bronze');
+            v116Assert(gloryLvl.nextLevel === 'silver', 'glory.level next level is silver');
+            v116Assert(gloryLvl.nextNeed === 1000, 'glory.level next need is 1000');
+
+            // Test 12: glory.claim fails for gold (not enough points)
+            const claimGold = server.mcpGloryClaim('gold');
+            v116Assert(claimGold.error && claimGold.error.includes('荣耀值不足'), 'glory.claim fails for gold with 0 points');
+
+            // Test 13: glory.claim succeeds for bronze (need 0)
+            server._initGloryState();
+            mockGameState.glory.points = 0;
+            const claimBronze = server.mcpGloryClaim('bronze');
+            v116Assert(claimBronze.success === true, 'glory.claim bronze succeeds');
+            v116Assert(claimBronze.reward, 'glory.claim returns reward');
+
+            // Test 14: glory.claim fails for already claimed bronze
+            const claimDup = server.mcpGloryClaim('bronze');
+            v116Assert(claimDup.error && claimDup.error.includes('已领取'), 'glory.claim fails for already claimed');
+
+            // Test 15: glory.claim fails for invalid levelId
+            const claimInvalid = server.mcpGloryClaim('invalid');
+            v116Assert(claimInvalid.error && claimInvalid.error.includes('荣耀等级不存在'), 'glory.claim fails with invalid level');
+
+            // Test 16: glory.claim fails for empty levelId
+            const claimEmpty = server.mcpGloryClaim('');
+            v116Assert(claimEmpty.error && claimEmpty.error.includes('不能为空'), 'glory.claim fails with empty levelId');
+
+            // Test 17: glory.level with silver points (1000)
+            mockGameState.glory.points = 1500;
+            mockGameState.glory.level = 'silver';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            const gloryLvl2 = server.mcpGloryLevel();
+            v116Assert(gloryLvl2.currentLevel === 'silver', 'glory.level shows silver');
+            v116Assert(gloryLvl2.nextLevel === 'gold', 'glory.level next is gold');
+            v116Assert(gloryLvl2.nextNeed === 5000, 'glory.level next need is 5000');
+            v116Assert(gloryLvl2.progress === 30, 'glory.level progress is 30%');
+
+            // Test 18: glory.claim silver succeeds with enough points
+            const claimSilver = server.mcpGloryClaim('silver');
+            v116Assert(claimSilver.success === true, 'glory.claim silver succeeds');
+
+            // Test 19: rank.query realm returns numeric values
+            const queryRealm = server.mcpRankQuery('realm');
+            v116Assert(queryRealm.entries[0].value >= 0, 'realm leaderboard has numeric values');
+
+            // Test 20: rank.query reputation returns numeric values
+            const queryRep = server.mcpRankQuery('reputation');
+            v116Assert(queryRep.entries[0].value >= 0, 'reputation leaderboard has numeric values');
+
+            // Test 21: rank.query pvp returns numeric values
+            const queryPvp = server.mcpRankQuery('pvp');
+            v116Assert(queryPvp.entries[0].value >= 0, 'pvp leaderboard has numeric values');
+
+            // Test 22: rank.detail returns -1 for non-existent player
+            mockGameState.rank = { leaderboards: { spiritStones: [{ id: 'player', name: '你', value: 50000 }], realm: [], reputation: [], pvp: [] } };
+            const detail3 = server.mcpRankDetail('nonexistent');
+            v116Assert(detail3.rankings[0].rank === -1, 'rank.detail returns -1 for missing player');
+
+            // Test 23: glory.claim gold with 6000 points succeeds
+            mockGameState.glory.points = 6000;
+            mockGameState.glory.level = 'gold';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            mockGameState.glory.levelRewards.silver.claimed = true;
+            const claimGold2 = server.mcpGloryClaim('gold');
+            v116Assert(claimGold2.success === true, 'glory.claim gold succeeds with 6000 points');
+
+            // Test 24: glory.claim diamond with 25000 points succeeds
+            mockGameState.glory.points = 25000;
+            mockGameState.glory.level = 'diamond';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            mockGameState.glory.levelRewards.bronze.claimed = true;
+            mockGameState.glory.levelRewards.silver.claimed = true;
+            mockGameState.glory.levelRewards.gold.claimed = true;
+            const claimDiamond = server.mcpGloryClaim('diamond');
+            v116Assert(claimDiamond.success === true, 'glory.claim diamond succeeds');
+
+            // Test 25: rank.refresh updates lastRefresh time
+            const before = mockGameState.rank ? mockGameState.rank.lastRefresh : 0;
+            server._initRankState();
+            const afterRefresh = server.mcpRankRefresh('spiritStones');
+            v116Assert(afterRefresh.lastRefresh > before, 'rank.refresh updates lastRefresh');
+
+            // Test 26-40: More edge cases and validation
+            // Test 26: rank.query with pageSize larger than list
+            server._initRankState();
+            const queryLarge = server.mcpRankQuery('spiritStones', 1, 100);
+            v116Assert(queryLarge.success === true, 'rank.query handles large pageSize');
+
+            // Test 27: rank.query with page beyond available
+            const queryPage2 = server.mcpRankQuery('spiritStones', 100, 10);
+            v116Assert(queryPage2.entries.length === 0, 'rank.query returns empty for high page');
+
+            // Test 28: glory.level at diamond level (max)
+            mockGameState.glory.points = 30000;
+            mockGameState.glory.level = 'diamond';
+            const gloryMax = server.mcpGloryLevel();
+            v116Assert(gloryMax.currentLevel === 'diamond', 'glory.level at max level');
+            v116Assert(gloryMax.nextLevel === null, 'glory.level has no next level');
+            v116Assert(gloryMax.progress === 100, 'glory.level progress is 100% at max');
+
+            // Test 29: rank.query with negative page uses default
+            const queryNeg = server.mcpRankQuery('spiritStones', -1, 10);
+            v116Assert(queryNeg.page === 1, 'rank.query defaults negative page to 1');
+
+            // Test 30: _initRankState initializes all leaderboards
+            mockGameState.rank = null;
+            const rankInit = server._initRankState();
+            v116Assert(rankInit.leaderboards.spiritStones, 'spiritStones leaderboard initialized');
+            v116Assert(rankInit.leaderboards.realm, 'realm leaderboard initialized');
+            v116Assert(rankInit.leaderboards.reputation, 'reputation leaderboard initialized');
+            v116Assert(rankInit.leaderboards.pvp, 'pvp leaderboard initialized');
+
+            // Test 31: _initGloryState creates proper structure
+            mockGameState.glory = null;
+            const gloryInit = server._initGloryState();
+            v116Assert(gloryInit.points === 0, 'glory init points is 0');
+            v116Assert(gloryInit.level === 'bronze', 'glory init level is bronze');
+            v116Assert(gloryInit.levelRewards, 'glory init has levelRewards');
+
+            // Test 32: rank.query entries have correct structure
+            server._initRankState();
+            const queryStruct = server.mcpRankQuery('spiritStones');
+            v116Assert(queryStruct.entries[0].rank !== undefined, 'entry has rank');
+            v116Assert(queryStruct.entries[0].id !== undefined, 'entry has id');
+            v116Assert(queryStruct.entries[0].name !== undefined, 'entry has name');
+            v116Assert(queryStruct.entries[0].value !== undefined, 'entry has value');
+            v116Assert(queryStruct.entries[0].isPlayer !== undefined, 'entry has isPlayer');
+
+            // Test 33: rank.detail rankings have correct structure
+            const detailStruct = server.mcpRankDetail();
+            v116Assert(detailStruct.rankings[0].type !== undefined, 'ranking has type');
+            v116Assert(detailStruct.rankings[0].rank !== undefined, 'ranking has rank');
+            v116Assert(detailStruct.rankings[0].value !== undefined, 'ranking has value');
+
+            // Test 34: glory query updates level based on points
+            mockGameState.glory = { points: 6000, level: 'bronze', levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS)) };
+            server._initGloryState();
+            v116Assert(mockGameState.glory.level === 'gold', 'glory level auto-updates to gold at 6000');
+
+            // Test 35: rank.refresh requires type parameter
+            const refreshNoType = server.mcpRankRefresh();
+            v116Assert(refreshNoType.error && refreshNoType.error.includes('无效的排行榜类型'), 'rank.refresh fails without type');
+
+            // Test 36: rank.query with 0 pageSize uses default
+            const queryZero = server.mcpRankQuery('spiritStones', 1, 0);
+            v116Assert(queryZero.success === true, 'rank.query handles 0 pageSize');
+
+            // Test 37: glory.claim requires enough points
+            mockGameState.glory = { points: 500, level: 'bronze', levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS)) };
+            const claimSilverLow = server.mcpGloryClaim('silver');
+            v116Assert(claimSilverLow.error && claimSilverLow.error.includes('荣耀值不足'), 'glory.claim fails when points too low');
+
+            // Test 38: rank.entries are sorted by value descending (spiritStones)
+            server._initRankState();
+            const querySorted = server.mcpRankQuery('spiritStones');
+            let sorted = true;
+            for (let i = 1; i < querySorted.entries.length; i++) {
+                if (querySorted.entries[i].value > querySorted.entries[i-1].value) {
+                    sorted = false;
+                    break;
+                }
+            }
+            v116Assert(sorted, 'spiritStones leaderboard is sorted descending');
+
+            // Test 39: player entry in leaderboard has correct name
+            const queryPlayer = server.mcpRankQuery('spiritStones');
+            const playerEntry = queryPlayer.entries.find(e => e.isPlayer);
+            v116Assert(playerEntry && playerEntry.name === '你', 'player entry has correct name');
+
+            // Test 40: rank.refresh success response has correct structure
+            const refreshResp = server.mcpRankRefresh('pvp');
+            v116Assert(refreshResp.success === true, 'rank.refresh pvp succeeds');
+            v116Assert(refreshResp.message === 'pvp排行榜已刷新', 'rank.refresh pvp message correct');
+            v116Assert(refreshResp.lastRefresh > 0, 'rank.refresh returns lastRefresh timestamp');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V116', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V116 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v116Results = runV116Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
