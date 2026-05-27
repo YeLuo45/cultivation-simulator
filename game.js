@@ -2812,6 +2812,75 @@
             }
         };
 
+        // --- MCP_TOOLS_V108: 仙界遗迹+混沌法则系统 ---
+        const MCP_TOOLS_V108 = {
+            'ruins.explore': {
+                name: 'ruins.explore',
+                description: '探索仙界遗迹，消耗体力 (仙界遗迹系统-探索遗迹)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        ruinsId: { type: 'string', description: '遗迹ID (可选，默认随机)' }
+                    }
+                }
+            },
+            'ruins.battle': {
+                name: 'ruins.battle',
+                description: '遗迹中的战斗，击败守护者获得奖励 (仙界遗迹系统-遗迹战斗)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        ruinsId: { type: 'string', description: '遗迹ID' },
+                        auto: { type: 'boolean', description: '是否自动战斗 (default false)', default: false }
+                    },
+                    required: ['ruinsId']
+                }
+            },
+            'ruins.reward': {
+                name: 'ruins.reward',
+                description: '领取遗迹探索奖励 (仙界遗迹系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        ruinsId: { type: 'string', description: '遗迹ID' }
+                    },
+                    required: ['ruinsId']
+                }
+            },
+            'chaos.law.understand': {
+                name: 'chaos.law.understand',
+                description: '领悟混沌法则 (混沌法则系统-法则领悟)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        lawType: { type: 'string', description: '法则类型 (time/space/fate/karma/creation/destruction)' }
+                    }
+                }
+            },
+            'chaos.law.resonance': {
+                name: 'chaos.law.resonance',
+                description: '多法则共鸣产生更强效果 (混沌法则系统-法则共鸣)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        lawIds: { type: 'array', description: '法则ID数组', items: { type: 'string' } }
+                    },
+                    required: ['lawIds']
+                }
+            },
+            'chaos.law.decompose': {
+                name: 'chaos.law.decompose',
+                description: '分解低等级法则 (混沌法则系统-法则分解)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        lawId: { type: 'string', description: '法则ID' }
+                    },
+                    required: ['lawId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -2947,6 +3016,10 @@
                 }
                 // V107: Register 仙界天榜+封神系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V107)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V108: Register 仙界遗迹+混沌法则系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V108)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3665,6 +3738,25 @@
                             break;
                         case 'deification.legacy':
                             result = this.mcpDeificationLegacy(args);
+                            break;
+                        // V108: 仙界遗迹+混沌法则系统
+                        case 'ruins.explore':
+                            result = this.mcpRuinsExplore(args);
+                            break;
+                        case 'ruins.battle':
+                            result = this.mcpRuinsBattle(args);
+                            break;
+                        case 'ruins.reward':
+                            result = this.mcpRuinsReward(args);
+                            break;
+                        case 'chaos.law.understand':
+                            result = this.mcpChaosLawUnderstand(args);
+                            break;
+                        case 'chaos.law.resonance':
+                            result = this.mcpChaosLawResonance(args);
+                            break;
+                        case 'chaos.law.decompose':
+                            result = this.mcpChaosLawDecompose(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
