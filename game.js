@@ -4807,6 +4807,72 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V111: 仙界奇遇+机缘系统 ---
+        const MCP_TOOLS_V111 = {
+            'serendipity.trigger': {
+                name: 'serendipity.trigger',
+                description: '触发随机奇遇事件 (仙界奇遇系统-触发)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        intensity: { type: 'string', description: '奇遇强度 (low/mid/high)', default: 'low' }
+                    }
+                }
+            },
+            'serendipity.query': {
+                name: 'serendipity.query',
+                description: '查询当前奇遇状态 (仙界奇遇系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'serendipity.complete': {
+                name: 'serendipity.complete',
+                description: '完成奇遇获得奖励 (仙界奇遇系统-完成)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['serendipityId']
+                }
+            },
+            'fortune.query': {
+                name: 'fortune.query',
+                description: '查询玩家的机缘记录 (机缘系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '筛选条件 (all/active/claimed)', default: 'all' }
+                    }
+                }
+            },
+            'fortune.activate': {
+                name: 'fortune.activate',
+                description: '激活某个机缘 (机缘系统-激活)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fortuneId: { type: 'string', description: '机缘ID' }
+                    },
+                    required: ['fortuneId']
+                }
+            },
+            'fortune.transform': {
+                name: 'fortune.transform',
+                description: '将机缘转化为实际收益 (机缘系统-转化)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fortuneId: { type: 'string', description: '机缘ID' },
+                        targetType: { type: 'string', description: '转化目标类型 (spiritStones/reputation/realm)' }
+                    },
+                    required: ['fortuneId', 'targetType']
+                }
+            }
+        };
+
         // --- MCP_TOOLS_V110: 天道誓言+因果誓约系统 ---
         const MCP_TOOLS_V110 = {
             'heaven.oath.take': {
@@ -5088,6 +5154,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V110: Register 天道誓言+因果誓约系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V110)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V111: Register 仙界奇遇+机缘系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V111)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5863,6 +5933,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'karma.oath.release':
                             result = this.mcpKarmaOathRelease(args);
+                            break;
+                        // V111: 仙界奇遇+机缘系统
+                        case 'serendipity.trigger':
+                            result = this.mcpSerendipityTrigger(args);
+                            break;
+                        case 'serendipity.query':
+                            result = this.mcpSerendipityQuery(args);
+                            break;
+                        case 'serendipity.complete':
+                            result = this.mcpSerendipityComplete(args);
+                            break;
+                        case 'fortune.query':
+                            result = this.mcpFortuneQuery(args);
+                            break;
+                        case 'fortune.activate':
+                            result = this.mcpFortuneActivate(args);
+                            break;
+                        case 'fortune.transform':
+                            result = this.mcpFortuneTransform(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12831,6 +12920,187 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V111: 仙界奇遇+机缘系统 Methods
+            _initSerendipityState() {
+                const gs = window.gameState;
+                if (!gs.serendipity) gs.serendipity = { events: [], lastTriggeredAt: null };
+                if (!gs.serendipity.events) gs.serendipity.events = [];
+                return gs.serendipity;
+            }
+
+            _initFortuneState() {
+                const gs = window.gameState;
+                if (!gs.fortune) gs.fortune = { records: [], fortuneIdCounter: 0 };
+                if (!gs.fortune.records) gs.fortune.records = [];
+                return gs.fortune;
+            }
+
+            mcpSerendipityTrigger(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const intensity = args?.intensity || 'low';
+                    if (!['low', 'mid', 'high'].includes(intensity)) {
+                        return { error: '无效的奇遇强度，必须为 low/mid/high' };
+                    }
+                    const state = this._initSerendipityState();
+                    const energyCost = intensity === 'low' ? 100 : intensity === 'mid' ? 300 : 500;
+                    if ((gs.spiritStones || 0) < energyCost) {
+                        return { error: '灵力不足，无法触发奇遇 (需要' + energyCost + '灵力)' };
+                    }
+                    gs.spiritStones -= energyCost;
+                    const eventTypes = ['洞府传承', '上古遗迹', '仙人指路', '妖兽献宝'];
+                    const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+                    const rewards = {
+                        '洞府传承': { type: 'spiritStones', amount: Math.floor(Math.random() * 500) + 200 },
+                        '上古遗迹': { type: 'reputation', amount: Math.floor(Math.random() * 30) + 10 },
+                        '仙人指路': { type: 'realm', amount: 1 },
+                        '妖兽献宝': { type: 'items', items: ['妖兽内丹', '灵草'] }
+                    };
+                    const reward = rewards[eventType];
+                    const eventId = 'serendipity_' + Date.now();
+                    state.events.push({
+                        id: eventId,
+                        eventType,
+                        intensity,
+                        status: 'pending',
+                        rewards: reward,
+                        createdAt: Date.now()
+                    });
+                    state.lastTriggeredAt = Date.now();
+                    return {
+                        success: true,
+                        serendipityId: eventId,
+                        eventType,
+                        intensity,
+                        status: 'pending',
+                        energyCost,
+                        message: '奇遇已触发: ' + eventType
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const state = this._initSerendipityState();
+                    return {
+                        total: state.events.length,
+                        events: state.events,
+                        lastTriggeredAt: state.lastTriggeredAt
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpSerendipityComplete(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { serendipityId } = args || {};
+                    if (!serendipityId) return { error: '奇遇ID不能为空' };
+                    const state = this._initSerendipityState();
+                    const event = state.events.find(e => e.id === serendipityId);
+                    if (!event) return { error: '不存在的奇遇: ' + serendipityId };
+                    if (event.status === 'completed') return { error: '奇遇已完成: ' + serendipityId };
+                    event.status = 'completed';
+                    event.completedAt = Date.now();
+                    const reward = event.rewards;
+                    if (reward.type === 'spiritStones') {
+                        gs.spiritStones = (gs.spiritStones || 0) + reward.amount;
+                    } else if (reward.type === 'reputation') {
+                        gs.reputation = (gs.reputation || 0) + reward.amount;
+                    } else if (reward.type === 'realm') {
+                        gs.realm = Math.min((gs.realm || 0) + reward.amount, 5);
+                    }
+                    return {
+                        success: true,
+                        serendipityId,
+                        eventType: event.eventType,
+                        status: 'completed',
+                        reward,
+                        message: '奇遇已完成，获得奖励'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFortuneQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const filter = args?.filter || 'all';
+                    const state = this._initFortuneState();
+                    let records = state.records;
+                    if (filter === 'active') records = records.filter(r => r.status === 'active');
+                    else if (filter === 'claimed') records = records.filter(r => r.status === 'claimed');
+                    return {
+                        total: records.length,
+                        records,
+                        filter
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFortuneActivate(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { fortuneId } = args || {};
+                    if (!fortuneId) return { error: '机缘ID不能为空' };
+                    const state = this._initFortuneState();
+                    const record = state.records.find(r => r.id === fortuneId);
+                    if (!record) return { error: '不存在的机缘: ' + fortuneId };
+                    if (record.status === 'claimed') return { error: '机缘已领取: ' + fortuneId };
+                    record.status = 'active';
+                    record.activatedAt = Date.now();
+                    return {
+                        success: true,
+                        fortuneId,
+                        fortuneType: record.fortuneType,
+                        status: 'active',
+                        message: '机缘已激活'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFortuneTransform(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { fortuneId, targetType } = args || {};
+                    if (!fortuneId) return { error: '机缘ID不能为空' };
+                    if (!targetType) return { error: '转化目标类型不能为空' };
+                    if (!['spiritStones', 'reputation', 'realm'].includes(targetType)) {
+                        return { error: '无效的目标类型，必须为 spiritStones/reputation/realm' };
+                    }
+                    const state = this._initFortuneState();
+                    const record = state.records.find(r => r.id === fortuneId);
+                    if (!record) return { error: '不存在的机缘: ' + fortuneId };
+                    if (record.status === 'claimed') return { error: '机缘已转化: ' + fortuneId };
+                    const level = record.level || 1;
+                    const multipliers = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
+                    const multiplier = multipliers[level] || 1;
+                    if (targetType === 'spiritStones') {
+                        const amount = 100 * multiplier;
+                        gs.spiritStones = (gs.spiritStones || 0) + amount;
+                        record.status = 'claimed';
+                        record.claimedAt = Date.now();
+                        return { success: true, fortuneId, targetType, amount, message: '机缘已转化为' + amount + '灵力' };
+                    } else if (targetType === 'reputation') {
+                        const amount = 20 * multiplier;
+                        gs.reputation = (gs.reputation || 0) + amount;
+                        record.status = 'claimed';
+                        record.claimedAt = Date.now();
+                        return { success: true, fortuneId, targetType, amount, message: '机缘已转化为' + amount + '声望' };
+                    } else if (targetType === 'realm') {
+                        gs.realm = Math.min((gs.realm || 0) + 1, 5);
+                        record.status = 'claimed';
+                        record.claimedAt = Date.now();
+                        return { success: true, fortuneId, targetType, amount: 1, message: '机缘已转化为境界提升' };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -19249,6 +19519,288 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v110Results = runV110Tests();
+
+        // ===== V111: 仙界奇遇+机缘系统 Tests =====
+        function runV111Tests() {
+            const results = [];
+            function v111Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 3,
+                stage: 1,
+                reputation: 50,
+                serendipity: null,
+                fortune: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: serendipity.trigger low intensity succeeds
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const trigger1 = server.mcpSerendipityTrigger({ intensity: 'low' });
+            v111Assert(trigger1.success === true, 'serendipity.trigger low succeeds');
+            v111Assert(trigger1.serendipityId && trigger1.serendipityId.startsWith('serendipity_'), 'serendipity.trigger returns id');
+            v111Assert(trigger1.intensity === 'low', 'serendipity.trigger intensity low');
+            v111Assert(trigger1.status === 'pending', 'serendipity.trigger status pending');
+            v111Assert(trigger1.energyCost === 100, 'serendipity.trigger low costs 100');
+
+            // Test 2: serendipity.trigger mid intensity costs 300
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const trigger2 = server.mcpSerendipityTrigger({ intensity: 'mid' });
+            v111Assert(trigger2.success === true, 'serendipity.trigger mid succeeds');
+            v111Assert(trigger2.energyCost === 300, 'serendipity.trigger mid costs 300');
+
+            // Test 3: serendipity.trigger high intensity costs 500
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const trigger3 = server.mcpSerendipityTrigger({ intensity: 'high' });
+            v111Assert(trigger3.success === true, 'serendipity.trigger high succeeds');
+            v111Assert(trigger3.energyCost === 500, 'serendipity.trigger high costs 500');
+
+            // Test 4: serendipity.trigger fails with invalid intensity
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const trigger4 = server.mcpSerendipityTrigger({ intensity: 'invalid' });
+            v111Assert(trigger4.error && trigger4.error.includes('无效的奇遇强度'), 'serendipity.trigger rejects invalid intensity');
+
+            // Test 5: serendipity.trigger fails with low spirit stones
+            mockGameState.spiritStones = 50;
+            mockGameState.serendipity = null;
+            const trigger5 = server.mcpSerendipityTrigger({ intensity: 'low' });
+            v111Assert(trigger5.error && trigger5.error.includes('灵力不足'), 'serendipity.trigger fails with low spirit stones');
+
+            // Test 6: serendipity.query returns all events
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_1', eventType: '洞府传承', intensity: 'low', status: 'pending' });
+            const query6 = server.mcpSerendipityQuery({});
+            v111Assert(query6.total === 1, 'serendipity.query returns 1 event');
+            v111Assert(query6.events && query6.events.length === 1, 'serendipity.query events array length 1');
+
+            // Test 7: serendipity.query returns empty when no events
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            const query7 = server.mcpSerendipityQuery({});
+            v111Assert(query7.total === 0, 'serendipity.query returns 0 when no events');
+
+            // Test 8: serendipity.complete succeeds for pending event
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_complete_1', eventType: '洞府传承', intensity: 'low', status: 'pending', rewards: { type: 'spiritStones', amount: 500 } });
+            const complete8 = server.mcpSerendipityComplete({ serendipityId: 's_complete_1' });
+            v111Assert(complete8.success === true, 'serendipity.complete succeeds');
+            v111Assert(complete8.status === 'completed', 'serendipity.complete status completed');
+
+            // Test 9: serendipity.complete fails for non-existent id
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            const complete9 = server.mcpSerendipityComplete({ serendipityId: 'non_existent' });
+            v111Assert(complete9.error && complete9.error.includes('不存在的奇遇'), 'serendipity.complete fails for non-existent id');
+
+            // Test 10: serendipity.complete fails for already completed
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_complete_2', eventType: '洞府传承', intensity: 'low', status: 'completed' });
+            const complete10 = server.mcpSerendipityComplete({ serendipityId: 's_complete_2' });
+            v111Assert(complete10.error && complete10.error.includes('奇遇已完成'), 'serendipity.complete fails for already completed');
+
+            // Test 11: serendipity.complete fails without id
+            const complete11 = server.mcpSerendipityComplete({});
+            v111Assert(complete11.error && complete11.error.includes('奇遇ID不能为空'), 'serendipity.complete fails without id');
+
+            // Test 12: serendipity.complete grants spirit stones reward
+            mockGameState.spiritStones = 1000;
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_reward_1', eventType: '洞府传承', intensity: 'low', status: 'pending', rewards: { type: 'spiritStones', amount: 500 } });
+            const complete12 = server.mcpSerendipityComplete({ serendipityId: 's_reward_1' });
+            v111Assert(complete12.success === true, 'serendipity.complete grants spirit stones reward');
+
+            // Test 13: fortune.query returns all records with filter all
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_1', fortuneType: '天灵根', level: 1, status: 'active' });
+            const fortune13 = server.mcpFortuneQuery({ filter: 'all' });
+            v111Assert(fortune13.total === 1, 'fortune.query filter all returns 1');
+            v111Assert(fortune13.filter === 'all', 'fortune.query returns correct filter');
+
+            // Test 14: fortune.query filter active returns only active
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_1', fortuneType: '天灵根', level: 1, status: 'active' });
+            mockGameState.fortune.records.push({ id: 'f_2', fortuneType: '地灵根', level: 2, status: 'claimed' });
+            const fortune14 = server.mcpFortuneQuery({ filter: 'active' });
+            v111Assert(fortune14.total === 1, 'fortune.query filter active returns 1');
+
+            // Test 15: fortune.query filter claimed returns only claimed
+            const fortune15 = server.mcpFortuneQuery({ filter: 'claimed' });
+            v111Assert(fortune15.total === 1, 'fortune.query filter claimed returns 1');
+
+            // Test 16: fortune.activate succeeds for existing fortune
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_activate_1', fortuneType: '天灵根', level: 1, status: 'inactive' });
+            const activate16 = server.mcpFortuneActivate({ fortuneId: 'f_activate_1' });
+            v111Assert(activate16.success === true, 'fortune.activate succeeds');
+            v111Assert(activate16.status === 'active', 'fortune.activate status active');
+
+            // Test 17: fortune.activate fails for non-existent fortune
+            const activate17 = server.mcpFortuneActivate({ fortuneId: 'non_existent' });
+            v111Assert(activate17.error && activate17.error.includes('不存在的机缘'), 'fortune.activate fails for non-existent');
+
+            // Test 18: fortune.activate fails for already claimed
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_activate_2', fortuneType: '天灵根', level: 1, status: 'claimed' });
+            const activate18 = server.mcpFortuneActivate({ fortuneId: 'f_activate_2' });
+            v111Assert(activate18.error && activate18.error.includes('机缘已领取'), 'fortune.activate fails for claimed');
+
+            // Test 19: fortune.activate fails without fortuneId
+            const activate19 = server.mcpFortuneActivate({});
+            v111Assert(activate19.error && activate19.error.includes('机缘ID不能为空'), 'fortune.activate fails without id');
+
+            // Test 20: fortune.transform to spiritStones succeeds
+            mockGameState.spiritStones = 1000;
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_1', fortuneType: '天灵根', level: 2, status: 'active' });
+            const transform20 = server.mcpFortuneTransform({ fortuneId: 'f_trans_1', targetType: 'spiritStones' });
+            v111Assert(transform20.success === true, 'fortune.transform to spiritStones succeeds');
+            v111Assert(transform20.targetType === 'spiritStones', 'fortune.transform targetType spiritStones');
+            v111Assert(transform20.amount === 200, 'fortune.transform level 2 gives 200');
+
+            // Test 21: fortune.transform to reputation succeeds
+            mockGameState.reputation = 50;
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_2', fortuneType: '地灵根', level: 3, status: 'active' });
+            const transform21 = server.mcpFortuneTransform({ fortuneId: 'f_trans_2', targetType: 'reputation' });
+            v111Assert(transform21.success === true, 'fortune.transform to reputation succeeds');
+            v111Assert(transform21.amount === 60, 'fortune.transform level 3 gives 60');
+
+            // Test 22: fortune.transform to realm succeeds
+            mockGameState.realm = 2;
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_3', fortuneType: '天灵根', level: 1, status: 'active' });
+            const transform22 = server.mcpFortuneTransform({ fortuneId: 'f_trans_3', targetType: 'realm' });
+            v111Assert(transform22.success === true, 'fortune.transform to realm succeeds');
+
+            // Test 23: fortune.transform fails for non-existent fortune
+            const transform23 = server.mcpFortuneTransform({ fortuneId: 'non_existent', targetType: 'spiritStones' });
+            v111Assert(transform23.error && transform23.error.includes('不存在的机缘'), 'fortune.transform fails for non-existent');
+
+            // Test 24: fortune.transform fails for already claimed
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_4', fortuneType: '天灵根', level: 1, status: 'claimed' });
+            const transform24 = server.mcpFortuneTransform({ fortuneId: 'f_trans_4', targetType: 'spiritStones' });
+            v111Assert(transform24.error && transform24.error.includes('机缘已转化'), 'fortune.transform fails for claimed');
+
+            // Test 25: fortune.transform fails without fortuneId
+            const transform25 = server.mcpFortuneTransform({ targetType: 'spiritStones' });
+            v111Assert(transform25.error && transform25.error.includes('机缘ID不能为空'), 'fortune.transform fails without fortuneId');
+
+            // Test 26: fortune.transform fails without targetType
+            const transform26 = server.mcpFortuneTransform({ fortuneId: 'f_1' });
+            v111Assert(transform26.error && transform26.error.includes('转化目标类型不能为空'), 'fortune.transform fails without targetType');
+
+            // Test 27: fortune.transform fails with invalid targetType
+            const transform27 = server.mcpFortuneTransform({ fortuneId: 'f_1', targetType: 'invalid' });
+            v111Assert(transform27.error && transform27.error.includes('无效的目标类型'), 'fortune.transform fails with invalid targetType');
+
+            // Test 28: fortune.transform level 5 gives 800 for spiritStones
+            mockGameState.spiritStones = 1000;
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_5', fortuneType: '天灵根', level: 5, status: 'active' });
+            const transform28 = server.mcpFortuneTransform({ fortuneId: 'f_trans_5', targetType: 'spiritStones' });
+            v111Assert(transform28.amount === 800, 'fortune.transform level 5 gives 800');
+
+            // Test 29: serendipity.trigger defaults to low intensity
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const trigger29 = server.mcpSerendipityTrigger({});
+            v111Assert(trigger29.intensity === 'low', 'serendipity.trigger defaults to low');
+
+            // Test 30: fortune.query defaults to filter all
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            const fortune30 = server.mcpFortuneQuery({});
+            v111Assert(fortune30.filter === 'all', 'fortune.query defaults to filter all');
+
+            // Test 31: serendipity.complete grants reputation reward
+            mockGameState.reputation = 50;
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_reward_rep', eventType: '上古遗迹', intensity: 'mid', status: 'pending', rewards: { type: 'reputation', amount: 30 } });
+            const complete31 = server.mcpSerendipityComplete({ serendipityId: 's_reward_rep' });
+            v111Assert(complete31.success === true, 'serendipity.complete grants reputation');
+
+            // Test 32: serendipity.complete grants realm reward
+            mockGameState.realm = 2;
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_reward_realm', eventType: '仙人指路', intensity: 'high', status: 'pending', rewards: { type: 'realm', amount: 1 } });
+            const complete32 = server.mcpSerendipityComplete({ serendipityId: 's_reward_realm' });
+            v111Assert(complete32.success === true, 'serendipity.complete grants realm');
+
+            // Test 33: fortune.transform level 4 gives 500 for spiritStones
+            mockGameState.spiritStones = 1000;
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_6', fortuneType: '天灵根', level: 4, status: 'active' });
+            const transform33 = server.mcpFortuneTransform({ fortuneId: 'f_trans_6', targetType: 'spiritStones' });
+            v111Assert(transform33.amount === 500, 'fortune.transform level 4 gives 500');
+
+            // Test 34: fortune.activate sets activatedAt timestamp
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_activate_ts', fortuneType: '天灵根', level: 1, status: 'inactive' });
+            const activate34 = server.mcpFortuneActivate({ fortuneId: 'f_activate_ts' });
+            v111Assert(activate34.success === true, 'fortune.activate succeeds');
+            const record34 = mockGameState.fortune.records.find(r => r.id === 'f_activate_ts');
+            v111Assert(record34.activatedAt && record34.activatedAt > 0, 'fortune.activate sets activatedAt');
+
+            // Test 35: fortune.transform sets claimedAt timestamp
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_ts', fortuneType: '天灵根', level: 1, status: 'active' });
+            const transform35 = server.mcpFortuneTransform({ fortuneId: 'f_trans_ts', targetType: 'reputation' });
+            v111Assert(transform35.success === true, 'fortune.transform succeeds');
+            const record35 = mockGameState.fortune.records.find(r => r.id === 'f_trans_ts');
+            v111Assert(record35.claimedAt && record35.claimedAt > 0, 'fortune.transform sets claimedAt');
+
+            // Test 36: serendipity.trigger creates event with valid eventType
+            mockGameState.spiritStones = 10000;
+            mockGameState.serendipity = null;
+            const eventTypes = ['洞府传承', '上古遗迹', '仙人指路', '妖兽献宝'];
+            const trigger36 = server.mcpSerendipityTrigger({ intensity: 'low' });
+            v111Assert(eventTypes.includes(trigger36.eventType), 'serendipity.trigger eventType is valid');
+
+            // Test 37: serendipity.complete sets completedAt timestamp
+            mockGameState.spiritStones = 1000;
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_complete_ts', eventType: '洞府传承', intensity: 'low', status: 'pending', rewards: { type: 'spiritStones', amount: 100 } });
+            const complete37 = server.mcpSerendipityComplete({ serendipityId: 's_complete_ts' });
+            v111Assert(complete37.success === true, 'serendipity.complete succeeds');
+            const event37 = mockGameState.serendipity.events.find(e => e.id === 's_complete_ts');
+            v111Assert(event37.completedAt && event37.completedAt > 0, 'serendipity.complete sets completedAt');
+
+            // Test 38: serendipity.query returns lastTriggeredAt
+            mockGameState.serendipity = { events: [], lastTriggeredAt: 1234567890 };
+            const query38 = server.mcpSerendipityQuery({});
+            v111Assert(query38.lastTriggeredAt === 1234567890, 'serendipity.query returns lastTriggeredAt');
+
+            // Test 39: fortune.transform marks record as claimed
+            mockGameState.fortune = { records: [], fortuneIdCounter: 0 };
+            mockGameState.fortune.records.push({ id: 'f_trans_claimed', fortuneType: '天灵根', level: 1, status: 'active' });
+            const transform39 = server.mcpFortuneTransform({ fortuneId: 'f_trans_claimed', targetType: 'realm' });
+            v111Assert(transform39.success === true, 'fortune.transform succeeds');
+            const record39 = mockGameState.fortune.records.find(r => r.id === 'f_trans_claimed');
+            v111Assert(record39.status === 'claimed', 'fortune.transform marks as claimed');
+
+            // Test 40: serendipity.complete works for items reward type
+            mockGameState.serendipity = { events: [], lastTriggeredAt: null };
+            mockGameState.serendipity.events.push({ id: 's_reward_items', eventType: '妖兽献宝', intensity: 'low', status: 'pending', rewards: { type: 'items', items: ['妖兽内丹', '灵草'] } });
+            const complete40 = server.mcpSerendipityComplete({ serendipityId: 's_reward_items' });
+            v111Assert(complete40.success === true, 'serendipity.complete for items type succeeds');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V111', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V111 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v111Results = runV111Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
