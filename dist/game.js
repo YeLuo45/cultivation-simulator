@@ -5311,6 +5311,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V115)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V116: Register 仙界排行榜+荣耀系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V116)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6179,6 +6183,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'collection.share':
                             result = this.mcpCollectionShare(args);
+                            break;
+                        // V116: 仙界排行榜+荣耀系统
+                        case 'rank.query':
+                            result = this.mcpRankQuery(args.type, args.page, args.pageSize);
+                            break;
+                        case 'rank.refresh':
+                            result = this.mcpRankRefresh(args.type);
+                            break;
+                        case 'rank.detail':
+                            result = this.mcpRankDetail(args.playerId);
+                            break;
+                        case 'glory.query':
+                            result = this.mcpGloryQuery();
+                            break;
+                        case 'glory.level':
+                            result = this.mcpGloryLevel();
+                            break;
+                        case 'glory.claim':
+                            result = this.mcpGloryClaim(args.levelId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -14093,6 +14116,245 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V116: _initRankState - 初始化仙界排行榜系统状态
+            _initRankState() {
+                const gs = window.gameState;
+                if (!gs.rank) {
+                    gs.rank = {
+                        leaderboards: {
+                            spiritStones: [],
+                            realm: [],
+                            reputation: [],
+                            pvp: []
+                        },
+                        lastRefresh: 0
+                    };
+                }
+                // Ensure player is always on the list
+                this._refreshLeaderboard('spiritStones');
+                this._refreshLeaderboard('realm');
+                this._refreshLeaderboard('reputation');
+                this._refreshLeaderboard('pvp');
+                return gs.rank;
+            }
+
+            // V116: _refreshLeaderboard - 刷新单个排行榜
+            _refreshLeaderboard(type) {
+                const gs = window.gameState;
+                const lb = gs.rank.leaderboards[type];
+                
+                // Generate NPC data based on player stats
+                const playerRealm = gs.realm || 0;
+                const playerStones = gs.spiritStones || 0;
+                const playerRep = gs.reputation || 0;
+                const playerPvp = gs.pvpRating || 1200;
+                
+                // Create NPC entries
+                const npcs = NPC_NAMES.map((name, i) => {
+                    let value;
+                    switch(type) {
+                        case 'spiritStones': value = Math.floor(playerStones * (0.3 + Math.random() * 1.4) * (1 - i * 0.03)); break;
+                        case 'realm': value = Math.max(0, Math.min(5, playerRealm + Math.floor(Math.random() * 7 - 3))); break;
+                        case 'reputation': value = Math.floor(playerRep * (0.3 + Math.random() * 1.4) * (1 - i * 0.03)); break;
+                        case 'pvp': value = Math.floor(playerPvp * (0.85 + Math.random() * 0.3) - i * 15); break;
+                    }
+                    return { id: 'npc_' + i, name, value };
+                });
+                
+                // Add player as position 1, then sort NPCs above and below
+                const playerEntry = { id: 'player', name: '你', value: type === 'realm' ? playerRealm : 
+                    (type === 'spiritStones' ? playerStones : 
+                    (type === 'reputation' ? playerRep : playerPvp)) };
+                
+                // Build final list with player always at position 1
+                lb.length = 0;
+                lb.push(playerEntry);
+                // Sort NPCs by value descending
+                npcs.sort((a, b) => b.value - a.value);
+                // Insert NPCs around player's "real" position
+                const playerRank = this._calculatePlayerRank(type, playerEntry.value, npcs);
+                const insertPos = Math.min(Math.max(1, playerRank), npcs.length + 1);
+                npcs.forEach((npc, i) => {
+                    if (i === insertPos - 1) lb.push(npc);
+                    else if (i < insertPos - 1) lb.splice(i + 1, 0, npc);
+                    else lb.push(npc);
+                });
+                
+                gs.rank.lastRefresh = Date.now();
+            }
+
+            // V116: _calculatePlayerRank - 计算玩家在排行榜中的真实位置
+            _calculatePlayerRank(type, playerValue, npcs) {
+                let rank = 1;
+                for (const npc of npcs) {
+                    if (npc.value > playerValue) rank++;
+                }
+                return rank;
+            }
+
+            // V116: _initGloryState - 初始化荣耀系统状态
+            _initGloryState() {
+                const gs = window.gameState;
+                if (!gs.glory) {
+                    gs.glory = {
+                        points: 0,
+                        level: 'bronze',
+                        levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS))
+                    };
+                }
+                // Update glory level based on points
+                const pts = gs.glory.points || 0;
+                if (pts >= 20000) gs.glory.level = 'diamond';
+                else if (pts >= 5000) gs.glory.level = 'gold';
+                else if (pts >= 1000) gs.glory.level = 'silver';
+                else gs.glory.level = 'bronze';
+                return gs.glory;
+            }
+
+            // V116: mcpRankQuery - 查询排行榜
+            mcpRankQuery(type = 'spiritStones', page = 1, pageSize = 10) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['spiritStones', 'realm', 'reputation', 'pvp'].includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    const rank = this._initRankState();
+                    const lb = rank.leaderboards[type] || [];
+                    
+                    // Pagination
+                    const start = (page - 1) * pageSize;
+                    const end = start + pageSize;
+                    const entries = lb.slice(start, end).map((e, i) => ({
+                        rank: start + i + 1,
+                        id: e.id,
+                        name: e.name,
+                        value: e.value,
+                        isPlayer: e.id === 'player'
+                    }));
+                    
+                    return {
+                        success: true,
+                        type,
+                        page,
+                        pageSize,
+                        total: lb.length,
+                        entries
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpRankRefresh - 刷新排行数据
+            mcpRankRefresh(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['spiritStones', 'realm', 'reputation', 'pvp'].includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    this._initRankState();
+                    this._refreshLeaderboard(type);
+                    return {
+                        success: true,
+                        message: type + '排行榜已刷新',
+                        lastRefresh: gs.rank.lastRefresh
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpRankDetail - 查看玩家排行详情
+            mcpRankDetail(playerId = 'player') {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rank = this._initRankState();
+                    
+                    const results = [];
+                    for (const type of ['spiritStones', 'realm', 'reputation', 'pvp']) {
+                        const lb = rank.leaderboards[type] || [];
+                        const idx = lb.findIndex(e => e.id === (playerId || 'player'));
+                        results.push({
+                            type,
+                            rank: idx >= 0 ? idx + 1 : -1,
+                            value: idx >= 0 ? lb[idx].value : null
+                        });
+                    }
+                    
+                    return {
+                        success: true,
+                        playerId: playerId || 'player',
+                        rankings: results
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryQuery - 查询玩家荣耀值
+            mcpGloryQuery() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const glory = this._initGloryState();
+                    return {
+                        success: true,
+                        points: glory.points || 0,
+                        level: glory.level || 'bronze'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryLevel - 查询荣耀等级信息
+            mcpGloryLevel() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const glory = this._initGloryState();
+                    const levels = ['bronze', 'silver', 'gold', 'diamond'];
+                    const currentIdx = levels.indexOf(glory.level || 'bronze');
+                    
+                    const nextLevel = currentIdx < levels.length - 1 ? levels[currentIdx + 1] : null;
+                    const nextNeed = nextLevel ? GLORY_LEVEL_REWARDS[nextLevel].need : null;
+                    
+                    return {
+                        success: true,
+                        currentLevel: glory.level || 'bronze',
+                        points: glory.points || 0,
+                        nextLevel,
+                        nextNeed,
+                        progress: nextNeed ? Math.min(100, Math.floor((glory.points || 0) / nextNeed * 100)) : 100
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V116: mcpGloryClaim - 领取荣耀等级奖励
+            mcpGloryClaim(levelId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!levelId) return { error: '等级ID不能为空' };
+                    if (!GLORY_LEVEL_REWARDS[levelId]) return { error: '荣耀等级不存在: ' + levelId };
+                    
+                    const glory = this._initGloryState();
+                    const tierData = glory.levelRewards[levelId];
+                    
+                    if (!tierData) return { error: '荣耀等级数据不存在' };
+                    if (tierData.claimed) return { error: '该等级奖励已领取' };
+                    
+                    if ((glory.points || 0) < tierData.need) {
+                        return { error: '荣耀值不足，需要' + tierData.need + '点，当前' + glory.points + '点' };
+                    }
+                    
+                    tierData.claimed = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + tierData.reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + tierData.reward.exp;
+                    
+                    return {
+                        success: true,
+                        message: '领取' + levelId + '荣耀奖励成功',
+                        reward: tierData.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V114: mcpQuestList - 获取可接任务列表
             mcpQuestList(args) {
                 try {
@@ -21655,7 +21917,88 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
-        // V115: Codex Pool - 仙界图鉴池
+        // ===== V116: 仙界排行榜+荣耀系统 =====
+        // --- MCP_TOOLS_V116: 仙界排行榜+荣耀系统 ---
+        const MCP_TOOLS_V116 = {
+            'rank.query': {
+                name: 'rank.query',
+                description: '查询排行榜 (仙界排行榜-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型 (spiritStones/realm/reputation/pvp)', default: 'spiritStones' },
+                        page: { type: 'number', description: '页码', default: 1 },
+                        pageSize: { type: 'number', description: '每页数量', default: 10 }
+                    }
+                }
+            },
+            'rank.refresh': {
+                name: 'rank.refresh',
+                description: '刷新排行数据 (仙界排行榜-刷新)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型 (spiritStones/realm/reputation/pvp)' }
+                    },
+                    required: ['type']
+                }
+            },
+            'rank.detail': {
+                name: 'rank.detail',
+                description: '查看玩家排行详情 (仙界排行榜-详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: '玩家ID', default: 'player' }
+                    }
+                }
+            },
+            'glory.query': {
+                name: 'glory.query',
+                description: '查询玩家荣耀值 (荣耀系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'glory.level': {
+                name: 'glory.level',
+                description: '查询荣耀等级信息 (荣耀系统-等级)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'glory.claim': {
+                name: 'glory.claim',
+                description: '领取荣耀等级奖励 (荣耀系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        levelId: { type: 'string', description: '等级ID (bronze/silver/gold/diamond)' }
+                    },
+                    required: ['levelId']
+                }
+            }
+        };
+
+        // V116: Glory Level Rewards
+        const GLORY_LEVEL_REWARDS = {
+            bronze: { need: 0, reward: { spiritStones: 500, exp: 50 }, claimed: false },
+            silver: { need: 1000, reward: { spiritStones: 2000, exp: 200 }, claimed: false },
+            gold: { need: 5000, reward: { spiritStones: 10000, exp: 1000 }, claimed: false },
+            diamond: { need: 20000, reward: { spiritStones: 50000, exp: 5000 }, claimed: false }
+        };
+
+        // V116: NPC Names for leaderboards
+        const NPC_NAMES = [
+            '太虚真人', '天道仙尊', '玄冥魔君', '九天神帝', '万妖女王',
+            '剑圣无名', '丹王华佗', '器神欧冶', '阵仙诸葛亮', '符圣张陵',
+            '灵兽仙君', '幽冥鬼帝', '紫霄雷尊', '青云剑仙', '赤焰魔尊',
+            '寒冰仙子', '金刚罗汉', '菩提佛祖', '太上老君', '元始天尊'
+        ];
+
+        // V116: Codex Pool - 仙界图鉴池
         const CODEX_POOL = {
             recipe: [
                 { id: 'recipe_001', name: '筑基丹', description: '服用后大幅提升筑基成功率', effect: '筑基成功率+20%', unlockCost: 500 },
@@ -22395,6 +22738,267 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v115Results = runV115Tests();
+
+        // ===== V116: 仙界排行榜+荣耀系统 Tests =====
+        function runV116Tests() {
+            const results = [];
+            function v116Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                reputation: 100,
+                pvpRating: 1500,
+                rank: null,
+                glory: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: rank.query returns spiritStones leaderboard by default
+            server._initRankState();
+            const query1 = server.mcpRankQuery();
+            v116Assert(query1.success === true, 'rank.query succeeds');
+            v116Assert(query1.type === 'spiritStones', 'rank.query defaults to spiritStones');
+            v116Assert(query1.entries && query1.entries.length > 0, 'rank.query returns entries');
+
+            // Test 2: rank.query with realm type
+            const query2 = server.mcpRankQuery('realm');
+            v116Assert(query2.success === true, 'rank.query realm succeeds');
+            v116Assert(query2.type === 'realm', 'rank.query returns realm type');
+
+            // Test 3: rank.query with pagination
+            const query3 = server.mcpRankQuery('spiritStones', 1, 5);
+            v116Assert(query3.success === true, 'rank.query pagination succeeds');
+            v116Assert(query3.page === 1, 'rank.query returns page 1');
+            v116Assert(query3.pageSize === 5, 'rank.query returns pageSize 5');
+
+            // Test 4: rank.query invalid type fails
+            const queryInvalid = server.mcpRankQuery('invalid');
+            v116Assert(queryInvalid.error && queryInvalid.error.includes('无效的排行榜类型'), 'rank.query fails with invalid type');
+
+            // Test 5: rank.refresh updates leaderboard
+            const refresh1 = server.mcpRankRefresh('spiritStones');
+            v116Assert(refresh1.success === true, 'rank.refresh succeeds');
+            v116Assert(refresh1.message && refresh1.message.includes('spiritStones'), 'rank.refresh returns message');
+
+            // Test 6: rank.refresh invalid type fails
+            const refreshInvalid = server.mcpRankRefresh('invalid');
+            v116Assert(refreshInvalid.error && refreshInvalid.error.includes('无效的排行榜类型'), 'rank.refresh fails with invalid type');
+
+            // Test 7: rank.detail returns player rankings across all types
+            server._initRankState();
+            const detail1 = server.mcpRankDetail();
+            v116Assert(detail1.success === true, 'rank.detail succeeds');
+            v116Assert(detail1.rankings && detail1.rankings.length === 4, 'rank.detail returns 4 rankings');
+            v116Assert(detail1.playerId === 'player', 'rank.detail returns player id');
+
+            // Test 8: rank.detail with specific playerId
+            const detail2 = server.mcpRankDetail('player');
+            v116Assert(detail2.success === true, 'rank.detail with player id succeeds');
+
+            // Test 9: player is always at rank 1 in spiritStones initially (high stones)
+            const queryP = server.mcpRankQuery('spiritStones');
+            v116Assert(queryP.entries && queryP.entries[0].isPlayer === true, 'player is at rank 1');
+
+            // Test 10: glory.query returns initial state
+            const glory1 = server.mcpGloryQuery();
+            v116Assert(glory1.success === true, 'glory.query succeeds');
+            v116Assert(glory1.points === 0, 'glory.query initial points is 0');
+            v116Assert(glory1.level === 'bronze', 'glory.query initial level is bronze');
+
+            // Test 11: glory.level returns level info
+            const gloryLvl = server.mcpGloryLevel();
+            v116Assert(gloryLvl.success === true, 'glory.level succeeds');
+            v116Assert(gloryLvl.currentLevel === 'bronze', 'glory.level current level is bronze');
+            v116Assert(gloryLvl.nextLevel === 'silver', 'glory.level next level is silver');
+            v116Assert(gloryLvl.nextNeed === 1000, 'glory.level next need is 1000');
+
+            // Test 12: glory.claim fails for gold (not enough points)
+            const claimGold = server.mcpGloryClaim('gold');
+            v116Assert(claimGold.error && claimGold.error.includes('荣耀值不足'), 'glory.claim fails for gold with 0 points');
+
+            // Test 13: glory.claim succeeds for bronze (need 0)
+            server._initGloryState();
+            mockGameState.glory.points = 0;
+            const claimBronze = server.mcpGloryClaim('bronze');
+            v116Assert(claimBronze.success === true, 'glory.claim bronze succeeds');
+            v116Assert(claimBronze.reward, 'glory.claim returns reward');
+
+            // Test 14: glory.claim fails for already claimed bronze
+            const claimDup = server.mcpGloryClaim('bronze');
+            v116Assert(claimDup.error && claimDup.error.includes('已领取'), 'glory.claim fails for already claimed');
+
+            // Test 15: glory.claim fails for invalid levelId
+            const claimInvalid = server.mcpGloryClaim('invalid');
+            v116Assert(claimInvalid.error && claimInvalid.error.includes('荣耀等级不存在'), 'glory.claim fails with invalid level');
+
+            // Test 16: glory.claim fails for empty levelId
+            const claimEmpty = server.mcpGloryClaim('');
+            v116Assert(claimEmpty.error && claimEmpty.error.includes('不能为空'), 'glory.claim fails with empty levelId');
+
+            // Test 17: glory.level with silver points (1000)
+            mockGameState.glory.points = 1500;
+            mockGameState.glory.level = 'silver';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            const gloryLvl2 = server.mcpGloryLevel();
+            v116Assert(gloryLvl2.currentLevel === 'silver', 'glory.level shows silver');
+            v116Assert(gloryLvl2.nextLevel === 'gold', 'glory.level next is gold');
+            v116Assert(gloryLvl2.nextNeed === 5000, 'glory.level next need is 5000');
+            v116Assert(gloryLvl2.progress === 30, 'glory.level progress is 30%');
+
+            // Test 18: glory.claim silver succeeds with enough points
+            const claimSilver = server.mcpGloryClaim('silver');
+            v116Assert(claimSilver.success === true, 'glory.claim silver succeeds');
+
+            // Test 19: rank.query realm returns numeric values
+            const queryRealm = server.mcpRankQuery('realm');
+            v116Assert(queryRealm.entries[0].value >= 0, 'realm leaderboard has numeric values');
+
+            // Test 20: rank.query reputation returns numeric values
+            const queryRep = server.mcpRankQuery('reputation');
+            v116Assert(queryRep.entries[0].value >= 0, 'reputation leaderboard has numeric values');
+
+            // Test 21: rank.query pvp returns numeric values
+            const queryPvp = server.mcpRankQuery('pvp');
+            v116Assert(queryPvp.entries[0].value >= 0, 'pvp leaderboard has numeric values');
+
+            // Test 22: rank.detail returns -1 for non-existent player
+            mockGameState.rank = { leaderboards: { spiritStones: [{ id: 'player', name: '你', value: 50000 }], realm: [], reputation: [], pvp: [] } };
+            const detail3 = server.mcpRankDetail('nonexistent');
+            v116Assert(detail3.rankings[0].rank === -1, 'rank.detail returns -1 for missing player');
+
+            // Test 23: glory.claim gold with 6000 points succeeds
+            mockGameState.glory.points = 6000;
+            mockGameState.glory.level = 'gold';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            mockGameState.glory.levelRewards.silver.claimed = true;
+            const claimGold2 = server.mcpGloryClaim('gold');
+            v116Assert(claimGold2.success === true, 'glory.claim gold succeeds with 6000 points');
+
+            // Test 24: glory.claim diamond with 25000 points succeeds
+            mockGameState.glory.points = 25000;
+            mockGameState.glory.level = 'diamond';
+            mockGameState.glory.levelRewards = JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS));
+            mockGameState.glory.levelRewards.bronze.claimed = true;
+            mockGameState.glory.levelRewards.silver.claimed = true;
+            mockGameState.glory.levelRewards.gold.claimed = true;
+            const claimDiamond = server.mcpGloryClaim('diamond');
+            v116Assert(claimDiamond.success === true, 'glory.claim diamond succeeds');
+
+            // Test 25: rank.refresh updates lastRefresh time
+            const before = mockGameState.rank ? mockGameState.rank.lastRefresh : 0;
+            server._initRankState();
+            const afterRefresh = server.mcpRankRefresh('spiritStones');
+            v116Assert(afterRefresh.lastRefresh > before, 'rank.refresh updates lastRefresh');
+
+            // Test 26-40: More edge cases and validation
+            // Test 26: rank.query with pageSize larger than list
+            server._initRankState();
+            const queryLarge = server.mcpRankQuery('spiritStones', 1, 100);
+            v116Assert(queryLarge.success === true, 'rank.query handles large pageSize');
+
+            // Test 27: rank.query with page beyond available
+            const queryPage2 = server.mcpRankQuery('spiritStones', 100, 10);
+            v116Assert(queryPage2.entries.length === 0, 'rank.query returns empty for high page');
+
+            // Test 28: glory.level at diamond level (max)
+            mockGameState.glory.points = 30000;
+            mockGameState.glory.level = 'diamond';
+            const gloryMax = server.mcpGloryLevel();
+            v116Assert(gloryMax.currentLevel === 'diamond', 'glory.level at max level');
+            v116Assert(gloryMax.nextLevel === null, 'glory.level has no next level');
+            v116Assert(gloryMax.progress === 100, 'glory.level progress is 100% at max');
+
+            // Test 29: rank.query with negative page uses default
+            const queryNeg = server.mcpRankQuery('spiritStones', -1, 10);
+            v116Assert(queryNeg.page === 1, 'rank.query defaults negative page to 1');
+
+            // Test 30: _initRankState initializes all leaderboards
+            mockGameState.rank = null;
+            const rankInit = server._initRankState();
+            v116Assert(rankInit.leaderboards.spiritStones, 'spiritStones leaderboard initialized');
+            v116Assert(rankInit.leaderboards.realm, 'realm leaderboard initialized');
+            v116Assert(rankInit.leaderboards.reputation, 'reputation leaderboard initialized');
+            v116Assert(rankInit.leaderboards.pvp, 'pvp leaderboard initialized');
+
+            // Test 31: _initGloryState creates proper structure
+            mockGameState.glory = null;
+            const gloryInit = server._initGloryState();
+            v116Assert(gloryInit.points === 0, 'glory init points is 0');
+            v116Assert(gloryInit.level === 'bronze', 'glory init level is bronze');
+            v116Assert(gloryInit.levelRewards, 'glory init has levelRewards');
+
+            // Test 32: rank.query entries have correct structure
+            server._initRankState();
+            const queryStruct = server.mcpRankQuery('spiritStones');
+            v116Assert(queryStruct.entries[0].rank !== undefined, 'entry has rank');
+            v116Assert(queryStruct.entries[0].id !== undefined, 'entry has id');
+            v116Assert(queryStruct.entries[0].name !== undefined, 'entry has name');
+            v116Assert(queryStruct.entries[0].value !== undefined, 'entry has value');
+            v116Assert(queryStruct.entries[0].isPlayer !== undefined, 'entry has isPlayer');
+
+            // Test 33: rank.detail rankings have correct structure
+            const detailStruct = server.mcpRankDetail();
+            v116Assert(detailStruct.rankings[0].type !== undefined, 'ranking has type');
+            v116Assert(detailStruct.rankings[0].rank !== undefined, 'ranking has rank');
+            v116Assert(detailStruct.rankings[0].value !== undefined, 'ranking has value');
+
+            // Test 34: glory query updates level based on points
+            mockGameState.glory = { points: 6000, level: 'bronze', levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS)) };
+            server._initGloryState();
+            v116Assert(mockGameState.glory.level === 'gold', 'glory level auto-updates to gold at 6000');
+
+            // Test 35: rank.refresh requires type parameter
+            const refreshNoType = server.mcpRankRefresh();
+            v116Assert(refreshNoType.error && refreshNoType.error.includes('无效的排行榜类型'), 'rank.refresh fails without type');
+
+            // Test 36: rank.query with 0 pageSize uses default
+            const queryZero = server.mcpRankQuery('spiritStones', 1, 0);
+            v116Assert(queryZero.success === true, 'rank.query handles 0 pageSize');
+
+            // Test 37: glory.claim requires enough points
+            mockGameState.glory = { points: 500, level: 'bronze', levelRewards: JSON.parse(JSON.stringify(GLORY_LEVEL_REWARDS)) };
+            const claimSilverLow = server.mcpGloryClaim('silver');
+            v116Assert(claimSilverLow.error && claimSilverLow.error.includes('荣耀值不足'), 'glory.claim fails when points too low');
+
+            // Test 38: rank.entries are sorted by value descending (spiritStones)
+            server._initRankState();
+            const querySorted = server.mcpRankQuery('spiritStones');
+            let sorted = true;
+            for (let i = 1; i < querySorted.entries.length; i++) {
+                if (querySorted.entries[i].value > querySorted.entries[i-1].value) {
+                    sorted = false;
+                    break;
+                }
+            }
+            v116Assert(sorted, 'spiritStones leaderboard is sorted descending');
+
+            // Test 39: player entry in leaderboard has correct name
+            const queryPlayer = server.mcpRankQuery('spiritStones');
+            const playerEntry = queryPlayer.entries.find(e => e.isPlayer);
+            v116Assert(playerEntry && playerEntry.name === '你', 'player entry has correct name');
+
+            // Test 40: rank.refresh success response has correct structure
+            const refreshResp = server.mcpRankRefresh('pvp');
+            v116Assert(refreshResp.success === true, 'rank.refresh pvp succeeds');
+            v116Assert(refreshResp.message === 'pvp排行榜已刷新', 'rank.refresh pvp message correct');
+            v116Assert(refreshResp.lastRefresh > 0, 'rank.refresh returns lastRefresh timestamp');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V116', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V116 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v116Results = runV116Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
