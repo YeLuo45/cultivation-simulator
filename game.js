@@ -3397,6 +3397,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V118)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V119: Register 七日特惠+限时商店系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V119)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4322,6 +4326,25 @@
                             break;
                         case 'mail.attachment':
                             result = this.mcpMailAttachment(args.mailId);
+                            break;
+                        // V119: 七日特惠+限时商店系统
+                        case 'sevenshop.query':
+                            result = this.mcpSevenshopQuery();
+                            break;
+                        case 'sevenshop.buy':
+                            result = this.mcpSevenshopBuy(args.day);
+                            break;
+                        case 'sevenshop.reset':
+                            result = this.mcpSevenshopReset();
+                            break;
+                        case 'limitedshop.list':
+                            result = this.mcpLimitedshopList();
+                            break;
+                        case 'limitedshop.refresh':
+                            result = this.mcpLimitedshopRefresh();
+                            break;
+                        case 'limitedshop.buy':
+                            result = this.mcpLimitedshopBuy(args.itemId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12724,6 +12747,184 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V119: _initSevenShopState - 初始化七日特惠状态
+            _initSevenShopState() {
+                const gs = window.gameState;
+                if (!gs.sevenShop) {
+                    gs.sevenShop = {
+                        days: SEVEN_SHOP_CONFIG.days.map(d => ({
+                            day: d.day,
+                            name: d.name,
+                            price: d.price,
+                            reward: d.reward,
+                            bought: false
+                        })),
+                        startDate: Date.now(),
+                        purchasedDays: []
+                    };
+                }
+                return gs.sevenShop;
+            }
+
+            // V119: _initLimitedShopState - 初始化限时商店状态
+            _initLimitedShopState() {
+                const gs = window.gameState;
+                if (!gs.limitedShop) {
+                    // Randomly select 6 items for the limited shop
+                    const shuffled = [...LIMITED_SHOP_ITEMS].sort(() => Math.random() - 0.5);
+                    gs.limitedShop = {
+                        items: shuffled.slice(0, 6).map(item => ({
+                            ...item,
+                            stock: 1,
+                            sold: false
+                        })),
+                        nextRefreshTime: Date.now() + (6 * 60 * 60 * 1000), // 6 hours from now
+                        refreshCost: 200
+                    };
+                }
+                return gs.limitedShop;
+            }
+
+            // V119: mcpSevenshopQuery - 查询七日特惠商品
+            mcpSevenshopQuery() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const shop = this._initSevenShopState();
+                    return {
+                        success: true,
+                        days: shop.days,
+                        purchasedDays: shop.purchasedDays,
+                        startDate: shop.startDate
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V119: mcpSevenshopBuy - 购买特惠商品
+            mcpSevenshopBuy(day) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!day || day < 1 || day > 7) return { error: '天数必须为1-7' };
+                    const shop = this._initSevenShopState();
+                    const dayData = shop.days.find(d => d.day === day);
+                    if (!dayData) return { error: '该天不存在' };
+                    if (dayData.bought) return { error: '该天已购买' };
+                    if ((gs.spiritStones || 0) < dayData.price) return { error: '灵石不足' };
+                    gs.spiritStones -= dayData.price;
+                    dayData.bought = true;
+                    shop.purchasedDays.push(day);
+                    // Award reward
+                    if (dayData.reward && dayData.reward.spiritStones) {
+                        gs.spiritStones += dayData.reward.spiritStones;
+                    }
+                    return {
+                        success: true,
+                        message: `购买第${day}天礼包成功`,
+                        day,
+                        price: dayData.price,
+                        reward: dayData.reward,
+                        balance: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V119: mcpSevenshopReset - 重置特惠进度
+            mcpSevenshopReset() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const resetCost = SEVEN_SHOP_CONFIG.resetCost;
+                    if ((gs.spiritStones || 0) < resetCost) return { error: `重置需要${resetCost}灵石，余额不足` };
+                    gs.spiritStones -= resetCost;
+                    gs.sevenShop = {
+                        days: SEVEN_SHOP_CONFIG.days.map(d => ({
+                            day: d.day,
+                            name: d.name,
+                            price: d.price,
+                            reward: d.reward,
+                            bought: false
+                        })),
+                        startDate: Date.now(),
+                        purchasedDays: []
+                    };
+                    return {
+                        success: true,
+                        message: '七日特惠已重置',
+                        cost: resetCost,
+                        balance: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V119: mcpLimitedshopList - 获取限时商店商品
+            mcpLimitedshopList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const shop = this._initLimitedShopState();
+                    return {
+                        success: true,
+                        items: shop.items,
+                        nextRefreshTime: shop.nextRefreshTime,
+                        refreshCost: shop.refreshCost
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V119: mcpLimitedshopRefresh - 刷新商店商品
+            mcpLimitedshopRefresh() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const shop = this._initLimitedShopState();
+                    if ((gs.spiritStones || 0) < shop.refreshCost) {
+                        return { error: `刷新需要${shop.refreshCost}灵石，余额不足` };
+                    }
+                    gs.spiritStones -= shop.refreshCost;
+                    // Randomly select 6 new items
+                    const shuffled = [...LIMITED_SHOP_ITEMS].sort(() => Math.random() - 0.5);
+                    shop.items = shuffled.slice(0, 6).map(item => ({
+                        ...item,
+                        stock: 1,
+                        sold: false
+                    }));
+                    shop.nextRefreshTime = Date.now() + (6 * 60 * 60 * 1000);
+                    return {
+                        success: true,
+                        message: '商店刷新成功',
+                        items: shop.items,
+                        cost: shop.refreshCost,
+                        nextRefreshTime: shop.nextRefreshTime,
+                        balance: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V119: mcpLimitedshopBuy - 购买限时商品
+            mcpLimitedshopBuy(itemId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!itemId) return { error: '商品ID不能为空' };
+                    const shop = this._initLimitedShopState();
+                    const item = shop.items.find(i => i.id === itemId);
+                    if (!item) return { error: '商品不存在' };
+                    if (item.sold) return { error: '商品已售出' };
+                    if ((gs.spiritStones || 0) < item.price) return { error: '灵石不足' };
+                    gs.spiritStones -= item.price;
+                    item.sold = true;
+                    item.stock = 0;
+                    return {
+                        success: true,
+                        message: `购买${item.name}成功`,
+                        itemId,
+                        item: { id: item.id, name: item.name, price: item.price },
+                        balance: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V117: mcpCheckinQuery - 查询签到状态
             mcpCheckinQuery() {
                 try {
@@ -20665,6 +20866,95 @@
             }
         };
 
+        // ===== V119: 七日特惠+限时商店系统 =====
+        // --- MCP_TOOLS_V119: 七日特惠+限时商店系统 ---
+        const MCP_TOOLS_V119 = {
+            'sevenshop.query': {
+                name: 'sevenshop.query',
+                description: '查询七日特惠商品 (七日特惠-列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'sevenshop.buy': {
+                name: 'sevenshop.buy',
+                description: '购买特惠商品 (七日特惠-购买)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        day: { type: 'number', description: '天数 (1-7)' }
+                    },
+                    required: ['day']
+                }
+            },
+            'sevenshop.reset': {
+                name: 'sevenshop.reset',
+                description: '重置特惠进度 (七日特惠-重置) - 需1000灵石',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'limitedshop.list': {
+                name: 'limitedshop.list',
+                description: '获取限时商店商品 (限时商店-列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'limitedshop.refresh': {
+                name: 'limitedshop.refresh',
+                description: '刷新商店商品 (限时商店-刷新)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'limitedshop.buy': {
+                name: 'limitedshop.buy',
+                description: '购买限时商品 (限时商店-购买)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: '商品ID' }
+                    },
+                    required: ['itemId']
+                }
+            }
+        };
+
+        // V119: Seven Day Shop Config - 七日特惠配置
+        const SEVEN_SHOP_CONFIG = {
+            resetCost: 1000,
+            days: [
+                { day: 1, price: 500, reward: { spiritStones: 1000 }, name: '第一天礼包' },
+                { day: 2, price: 800, reward: { spiritStones: 2000 }, name: '第二天礼包' },
+                { day: 3, price: 1000, reward: { spiritStones: 3500 }, name: '第三天礼包' },
+                { day: 4, price: 1200, reward: { spiritStones: 5000 }, name: '第四天礼包' },
+                { day: 5, price: 1500, reward: { spiritStones: 8000 }, name: '第五天礼包' },
+                { day: 6, price: 2000, reward: { spiritStones: 12000 }, name: '第六天礼包' },
+                { day: 7, price: 3000, reward: { spiritStones: 20000 }, name: '第七天豪华礼包' }
+            ]
+        };
+
+        // V119: Limited Shop Items Pool - 限时商店商品池
+        const LIMITED_SHOP_ITEMS = [
+            { id: 'ls_item_001', name: '筑基丹', description: '服用后大幅提升筑基成功率', price: 800, type: 'pill', rarity: 'common' },
+            { id: 'ls_item_002', name: '金丹丹', description: '服用后可提升金丹期修为', price: 2000, type: 'pill', rarity: 'rare' },
+            { id: 'ls_item_003', name: '聚灵丹', description: '加速灵气聚集', price: 500, type: 'pill', rarity: 'common' },
+            { id: 'ls_item_004', name: '玄铁剑', description: '以玄铁锻造的神兵', price: 3000, type: 'equipment', rarity: 'rare' },
+            { id: 'ls_item_005', name: '灵玉佩', description: '蕴含灵气的玉佩', price: 1500, type: 'accessory', rarity: 'uncommon' },
+            { id: 'ls_item_006', name: '天机镜', description: '可窥探天机的宝镜', price: 8000, type: 'treasure', rarity: 'epic' },
+            { id: 'ls_item_007', name: '避水珠', description: '分水避海的明珠', price: 2500, type: 'treasure', rarity: 'uncommon' },
+            { id: 'ls_item_008', name: '移山符', description: '搬山填海的符箓', price: 4000, type: 'talisman', rarity: 'rare' },
+            { id: 'ls_item_009', name: '灵狐', description: '灵性十足的狐狸宠物', price: 5000, type: 'pet', rarity: 'epic' },
+            { id: 'ls_item_010', name: '炼妖壶', description: '炼制妖物的神器', price: 6000, type: 'treasure', rarity: 'epic' },
+            { id: 'ls_item_011', name: '淬体丹', description: '强化肉身强度', price: 1000, type: 'pill', rarity: 'common' },
+            { id: 'ls_item_012', name: '元婴丹', description: '服用后可提升元婴期修为', price: 5000, type: 'pill', rarity: 'rare' }
+        ];
+
         // V118: Announcement Pool - 仙界公告池
         const ANNOUNCE_POOL = [
             { id: 'ann_001', title: '仙界盛典', content: '筑基丹大派发，登录即送！', type: 'event', priority: 'high', date: '2025-01-01', reward: { spiritStones: 1000 }, published: true },
@@ -22225,6 +22515,326 @@
             return summary;
         }
         const v118Results = runV118Tests();
+
+        // ===== V119: 七日特惠+限时商店系统 Tests =====
+        function runV119Tests() {
+            const results = [];
+            function v119Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                reputation: 100,
+                sevenShop: null,
+                limitedShop: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: sevenshop.query returns all 7 days
+            const query1 = server.mcpSevenshopQuery();
+            v119Assert(query1.success === true, 'sevenshop.query succeeds');
+            v119Assert(query1.days && query1.days.length === 7, 'sevenshop.query returns 7 days');
+            v119Assert(query1.purchasedDays && query1.purchasedDays.length === 0, 'sevenshop.query initial purchasedDays is empty');
+
+            // Test 2: sevenshop.buy day 1 successfully
+            mockGameState.spiritStones = 10000;
+            const buy1 = server.mcpSevenshopBuy(1);
+            v119Assert(buy1.success === true, 'sevenshop.buy day 1 succeeds');
+            v119Assert(buy1.day === 1, 'sevenshop.buy returns day 1');
+            v119Assert(buy1.price === 500, 'sevenshop.buy day 1 costs 500');
+            v119Assert(buy1.reward && buy1.reward.spiritStones === 1000, 'sevenshop.buy day 1 gives 1000 reward');
+            v119Assert(buy1.balance === 9500, 'sevenshop.buy day 1 balance is 9500 (10000 - 500 + 1000)');
+
+            // Test 3: sevenshop.buy day 1 again fails
+            const buy1Again = server.mcpSevenshopBuy(1);
+            v119Assert(buy1Again.error && buy1Again.error.includes('已购买'), 'sevenshop.buy day 1 again fails');
+
+            // Test 4: sevenshop.buy day 2 successfully
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            const buy2 = server.mcpSevenshopBuy(2);
+            v119Assert(buy2.success === true, 'sevenshop.buy day 2 succeeds');
+            v119Assert(buy2.day === 2, 'sevenshop.buy returns day 2');
+            v119Assert(buy2.price === 800, 'sevenshop.buy day 2 costs 800');
+
+            // Test 5: sevenshop.buy invalid day (0)
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            const buy0 = server.mcpSevenshopBuy(0);
+            v119Assert(buy0.error && buy0.error.includes('1-7'), 'sevenshop.buy day 0 fails');
+
+            // Test 6: sevenshop.buy invalid day (8)
+            const buy8 = server.mcpSevenshopBuy(8);
+            v119Assert(buy8.error && buy8.error.includes('1-7'), 'sevenshop.buy day 8 fails');
+
+            // Test 7: sevenshop.buy insufficient spirit stones
+            mockGameState.spiritStones = 100;
+            server._initSevenShopState();
+            const buyLow = server.mcpSevenshopBuy(1);
+            v119Assert(buyLow.error && buyLow.error.includes('灵石不足'), 'sevenshop.buy fails with low stones');
+
+            // Test 8: sevenshop.reset successfully
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            mockGameState.sevenShop.days[0].bought = true;
+            const reset1 = server.mcpSevenshopReset();
+            v119Assert(reset1.success === true, 'sevenshop.reset succeeds');
+            v119Assert(reset1.cost === 1000, 'sevenshop.reset costs 1000');
+            v119Assert(reset1.balance === 9000, 'sevenshop.reset balance is 9000');
+            v119Assert(mockGameState.sevenShop.days[0].bought === false, 'sevenshop.reset resets day 1 bought status');
+
+            // Test 9: sevenshop.reset fails with insufficient stones
+            mockGameState.spiritStones = 500;
+            const resetLow = server.mcpSevenshopReset();
+            v119Assert(resetLow.error && resetLow.error.includes('余额不足'), 'sevenshop.reset fails with low stones');
+
+            // Test 10: limitedshop.list returns items
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const list1 = server.mcpLimitedshopList();
+            v119Assert(list1.success === true, 'limitedshop.list succeeds');
+            v119Assert(list1.items && list1.items.length === 6, 'limitedshop.list returns 6 items');
+            v119Assert(typeof list1.refreshCost === 'number', 'limitedshop.list has refreshCost');
+            v119Assert(typeof list1.nextRefreshTime === 'number', 'limitedshop.list has nextRefreshTime');
+
+            // Test 11: limitedshop.buy item successfully
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const firstItem = mockGameState.limitedShop.items[0];
+            const buyItem1 = server.mcpLimitedshopBuy(firstItem.id);
+            v119Assert(buyItem1.success === true, 'limitedshop.buy succeeds');
+            v119Assert(buyItem1.itemId === firstItem.id, 'limitedshop.buy returns correct itemId');
+            v119Assert(buyItem1.balance < 10000, 'limitedshop.buy deducts balance');
+
+            // Test 12: limitedshop.buy same item again fails
+            const buyItemAgain = server.mcpLimitedshopBuy(firstItem.id);
+            v119Assert(buyItemAgain.error && buyItemAgain.error.includes('已售出'), 'limitedshop.buy same item again fails');
+
+            // Test 13: limitedshop.buy item with insufficient stones
+            mockGameState.spiritStones = 100;
+            server._initLimitedShopState();
+            const item2 = mockGameState.limitedShop.items.find(i => !i.sold);
+            if (item2) {
+                const buyLowItem = server.mcpLimitedshopBuy(item2.id);
+                v119Assert(buyLowItem.error && buyLowItem.error.includes('灵石不足'), 'limitedshop.buy fails with low stones');
+            }
+
+            // Test 14: limitedshop.buy invalid item id
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const buyInvalid = server.mcpLimitedshopBuy('invalid_item_id');
+            v119Assert(buyInvalid.error && buyInvalid.error.includes('商品不存在'), 'limitedshop.buy invalid id fails');
+
+            // Test 15: limitedshop.buy empty item id
+            const buyEmpty = server.mcpLimitedshopBuy('');
+            v119Assert(buyEmpty.error && buyEmpty.error.includes('商品ID不能为空'), 'limitedshop.buy empty id fails');
+
+            // Test 16: limitedshop.refresh successfully
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const refresh1 = server.mcpLimitedshopRefresh();
+            v119Assert(refresh1.success === true, 'limitedshop.refresh succeeds');
+            v119Assert(refresh1.items && refresh1.items.length === 6, 'limitedshop.refresh has 6 items');
+            v119Assert(refresh1.cost === 200, 'limitedshop.refresh costs 200');
+            v119Assert(refresh1.balance === 9800, 'limitedshop.refresh balance is 9800');
+
+            // Test 17: limitedshop.refresh fails with insufficient stones
+            mockGameState.spiritStones = 100;
+            server._initLimitedShopState();
+            const refreshLow = server.mcpLimitedshopRefresh();
+            v119Assert(refreshLow.error && refreshLow.error.includes('余额不足'), 'limitedshop.refresh fails with low stones');
+
+            // Test 18: sevenshop.query after purchase shows purchasedDays
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            server.mcpSevenshopBuy(1);
+            server.mcpSevenshopBuy(2);
+            const query2 = server.mcpSevenshopQuery();
+            v119Assert(query2.purchasedDays.includes(1), 'sevenshop.query shows day 1 purchased');
+            v119Assert(query2.purchasedDays.includes(2), 'sevenshop.query shows day 2 purchased');
+
+            // Test 19: _initSevenShopState initializes properly
+            mockGameState.sevenShop = null;
+            const sevenInit = server._initSevenShopState();
+            v119Assert(sevenInit && sevenInit.days, '_initSevenShopState creates days');
+            v119Assert(sevenInit.days.length === 7, '_initSevenShopState has 7 days');
+            v119Assert(sevenInit.startDate, '_initSevenShopState has startDate');
+
+            // Test 20: _initLimitedShopState initializes properly
+            mockGameState.limitedShop = null;
+            const limitedInit = server._initLimitedShopState();
+            v119Assert(limitedInit && limitedInit.items, '_initLimitedShopState creates items');
+            v119Assert(limitedInit.items.length === 6, '_initLimitedShopState has 6 items');
+            v119Assert(limitedInit.refreshCost === 200, '_initLimitedShopState has correct refreshCost');
+
+            // Test 21: sevenshop.buy day 7 (most expensive)
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            const buy7 = server.mcpSevenshopBuy(7);
+            v119Assert(buy7.success === true, 'sevenshop.buy day 7 succeeds');
+            v119Assert(buy7.price === 3000, 'sevenshop.buy day 7 costs 3000');
+            v119Assert(buy7.reward && buy7.reward.spiritStones === 20000, 'sevenshop.buy day 7 gives 20000 reward');
+
+            // Test 22: limitedshop.list items have correct structure
+            mockGameState.limitedShop = null;
+            server._initLimitedShopState();
+            const list2 = server.mcpLimitedshopList();
+            const firstItem2 = list2.items[0];
+            v119Assert(firstItem2.id, 'limitedshop item has id');
+            v119Assert(firstItem2.name, 'limitedshop item has name');
+            v119Assert(firstItem2.price, 'limitedshop item has price');
+            v119Assert(firstItem2.type, 'limitedshop item has type');
+            v119Assert(firstItem2.rarity, 'limitedshop item has rarity');
+
+            // Test 23: sevenshop.query shows correct day names
+            mockGameState.sevenShop = null;
+            server._initSevenShopState();
+            const query3 = server.mcpSevenshopQuery();
+            v119Assert(query3.days[0].name === '第一天礼包', 'sevenshop day 1 name correct');
+            v119Assert(query3.days[6].name === '第七天豪华礼包', 'sevenshop day 7 name correct');
+
+            // Test 24: limitedshop.refresh changes items
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const oldItems = [...mockGameState.limitedShop.items.map(i => i.id)];
+            const refresh2 = server.mcpLimitedshopRefresh();
+            v119Assert(refresh2.success, 'limitedshop.refresh succeeds again');
+            const newItems = mockGameState.limitedShop.items.map(i => i.id);
+            v119Assert(oldItems.join(',') !== newItems.join(','), 'limitedshop.refresh changes items');
+
+            // Test 25: sevenshop.buy day 3 after reset
+            mockGameState.spiritStones = 10000;
+            server._initSevenShopState();
+            server.mcpSevenshopReset();
+            const buy3AfterReset = server.mcpSevenshopBuy(3);
+            v119Assert(buy3AfterReset.success === true, 'sevenshop.buy day 3 after reset succeeds');
+
+            // Test 26: sevenshop.buy day 4
+            const buy4 = server.mcpSevenshopBuy(4);
+            v119Assert(buy4.success === true, 'sevenshop.buy day 4 succeeds');
+            v119Assert(buy4.price === 1200, 'sevenshop.buy day 4 costs 1200');
+
+            // Test 27: sevenshop.buy day 5
+            const buy5 = server.mcpSevenshopBuy(5);
+            v119Assert(buy5.success === true, 'sevenshop.buy day 5 succeeds');
+            v119Assert(buy5.price === 1500, 'sevenshop.buy day 5 costs 1500');
+
+            // Test 28: sevenshop.buy day 6
+            const buy6 = server.mcpSevenshopBuy(6);
+            v119Assert(buy6.success === true, 'sevenshop.buy day 6 succeeds');
+            v119Assert(buy6.price === 2000, 'sevenshop.buy day 6 costs 2000');
+
+            // Test 29: limitedshop.buy all 6 items
+            mockGameState.spiritStones = 100000;
+            server._initLimitedShopState();
+            for (const item of mockGameState.limitedShop.items) {
+                const r = server.mcpLimitedshopBuy(item.id);
+                v119Assert(r.success === true, `limitedshop.buy ${item.name} succeeds`);
+            }
+            // Try to buy again - all should be sold
+            const allSoldCheck = server.mcpLimitedshopList();
+            v119Assert(allSoldCheck.items.every(i => i.sold), 'all limitedshop items are sold');
+
+            // Test 30: sevenshop.reset updates startDate
+            mockGameState.spiritStones = 10000;
+            const oldStartDate = mockGameState.sevenShop.startDate;
+            server.mcpSevenshopReset();
+            v119Assert(mockGameState.sevenShop.startDate >= oldStartDate, 'sevenshop.reset updates startDate');
+
+            // Test 31: sevenshop.query shows purchasedDays after buying multiple
+            server._initSevenShopState();
+            server.mcpSevenshopBuy(1);
+            server.mcpSevenshopBuy(3);
+            server.mcpSevenshopBuy(5);
+            const query4 = server.mcpSevenshopQuery();
+            v119Assert(query4.purchasedDays.length === 3, 'sevenshop.query shows 3 purchased days');
+            v119Assert(query4.purchasedDays.includes(1) && query4.purchasedDays.includes(3) && query4.purchasedDays.includes(5), 'sevenshop.query shows correct purchased days');
+
+            // Test 32: limitedshop.list shows sold status
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const itemToBuy = mockGameState.limitedShop.items[0];
+            server.mcpLimitedshopBuy(itemToBuy.id);
+            const listAfterBuy = server.mcpLimitedshopList();
+            const boughtItem = listAfterBuy.items.find(i => i.id === itemToBuy.id);
+            v119Assert(boughtItem.sold === true, 'limitedshop item shows sold status');
+
+            // Test 33: sevenshop.buy day with reward calculation
+            mockGameState.spiritStones = 5000;
+            server._initSevenShopState();
+            server.mcpSevenshopReset();
+            const beforeStones = mockGameState.spiritStones;
+            server.mcpSevenshopBuy(1);
+            const afterStones = mockGameState.spiritStones;
+            // Day 1: costs 500, then gives 1000 reward = net +500
+            v119Assert(afterStones === beforeStones - 500 + 1000, 'sevenshop day 1 net gain is correct');
+
+            // Test 34: limitedshop.refresh updates nextRefreshTime
+            mockGameState.spiritStones = 10000;
+            server._initLimitedShopState();
+            const oldRefreshTime = mockGameState.limitedShop.nextRefreshTime;
+            server.mcpLimitedshopRefresh();
+            v119Assert(mockGameState.limitedShop.nextRefreshTime > oldRefreshTime, 'limitedshop.refresh updates nextRefreshTime');
+
+            // Test 35: sevenshop.buy same day after reset
+            server._initSevenShopState();
+            server.mcpSevenshopReset();
+            const buyDay1Again = server.mcpSevenshopBuy(1);
+            v119Assert(buyDay1Again.success === true, 'sevenshop.buy day 1 after reset succeeds');
+
+            // Test 36: limitedshop.buy item no itemId
+            const buyNoId = server.mcpLimitedshopBuy(null);
+            v119Assert(buyNoId.error && buyNoId.error.includes('商品ID不能为空'), 'limitedshop.buy null id fails');
+
+            // Test 37: sevenshop.buy no day
+            const buyNoDay = server.mcpSevenshopBuy(null);
+            v119Assert(buyNoDay.error && buyNoDay.error.includes('1-7'), 'sevenshop.buy null day fails');
+
+            // Test 38: _initLimitedShopState uses correct item pool
+            mockGameState.limitedShop = null;
+            server._initLimitedShopState();
+            const allItemIds = LIMITED_SHOP_ITEMS.map(i => i.id);
+            const shopItemIds = mockGameState.limitedShop.items.map(i => i.id);
+            let allValid = true;
+            for (const id of shopItemIds) {
+                if (!allItemIds.includes(id)) {
+                    allValid = false;
+                    break;
+                }
+            }
+            v119Assert(allValid, 'limitedshop items are from correct pool');
+
+            // Test 39: sevenshop.reset clears all purchasedDays
+            server._initSevenShopState();
+            server.mcpSevenshopBuy(1);
+            server.mcpSevenshopBuy(2);
+            server.mcpSevenshopBuy(3);
+            v119Assert(mockGameState.sevenShop.purchasedDays.length === 3, 'before reset has 3 purchased days');
+            server.mcpSevenshopReset();
+            v119Assert(mockGameState.sevenShop.purchasedDays.length === 0, 'after reset purchasedDays is empty');
+
+            // Test 40: sevenshop.query returns correct reward structure per day
+            mockGameState.sevenShop = null;
+            server._initSevenShopState();
+            const query5 = server.mcpSevenshopQuery();
+            for (let i = 0; i < 7; i++) {
+                v119Assert(query5.days[i].reward && query5.days[i].reward.spiritStones, `day ${i+1} has spiritStones reward`);
+                v119Assert(query5.days[i].price > 0, `day ${i+1} has positive price`);
+            }
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V119', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V119 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v119Results = runV119Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
