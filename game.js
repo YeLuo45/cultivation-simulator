@@ -2947,6 +2947,72 @@
             }
         };
 
+        // --- MCP_TOOLS_V112: 仙界联盟+气运系统 ---
+        const MCP_TOOLS_V112 = {
+            'alliance.query': {
+                name: 'alliance.query',
+                description: '查询联盟信息 (仙界联盟系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        allianceId: { type: 'string', description: '联盟ID (不填则查自己的)' }
+                    }
+                }
+            },
+            'alliance.create': {
+                name: 'alliance.create',
+                description: '创建联盟 (仙界联盟系统-创建, 需要灵力>=10000, 境界>=3)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: '联盟名称' },
+                        tag: { type: 'string', description: '联盟标签 (3-5字符)' }
+                    },
+                    required: ['name']
+                }
+            },
+            'alliance.upgrade': {
+                name: 'alliance.upgrade',
+                description: '升级联盟 (仙界联盟系统-升级, 需要成员>=3, 联盟资金>=50000灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        allianceId: { type: 'string', description: '联盟ID (不填则用自己的)' }
+                    }
+                }
+            },
+            'luck.query': {
+                name: 'luck.query',
+                description: '查询玩家气运 (气运系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'luck.bless': {
+                name: 'luck.bless',
+                description: '祈福提升气运 (气运系统-祈福, low=+5, mid=+15, high=+30, 消耗灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        intensity: { type: 'string', description: '祈福强度 (low/mid/high)', default: 'low' }
+                    }
+                }
+            },
+            'luck.transform': {
+                name: 'luck.transform',
+                description: '将气运转化为实际收益 (气运系统-转化, 点数*10=灵石, *1=声望, *100=境界经验)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetType: { type: 'string', description: '转化目标类型 (spiritStones/reputation/realm)' },
+                        amount: { type: 'number', description: '气运点数' }
+                    },
+                    required: ['targetType', 'amount']
+                }
+            }
+        };
+
         // --- MCP_TOOLS_V110: 天道誓言+因果誓约系统 ---
         const MCP_TOOLS_V110 = {
             'heaven.oath.take': {
@@ -3232,6 +3298,10 @@
                 }
                 // V111: Register 仙界奇遇+机缘系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V111)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V112: Register 仙界联盟+气运系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V112)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4026,6 +4096,25 @@
                             break;
                         case 'fortune.transform':
                             result = this.mcpFortuneTransform(args);
+                            break;
+                        // V112: 仙界联盟+气运系统
+                        case 'alliance.query':
+                            result = this.mcpAllianceQuery(args);
+                            break;
+                        case 'alliance.create':
+                            result = this.mcpAllianceCreateV112(args);
+                            break;
+                        case 'alliance.upgrade':
+                            result = this.mcpAllianceUpgrade(args);
+                            break;
+                        case 'luck.query':
+                            result = this.mcpLuckQuery(args);
+                            break;
+                        case 'luck.bless':
+                            result = this.mcpLuckBless(args);
+                            break;
+                        case 'luck.transform':
+                            result = this.mcpLuckTransform(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -11180,6 +11269,187 @@
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
             }
 
+            // V112: 仙界联盟+气运系统 状态初始化
+            _initLuckState() {
+                const gs = window.gameState;
+                if (!gs.luck) {
+                    gs.luck = {
+                        base: 0,
+                        bonus: 0,
+                        lastBless: null,
+                        blessingCount: 0
+                    };
+                }
+                return gs.luck;
+            }
+
+            // V112: alliance.query - 查询联盟信息
+            mcpAllianceQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { allianceId } = args || {};
+                    const alliances = this._initAllianceState();
+                    if (allianceId) {
+                        const alliance = alliances.byId[allianceId];
+                        if (!alliance) return { error: '联盟不存在: ' + allianceId };
+                        return { success: true, alliance };
+                    }
+                    // 不填则查玩家自己的联盟
+                    const playerAlliance = this._getPlayerAlliance(alliances);
+                    if (!playerAlliance) return { success: true, alliance: null, message: '玩家未加入任何联盟' };
+                    return { success: true, alliance: playerAlliance };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V112: alliance.create - 创建联盟 (灵力>=10000, 境界>=3)
+            mcpAllianceCreateV112(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { name, tag } = args || {};
+                    if (!name) return { error: '联盟名称不能为空' };
+                    if (name.length < 2) return { error: '联盟名称至少2字符' };
+                    if (tag && (tag.length < 3 || tag.length > 5)) return { error: '联盟标签必须3-5字符' };
+                    // 检查灵力>=10000
+                    if ((gs.spiritStones || 0) < 10000) return { error: '灵力不足10000，无法创建联盟' };
+                    // 检查境界>=3 (金丹)
+                    if ((gs.realm || 0) < 3) return { error: '境界不足3阶(金丹)，无法创建联盟' };
+                    const alliances = this._initAllianceState();
+                    const playerId = gs.playerId || 'player_1';
+                    const id = 'ally_' + Date.now();
+                    const alliance = {
+                        id,
+                        name,
+                        tag: tag || name.substring(0, 3).toUpperCase(),
+                        level: 1,
+                        leaderId: playerId,
+                        leaderName: gs.playerName || '盟主',
+                        members: [{ id: playerId, name: gs.playerName || '盟主', role: 'leader', joinedAt: Date.now(), contribution: 0 }],
+                        resources: { spiritStones: 0, resources: 0, cultivation: 0 },
+                        territories: [],
+                        skills: [],
+                        createdAt: Date.now(),
+                        levelUps: 0
+                    };
+                    alliances.byId[id] = alliance;
+                    alliances.list.push(alliance);
+                    gs.spiritStones -= 10000;
+                    return { success: true, alliance, message: '联盟"' + name + '"创建成功，消耗10000灵力' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V112: alliance.upgrade - 升级联盟 (成员>=3, 联盟资金>=50000灵石)
+            mcpAllianceUpgrade(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { allianceId } = args || {};
+                    const alliances = this._initAllianceState();
+                    const alliance = allianceId ? alliances.byId[allianceId] : this._getPlayerAlliance(alliances);
+                    if (!alliance) return { error: '联盟不存在或玩家未加入任何联盟' };
+                    // 检查成员>=3
+                    if (alliance.members.length < 3) return { error: '成员不足3人，无法升级联盟' };
+                    // 检查联盟资金>=50000灵石
+                    const funds = alliance.resources?.spiritStones || 0;
+                    if (funds < 50000) return { error: '联盟资金不足50000灵石，无法升级联盟' };
+                    // 执行升级
+                    alliance.level += 1;
+                    alliance.resources.spiritStones -= 50000;
+                    alliance.levelUps = (alliance.levelUps || 0) + 1;
+                    return { success: true, level: alliance.level, message: '联盟升级成功，当前等级' + alliance.level };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V112: luck.query - 查询玩家气运
+            mcpLuckQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const luck = this._initLuckState();
+                    return {
+                        success: true,
+                        base: luck.base || 0,
+                        bonus: luck.bonus || 0,
+                        total: (luck.base || 0) + (luck.bonus || 0),
+                        lastBless: luck.lastBless,
+                        blessingCount: luck.blessingCount || 0
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V112: luck.bless - 祈福提升气运 (low=+5, mid=+15, high=+30)
+            mcpLuckBless(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { intensity = 'low' } = args || {};
+                    const VALID_INTENSITIES = ['low', 'mid', 'high'];
+                    if (!VALID_INTENSITIES.includes(intensity)) return { error: '无效的祈福强度，必须为low/mid/high' };
+                    const costs = { low: 100, mid: 300, high: 500 };
+                    const gains = { low: 5, mid: 15, high: 30 };
+                    const cost = costs[intensity] || 100;
+                    const gain = gains[intensity] || 5;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵力不足' + cost + '，无法祈福' };
+                    const luck = this._initLuckState();
+                    gs.spiritStones -= cost;
+                    luck.bonus = (luck.bonus || 0) + gain;
+                    luck.lastBless = Date.now();
+                    luck.blessingCount = (luck.blessingCount || 0) + 1;
+                    return {
+                        success: true,
+                        intensity,
+                        gain,
+                        total: luck.base + luck.bonus,
+                        cost,
+                        message: '祈福成功，气运+' + gain
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V112: luck.transform - 将气运转化为实际收益
+            mcpLuckTransform(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { targetType, amount } = args || {};
+                    if (!targetType) return { error: '转化目标类型不能为空' };
+                    if (!amount || amount <= 0) return { error: '气运点数必须为正数' };
+                    if (!['spiritStones', 'reputation', 'realm'].includes(targetType)) {
+                        return { error: '无效的目标类型，必须为spiritStones/reputation/realm' };
+                    }
+                    const luck = this._initLuckState();
+                    const totalLuck = (luck.base || 0) + (luck.bonus || 0);
+                    if (totalLuck < amount) return { error: '气运不足，当前气运' + totalLuck };
+                    // 消耗气运
+                    if (luck.bonus >= amount) {
+                        luck.bonus -= amount;
+                    } else {
+                        const remaining = amount - luck.bonus;
+                        luck.bonus = 0;
+                        luck.base -= remaining;
+                    }
+                    // 转化收益
+                    let result = {};
+                    if (targetType === 'spiritStones') {
+                        const reward = amount * 10;
+                        gs.spiritStones = (gs.spiritStones || 0) + reward;
+                        result = { success: true, targetType, amount, reward, message: '气运转化为' + reward + '灵石' };
+                    } else if (targetType === 'reputation') {
+                        const reward = amount;
+                        gs.reputation = (gs.reputation || 0) + reward;
+                        result = { success: true, targetType, amount, reward, message: '气运转化为' + reward + '声望' };
+                    } else if (targetType === 'realm') {
+                        const reward = Math.floor(amount / 100);
+                        if (reward < 1) return { error: '气运点数不足100，无法转化为境界经验' };
+                        gs.realmProgress = (gs.realmProgress || 0) + reward * 100;
+                        result = { success: true, targetType, amount, reward, message: '气运转化为' + reward + '境界经验' };
+                    }
+                    result.remainingLuck = luck.base + luck.bonus;
+                    return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -17875,6 +18145,284 @@
             return summary;
         }
         const v111Results = runV111Tests();
+
+        // ===== V112: 仙界联盟+气运系统 Tests =====
+        function runV112Tests() {
+            const results = [];
+            function v112Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                reputation: 100,
+                alliances: null,
+                luck: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: luck.query returns initial state
+            mockGameState.luck = null;
+            const query1 = server.mcpLuckQuery({});
+            v112Assert(query1.success === true, 'luck.query succeeds');
+            v112Assert(query1.base === 0, 'luck.query base is 0');
+            v112Assert(query1.bonus === 0, 'luck.query bonus is 0');
+            v112Assert(query1.total === 0, 'luck.query total is 0');
+
+            // Test 2: luck.bless low intensity succeeds
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const bless1 = server.mcpLuckBless({ intensity: 'low' });
+            v112Assert(bless1.success === true, 'luck.bless low succeeds');
+            v112Assert(bless1.gain === 5, 'luck.bless low gives +5');
+            v112Assert(bless1.cost === 100, 'luck.bless low costs 100');
+            v112Assert(bless1.total === 5, 'luck.bless total is 5');
+
+            // Test 3: luck.bless mid intensity gives +15
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const bless2 = server.mcpLuckBless({ intensity: 'mid' });
+            v112Assert(bless2.success === true, 'luck.bless mid succeeds');
+            v112Assert(bless2.gain === 15, 'luck.bless mid gives +15');
+            v112Assert(bless2.cost === 300, 'luck.bless mid costs 300');
+
+            // Test 4: luck.bless high intensity gives +30
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const bless3 = server.mcpLuckBless({ intensity: 'high' });
+            v112Assert(bless3.success === true, 'luck.bless high succeeds');
+            v112Assert(bless3.gain === 30, 'luck.bless high gives +30');
+            v112Assert(bless3.cost === 500, 'luck.bless high costs 500');
+
+            // Test 5: luck.bless fails with low spirit stones
+            mockGameState.spiritStones = 50;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const blessLow = server.mcpLuckBless({ intensity: 'low' });
+            v112Assert(blessLow.error && blessLow.error.includes('灵力不足'), 'luck.bless fails with low spirit stones');
+
+            // Test 6: luck.bless fails with invalid intensity
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const blessInvalid = server.mcpLuckBless({ intensity: 'invalid' });
+            v112Assert(blessInvalid.error && blessInvalid.error.includes('无效的祈福强度'), 'luck.bless rejects invalid intensity');
+
+            // Test 7: luck.transform to spiritStones
+            mockGameState.spiritStones = 10000;
+            mockGameState.luck = { base: 10, bonus: 20, lastBless: null, blessingCount: 1 };
+            const transform1 = server.mcpLuckTransform({ targetType: 'spiritStones', amount: 10 });
+            v112Assert(transform1.success === true, 'luck.transform spiritStones succeeds');
+            v112Assert(transform1.reward === 100, 'luck.transform gives 10*10=100 spirit stones');
+            v112Assert(transform1.remainingLuck === 20, 'luck.transform remaining luck is 20');
+
+            // Test 8: luck.transform to reputation
+            mockGameState.luck = { base: 10, bonus: 10, lastBless: null, blessingCount: 1 };
+            const transform2 = server.mcpLuckTransform({ targetType: 'reputation', amount: 5 });
+            v112Assert(transform2.success === true, 'luck.transform reputation succeeds');
+            v112Assert(transform2.reward === 5, 'luck.transform gives 5 reputation');
+            v112Assert(transform2.remainingLuck === 15, 'luck.transform remaining luck is 15');
+
+            // Test 9: luck.transform to realm (needs 100 points)
+            mockGameState.luck = { base: 50, bonus: 100, lastBless: null, blessingCount: 1 };
+            const transform3 = server.mcpLuckTransform({ targetType: 'realm', amount: 100 });
+            v112Assert(transform3.success === true, 'luck.transform realm succeeds');
+            v112Assert(transform3.reward === 1, 'luck.transform gives 1 realm experience');
+            v112Assert(transform3.remainingLuck === 50, 'luck.transform remaining luck is 50');
+
+            // Test 10: luck.transform fails with insufficient luck
+            mockGameState.luck = { base: 5, bonus: 5, lastBless: null, blessingCount: 0 };
+            const transformFail = server.mcpLuckTransform({ targetType: 'spiritStones', amount: 20 });
+            v112Assert(transformFail.error && transformFail.error.includes('气运不足'), 'luck.transform fails with insufficient luck');
+
+            // Test 11: luck.transform fails with invalid type
+            mockGameState.luck = { base: 100, bonus: 0, lastBless: null, blessingCount: 0 };
+            const transformInvalid = server.mcpLuckTransform({ targetType: 'invalid', amount: 10 });
+            v112Assert(transformInvalid.error && transformInvalid.error.includes('无效的目标类型'), 'luck.transform rejects invalid type');
+
+            // Test 12: luck.transform fails with invalid amount
+            mockGameState.luck = { base: 100, bonus: 0, lastBless: null, blessingCount: 0 };
+            const transformNeg = server.mcpLuckTransform({ targetType: 'spiritStones', amount: -5 });
+            v112Assert(transformNeg.error && transformNeg.error.includes('气运点数必须为正数'), 'luck.transform rejects negative amount');
+
+            // Test 13: alliance.query returns null when not in alliance
+            mockGameState.alliances = null;
+            const query2 = server.mcpAllianceQuery({});
+            v112Assert(query2.success === true, 'alliance.query succeeds');
+            v112Assert(query2.alliance === null, 'alliance.query returns null when not in alliance');
+
+            // Test 14: alliance.create requires spiritStones >= 10000
+            mockGameState.spiritStones = 5000;
+            mockGameState.alliances = null;
+            const create1 = server.mcpAllianceCreateV112({ name: 'TestAlliance' });
+            v112Assert(create1.error && create1.error.includes('灵力不足10000'), 'alliance.create fails with < 10000 spirit stones');
+
+            // Test 15: alliance.create requires realm >= 3
+            mockGameState.spiritStones = 50000;
+            mockGameState.realm = 2;
+            mockGameState.alliances = null;
+            const create2 = server.mcpAllianceCreateV112({ name: 'TestAlliance' });
+            v112Assert(create2.error && create2.error.includes('境界不足3阶'), 'alliance.create fails with realm < 3');
+
+            // Test 16: alliance.create succeeds with valid conditions
+            mockGameState.spiritStones = 50000;
+            mockGameState.realm = 3;
+            mockGameState.alliances = null;
+            const create3 = server.mcpAllianceCreateV112({ name: 'TestAlliance', tag: 'TEST' });
+            v112Assert(create3.success === true, 'alliance.create succeeds');
+            v112Assert(create3.alliance && create3.alliance.name === 'TestAlliance', 'alliance.create returns alliance');
+            v112Assert(create3.alliance.tag === 'TEST', 'alliance.create uses custom tag');
+
+            // Test 17: alliance.create deducts 10000 spirit stones
+            v112Assert(mockGameState.spiritStones === 40000, 'alliance.create deducts 10000 spirit stones');
+
+            // Test 18: alliance.query returns alliance after creation
+            const query3 = server.mcpAllianceQuery({});
+            v112Assert(query3.success === true, 'alliance.query after create succeeds');
+            v112Assert(query3.alliance !== null, 'alliance.query returns alliance');
+            v112Assert(query3.alliance.name === 'TestAlliance', 'alliance.query returns correct alliance');
+
+            // Test 19: alliance.upgrade fails with < 3 members
+            mockGameState.alliances.list[0].members = [{ id: 'player_1', name: 'Leader', role: 'leader' }];
+            const upgrade1 = server.mcpAllianceUpgrade({});
+            v112Assert(upgrade1.error && upgrade1.error.includes('成员不足3人'), 'alliance.upgrade fails with < 3 members');
+
+            // Test 20: alliance.upgrade fails with < 50000 funds
+            mockGameState.alliances.list[0].members = [
+                { id: 'p1', name: 'M1', role: 'member' },
+                { id: 'p2', name: 'M2', role: 'member' },
+                { id: 'p3', name: 'M3', role: 'member' }
+            ];
+            mockGameState.alliances.list[0].resources = { spiritStones: 10000 };
+            const upgrade2 = server.mcpAllianceUpgrade({});
+            v112Assert(upgrade2.error && upgrade2.error.includes('联盟资金不足50000灵石'), 'alliance.upgrade fails with < 50000 funds');
+
+            // Test 21: alliance.upgrade succeeds with valid conditions
+            mockGameState.alliances.list[0].resources = { spiritStones: 60000 };
+            const upgrade3 = server.mcpAllianceUpgrade({});
+            v112Assert(upgrade3.success === true, 'alliance.upgrade succeeds');
+            v112Assert(upgrade3.level === 2, 'alliance.upgrade increases level');
+            v112Assert(mockGameState.alliances.list[0].resources.spiritStones === 10000, 'alliance.upgrade deducts 50000 funds');
+
+            // Test 22: alliance.query with specific allianceId
+            const query4 = server.mcpAllianceQuery({ allianceId: 'invalid_id' });
+            v112Assert(query4.error && query4.error.includes('联盟不存在'), 'alliance.query returns error for invalid id');
+
+            // Test 23: luck.query returns updated state after blessings
+            mockGameState.luck = { base: 0, bonus: 25, lastBless: Date.now(), blessingCount: 2 };
+            const query5 = server.mcpLuckQuery({});
+            v112Assert(query5.total === 25, 'luck.query returns correct total');
+            v112Assert(query5.blessingCount === 2, 'luck.query returns correct blessing count');
+
+            // Test 24: luck.transform burns bonus first then base
+            mockGameState.luck = { base: 5, bonus: 15, lastBless: null, blessingCount: 1 };
+            const transform4 = server.mcpLuckTransform({ targetType: 'spiritStones', amount: 20 });
+            v112Assert(transform4.success === true, 'luck.transform with 15 bonus + 5 base succeeds');
+            v112Assert(transform4.remainingLuck === 0, 'luck.transform burns all luck');
+            v112Assert(mockGameState.luck.bonus === 0, 'luck bonus is 0');
+            v112Assert(mockGameState.luck.base === 0, 'luck base is 0');
+
+            // Test 25: multiple blessings accumulate
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            server.mcpLuckBless({ intensity: 'high' });
+            server.mcpLuckBless({ intensity: 'mid' });
+            server.mcpLuckBless({ intensity: 'low' });
+            v112Assert(mockGameState.luck.bonus === 50, 'three blessings give 50 total bonus (30+15+5)');
+            v112Assert(mockGameState.luck.blessingCount === 3, 'blessing count is 3');
+
+            // Test 26: alliance.create requires name
+            mockGameState.spiritStones = 50000;
+            mockGameState.realm = 3;
+            mockGameState.alliances = null;
+            const createNoName = server.mcpAllianceCreateV112({});
+            v112Assert(createNoName.error && createNoName.error.includes('名称不能为空'), 'alliance.create fails without name');
+
+            // Test 27: alliance.create requires min 2 char name
+            const createShort = server.mcpAllianceCreateV112({ name: 'A' });
+            v112Assert(createShort.error && createShort.error.includes('至少2字符'), 'alliance.create fails with 1 char name');
+
+            // Test 28: alliance.create requires tag 3-5 chars
+            const createBadTag = server.mcpAllianceCreateV112({ name: 'TestAlliance', tag: 'AB' });
+            v112Assert(createBadTag.error && createBadTag.error.includes('3-5字符'), 'alliance.create fails with 2 char tag');
+
+            // Test 29: luck.transform realm requires 100+ points
+            mockGameState.luck = { base: 50, bonus: 49, lastBless: null, blessingCount: 0 };
+            const transformSmall = server.mcpLuckTransform({ targetType: 'realm', amount: 100 });
+            v112Assert(transformSmall.error && transformSmall.error.includes('气运点数不足100'), 'luck.transform realm fails with < 100 points');
+
+            // Test 30: alliance.upgrade with specific allianceId
+            mockGameState.alliances.list[0].resources = { spiritStones: 60000 };
+            const upgradeSpecific = server.mcpAllianceUpgrade({ allianceId: mockGameState.alliances.list[0].id });
+            v112Assert(upgradeSpecific.success === true, 'alliance.upgrade with specific id succeeds');
+
+            // Test 31: luck.bless default intensity is low
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            const blessDefault = server.mcpLuckBless({});
+            v112Assert(blessDefault.gain === 5, 'luck.bless default is low');
+
+            // Test 32: alliance.query with specific id returns correct alliance
+            const alliancesResult = server.mcpAllianceQuery({ allianceId: mockGameState.alliances.list[0].id });
+            v112Assert(alliancesResult.success === true, 'alliance.query specific id succeeds');
+
+            // Test 33: luck.transform with 0 amount fails
+            mockGameState.luck = { base: 100, bonus: 0, lastBless: null, blessingCount: 0 };
+            const transformZero = server.mcpLuckTransform({ targetType: 'spiritStones', amount: 0 });
+            v112Assert(transformZero.error && transformZero.error.includes('气运点数必须为正数'), 'luck.transform fails with 0 amount');
+
+            // Test 34: luck.transform with no target type fails
+            const transformNoTarget = server.mcpLuckTransform({ amount: 10 });
+            v112Assert(transformNoTarget.error && transformNoTarget.error.includes('转化目标类型不能为空'), 'luck.transform fails without target type');
+
+            // Test 35: alliance.upgrade with non-existent alliance id
+            mockGameState.alliances.list[0].resources = { spiritStones: 60000 };
+            const upgradeInvalid = server.mcpAllianceUpgrade({ allianceId: 'non_existent_alliance' });
+            v112Assert(upgradeInvalid.error && upgradeInvalid.error.includes('联盟不存在'), 'alliance.upgrade fails with invalid id');
+
+            // Test 36: luck.bless multiple times tracks lastBless timestamp
+            mockGameState.spiritStones = 50000;
+            mockGameState.luck = { base: 0, bonus: 0, lastBless: null, blessingCount: 0 };
+            server.mcpLuckBless({ intensity: 'low' });
+            const lastBlessTime = mockGameState.luck.lastBless;
+            v112Assert(lastBlessTime !== null, 'luck.bless sets lastBless timestamp');
+
+            // Test 37: alliance.create auto-generates tag from name
+            mockGameState.spiritStones = 50000;
+            mockGameState.realm = 3;
+            mockGameState.alliances = null;
+            const createAutoTag = server.mcpAllianceCreateV112({ name: 'MyAlliance' });
+            v112Assert(createAutoTag.success === true, 'alliance.create auto-generates tag');
+            v112Assert(createAutoTag.alliance.tag === 'MYA', 'alliance.create tag is first 3 chars uppercase');
+
+            // Test 38: luck.transform remaining luck is correct after partial transform
+            mockGameState.luck = { base: 30, bonus: 30, lastBless: null, blessingCount: 1 };
+            const transformPartial = server.mcpLuckTransform({ targetType: 'spiritStones', amount: 40 });
+            v112Assert(transformPartial.remainingLuck === 20, 'luck.transform remaining luck is 20 (30+30-40)');
+
+            // Test 39: alliance upgrade increases levelUps counter
+            mockGameState.alliances.list[0].resources = { spiritStones: 60000 };
+            mockGameState.alliances.list[0].levelUps = 0;
+            server.mcpAllianceUpgrade({});
+            v112Assert(mockGameState.alliances.list[0].levelUps === 1, 'alliance.upgrade increments levelUps');
+
+            // Test 40: luck.query shows lastBless as timestamp
+            mockGameState.luck = { base: 0, bonus: 10, lastBless: 1234567890, blessingCount: 1 };
+            const queryLast = server.mcpLuckQuery({});
+            v112Assert(queryLast.lastBless === 1234567890, 'luck.query returns lastBless timestamp');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V112', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V112 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v112Results = runV112Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
