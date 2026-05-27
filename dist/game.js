@@ -4603,6 +4603,141 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V106: 天道轮回+因果律系统 ---
+        const MCP_TOOLS_V106 = {
+            'heaven.cycle.open': {
+                name: 'heaven.cycle.open',
+                description: '开启天道轮回，消耗大量灵石开启一个纪元的轮回 (天道轮回系统-开启轮回)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        cycleType: { type: 'string', description: '轮回类型: small|medium|large (default medium)', default: 'medium' }
+                    }
+                }
+            },
+            'heaven.cycle.settle': {
+                name: 'heaven.cycle.settle',
+                description: '结算当前天道轮回的因果，评估善恶因果并给予奖励或惩罚 (天道轮回系统-结算因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        force: { type: 'boolean', description: '强制结算当前因果 (default false)' }
+                    }
+                }
+            },
+            'heaven.cycle.reset': {
+                name: 'heaven.cycle.reset',
+                description: '重置天道轮回，清除当前纪元记录，重新开始新纪元 (天道轮回系统-重置轮回)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        confirm: { type: 'boolean', description: '确认重置 (required true)' }
+                    }
+                }
+            },
+            'karma.law.query': {
+                name: 'karma.law.query',
+                description: '查询因果律记录，查看善恶因果和业力值 (因果律系统-查询因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '过滤类型: all|good|evil|neutral (default all)' }
+                    }
+                }
+            },
+            'karma.law.attribute': {
+                name: 'karma.law.attribute',
+                description: '为行为添加因果 Attribution，记录善行或恶行 (因果律系统-添加因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: { type: 'string', description: '行为类型: good|evil|neutral' },
+                        desc: { type: 'string', description: '行为描述' },
+                        weight: { type: 'number', description: '因果权重: 1-10 (default 5)' }
+                    },
+                    required: ['action', 'desc']
+                }
+            },
+            'karma.law.reverse': {
+                name: 'karma.law.reverse',
+                description: '逆转因果，消耗大量资源改变因果记录 (因果律系统-逆转因果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        karmaId: { type: 'string', description: '因果记录ID' },
+                        cost: { type: 'integer', description: '消耗灵石数量 (min 5000)' }
+                    },
+                    required: ['karmaId']
+                }
+            }
+        };
+
+        // --- MCP_TOOLS_V107: 仙界天榜+封神系统 ---
+        const MCP_TOOLS_V107 = {
+            'heaven.rank.query': {
+                name: 'heaven.rank.query',
+                description: '查询天榜排名信息 (仙界天榜系统-查询天榜)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        page: { type: 'integer', description: '页码 (default 1)', default: 1 }
+                    }
+                }
+            },
+            'heaven.rank.challenge': {
+                name: 'heaven.rank.challenge',
+                description: '挑战天榜上的玩家 (仙界天榜系统-挑战玩家)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetRank: { type: 'integer', description: '目标排名' }
+                    },
+                    required: ['targetRank']
+                }
+            },
+            'heaven.rank.reward': {
+                name: 'heaven.rank.reward',
+                description: '领取天榜排名奖励 (仙界天榜系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rank: { type: 'integer', description: '排名' }
+                    },
+                    required: ['rank']
+                }
+            },
+            'deification.open': {
+                name: 'deification.open',
+                description: '开启封神系统 (封神系统-开启封神)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'deification.certify': {
+                name: 'deification.certify',
+                description: '申请成为真神 (封神系统-申请封神)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        deityTitle: { type: 'string', description: '神位称号' }
+                    }
+                }
+            },
+            'deification.legacy': {
+                name: 'deification.legacy',
+                description: '传承神位 (封神系统-传承神位)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        deityId: { type: 'string', description: '神位ID' },
+                        heirId: { type: 'string', description: '继承者ID' }
+                    },
+                    required: ['deityId', 'heirId']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4730,6 +4865,14 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V105: Register 秘境争夺+混沌灵宝系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V105)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V106: Register 天道轮回+因果律系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V106)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V107: Register 仙界天榜+封神系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V107)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5410,6 +5553,44 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'artifact.chaos.resonance':
                             result = this.mcpArtifactChaosResonance(args);
+                            break;
+                        // V106: 天道轮回+因果律系统
+                        case 'heaven.cycle.open':
+                            result = this.mcpHeavenCycleOpen(args);
+                            break;
+                        case 'heaven.cycle.settle':
+                            result = this.mcpHeavenCycleSettle(args);
+                            break;
+                        case 'heaven.cycle.reset':
+                            result = this.mcpHeavenCycleReset(args);
+                            break;
+                        case 'karma.law.query':
+                            result = this.mcpKarmaLawQuery(args);
+                            break;
+                        case 'karma.law.attribute':
+                            result = this.mcpKarmaLawAttribute(args);
+                            break;
+                        case 'karma.law.reverse':
+                            result = this.mcpKarmaLawReverse(args);
+                            break;
+                        // V107: 仙界天榜+封神系统
+                        case 'heaven.rank.query':
+                            result = this.mcpHeavenRankQuery(args);
+                            break;
+                        case 'heaven.rank.challenge':
+                            result = this.mcpHeavenRankChallenge(args);
+                            break;
+                        case 'heaven.rank.reward':
+                            result = this.mcpHeavenRankReward(args);
+                            break;
+                        case 'deification.open':
+                            result = this.mcpDeificationOpen(args);
+                            break;
+                        case 'deification.certify':
+                            result = this.mcpDeificationCertify(args);
+                            break;
+                        case 'deification.legacy':
+                            result = this.mcpDeificationLegacy(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -11316,6 +11497,530 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V106: 天道轮回+因果律系统 MCP Methods
+            _initHeavenCycleState() {
+                const gs = window.gameState;
+                if (!gs.heavenCycle) {
+                    gs.heavenCycle = {
+                        isActive: false,
+                        cycleType: 'medium',
+                        openedAt: null,
+                        era: 1,
+                        karmaRecords: [],
+                        goodKarma: 0,
+                        evilKarma: 0,
+                        settleCount: 0
+                    };
+                }
+                return gs.heavenCycle;
+            }
+
+            mcpHeavenCycleOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (cycle.isActive) {
+                        return { error: 'Heaven cycle already active. Settle or reset first.' };
+                    }
+                    const { cycleType = 'medium' } = args || {};
+                    const costs = { small: 5000, medium: 20000, large: 50000 };
+                    const cost = costs[cycleType] || costs.medium;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: 'Not enough spirit stones. Required: ' + cost };
+                    }
+                    gs.spiritStones -= cost;
+                    cycle.isActive = true;
+                    cycle.cycleType = cycleType;
+                    cycle.openedAt = Date.now();
+                    cycle.karmaRecords = [];
+                    cycle.goodKarma = 0;
+                    cycle.evilKarma = 0;
+                    cycle.settleCount = 0;
+                    return {
+                        success: true,
+                        cycleType,
+                        cost,
+                        remaining: gs.spiritStones,
+                        era: cycle.era,
+                        openedAt: cycle.openedAt,
+                        message: 'Heaven cycle opened! Type: ' + cycleType + ', Cost: ' + cost + ' spirit stones.'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenCycleSettle(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (!cycle.isActive && !args?.force) {
+                        return { error: 'No active heaven cycle. Open one first.' };
+                    }
+                    const { force = false } = args || {};
+                    const totalGood = cycle.goodKarma || 0;
+                    const totalEvil = cycle.evilKarma || 0;
+                    const netKarma = totalGood - totalEvil;
+                    let reward = 0;
+                    let message = '';
+                    if (netKarma > 10) {
+                        reward = Math.floor(netKarma * 100);
+                        message = 'Blessed by heaven! Good karma exceeds evil. Reward: ' + reward + ' spirit stones.';
+                    } else if (netKarma < -10) {
+                        reward = Math.floor(netKarma * 50);
+                        message = 'Punished by heaven! Evil karma exceeds good. Penalty: ' + Math.abs(reward) + ' spirit stones.';
+                    } else {
+                        reward = 0;
+                        message = 'Karma balanced. No reward or penalty.';
+                    }
+                    if (reward > 0) {
+                        gs.spiritStones = (gs.spiritStones || 0) + reward;
+                    } else if (reward < 0) {
+                        gs.spiritStones = Math.max(0, (gs.spiritStones || 0) + reward);
+                    }
+                    cycle.settleCount++;
+                    return {
+                        success: true,
+                        goodKarma: totalGood,
+                        evilKarma: totalEvil,
+                        netKarma,
+                        reward,
+                        settleCount: cycle.settleCount,
+                        message
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenCycleReset(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    if (!args?.confirm) {
+                        return { error: 'Confirmation required. Set confirm: true to reset.' };
+                    }
+                    cycle.isActive = false;
+                    cycle.cycleType = 'medium';
+                    cycle.openedAt = null;
+                    cycle.era++;
+                    cycle.karmaRecords = [];
+                    cycle.goodKarma = 0;
+                    cycle.evilKarma = 0;
+                    cycle.settleCount = 0;
+                    return {
+                        success: true,
+                        era: cycle.era,
+                        message: 'Heaven cycle reset. New era: ' + cycle.era + ' begins.'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { filter = 'all' } = args || {};
+                    let records = cycle.karmaRecords || [];
+                    if (filter === 'good') {
+                        records = records.filter(r => r.action === 'good');
+                    } else if (filter === 'evil') {
+                        records = records.filter(r => r.action === 'evil');
+                    } else if (filter === 'neutral') {
+                        records = records.filter(r => r.action === 'neutral');
+                    }
+                    return {
+                        total: records.length,
+                        filter,
+                        goodKarma: cycle.goodKarma || 0,
+                        evilKarma: cycle.evilKarma || 0,
+                        records: records.map(r => ({
+                            id: r.id,
+                            action: r.action,
+                            desc: r.desc,
+                            weight: r.weight,
+                            createdAt: r.createdAt
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawAttribute(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { action, desc, weight = 5 } = args || {};
+                    if (!action || !desc) {
+                        return { error: 'action and desc are required' };
+                    }
+                    if (!['good', 'evil', 'neutral'].includes(action)) {
+                        return { error: 'action must be: good, evil, or neutral' };
+                    }
+                    if (weight < 1 || weight > 10) {
+                        return { error: 'weight must be between 1 and 10' };
+                    }
+                    const record = {
+                        id: 'karma_' + Date.now(),
+                        action,
+                        desc,
+                        weight,
+                        createdAt: Date.now()
+                    };
+                    cycle.karmaRecords.push(record);
+                    if (action === 'good') {
+                        cycle.goodKarma = (cycle.goodKarma || 0) + weight;
+                    } else if (action === 'evil') {
+                        cycle.evilKarma = (cycle.evilKarma || 0) + weight;
+                    }
+                    return {
+                        success: true,
+                        id: record.id,
+                        action,
+                        desc,
+                        weight,
+                        goodKarma: cycle.goodKarma,
+                        evilKarma: cycle.evilKarma,
+                        message: 'Karma recorded: ' + action + ' - ' + desc + ' (weight: ' + weight + ')'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaLawReverse(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const cycle = this._initHeavenCycleState();
+                    const { karmaId, cost = 5000 } = args || {};
+                    if (!karmaId) {
+                        return { error: 'karmaId is required' };
+                    }
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: 'Not enough spirit stones. Required: ' + cost };
+                    }
+                    const recordIndex = cycle.karmaRecords.findIndex(r => r.id === karmaId);
+                    if (recordIndex === -1) {
+                        return { error: 'Karma record not found: ' + karmaId };
+                    }
+                    const record = cycle.karmaRecords[recordIndex];
+                    gs.spiritStones -= cost;
+                    // Reverse the karma effect
+                    if (record.action === 'good') {
+                        cycle.goodKarma = Math.max(0, (cycle.goodKarma || 0) - record.weight);
+                    } else if (record.action === 'evil') {
+                        cycle.evilKarma = Math.max(0, (cycle.evilKarma || 0) - record.weight);
+                    }
+                    // Mark as reversed instead of removing
+                    cycle.karmaRecords[recordIndex].reversed = true;
+                    cycle.karmaRecords[recordIndex].reversedAt = Date.now();
+                    return {
+                        success: true,
+                        karmaId,
+                        cost,
+                        remaining: gs.spiritStones,
+                        originalAction: record.action,
+                        originalWeight: record.weight,
+                        message: 'Karma reversed: ' + record.action + ' - ' + record.desc
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V107: 仙界天榜+封神系统
+            _initHeavenRankState() {
+                const gs = window.gameState;
+                if (!gs.heavenRank) {
+                    gs.heavenRank = {
+                        isOpen: false,
+                        rankings: [],
+                        playerRank: null,
+                        lastUpdated: null,
+                        challengeCount: 0,
+                        winCount: 0,
+                        totalRewards: {}
+                    };
+                    // Initialize with mock rankings
+                    gs.heavenRank.rankings = [
+                        { rank: 1, playerId: 'heaven_1', name: '天道真人', realm: 9, combatPower: 999999, title: '天榜第一' },
+                        { rank: 2, playerId: 'heaven_2', name: '苍穹仙尊', realm: 8, combatPower: 888888, title: '天榜第二' },
+                        { rank: 3, playerId: 'heaven_3', name: '万古剑圣', realm: 8, combatPower: 777777, title: '天榜第三' },
+                        { rank: 4, playerId: 'heaven_4', name: '星河武帝', realm: 7, combatPower: 666666, title: '天榜第四' },
+                        { rank: 5, playerId: 'heaven_5', name: '混沌魔尊', realm: 7, combatPower: 555555, title: '天榜第五' },
+                        { rank: 6, playerId: 'heaven_6', name: '万法至尊', realm: 6, combatPower: 444444, title: '天榜第六' },
+                        { rank: 7, playerId: 'heaven_7', name: '太虚真仙', realm: 6, combatPower: 333333, title: '天榜第七' },
+                        { rank: 8, playerId: 'heaven_8', name: '九天真君', realm: 5, combatPower: 222222, title: '天榜第八' },
+                        { rank: 9, playerId: 'heaven_9', name: '万灵药王', realm: 5, combatPower: 111111, title: '天榜第九' },
+                        { rank: 10, playerId: 'heaven_10', name: '万妖之王', realm: 4, combatPower: 99999, title: '天榜第十' }
+                    ];
+                }
+                return gs.heavenRank;
+            }
+
+            _initDeificationState() {
+                const gs = window.gameState;
+                if (!gs.deification) {
+                    gs.deification = {
+                        isOpen: false,
+                        isDeity: false,
+                        deityTitle: null,
+                        deityId: null,
+                        deityRank: 0,
+                        legacyCandidates: [],
+                        inheritedFrom: null,
+                        passedTo: null
+                    };
+                }
+                return gs.deification;
+            }
+
+            mcpHeavenRankQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rank = this._initHeavenRankState();
+                    const { page = 1 } = args || {};
+                    const pageSize = 10;
+                    const startIdx = (page - 1) * pageSize;
+                    const endIdx = startIdx + pageSize;
+                    const pageRankings = rank.rankings.slice(startIdx, endIdx);
+                    const playerRankEntry = rank.playerRank ? rank.rankings.find(r => r.rank === rank.playerRank) : null;
+                    return {
+                        success: true,
+                        isOpen: rank.isOpen,
+                        rankings: pageRankings,
+                        total: rank.rankings.length,
+                        page,
+                        pageSize,
+                        playerRank: rank.playerRank,
+                        playerEntry: playerRankEntry,
+                        challengeCount: rank.challengeCount || 0,
+                        winCount: rank.winCount || 0,
+                        lastUpdated: rank.lastUpdated,
+                        message: '天榜查询成功，共 ' + rank.rankings.length + ' 名玩家'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenRankChallenge(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rank = this._initHeavenRankState();
+                    if (!rank.isOpen) {
+                        return { error: '天榜系统未开启，请先开启天榜' };
+                    }
+                    const { targetRank } = args || {};
+                    if (!targetRank || targetRank < 1 || targetRank > rank.rankings.length) {
+                        return { error: '无效的挑战排名，排名范围: 1-' + rank.rankings.length };
+                    }
+                    const playerPower = gs.combatPower || (gs.realm * 10000 + gs.stage * 1000);
+                    const target = rank.rankings.find(r => r.rank === targetRank);
+                    if (!target) {
+                        return { error: '排名 ' + targetRank + ' 的玩家不存在' };
+                    }
+                    // Simulate battle
+                    const playerWinChance = playerPower / (playerPower + target.combatPower);
+                    const roll = Math.random();
+                    const victory = roll < playerWinChance;
+                    rank.challengeCount = (rank.challengeCount || 0) + 1;
+                    if (victory) {
+                        rank.winCount = (rank.winCount || 0) + 1;
+                        // Swap positions
+                        const currentPlayerRank = rank.playerRank || rank.rankings.length + 1;
+                        if (currentPlayerRank <= rank.rankings.length) {
+                            const currentEntry = rank.rankings.find(r => r.rank === currentPlayerRank);
+                            if (currentEntry) {
+                                currentEntry.rank = targetRank;
+                            }
+                        }
+                        target.rank = currentPlayerRank;
+                        rank.playerRank = targetRank;
+                        rank.lastUpdated = Date.now();
+                        return {
+                            success: true,
+                            victory: true,
+                            targetRank,
+                            targetName: target.name,
+                            playerPower,
+                            targetPower: target.combatPower,
+                            newRank: targetRank,
+                            winStreak: rank.winCount,
+                            message: '挑战成功！排名提升至第 ' + targetRank + ' 名'
+                        };
+                    } else {
+                        rank.playerRank = rank.playerRank || rank.rankings.length + 1;
+                        rank.lastUpdated = Date.now();
+                        return {
+                            success: true,
+                            victory: false,
+                            targetRank,
+                            targetName: target.name,
+                            playerPower,
+                            targetPower: target.combatPower,
+                            currentRank: rank.playerRank,
+                            message: '挑战失败，当前排名: 第 ' + rank.playerRank + ' 名'
+                        };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenRankReward(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rank = this._initHeavenRankState();
+                    const { rank: targetRank } = args || {};
+                    if (!targetRank) {
+                        return { error: 'rank is required' };
+                    }
+                    if (targetRank < 1 || targetRank > rank.rankings.length) {
+                        return { error: '无效的排名，排名范围: 1-' + rank.rankings.length };
+                    }
+                    const rankKey = 'rank_' + targetRank;
+                    if (rank.totalRewards && rank.totalRewards[rankKey]) {
+                        return { error: '排名 ' + targetRank + ' 的奖励已领取' };
+                    }
+                    // Calculate reward based on rank
+                    const REWARD_TIERS = {
+                        1: { spiritStones: 50000, reputation: 1000, title: '天榜冠军' },
+                        2: { spiritStones: 30000, reputation: 700, title: '天榜亚军' },
+                        3: { spiritStones: 20000, reputation: 500, title: '天榜季军' },
+                        4: { spiritStones: 15000, reputation: 300 },
+                        5: { spiritStones: 12000, reputation: 250 },
+                        6: { spiritStones: 10000, reputation: 200 },
+                        7: { spiritStones: 8000, reputation: 150 },
+                        8: { spiritStones: 6000, reputation: 100 },
+                        9: { spiritStones: 4000, reputation: 80 },
+                        10: { spiritStones: 2000, reputation: 50 }
+                    };
+                    const reward = REWARD_TIERS[targetRank] || { spiritStones: 1000, reputation: 30 };
+                    if (!rank.totalRewards) rank.totalRewards = {};
+                    rank.totalRewards[rankKey] = { claimed: true, claimedAt: Date.now(), ...reward };
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    gs.reputation = (gs.reputation || 0) + reward.reputation;
+                    return {
+                        success: true,
+                        rank: targetRank,
+                        reward: reward,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取排名 ' + targetRank + ' 奖励成功！灵石+' + reward.spiritStones + ', 声望+' + reward.reputation
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpDeificationOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const deify = this._initDeificationState();
+                    if (deify.isOpen) {
+                        return { error: '封神系统已开启' };
+                    }
+                    // Require realm 5+ to open deification
+                    if ((gs.realm || 0) < 5) {
+                        return { error: '修为不足，需要境界达到化神期( realm >= 5)才能开启封神系统' };
+                    }
+                    deify.isOpen = true;
+                    return {
+                        success: true,
+                        isOpen: true,
+                        message: '封神系统已开启！可申请神位或传承神位'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpDeificationCertify(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const deify = this._initDeificationState();
+                    if (!deify.isOpen) {
+                        return { error: '封神系统未开启，请先调用 deification.open' };
+                    }
+                    if (deify.isDeity) {
+                        return { error: '您已是真神，无需再次认证' };
+                    }
+                    const { deityTitle } = args || {};
+                    const TITLES = ['雷部正神', '火部正神', '水部正神', '山部正神', '风部正神', '斗部正神', '瘟部正神', '财部正神'];
+                    const title = deityTitle || TITLES[Math.floor(Math.random() * TITLES.length)];
+                    // Require high combat power and realm to certify
+                    const minRealm = 7;
+                    const minPower = 500000;
+                    const playerRealm = gs.realm || 0;
+                    const playerPower = gs.combatPower || (playerRealm * 10000);
+                    if (playerRealm < minRealm) {
+                        return { error: '修为不足，需要境界达到大乘期( realm >= 7)才能申请封神' };
+                    }
+                    if (playerPower < minPower) {
+                        return { error: '战力不足，需要战力达到 ' + minPower + ' 才能申请封神' };
+                    }
+                    deify.isDeity = true;
+                    deify.deityTitle = title;
+                    deify.deityId = 'deity_' + Date.now();
+                    deify.deityRank = 1;
+                    deify.certifiedAt = Date.now();
+                    gs.spiritStones = (gs.spiritStones || 0) + 100000;
+                    return {
+                        success: true,
+                        isDeity: true,
+                        deityId: deify.deityId,
+                        deityTitle: title,
+                        deityRank: 1,
+                        bonus: { spiritStones: 100000 },
+                        message: '恭喜！您已晋升为 ' + title + '！获得100000灵石奖励'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpDeificationLegacy(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const deify = this._initDeificationState();
+                    if (!deify.isOpen) {
+                        return { error: '封神系统未开启，请先调用 deification.open' };
+                    }
+                    if (!deify.isDeity) {
+                        return { error: '您尚未封神，无法传承神位' };
+                    }
+                    const { deityId, heirId } = args || {};
+                    if (!deityId || !heirId) {
+                        return { error: 'deityId and heirId are required' };
+                    }
+                    if (deify.deityId !== deityId) {
+                        return { error: '神位ID不匹配，您没有该神位的传承权限' };
+                    }
+                    if (deify.passedTo) {
+                        return { error: '神位已传承给 ' + deify.passedTo + '，无法再次传承' };
+                    }
+                    const heir = gs.npcCollab?.npcs?.find(n => n.id === heirId || n.name === heirId);
+                    if (!heir) {
+                        return { error: '继承者不存在: ' + heirId };
+                    }
+                    const originalTitle = deify.deityTitle;
+                    deify.passedTo = heirId;
+                    deify.passedAt = Date.now();
+                    deify.isDeity = false;
+                    deify.deityTitle = null;
+                    // Heir gains the deity status
+                    if (!gs.deificationLegacy) gs.deificationLegacy = [];
+                    gs.deificationLegacy.push({
+                        fromDeityId: deityId,
+                        fromTitle: originalTitle,
+                        toHeirId: heirId,
+                        passedAt: Date.now()
+                    });
+                    return {
+                        success: true,
+                        deityId,
+                        heirId,
+                        heirName: heir.name || heirId,
+                        originalTitle,
+                        passedAt: deify.passedAt,
+                        message: originalTitle + ' 神位已传承给 ' + (heir.name || heirId)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -16256,6 +16961,642 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v105Results = runV105Tests();
+
+        // ===== V106: 天道轮回+因果律系统 Tests =====
+        function runV106Tests() {
+            const results = [];
+            function v106Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                realm: 2,
+                stage: 1,
+                playerId: 'player_1',
+                heavenCycle: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: heaven.cycle.open small type costs 5000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openSmall = server.mcpHeavenCycleOpen({ cycleType: 'small' });
+            v106Assert(openSmall.success === true, 'heaven.cycle.open small succeeds');
+            v106Assert(openSmall.cost === 5000, 'heaven.cycle.open small costs 5000');
+            v106Assert(openSmall.cycleType === 'small', 'heaven.cycle.open returns small type');
+
+            // Test 2: heaven.cycle.open medium type costs 20000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openMedium = server.mcpHeavenCycleOpen({ cycleType: 'medium' });
+            v106Assert(openMedium.success === true, 'heaven.cycle.open medium succeeds');
+            v106Assert(openMedium.cost === 20000, 'heaven.cycle.open medium costs 20000');
+            v106Assert(openMedium.cycleType === 'medium', 'heaven.cycle.open returns medium type');
+
+            // Test 3: heaven.cycle.open large type costs 50000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openLarge = server.mcpHeavenCycleOpen({ cycleType: 'large' });
+            v106Assert(openLarge.success === true, 'heaven.cycle.open large succeeds');
+            v106Assert(openLarge.cost === 50000, 'heaven.cycle.open large costs 50000');
+            v106Assert(openLarge.cycleType === 'large', 'heaven.cycle.open returns large type');
+
+            // Test 4: heaven.cycle.open fails with not enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenCycle = null;
+            const openLow = server.mcpHeavenCycleOpen({});
+            v106Assert(openLow.error && openLow.error.includes('Not enough'), 'heaven.cycle.open fails with low spirit stones');
+
+            // Test 5: heaven.cycle.open fails if already active
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = { isActive: true, cycleType: 'medium' };
+            const openAgain = server.mcpHeavenCycleOpen({});
+            v106Assert(openAgain.error && openAgain.error.includes('already active'), 'heaven.cycle.open fails when already active');
+
+            // Test 6: karma.law.attribute adds good karma
+            mockGameState.heavenCycle = null;
+            mockGameState.spiritStones = 100000;
+            server.mcpHeavenCycleOpen({});
+            const attrGood = server.mcpKarmaLawAttribute({ action: 'good', desc: '救人有功', weight: 8 });
+            v106Assert(attrGood.success === true, 'karma.law.attribute good succeeds');
+            v106Assert(attrGood.action === 'good', 'karma.law.attribute returns good action');
+            v106Assert(attrGood.weight === 8, 'karma.law.attribute returns weight 8');
+            v106Assert(attrGood.goodKarma === 8, 'karma.law.attribute increases goodKarma');
+
+            // Test 7: karma.law.attribute adds evil karma
+            const attrEvil = server.mcpKarmaLawAttribute({ action: 'evil', desc: '杀伤无辜', weight: 6 });
+            v106Assert(attrEvil.success === true, 'karma.law.attribute evil succeeds');
+            v106Assert(attrEvil.evilKarma === 6, 'karma.law.attribute increases evilKarma');
+
+            // Test 8: karma.law.attribute requires action and desc
+            const attrNoParams = server.mcpKarmaLawAttribute({});
+            v106Assert(attrNoParams.error && attrNoParams.error.includes('required'), 'karma.law.attribute requires params');
+
+            // Test 9: karma.law.attribute validates action type
+            const attrInvalid = server.mcpKarmaLawAttribute({ action: 'invalid', desc: 'test' });
+            v106Assert(attrInvalid.error && attrInvalid.error.includes('good, evil'), 'karma.law.attribute validates action');
+
+            // Test 10: karma.law.attribute validates weight range
+            const attrWeightLow = server.mcpKarmaLawAttribute({ action: 'good', desc: 'test', weight: 0 });
+            v106Assert(attrWeightLow.error && attrWeightLow.error.includes('weight'), 'karma.law.attribute rejects low weight');
+
+            // Test 11: karma.law.query returns all records
+            const queryAll = server.mcpKarmaLawQuery({});
+            v106Assert(queryAll.total === 2, 'karma.law.query returns all records');
+            v106Assert(queryAll.filter === 'all', 'karma.law.query filter is all');
+
+            // Test 12: karma.law.query filter good
+            const queryGood = server.mcpKarmaLawQuery({ filter: 'good' });
+            v106Assert(queryGood.total === 1, 'karma.law.query filter good returns 1');
+            v106Assert(queryGood.records[0].action === 'good', 'karma.law.query good record is good');
+
+            // Test 13: karma.law.query filter evil
+            const queryEvil = server.mcpKarmaLawQuery({ filter: 'evil' });
+            v106Assert(queryEvil.total === 1, 'karma.law.query filter evil returns 1');
+            v106Assert(queryEvil.records[0].action === 'evil', 'karma.law.query evil record is evil');
+
+            // Test 14: karma.law.query filter neutral (empty)
+            const queryNeutral = server.mcpKarmaLawQuery({ filter: 'neutral' });
+            v106Assert(queryNeutral.total === 0, 'karma.law.query filter neutral returns 0');
+
+            // Test 15: heaven.cycle.settle with positive karma gives reward
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 50,
+                evilKarma: 10,
+                settleCount: 0
+            };
+            const settlePos = server.mcpHeavenCycleSettle({});
+            v106Assert(settlePos.success === true, 'heaven.cycle.settle succeeds');
+            v106Assert(settlePos.netKarma === 40, 'heaven.cycle.settle netKarma is 40');
+            v106Assert(settlePos.reward > 0, 'heaven.cycle.settle gives positive reward');
+            v106Assert(settlePos.message.includes('Blessed'), 'heaven.cycle.settle blessed message');
+
+            // Test 16: heaven.cycle.settle with negative karma gives penalty
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 5,
+                evilKarma: 60,
+                settleCount: 0
+            };
+            const settleNeg = server.mcpHeavenCycleSettle({});
+            v106Assert(settleNeg.reward < 0, 'heaven.cycle.settle gives negative reward');
+            v106Assert(settleNeg.message.includes('Punished'), 'heaven.cycle.settle punished message');
+
+            // Test 17: heaven.cycle.settle with balanced karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'medium',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 20,
+                evilKarma: 15,
+                settleCount: 0
+            };
+            const settleBal = server.mcpHeavenCycleSettle({});
+            v106Assert(settleBal.reward === 0, 'heaven.cycle.settle balanced karma gives 0 reward');
+            v106Assert(settleBal.message.includes('balanced'), 'heaven.cycle.settle balanced message');
+
+            // Test 18: heaven.cycle.settle fails without active cycle
+            mockGameState.heavenCycle = { isActive: false };
+            const settleNoActive = server.mcpHeavenCycleSettle({});
+            v106Assert(settleNoActive.error && settleNoActive.error.includes('No active'), 'heaven.cycle.settle fails without active cycle');
+
+            // Test 19: heaven.cycle.settle force works without active cycle
+            const settleForce = server.mcpHeavenCycleSettle({ force: true });
+            v106Assert(settleForce.success === true, 'heaven.cycle.settle force succeeds');
+
+            // Test 20: heaven.cycle.reset requires confirmation
+            mockGameState.heavenCycle = { isActive: true };
+            const resetNoConfirm = server.mcpHeavenCycleReset({});
+            v106Assert(resetNoConfirm.error && resetNoConfirm.error.includes('Confirmation'), 'heaven.cycle.reset requires confirm');
+
+            // Test 21: heaven.cycle.reset succeeds with confirm
+            mockGameState.heavenCycle = {
+                isActive: true,
+                cycleType: 'large',
+                era: 1,
+                karmaRecords: [],
+                goodKarma: 30,
+                evilKarma: 20
+            };
+            const resetOk = server.mcpHeavenCycleReset({ confirm: true });
+            v106Assert(resetOk.success === true, 'heaven.cycle.reset succeeds');
+            v106Assert(resetOk.era === 2, 'heaven.cycle.reset increments era');
+            v106Assert(resetOk.message.includes('New era'), 'heaven.cycle.reset message has new era');
+
+            // Test 22: karma.law.reverse requires karmaId
+            const reverseNoId = server.mcpKarmaLawReverse({});
+            v106Assert(reverseNoId.error && reverseNoId.error.includes('karmaId'), 'karma.law.reverse requires karmaId');
+
+            // Test 23: karma.law.reverse not enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_1', action: 'good', desc: 'test', weight: 5 }]
+            };
+            const reverseLow = server.mcpKarmaLawReverse({ karmaId: 'karma_1', cost: 5000 });
+            v106Assert(reverseLow.error && reverseLow.error.includes('Not enough'), 'karma.law.reverse fails with low spirit stones');
+
+            // Test 24: karma.law.reverse karma record not found
+            mockGameState.spiritStones = 100000;
+            const reverseNotFound = server.mcpKarmaLawReverse({ karmaId: 'nonexistent', cost: 5000 });
+            v106Assert(reverseNotFound.error && reverseNotFound.error.includes('not found'), 'karma.law.reverse returns error for unknown id');
+
+            // Test 25: karma.law.reverse successfully reverses good karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_test_1', action: 'good', desc: '救人有功', weight: 10, reversed: false }],
+                goodKarma: 10,
+                evilKarma: 0
+            };
+            const reverseGood = server.mcpKarmaLawReverse({ karmaId: 'karma_test_1', cost: 5000 });
+            v106Assert(reverseGood.success === true, 'karma.law.reverse succeeds');
+            v106Assert(reverseGood.cost === 5000, 'karma.law.reverse deducts correct cost');
+            v106Assert(reverseGood.originalAction === 'good', 'karma.law.reverse returns original action');
+            v106Assert(reverseGood.originalWeight === 10, 'karma.law.reverse returns original weight');
+            v106Assert(mockGameState.heavenCycle.goodKarma === 0, 'karma.law.goodKarma reduced to 0 after reverse');
+
+            // Test 26: karma.law.reverse successfully reverses evil karma
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_test_2', action: 'evil', desc: '杀伤无辜', weight: 8, reversed: false }],
+                goodKarma: 0,
+                evilKarma: 8
+            };
+            const reverseEvil = server.mcpKarmaLawReverse({ karmaId: 'karma_test_2', cost: 6000 });
+            v106Assert(reverseEvil.success === true, 'karma.law.reverse evil succeeds');
+            v106Assert(mockGameState.heavenCycle.evilKarma === 0, 'karma.law.evilKarma reduced to 0 after reverse');
+
+            // Test 27: heaven.cycle.open deducts correct amount
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const beforeOpen = mockGameState.spiritStones;
+            server.mcpHeavenCycleOpen({ cycleType: 'medium' });
+            v106Assert(mockGameState.spiritStones === beforeOpen - 20000, 'heaven.cycle.open deducts 20000');
+
+            // Test 28: karma.law.attribute returns record id
+            mockGameState.heavenCycle = null;
+            mockGameState.spiritStones = 100000;
+            server.mcpHeavenCycleOpen({});
+            const attrRecord = server.mcpKarmaLawAttribute({ action: 'good', desc: '测试', weight: 5 });
+            v106Assert(attrRecord.id && attrRecord.id.startsWith('karma_'), 'karma.law.attribute returns karma id');
+
+            // Test 29: karma.law.query returns correct goodKarma and evilKarma totals
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [
+                    { id: 'karma_1', action: 'good', desc: '善1', weight: 5, createdAt: Date.now() },
+                    { id: 'karma_2', action: 'evil', desc: '恶1', weight: 3, createdAt: Date.now() }
+                ],
+                goodKarma: 5,
+                evilKarma: 3
+            };
+            const queryKarma = server.mcpKarmaLawQuery({});
+            v106Assert(queryKarma.goodKarma === 5, 'karma.law.query returns correct goodKarma');
+            v106Assert(queryKarma.evilKarma === 3, 'karma.law.query returns correct evilKarma');
+
+            // Test 30: heaven.cycle.settle increments settleCount
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [],
+                goodKarma: 50,
+                evilKarma: 10,
+                settleCount: 0
+            };
+            const settleCount1 = server.mcpHeavenCycleSettle({});
+            v106Assert(settleCount1.settleCount === 1, 'heaven.cycle.settle increments settleCount');
+            const settleCount2 = server.mcpHeavenCycleSettle({});
+            v106Assert(settleCount2.settleCount === 2, 'heaven.cycle.settle increments settleCount again');
+
+            // Test 31: karma.law.reverse marks record as reversed
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_rev_1', action: 'good', desc: 'test', weight: 5, reversed: false }],
+                goodKarma: 5,
+                evilKarma: 0
+            };
+            server.mcpKarmaLawReverse({ karmaId: 'karma_rev_1', cost: 5000 });
+            v106Assert(mockGameState.heavenCycle.karmaRecords[0].reversed === true, 'karma.law.reverse marks record as reversed');
+            v106Assert(mockGameState.heavenCycle.karmaRecords[0].reversedAt > 0, 'karma.law.reverse sets reversedAt');
+
+            // Test 32: karma.law.attribute default weight is 5
+            const attrDefault = server.mcpKarmaLawAttribute({ action: 'neutral', desc: 'test' });
+            v106Assert(attrDefault.weight === 5, 'karma.law.attribute default weight is 5');
+
+            // Test 33: heaven.cycle.open returns era
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openEra = server.mcpHeavenCycleOpen({});
+            v106Assert(openEra.era === 1, 'heaven.cycle.open returns era 1');
+            v106Assert(openEra.openedAt > 0, 'heaven.cycle.open returns openedAt');
+
+            // Test 34: karma.law.query returns record descriptions
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_desc_1', action: 'good', desc: '救助贫苦', weight: 7, createdAt: Date.now() }],
+                goodKarma: 7,
+                evilKarma: 0
+            };
+            const queryDesc = server.mcpKarmaLawQuery({});
+            v106Assert(queryDesc.records[0].desc === '救助贫苦', 'karma.law.query returns desc');
+
+            // Test 35: heaven.cycle.reset clears karma records
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_1', action: 'good', desc: 'test', weight: 5 }],
+                goodKarma: 5,
+                evilKarma: 0
+            };
+            server.mcpHeavenCycleReset({ confirm: true });
+            v106Assert(mockGameState.heavenCycle.karmaRecords.length === 0, 'heaven.cycle.reset clears karmaRecords');
+            v106Assert(mockGameState.heavenCycle.goodKarma === 0, 'heaven.cycle.reset clears goodKarma');
+            v106Assert(mockGameState.heavenCycle.evilKarma === 0, 'heaven.cycle.reset clears evilKarma');
+
+            // Test 36: karma.law.reverse deducts cost from spirit stones
+            mockGameState.spiritStones = 50000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [{ id: 'karma_cost_1', action: 'evil', desc: 'test', weight: 5, reversed: false }],
+                goodKarma: 0,
+                evilKarma: 5
+            };
+            const beforeReverse = mockGameState.spiritStones;
+            server.mcpKarmaLawReverse({ karmaId: 'karma_cost_1', cost: 7000 });
+            v106Assert(mockGameState.spiritStones === beforeReverse - 7000, 'karma.law.reverse deducts cost');
+
+            // Test 37: heaven.cycle.settle with default cost 5000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = {
+                isActive: true,
+                karmaRecords: [],
+                goodKarma: 0,
+                evilKarma: 0
+            };
+            const reverseDefault = server.mcpKarmaLawReverse({ karmaId: 'karma_default_1', cost: 5000 });
+            v106Assert(reverseDefault.cost === 5000, 'karma.law.reverse default cost is 5000');
+
+            // Test 38: karma.law.attribute with weight 10
+            const attrMax = server.mcpKarmaLawAttribute({ action: 'good', desc: '最大善行', weight: 10 });
+            v106Assert(attrMax.success === true, 'karma.law.attribute weight 10 succeeds');
+            v106Assert(attrMax.goodKarma === 10, 'karma.law.attribute weight 10 adds 10');
+
+            // Test 39: karma.law.attribute with weight 1
+            const attrMin = server.mcpKarmaLawAttribute({ action: 'evil', desc: '最小恶行', weight: 1 });
+            v106Assert(attrMin.success === true, 'karma.law.attribute weight 1 succeeds');
+            v106Assert(attrMin.evilKarma === 1, 'karma.law.attribute weight 1 adds 1');
+
+            // Test 40: heaven.cycle.open with default type is medium
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenCycle = null;
+            const openDefault = server.mcpHeavenCycleOpen({});
+            v106Assert(openDefault.cycleType === 'medium', 'heaven.cycle.open default type is medium');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V106', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V106 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v106Results = runV106Tests();
+
+        // ===== V107: 仙界天榜+封神系统 Tests =====
+        function runV107Tests() {
+            const results = [];
+            function v107Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                realm: 8,
+                stage: 3,
+                playerId: 'player_1',
+                combatPower: 600000,
+                heavenRank: null,
+                deification: null,
+                npcCollab: { npcs: [{ id: 'npc_heir_1', name: '传承弟子' }] }
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: heaven.rank.query returns rankings
+            mockGameState.heavenRank = null;
+            const query1 = server.mcpHeavenRankQuery({});
+            v107Assert(query1.success === true, 'heaven.rank.query succeeds');
+            v107Assert(Array.isArray(query1.rankings), 'heaven.rank.query returns rankings array');
+            v107Assert(query1.total === 10, 'heaven.rank.query returns 10 total');
+
+            // Test 2: heaven.rank.query with page parameter
+            mockGameState.heavenRank = null;
+            const query2 = server.mcpHeavenRankQuery({ page: 1 });
+            v107Assert(query2.page === 1, 'heaven.rank.query page param works');
+            v107Assert(query2.pageSize === 10, 'heaven.rank.query pageSize is 10');
+
+            // Test 3: heaven.rank.query isOpen is false initially
+            mockGameState.heavenRank = null;
+            const query3 = server.mcpHeavenRankQuery({});
+            v107Assert(query3.isOpen === false, 'heaven.rank.query isOpen is false initially');
+
+            // Test 4: heaven.rank.challenge fails when not open
+            mockGameState.heavenRank = null;
+            const chal4 = server.mcpHeavenRankChallenge({ targetRank: 5 });
+            v107Assert(chal4.error && chal4.error.includes('未开启'), 'heaven.rank.challenge fails when not open');
+
+            // Test 5: heaven.rank.challenge fails with invalid rank
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], playerRank: null };
+            const chal5 = server.mcpHeavenRankChallenge({ targetRank: 99 });
+            v107Assert(chal5.error && chal5.error.includes('无效'), 'heaven.rank.challenge rejects invalid rank');
+
+            // Test 6: heaven.rank.challenge fails with rank 0
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], playerRank: null };
+            const chal6 = server.mcpHeavenRankChallenge({ targetRank: 0 });
+            v107Assert(chal6.error && chal6.error.includes('无效'), 'heaven.rank.challenge rejects rank 0');
+
+            // Test 7: heaven.rank.challenge target not found
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1, playerId: 'p1', name: 'Test', combatPower: 1000 }], playerRank: null, challengeCount: 0 };
+            const chal7 = server.mcpHeavenRankChallenge({ targetRank: 5 });
+            v107Assert(chal7.error && chal7.error.includes('不存在'), 'heaven.rank.challenge handles missing target');
+
+            // Test 8: heaven.rank.challenge increments challengeCount
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1, playerId: 'p1', name: 'Test', combatPower: 1000 }], playerRank: 11, challengeCount: 0 };
+            mockGameState.combatPower = 100;
+            server.mcpHeavenRankChallenge({ targetRank: 1 });
+            v107Assert(mockGameState.heavenRank.challengeCount === 1, 'heaven.rank.challenge increments count');
+
+            // Test 9: heaven.rank.reward requires rank
+            const rew9 = server.mcpHeavenRankReward({});
+            v107Assert(rew9.error && rew9.error.includes('required'), 'heaven.rank.reward requires rank');
+
+            // Test 10: heaven.rank.reward validates rank range
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], totalRewards: {} };
+            const rew10 = server.mcpHeavenRankReward({ rank: 0 });
+            v107Assert(rew10.error && rew10.error.includes('无效'), 'heaven.rank.reward rejects rank 0');
+
+            // Test 11: heaven.rank.reward detects already claimed
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], totalRewards: { rank_1: { claimed: true } } };
+            const rew11 = server.mcpHeavenRankReward({ rank: 1 });
+            v107Assert(rew11.error && rew11.error.includes('已领取'), 'heaven.rank.reward detects already claimed');
+
+            // Test 12: heaven.rank.reward rank 1 gives 50000 spirit stones
+            mockGameState.spiritStones = 100000;
+            mockGameState.reputation = 0;
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], totalRewards: {} };
+            const rew12 = server.mcpHeavenRankReward({ rank: 1 });
+            v107Assert(rew12.success === true, 'heaven.rank.reward rank 1 succeeds');
+            v107Assert(rew12.reward.spiritStones === 50000, 'heaven.rank.reward rank 1 gives 50000');
+            v107Assert(mockGameState.spiritStones === 150000, 'heaven.rank.reward adds spirit stones');
+
+            // Test 13: heaven.rank.reward rank 2 gives 30000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 2 }], totalRewards: {} };
+            const rew13 = server.mcpHeavenRankReward({ rank: 2 });
+            v107Assert(rew13.success === true, 'heaven.rank.reward rank 2 succeeds');
+            v107Assert(rew13.reward.spiritStones === 30000, 'heaven.rank.reward rank 2 gives 30000');
+
+            // Test 14: heaven.rank.reward rank 3 gives 20000
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 3 }], totalRewards: {} };
+            const rew14 = server.mcpHeavenRankReward({ rank: 3 });
+            v107Assert(rew14.success === true, 'heaven.rank.reward rank 3 succeeds');
+            v107Assert(rew14.reward.spiritStones === 20000, 'heaven.rank.reward rank 3 gives 20000');
+
+            // Test 15: deification.open succeeds for realm >= 5
+            mockGameState.realm = 5;
+            mockGameState.deification = null;
+            const deify15 = server.mcpDeificationOpen({});
+            v107Assert(deify15.success === true, 'deification.open succeeds for realm 5');
+            v107Assert(deify15.isOpen === true, 'deification.open sets isOpen true');
+
+            // Test 16: deification.open fails if already open
+            mockGameState.deification = { isOpen: true };
+            const deify16 = server.mcpDeificationOpen({});
+            v107Assert(deify16.error && deify16.error.includes('已开启'), 'deification.open fails if already open');
+
+            // Test 17: deification.open fails for realm < 5
+            mockGameState.realm = 4;
+            mockGameState.deification = null;
+            const deify17 = server.mcpDeificationOpen({});
+            v107Assert(deify17.error && deify17.error.includes('修为不足'), 'deification.open fails for realm < 5');
+
+            // Test 18: deification.certify fails if not open
+            mockGameState.deification = { isOpen: false };
+            const cert18 = server.mcpDeificationCertify({});
+            v107Assert(cert18.error && cert18.error.includes('未开启'), 'deification.certify fails if not open');
+
+            // Test 19: deification.certify fails if already deity
+            mockGameState.deification = { isOpen: true, isDeity: true, deityTitle: '雷部正神' };
+            const cert19 = server.mcpDeificationCertify({});
+            v107Assert(cert19.error && cert19.error.includes('已是真神'), 'deification.certify fails if already deity');
+
+            // Test 20: deification.certify fails for realm < 7
+            mockGameState.realm = 6;
+            mockGameState.deification = { isOpen: true, isDeity: false };
+            const cert20 = server.mcpDeificationCertify({});
+            v107Assert(cert20.error && cert20.error.includes('修为不足'), 'deification.certify fails for realm < 7');
+
+            // Test 21: deification.certify fails for power < 500000
+            mockGameState.realm = 7;
+            mockGameState.combatPower = 400000;
+            mockGameState.deification = { isOpen: true, isDeity: false };
+            const cert21 = server.mcpDeificationCertify({});
+            v107Assert(cert21.error && cert21.error.includes('战力不足'), 'deification.certify fails for power < 500000');
+
+            // Test 22: deification.certify succeeds for valid realm and power
+            mockGameState.realm = 7;
+            mockGameState.combatPower = 600000;
+            mockGameState.spiritStones = 100000;
+            mockGameState.deification = { isOpen: true, isDeity: false };
+            const cert22 = server.mcpDeificationCertify({ deityTitle: '雷部正神' });
+            v107Assert(cert22.success === true, 'deification.certify succeeds');
+            v107Assert(cert22.isDeity === true, 'deification.certify sets isDeity true');
+            v107Assert(cert22.deityTitle === '雷部正神', 'deification.certify returns title');
+            v107Assert(cert22.deityId && cert22.deityId.startsWith('deity_'), 'deification.certify returns deityId');
+            v107Assert(mockGameState.spiritStones === 200000, 'deification.certify adds 100000 spirit stones');
+
+            // Test 23: deification.legacy fails if not open
+            mockGameState.deification = { isOpen: false };
+            const leg23 = server.mcpDeificationLegacy({ deityId: 'd1', heirId: 'h1' });
+            v107Assert(leg23.error && leg23.error.includes('未开启'), 'deification.legacy fails if not open');
+
+            // Test 24: deification.legacy fails if not deity
+            mockGameState.deification = { isOpen: true, isDeity: false };
+            const leg24 = server.mcpDeificationLegacy({ deityId: 'd1', heirId: 'h1' });
+            v107Assert(leg24.error && leg24.error.includes('尚未封神'), 'deification.legacy fails if not deity');
+
+            // Test 25: deification.legacy requires deityId and heirId
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd1' };
+            const leg25a = server.mcpDeificationLegacy({ heirId: 'h1' });
+            v107Assert(leg25a.error && leg25a.error.includes('required'), 'deification.legacy requires deityId');
+            const leg25b = server.mcpDeificationLegacy({ deityId: 'd1' });
+            v107Assert(leg25b.error && leg25b.error.includes('required'), 'deification.legacy requires heirId');
+
+            // Test 26: deification.legacy fails if deityId mismatch
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd1', deityTitle: '火部正神' };
+            const leg26 = server.mcpDeificationLegacy({ deityId: 'wrong_id', heirId: 'npc_heir_1' });
+            v107Assert(leg26.error && leg26.error.includes('不匹配'), 'deification.legacy fails with wrong deityId');
+
+            // Test 27: deification.legacy fails if already passed
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd1', deityTitle: '火部正神', passedTo: 'someone_else' };
+            const leg27 = server.mcpDeificationLegacy({ deityId: 'd1', heirId: 'npc_heir_1' });
+            v107Assert(leg27.error && leg27.error.includes('已传承'), 'deification.legacy fails if already passed');
+
+            // Test 28: deification.legacy fails if heir not found
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd1', deityTitle: '火部正神', passedTo: null };
+            const leg28 = server.mcpDeificationLegacy({ deityId: 'd1', heirId: 'nonexistent_heir' });
+            v107Assert(leg28.error && leg28.error.includes('不存在'), 'deification.legacy fails if heir not found');
+
+            // Test 29: deification.legacy succeeds with valid params
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd1', deityTitle: '火部正神', passedTo: null };
+            const leg29 = server.mcpDeificationLegacy({ deityId: 'd1', heirId: 'npc_heir_1' });
+            v107Assert(leg29.success === true, 'deification.legacy succeeds');
+            v107Assert(leg29.heirId === 'npc_heir_1', 'deification.legacy returns heirId');
+            v107Assert(leg29.originalTitle === '火部正神', 'deification.legacy returns original title');
+            v107Assert(mockGameState.deification.passedTo === 'npc_heir_1', 'deification.legacy sets passedTo');
+
+            // Test 30: deification.legacy sets isDeity to false after passing
+            v107Assert(mockGameState.deification.isDeity === false, 'deification.legacy sets isDeity false');
+            v107Assert(mockGameState.deification.deityTitle === null, 'deification.legacy clears deityTitle');
+
+            // Test 31: heaven.rank.challenge sets playerRank after challenge
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1, playerId: 'p1', name: 'Test', combatPower: 1000 }, { rank: 5, playerId: 'p5', name: 'Target', combatPower: 5000 }], playerRank: 5, challengeCount: 0, winCount: 0 };
+            mockGameState.combatPower = 10000;
+            const chal31 = server.mcpHeavenRankChallenge({ targetRank: 1 });
+            v107Assert(chal31.success === true, 'heaven.rank.challenge returns success');
+
+            // Test 32: deification.certify generates random title if not specified
+            mockGameState.realm = 8;
+            mockGameState.combatPower = 600000;
+            mockGameState.deification = { isOpen: true, isDeity: false };
+            const cert32 = server.mcpDeificationCertify({});
+            v107Assert(cert32.success === true, 'deification.certify succeeds without title');
+            const TITLES = ['雷部正神', '火部正神', '水部正神', '山部正神', '风部正神', '斗部正神', '瘟部正神', '财部正神'];
+            v107Assert(TITLES.includes(cert32.deityTitle), 'deification.certify returns valid title');
+
+            // Test 33: heaven.rank.query returns playerRank
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 3 }], playerRank: 3 };
+            const query33 = server.mcpHeavenRankQuery({});
+            v107Assert(query33.playerRank === 3, 'heaven.rank.query returns playerRank');
+
+            // Test 34: heaven.rank.query returns playerEntry
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 3, name: 'Player3' }], playerRank: 3 };
+            const query34 = server.mcpHeavenRankQuery({});
+            v107Assert(query34.playerEntry && query34.playerEntry.rank === 3, 'heaven.rank.query returns playerEntry');
+
+            // Test 35: deification.legacy records in deificationLegacy array
+            mockGameState.deification = { isOpen: true, isDeity: true, deityId: 'd_legacy_test', deityTitle: '财部正神', passedTo: null };
+            mockGameState.deificationLegacy = [];
+            server.mcpDeificationLegacy({ deityId: 'd_legacy_test', heirId: 'npc_heir_1' });
+            v107Assert(mockGameState.deificationLegacy.length === 1, 'deification.legacy records in array');
+            v107Assert(mockGameState.deificationLegacy[0].fromTitle === '财部正神', 'deification.legacy records fromTitle');
+
+            // Test 36: heaven.rank.reward adds reputation
+            mockGameState.spiritStones = 100000;
+            mockGameState.reputation = 0;
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1 }], totalRewards: {} };
+            const rew36 = server.mcpHeavenRankReward({ rank: 1 });
+            v107Assert(rew36.reward.reputation === 1000, 'heaven.rank.reward rank 1 gives 1000 reputation');
+            v107Assert(mockGameState.reputation === 1000, 'reputation is added');
+
+            // Test 37: heaven.rank.reward rank 10 gives 2000 spirit stones
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 10 }], totalRewards: {} };
+            const rew37 = server.mcpHeavenRankReward({ rank: 10 });
+            v107Assert(rew37.success === true, 'heaven.rank.reward rank 10 succeeds');
+            v107Assert(rew37.reward.spiritStones === 2000, 'heaven.rank.reward rank 10 gives 2000');
+
+            // Test 38: mcpHeavenRankQuery initializes state if null
+            mockGameState.heavenRank = null;
+            const query38 = server.mcpHeavenRankQuery({});
+            v107Assert(query38.success === true, 'mcpHeavenRankQuery initializes state');
+            v107Assert(mockGameState.heavenRank !== null, 'heavenRank is initialized');
+            v107Assert(mockGameState.heavenRank.isOpen === false, 'isOpen is false after init');
+
+            // Test 39: mcpDeificationOpen initializes state if null
+            mockGameState.deification = null;
+            mockGameState.realm = 6;
+            const deify39 = server.mcpDeificationOpen({});
+            v107Assert(deify39.success === true, 'mcpDeificationOpen initializes state');
+            v107Assert(mockGameState.deification !== null, 'deification is initialized');
+            v107Assert(mockGameState.deification.isOpen === true, 'isOpen is true after init');
+
+            // Test 40: heaven.rank.challenge returns correct victory message
+            mockGameState.heavenRank = { isOpen: true, rankings: [{ rank: 1, playerId: 'p1', name: 'Test', combatPower: 100 }], playerRank: 11, challengeCount: 0, winCount: 0 };
+            mockGameState.combatPower = 10000;
+            const chal40 = server.mcpHeavenRankChallenge({ targetRank: 1 });
+            v107Assert(chal40.success === true, 'heaven.rank.challenge returns success');
+            v107Assert(chal40.targetName === 'Test', 'heaven.rank.challenge returns targetName');
+            v107Assert(typeof chal40.victory === 'boolean', 'heaven.rank.challenge returns victory boolean');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V107', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V107 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v107Results = runV107Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
