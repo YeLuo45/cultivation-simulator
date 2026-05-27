@@ -3013,6 +3013,75 @@
             }
         };
 
+        // --- MCP_TOOLS_V113: 仙界商城+兑换系统 ---
+        const MCP_TOOLS_V113 = {
+            'mall.browse': {
+                name: 'mall.browse',
+                description: '浏览商城商品 (仙界商城系统-浏览)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        category: { type: 'string', description: '商品分类 (all/weapon/pill/sect/pet)', default: 'all' },
+                        page: { type: 'number', description: '页码 (默认1)', default: 1 }
+                    }
+                }
+            },
+            'mall.buy': {
+                name: 'mall.buy',
+                description: '购买商品 (仙界商城系统-购买, 扣灵石，更新库存)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: '商品ID' },
+                        quantity: { type: 'number', description: '购买数量', default: 1 }
+                    },
+                    required: ['itemId']
+                }
+            },
+            'mall.sell': {
+                name: 'mall.sell',
+                description: '上架商品到集市 (仙界商城系统-上架, 收取上架费100灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: '商品ID' },
+                        price: { type: 'number', description: '上架价格 (灵石)' }
+                    },
+                    required: ['itemId', 'price']
+                }
+            },
+            'exchange.query': {
+                name: 'exchange.query',
+                description: '查询兑换积分 (兑换系统-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'exchange.redeem': {
+                name: 'exchange.redeem',
+                description: '使用积分兑换道具 (兑换系统-兑换, 扣积分发道具)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemId: { type: 'string', description: '兑换商品ID' }
+                    },
+                    required: ['itemId']
+                }
+            },
+            'exchange.charge': {
+                name: 'exchange.charge',
+                description: '充值兑换积分 (兑换系统-充值, 1灵石=1积分)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '充值灵石数量' }
+                    },
+                    required: ['amount']
+                }
+            }
+        };
+
         // --- MCP_TOOLS_V110: 天道誓言+因果誓约系统 ---
         const MCP_TOOLS_V110 = {
             'heaven.oath.take': {
@@ -3302,6 +3371,10 @@
                 }
                 // V112: Register 仙界联盟+气运系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V112)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V113: Register 仙界商城+兑换系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V113)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -4115,6 +4188,25 @@
                             break;
                         case 'luck.transform':
                             result = this.mcpLuckTransform(args);
+                            break;
+                        // V113: 仙界商城+兑换系统
+                        case 'mall.browse':
+                            result = this.mcpMallBrowse(args);
+                            break;
+                        case 'mall.buy':
+                            result = this.mcpMallBuy(args);
+                            break;
+                        case 'mall.sell':
+                            result = this.mcpMallSell(args);
+                            break;
+                        case 'exchange.query':
+                            result = this.mcpExchangeQuery(args);
+                            break;
+                        case 'exchange.redeem':
+                            result = this.mcpExchangeRedeem(args);
+                            break;
+                        case 'exchange.charge':
+                            result = this.mcpExchangeCharge(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -11450,6 +11542,246 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V113: _initMallState - 初始化仙界商城状态
+            _initMallState() {
+                const gs = window.gameState;
+                if (!gs.mall) {
+                    gs.mall = {
+                        items: [
+                            // weapon
+                            { id: 'wep_001', name: '青云剑', category: 'weapon', price: 5000, stock: 10, quality: 'rare' },
+                            { id: 'wep_002', name: '玄铁重剑', category: 'weapon', price: 8000, stock: 5, quality: 'epic' },
+                            { id: 'wep_003', name: '紫电青霜剑', category: 'weapon', price: 15000, stock: 2, quality: 'legendary' },
+                            // pill
+                            { id: 'pil_001', name: '筑基丹', category: 'pill', price: 1000, stock: 50, quality: 'common' },
+                            { id: 'pil_002', name: '金丹丹', category: 'pill', price: 5000, stock: 20, quality: 'rare' },
+                            { id: 'pil_003', name: '元婴丹', category: 'pill', price: 20000, stock: 5, quality: 'epic' },
+                            // sect
+                            { id: 'sec_001', name: '宗门令牌', category: 'sect', price: 3000, stock: 30, quality: 'common' },
+                            { id: 'sec_002', name: '传承玉简', category: 'sect', price: 10000, stock: 10, quality: 'rare' },
+                            { id: 'sec_003', name: '护宗大阵', category: 'sect', price: 50000, stock: 3, quality: 'legendary' },
+                            // pet
+                            { id: 'pet_001', name: '灵狐幼崽', category: 'pet', price: 2000, stock: 15, quality: 'common' },
+                            { id: 'pet_002', name: '神禽雏鸟', category: 'pet', price: 8000, stock: 8, quality: 'rare' },
+                            { id: 'pet_003', name: '上古神兽蛋', category: 'pet', price: 100000, stock: 1, quality: 'legendary' }
+                        ],
+                        listings: [],
+                        categories: {
+                            weapon: [],
+                            pill: [],
+                            sect: [],
+                            pet: []
+                        }
+                    };
+                    // 分类索引
+                    gs.mall.items.forEach(item => {
+                        if (gs.mall.categories[item.category]) {
+                            gs.mall.categories[item.category].push(item);
+                        }
+                    });
+                }
+                return gs.mall;
+            }
+
+            // V113: _initExchangeState - 初始化兑换系统状态
+            _initExchangeState() {
+                const gs = window.gameState;
+                if (!gs.exchange) {
+                    gs.exchange = {
+                        points: 0,
+                        records: [],
+                        items: {
+                            'ex_001': { id: 'ex_001', name: '筑基丹×1', cost: 100, type: 'pill', description: '辅助筑基' },
+                            'ex_002': { id: 'ex_002', name: '金丹丹×1', cost: 500, type: 'pill', description: '辅助结丹' },
+                            'ex_003': { id: 'ex_003', name: '上品灵石×10', cost: 200, type: 'spiritStone', description: '灵石兑换' },
+                            'ex_004': { id: 'ex_004', name: '传承玉简×1', cost: 800, type: 'sect', description: '宗门传承' },
+                            'ex_005': { id: 'ex_005', name: '灵宠蛋×1', cost: 1000, type: 'pet', description: '随机灵宠' },
+                            'ex_006': { id: 'ex_006', name: '天阶功法×1', cost: 5000, type: 'technique', description: '天阶功法一部' }
+                        }
+                    };
+                }
+                return gs.exchange;
+            }
+
+            // V113: mall.browse - 浏览商城商品
+            mcpMallBrowse(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { category = 'all', page = 1 } = args || {};
+                    const mall = this._initMallState();
+                    const PAGE_SIZE = 10;
+                    let items = mall.items;
+                    if (category !== 'all' && mall.categories[category]) {
+                        items = mall.categories[category];
+                    }
+                    const totalItems = items.length;
+                    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+                    const startIdx = (page - 1) * PAGE_SIZE;
+                    const pageItems = items.slice(startIdx, startIdx + PAGE_SIZE);
+                    return {
+                        success: true,
+                        category,
+                        page,
+                        pageSize: PAGE_SIZE,
+                        totalItems,
+                        totalPages,
+                        items: pageItems
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V113: mall.buy - 购买商品
+            mcpMallBuy(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { itemId, quantity = 1 } = args || {};
+                    if (!itemId) return { error: '商品ID不能为空' };
+                    const mall = this._initMallState();
+                    const item = mall.items.find(i => i.id === itemId);
+                    if (!item) return { error: '商品不存在: ' + itemId };
+                    if (item.stock < quantity) return { error: '库存不足，当前库存' + item.stock };
+                    const totalCost = item.price * quantity;
+                    if ((gs.spiritStones || 0) < totalCost) return { error: '灵力不足，需要' + totalCost + '灵石' };
+                    gs.spiritStones -= totalCost;
+                    item.stock -= quantity;
+                    // 添加到背包
+                    if (!gs.items) gs.items = [];
+                    gs.items.push({ id: itemId + '_' + Date.now(), templateId: itemId, name: item.name, category: item.category, quality: item.quality, quantity });
+                    return {
+                        success: true,
+                        itemId,
+                        name: item.name,
+                        quantity,
+                        totalCost,
+                        remainingStock: item.stock,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '购买成功，消耗' + totalCost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V113: mall.sell - 上架商品到集市
+            mcpMallSell(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { itemId, price } = args || {};
+                    if (!itemId) return { error: '商品ID不能为空' };
+                    if (!price || price <= 0) return { error: '价格必须大于0' };
+                    const LISTING_FEE = 100;
+                    if ((gs.spiritStones || 0) < LISTING_FEE) return { error: '灵力不足，上架费需要' + LISTING_FEE + '灵石' };
+                    // 检查玩家背包是否有该物品
+                    const playerItem = gs.items ? gs.items.find(i => i.id === itemId || i.templateId === itemId) : null;
+                    if (!playerItem) return { error: '背包中没有该物品: ' + itemId };
+                    const mall = this._initMallState();
+                    gs.spiritStones -= LISTING_FEE;
+                    const listing = {
+                        id: 'list_' + Date.now(),
+                        itemId: playerItem.templateId || itemId,
+                        name: playerItem.name,
+                        category: playerItem.category,
+                        quality: playerItem.quality,
+                        price,
+                        sellerId: gs.playerId || 'player_1',
+                        sellerName: gs.playerName || '玩家',
+                        listedAt: Date.now()
+                    };
+                    mall.listings.push(listing);
+                    // 从背包移除
+                    if (gs.items) {
+                        const idx = gs.items.findIndex(i => i.id === itemId || i.templateId === itemId);
+                        if (idx !== -1) gs.items.splice(idx, 1);
+                    }
+                    return {
+                        success: true,
+                        listing,
+                        fee: LISTING_FEE,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '上架成功，收取上架费' + LISTING_FEE + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V113: exchange.query - 查询兑换积分
+            mcpExchangeQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exchange = this._initExchangeState();
+                    return {
+                        success: true,
+                        points: exchange.points,
+                        totalRecords: exchange.records.length,
+                        records: exchange.records.slice(-10).reverse(),
+                        items: Object.values(exchange.items)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V113: exchange.redeem - 使用积分兑换道具
+            mcpExchangeRedeem(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { itemId } = args || {};
+                    if (!itemId) return { error: '兑换商品ID不能为空' };
+                    const exchange = this._initExchangeState();
+                    const item = exchange.items[itemId];
+                    if (!item) return { error: '兑换商品不存在: ' + itemId };
+                    if (exchange.points < item.cost) return { error: '积分不足，需要' + item.cost + '积分，当前' + exchange.points + '积分' };
+                    exchange.points -= item.cost;
+                    // 添加到背包
+                    if (!gs.items) gs.items = [];
+                    gs.items.push({ id: itemId + '_' + Date.now(), templateId: itemId, name: item.name, type: item.type, quantity: 1 });
+                    // 记录
+                    exchange.records.push({
+                        id: 'rec_' + Date.now(),
+                        itemId,
+                        name: item.name,
+                        cost: item.cost,
+                        redeemedAt: Date.now()
+                    });
+                    return {
+                        success: true,
+                        itemId,
+                        name: item.name,
+                        cost: item.cost,
+                        remainingPoints: exchange.points,
+                        message: '兑换成功，消耗' + item.cost + '积分'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V113: exchange.charge - 充值兑换积分 (1灵石=1积分)
+            mcpExchangeCharge(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const { amount } = args || {};
+                    if (!amount || amount <= 0) return { error: '充值数量必须大于0' };
+                    if ((gs.spiritStones || 0) < amount) return { error: '灵力不足，需要' + amount + '灵石' };
+                    const exchange = this._initExchangeState();
+                    gs.spiritStones -= amount;
+                    exchange.points += amount;
+                    exchange.records.push({
+                        id: 'rec_' + Date.now(),
+                        type: 'charge',
+                        amount,
+                        chargedAt: Date.now()
+                    });
+                    return {
+                        success: true,
+                        amount,
+                        pointsAdded: amount,
+                        totalPoints: exchange.points,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '充值成功，' + amount + '灵石兑换' + amount + '积分'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -18423,6 +18755,280 @@
             return summary;
         }
         const v112Results = runV112Tests();
+
+        // ===== V113: 仙界商城+兑换系统 Tests =====
+        function runV113Tests() {
+            const results = [];
+            function v113Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 3,
+                stage: 1,
+                reputation: 100,
+                items: [],
+                mall: null,
+                exchange: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: mall.browse returns all items
+            const browse1 = server.mcpMallBrowse({});
+            v113Assert(browse1.success === true, 'mall.browse succeeds');
+            v113Assert(browse1.totalItems === 12, 'mall.browse returns 12 items');
+            v113Assert(browse1.category === 'all', 'mall.browse category is all');
+
+            // Test 2: mall.browse with category filter
+            const browse2 = server.mcpMallBrowse({ category: 'weapon' });
+            v113Assert(browse2.success === true, 'mall.browse weapon succeeds');
+            v113Assert(browse2.totalItems === 3, 'mall.browse weapon returns 3 items');
+
+            // Test 3: mall.browse with pill category
+            const browse3 = server.mcpMallBrowse({ category: 'pill' });
+            v113Assert(browse3.totalItems === 3, 'mall.browse pill returns 3 items');
+
+            // Test 4: mall.browse with pagination
+            const browse4 = server.mcpMallBrowse({ page: 1 });
+            v113Assert(browse4.page === 1, 'mall.browse page 1');
+            v113Assert(browse4.totalPages >= 1, 'mall.browse has pages');
+
+            // Test 5: mall.buy succeeds with valid item
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            mockGameState.items = [];
+            const buy1 = server.mcpMallBuy({ itemId: 'pil_001', quantity: 1 });
+            v113Assert(buy1.success === true, 'mall.buy succeeds');
+            v113Assert(buy1.totalCost === 1000, 'mall.buy pil_001 costs 1000');
+            v113Assert(buy1.remainingSpiritStones === 49000, 'mall.buy deducts spirit stones');
+
+            // Test 6: mall.buy fails with insufficient spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.mall = null;
+            const buyFail = server.mcpMallBuy({ itemId: 'pil_001', quantity: 1 });
+            v113Assert(buyFail.error && buyFail.error.includes('灵力不足'), 'mall.buy fails with insufficient stones');
+
+            // Test 7: mall.buy fails with invalid item
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            const buyInvalid = server.mcpMallBuy({ itemId: 'invalid_item', quantity: 1 });
+            v113Assert(buyInvalid.error && buyInvalid.error.includes('商品不存在'), 'mall.buy fails with invalid item');
+
+            // Test 8: mall.buy fails with insufficient stock
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            // First set stock to 0
+            server._initMallState();
+            mockGameState.mall.items.find(i => i.id === 'pil_001').stock = 0;
+            const buyNoStock = server.mcpMallBuy({ itemId: 'pil_001', quantity: 1 });
+            v113Assert(buyNoStock.error && buyNoStock.error.includes('库存不足'), 'mall.buy fails with no stock');
+
+            // Test 9: mall.sell succeeds with valid item
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            mockGameState.items = [{ id: 'test_item', templateId: 'wep_001', name: '青云剑', category: 'weapon', quality: 'rare' }];
+            const sell1 = server.mcpMallSell({ itemId: 'wep_001', price: 6000 });
+            v113Assert(sell1.success === true, 'mall.sell succeeds');
+            v113Assert(sell1.fee === 100, 'mall.sell fee is 100');
+            v113Assert(sell1.remainingSpiritStones === 49900, 'mall.sell deducts fee');
+
+            // Test 10: mall.sell fails without listing fee
+            mockGameState.spiritStones = 50;
+            mockGameState.items = [{ id: 'test_item2', templateId: 'wep_001', name: '青云剑', category: 'weapon', quality: 'rare' }];
+            const sellNoFee = server.mcpMallSell({ itemId: 'wep_001', price: 6000 });
+            v113Assert(sellNoFee.error && sellNoFee.error.includes('灵力不足'), 'mall.sell fails without fee');
+
+            // Test 11: mall.sell fails without item in inventory
+            mockGameState.spiritStones = 50000;
+            mockGameState.items = [];
+            const sellNoItem = server.mcpMallSell({ itemId: 'wep_001', price: 6000 });
+            v113Assert(sellNoItem.error && sellNoItem.error.includes('背包中没有该物品'), 'mall.sell fails without item');
+
+            // Test 12: exchange.query returns initial state
+            mockGameState.exchange = null;
+            const exQuery1 = server.mcpExchangeQuery({});
+            v113Assert(exQuery1.success === true, 'exchange.query succeeds');
+            v113Assert(exQuery1.points === 0, 'exchange.query initial points is 0');
+
+            // Test 13: exchange.charge succeeds
+            mockGameState.spiritStones = 50000;
+            mockGameState.exchange = null;
+            const charge1 = server.mcpExchangeCharge({ amount: 1000 });
+            v113Assert(charge1.success === true, 'exchange.charge succeeds');
+            v113Assert(charge1.pointsAdded === 1000, 'exchange.charge adds 1000 points');
+            v113Assert(charge1.totalPoints === 1000, 'exchange.charge total points is 1000');
+            v113Assert(charge1.remainingSpiritStones === 49000, 'exchange.charge deducts stones');
+
+            // Test 14: exchange.charge fails with insufficient stones
+            mockGameState.spiritStones = 100;
+            mockGameState.exchange = null;
+            const chargeFail = server.mcpExchangeCharge({ amount: 1000 });
+            v113Assert(chargeFail.error && chargeFail.error.includes('灵力不足'), 'exchange.charge fails with insufficient stones');
+
+            // Test 15: exchange.charge fails with invalid amount
+            mockGameState.spiritStones = 50000;
+            mockGameState.exchange = null;
+            const chargeInvalid = server.mcpExchangeCharge({ amount: -100 });
+            v113Assert(chargeInvalid.error && chargeInvalid.error.includes('充值数量必须大于0'), 'exchange.charge rejects invalid amount');
+
+            // Test 16: exchange.redeem succeeds
+            mockGameState.exchange = { points: 5000, records: [], items: server._initExchangeState().items };
+            mockGameState.items = [];
+            const redeem1 = server.mcpExchangeRedeem({ itemId: 'ex_001' });
+            v113Assert(redeem1.success === true, 'exchange.redeem succeeds');
+            v113Assert(redeem1.cost === 100, 'exchange.redeem costs 100');
+            v113Assert(redeem1.remainingPoints === 4900, 'exchange.redeem deducts points');
+
+            // Test 17: exchange.redeem fails with insufficient points
+            mockGameState.exchange = { points: 50, records: [], items: server._initExchangeState().items };
+            const redeemFail = server.mcpExchangeRedeem({ itemId: 'ex_001' });
+            v113Assert(redeemFail.error && redeemFail.error.includes('积分不足'), 'exchange.redeem fails with insufficient points');
+
+            // Test 18: exchange.redeem fails with invalid item
+            mockGameState.exchange = { points: 5000, records: [], items: server._initExchangeState().items };
+            const redeemInvalid = server.mcpExchangeRedeem({ itemId: 'invalid_item' });
+            v113Assert(redeemInvalid.error && redeemInvalid.error.includes('兑换商品不存在'), 'exchange.redeem fails with invalid item');
+
+            // Test 19: mall.browse returns items with correct structure
+            mockGameState.mall = null;
+            const browse5 = server.mcpMallBrowse({ category: 'all' });
+            v113Assert(browse5.items[0].id !== undefined, 'mall items have id');
+            v113Assert(browse5.items[0].name !== undefined, 'mall items have name');
+            v113Assert(browse5.items[0].price !== undefined, 'mall items have price');
+
+            // Test 20: mall.browse sect category
+            const browseSect = server.mcpMallBrowse({ category: 'sect' });
+            v113Assert(browseSect.totalItems === 3, 'mall.browse sect returns 3 items');
+
+            // Test 21: mall.browse pet category
+            const browsePet = server.mcpMallBrowse({ category: 'pet' });
+            v113Assert(browsePet.totalItems === 3, 'mall.browse pet returns 3 items');
+
+            // Test 22: mall.buy multiple quantities
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            mockGameState.items = [];
+            const buyMulti = server.mcpMallBuy({ itemId: 'pil_001', quantity: 5 });
+            v113Assert(buyMulti.success === true, 'mall.buy multiple succeeds');
+            v113Assert(buyMulti.totalCost === 5000, 'mall.buy 5x pil_001 costs 5000');
+            v113Assert(buyMulti.remainingSpiritStones === 45000, 'mall.buy deducts 5000 stones');
+
+            // Test 23: exchange.charge 1:1 ratio
+            mockGameState.spiritStones = 10000;
+            mockGameState.exchange = null;
+            const charge100 = server.mcpExchangeCharge({ amount: 100 });
+            v113Assert(charge100.pointsAdded === 100, 'exchange.charge 1:1 ratio');
+
+            // Test 24: exchange.redeem adds item to inventory
+            mockGameState.exchange = { points: 1000, records: [], items: server._initExchangeState().items };
+            mockGameState.items = [];
+            server.mcpExchangeRedeem({ itemId: 'ex_001' });
+            v113Assert(mockGameState.items.length === 1, 'exchange.redeem adds item to inventory');
+
+            // Test 25: exchange.query returns all exchange items
+            mockGameState.exchange = null;
+            const exQuery2 = server.mcpExchangeQuery({});
+            v113Assert(exQuery2.items.length === 6, 'exchange.query returns 6 exchange items');
+
+            // Test 26: mall.buy deducts stock
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            const pil001 = server._initMallState().items.find(i => i.id === 'pil_001');
+            const origStock = pil001.stock;
+            server.mcpMallBuy({ itemId: 'pil_001', quantity: 1 });
+            v113Assert(pil001.stock === origStock - 1, 'mall.buy deducts stock');
+
+            // Test 27: mall.sell removes item from inventory
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            mockGameState.items = [{ id: 'sell_test', templateId: 'wep_001', name: '青云剑', category: 'weapon', quality: 'rare' }];
+            server.mcpMallSell({ itemId: 'wep_001', price: 6000 });
+            v113Assert(mockGameState.items.length === 0, 'mall.sell removes item from inventory');
+
+            // Test 28: exchange.redeem adds record
+            mockGameState.exchange = { points: 1000, records: [], items: server._initExchangeState().items };
+            server.mcpExchangeRedeem({ itemId: 'ex_001' });
+            v113Assert(mockGameState.exchange.records.length === 1, 'exchange.redeem adds record');
+
+            // Test 29: exchange.charge adds record
+            mockGameState.exchange = { points: 0, records: [], items: server._initExchangeState().items };
+            server.mcpExchangeCharge({ amount: 500 });
+            v113Assert(mockGameState.exchange.records.length === 1, 'exchange.charge adds record');
+
+            // Test 30: mall.buy with missing itemId fails
+            const buyNoId = server.mcpMallBuy({ quantity: 1 });
+            v113Assert(buyNoId.error && buyNoId.error.includes('商品ID不能为空'), 'mall.buy requires itemId');
+
+            // Test 31: mall.sell with missing itemId fails
+            const sellNoId = server.mcpMallSell({ price: 1000 });
+            v113Assert(sellNoId.error && sellNoId.error.includes('商品ID不能为空'), 'mall.sell requires itemId');
+
+            // Test 32: mall.sell with missing price fails
+            const sellNoPrice = server.mcpMallSell({ itemId: 'wep_001' });
+            v113Assert(sellNoPrice.error && sellNoPrice.error.includes('价格必须大于0'), 'mall.sell requires price');
+
+            // Test 33: exchange.redeem with missing itemId fails
+            const redeemNoId = server.mcpExchangeRedeem({});
+            v113Assert(redeemNoId.error && redeemNoId.error.includes('兑换商品ID不能为空'), 'exchange.redeem requires itemId');
+
+            // Test 34: exchange.charge with missing amount fails
+            const chargeNoAmt = server.mcpExchangeCharge({});
+            v113Assert(chargeNoAmt.error && chargeNoAmt.error.includes('充值数量必须大于0'), 'exchange.charge requires amount');
+
+            // Test 35: mall.browse category is case-sensitive (invalid category returns empty)
+            const browseInv = server.mcpMallBrowse({ category: 'invalid' });
+            v113Assert(browseInv.success === true, 'mall.browse invalid category succeeds');
+            v113Assert(browseInv.totalItems === 0, 'mall.browse invalid category returns 0');
+
+            // Test 36: exchange.charge multiple times accumulates points
+            mockGameState.spiritStones = 10000;
+            mockGameState.exchange = null;
+            server.mcpExchangeCharge({ amount: 1000 });
+            server.mcpExchangeCharge({ amount: 2000 });
+            v113Assert(mockGameState.exchange.points === 3000, 'exchange.charge accumulates points');
+
+            // Test 37: mall.buy updates remaining stock correctly
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            const buy2 = server.mcpMallBuy({ itemId: 'wep_001', quantity: 2 });
+            v113Assert(buy2.remainingStock === 8, 'mall.buy remaining stock is 8 (10-2)');
+
+            // Test 38: exchange.redeem for expensive item
+            mockGameState.exchange = { points: 10000, records: [], items: server._initExchangeState().items };
+            const redeemExp = server.mcpExchangeRedeem({ itemId: 'ex_006' });
+            v113Assert(redeemExp.success === true, 'exchange.redeem expensive item succeeds');
+            v113Assert(redeemExp.remainingPoints === 5000, 'exchange.redeem remaining points is 5000');
+
+            // Test 39: mall.sell listing appears in mall.listings
+            mockGameState.spiritStones = 50000;
+            mockGameState.mall = null;
+            mockGameState.items = [{ id: 'list_test', templateId: 'pil_002', name: '金丹丹', category: 'pill', quality: 'rare' }];
+            server.mcpMallSell({ itemId: 'pil_002', price: 6000 });
+            v113Assert(mockGameState.mall.listings.length === 1, 'mall.sell adds listing to mall.listings');
+
+            // Test 40: exchange.query returns records in reverse order
+            mockGameState.exchange = { points: 0, records: [], items: server._initExchangeState().items };
+            mockGameState.exchange.records = [
+                { id: 'rec_1', type: 'charge', amount: 100, chargedAt: 1000 },
+                { id: 'rec_2', type: 'charge', amount: 200, chargedAt: 2000 },
+                { id: 'rec_3', type: 'charge', amount: 300, chargedAt: 3000 }
+            ];
+            const exQuery3 = server.mcpExchangeQuery({});
+            v113Assert(exQuery3.records[0].id === 'rec_3', 'exchange.query returns records in reverse');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V113', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V113 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v113Results = runV113Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
