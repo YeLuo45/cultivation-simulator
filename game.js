@@ -4467,6 +4467,70 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V104: 轮回池+因果簿系统 ---
+        const MCP_TOOLS_V104 = {
+            'reincarnation.pool.open': {
+                name: 'reincarnation.pool.open',
+                description: 'Open the Celestial Reincarnation Pool (仙界轮回池), costs spirit stones (轮回池系统-开启轮回池)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'integer', description: 'Pool tier (1-3), higher tier provides better purification effects', minimum: 1, maximum: 3, default: 1 }
+                    }
+                }
+            },
+            'reincarnation.pool.bathe': {
+                name: 'reincarnation.pool.bathe',
+                description: 'Bathe in the reincarnation pool to purify karma and gain attribute bonuses (轮回池系统-浸泡轮回池)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        duration: { type: 'integer', description: 'Bathing duration in hours (1-24)', minimum: 1, maximum: 24, default: 1 }
+                    }
+                }
+            },
+            'reincarnation.fruit.query': {
+                name: 'reincarnation.fruit.query',
+                description: 'Query reincarnation fruit inventory and effects (轮回果系统-查询轮回果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fruitId: { type: 'string', description: 'Specific fruit ID to query, or "all" for all fruits' }
+                    }
+                }
+            },
+            'reincarnation.fruit.consume': {
+                name: 'reincarnation.fruit.consume',
+                description: 'Consume a reincarnation fruit to gain random talent (轮回果系统-服用轮回果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fruitId: { type: 'string', description: 'Fruit ID to consume' },
+                        fruitType: { type: 'string', description: 'Fruit type: small|medium|large (auto-selected if fruitId provided)' }
+                    },
+                    required: ['fruitId']
+                }
+            },
+            'karma.book.open': {
+                name: 'karma.book.open',
+                description: 'Open the Karma Book to record good and evil karma deeds (因果簿系统-开启因果簿)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'karma.book.query': {
+                name: 'karma.book.query',
+                description: 'Query character karma records and statistics (因果簿系统-查询因果记录)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Filter: all|good|evil (default all)' }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4586,6 +4650,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V103: Register 仙界天机阁+命格系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V103)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V104: Register 轮回池+因果簿系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V104)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5228,6 +5296,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'fate.resonance':
                             result = this.mcpFateResonance(args);
+                            break;
+                        // V104: 轮回池+因果簿系统
+                        case 'reincarnation.pool.open':
+                            result = this.mcpReincarnationPoolOpen(args);
+                            break;
+                        case 'reincarnation.pool.bathe':
+                            result = this.mcpReincarnationPoolBathe(args);
+                            break;
+                        case 'reincarnation.fruit.query':
+                            result = this.mcpReincarnationFruitQuery(args);
+                            break;
+                        case 'reincarnation.fruit.consume':
+                            result = this.mcpReincarnationFruitConsume(args);
+                            break;
+                        case 'karma.book.open':
+                            result = this.mcpKarmaBookOpen(args);
+                            break;
+                        case 'karma.book.query':
+                            result = this.mcpKarmaBookQuery(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -10685,6 +10772,193 @@ const ACHIEVEMENT_ID_MAP = {
                     } else {
                         return { error: 'Force resonance requires valid combination. Use force: false to see possibilities.' };
                     }
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V104: 轮回池+因果簿系统
+            _initReincarnationPoolState() {
+                const gs = window.gameState;
+                if (!gs.reincarnationPool) {
+                    gs.reincarnationPool = {
+                        isOpen: false,
+                        tier: 0,
+                        openedAt: null,
+                        batheCount: 0,
+                        lastBatheAt: null
+                    };
+                }
+                if (!gs.reincarnationFruits) {
+                    gs.reincarnationFruits = [];
+                }
+                if (!gs.karmaBook) {
+                    gs.karmaBook = {
+                        isOpen: false,
+                        goodDeeds: [],
+                        badDeeds: [],
+                        goodScore: 0,
+                        badScore: 0,
+                        openedAt: null
+                    };
+                }
+                return gs;
+            }
+
+            mcpReincarnationPoolOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    const { tier = 1 } = args;
+                    if (tier < 1 || tier > 3) return { error: 'tier must be 1-3' };
+                    const POOL_COSTS = { 1: 1000, 2: 3000, 3: 10000 };
+                    const cost = POOL_COSTS[tier] || 1000;
+                    if (gs.spiritStones < cost) {
+                        return { error: `Insufficient spirit stones. Need ${cost}, have ${gs.spiritStones}` };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.reincarnationPool.isOpen = true;
+                    gs.reincarnationPool.tier = tier;
+                    gs.reincarnationPool.openedAt = Date.now();
+                    return {
+                        success: true,
+                        tier,
+                        cost,
+                        remainingStones: gs.spiritStones,
+                        message: `Reincarnation Pool Tier ${tier} opened`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpReincarnationPoolBathe(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    if (!gs.reincarnationPool.isOpen) {
+                        return { error: 'Reincarnation pool not open. Use reincarnation.pool.open first.' };
+                    }
+                    const tier = gs.reincarnationPool.tier || 1;
+                    const BATHE_COSTS = { 1: 100, 2: 300, 3: 1000 };
+                    const cost = BATHE_COSTS[tier] || 100;
+                    if (gs.spiritStones < cost) {
+                        return { error: `Insufficient spirit stones for bathe. Need ${cost}` };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.reincarnationPool.batheCount++;
+                    gs.reincarnationPool.lastBatheAt = Date.now();
+                    // Apply benefits
+                    const PURIFY_BONUS = { 1: 10, 2: 25, 3: 50 };
+                    const karmaReduction = PURIFY_BONUS[tier] || 10;
+                    gs.karmaBalance = Math.max(-1000, (gs.karmaBalance || 0) - karmaReduction);
+                    const STAT_BONUS = { 1: 5, 2: 12, 3: 25 };
+                    const statBonus = STAT_BONUS[tier] || 5;
+                    gs.cultivationBase = (gs.cultivationBase || 0) + statBonus;
+                    return {
+                        success: true,
+                        batheCount: gs.reincarnationPool.batheCount,
+                        karmaPurified: karmaReduction,
+                        karmaBalance: gs.karmaBalance,
+                        statBonus,
+                        remainingStones: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpReincarnationFruitQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    const fruits = gs.reincarnationFruits || [];
+                    const FRUIT_TYPES = {
+                        'talent': { name: '天赋果', effect: '资质+10', rarity: 'common' },
+                        'spirit': { name: '灵力果', effect: '灵力+50', rarity: 'common' },
+                        'longevity': { name: '延寿果', effect: '寿命+20', rarity: 'rare' },
+                        'wisdom': { name: '智慧果', effect: '悟性+15', rarity: 'rare' },
+                        'destiny': { name: '命格果', effect: '命格等级+1', rarity: 'legendary' }
+                    };
+                    return {
+                        total: fruits.length,
+                        fruits: fruits.map(f => ({
+                            ...f,
+                            typeInfo: FRUIT_TYPES[f.type] || { name: '未知', effect: '?', rarity: 'unknown' }
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpReincarnationFruitConsume(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    const { fruitId } = args;
+                    if (!fruitId) return { error: 'fruitId is required' };
+                    const fruits = gs.reincarnationFruits || [];
+                    const fruitIndex = fruits.findIndex(f => f.id === fruitId);
+                    if (fruitIndex === -1) return { error: 'Fruit not found: ' + fruitId };
+                    const fruit = fruits[fruitIndex];
+                    fruits.splice(fruitIndex, 1);
+                    // Apply effect
+                    const effects = {
+                        talent: { stat: 'talent', bonus: 10 },
+                        spirit: { stat: 'qi', bonus: 50 },
+                        longevity: { stat: 'maxLifeSpan', bonus: 20 },
+                        wisdom: { stat: 'comprehension', bonus: 15 },
+                        destiny: { stat: 'fateLevel', bonus: 1 }
+                    };
+                    const effect = effects[fruit.type] || { stat: 'unknown', bonus: 0 };
+                    return {
+                        success: true,
+                        consumed: fruit,
+                        effect: fruit.type,
+                        message: `Consumed ${fruit.type} fruit, gained ${effect.stat}+${effect.bonus}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaBookOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    if (gs.karmaBook.isOpen) {
+                        return { error: 'Karma book already open', openedAt: gs.karmaBook.openedAt };
+                    }
+                    gs.karmaBook.isOpen = true;
+                    gs.karmaBook.openedAt = Date.now();
+                    return {
+                        success: true,
+                        message: 'Karma book opened',
+                        openedAt: gs.karmaBook.openedAt
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpKarmaBookQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initReincarnationPoolState();
+                    if (!gs.karmaBook.isOpen) {
+                        return { error: 'Karma book not open. Use karma.book.open first.' };
+                    }
+                    const { detail = 'summary' } = args;
+                    if (detail === 'summary') {
+                        return {
+                            goodScore: gs.karmaBook.goodScore,
+                            badScore: gs.karmaBook.badScore,
+                            netKarma: gs.karmaBook.goodScore - gs.karmaBook.badScore,
+                            totalGoodDeeds: gs.karmaBook.goodDeeds.length,
+                            totalBadDeeds: gs.karmaBook.badDeeds.length
+                        };
+                    }
+                    return {
+                        goodDeeds: gs.karmaBook.goodDeeds,
+                        badDeeds: gs.karmaBook.badDeeds,
+                        goodScore: gs.karmaBook.goodScore,
+                        badScore: gs.karmaBook.badScore
+                    };
                 } catch (e) { return { error: e.message }; }
             }
 
