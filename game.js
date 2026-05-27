@@ -3389,6 +3389,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V116)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V117: Register 仙界签到+福利系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V117)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4276,6 +4280,25 @@
                             break;
                         case 'glory.claim':
                             result = this.mcpGloryClaim(args.levelId);
+                            break;
+                        // V117: 仙界签到+福利系统
+                        case 'checkin.query':
+                            result = this.mcpCheckinQuery();
+                            break;
+                        case 'checkin.sign':
+                            result = this.mcpCheckinSign();
+                            break;
+                        case 'checkin.reward':
+                            result = this.mcpCheckinReward(args.day);
+                            break;
+                        case 'welfare.query':
+                            result = this.mcpWelfareQuery();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaim(args.welfareId);
+                            break;
+                        case 'welfare.status':
+                            result = this.mcpWelfareStatus();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12429,6 +12452,246 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V117: _initCheckinState - 初始化签到系统状态
+            _initCheckinState() {
+                const gs = window.gameState;
+                if (!gs.checkin) {
+                    gs.checkin = {
+                        signedToday: false,
+                        currentStreak: 0,
+                        lastSignDate: null,
+                        totalDays: 0,
+                        streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS))
+                    };
+                }
+                // Check if it's a new day and reset signedToday if needed
+                if (gs.checkin.lastSignDate) {
+                    const last = new Date(gs.checkin.lastSignDate);
+                    const now = new Date();
+                    const diffDays = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+                    if (diffDays > 1) {
+                        // Streak broken if missed more than 1 day
+                        gs.checkin.currentStreak = 0;
+                    }
+                    if (diffDays >= 1) {
+                        gs.checkin.signedToday = false;
+                    }
+                }
+                return gs.checkin;
+            }
+
+            // V117: _initWelfareState - 初始化福利系统状态
+            _initWelfareState() {
+                const gs = window.gameState;
+                if (!gs.welfare) {
+                    gs.welfare = {
+                        dailyClaimed: false,
+                        weeklyClaimed: false,
+                        monthlyClaimed: false,
+                        lastClaimDate: null,
+                        rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS))
+                    };
+                }
+                // Check if it's a new day and reset daily claim if needed
+                if (gs.welfare.lastClaimDate) {
+                    const last = new Date(gs.welfare.lastClaimDate);
+                    const now = new Date();
+                    const diffDays = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 1) {
+                        gs.welfare.dailyClaimed = false;
+                    }
+                    // Reset weekly at start of week (Monday)
+                    const lastWeek = Math.floor(last.getTime() / (7 * 24 * 60 * 60 * 1000));
+                    const nowWeek = Math.floor(now.getTime() / (7 * 24 * 60 * 60 * 1000));
+                    if (nowWeek > lastWeek) {
+                        gs.welfare.weeklyClaimed = false;
+                    }
+                    // Reset monthly at start of month
+                    if (last.getMonth() !== now.getMonth() || last.getFullYear() !== now.getFullYear()) {
+                        gs.welfare.monthlyClaimed = false;
+                    }
+                }
+                return gs.welfare;
+            }
+
+            // V117: mcpCheckinQuery - 查询签到状态
+            mcpCheckinQuery() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const checkin = this._initCheckinState();
+                    return {
+                        success: true,
+                        signedToday: checkin.signedToday,
+                        currentStreak: checkin.currentStreak,
+                        lastSignDate: checkin.lastSignDate,
+                        totalDays: checkin.totalDays,
+                        streakRewards: checkin.streakRewards
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V117: mcpCheckinSign - 执行签到
+            mcpCheckinSign() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const checkin = this._initCheckinState();
+
+                    if (checkin.signedToday) {
+                        return { error: '今日已签到，请明天再来' };
+                    }
+
+                    // Update streak and last sign date
+                    const now = new Date();
+                    if (checkin.lastSignDate) {
+                        const last = new Date(checkin.lastSignDate);
+                        const diffDays = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+                        if (diffDays === 1) {
+                            checkin.currentStreak += 1;
+                        } else if (diffDays > 1) {
+                            checkin.currentStreak = 1;
+                        }
+                    } else {
+                        checkin.currentStreak = 1;
+                    }
+
+                    checkin.lastSignDate = now.toISOString();
+                    checkin.signedToday = true;
+                    checkin.totalDays += 1;
+
+                    // Base reward for signing in
+                    const baseReward = 100 + checkin.currentStreak * 10;
+                    gs.spiritStones = (gs.spiritStones || 0) + baseReward;
+
+                    return {
+                        success: true,
+                        message: '签到成功，连续签到' + checkin.currentStreak + '天',
+                        streak: checkin.currentStreak,
+                        totalDays: checkin.totalDays,
+                        reward: { spiritStones: baseReward }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V117: mcpCheckinReward - 领取连续签到奖励
+            mcpCheckinReward(day) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!day) return { error: '连续签到天数不能为空' };
+
+                    const dayKey = 'day' + day;
+                    if (!CHECKIN_STREAK_REWARDS[dayKey]) {
+                        return { error: '无效的连续签到天数: ' + day + '，可选: 3, 7, 30' };
+                    }
+
+                    const checkin = this._initCheckinState();
+                    const streakData = checkin.streakRewards[dayKey];
+
+                    if (!streakData) return { error: '连续签到奖励数据不存在' };
+                    if (streakData.claimed) return { error: '该奖励已领取' };
+                    if (checkin.currentStreak < day) {
+                        return { error: '连续签到天数不足，需要连续签到' + day + '天，当前连续' + checkin.currentStreak + '天' };
+                    }
+
+                    streakData.claimed = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + streakData.reward.spiritStones;
+
+                    return {
+                        success: true,
+                        message: '领取连续签到' + day + '天奖励成功',
+                        reward: streakData.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V117: mcpWelfareQuery - 查询可领取福利
+            mcpWelfareQuery() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfare = this._initWelfareState();
+
+                    return {
+                        success: true,
+                        daily: {
+                            available: !welfare.dailyClaimed,
+                            claimed: welfare.dailyClaimed,
+                            reward: welfare.rewards.daily.reward
+                        },
+                        weekly: {
+                            available: !welfare.weeklyClaimed,
+                            claimed: welfare.weeklyClaimed,
+                            reward: welfare.rewards.weekly.reward
+                        },
+                        monthly: {
+                            available: !welfare.monthlyClaimed,
+                            claimed: welfare.monthlyClaimed,
+                            reward: welfare.rewards.monthly.reward
+                        }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V117: mcpWelfareClaim - 领取福利
+            mcpWelfareClaim(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '福利ID不能为空' };
+
+                    const validIds = ['daily', 'weekly', 'monthly'];
+                    if (!validIds.includes(welfareId)) {
+                        return { error: '无效的福利ID: ' + welfareId + '，可选: daily, weekly, monthly' };
+                    }
+
+                    const welfare = this._initWelfareState();
+                    const welfareData = welfare.rewards[welfareId];
+
+                    if (!welfareData) return { error: '福利数据不存在' };
+
+                    const claimMap = {
+                        daily: 'dailyClaimed',
+                        weekly: 'weeklyClaimed',
+                        monthly: 'monthlyClaimed'
+                    };
+                    const claimedFlag = claimMap[welfareId];
+
+                    if (welfare[claimedFlag]) {
+                        return { error: welfareId + '福利已领取，请下次再来' };
+                    }
+
+                    welfare[claimedFlag] = true;
+                    welfare.lastClaimDate = new Date().toISOString();
+                    gs.spiritStones = (gs.spiritStones || 0) + welfareData.reward.spiritStones;
+
+                    return {
+                        success: true,
+                        message: '领取' + welfareId + '福利成功',
+                        welfareId,
+                        reward: welfareData.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V117: mcpWelfareStatus - 查询福利状态
+            mcpWelfareStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfare = this._initWelfareState();
+
+                    return {
+                        success: true,
+                        dailyClaimed: welfare.dailyClaimed,
+                        weeklyClaimed: welfare.weeklyClaimed,
+                        monthlyClaimed: welfare.monthlyClaimed,
+                        lastClaimDate: welfare.lastClaimDate
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V114: mcpQuestList - 获取可接任务列表
             mcpQuestList(args) {
                 try {
@@ -20122,6 +20385,79 @@
             tier4: { need: 30, reward: { spiritStones: 30000, exp: 3000 }, claimed: false }
         };
 
+        // ===== V117: 仙界签到+福利系统 =====
+        // --- MCP_TOOLS_V117: 仙界签到+福利系统 ---
+        const MCP_TOOLS_V117 = {
+            'checkin.query': {
+                name: 'checkin.query',
+                description: '查询签到状态 (仙界签到-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'checkin.sign': {
+                name: 'checkin.sign',
+                description: '执行签到 (仙界签到-签到)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'checkin.reward': {
+                name: 'checkin.reward',
+                description: '领取连续签到奖励 (仙界签到-连续奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        day: { type: 'number', description: '连续签到天数 (3/7/30)' }
+                    },
+                    required: ['day']
+                }
+            },
+            'welfare.query': {
+                name: 'welfare.query',
+                description: '查询可领取福利 (仙界福利-查询)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利 (仙界福利-领取)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID (daily/weekly/monthly)' }
+                    },
+                    required: ['welfareId']
+                }
+            },
+            'welfare.status': {
+                name: 'welfare.status',
+                description: '查询福利状态 (仙界福利-状态)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
+        // V117: Check-in Streak Rewards
+        const CHECKIN_STREAK_REWARDS = {
+            day3: { need: 3, reward: { spiritStones: 500 }, claimed: false },
+            day7: { need: 7, reward: { spiritStones: 2000 }, claimed: false },
+            day30: { need: 30, reward: { spiritStones: 10000 }, claimed: false }
+        };
+
+        // V117: Welfare Rewards
+        const WELFARE_REWARDS = {
+            daily: { reward: { spiritStones: 500 }, claimed: false, lastClaimDate: null },
+            weekly: { reward: { spiritStones: 2000 }, claimed: false, lastClaimDate: null },
+            monthly: { reward: { spiritStones: 10000 }, claimed: false, lastClaimDate: null }
+        };
+
         // ===== V114: 仙界任务+成就系统 =====
         // --- MCP_TOOLS_V114: 仙界任务+成就系统 ---
         const MCP_TOOLS_V114 = {
@@ -21073,6 +21409,254 @@
             return summary;
         }
         const v116Results = runV116Tests();
+
+        // ===== V117: 仙界签到+福利系统 Tests =====
+        function runV117Tests() {
+            const results = [];
+            function v117Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 3,
+                stage: 1,
+                checkin: null,
+                welfare: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: checkin.query returns initial state
+            const query1 = server.mcpCheckinQuery();
+            v117Assert(query1.success === true, 'checkin.query succeeds');
+            v117Assert(query1.signedToday === false, 'checkin.query initial signedToday is false');
+            v117Assert(query1.currentStreak === 0, 'checkin.query initial streak is 0');
+            v117Assert(query1.totalDays === 0, 'checkin.query initial totalDays is 0');
+
+            // Test 2: checkin.sign first time succeeds
+            const sign1 = server.mcpCheckinSign();
+            v117Assert(sign1.success === true, 'checkin.sign first time succeeds');
+            v117Assert(sign1.streak === 1, 'checkin.sign first time streak is 1');
+            v117Assert(sign1.totalDays === 1, 'checkin.sign first time totalDays is 1');
+            v117Assert(sign1.reward && sign1.reward.spiritStones > 0, 'checkin.sign returns reward');
+
+            // Test 3: checkin.query after signing shows signedToday
+            const query2 = server.mcpCheckinQuery();
+            v117Assert(query2.signedToday === true, 'checkin.query after sign shows signedToday true');
+            v117Assert(query2.currentStreak === 1, 'checkin.query shows currentStreak 1');
+
+            // Test 4: checkin.sign same day fails
+            const sign2 = server.mcpCheckinSign();
+            v117Assert(sign2.error && sign2.error.includes('今日已签到'), 'checkin.sign same day fails');
+
+            // Test 5: welfare.query returns initial state
+            const welfare1 = server.mcpWelfareQuery();
+            v117Assert(welfare1.success === true, 'welfare.query succeeds');
+            v117Assert(welfare1.daily && welfare1.daily.available === true, 'welfare.query daily available');
+            v117Assert(welfare1.weekly && welfare1.weekly.available === true, 'welfare.query weekly available');
+            v117Assert(welfare1.monthly && welfare1.monthly.available === true, 'welfare.query monthly available');
+
+            // Test 6: welfare.claim daily succeeds
+            const claim1 = server.mcpWelfareClaim('daily');
+            v117Assert(claim1.success === true, 'welfare.claim daily succeeds');
+            v117Assert(claim1.welfareId === 'daily', 'welfare.claim returns daily welfareId');
+
+            // Test 7: welfare.query after daily claim shows not available
+            const welfare2 = server.mcpWelfareQuery();
+            v117Assert(welfare2.daily.available === false, 'welfare.query daily not available after claim');
+            v117Assert(welfare2.daily.claimed === true, 'welfare.query daily claimed is true');
+
+            // Test 8: welfare.claim same daily again fails
+            const claim2 = server.mcpWelfareClaim('daily');
+            v117Assert(claim2.error && claim2.error.includes('已领取'), 'welfare.claim daily again fails');
+
+            // Test 9: welfare.claim weekly succeeds
+            const claim3 = server.mcpWelfareClaim('weekly');
+            v117Assert(claim3.success === true, 'welfare.claim weekly succeeds');
+
+            // Test 10: welfare.claim monthly succeeds
+            const claim4 = server.mcpWelfareClaim('monthly');
+            v117Assert(claim4.success === true, 'welfare.claim monthly succeeds');
+
+            // Test 11: welfare.status returns status
+            const status1 = server.mcpWelfareStatus();
+            v117Assert(status1.success === true, 'welfare.status succeeds');
+            v117Assert(status1.dailyClaimed === true, 'welfare.status dailyClaimed is true');
+            v117Assert(status1.weeklyClaimed === true, 'welfare.status weeklyClaimed is true');
+            v117Assert(status1.monthlyClaimed === true, 'welfare.status monthlyClaimed is true');
+
+            // Test 12: checkin.reward requires valid day
+            const reward1 = server.mcpCheckinReward(999);
+            v117Assert(reward1.error && reward1.error.includes('无效的连续签到天数'), 'checkin.reward fails for invalid day');
+
+            // Test 13: checkin.reward requires streak
+            mockGameState.checkin = { signedToday: true, currentStreak: 1, lastSignDate: new Date().toISOString(), totalDays: 1, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const reward2 = server.mcpCheckinReward(3);
+            v117Assert(reward2.error && reward2.error.includes('连续签到天数不足'), 'checkin.reward fails when streak too low');
+
+            // Test 14: checkin.reward day3 succeeds with enough streak
+            mockGameState.checkin = { signedToday: true, currentStreak: 3, lastSignDate: new Date().toISOString(), totalDays: 3, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const reward3 = server.mcpCheckinReward(3);
+            v117Assert(reward3.success === true, 'checkin.reward day3 succeeds with streak 3');
+
+            // Test 15: checkin.reward already claimed fails
+            const reward4 = server.mcpCheckinReward(3);
+            v117Assert(reward4.error && reward4.error.includes('已领取'), 'checkin.reward day3 fails when already claimed');
+
+            // Test 16: checkin.reward day7 with streak 7
+            mockGameState.checkin = { signedToday: true, currentStreak: 7, lastSignDate: new Date().toISOString(), totalDays: 7, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const reward5 = server.mcpCheckinReward(7);
+            v117Assert(reward5.success === true, 'checkin.reward day7 succeeds with streak 7');
+
+            // Test 17: checkin.reward day30 with streak 30
+            mockGameState.checkin = { signedToday: true, currentStreak: 30, lastSignDate: new Date().toISOString(), totalDays: 30, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const reward6 = server.mcpCheckinReward(30);
+            v117Assert(reward6.success === true, 'checkin.reward day30 succeeds with streak 30');
+
+            // Test 18: welfare.claim invalid id fails
+            const claimInvalid = server.mcpWelfareClaim('invalid');
+            v117Assert(claimInvalid.error && claimInvalid.error.includes('无效的福利ID'), 'welfare.claim invalid id fails');
+
+            // Test 19: welfare.claim empty id fails
+            const claimEmpty = server.mcpWelfareClaim('');
+            v117Assert(claimEmpty.error && claimEmpty.error.includes('不能为空'), 'welfare.claim empty id fails');
+
+            // Test 20: checkin.query returns streakRewards structure
+            mockGameState.checkin = { signedToday: true, currentStreak: 5, lastSignDate: new Date().toISOString(), totalDays: 5, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const query3 = server.mcpCheckinQuery();
+            v117Assert(query3.streakRewards && query3.streakRewards.day3, 'checkin.query has day3 reward');
+            v117Assert(query3.streakRewards && query3.streakRewards.day7, 'checkin.query has day7 reward');
+            v117Assert(query3.streakRewards && query3.streakRewards.day30, 'checkin.query has day30 reward');
+
+            // Test 21: _initCheckinState creates proper structure
+            mockGameState.checkin = null;
+            const checkinInit = server._initCheckinState();
+            v117Assert(checkinInit.signedToday === false, 'checkin init signedToday is false');
+            v117Assert(checkinInit.currentStreak === 0, 'checkin init currentStreak is 0');
+            v117Assert(checkinInit.streakRewards, 'checkin init has streakRewards');
+
+            // Test 22: _initWelfareState creates proper structure
+            mockGameState.welfare = null;
+            const welfareInit = server._initWelfareState();
+            v117Assert(welfareInit.dailyClaimed === false, 'welfare init dailyClaimed is false');
+            v117Assert(welfareInit.weeklyClaimed === false, 'welfare init weeklyClaimed is false');
+            v117Assert(welfareInit.monthlyClaimed === false, 'welfare init monthlyClaimed is false');
+            v117Assert(welfareInit.rewards, 'welfare init has rewards');
+
+            // Test 23: checkin.sign increments totalDays
+            mockGameState.checkin = { signedToday: false, currentStreak: 2, lastSignDate: new Date(Date.now() - 86400000).toISOString(), totalDays: 10, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const sign3 = server.mcpCheckinSign();
+            v117Assert(sign3.totalDays === 11, 'checkin.sign increments totalDays');
+
+            // Test 24: checkin.sign increases streak for consecutive day
+            mockGameState.checkin = { signedToday: false, currentStreak: 2, lastSignDate: new Date(Date.now() - 86400000).toISOString(), totalDays: 10, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const sign4 = server.mcpCheckinSign();
+            v117Assert(sign4.streak === 3, 'checkin.sign increases streak for consecutive day');
+
+            // Test 25: checkin.sign resets streak for gap > 1 day
+            mockGameState.checkin = { signedToday: false, currentStreak: 5, lastSignDate: new Date(Date.now() - 2 * 86400000).toISOString(), totalDays: 10, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const sign5 = server.mcpCheckinSign();
+            v117Assert(sign5.streak === 1, 'checkin.sign resets streak for gap > 1 day');
+
+            // Test 26: checkin.reward requires day parameter
+            mockGameState.checkin = { signedToday: true, currentStreak: 5, lastSignDate: new Date().toISOString(), totalDays: 5, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const rewardNoDay = server.mcpCheckinReward();
+            v117Assert(rewardNoDay.error && rewardNoDay.error.includes('不能为空'), 'checkin.reward fails without day');
+
+            // Test 27: welfare.claim weekly requires level 2 reward
+            mockGameState.welfare = { dailyClaimed: true, weeklyClaimed: false, monthlyClaimed: true, lastClaimDate: new Date().toISOString(), rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS)) };
+            const claimWeekly = server.mcpWelfareClaim('weekly');
+            v117Assert(claimWeekly.success === true, 'welfare.claim weekly succeeds');
+            v117Assert(claimWeekly.reward && claimWeekly.reward.spiritStones === 2000, 'welfare.claim weekly has 2000 spiritStones');
+
+            // Test 28: welfare.claim monthly requires level 3 reward
+            mockGameState.welfare = { dailyClaimed: true, weeklyClaimed: true, monthlyClaimed: false, lastClaimDate: new Date().toISOString(), rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS)) };
+            const claimMonthly = server.mcpWelfareClaim('monthly');
+            v117Assert(claimMonthly.success === true, 'welfare.claim monthly succeeds');
+            v117Assert(claimMonthly.reward && claimMonthly.reward.spiritStones === 10000, 'welfare.claim monthly has 10000 spiritStones');
+
+            // Test 29: checkin.sign reward scales with streak
+            mockGameState.checkin = { signedToday: false, currentStreak: 0, lastSignDate: null, totalDays: 0, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const sign6 = server.mcpCheckinSign();
+            v117Assert(sign6.reward.spiritStones >= 100, 'checkin.sign reward at least 100');
+
+            // Test 30: checkin.sign with streak 10
+            mockGameState.checkin = { signedToday: false, currentStreak: 9, lastSignDate: new Date(Date.now() - 86400000).toISOString(), totalDays: 9, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const sign7 = server.mcpCheckinSign();
+            v117Assert(sign7.streak === 10, 'checkin.sign streak becomes 10');
+            v117Assert(sign7.reward.spiritStones >= 200, 'checkin.sign streak 10 reward >= 200');
+
+            // Test 31: welfare.query returns correct reward values
+            mockGameState.welfare = { dailyClaimed: false, weeklyClaimed: false, monthlyClaimed: false, lastClaimDate: null, rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS)) };
+            const welfareQuery = server.mcpWelfareQuery();
+            v117Assert(welfareQuery.daily.reward.spiritStones === 500, 'welfare daily reward is 500');
+            v117Assert(welfareQuery.weekly.reward.spiritStones === 2000, 'welfare weekly reward is 2000');
+            v117Assert(welfareQuery.monthly.reward.spiritStones === 10000, 'welfare monthly reward is 10000');
+
+            // Test 32: checkin.reward day3 has correct reward
+            mockGameState.checkin = { signedToday: true, currentStreak: 3, lastSignDate: new Date().toISOString(), totalDays: 3, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const rewardDay3 = server.mcpCheckinReward(3);
+            v117Assert(rewardDay3.reward.spiritStones === 500, 'checkin reward day3 is 500');
+
+            // Test 33: checkin.reward day7 has correct reward
+            mockGameState.checkin = { signedToday: true, currentStreak: 7, lastSignDate: new Date().toISOString(), totalDays: 7, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const rewardDay7 = server.mcpCheckinReward(7);
+            v117Assert(rewardDay7.reward.spiritStones === 2000, 'checkin reward day7 is 2000');
+
+            // Test 34: checkin.reward day30 has correct reward
+            mockGameState.checkin = { signedToday: true, currentStreak: 30, lastSignDate: new Date().toISOString(), totalDays: 30, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            const rewardDay30 = server.mcpCheckinReward(30);
+            v117Assert(rewardDay30.reward.spiritStones === 10000, 'checkin reward day30 is 10000');
+
+            // Test 35: welfare.claim adds spirit stones to player
+            mockGameState.spiritStones = 5000;
+            mockGameState.welfare = { dailyClaimed: false, weeklyClaimed: false, monthlyClaimed: false, lastClaimDate: null, rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS)) };
+            server.mcpWelfareClaim('daily');
+            v117Assert(mockGameState.spiritStones === 5500, 'welfare.claim daily adds 500 stones');
+
+            // Test 36: checkin.sign adds spirit stones to player
+            mockGameState.spiritStones = 5000;
+            mockGameState.checkin = { signedToday: false, currentStreak: 0, lastSignDate: null, totalDays: 0, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            server.mcpCheckinSign();
+            v117Assert(mockGameState.spiritStones > 5000, 'checkin.sign adds spirit stones');
+
+            // Test 37: checkin.query has lastSignDate after sign
+            mockGameState.checkin = { signedToday: false, currentStreak: 0, lastSignDate: null, totalDays: 0, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            server.mcpCheckinSign();
+            const query4 = server.mcpCheckinQuery();
+            v117Assert(query4.lastSignDate !== null, 'checkin.query has lastSignDate');
+
+            // Test 38: welfare.status has lastClaimDate
+            const status2 = server.mcpWelfareStatus();
+            v117Assert(status2.lastClaimDate !== null, 'welfare.status has lastClaimDate');
+
+            // Test 39: checkin.query totalDays accumulates
+            mockGameState.checkin = { signedToday: false, currentStreak: 0, lastSignDate: null, totalDays: 99, streakRewards: JSON.parse(JSON.stringify(CHECKIN_STREAK_REWARDS)) };
+            server.mcpCheckinSign();
+            const query5 = server.mcpCheckinQuery();
+            v117Assert(query5.totalDays === 100, 'checkin totalDays accumulates to 100');
+
+            // Test 40: All welfare types can be claimed in sequence
+            mockGameState.welfare = { dailyClaimed: false, weeklyClaimed: false, monthlyClaimed: false, lastClaimDate: null, rewards: JSON.parse(JSON.stringify(WELFARE_REWARDS)) };
+            const seq1 = server.mcpWelfareClaim('daily');
+            const seq2 = server.mcpWelfareClaim('weekly');
+            const seq3 = server.mcpWelfareClaim('monthly');
+            v117Assert(seq1.success === true, 'welfare claim sequence daily');
+            v117Assert(seq2.success === true, 'welfare claim sequence weekly');
+            v117Assert(seq3.success === true, 'welfare claim sequence monthly');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V117', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V117 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v117Results = runV117Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
