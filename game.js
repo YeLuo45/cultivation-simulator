@@ -4400,6 +4400,73 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V103: 仙界天机阁+命格系统 ---
+        const MCP_TOOLS_V103 = {
+            'heaven.archive.open': {
+                name: 'heaven.archive.open',
+                description: 'Open the Celestial Archive (天机阁) to access fate knowledge, costs spirit stones (仙界天机阁-开启天机阁)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'integer', description: 'Archive tier (1-3), higher tier reveals more fate secrets', minimum: 1, maximum: 3, default: 1 }
+                    }
+                }
+            },
+            'fate.query': {
+                name: 'fate.query',
+                description: 'Query character fate information including fate types, levels, and effects (命格系统-查询命格信息)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fateType: { type: 'string', description: 'Specific fate type to query, or "all" for all fates', default: 'all' }
+                    }
+                }
+            },
+            'fate.activate': {
+                name: 'fate.activate',
+                description: 'Activate a fate slot, consuming resources and granting passive effects (命格系统-激活命格)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        fateType: { type: 'string', description: 'Fate type to activate: phoenix|dragon|tortoise|grimlock|celestial|shadow' },
+                        slot: { type: 'integer', description: 'Fate slot index (0-2), if not specified, auto-selects first empty slot', minimum: 0, maximum: 2 }
+                    },
+                    required: ['fateType']
+                }
+            },
+            'heaven.augur': {
+                name: 'heaven.augur',
+                description: 'Consume spirit energy to divine heavenly secrets, gaining random event hints (天机阁-天机推演)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        intensity: { type: 'string', description: 'Augury intensity: low|medium|high', default: 'medium' }
+                    }
+                }
+            },
+            'fate.upgrade': {
+                name: 'fate.upgrade',
+                description: 'Upgrade an already activated fate to enhance its effects (命格系统-命格升级)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        slot: { type: 'integer', description: 'Fate slot index to upgrade (0-2)', minimum: 0, maximum: 2 }
+                    },
+                    required: ['slot']
+                }
+            },
+            'fate.resonance': {
+                name: 'fate.resonance',
+                description: 'Trigger resonance between multiple fates to activate combination effects (命格系统-命格共鸣)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        force: { type: 'boolean', description: 'Force resonance even if combination requirements not met', default: false }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4515,6 +4582,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V102: Register 天命轮回增强+仙界仲裁庭系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V102)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V103: Register 仙界天机阁+命格系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V103)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5138,6 +5209,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'court.judge':
                             result = this.mcpCourtJudge(args);
+                            break;
+                        // V103: 仙界天机阁+命格系统
+                        case 'heaven.archive.open':
+                            result = this.mcpHeavenArchiveOpen(args);
+                            break;
+                        case 'fate.query':
+                            result = this.mcpFateQuery(args);
+                            break;
+                        case 'fate.activate':
+                            result = this.mcpFateActivate(args);
+                            break;
+                        case 'heaven.augur':
+                            result = this.mcpHeavenAugur(args);
+                            break;
+                        case 'fate.upgrade':
+                            result = this.mcpFateUpgrade(args);
+                            break;
+                        case 'fate.resonance':
+                            result = this.mcpFateResonance(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -10279,6 +10369,325 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V103: 仙界天机阁+命格系统实现
+            _initHeavenArchiveState() {
+                const gs = window.gameState;
+                if (!gs.heavenArchive) {
+                    gs.heavenArchive = {
+                        isOpen: false,
+                        tier: 0,
+                        openedAt: null,
+                        auguryCount: 0,
+                        secretsRevealed: []
+                    };
+                }
+                if (!gs.fateSlots) {
+                    gs.fateSlots = [null, null, null]; // 3 fate slots
+                }
+                if (!gs.activatedFates) {
+                    gs.activatedFates = [];
+                }
+                if (!gs.fateResonances) {
+                    gs.fateResonances = [];
+                }
+                return gs;
+            }
+
+            _getFateConfig(fateType) {
+                const FATE_CONFIGS = {
+                    phoenix: { name: '凤凰命', element: 'fire', baseBonus: { attack: 15, crit: 10 }, resonanceWith: ['dragon', 'tortoise'] },
+                    dragon: { name: '龙命', element: 'wood', baseBonus: { hp: 100, defense: 8 }, resonanceWith: ['phoenix', 'grimlock'] },
+                    tortoise: { name: '玄武命', element: 'water', baseBonus: { hp: 150, defense: 12 }, resonanceWith: ['phoenix'] },
+                    grimlock: { name: ' Grimlock命', element: 'earth', baseBonus: { attack: 10, hp: 50 }, resonanceWith: ['dragon'] },
+                    celestial: { name: '天仙命', element: 'thunder', baseBonus: { spirit: 20, crit: 5 }, resonanceWith: ['shadow'] },
+                    shadow: { name: '暗影命', element: 'dark', baseBonus: { attack: 12, dodge: 8 }, resonanceWith: ['celestial'] }
+                };
+                return FATE_CONFIGS[fateType] || null;
+            }
+
+            _getFateEffect(fateType, level) {
+                const config = this._getFateConfig(fateType);
+                if (!config) return null;
+                const bonus = { ...config.baseBonus };
+                const multiplier = 1 + (level - 1) * 0.3;
+                for (const key in bonus) {
+                    bonus[key] = Math.round(bonus[key] * multiplier);
+                }
+                return {
+                    type: fateType,
+                    name: config.name,
+                    level,
+                    element: config.element,
+                    bonus,
+                    passiveEffect: `${config.name} Lv.${level}: ${Object.entries(bonus).map(([k, v]) => CONFIG.ELEMENT_NAMES[config.element] + '+' + v).join(', ')}`
+                };
+            }
+
+            mcpHeavenArchiveOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    const tier = args && args.tier ? Math.min(3, Math.max(1, args.tier)) : 1;
+                    const TIER_COSTS = { 1: 500, 2: 1500, 3: 5000 };
+                    const cost = TIER_COSTS[tier] || 500;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: `Not enough spirit stones. Need ${cost}, have ${gs.spiritStones || 0}` };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.heavenArchive.isOpen = true;
+                    gs.heavenArchive.tier = tier;
+                    gs.heavenArchive.openedAt = Date.now();
+                    return {
+                        success: true,
+                        message: `天机阁开启成功 (Tier ${tier})`,
+                        tier,
+                        cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        tierBenefits: {
+                            1: '可查询基础命格信息',
+                            2: '解锁命格激活功能',
+                            3: '解锁天机推演和命格共鸣'
+                        }[tier]
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFateQuery(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    const fateType = args && args.fateType ? args.fateType : 'all';
+                    const ALL_FATES = ['phoenix', 'dragon', 'tortoise', 'grimlock', 'celestial', 'shadow'];
+                    if (fateType === 'all') {
+                        const availableFates = ALL_FATES.map(ft => {
+                            const config = this._getFateConfig(ft);
+                            const activated = gs.fateSlots.findIndex(f => f && f.type === ft);
+                            const level = activated >= 0 ? gs.fateSlots[activated].level : 0;
+                            return {
+                                type: ft,
+                                name: config.name,
+                                element: config.element,
+                                canActivate: activated < 0 && gs.heavenArchive.isOpen && gs.heavenArchive.tier >= 2,
+                                isActivated: activated >= 0,
+                                slot: activated >= 0 ? activated : null,
+                                level,
+                                resonancePartners: config.resonanceWith
+                            };
+                        });
+                        return {
+                            fateSlots: gs.fateSlots.map((slot, i) => slot ? { slot: i, ...slot } : null),
+                            availableFates,
+                            archiveOpen: gs.heavenArchive.isOpen,
+                            archiveTier: gs.heavenArchive.tier
+                        };
+                    } else {
+                        const config = this._getFateConfig(fateType);
+                        if (!config) return { error: `Unknown fate type: ${fateType}` };
+                        const slotIndex = gs.fateSlots.findIndex(f => f && f.type === fateType);
+                        const level = slotIndex >= 0 ? gs.fateSlots[slotIndex].level : 0;
+                        return {
+                            type: fateType,
+                            name: config.name,
+                            element: config.element,
+                            isActivated: slotIndex >= 0,
+                            slot: slotIndex >= 0 ? slotIndex : null,
+                            level,
+                            effect: level > 0 ? this._getFateEffect(fateType, level) : null,
+                            resonancePartners: config.resonanceWith
+                        };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFateActivate(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    if (!gs.heavenArchive.isOpen || gs.heavenArchive.tier < 2) {
+                        return { error: 'Archive tier 2+ required to activate fates. Use heaven.archive.open first.' };
+                    }
+                    const { fateType, slot } = args;
+                    if (!fateType) return { error: 'fateType is required' };
+                    const config = this._getFateConfig(fateType);
+                    if (!config) return { error: `Unknown fate type: ${fateType}` };
+                    const existingSlot = gs.fateSlots.findIndex(f => f && f.type === fateType);
+                    if (existingSlot >= 0) {
+                        return { error: `Fate ${fateType} already activated in slot ${existingSlot}` };
+                    }
+                    let targetSlot = slot !== undefined ? slot : gs.fateSlots.findIndex(f => f === null);
+                    if (targetSlot < 0 || targetSlot > 2) {
+                        return { error: 'No empty fate slots available' };
+                    }
+                    const ACTIVATION_COST = 1000;
+                    if ((gs.spiritStones || 0) < ACTIVATION_COST) {
+                        return { error: `Not enough spirit stones. Need ${ACTIVATION_COST}, have ${gs.spiritStones || 0}` };
+                    }
+                    gs.spiritStones -= ACTIVATION_COST;
+                    const effect = this._getFateEffect(fateType, 1);
+                    gs.fateSlots[targetSlot] = { type: fateType, level: 1, activatedAt: Date.now(), effect };
+                    gs.activatedFates.push({ type: fateType, slot: targetSlot });
+                    return {
+                        success: true,
+                        message: `命格 [${config.name}] 激活成功`,
+                        slot: targetSlot,
+                        cost: ACTIVATION_COST,
+                        effect,
+                        remainingSpiritStones: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpHeavenAugur(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    if (!gs.heavenArchive.isOpen || gs.heavenArchive.tier < 3) {
+                        return { error: 'Archive tier 3+ required for augury. Use heaven.archive.open with tier 3.' };
+                    }
+                    const intensity = args && args.intensity ? args.intensity : 'medium';
+                    const INTENSITY_COSTS = { low: 50, medium: 100, high: 200 };
+                    const cost = INTENSITY_COSTS[intensity] || 100;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: `Not enough spirit stones for augury. Need ${cost}, have ${gs.spiritStones || 0}` };
+                    }
+                    gs.spiritStones -= cost;
+                    gs.heavenArchive.auguryCount++;
+                    const DIVINATION_EVENTS = [
+                        { event: 'serendipity_approaching', hint: '奇遇将至，保持修炼' },
+                        { event: 'realm_breakthrough', hint: '境界突破机缘已熟' },
+                        { event: 'treasure_nearby', hint: '有宝物现世，缘分未到' },
+                        { event: 'danger_ahead', hint: '劫难将至，早做准备' },
+                        { event: 'sect_fate', hint: '宗门将有大事发生' },
+                        { event: 'true love appears', hint: '佳缘将至' },
+                        { event: 'powerful_enemy', hint: '强敌窥伺' },
+                        { event: 'fortune_found', hint: '福缘深厚' }
+                    ];
+                    const roll = Math.random();
+                    const eventIndex = Math.floor(roll * DIVINATION_EVENTS.length);
+                    const event = DIVINATION_EVENTS[eventIndex];
+                    return {
+                        success: true,
+                        message: `天机推演 (${intensity}) - ${event.hint}`,
+                        intensity,
+                        cost,
+                        eventType: event.event,
+                        hint: event.hint,
+                        auguryCount: gs.heavenArchive.auguryCount,
+                        remainingSpiritStones: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFateUpgrade(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    const { slot } = args;
+                    if (slot === undefined || slot < 0 || slot > 2) {
+                        return { error: 'slot (0-2) is required' };
+                    }
+                    const fateSlot = gs.fateSlots[slot];
+                    if (!fateSlot) {
+                        return { error: `No fate activated in slot ${slot}` };
+                    }
+                    const MAX_LEVEL = 5;
+                    if (fateSlot.level >= MAX_LEVEL) {
+                        return { error: `Fate already at max level ${MAX_LEVEL}` };
+                    }
+                    const UPGRADE_COSTS = { 1: 500, 2: 1000, 3: 2000, 4: 4000 };
+                    const upgradeCost = UPGRADE_COSTS[fateSlot.level] || 500;
+                    if ((gs.spiritStones || 0) < upgradeCost) {
+                        return { error: `Not enough spirit stones. Need ${upgradeCost}, have ${gs.spiritStones || 0}` };
+                    }
+                    gs.spiritStones -= upgradeCost;
+                    fateSlot.level++;
+                    fateSlot.effect = this._getFateEffect(fateSlot.type, fateSlot.level);
+                    return {
+                        success: true,
+                        message: `命格升级成功 [Slot ${slot} → Lv.${fateSlot.level}]`,
+                        slot,
+                        newLevel: fateSlot.level,
+                        cost: upgradeCost,
+                        effect: fateSlot.effect,
+                        remainingSpiritStones: gs.spiritStones
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpFateResonance(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initHeavenArchiveState();
+                    if (gs.heavenArchive.tier < 3) {
+                        return { error: 'Archive tier 3+ required for resonance. Use heaven.archive.open with tier 3.' };
+                    }
+                    const force = args && args.force ? args.force : false;
+                    const activatedSlots = gs.fateSlots.map((slot, i) => slot ? { ...slot, slotIndex: i } : null).filter(s => s !== null);
+                    if (activatedSlots.length < 2) {
+                        return { error: 'At least 2 fates must be activated for resonance' };
+                    }
+                    const fateTypes = activatedSlots.map(s => s.type);
+                    const RESONANCE_COMBOS = [
+                        { fates: ['phoenix', 'dragon'], name: '龙凤呈祥', effect: '攻击+30%, 暴击+20%' },
+                        { fates: ['phoenix', 'tortoise'], name: '玄武护魂', effect: 'HP+40%, 防御+25%' },
+                        { fates: ['dragon', 'grimlock'], name: '龙蛇混杂', effect: 'HP+25%, 攻击+20%' },
+                        { fates: ['celestial', 'shadow'], name: '天命背反', effect: '闪避+15%, 会心+15%' },
+                        { fates: ['phoenix', 'celestial'], name: '凤凰天降', effect: '灵力+35%, 攻击+15%' },
+                        { fates: ['tortoise', 'shadow'], name: '幽冥玄武', effect: 'HP+30%, 闪避+12%' }
+                    ];
+                    let resonanceCombo = null;
+                    for (const combo of RESONANCE_COMBOS) {
+                        const hasF1 = fateTypes.includes(combo.fates[0]);
+                        const hasF2 = fateTypes.includes(combo.fates[1]);
+                        if ((hasF1 && hasF2)) {
+                            resonanceCombo = combo;
+                            break;
+                        }
+                    }
+                    if (!resonanceCombo && !force) {
+                        return {
+                            error: 'No valid resonance combination found',
+                            activatedFates: fateTypes,
+                            possibleCombinations: RESONANCE_COMBOS.filter(c => {
+                                const hasF1 = fateTypes.includes(c.fates[0]);
+                                const hasF2 = fateTypes.includes(c.fates[1]);
+                                return hasF1 !== hasF2; // exactly one matches
+                            }).map(c => c.name)
+                        };
+                    }
+                    if (resonanceCombo) {
+                        const existingRes = gs.fateResonances.findIndex(r => r.combo === resonanceCombo.name);
+                        if (existingRes >= 0) {
+                            gs.fateResonances[existingRes].triggeredAt = Date.now();
+                            gs.fateResonances[existingRes].count++;
+                        } else {
+                            gs.fateResonances.push({
+                                combo: resonanceCombo.name,
+                                fates: resonanceCombo.fates,
+                                effect: resonanceCombo.effect,
+                                triggeredAt: Date.now(),
+                                count: 1
+                            });
+                        }
+                        return {
+                            success: true,
+                            message: `命格共鸣 [${resonanceCombo.name}] 激活！`,
+                            combo: resonanceCombo.name,
+                            effect: resonanceCombo.effect,
+                            participatingFates: resonanceCombo.fates
+                        };
+                    } else {
+                        return { error: 'Force resonance requires valid combination. Use force: false to see possibilities.' };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -14947,6 +15356,279 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v94Results = runV94Tests();
+
+        // ===== V103: 仙界天机阁+命格系统 Tests =====
+        function runV103Tests() {
+            const results = [];
+            function v103Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 2,
+                stage: 1,
+                heavenArchive: null,
+                fateSlots: [null, null, null],
+                activatedFates: [],
+                fateResonances: []
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: heaven.archive.open tier 1 costs 500
+            mockGameState.spiritStones = 10000;
+            const archive1 = server.mcpHeavenArchiveOpen({ tier: 1 });
+            v103Assert(archive1.success === true, 'heaven.archive.open tier 1 succeeds');
+            v103Assert(archive1.cost === 500, 'heaven.archive.open tier 1 costs 500');
+            v103Assert(archive1.tier === 1, 'heaven.archive.open returns tier 1');
+
+            // Test 2: heaven.archive.open tier 2 costs 1500
+            mockGameState.heavenArchive = { isOpen: false };
+            const archive2 = server.mcpHeavenArchiveOpen({ tier: 2 });
+            v103Assert(archive2.tier === 2, 'heaven.archive.open tier 2 returns tier 2');
+            v103Assert(archive2.cost === 1500, 'heaven.archive.open tier 2 costs 1500');
+
+            // Test 3: heaven.archive.open tier 3 costs 5000
+            mockGameState.heavenArchive = { isOpen: false };
+            const archive3 = server.mcpHeavenArchiveOpen({ tier: 3 });
+            v103Assert(archive3.tier === 3, 'heaven.archive.open tier 3 returns tier 3');
+            v103Assert(archive3.cost === 5000, 'heaven.archive.open tier 3 costs 5000');
+
+            // Test 4: heaven.archive.open fails without enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenArchive = { isOpen: false };
+            const archiveLow = server.mcpHeavenArchiveOpen({ tier: 1 });
+            v103Assert(archiveLow.error && archiveLow.error.includes('Not enough'), 'heaven.archive.open fails with low spirit stones');
+
+            // Test 5: fate.query returns all fates
+            mockGameState.spiritStones = 10000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            const queryAll = server.mcpFateQuery({});
+            v103Assert(queryAll.fateSlots && queryAll.fateSlots.length === 3, 'fate.query returns 3 slots');
+            v103Assert(queryAll.availableFates && queryAll.availableFates.length === 6, 'fate.query returns 6 fate types');
+
+            // Test 6: fate.query specific fate type
+            const queryPhoenix = server.mcpFateQuery({ fateType: 'phoenix' });
+            v103Assert(queryPhoenix.type === 'phoenix', 'fate.query phoenix returns phoenix type');
+            v103Assert(queryPhoenix.element === 'fire', 'fate.query phoenix has fire element');
+
+            // Test 7: fate.query unknown fate type returns error
+            const queryUnknown = server.mcpFateQuery({ fateType: 'unknown_fate' });
+            v103Assert(queryUnknown.error && queryUnknown.error.includes('Unknown'), 'fate.query unknown type returns error');
+
+            // Test 8: fate.activate requires archive tier 2+
+            mockGameState.heavenArchive = { isOpen: true, tier: 1 };
+            const activateTier1 = server.mcpFateActivate({ fateType: 'phoenix' });
+            v103Assert(activateTier1.error && activateTier1.error.includes('tier 2'), 'fate.activate requires tier 2');
+
+            // Test 9: fate.activate fails without enough spirit stones
+            mockGameState.spiritStones = 100;
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            mockGameState.fateSlots = [null, null, null];
+            const activateLow = server.mcpFateActivate({ fateType: 'phoenix' });
+            v103Assert(activateLow.error && activateLow.error.includes('Not enough'), 'fate.activate fails with low spirit stones');
+
+            // Test 10: fate.activate phoenix successfully
+            mockGameState.spiritStones = 10000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            mockGameState.fateSlots = [null, null, null];
+            const activatePhoenix = server.mcpFateActivate({ fateType: 'phoenix' });
+            v103Assert(activatePhoenix.success === true, 'fate.activate phoenix succeeds');
+            v103Assert(activatePhoenix.effect && activatePhoenix.effect.level === 1, 'fate.activate creates level 1 fate');
+            v103Assert(activatePhoenix.slot === 0, 'fate.activate uses first empty slot');
+
+            // Test 11: fate.activate cannot duplicate fate
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, null, null];
+            const activateDup = server.mcpFateActivate({ fateType: 'phoenix' });
+            v103Assert(activateDup.error && activateDup.error.includes('already activated'), 'fate.activate rejects duplicate');
+
+            // Test 12: fate.activate with specific slot
+            mockGameState.fateSlots = [null, null, null];
+            const activateSlot2 = server.mcpFateActivate({ fateType: 'dragon', slot: 2 });
+            v103Assert(activateSlot2.success === true, 'fate.activate with slot succeeds');
+            v103Assert(activateSlot2.slot === 2, 'fate.activate uses specified slot');
+
+            // Test 13: heaven.augur requires tier 3
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            const augurTier2 = server.mcpHeavenAugur({});
+            v103Assert(augurTier2.error && augurTier2.error.includes('tier 3'), 'heaven.augur requires tier 3');
+
+            // Test 14: heaven.augur low intensity costs 50
+            mockGameState.spiritStones = 1000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 3, auguryCount: 0 };
+            const augurLow = server.mcpHeavenAugur({ intensity: 'low' });
+            v103Assert(augurLow.success === true, 'heaven.augur low succeeds');
+            v103Assert(augurLow.cost === 50, 'heaven.augur low costs 50');
+
+            // Test 15: heaven.augur medium intensity costs 100
+            mockGameState.heavenArchive = { isOpen: true, tier: 3, auguryCount: 0 };
+            const augurMed = server.mcpHeavenAugur({ intensity: 'medium' });
+            v103Assert(augurMed.cost === 100, 'heaven.augur medium costs 100');
+
+            // Test 16: heaven.augur high intensity costs 200
+            mockGameState.heavenArchive = { isOpen: true, tier: 3, auguryCount: 0 };
+            const augurHigh = server.mcpHeavenAugur({ intensity: 'high' });
+            v103Assert(augurHigh.cost === 200, 'heaven.augur high costs 200');
+
+            // Test 17: heaven.augur returns hint
+            mockGameState.heavenArchive = { isOpen: true, tier: 3, auguryCount: 0 };
+            const augurHint = server.mcpHeavenAugur({});
+            v103Assert(augurHint.hint && augurHint.hint.length > 0, 'heaven.augur returns hint');
+
+            // Test 18: fate.upgrade requires slot
+            const upgradeNoSlot = server.mcpFateUpgrade({});
+            v103Assert(upgradeNoSlot.error && upgradeNoSlot.error.includes('slot'), 'fate.upgrade requires slot param');
+
+            // Test 19: fate.upgrade fails on empty slot
+            mockGameState.fateSlots = [null, null, null];
+            const upgradeEmpty = server.mcpFateUpgrade({ slot: 0 });
+            v103Assert(upgradeEmpty.error && upgradeEmpty.error.includes('No fate'), 'fate.upgrade fails on empty slot');
+
+            // Test 20: fate.upgrade succeeds
+            mockGameState.spiritStones = 10000;
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1, effect: {} }, null, null];
+            const upgrade1 = server.mcpFateUpgrade({ slot: 0 });
+            v103Assert(upgrade1.success === true, 'fate.upgrade succeeds');
+            v103Assert(upgrade1.newLevel === 2, 'fate.upgrade increases level to 2');
+            v103Assert(upgrade1.cost === 500, 'fate.upgrade level 1 costs 500');
+
+            // Test 21: fate.upgrade level 2 costs 1000
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 2, effect: {} }, null, null];
+            const upgrade2 = server.mcpFateUpgrade({ slot: 0 });
+            v103Assert(upgrade2.newLevel === 3, 'fate.upgrade increases level to 3');
+            v103Assert(upgrade2.cost === 1000, 'fate.upgrade level 2 costs 1000');
+
+            // Test 22: fate.upgrade max level returns error
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 5, effect: {} }, null, null];
+            const upgradeMax = server.mcpFateUpgrade({ slot: 0 });
+            v103Assert(upgradeMax.error && upgradeMax.error.includes('max level'), 'fate.upgrade max level error');
+
+            // Test 23: fate.resonance requires tier 3
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            const resTier2 = server.mcpFateResonance({});
+            v103Assert(resTier2.error && resTier2.error.includes('tier 3'), 'fate.resonance requires tier 3');
+
+            // Test 24: fate.resonance requires 2 fates
+            mockGameState.heavenArchive = { isOpen: true, tier: 3 };
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, null, null];
+            const resOne = server.mcpFateResonance({});
+            v103Assert(resOne.error && resOne.error.includes('2 fates'), 'fate.resonance requires 2 fates');
+
+            // Test 25: fate.resonance phoenix+dragon combo
+            mockGameState.heavenArchive = { isOpen: true, tier: 3 };
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, { type: 'dragon', level: 1 }, null];
+            mockGameState.fateResonances = [];
+            const resCombo = server.mcpFateResonance({});
+            v103Assert(resCombo.success === true, 'fate.resonance combo succeeds');
+            v103Assert(resCombo.combo === '龙凤呈祥', 'fate.resonance identifies dragon-phoenix combo');
+
+            // Test 26: fate.resonance celestial+shadow combo
+            mockGameState.fateSlots = [{ type: 'celestial', level: 1 }, { type: 'shadow', level: 1 }, null];
+            mockGameState.fateResonances = [];
+            const resCombo2 = server.mcpFateResonance({});
+            v103Assert(resCombo2.combo === '天命背反', 'fate.resonance celestial-shadow combo');
+
+            // Test 27: fate.resonance no valid combo returns error with possibilities
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, { type: 'celestial', level: 1 }, null];
+            mockGameState.fateResonances = [];
+            const resInvalid = server.mcpFateResonance({});
+            v103Assert(resInvalid.error && resInvalid.error.includes('No valid'), 'fate.resonance returns error for no combo');
+            v103Assert(resInvalid.possibleCombinations && resInvalid.possibleCombinations.length > 0, 'fate.resonance returns possible combos');
+
+            // Test 28: fate.query returns correct slot info
+            mockGameState.heavenArchive = { isOpen: true, tier: 3 };
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 2 }, null, null];
+            const querySlots = server.mcpFateQuery({});
+            v103Assert(querySlots.fateSlots[0] && querySlots.fateSlots[0].level === 2, 'fate.query returns correct level');
+            v103Assert(querySlots.fateSlots[1] === null, 'fate.query returns null for empty slot');
+            v103Assert(querySlots.fateSlots[2] === null, 'fate.query returns null for empty slot 2');
+
+            // Test 29: _getFateConfig returns correct config
+            const phoenixConfig = server._getFateConfig('phoenix');
+            v103Assert(phoenixConfig && phoenixConfig.name === '凤凰命', '_getFateConfig returns phoenix name');
+            v103Assert(phoenixConfig.resonanceWith.includes('dragon'), '_getFateConfig phoenix resonates with dragon');
+
+            // Test 30: _getFateEffect scales with level
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, null, null];
+            const effect1 = server._getFateEffect('phoenix', 1);
+            const effect2 = server._getFateEffect('phoenix', 2);
+            v103Assert(effect2.bonus.attack > effect1.bonus.attack, '_getFateEffect scales attack with level');
+
+            // Test 31: heaven.archive.open tier clamped to 1-3
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenArchive = { isOpen: false };
+            const archiveT4 = server.mcpHeavenArchiveOpen({ tier: 4 });
+            v103Assert(archiveT4.tier === 3, 'heaven.archive.open clamps tier to 3');
+            const archiveT0 = server.mcpHeavenArchiveOpen({ tier: 0 });
+            v103Assert(archiveT0.tier === 1, 'heaven.archive.open clamps tier to 1 for 0');
+
+            // Test 32: fate.activate with auto slot selection
+            mockGameState.spiritStones = 10000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            mockGameState.fateSlots = [null, null, null];
+            const autoSlot = server.mcpFateActivate({ fateType: 'tortoise' });
+            v103Assert(autoSlot.slot === 0, 'fate.activate auto-selects first empty slot');
+
+            // Test 33: fate.activate fills second slot if first occupied
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, null, null];
+            const secondSlot = server.mcpFateActivate({ fateType: 'dragon' });
+            v103Assert(secondSlot.slot === 1, 'fate.activate fills second slot');
+
+            // Test 34: fate.upgrade insufficient funds
+            mockGameState.spiritStones = 100;
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, null, null];
+            const upgradePoor = server.mcpFateUpgrade({ slot: 0 });
+            v103Assert(upgradePoor.error && upgradePoor.error.includes('Not enough'), 'fate.upgrade fails with insufficient funds');
+
+            // Test 35: fate.resonance records in history
+            mockGameState.heavenArchive = { isOpen: true, tier: 3 };
+            mockGameState.fateSlots = [{ type: 'phoenix', level: 1 }, { type: 'dragon', level: 1 }, null];
+            mockGameState.fateResonances = [];
+            server.mcpFateResonance({});
+            v103Assert(mockGameState.fateResonances.length === 1, 'fate.resonance records resonance');
+
+            // Test 36: fate.resonance increments existing combo count
+            mockGameState.fateResonances = [{ combo: '龙凤呈祥', fates: ['phoenix', 'dragon'], count: 1, triggeredAt: Date.now() }];
+            server.mcpFateResonance({});
+            v103Assert(mockGameState.fateResonances[0].count === 2, 'fate.resonance increments combo count');
+
+            // Test 37: heaven.augur increments counter
+            mockGameState.spiritStones = 1000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 3, auguryCount: 5 };
+            server.mcpHeavenAugur({});
+            v103Assert(mockGameState.heavenArchive.auguryCount === 6, 'heaven.augur increments auguryCount');
+
+            // Test 38: fate query all returns archive status
+            mockGameState.heavenArchive = { isOpen: true, tier: 2 };
+            const queryArchive = server.mcpFateQuery({});
+            v103Assert(queryArchive.archiveOpen === true, 'fate.query returns archiveOpen');
+            v103Assert(queryArchive.archiveTier === 2, 'fate.query returns archiveTier');
+
+            // Test 39: fate.activate all 3 slots
+            mockGameState.spiritStones = 100000;
+            mockGameState.heavenArchive = { isOpen: true, tier: 3 };
+            mockGameState.fateSlots = [null, null, null];
+            server.mcpFateActivate({ fateType: 'phoenix' });
+            server.mcpFateActivate({ fateType: 'dragon' });
+            server.mcpFateActivate({ fateType: 'tortoise' });
+            v103Assert(mockGameState.fateSlots.every(s => s !== null), 'fate.activate fills all 3 slots');
+
+            // Test 40: fate.activate no slots left
+            const noSlotsLeft = server.mcpFateActivate({ fateType: 'celestial' });
+            v103Assert(noSlotsLeft.error && noSlotsLeft.error.includes('No empty'), 'fate.activate fails when all slots full');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V103', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V103 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v103Results = runV103Tests();
 
         // ===== V71 Direction B: Heavenly Dao Laws System =====
         // Based on generic-agent state machine + nanobot ecological design
