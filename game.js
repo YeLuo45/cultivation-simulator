@@ -4328,6 +4328,78 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_V102: 天命轮回增强+仙界仲裁庭系统 ---
+        const MCP_TOOLS_V102 = {
+            'destiny.trail': {
+                name: 'destiny.trail',
+                description: 'Query character destiny trail across past lives (天命轮回-查询命运轨迹)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        detail: { type: 'boolean', description: 'Include detailed karmic records', default: false }
+                    }
+                }
+            },
+            'reincarnation.mark': {
+                name: 'reincarnation.mark',
+                description: 'Record karma imprint for current life affecting talents (天命轮回-记录轮回印记)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: 'Karma type: good|neutral|bad', enum: ['good', 'neutral', 'bad'] },
+                        cause: { type: 'string', description: 'Cause description' },
+                        effect: { type: 'string', description: 'Effect on talent' }
+                    },
+                    required: ['type', 'cause']
+                }
+            },
+            'karma.settle': {
+                name: 'karma.settle',
+                description: 'Settle current life karma upon ascension, convert to next life talents (天命轮回-因果结算)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        preview: { type: 'boolean', description: 'Preview settlement without committing', default: false }
+                    }
+                }
+            },
+            'court.open': {
+                name: 'court.open',
+                description: 'Open celestial arbitration court for cross-server disputes (仙界仲裁庭-开启仲裁庭)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        courtType: { type: 'string', description: 'Court type: karmic|territorial|trade|alliance', default: 'karmic' }
+                    }
+                }
+            },
+            'court.appeal': {
+                name: 'court.appeal',
+                description: 'Submit arbitration appeal, costs spirit stones (仙界仲裁庭-提交仲裁申请)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        defendantId: { type: 'string', description: 'Defendant player ID' },
+                        reason: { type: 'string', description: 'Appeal reason' },
+                        evidence: { type: 'array', description: 'Evidence items', items: { type: 'string' } }
+                    },
+                    required: ['defendantId', 'reason']
+                }
+            },
+            'court.judge': {
+                name: 'court.judge',
+                description: 'Court judges based on evidence and karma (仙界仲裁庭-仲裁裁决)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        caseId: { type: 'string', description: 'Case ID to judge' },
+                        verdict: { type: 'string', description: 'Verdict: plaintiff|defendant|dismiss', enum: ['plaintiff', 'defendant', 'dismiss'] }
+                    },
+                    required: ['caseId', 'verdict']
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -4439,6 +4511,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V101: Register 仙盟系统 仙盟创建+领地争夺 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V101)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V102: Register 天命轮回增强+仙界仲裁庭系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V102)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -5043,6 +5119,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'alliance.members.list':
                             result = this.mcpAllianceMembersList(args);
+                            break;
+                        // V102: 天命轮回增强+仙界仲裁庭系统
+                        case 'destiny.trail':
+                            result = this.mcpDestinyTrail(args);
+                            break;
+                        case 'reincarnation.mark':
+                            result = this.mcpReincarnationMark(args);
+                            break;
+                        case 'karma.settle':
+                            result = this.mcpKarmaSettle(args);
+                            break;
+                        case 'court.open':
+                            result = this.mcpCourtOpen(args);
+                            break;
+                        case 'court.appeal':
+                            result = this.mcpCourtAppeal(args);
+                            break;
+                        case 'court.judge':
+                            result = this.mcpCourtJudge(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -9909,6 +10004,278 @@ const ACHIEVEMENT_ID_MAP = {
                         }))
                     };
                     return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V102: 天命轮回增强+仙界仲裁庭系统
+            _initDestinyState() {
+                const gs = window.gameState;
+                if (!gs.destinyTrail) {
+                    gs.destinyTrail = [];
+                }
+                if (!gs.reincarnationMarks) {
+                    gs.reincarnationMarks = [];
+                }
+                if (!gs.karmaBalance) {
+                    gs.karmaBalance = 0;
+                }
+                if (!gs.pastLives) {
+                    gs.pastLives = [];
+                }
+                return gs;
+            }
+
+            _initCourtState() {
+                const gs = window.gameState;
+                if (!gs.celestialCourt) {
+                    gs.celestialCourt = {
+                        isOpen: false,
+                        cases: [],
+                        judges: [],
+                        rulings: [],
+                        treasury: 0
+                    };
+                }
+                return gs.celestialCourt;
+            }
+
+            mcpDestinyTrail(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initDestinyState();
+                    const { lifeIndex, includePastLives = false } = args;
+                    if (lifeIndex !== undefined) {
+                        const trail = gs.destinyTrail;
+                        if (lifeIndex < 0 || lifeIndex >= trail.length) {
+                            return { error: `lifeIndex ${lifeIndex} out of range (0-${trail.length - 1})` };
+                        }
+                        return { lifeIndex, record: trail[lifeIndex] };
+                    }
+                    const result = {
+                        currentKarma: gs.karmaBalance,
+                        totalLives: gs.destinyTrail.length,
+                        currentLifeIndex: gs.destinyTrail.length - 1,
+                        trail: gs.destinyTrail
+                    };
+                    if (includePastLives) {
+                        result.pastLives = gs.pastLives || [];
+                    }
+                    return result;
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpReincarnationMark(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initDestinyState();
+                    const { markType, intensity = 1, description } = args;
+                    if (!markType) return { error: 'markType is required' };
+                    const VALID_TYPES = ['virtue', 'sin', 'wisdom', 'strength', 'agility', 'spirit', 'luck'];
+                    if (!VALID_TYPES.includes(markType)) {
+                        return { error: `markType must be one of: ${VALID_TYPES.join(', ')}` };
+                    }
+                    const mark = {
+                        id: 'mark_' + Date.now(),
+                        type: markType,
+                        intensity: Math.max(1, Math.min(10, intensity)),
+                        description: description || `${markType}印记`,
+                        acquiredAt: Date.now(),
+                        effects: this._calculateMarkEffect(markType, intensity)
+                    };
+                    gs.reincarnationMarks.push(mark);
+                    // Update karma based on mark
+                    if (markType === 'virtue' || markType === 'wisdom') {
+                        gs.karmaBalance += intensity * 10;
+                    } else if (markType === 'sin') {
+                        gs.karmaBalance -= intensity * 10;
+                    }
+                    return {
+                        success: true,
+                        mark,
+                        karmaBalance: gs.karmaBalance,
+                        totalMarks: gs.reincarnationMarks.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            _calculateMarkEffect(markType, intensity) {
+                const effects = {
+                    virtue: { talentBonus: intensity * 5, reputationBonus: intensity * 10 },
+                    sin: { talentBonus: -intensity * 3, reputationBonus: -intensity * 5 },
+                    wisdom: { cultivationSpeedBonus: intensity * 8, comprehensionBonus: intensity * 5 },
+                    strength: { attackBonus: intensity * 12, defenseBonus: intensity * 3 },
+                    agility: { speedBonus: intensity * 10, dodgeBonus: intensity * 5 },
+                    spirit: { qiBonus: intensity * 15, maxStaminaBonus: intensity * 8 },
+                    luck: { dropRateBonus: intensity * 6, critBonus: intensity * 4 }
+                };
+                return effects[markType] || {};
+            }
+
+            mcpKarmaSettle(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    this._initDestinyState();
+                    const { lifeSpan, moralChoices, achievements } = args;
+                    const karmaStart = gs.karmaBalance || 0;
+                    // Simulate karma calculation
+                    let karmaChange = 0;
+                    const moralScore = moralChoices ? moralChoices.reduce((a, b) => a + b, 0) : 0;
+                    karmaChange += moralScore;
+                    // Record this life in trail
+                    const lifeRecord = {
+                        lifeIndex: gs.destinyTrail.length,
+                        karmaStart,
+                        karmaEnd: karmaStart + karmaChange,
+                        karmaChange,
+                        lifespan: lifeSpan || 100,
+                        moralChoices: moralChoices || [],
+                        achievements: achievements || [],
+                        timestamp: Date.now()
+                    };
+                    gs.destinyTrail.push(lifeRecord);
+                    // Save to past lives
+                    gs.pastLives.push({
+                        ...lifeRecord,
+                        reincarnationBonus: this._calculateReincarnationBonus(karmaStart + karmaChange)
+                    });
+                    // Calculate next life天赋
+                    const nextLifeTalent = this._calculateReincarnationBonus(karmaStart + karmaChange);
+                    gs.karmaBalance = Math.max(-1000, Math.min(1000, karmaStart + karmaChange));
+                    return {
+                        success: true,
+                        settlement: {
+                            thisLife: lifeRecord,
+                            karmaBalance: gs.karmaBalance,
+                            nextLifeTalent
+                        }
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            _calculateReincarnationBonus(karma) {
+                const base = 100;
+                const bonus = Math.floor(karma / 10);
+                return {
+                    talentBase: Math.max(10, base + bonus),
+                    aptitudeBonus: karma > 0 ? Math.min(50, karma / 5) : 0,
+                    luckBonus: karma > 500 ? 20 : 0,
+                    reincarnationCount: (window.gameState.pastLives || []).length
+                };
+            }
+
+            mcpCourtOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const court = this._initCourtState();
+                    if (court.isOpen) {
+                        return { error: 'Court is already in session', sessionId: court.sessionId };
+                    }
+                    const { sessionName, judgeCount = 3 } = args;
+                    court.isOpen = true;
+                    court.sessionId = 'court_' + Date.now();
+                    court.sessionName = sessionName || '天庭仲裁庭';
+                    court.judgeCount = judgeCount;
+                    court.cases = [];
+                    court.rulings = [];
+                    court.treasury = court.treasury || 0;
+                    court.openedAt = Date.now();
+                    return {
+                        success: true,
+                        sessionId: court.sessionId,
+                        sessionName: court.sessionName,
+                        judgeCount: court.judgeCount,
+                        message: `Celestial Court "${court.sessionName}" is now in session`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpCourtAppeal(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const court = this._initCourtState();
+                    if (!court.isOpen) {
+                        return { error: 'Court is not in session. Use court.open first.' };
+                    }
+                    const { plaintiff, defendant, caseType, description, evidence, spiritStoneCost = 500 } = args;
+                    if (!plaintiff || !defendant) {
+                        return { error: 'plaintiff and defendant are required' };
+                    }
+                    if (gs.spiritStones < spiritStoneCost) {
+                        return { error: `Insufficient spirit stones. Need ${spiritStoneCost}, have ${gs.spiritStones}` };
+                    }
+                    gs.spiritStones -= spiritStoneCost;
+                    court.treasury += spiritStoneCost;
+                    const caseId = 'case_' + Date.now();
+                    const newCase = {
+                        id: caseId,
+                        plaintiff,
+                        defendant,
+                        caseType: caseType || 'dispute',
+                        description: description || 'No description provided',
+                        evidence: evidence || [],
+                        spiritStoneCost,
+                        status: 'pending',
+                        filedAt: Date.now()
+                    };
+                    court.cases.push(newCase);
+                    return {
+                        success: true,
+                        caseId,
+                        case: newCase,
+                        remainingSpiritStones: gs.spiritStones,
+                        treasury: court.treasury
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpCourtJudge(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const court = this._initCourtState();
+                    if (!court.isOpen) {
+                        return { error: 'Court is not in session' };
+                    }
+                    const { caseId, verdict, reasoning, punishment, reward } = args;
+                    if (!caseId) return { error: 'caseId is required' };
+                    const caseIndex = court.cases.findIndex(c => c.id === caseId);
+                    if (caseIndex === -1) return { error: 'Case not found: ' + caseId };
+                    const caseInfo = court.cases[caseIndex];
+                    if (caseInfo.status === 'ruled') {
+                        return { error: 'Case already ruled' };
+                    }
+                    if (!verdict || !reasoning) {
+                        return { error: 'verdict and reasoning are required' };
+                    }
+                    const ruling = {
+                        id: 'ruling_' + Date.now(),
+                        caseId,
+                        verdict, // 'plaintiff_wins' | 'defendant_wins' | 'dismissed' | 'compromise'
+                        reasoning,
+                        punishment: punishment || null,
+                        reward: reward || null,
+                        judgedAt: Date.now()
+                    };
+                    court.rulings.push(ruling);
+                    caseInfo.status = 'ruled';
+                    caseInfo.verdict = verdict;
+                    caseInfo.rulingId = ruling.id;
+                    // Apply karma rewards/penalties
+                    const karmaChange = verdict === 'plaintiff_wins' ? 50 : verdict === 'defendant_wins' ? -30 : 0;
+                    if (karmaChange !== 0) {
+                        gs.karmaBalance = Math.max(-1000, Math.min(1000, (gs.karmaBalance || 0) + karmaChange));
+                    }
+                    return {
+                        success: true,
+                        ruling,
+                        case: caseInfo,
+                        karmaBalance: gs.karmaBalance
+                    };
                 } catch (e) { return { error: e.message }; }
             }
 
