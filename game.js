@@ -2881,6 +2881,69 @@
             }
         };
 
+        // --- MCP_TOOLS_V109: 仙界试炼+飞升系统 ---
+        const MCP_TOOLS_V109 = {
+            'trial.open': {
+                name: 'trial.open',
+                description: '开启仙界试炼 (仙界试炼系统-开启试炼)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        trialType: { type: 'string', description: '试炼类型 (primary/advanced/supreme)', default: 'primary' }
+                    }
+                }
+            },
+            'trial.challenge': {
+                name: 'trial.challenge',
+                description: '挑战试炼关卡 (仙界试炼系统-挑战关卡)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        level: { type: 'integer', description: '关卡等级 (1-10)', default: 1 }
+                    }
+                }
+            },
+            'trial.reward': {
+                name: 'trial.reward',
+                description: '领取试炼奖励 (仙界试炼系统-领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        level: { type: 'integer', description: '关卡等级 (1-10)' }
+                    },
+                    required: ['level']
+                }
+            },
+            'ascend.condition': {
+                name: 'ascend.condition',
+                description: '查询飞升条件 (飞升系统-查询条件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'ascend.apply': {
+                name: 'ascend.apply',
+                description: '申请飞升 (飞升系统-申请飞升)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        force: { type: 'boolean', description: '强制飞升 (无视部分条件)', default: false }
+                    }
+                }
+            },
+            'ascend.channel': {
+                name: 'ascend.channel',
+                description: '开启飞升通道 (飞升系统-开启通道)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        confirm: { type: 'boolean', description: '确认开启通道', default: false }
+                    }
+                }
+            }
+        };
+
         // --- MCP Request/Response types ---
         const MCP_REQUEST_TYPES = {
             TOOL_CALL: 'tool_call',
@@ -3020,6 +3083,10 @@
                 }
                 // V108: Register 仙界遗迹+混沌法则系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V108)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V109: Register 仙界试炼+飞升系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V109)) {
                     this.toolRegistry.set(name, tool);
                 }
             }
@@ -3757,6 +3824,25 @@
                             break;
                         case 'chaos.law.decompose':
                             result = this.mcpChaosLawDecompose(args);
+                            break;
+                        // V109: 仙界试炼+飞升系统
+                        case 'trial.open':
+                            result = this.mcpTrialOpen(args);
+                            break;
+                        case 'trial.challenge':
+                            result = this.mcpTrialChallenge(args);
+                            break;
+                        case 'trial.reward':
+                            result = this.mcpTrialReward(args);
+                            break;
+                        case 'ascend.condition':
+                            result = this.mcpAscendCondition(args);
+                            break;
+                        case 'ascend.apply':
+                            result = this.mcpAscendApply(args);
+                            break;
+                        case 'ascend.channel':
+                            result = this.mcpAscendChannel(args);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -10187,6 +10273,360 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V108: 仙界遗迹+混沌法则系统 Methods
+            _initRuinsState() {
+                const gs = window.gameState;
+                if (!gs.ruins) {
+                    gs.ruins = {
+                        explored: [],
+                        pendingRewards: {},
+                        stamina: gs.stamina || 100
+                    };
+                }
+                return gs.ruins;
+            }
+
+            _initChaosLawState() {
+                const gs = window.gameState;
+                if (!gs.chaosLaw) {
+                    gs.chaosLaw = {
+                        laws: [],
+                        resonances: []
+                    };
+                }
+                return gs.chaosLaw;
+            }
+
+            mcpRuinsExplore(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const ruins = this._initRuinsState();
+                    const staminaCost = 20;
+                    if ((gs.stamina || 0) < staminaCost) {
+                        return { error: '体力不足，需要 ' + staminaCost + ' 点体力' };
+                    }
+                    gs.stamina = Math.max(0, (gs.stamina || 0) - staminaCost);
+                    const presetRuins = ['ancient_palace', 'celestial_tomb', 'fairy_cave', 'spirit_mountain', 'dragon_palace'];
+                    const ruinsId = args.ruinsId || presetRuins[Math.floor(Math.random() * presetRuins.length)];
+                    const itemsFound = [];
+                    const randomItems = ['Spirit Stone x50', 'Ancient Manuscript', 'Immortal Essence', 'Celestial Dust'];
+                    if (Math.random() > 0.5) {
+                        itemsFound.push(randomItems[Math.floor(Math.random() * randomItems.length)]);
+                    }
+                    if (!ruins.explored.includes(ruinsId)) {
+                        ruins.explored.push(ruinsId);
+                    }
+                    return {
+                        success: true,
+                        ruinsId,
+                        staminaCost,
+                        remainingStamina: gs.stamina,
+                        itemsFound,
+                        message: '探索 ' + ruinsId + ' 消耗 ' + staminaCost + ' 体力'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpRuinsBattle(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!args.ruinsId) return { error: 'ruinsId is required' };
+                    const ruins = this._initRuinsState();
+                    if (!ruins.explored.includes(args.ruinsId)) {
+                        return { error: '尚未探索此遗迹，请先探索' };
+                    }
+                    const guardianPower = 10000 + Math.floor(Math.random() * 50000);
+                    const playerPower = gs.combatPower || 10000;
+                    const victory = playerPower >= guardianPower * 0.7;
+                    const rewards = victory ? {
+                        spiritStones: Math.floor(guardianPower * 0.1),
+                        items: ['Guardian Essence', 'Ancient Relic']
+                    } : { spiritStones: 0, items: [] };
+                    ruins.pendingRewards[args.ruinsId] = rewards;
+                    return {
+                        success: true,
+                        ruinsId: args.ruinsId,
+                        victory,
+                        guardianPower,
+                        rewards
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpRuinsReward(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!args.ruinsId) return { error: 'ruinsId is required' };
+                    const ruins = this._initRuinsState();
+                    const reward = ruins.pendingRewards[args.ruinsId];
+                    if (!reward) return { error: '没有可领取的奖励' };
+                    const claimed = ruins.pendingRewards[args.ruinsId];
+                    delete ruins.pendingRewards[args.ruinsId];
+                    if (claimed.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + claimed.spiritStones;
+                    }
+                    return {
+                        success: true,
+                        ruinsId: args.ruinsId,
+                        spiritStones: claimed.spiritStones || 0,
+                        items: claimed.items || []
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpChaosLawUnderstand(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const lawTypes = ['time', 'space', 'fate', 'karma', 'creation', 'destruction'];
+                    const lawType = args.lawType || lawTypes[Math.floor(Math.random() * lawTypes.length)];
+                    if (!lawTypes.includes(lawType)) {
+                        return { error: 'Unknown law type: ' + lawType };
+                    }
+                    const cost = 5000;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: 'Not enough spirit stones, need ' + cost };
+                    }
+                    gs.spiritStones -= cost;
+                    const chaosLaw = this._initChaosLawState();
+                    const lawId = 'law_' + Date.now();
+                    const law = {
+                        id: lawId,
+                        type: lawType,
+                        level: 1,
+                        understoodAt: Date.now()
+                    };
+                    chaosLaw.laws.push(law);
+                    return {
+                        success: true,
+                        lawId,
+                        lawType,
+                        level: 1,
+                        cost
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpChaosLawResonance(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!args.lawIds || args.lawIds.length < 2) {
+                        return { error: 'Need at least 2 law IDs for resonance' };
+                    }
+                    const chaosLaw = this._initChaosLawState();
+                    const laws = chaosLaw.laws.filter(l => args.lawIds.includes(l.id));
+                    if (laws.length < 2) {
+                        return { error: 'Not enough valid laws found' };
+                    }
+                    const types = laws.map(l => l.type).sort();
+                    const combos = {
+                        'time,space': { name: '时空主宰', bonus: 50 },
+                        'fate,karma': { name: '命运轮回', bonus: 50 },
+                        'creation,destruction': { name: '创灭合一', bonus: 60 },
+                        'time,fate': { name: '时空命运', bonus: 40 },
+                        'space,karma': { name: '空间因果', bonus: 40 }
+                    };
+                    const comboKey = types.join(',');
+                    const combo = combos[comboKey] || { name: '法则共鸣', bonus: 20 };
+                    chaosLaw.resonances.push({ lawIds: args.lawIds, combo: combo.name, bonus: combo.bonus, at: Date.now() });
+                    return {
+                        success: true,
+                        combo: combo.name,
+                        bonus: combo.bonus,
+                        laws: types
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpChaosLawDecompose(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!args.lawId) return { error: 'lawId is required' };
+                    const chaosLaw = this._initChaosLawState();
+                    const index = chaosLaw.laws.findIndex(l => l.id === args.lawId);
+                    if (index === -1) return { error: 'Law not found: ' + args.lawId };
+                    const law = chaosLaw.laws[index];
+                    const recovered = Math.floor(500 * law.level);
+                    chaosLaw.laws.splice(index, 1);
+                    gs.spiritStones = (gs.spiritStones || 0) + recovered;
+                    return {
+                        success: true,
+                        lawId: args.lawId,
+                        lawType: law.type,
+                        recovered
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V109: 仙界试炼+飞升系统 Methods
+            _initTrialState() {
+                const gs = window.gameState;
+                if (!gs.trial) {
+                    gs.trial = {
+                        isOpen: false,
+                        trialType: null,
+                        clearedLevels: [],
+                        currentLevel: 0
+                    };
+                }
+                return gs.trial;
+            }
+
+            _initAscendState() {
+                const gs = window.gameState;
+                if (!gs.ascend) {
+                    gs.ascend = {
+                        pending: false,
+                        activated: false,
+                        ascendedAt: null
+                    };
+                }
+                return gs.ascend;
+            }
+
+            mcpTrialOpen(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if ((gs.realm || 0) < 4) {
+                        return { error: '需要境界达到化神期 (realm >= 4) 才能开启试炼' };
+                    }
+                    const trial = this._initTrialState();
+                    const trialType = args.trialType || 'primary';
+                    trial.isOpen = true;
+                    trial.trialType = trialType;
+                    return {
+                        success: true,
+                        isOpen: true,
+                        trialType,
+                        message: '仙界试炼已开启'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpTrialChallenge(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const trial = this._initTrialState();
+                    if (!trial.isOpen) {
+                        return { error: '试炼未开启，请先调用 trial.open' };
+                    }
+                    const level = args.level || 1;
+                    if (level < 1 || level > 10) {
+                        return { error: '关卡等级必须在 1-10 之间' };
+                    }
+                    const guardianPower = level * 50000 + Math.floor(Math.random() * level * 10000);
+                    const playerPower = gs.combatPower || 50000;
+                    const victory = playerPower >= guardianPower * 0.6;
+                    if (victory && !trial.clearedLevels.includes(level)) {
+                        trial.clearedLevels.push(level);
+                    }
+                    trial.currentLevel = level;
+                    return {
+                        success: true,
+                        level,
+                        victory,
+                        guardianPower,
+                        playerPower,
+                        levelCleared: victory
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpTrialReward(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const level = args.level || 1;
+                    const trial = this._initTrialState();
+                    if (!trial.clearedLevels.includes(level)) {
+                        return { error: '关卡 ' + level + ' 尚未通关，无法领取奖励' };
+                    }
+                    const spiritStones = level * 5000 + Math.floor(Math.random() * level * 1000);
+                    const reputation = level * 100;
+                    gs.spiritStones = (gs.spiritStones || 0) + spiritStones;
+                    if (!gs.trialRewards) gs.trialRewards = {};
+                    gs.trialRewards[level] = { claimed: true, claimedAt: Date.now() };
+                    return {
+                        success: true,
+                        level,
+                        spiritStones,
+                        reputation,
+                        message: '领取关卡 ' + level + ' 奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAscendCondition(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmReq = 8;
+                    const stoneReq = 50000;
+                    const canAscend = (gs.realm || 0) >= realmReq && (gs.spiritStones || 0) >= stoneReq;
+                    return {
+                        canAscend,
+                        requirements: {
+                            realm: { current: gs.realm || 0, required: realmReq },
+                            spiritStones: { current: gs.spiritStones || 0, required: stoneReq }
+                        },
+                        message: canAscend ? '满足飞升条件' : '不满足飞升条件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAscendApply(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const ascend = this._initAscendState();
+                    if (ascend.pending) {
+                        return { success: true, pending: true, message: '飞升申请已提交，请调用 ascend.channel' };
+                    }
+                    ascend.pending = true;
+                    return {
+                        success: true,
+                        pending: true,
+                        message: '飞升申请已提交，等待激活'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            mcpAscendChannel(args) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const ascend = this._initAscendState();
+                    if (!ascend.pending) {
+                        return { error: '请先调用 ascend.apply 提交申请' };
+                    }
+                    const realmReq = 8;
+                    const stoneReq = 50000;
+                    if ((gs.realm || 0) < realmReq) {
+                        return { error: '境界不足，无法飞升' };
+                    }
+                    if ((gs.spiritStones || 0) < stoneReq) {
+                        return { error: '灵力不足，无法飞升' };
+                    }
+                    gs.spiritStones -= stoneReq;
+                    ascend.pending = false;
+                    ascend.activated = true;
+                    ascend.ascendedAt = Date.now();
+                    return {
+                        success: true,
+                        activated: true,
+                        ascendedAt: ascend.ascendedAt,
+                        message: '飞升成功!'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             _getPlayerAlliance(alliances) {
                 const playerId = typeof window !== 'undefined' && window.gameState ? (window.gameState.playerId || 'player_1') : 'player_1';
                 return alliances.list.find(a => a.members && a.members.some(m => m.id === playerId)) || null;
@@ -15763,6 +16203,575 @@
             return summary;
         }
         const v107Results = runV107Tests();
+
+        // ===== V108: 仙界遗迹+混沌法则系统 Tests =====
+        function runV108Tests() {
+            const results = [];
+            function v108Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                stamina: 100,
+                realm: 5,
+                stage: 2,
+                combatPower: 80000,
+                ruins: null,
+                chaosLaw: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: ruins.explore costs stamina and returns success
+            mockGameState.stamina = 100;
+            mockGameState.ruins = null;
+            const explore1 = server.mcpRuinsExplore({});
+            v108Assert(explore1.success === true, 'ruins.explore succeeds');
+            v108Assert(explore1.staminaCost === 20, 'ruins.explore costs 20 stamina');
+            v108Assert(explore1.remainingStamina === 80, 'ruins.explore remaining stamina is 80');
+
+            // Test 2: ruins.explore with specific ruinsId
+            mockGameState.stamina = 100;
+            const explore2 = server.mcpRuinsExplore({ ruinsId: 'ancient_palace' });
+            v108Assert(explore2.success === true, 'ruins.explore with ruinsId succeeds');
+            v108Assert(explore2.ruinsId === 'ancient_palace', 'ruins.explore returns correct ruinsId');
+
+            // Test 3: ruins.explore fails with low stamina
+            mockGameState.stamina = 10;
+            const exploreLow = server.mcpRuinsExplore({});
+            v108Assert(exploreLow.error && exploreLow.error.includes('体力不足'), 'ruins.explore fails with low stamina');
+
+            // Test 4: ruins.explore random ruins selection
+            mockGameState.stamina = 100;
+            const exploreRandom = server.mcpRuinsExplore({});
+            v108Assert(exploreRandom.ruinsId, 'ruins.explore selects random ruins when none specified');
+
+            // Test 5: ruins.battle requires explore first
+            mockGameState.ruins = { explored: [], pendingRewards: {} };
+            const battle5 = server.mcpRuinsBattle({ ruinsId: 'ancient_palace' });
+            v108Assert(battle5.error && battle5.error.includes('尚未探索'), 'ruins.battle fails without explore');
+
+            // Test 6: ruins.battle succeeds after explore
+            mockGameState.ruins = { explored: ['ancient_palace'], pendingRewards: {} };
+            const battle6 = server.mcpRuinsBattle({ ruinsId: 'ancient_palace' });
+            v108Assert(battle6.success === true, 'ruins.battle succeeds after explore');
+            v108Assert(typeof battle6.victory === 'boolean', 'ruins.battle returns victory boolean');
+            v108Assert(battle6.rewards, 'ruins.battle returns rewards');
+
+            // Test 7: ruins.battle stores pending reward
+            mockGameState.ruins = { explored: ['ancient_palace'], pendingRewards: {} };
+            const battle7 = server.mcpRuinsBattle({ ruinsId: 'ancient_palace' });
+            v108Assert(mockGameState.ruins.pendingRewards['ancient_palace'], 'ruins.battle stores pending reward');
+
+            // Test 8: ruins.reward without battle returns error
+            mockGameState.ruins = { explored: ['ancient_palace'], pendingRewards: {} };
+            const reward8 = server.mcpRuinsReward({ ruinsId: 'ancient_palace' });
+            v108Assert(reward8.error && reward8.error.includes('没有可领取'), 'ruins.reward fails without battle');
+
+            // Test 9: ruins.reward succeeds and clears pending reward
+            mockGameState.ruins = {
+                explored: ['ancient_palace'],
+                pendingRewards: { 'ancient_palace': { spiritStones: 1000, items: ['item1'] } }
+            };
+            const reward9 = server.mcpRuinsReward({ ruinsId: 'ancient_palace' });
+            v108Assert(reward9.success === true, 'ruins.reward succeeds');
+            v108Assert(reward9.spiritStones === 1000, 'ruins.reward returns spirit stones');
+
+            // Test 10: chaos.law.understand costs spirit stones
+            mockGameState.spiritStones = 100000;
+            mockGameState.chaosLaw = null;
+            const understand10 = server.mcpChaosLawUnderstand({ lawType: 'time' });
+            v108Assert(understand10.success === true, 'chaos.law.understand succeeds');
+            v108Assert(understand10.lawType === 'time', 'chaos.law.understand returns correct type');
+            v108Assert(understand10.cost === 5000, 'chaos.law.understand costs 5000');
+
+            // Test 11: chaos.law.understand fails with low spirit stones
+            mockGameState.spiritStones = 1000;
+            const understand11 = server.mcpChaosLawUnderstand({ lawType: 'time' });
+            v108Assert(understand11.error && understand11.error.includes('Not enough'), 'chaos.law.understand fails with low stones');
+
+            // Test 12: chaos.law.understand with random type
+            mockGameState.spiritStones = 100000;
+            mockGameState.chaosLaw = null;
+            const understand12 = server.mcpChaosLawUnderstand({});
+            v108Assert(understand12.success === true, 'chaos.law.understand with random type succeeds');
+
+            // Test 13: chaos.law.understand rejects unknown type
+            mockGameState.spiritStones = 100000;
+            const understand13 = server.mcpChaosLawUnderstand({ lawType: 'unknown' });
+            v108Assert(understand13.error && understand13.error.includes('Unknown'), 'chaos.law.understand rejects unknown type');
+
+            // Test 14: chaos.law.resonance requires 2+ laws
+            mockGameState.chaosLaw = { laws: [], resonances: [] };
+            const resonance14 = server.mcpChaosLawResonance({ lawIds: ['law_1'] });
+            v108Assert(resonance14.error && resonance14.error.includes('at least 2'), 'chaos.law.resonance requires 2+ laws');
+
+            // Test 15: chaos.law.resonance finds laws by id
+            mockGameState.chaosLaw = {
+                laws: [
+                    { id: 'law_time', type: 'time', level: 1 },
+                    { id: 'law_space', type: 'space', level: 1 }
+                ],
+                resonances: []
+            };
+            const resonance15 = server.mcpChaosLawResonance({ lawIds: ['law_time', 'law_space'] });
+            v108Assert(resonance15.success === true, 'chaos.law.resonance succeeds');
+            v108Assert(resonance15.combo === '时空主宰', 'chaos.law.resonance detects time+space combo');
+
+            // Test 16: chaos.law.resonance with fate+karma
+            mockGameState.chaosLaw = {
+                laws: [
+                    { id: 'law_fate', type: 'fate', level: 1 },
+                    { id: 'law_karma', type: 'karma', level: 1 }
+                ],
+                resonances: []
+            };
+            const resonance16 = server.mcpChaosLawResonance({ lawIds: ['law_fate', 'law_karma'] });
+            v108Assert(resonance16.combo === '命运轮回', 'chaos.law.resonance detects fate+karma combo');
+
+            // Test 17: chaos.law.resonance with creation+destruction
+            mockGameState.chaosLaw = {
+                laws: [
+                    { id: 'law_create', type: 'creation', level: 1 },
+                    { id: 'law_destroy', type: 'destruction', level: 1 }
+                ],
+                resonances: []
+            };
+            const resonance17 = server.mcpChaosLawResonance({ lawIds: ['law_create', 'law_destroy'] });
+            v108Assert(resonance17.combo === '创灭合一', 'chaos.law.resonance detects creation+destruction combo');
+            v108Assert(resonance17.bonus === 60, 'chaos.law.resonance gives 60 bonus for creation+destruction');
+
+            // Test 18: chaos.law.resonance fails when laws not found
+            mockGameState.chaosLaw = { laws: [], resonances: [] };
+            const resonance18 = server.mcpChaosLawResonance({ lawIds: ['nonexistent'] });
+            v108Assert(resonance18.error && resonance18.error.includes('Not enough'), 'chaos.law.resonance fails with nonexistent laws');
+
+            // Test 19: chaos.law.decompose removes law
+            mockGameState.chaosLaw = {
+                laws: [{ id: 'law_test', type: 'time', level: 2 }],
+                resonances: []
+            };
+            const decompose19 = server.mcpChaosLawDecompose({ lawId: 'law_test' });
+            v108Assert(decompose19.success === true, 'chaos.law.decompose succeeds');
+            v108Assert(decompose19.lawType === 'time', 'chaos.law.decompose returns law type');
+            v108Assert(decompose19.recovered === 1000, 'chaos.law.decompose recovers 500*level stones');
+
+            // Test 20: chaos.law.decompose fails with unknown law
+            mockGameState.chaosLaw = { laws: [], resonances: [] };
+            const decompose20 = server.mcpChaosLawDecompose({ lawId: 'nonexistent' });
+            v108Assert(decompose20.error && decompose20.error.includes('Law not found'), 'chaos.law.decompose fails with unknown law');
+
+            // Test 21: ruins.explore adds to explored list
+            mockGameState.stamina = 100;
+            mockGameState.ruins = { explored: [], pendingRewards: {} };
+            server.mcpRuinsExplore({ ruinsId: 'celestial_tomb' });
+            v108Assert(mockGameState.ruins.explored.includes('celestial_tomb'), 'ruins.explore adds to explored list');
+
+            // Test 22: ruins.explore with no previous state
+            mockGameState.stamina = 100;
+            mockGameState.ruins = null;
+            const explore22 = server.mcpRuinsExplore({ ruinsId: 'fairy_cave' });
+            v108Assert(explore22.success === true, 'ruins.explore works with no previous state');
+
+            // Test 23: ruins.explore may find items
+            mockGameState.stamina = 100;
+            mockGameState.ruins = { explored: [], pendingRewards: {} };
+            const explore23 = server.mcpRuinsExplore({});
+            v108Assert(Array.isArray(explore23.itemsFound), 'ruins.explore returns items array');
+
+            // Test 24: ruins.battle returns guardian power
+            mockGameState.ruins = { explored: ['dragon_palace'], pendingRewards: {} };
+            const battle24 = server.mcpRuinsBattle({ ruinsId: 'dragon_palace' });
+            v108Assert(battle24.guardianPower > 0, 'ruins.battle returns positive guardian power');
+
+            // Test 25: ruins.reward returns items
+            mockGameState.ruins = {
+                explored: ['ancient_palace'],
+                pendingRewards: { 'ancient_palace': { spiritStones: 500, items: ['Relic', 'Dust'] } }
+            };
+            const reward25 = server.mcpRuinsReward({ ruinsId: 'ancient_palace' });
+            v108Assert(Array.isArray(reward25.items), 'ruins.reward returns items array');
+
+            // Test 26: chaos.law.understand adds law to state
+            mockGameState.spiritStones = 100000;
+            mockGameState.chaosLaw = null;
+            const understand26 = server.mcpChaosLawUnderstand({ lawType: 'space' });
+            v108Assert(mockGameState.chaosLaw && mockGameState.chaosLaw.laws.length === 1, 'chaos.law.understand adds law to state');
+
+            // Test 27: chaos.law.understand returns lawId
+            mockGameState.spiritStones = 100000;
+            mockGameState.chaosLaw = { laws: [], resonances: [] };
+            const understand27 = server.mcpChaosLawUnderstand({ lawType: 'fate' });
+            v108Assert(understand27.lawId.startsWith('law_'), 'chaos.law.understand returns lawId with correct prefix');
+
+            // Test 28: chaos.law.resonance stores resonance
+            mockGameState.chaosLaw = {
+                laws: [{ id: 'l1', type: 'time', level: 1 }, { id: 'l2', type: 'space', level: 1 }],
+                resonances: []
+            };
+            server.mcpChaosLawResonance({ lawIds: ['l1', 'l2'] });
+            v108Assert(mockGameState.chaosLaw.resonances.length === 1, 'chaos.law.resonance stores resonance');
+
+            // Test 29: chaos.law.decompose updates spirit stones
+            mockGameState.spiritStones = 50000;
+            mockGameState.chaosLaw = { laws: [{ id: 'ldec', type: 'karma', level: 3 }], resonances: [] };
+            const decompose29 = server.mcpChaosLawDecompose({ lawId: 'ldec' });
+            v108Assert(mockGameState.spiritStones === 50000 + 1500, 'chaos.law.decompose updates spirit stones');
+
+            // Test 30: chaos.law.decompose requires lawId
+            const decompose30 = server.mcpChaosLawDecompose({});
+            v108Assert(decompose30.error && decompose30.error.includes('lawId'), 'chaos.law.decompose requires lawId');
+
+            // Test 31: ruins.battle requires ruinsId
+            const battle31 = server.mcpRuinsBattle({});
+            v108Assert(battle31.error && battle31.error.includes('ruinsId'), 'ruins.battle requires ruinsId');
+
+            // Test 32: ruins.reward requires ruinsId
+            const reward32 = server.mcpRuinsReward({});
+            v108Assert(reward32.error && reward32.error.includes('ruinsId'), 'ruins.reward requires ruinsId');
+
+            // Test 33: chaos.law.resonance stores law types
+            mockGameState.chaosLaw = {
+                laws: [{ id: 'lt1', type: 'creation', level: 1 }, { id: 'lt2', type: 'destruction', level: 1 }],
+                resonances: []
+            };
+            const resonance33 = server.mcpChaosLawResonance({ lawIds: ['lt1', 'lt2'] });
+            v108Assert(resonance33.laws && resonance33.laws.length === 2, 'chaos.law.resonance returns law types');
+
+            // Test 34: ruins.explore with random item chance
+            mockGameState.stamina = 100;
+            mockGameState.ruins = { explored: [], pendingRewards: {} };
+            let foundItem = false;
+            for (let i = 0; i < 10; i++) {
+                const exp = server.mcpRuinsExplore({});
+                if (exp.itemsFound && exp.itemsFound.length > 0) { foundItem = true; break; }
+            }
+            v108Assert(foundItem, 'ruins.explore can find items over multiple attempts');
+
+            // Test 35: ruins.battle victory check
+            mockGameState.combatPower = 100000;
+            mockGameState.ruins = { explored: ['spirit_mountain'], pendingRewards: {} };
+            const battle35 = server.mcpRuinsBattle({ ruinsId: 'spirit_mountain' });
+            v108Assert(battle35.victory === true, 'ruins.battle victory when power exceeds guardian');
+
+            // Test 36: ruins.battle defeat check
+            mockGameState.combatPower = 100;
+            mockGameState.ruins = { explored: ['celestial_tomb'], pendingRewards: {} };
+            const battle36 = server.mcpRuinsBattle({ ruinsId: 'celestial_tomb' });
+            v108Assert(battle36.victory === false, 'ruins.battle defeat when power too low');
+
+            // Test 37: chaos.law.understand all types
+            const types = ['time', 'space', 'fate', 'karma', 'creation', 'destruction'];
+            for (const t of types) {
+                mockGameState.spiritStones = 100000;
+                mockGameState.chaosLaw = { laws: [], resonances: [] };
+                const u = server.mcpChaosLawUnderstand({ lawType: t });
+                v108Assert(u.success === true, 'chaos.law.understand accepts type: ' + t);
+            }
+
+            // Test 38: ruins.explore stamina update
+            mockGameState.stamina = 50;
+            mockGameState.ruins = { explored: [], pendingRewards: {} };
+            const exp38 = server.mcpRuinsExplore({});
+            v108Assert(exp38.remainingStamina === 30, 'ruins.explore reduces stamina by 20');
+
+            // Test 39: ruins.battle updates pendingRewards even on defeat
+            mockGameState.combatPower = 100;
+            mockGameState.ruins = { explored: ['ancient_palace'], pendingRewards: {} };
+            server.mcpRuinsBattle({ ruinsId: 'ancient_palace' });
+            v108Assert(mockGameState.ruins.pendingRewards['ancient_palace'], 'ruins.battle stores reward even on defeat');
+
+            // Test 40: chaos.law.resonance unknown combo still works
+            mockGameState.chaosLaw = {
+                laws: [{ id: 'lx1', type: 'time', level: 1 }, { id: 'lx2', type: 'creation', level: 1 }],
+                resonances: []
+            };
+            const resonance40 = server.mcpChaosLawResonance({ lawIds: ['lx1', 'lx2'] });
+            v108Assert(resonance40.success === true, 'chaos.law.resonance works with unknown combo');
+            v108Assert(resonance40.bonus === 20, 'chaos.law.resonance gives default 20 bonus');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V108', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V108 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v108Results = runV108Tests();
+
+        // ===== V109: 仙界试炼+飞升系统 Tests =====
+        function runV109Tests() {
+            const results = [];
+            function v109Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                realm: 8,
+                stage: 3,
+                combatPower: 200000,
+                trial: null,
+                ascend: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: trial.open succeeds with realm >= 4
+            mockGameState.realm = 5;
+            mockGameState.trial = null;
+            const trial1 = server.mcpTrialOpen({});
+            v109Assert(trial1.success === true, 'trial.open succeeds');
+            v109Assert(trial1.isOpen === true, 'trial.open returns isOpen true');
+
+            // Test 2: trial.open fails with low realm
+            mockGameState.realm = 3;
+            const trial2 = server.mcpTrialOpen({});
+            v109Assert(trial2.error && trial2.error.includes('realm'), 'trial.open fails with low realm');
+
+            // Test 3: trial.open with trialType parameter
+            mockGameState.realm = 5;
+            const trial3 = server.mcpTrialOpen({ trialType: 'advanced' });
+            v109Assert(trial3.trialType === 'advanced', 'trial.open accepts trialType');
+
+            // Test 4: trial.challenge fails when trial not open
+            mockGameState.trial = { isOpen: false };
+            const chal4 = server.mcpTrialChallenge({ level: 1 });
+            v109Assert(chal4.error && chal4.error.includes('未开启'), 'trial.challenge fails when not open');
+
+            // Test 5: trial.challenge succeeds when trial is open
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            const chal5 = server.mcpTrialChallenge({ level: 1 });
+            v109Assert(chal5.success === true, 'trial.challenge succeeds');
+            v109Assert(typeof chal5.victory === 'boolean', 'trial.challenge returns victory');
+
+            // Test 6: trial.challenge fails with invalid level
+            mockGameState.trial = { isOpen: true, clearedLevels: [] };
+            const chal6 = server.mcpTrialChallenge({ level: 11 });
+            v109Assert(chal6.error && chal6.error.includes('1-10'), 'trial.challenge rejects invalid level');
+
+            // Test 7: trial.challenge level 1
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            const chal7 = server.mcpTrialChallenge({ level: 1 });
+            v109Assert(chal7.level === 1, 'trial.challenge returns correct level');
+
+            // Test 8: trial.challenge level 10
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            const chal8 = server.mcpTrialChallenge({ level: 10 });
+            v109Assert(chal8.level === 10, 'trial.challenge level 10 works');
+
+            // Test 9: trial.challenge victory adds to clearedLevels
+            mockGameState.combatPower = 1000000;
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            server.mcpTrialChallenge({ level: 1 });
+            v109Assert(mockGameState.trial.clearedLevels.includes(1), 'trial.challenge victory adds to clearedLevels');
+
+            // Test 10: trial.reward fails for uncleared level
+            mockGameState.trial = { isOpen: true, clearedLevels: [] };
+            const reward10 = server.mcpTrialReward({ level: 1 });
+            v109Assert(reward10.error && reward10.error.includes('尚未通关'), 'trial.reward fails for uncleared level');
+
+            // Test 11: trial.reward succeeds for cleared level
+            mockGameState.trial = { isOpen: true, clearedLevels: [1] };
+            const reward11 = server.mcpTrialReward({ level: 1 });
+            v109Assert(reward11.success === true, 'trial.reward succeeds');
+            v109Assert(reward11.spiritStones > 0, 'trial.reward returns spirit stones');
+
+            // Test 12: trial.reward returns reputation
+            mockGameState.trial = { isOpen: true, clearedLevels: [2] };
+            const reward12 = server.mcpTrialReward({ level: 2 });
+            v109Assert(reward12.reputation > 0, 'trial.reward returns reputation');
+
+            // Test 13: ascend.condition shows requirements
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 100000;
+            const cond13 = server.mcpAscendCondition({});
+            v109Assert(cond13.canAscend === true, 'ascend.condition canAscend true');
+            v109Assert(cond13.requirements, 'ascend.condition returns requirements');
+
+            // Test 14: ascend.condition fails with low realm
+            mockGameState.realm = 7;
+            mockGameState.spiritStones = 100000;
+            const cond14 = server.mcpAscendCondition({});
+            v109Assert(cond14.canAscend === false, 'ascend.condition canAscend false with low realm');
+
+            // Test 15: ascend.condition fails with low spirit stones
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 10000;
+            const cond15 = server.mcpAscendCondition({});
+            v109Assert(cond15.canAscend === false, 'ascend.condition canAscend false with low stones');
+
+            // Test 16: ascend.apply sets pending
+            mockGameState.ascend = null;
+            const apply16 = server.mcpAscendApply({});
+            v109Assert(apply16.success === true, 'ascend.apply succeeds');
+            v109Assert(apply16.pending === true, 'ascend.apply sets pending');
+
+            // Test 17: ascend.apply already pending returns success
+            mockGameState.ascend = { pending: true };
+            const apply17 = server.mcpAscendApply({});
+            v109Assert(apply17.success === true, 'ascend.apply returns success when already pending');
+
+            // Test 18: ascend.channel fails without apply
+            mockGameState.ascend = { pending: false };
+            const channel18 = server.mcpAscendChannel({});
+            v109Assert(channel18.error && channel18.error.includes('ascend.apply'), 'ascend.channel fails without apply');
+
+            // Test 19: ascend.channel succeeds with conditions met
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 100000;
+            mockGameState.ascend = { pending: true };
+            const channel19 = server.mcpAscendChannel({});
+            v109Assert(channel19.success === true, 'ascend.channel succeeds');
+            v109Assert(channel19.activated === true, 'ascend.channel sets activated');
+
+            // Test 20: ascend.channel fails with low realm
+            mockGameState.realm = 7;
+            mockGameState.spiritStones = 100000;
+            mockGameState.ascend = { pending: true };
+            const channel20 = server.mcpAscendChannel({});
+            v109Assert(channel20.error && channel20.error.includes('境界'), 'ascend.channel fails with low realm');
+
+            // Test 21: ascend.channel fails with low spirit stones
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 10000;
+            mockGameState.ascend = { pending: true };
+            const channel21 = server.mcpAscendChannel({});
+            v109Assert(channel21.error && channel21.error.includes('灵力'), 'ascend.channel fails with low stones');
+
+            // Test 22: trial.challenge level boundaries
+            mockGameState.trial = { isOpen: true, clearedLevels: [] };
+            const chal22a = server.mcpTrialChallenge({ level: 0 });
+            v109Assert(chal22a.error, 'trial.challenge rejects level 0');
+            const chal22b = server.mcpTrialChallenge({ level: 1 });
+            v109Assert(chal22b.success, 'trial.challenge accepts level 1');
+
+            // Test 23: trial.reward multiple levels
+            mockGameState.trial = { isOpen: true, clearedLevels: [1, 2, 3] };
+            const reward23a = server.mcpTrialReward({ level: 1 });
+            const reward23b = server.mcpTrialReward({ level: 2 });
+            v109Assert(reward23a.success && reward23b.success, 'trial.reward works for multiple levels');
+
+            // Test 24: ascend.condition shows current vs required
+            mockGameState.realm = 5;
+            mockGameState.spiritStones = 20000;
+            const cond24 = server.mcpAscendCondition({});
+            v109Assert(cond24.requirements.realm.current === 5, 'ascend.condition shows current realm');
+            v109Assert(cond24.requirements.spiritStones.current === 20000, 'ascend.condition shows current stones');
+
+            // Test 25: trial.challenge stores currentLevel
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            server.mcpTrialChallenge({ level: 5 });
+            v109Assert(mockGameState.trial.currentLevel === 5, 'trial.challenge stores currentLevel');
+
+            // Test 26: ascend.channel deducts spirit stones
+            mockGameState.spiritStones = 60000;
+            mockGameState.realm = 8;
+            mockGameState.ascend = { pending: true };
+            server.mcpAscendChannel({});
+            v109Assert(mockGameState.spiritStones === 10000, 'ascend.channel deducts 50000 stones');
+
+            // Test 27: trial.open with primary type
+            mockGameState.realm = 5;
+            mockGameState.trial = null;
+            const trial27 = server.mcpTrialOpen({ trialType: 'primary' });
+            v109Assert(trial27.trialType === 'primary', 'trial.open primary type works');
+
+            // Test 28: trial.open with supreme type
+            const trial28 = server.mcpTrialOpen({ trialType: 'supreme' });
+            v109Assert(trial28.trialType === 'supreme', 'trial.open supreme type works');
+
+            // Test 29: ascend.channel stores ascendedAt
+            mockGameState.spiritStones = 100000;
+            mockGameState.realm = 8;
+            mockGameState.ascend = { pending: true };
+            const channel29 = server.mcpAscendChannel({});
+            v109Assert(channel29.ascendedAt, 'ascend.channel returns ascendedAt');
+
+            // Test 30: trial.challenge guardian power increases with level
+            mockGameState.trial = { isOpen: true, clearedLevels: [], currentLevel: 0 };
+            const chal30a = server.mcpTrialChallenge({ level: 1 });
+            mockGameState.trial.currentLevel = 0;
+            const chal30b = server.mcpTrialChallenge({ level: 10 });
+            v109Assert(chal30b.guardianPower > chal30a.guardianPower, 'guardian power increases with level');
+
+            // Test 31: ascend.apply initializes ascend state
+            mockGameState.ascend = null;
+            server.mcpAscendApply({});
+            v109Assert(mockGameState.ascend && mockGameState.ascend.pending === true, 'ascend.apply initializes state');
+
+            // Test 32: trial.reward spirit stones scale with level
+            mockGameState.trial = { isOpen: true, clearedLevels: [1] };
+            const reward32a = server.mcpTrialReward({ level: 1 });
+            mockGameState.trial.clearedLevels = [10];
+            const reward32b = server.mcpTrialReward({ level: 10 });
+            v109Assert(reward32b.spiritStones > reward32a.spiritStones, 'trial.reward scales with level');
+
+            // Test 33: ascend.condition default trialType is primary
+            mockGameState.realm = 5;
+            mockGameState.trial = null;
+            const trial33 = server.mcpTrialOpen({});
+            v109Assert(trial33.trialType === 'primary', 'trial.open defaults to primary');
+
+            // Test 34: trial.challenge returns playerPower
+            mockGameState.combatPower = 150000;
+            mockGameState.trial = { isOpen: true, clearedLevels: [] };
+            const chal34 = server.mcpTrialChallenge({ level: 1 });
+            v109Assert(chal34.playerPower === 150000, 'trial.challenge returns playerPower');
+
+            // Test 35: ascend.condition returns message
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 100000;
+            const cond35 = server.mcpAscendCondition({});
+            v109Assert(cond35.message, 'ascend.condition returns message');
+
+            // Test 36: trial.reward updates trialRewards
+            mockGameState.trial = { isOpen: true, clearedLevels: [3] };
+            server.mcpTrialReward({ level: 3 });
+            v109Assert(mockGameState.trialRewards && mockGameState.trialRewards[3], 'trial.reward updates trialRewards');
+
+            // Test 37: ascend.channel clears pending
+            mockGameState.ascend = { pending: true };
+            server.mcpAscendChannel({});
+            v109Assert(mockGameState.ascend.pending === false, 'ascend.channel clears pending');
+
+            // Test 38: trial.challenge level default is 1
+            mockGameState.trial = { isOpen: true, clearedLevels: [] };
+            const chal38 = server.mcpTrialChallenge({});
+            v109Assert(chal38.level === 1, 'trial.challenge defaults to level 1');
+
+            // Test 39: ascend.condition realm requirement is 8
+            mockGameState.realm = 7;
+            mockGameState.spiritStones = 100000;
+            const cond39 = server.mcpAscendCondition({});
+            v109Assert(cond39.canAscend === false, 'ascend.condition fails at realm 7');
+            mockGameState.realm = 8;
+            const cond39b = server.mcpAscendCondition({});
+            v109Assert(cond39b.canAscend === true, 'ascend.condition succeeds at realm 8');
+
+            // Test 40: ascend.channel activated state persists
+            mockGameState.ascend = { pending: false, activated: false };
+            mockGameState.realm = 8;
+            mockGameState.spiritStones = 100000;
+            mockGameState.ascend.pending = true;
+            server.mcpAscendChannel({});
+            v109Assert(mockGameState.ascend.activated === true, 'ascend.channel sets activated state');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V109', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V109 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v109Results = runV109Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
