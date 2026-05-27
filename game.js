@@ -3393,6 +3393,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V117)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V118: Register 仙界公告+邮件系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V118)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4299,6 +4303,25 @@
                             break;
                         case 'welfare.status':
                             result = this.mcpWelfareStatus();
+                            break;
+                        // V118: 仙界公告+邮件系统
+                        case 'announce.list':
+                            result = this.mcpAnnounceList(args.page, args.pageSize);
+                            break;
+                        case 'announce.detail':
+                            result = this.mcpAnnounceDetail(args.announceId);
+                            break;
+                        case 'announce.read':
+                            result = this.mcpAnnounceRead(args.announceId);
+                            break;
+                        case 'mail.list':
+                            result = this.mcpMailList(args.filter);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailRead(args.mailId);
+                            break;
+                        case 'mail.attachment':
+                            result = this.mcpMailAttachment(args.mailId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12514,6 +12537,193 @@
                 return gs.welfare;
             }
 
+            // V118: _initAnnounceState - 初始化仙界公告系统状态
+            _initAnnounceState() {
+                const gs = window.gameState;
+                if (!gs.announce) {
+                    gs.announce = {
+                        announcements: JSON.parse(JSON.stringify(ANNOUNCE_POOL)),
+                        readIds: [],
+                        nextId: ANNOUNCE_POOL.length + 1
+                    };
+                }
+                return gs.announce;
+            }
+
+            // V118: _initMailState - 初始化仙界邮件系统状态
+            _initMailState() {
+                const gs = window.gameState;
+                if (!gs.mail) {
+                    gs.mail = {
+                        mails: JSON.parse(JSON.stringify(MAIL_POOL)),
+                        unreadCount: MAIL_POOL.filter(m => !m.read).length,
+                        nextId: MAIL_POOL.length + 1
+                    };
+                }
+                return gs.mail;
+            }
+
+            // V118: mcpAnnounceList - 获取公告列表
+            mcpAnnounceList(page = 1, pageSize = 10) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announce = this._initAnnounceState();
+                    const published = announce.announcements.filter(a => a.published);
+                    const total = published.length;
+                    const start = (page - 1) * pageSize;
+                    const end = start + pageSize;
+                    const list = published.slice(start, end).map(a => ({
+                        id: a.id,
+                        title: a.title,
+                        type: a.type,
+                        priority: a.priority,
+                        date: a.date,
+                        isRead: announce.readIds.includes(a.id),
+                        hasReward: !!a.reward
+                    }));
+                    return {
+                        success: true,
+                        page,
+                        pageSize,
+                        total,
+                        totalPages: Math.ceil(total / pageSize),
+                        announcements: list
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V118: mcpAnnounceDetail - 查看公告详情
+            mcpAnnounceDetail(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '公告ID不能为空' };
+                    const announce = this._initAnnounceState();
+                    const a = announce.announcements.find(x => x.id === announceId);
+                    if (!a) return { error: '公告不存在' };
+                    return {
+                        success: true,
+                        id: a.id,
+                        title: a.title,
+                        content: a.content,
+                        type: a.type,
+                        priority: a.priority,
+                        date: a.date,
+                        isRead: announce.readIds.includes(a.id),
+                        reward: a.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V118: mcpAnnounceRead - 标记公告为已读
+            mcpAnnounceRead(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '公告ID不能为空' };
+                    const announce = this._initAnnounceState();
+                    const a = announce.announcements.find(x => x.id === announceId);
+                    if (!a) return { error: '公告不存在' };
+                    if (!announce.readIds.includes(announceId)) {
+                        announce.readIds.push(announceId);
+                    }
+                    return { success: true, message: '已标记公告为已读', announceId };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V118: mcpMailList - 获取邮件列表
+            mcpMailList(filter = 'all') {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mail = this._initMailState();
+                    let mails = mail.mails;
+                    switch (filter) {
+                        case 'unread':
+                            mails = mails.filter(m => !m.read);
+                            break;
+                        case 'attachment':
+                            mails = mails.filter(m => m.hasAttachment && !m.claimed);
+                            break;
+                        default:
+                            // 'all' - return all
+                    }
+                    return {
+                        success: true,
+                        filter,
+                        total: mails.length,
+                        unreadCount: mail.unreadCount,
+                        mails: mails.map(m => ({
+                            id: m.id,
+                            from: m.from,
+                            title: m.title,
+                            date: m.date,
+                            hasAttachment: m.hasAttachment,
+                            isRead: m.read,
+                            isClaimed: m.claimed
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V118: mcpMailRead - 读取邮件
+            mcpMailRead(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '邮件ID不能为空' };
+                    const mail = this._initMailState();
+                    const m = mail.mails.find(x => x.id === mailId);
+                    if (!m) return { error: '邮件不存在' };
+                    // Mark as read and decrement unread count
+                    if (!m.read) {
+                        m.read = true;
+                        mail.unreadCount = Math.max(0, mail.unreadCount - 1);
+                    }
+                    return {
+                        success: true,
+                        id: m.id,
+                        from: m.from,
+                        title: m.title,
+                        content: m.content,
+                        date: m.date,
+                        hasAttachment: m.hasAttachment,
+                        attachment: m.hasAttachment && !m.claimed ? m.attachment : null
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V118: mcpMailAttachment - 领取邮件附件
+            mcpMailAttachment(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '邮件ID不能为空' };
+                    const mail = this._initMailState();
+                    const m = mail.mails.find(x => x.id === mailId);
+                    if (!m) return { error: '邮件不存在' };
+                    if (!m.hasAttachment) return { error: '该邮件无附件' };
+                    if (m.claimed) return { error: '附件已领取' };
+                    // Award the attachment
+                    m.claimed = true;
+                    if (m.attachment) {
+                        if (m.attachment.spiritStones) {
+                            gs.spiritStones = (gs.spiritStones || 0) + m.attachment.spiritStones;
+                        }
+                        if (m.attachment.reputation) {
+                            gs.reputation = (gs.reputation || 0) + m.attachment.reputation;
+                        }
+                    }
+                    return {
+                        success: true,
+                        message: '附件领取成功',
+                        mailId,
+                        reward: m.attachment
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V117: mcpCheckinQuery - 查询签到状态
             mcpCheckinQuery() {
                 try {
@@ -20385,6 +20595,94 @@
             tier4: { need: 30, reward: { spiritStones: 30000, exp: 3000 }, claimed: false }
         };
 
+        // ===== V118: 仙界公告+邮件系统 =====
+        // --- MCP_TOOLS_V118: 仙界公告+邮件系统 ---
+        const MCP_TOOLS_V118 = {
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (仙界公告-列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        page: { type: 'number', description: '页码 (默认1)', default: 1 },
+                        pageSize: { type: 'number', description: '每页数量 (默认10)', default: 10 }
+                    }
+                }
+            },
+            'announce.detail': {
+                name: 'announce.detail',
+                description: '查看公告详情 (仙界公告-详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
+                }
+            },
+            'announce.read': {
+                name: 'announce.read',
+                description: '标记公告为已读 (仙界公告-已读)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
+                }
+            },
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (仙界邮件-列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: '筛选条件 (all/unread/attachment)', default: 'all' }
+                    }
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件 (仙界邮件-读取)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.attachment': {
+                name: 'mail.attachment',
+                description: '领取邮件附件 (仙界邮件-附件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            }
+        };
+
+        // V118: Announcement Pool - 仙界公告池
+        const ANNOUNCE_POOL = [
+            { id: 'ann_001', title: '仙界盛典', content: '筑基丹大派发，登录即送！', type: 'event', priority: 'high', date: '2025-01-01', reward: { spiritStones: 1000 }, published: true },
+            { id: 'ann_002', title: '秘境开启', content: '虚无秘境现世，机缘难得', type: 'notice', priority: 'high', date: '2025-01-03', reward: null, published: true },
+            { id: 'ann_003', title: '灵石雨', content: '全服灵石雨，捡到就是赚到', type: 'event', priority: 'medium', date: '2025-01-05', reward: { spiritStones: 500 }, published: true },
+            { id: 'ann_004', title: '师门任务', content: '完成师门任务获得额外奖励', type: 'quest', priority: 'medium', date: '2025-01-07', reward: { spiritStones: 800 }, published: true },
+            { id: 'ann_005', title: '天榜刷新', content: '本期天榜排名已刷新', type: 'notice', priority: 'low', date: '2025-01-10', reward: null, published: true }
+        ];
+
+        // V118: Mail Pool - 仙界邮件池
+        const MAIL_POOL = [
+            { id: 'mail_001', from: '系统', title: '欢迎来到仙界', content: '恭喜你踏入仙途，这是新手礼包', hasAttachment: true, attachment: { spiritStones: 1000, reputation: 100 }, read: false, claimed: false, date: '2025-01-01' },
+            { id: 'mail_002', from: '掌门', title: '师门任务', content: '请完成师门规定的修炼任务', hasAttachment: true, attachment: { spiritStones: 500 }, read: false, claimed: false, date: '2025-01-02' },
+            { id: 'mail_003', from: '仙盟', title: '仙盟福利', content: '仙盟每月福利发放，请查收', hasAttachment: true, attachment: { spiritStones: 2000, reputation: 200 }, read: false, claimed: false, date: '2025-01-03' },
+            { id: 'mail_004', from: '神秘人', title: '机缘巧合', content: '有缘人，这是一份机缘', hasAttachment: true, attachment: { spiritStones: 5000, reputation: 500 }, read: false, claimed: false, date: '2025-01-05' },
+            { id: 'mail_005', from: '系统', title: '签到提醒', content: '今日还未签到，快去签到吧', hasAttachment: false, attachment: null, read: false, claimed: false, date: '2025-01-06' }
+        ];
+
         // ===== V117: 仙界签到+福利系统 =====
         // --- MCP_TOOLS_V117: 仙界签到+福利系统 ---
         const MCP_TOOLS_V117 = {
@@ -21657,6 +21955,276 @@
             return summary;
         }
         const v117Results = runV117Tests();
+
+        // ===== V118: 仙界公告+邮件系统 Tests =====
+        function runV118Tests() {
+            const results = [];
+            function v118Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                reputation: 100,
+                announce: null,
+                mail: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: announce.list returns paginated list
+            const list1 = server.mcpAnnounceList(1, 10);
+            v118Assert(list1.success === true, 'announce.list succeeds');
+            v118Assert(list1.total === 5, 'announce.list returns 5 announcements');
+            v118Assert(list1.page === 1, 'announce.list page 1');
+            v118Assert(list1.pageSize === 10, 'announce.list pageSize 10');
+            v118Assert(list1.announcements && list1.announcements.length === 5, 'announce.list has announcements array');
+
+            // Test 2: announce.list pagination
+            const list2 = server.mcpAnnounceList(1, 2);
+            v118Assert(list2.total === 5, 'announce.list pagination total 5');
+            v118Assert(list2.totalPages === 3, 'announce.list totalPages 3');
+            v118Assert(list2.announcements.length === 2, 'announce.list page 1 has 2 items');
+
+            // Test 3: announce.list page 2
+            const list3 = server.mcpAnnounceList(2, 2);
+            v118Assert(list3.announcements.length === 2, 'announce.list page 2 has 2 items');
+
+            // Test 4: announce.detail returns full announcement
+            const detail1 = server.mcpAnnounceDetail('ann_001');
+            v118Assert(detail1.success === true, 'announce.detail succeeds');
+            v118Assert(detail1.id === 'ann_001', 'announce.detail returns correct id');
+            v118Assert(detail1.title === '仙界盛典', 'announce.detail returns title');
+            v118Assert(detail1.content, 'announce.detail returns content');
+            v118Assert(detail1.reward && detail1.reward.spiritStones === 1000, 'announce.detail returns reward');
+
+            // Test 5: announce.detail fails with invalid id
+            const detailInvalid = server.mcpAnnounceDetail('invalid_ann');
+            v118Assert(detailInvalid.error && detailInvalid.error.includes('公告不存在'), 'announce.detail fails with invalid id');
+
+            // Test 6: announce.detail fails with missing id
+            const detailNoId = server.mcpAnnounceDetail('');
+            v118Assert(detailNoId.error && detailNoId.error.includes('公告ID不能为空'), 'announce.detail requires id');
+
+            // Test 7: announce.read marks announcement as read
+            server._initAnnounceState();
+            mockGameState.announce.readIds = [];
+            const read1 = server.mcpAnnounceRead('ann_001');
+            v118Assert(read1.success === true, 'announce.read succeeds');
+            v118Assert(mockGameState.announce.readIds.includes('ann_001'), 'announce.read adds to readIds');
+
+            // Test 8: announce.read is idempotent
+            const read2 = server.mcpAnnounceRead('ann_001');
+            v118Assert(read2.success === true, 'announce.read idempotent');
+            v118Assert(mockGameState.announce.readIds.length === 1, 'announce.read no duplicate');
+
+            // Test 9: announce.read fails with invalid id
+            const readInvalid = server.mcpAnnounceRead('invalid_ann');
+            v118Assert(readInvalid.error && readInvalid.error.includes('公告不存在'), 'announce.read fails with invalid id');
+
+            // Test 10: mail.list returns all mails by default
+            const mailList1 = server.mcpMailList('all');
+            v118Assert(mailList1.success === true, 'mail.list all succeeds');
+            v118Assert(mailList1.total === 5, 'mail.list returns 5 mails');
+            v118Assert(mailList1.unreadCount === 5, 'mail.list unreadCount 5');
+            v118Assert(mailList1.mails && mailList1.mails.length === 5, 'mail.list has mails array');
+
+            // Test 11: mail.list filter unread
+            const mailList2 = server.mcpMailList('unread');
+            v118Assert(mailList2.success === true, 'mail.list unread succeeds');
+            v118Assert(mailList2.total === 5, 'mail.list unread total 5');
+
+            // Test 12: mail.list filter attachment
+            const mailList3 = server.mcpMailList('attachment');
+            v118Assert(mailList3.success === true, 'mail.list attachment succeeds');
+            v118Assert(mailList3.total === 4, 'mail.list attachment total 4'); // 4 mails have attachments
+
+            // Test 13: mail.read marks mail as read
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.unreadCount = 5;
+            const mailRead1 = server.mcpMailRead('mail_001');
+            v118Assert(mailRead1.success === true, 'mail.read succeeds');
+            v118Assert(mailRead1.title === '欢迎来到仙界', 'mail.read returns correct mail');
+            v118Assert(mailRead1.content, 'mail.read returns content');
+            v118Assert(mockGameState.mail.unreadCount === 4, 'mail.read decrements unreadCount');
+
+            // Test 14: mail.read shows attachment when not claimed
+            v118Assert(mailRead1.hasAttachment === true, 'mail.read has attachment');
+            v118Assert(mailRead1.attachment && mailRead1.attachment.spiritStones === 1000, 'mail.read returns attachment');
+
+            // Test 15: mail.read is idempotent (doesn't decrement twice)
+            const mailRead2 = server.mcpMailRead('mail_001');
+            v118Assert(mailRead2.success === true, 'mail.read idempotent');
+            v118Assert(mockGameState.mail.unreadCount === 4, 'mail.read no double decrement');
+
+            // Test 16: mail.read fails with invalid id
+            const mailReadInvalid = server.mcpMailRead('invalid_mail');
+            v118Assert(mailReadInvalid.error && mailReadInvalid.error.includes('邮件不存在'), 'mail.read fails with invalid id');
+
+            // Test 17: mail.read fails with missing id
+            const mailReadNoId = server.mcpMailRead('');
+            v118Assert(mailReadNoId.error && mailReadNoId.error.includes('邮件ID不能为空'), 'mail.read requires id');
+
+            // Test 18: mail.attachment claims attachment
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            const stonesBefore = mockGameState.spiritStones;
+            const attach1 = server.mcpMailAttachment('mail_001');
+            v118Assert(attach1.success === true, 'mail.attachment succeeds');
+            v118Assert(attach1.reward && attach1.reward.spiritStones === 1000, 'mail.attachment returns reward');
+            v118Assert(mockGameState.spiritStones === stonesBefore + 1000, 'mail.attachment adds spirit stones');
+            v118Assert(mockGameState.mail.mails.find(m => m.id === 'mail_001').claimed === true, 'mail.attachment marks as claimed');
+
+            // Test 19: mail.attachment adds reputation
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].attachment.reputation = 100;
+            const repBefore = mockGameState.reputation;
+            server.mcpMailAttachment('mail_001');
+            v118Assert(mockGameState.reputation === repBefore + 100, 'mail.attachment adds reputation');
+
+            // Test 20: mail.attachment fails when already claimed
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].claimed = true;
+            const attachClaimed = server.mcpMailAttachment('mail_001');
+            v118Assert(attachClaimed.error && attachClaimed.error.includes('附件已领取'), 'mail.attachment fails when claimed');
+
+            // Test 21: mail.attachment fails for mail without attachment
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            const attachNoAttach = server.mcpMailAttachment('mail_005'); // mail_005 has no attachment
+            v118Assert(attachNoAttach.error && attachNoAttach.error.includes('该邮件无附件'), 'mail.attachment fails for no attachment');
+
+            // Test 22: mail.attachment fails with invalid id
+            const attachInvalid = server.mcpMailAttachment('invalid_mail');
+            v118Assert(attachInvalid.error && attachInvalid.error.includes('邮件不存在'), 'mail.attachment fails with invalid id');
+
+            // Test 23: mail.attachment fails with missing id
+            const attachNoId = server.mcpMailAttachment('');
+            v118Assert(attachNoId.error && attachNoId.error.includes('邮件ID不能为空'), 'mail.attachment requires id');
+
+            // Test 24: mail.list shows claimed status correctly
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].claimed = true;
+            const mailListClaimed = server.mcpMailList('all');
+            v118Assert(mailListClaimed.mails[0].isClaimed === true, 'mail.list shows claimed status');
+
+            // Test 25: mail.read doesn't return attachment after claimed
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].claimed = true;
+            const mailReadClaimed = server.mcpMailRead('mail_001');
+            v118Assert(mailReadClaimed.attachment === null, 'mail.read returns null attachment after claimed');
+
+            // Test 26: announce.isRead is reflected in list
+            server._initAnnounceState();
+            mockGameState.announce.announcements = JSON.parse(JSON.stringify(ANNOUNCE_POOL));
+            mockGameState.announce.readIds = ['ann_001'];
+            const listRead = server.mcpAnnounceList(1, 10);
+            const annRead = listRead.announcements.find(a => a.id === 'ann_001');
+            v118Assert(annRead.isRead === true, 'announce.list reflects read status');
+
+            // Test 27: mail.list unread count after reading all
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.unreadCount = 5;
+            server.mcpMailRead('mail_001');
+            server.mcpMailRead('mail_002');
+            server.mcpMailRead('mail_003');
+            v118Assert(mockGameState.mail.unreadCount === 2, 'mail.list unreadCount decrements correctly');
+
+            // Test 28: announce.detail returns isRead status
+            server._initAnnounceState();
+            mockGameState.announce.announcements = JSON.parse(JSON.stringify(ANNOUNCE_POOL));
+            mockGameState.announce.readIds = ['ann_001'];
+            const detailRead = server.mcpAnnounceDetail('ann_001');
+            v118Assert(detailRead.isRead === true, 'announce.detail returns isRead');
+
+            // Test 29: mail.attachment idempotent (already claimed but no error on second call except state check)
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.spiritStones = 10000;
+            server.mcpMailAttachment('mail_001');
+            const stonesAfter = mockGameState.spiritStones;
+            server.mcpMailAttachment('mail_001');
+            v118Assert(mockGameState.spiritStones === stonesAfter, 'mail.attachment no double reward');
+
+            // Test 30: _initAnnounceState initializes properly
+            server._initAnnounceState();
+            v118Assert(mockGameState.announce && mockGameState.announce.announcements, '_initAnnounceState creates announce');
+            v118Assert(mockGameState.announce.readIds, '_initAnnounceState creates readIds');
+            v118Assert(mockGameState.announce.nextId, '_initAnnounceState creates nextId');
+
+            // Test 31: _initMailState initializes properly
+            server._initMailState();
+            v118Assert(mockGameState.mail && mockGameState.mail.mails, '_initMailState creates mail');
+            v118Assert(typeof mockGameState.mail.unreadCount === 'number', '_initMailState creates unreadCount');
+            v118Assert(mockGameState.mail.nextId, '_initMailState creates nextId');
+
+            // Test 32: announce.list hasReward field
+            const listReward = server.mcpAnnounceList(1, 10);
+            const annWithReward = listReward.announcements.find(a => a.hasReward);
+            v118Assert(annWithReward && annWithReward.hasReward === true, 'announce.list hasReward works');
+
+            // Test 33: mail.list filter works correctly (all returns all, not just filtered)
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            const mailAll = server.mcpMailList('all');
+            v118Assert(mailAll.total === 5, 'mail.list all returns 5');
+
+            // Test 34: announce.list sorted by date descending (most recent first)
+            const listSorted = server.mcpAnnounceList(1, 10);
+            const dates = listSorted.announcements.map(a => a.date);
+            v118Assert(dates[0] >= dates[1], 'announce.list sorted by date');
+
+            // Test 35: mail.list shows hasAttachment correctly
+            const mailHasAttach = server.mcpMailList('all');
+            const mailWithAttach = mailHasAttach.mails.find(m => m.hasAttachment);
+            v118Assert(mailWithAttach && mailWithAttach.hasAttachment === true, 'mail.list hasAttachment works');
+
+            // Test 36: announce.read fails with empty id
+            const readNoId = server.mcpAnnounceRead('');
+            v118Assert(readNoId.error && readNoId.error.includes('公告ID不能为空'), 'announce.read requires id');
+
+            // Test 37: mail.list with unread filter only returns unread
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].read = true;
+            mockGameState.mail.mails[1].read = true;
+            mockGameState.mail.unreadCount = 3;
+            const mailUnread = server.mcpMailList('unread');
+            v118Assert(mailUnread.total === 3, 'mail.list unread returns only unread');
+
+            // Test 38: mail.list with attachment filter only returns unclaimed attachments
+            server._initMailState();
+            mockGameState.mail.mails = JSON.parse(JSON.stringify(MAIL_POOL));
+            mockGameState.mail.mails[0].claimed = true;
+            const mailAttach = server.mcpMailList('attachment');
+            v118Assert(mailAttach.total === 3, 'mail.list attachment excludes claimed');
+
+            // Test 39: announce.detail returns type and priority
+            const detailType = server.mcpAnnounceDetail('ann_001');
+            v118Assert(detailType.type === 'event', 'announce.detail returns type');
+            v118Assert(detailType.priority === 'high', 'announce.detail returns priority');
+
+            // Test 40: mail.read returns from field correctly
+            const mailReadFrom = server.mcpMailRead('mail_002');
+            v118Assert(mailReadFrom.from === '掌门', 'mail.read returns from');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            const summary = { version: 'V118', passed, total, passRate: passRate.toFixed(3), results };
+            console.log('V118 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            summary.results.forEach((r, i) => { if (!r.pass) console.log('  FAIL[' + i + ']: ' + r.msg); });
+            return summary;
+        }
+        const v118Results = runV118Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
