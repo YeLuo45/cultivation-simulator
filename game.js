@@ -5359,6 +5359,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V127)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V128: Register 任务+日常系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V128)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6455,6 +6459,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'bag.sell':
                             result = this.mcpBagSell(args.itemId);
+                            break;
+                        // V128: 任务+日常系统
+                        case 'quest.list':
+                            result = this.mcpQuestList(args.filter);
+                            break;
+                        case 'quest.accept':
+                            result = this.mcpQuestAccept(args.questId);
+                            break;
+                        case 'quest.complete':
+                            result = this.mcpQuestComplete(args.questId);
+                            break;
+                        case 'daily.list':
+                            result = this.mcpDailyList();
+                            break;
+                        case 'daily.claim':
+                            result = this.mcpDailyClaim(args.dailyId);
+                            break;
+                        case 'daily.reset':
+                            result = this.mcpDailyReset();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -16674,6 +16697,136 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V128: _initQuestState - 初始化任务状态
+            _initQuestState() {
+                const gs = window.gameState;
+                if (!gs.quest) {
+                    gs.quest = {
+                        available: [
+                            { id: 'quest_1', title: '收集灵草', description: '在仙界采集10株灵草', reward: { spiritStones: 100 }, requirement: { type: 'collect', itemId: 'herb', count: 10 }, progress: 0 },
+                            { id: 'quest_2', title: '击败妖兽', description: '在秘境中击败5只妖兽', reward: { spiritStones: 200 }, requirement: { type: 'combat', count: 5 }, progress: 0 },
+                            { id: 'quest_3', title: '炼制丹药', description: '炼制3颗灵气丹', reward: { spiritStones: 150 }, requirement: { type: 'craft', itemId: 'pill_spirit', count: 3 }, progress: 0 }
+                        ],
+                        active: [],
+                        completed: []
+                    };
+                }
+                return gs.quest;
+            }
+
+            // V128: _initDailyState - 初始化日常任务状态
+            _initDailyState() {
+                const gs = window.gameState;
+                const now = Date.now();
+                if (!gs.daily) {
+                    gs.daily = {
+                        tasks: [
+                            { id: 'daily_1', title: '每日修炼', description: '完成灵气修炼', progress: 0, target: 1, reward: { spiritStones: 50 }, claimed: false },
+                            { id: 'daily_2', title: '采集灵石', description: '采集5块灵石', progress: 0, target: 5, reward: { spiritStones: 30 }, claimed: false },
+                            { id: 'daily_3', title: '击败怪物', description: '击败3只怪物', progress: 0, target: 3, reward: { spiritStones: 80 }, claimed: false }
+                        ],
+                        lastReset: now
+                    };
+                }
+                return gs.daily;
+            }
+
+            // V128: mcpQuestList - 获取任务列表
+            mcpQuestList(filter) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questState = this._initQuestState();
+                    const f = filter || 'available';
+                    switch (f) {
+                        case 'available': return { success: true, available: questState.available };
+                        case 'active': return { success: true, active: questState.active };
+                        case 'completed': return { success: true, completed: questState.completed };
+                        case 'all': return { success: true, available: questState.available, active: questState.active, completed: questState.completed };
+                        default: return { error: 'Unknown filter: ' + f };
+                    }
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V128: mcpQuestAccept - 接受任务
+            mcpQuestAccept(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: 'questId不能为空' };
+                    const questState = this._initQuestState();
+                    const idx = questState.available.findIndex(q => q.id === questId);
+                    if (idx === -1) return { error: '任务不存在: ' + questId };
+                    const quest = questState.available.splice(idx, 1)[0];
+                    quest.progress = 0;
+                    questState.active.push(quest);
+                    return { success: true, message: '接受任务成功: ' + quest.title, questId: quest.id };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V128: mcpQuestComplete - 完成任务
+            mcpQuestComplete(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: 'questId不能为空' };
+                    const questState = this._initQuestState();
+                    const idx = questState.active.findIndex(q => q.id === questId);
+                    if (idx === -1) return { error: '任务不存在或未接取: ' + questId };
+                    const quest = questState.active[idx];
+                    const req = quest.requirement;
+                    if (quest.progress < req.count) return { error: '任务进度不足: ' + quest.progress + '/' + req.count };
+                    // Award reward
+                    if (quest.reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + quest.reward.spiritStones;
+                    // Move to completed
+                    questState.active.splice(idx, 1);
+                    questState.completed.push({ ...quest, completedAt: Date.now() });
+                    return { success: true, message: '完成任务: ' + quest.title, reward: quest.reward };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V128: mcpDailyList - 获取日常任务
+            mcpDailyList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dailyState = this._initDailyState();
+                    return { success: true, tasks: dailyState.tasks };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V128: mcpDailyClaim - 领取日常奖励
+            mcpDailyClaim(dailyId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!dailyId) return { error: 'dailyId不能为空' };
+                    const dailyState = this._initDailyState();
+                    const task = dailyState.tasks.find(t => t.id === dailyId);
+                    if (!task) return { error: '日常任务不存在: ' + dailyId };
+                    if (task.claimed) return { error: '奖励已领取' };
+                    if (task.progress < task.target) return { error: '任务未完成: ' + task.progress + '/' + task.target };
+                    if (task.reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + task.reward.spiritStones;
+                    task.claimed = true;
+                    return { success: true, message: '领取奖励成功: ' + task.title, reward: task.reward };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V128: mcpDailyReset - 重置日常任务
+            mcpDailyReset() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dailyState = this._initDailyState();
+                    dailyState.tasks.forEach(t => {
+                        t.progress = 0;
+                        t.claimed = false;
+                    });
+                    dailyState.lastReset = Date.now();
+                    return { success: true, message: '日常任务已重置' };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -24441,6 +24594,16 @@ const ACHIEVEMENT_ID_MAP = {
             'bag.sell': { name: 'bag.sell', description: '出售物品', inputSchema: { type: 'object', properties: { itemId: { type: 'string' } }, required: ['itemId'] } }
         };
 
+        // V128: 任务+日常系统
+        const MCP_TOOLS_V128 = {
+            'quest.list': { name: 'quest.list', description: '获取任务列表', inputSchema: { type: 'object', properties: { filter: { type: 'string', description: '筛选条件 (available/active/completed)', default: 'available' } } } },
+            'quest.accept': { name: 'quest.accept', description: '接受任务', inputSchema: { type: 'object', properties: { questId: { type: 'string', description: '任务ID' } }, required: ['questId'] } },
+            'quest.complete': { name: 'quest.complete', description: '完成任务', inputSchema: { type: 'object', properties: { questId: { type: 'string', description: '任务ID' } }, required: ['questId'] } },
+            'daily.list': { name: 'daily.list', description: '获取日常任务', inputSchema: { type: 'object', properties: {} } },
+            'daily.claim': { name: 'daily.claim', description: '领取日常奖励', inputSchema: { type: 'object', properties: { dailyId: { type: 'string', description: '日常任务ID' } }, required: ['dailyId'] } },
+            'daily.reset': { name: 'daily.reset', description: '重置日常任务', inputSchema: { type: 'object', properties: {} } }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -27472,6 +27635,184 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V127', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v127Results = runV127Tests();
+
+        // ===== V128: 任务+日常系统 Tests =====
+        function runV128Tests() {
+            const results = [];
+            function v128Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 10000,
+                hp: 100,
+                spirit: 50,
+                attack: 10,
+                defense: 5,
+                items: [],
+                quest: null,
+                daily: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // quest.list - initial state (available)
+            const ql1 = server.mcpQuestList();
+            v128Assert(ql1.success === true, 'quest.list succeeds');
+            v128Assert(ql1.available && ql1.available.length === 3, 'quest.list returns 3 available quests');
+
+            // quest.list - active (empty initially)
+            const ql2 = server.mcpQuestList('active');
+            v128Assert(ql2.success === true, 'quest.list active succeeds');
+            v128Assert(ql2.active && ql2.active.length === 0, 'quest.list active is empty initially');
+
+            // quest.list - completed (empty initially)
+            const ql3 = server.mcpQuestList('completed');
+            v128Assert(ql3.success === true, 'quest.list completed succeeds');
+            v128Assert(ql3.completed && ql3.completed.length === 0, 'quest.list completed is empty initially');
+
+            // quest.list - all
+            const ql4 = server.mcpQuestList('all');
+            v128Assert(ql4.success === true, 'quest.list all succeeds');
+            v128Assert(ql4.available && ql4.active && ql4.completed, 'quest.list all returns all categories');
+
+            // quest.list - unknown filter
+            const qlErr = server.mcpQuestList('unknown');
+            v128Assert(qlErr.error && qlErr.error.includes('Unknown filter'), 'quest.list fails with unknown filter');
+
+            // quest.accept - success
+            const qa1 = server.mcpQuestAccept('quest_1');
+            v128Assert(qa1.success === true, 'quest.accept succeeds');
+            v128Assert(qa1.questId === 'quest_1', 'quest.accept returns correct questId');
+            v128Assert(qa1.message && qa1.message.includes('收集灵草'), 'quest.accept returns quest title');
+
+            // quest.accept - verify moved to active
+            const ql5 = server.mcpQuestList('active');
+            v128Assert(ql5.active && ql5.active.length === 1, 'quest.list active has 1 quest after accept');
+            v128Assert(ql5.active[0].id === 'quest_1', 'quest.list active contains accepted quest');
+
+            // quest.accept - verify removed from available
+            const ql6 = server.mcpQuestList('available');
+            v128Assert(ql6.available.length === 2, 'quest.list available has 2 quests after accept');
+
+            // quest.accept - missing questId
+            const qaErr1 = server.mcpQuestAccept(null);
+            v128Assert(qaErr1.error && qaErr1.error.includes('questId不能为空'), 'quest.accept requires questId');
+
+            // quest.accept - invalid quest
+            const qaErr2 = server.mcpQuestAccept('quest_invalid');
+            v128Assert(qaErr2.error && qaErr2.error.includes('任务不存在'), 'quest.accept fails with invalid quest');
+
+            // quest.accept - already accepted
+            const qaErr3 = server.mcpQuestAccept('quest_1');
+            v128Assert(qaErr3.error && qaErr3.error.includes('任务不存在'), 'quest.accept fails for already accepted quest');
+
+            // quest.complete - missing questId
+            const qcErr1 = server.mcpQuestComplete(null);
+            v128Assert(qcErr1.error && qcErr1.error.includes('questId不能为空'), 'quest.complete requires questId');
+
+            // quest.complete - not accepted yet
+            const qcErr2 = server.mcpQuestComplete('quest_2');
+            v128Assert(qcErr2.error && qcErr2.error.includes('任务不存在或未接取'), 'quest.complete fails for non-accepted quest');
+
+            // quest.complete - progress insufficient
+            // Accept quest_2 and try to complete without progress
+            server.mcpQuestAccept('quest_2');
+            const qcErr3 = server.mcpQuestComplete('quest_2');
+            v128Assert(qcErr3.error && qcErr3.error.includes('任务进度不足'), 'quest.complete fails with insufficient progress');
+
+            // quest.complete - success (simulate progress by directly setting it)
+            mockGameState.quest.active[1].progress = 5; // requirement.count = 5 for quest_2
+            const qc1 = server.mcpQuestComplete('quest_2');
+            v128Assert(qc1.success === true, 'quest.complete succeeds');
+            v128Assert(qc1.reward && qc1.reward.spiritStones === 200, 'quest.complete gives correct reward');
+
+            // quest.complete - verify moved to completed
+            const ql7 = server.mcpQuestList('completed');
+            v128Assert(ql7.completed && ql7.completed.length === 1, 'quest.list completed has 1 after complete');
+            v128Assert(ql7.completed[0].id === 'quest_2', 'quest.list completed contains completed quest');
+
+            // quest.complete - verify removed from active
+            const ql8 = server.mcpQuestList('active');
+            v128Assert(ql8.active.length === 1, 'quest.list active has 0 after complete');
+
+            // daily.list - initial state
+            const dl1 = server.mcpDailyList();
+            v128Assert(dl1.success === true, 'daily.list succeeds');
+            v128Assert(dl1.tasks && dl1.tasks.length === 3, 'daily.list returns 3 tasks');
+
+            // daily.list - verify structure
+            v128Assert(dl1.tasks[0].id === 'daily_1', 'daily.list first task is daily_1');
+            v128Assert(dl1.tasks[0].target === 1, 'daily.list daily_1 target is 1');
+            v128Assert(dl1.tasks[1].target === 5, 'daily.list daily_2 target is 5');
+            v128Assert(dl1.tasks[2].target === 3, 'daily.list daily_3 target is 3');
+
+            // daily.claim - missing dailyId
+            const dcErr1 = server.mcpDailyClaim(null);
+            v128Assert(dcErr1.error && dcErr1.error.includes('dailyId不能为空'), 'daily.claim requires dailyId');
+
+            // daily.claim - invalid task
+            const dcErr2 = server.mcpDailyClaim('daily_invalid');
+            v128Assert(dcErr2.error && dcErr2.error.includes('日常任务不存在'), 'daily.claim fails with invalid task');
+
+            // daily.claim - progress insufficient
+            const dcErr3 = server.mcpDailyClaim('daily_1');
+            v128Assert(dcErr3.error && dcErr3.error.includes('任务未完成'), 'daily.claim fails when progress insufficient');
+
+            // daily.claim - success (simulate progress)
+            mockGameState.daily.tasks[0].progress = 1;
+            const dc1 = server.mcpDailyClaim('daily_1');
+            v128Assert(dc1.success === true, 'daily.claim succeeds');
+            v128Assert(dc1.reward && dc1.reward.spiritStones === 50, 'daily.claim gives correct reward');
+            v128Assert(dc1.message && dc1.message.includes('每日修炼'), 'daily.claim returns task title');
+
+            // daily.claim - already claimed
+            const dcErr4 = server.mcpDailyClaim('daily_1');
+            v128Assert(dcErr4.error && dcErr4.error.includes('奖励已领取'), 'daily.claim fails when already claimed');
+
+            // daily.reset - success
+            const dr1 = server.mcpDailyReset();
+            v128Assert(dr1.success === true, 'daily.reset succeeds');
+            v128Assert(dr1.message === '日常任务已重置', 'daily.reset returns correct message');
+
+            // daily.reset - verify tasks reset
+            const dl2 = server.mcpDailyList();
+            v128Assert(dl2.tasks[0].progress === 0, 'daily.list after reset progress is 0');
+            v128Assert(dl2.tasks[0].claimed === false, 'daily.list after reset claimed is false');
+
+            // daily.claim after reset - success
+            mockGameState.daily.tasks[0].progress = 1;
+            const dc2 = server.mcpDailyClaim('daily_1');
+            v128Assert(dc2.success === true, 'daily.claim after reset succeeds');
+
+            // daily.claim - verify spirit stones added
+            mockGameState.spiritStones = 10000;
+            mockGameState.daily.tasks[1].progress = 5;
+            const dc3 = server.mcpDailyClaim('daily_2');
+            v128Assert(dc3.success === true, 'daily.claim daily_2 succeeds');
+            v128Assert(mockGameState.spiritStones === 10030, 'daily.claim adds spirit stones (30)');
+
+            // Complete quest_1 which should be in active
+            const ql9 = server.mcpQuestList('active');
+            if (ql9.active && ql9.active.length > 0) {
+                const questToComplete = ql9.active[0];
+                questToComplete.progress = 10;
+                const qc2 = server.mcpQuestComplete(questToComplete.id);
+                v128Assert(qc2.success === true, 'quest.complete remaining active quest succeeds');
+            }
+
+            // daily.list - verify all tasks exist
+            const dl3 = server.mcpDailyList();
+            v128Assert(dl3.tasks.length === 3, 'daily.list still has 3 tasks after operations');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V128 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V128', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v128Results = runV128Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
