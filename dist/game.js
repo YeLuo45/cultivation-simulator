@@ -5567,6 +5567,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V162)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V163: Register 邮件+公告系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V163)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5665,6 +5669,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'collection.reset':
                             result = this.mcpCollectionResetV3();
+                            break;
+                        // V163: 邮件+公告系统v3
+                        case 'mail.list':
+                            result = this.mcpMailListV3();
+                            break;
+                        case 'mail.send':
+                            result = this.mcpMailSendV3(args.to, args.title, args.content);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailReadV3(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = this.mcpMailDeleteV3(args.mailId);
+                            break;
+                        case 'announce.list':
+                            result = this.mcpAnnounceListV3();
+                            break;
+                        case 'announce.view':
+                            result = this.mcpAnnounceViewV3(args.announceId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -17909,6 +17932,186 @@ const ACHIEVEMENT_ID_MAP = {
                         success: true,
                         cost: resetCost,
                         message: '重置成功！消耗' + resetCost + '灵石，所有图鉴已重置为未解锁'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: _initMailStateV3 - 初始化邮件系统状态v3
+            _initMailStateV3() {
+                const gs = window.gameState;
+                if (!gs.mailV3) {
+                    gs.mailV3 = {
+                        inbox: [
+                            { id: 'mail_v3_001', from: '系统', fromId: 'system', title: '欢迎使用邮件系统v3', content: '邮件系统v3已启用，您可以发送和接收邮件了。', timestamp: Date.now() - 86400000, read: false, hasAttachment: false },
+                            { id: 'mail_v3_002', from: '掌门', fromId: 'elder_001', title: '门派任务通知', content: '门派有新任务发布，请及时查看。', timestamp: Date.now() - 172800000, read: false, hasAttachment: true }
+                        ],
+                        sent: [
+                            { id: 'mail_sent_v3_001', to: '道友', toId: 'fellow_001', title: '切磋邀请', content: '近日修为有所精进，想与道友切磋一番。', timestamp: Date.now() - 3600000, cost: 10 }
+                        ],
+                        nextId: 3
+                    };
+                }
+                return gs.mailV3;
+            }
+
+            // V163: _initAnnounceStateV3 - 初始化公告系统状态v3
+            _initAnnounceStateV3() {
+                const gs = window.gameState;
+                if (!gs.announceV3) {
+                    gs.announceV3 = {
+                        announcements: [
+                            { id: 'ann_v3_001', title: '欢迎来到修仙世界v3', content: '各位修士，欢迎踏入修仙之路！邮件系统和公告系统已全面升级。', timestamp: Date.now() - 86400000, priority: 'high', expiresAt: null },
+                            { id: 'ann_v3_002', title: '新版本更新公告', content: 'V163版本已更新，新增邮件系统v3和公告系统v3，详情请查看游戏内说明。', timestamp: Date.now() - 172800000, priority: 'medium', expiresAt: null },
+                            { id: 'ann_v3_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', timestamp: Date.now() - 259200000, priority: 'high', expiresAt: Date.now() + 604800000 },
+                            { id: 'ann_v3_004', title: '系统维护通知', content: '系统将于明日凌晨进行维护，请提前做好准备。', timestamp: Date.now() - 432000000, priority: 'low', expiresAt: Date.now() + 86400000 }
+                        ],
+                        viewed: []
+                    };
+                }
+                return gs.announceV3;
+            }
+
+            // V163: mcpMailListV3 - 获取邮件列表v3
+            mcpMailListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mailV3 = this._initMailStateV3();
+                    const inbox = mailV3.inbox.map(m => ({
+                        id: m.id,
+                        from: m.from,
+                        fromId: m.fromId,
+                        title: m.title,
+                        timestamp: m.timestamp,
+                        read: m.read,
+                        hasAttachment: m.hasAttachment
+                    }));
+                    return {
+                        success: true,
+                        inbox: inbox,
+                        sentCount: mailV3.sent.length,
+                        unreadCount: inbox.filter(m => !m.read).length,
+                        message: '收件箱共' + inbox.length + '封邮件，' + (inbox.length - inbox.filter(m => !m.read).length) + '封已读'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: mcpMailSendV3 - 发送邮件v3
+            mcpMailSendV3(to, title, content) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!to || !title || !content) return { error: '请提供收件人ID、标题和内容' };
+                    const cost = 10;
+                    if (gs.spiritStones < cost) return { error: '灵石不足，发送邮件需要' + cost + '灵石' };
+                    gs.spiritStones -= cost;
+                    const mailV3 = this._initMailStateV3();
+                    const newMail = {
+                        id: 'mail_sent_v3_' + mailV3.nextId++,
+                        to: to,
+                        toId: to,
+                        title: title,
+                        content: content,
+                        timestamp: Date.now(),
+                        cost: cost
+                    };
+                    mailV3.sent.push(newMail);
+                    return {
+                        success: true,
+                        mailId: newMail.id,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '邮件发送成功，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: mcpMailReadV3 - 读取邮件内容v3
+            mcpMailReadV3(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV3 = this._initMailStateV3();
+                    const mail = mailV3.inbox.find(m => m.id === mailId);
+                    if (!mail) return { error: '邮件不存在' };
+                    mail.read = true;
+                    return {
+                        success: true,
+                        id: mail.id,
+                        from: mail.from,
+                        fromId: mail.fromId,
+                        title: mail.title,
+                        content: mail.content,
+                        timestamp: mail.timestamp,
+                        hasAttachment: mail.hasAttachment,
+                        message: '邮件读取成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: mcpMailDeleteV3 - 删除邮件v3
+            mcpMailDeleteV3(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV3 = this._initMailStateV3();
+                    const idx = mailV3.inbox.findIndex(m => m.id === mailId);
+                    if (idx === -1) return { error: '邮件不存在' };
+                    mailV3.inbox.splice(idx, 1);
+                    return {
+                        success: true,
+                        message: '邮件删除成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: mcpAnnounceListV3 - 获取公告列表v3
+            mcpAnnounceListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announceV3 = this._initAnnounceStateV3();
+                    const now = Date.now();
+                    const activeAnnouncements = announceV3.announcements.filter(a => !a.expiresAt || a.expiresAt > now);
+                    return {
+                        success: true,
+                        announcements: activeAnnouncements.map(a => ({
+                            id: a.id,
+                            title: a.title,
+                            timestamp: a.timestamp,
+                            priority: a.priority,
+                            expiresAt: a.expiresAt
+                        })),
+                        total: activeAnnouncements.length,
+                        message: '共' + activeAnnouncements.length + '条公告'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V163: mcpAnnounceViewV3 - 查看公告详情v3
+            mcpAnnounceViewV3(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '请指定公告ID' };
+                    const announceV3 = this._initAnnounceStateV3();
+                    const announcement = announceV3.announcements.find(a => a.id === announceId);
+                    if (!announcement) return { error: '公告不存在' };
+                    if (announcement.expiresAt && announcement.expiresAt <= Date.now()) return { error: '公告已过期' };
+                    if (!announceV3.viewed.includes(announceId)) {
+                        announceV3.viewed.push(announceId);
+                    }
+                    return {
+                        success: true,
+                        id: announcement.id,
+                        title: announcement.title,
+                        content: announcement.content,
+                        timestamp: announcement.timestamp,
+                        priority: announcement.priority,
+                        expiresAt: announcement.expiresAt,
+                        message: '公告读取成功'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -33949,6 +34152,66 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'collection.reset',
                 description: '重置收集进度 (收集系统v3-重置所有收集进度，需消耗灵石)',
                 inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V163: 邮件+公告系统v3
+        const MCP_TOOLS_V163 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统v3-获取收件箱和已发送邮件列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统v3-发送邮件，消耗10灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        to: { type: 'string', description: '收件人ID' },
+                        title: { type: 'string', description: '邮件标题' },
+                        content: { type: 'string', description: '邮件内容' }
+                    },
+                    required: ['to', 'title', 'content']
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件内容 (邮件系统v3-读取邮件并标记为已读)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统v3-删除指定邮件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统v3-获取未过期的公告列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统v3-查看公告详情并标记为已查看)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
+                }
             }
         };
 
@@ -60692,6 +60955,294 @@ const v152Results = runV152Tests();
             }
 
             const v162Results = runV162Tests();
+
+            // V163 Tests (P-20260529-004)
+            function runV163Tests() {
+                const results = [];
+                const v163Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+                window.gameState = {
+                    spiritStones: 50000,
+                    level: 15,
+                    name: 'TestUser',
+                    title: ''
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V163 definition exists and has 6 tools
+                v163Assert(typeof MCP_TOOLS_V163 === 'object', 'MCP_TOOLS_V163 is defined');
+                v163Assert(Object.keys(MCP_TOOLS_V163).length === 6, 'MCP_TOOLS_V163 has 6 tools');
+                v163Assert('mail.list' in MCP_TOOLS_V163, 'mail.list tool exists');
+                v163Assert('mail.send' in MCP_TOOLS_V163, 'mail.send tool exists');
+                v163Assert('mail.read' in MCP_TOOLS_V163, 'mail.read tool exists');
+                v163Assert('mail.delete' in MCP_TOOLS_V163, 'mail.delete tool exists');
+                v163Assert('announce.list' in MCP_TOOLS_V163, 'announce.list tool exists');
+                v163Assert('announce.view' in MCP_TOOLS_V163, 'announce.view tool exists');
+
+                // Test 2: _initMailStateV3 initializes correctly
+                const mailV3State = server._initMailStateV3();
+                v163Assert(mailV3State !== null, '_initMailStateV3 returns state');
+                v163Assert(Array.isArray(mailV3State.inbox), 'mailV3 inbox is array');
+                v163Assert(mailV3State.inbox.length === 2, 'mailV3 has 2 initial inbox mails');
+                v163Assert(Array.isArray(mailV3State.sent), 'mailV3 sent is array');
+                v163Assert(mailV3State.sent.length === 1, 'mailV3 has 1 initial sent mail');
+                v163Assert(mailV3State.nextId === 3, 'mailV3 nextId is 3');
+
+                // Test 3: _initAnnounceStateV3 initializes correctly
+                const announceV3State = server._initAnnounceStateV3();
+                v163Assert(announceV3State !== null, '_initAnnounceStateV3 returns state');
+                v163Assert(Array.isArray(announceV3State.announcements), 'announceV3 announcements is array');
+                v163Assert(announceV3State.announcements.length === 4, 'announceV3 has 4 initial announcements');
+                v163Assert(Array.isArray(announceV3State.viewed), 'announceV3 viewed is array');
+                v163Assert(announceV3State.viewed.length === 0, 'announceV3 viewed is initially empty');
+
+                // Test 4: mcpMailListV3 returns mail list
+                const mlV3 = server.mcpMailListV3();
+                v163Assert(mlV3.success === true, 'mail.list v3 returns success');
+                v163Assert(mlV3.inbox.length === 2, 'mail.list v3 shows 2 inbox mails');
+                v163Assert(mlV3.sentCount === 1, 'mail.list v3 shows 1 sent mail');
+                v163Assert(mlV3.unreadCount === 2, 'mail.list v3 shows 2 unread mails');
+
+                // Test 5: mcpMailSendV3 sends mail
+                window.gameState.spiritStones = 50000;
+                const msV3 = server.mcpMailSendV3('player_002', '测试邮件v3', '这是测试内容v3');
+                v163Assert(msV3.success === true, 'mail.send v3 returns success');
+                v163Assert(msV3.mailId && msV3.mailId.startsWith('mail_sent_v3_'), 'mail.send v3 returns mailSent_v3_ id');
+                v163Assert(msV3.cost === 10, 'mail.send v3 costs 10 spirit stones');
+                v163Assert(msV3.remainingSpiritStones === 49990, 'mail.send v3 deducts cost');
+
+                // Test 6: mcpMailSendV3 fails without parameters
+                const msV3Err1 = server.mcpMailSendV3();
+                v163Assert(msV3Err1.error && msV3Err1.error.includes('收件人ID'), 'mail.send v3 missing params error');
+
+                // Test 7: mcpMailSendV3 fails when insufficient spirit stones
+                window.gameState.spiritStones = 5;
+                const msV3Err2 = server.mcpMailSendV3('player_002', '测试', '内容');
+                v163Assert(msV3Err2.error && msV3Err2.error.includes('灵石不足'), 'mail.send v3 insufficient stones error');
+
+                // Test 8: mcpMailReadV3 reads mail
+                window.gameState.spiritStones = 50000;
+                const mrV3 = server.mcpMailReadV3('mail_v3_001');
+                v163Assert(mrV3.success === true, 'mail.read v3 returns success');
+                v163Assert(mrV3.title === '欢迎使用邮件系统v3', 'mail.read v3 title correct');
+                v163Assert(mrV3.content === '邮件系统v3已启用，您可以发送和接收邮件了。', 'mail.read v3 content correct');
+                v163Assert(mrV3.from === '系统', 'mail.read v3 from correct');
+
+                // Test 9: mcpMailReadV3 marks mail as read
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                const mrV3_2 = server.mcpMailReadV3('mail_v3_002');
+                v163Assert(mrV3_2.read !== false, 'mail.read v3 marks as read');
+
+                // Test 10: mcpMailReadV3 fails for invalid mailId
+                const mrV3Err1 = server.mcpMailReadV3('invalid_mail');
+                v163Assert(mrV3Err1.error && mrV3Err1.error.includes('不存在'), 'mail.read v3 invalid mail error');
+
+                // Test 11: mcpMailReadV3 fails without mailId
+                const mrV3Err2 = server.mcpMailReadV3();
+                v163Assert(mrV3Err2.error && mrV3Err2.error.includes('邮件ID'), 'mail.read v3 missing mailId error');
+
+                // Test 12: mcpMailDeleteV3 deletes mail
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                const mdV3 = server.mcpMailDeleteV3('mail_v3_001');
+                v163Assert(mdV3.success === true, 'mail.delete v3 returns success');
+                v163Assert(mdV3.message.includes('删除成功'), 'mail.delete v3 message correct');
+
+                // Test 13: mcpMailDeleteV3 reduces inbox count
+                const mlV3_2 = server.mcpMailListV3();
+                v163Assert(mlV3_2.inbox.length === 1, 'mail.delete v3 reduces inbox count');
+
+                // Test 14: mcpMailDeleteV3 fails for invalid mailId
+                const mdV3Err1 = server.mcpMailDeleteV3('invalid_mail');
+                v163Assert(mdV3Err1.error && mdV3Err1.error.includes('不存在'), 'mail.delete v3 invalid mail error');
+
+                // Test 15: mcpMailDeleteV3 fails without mailId
+                const mdV3Err2 = server.mcpMailDeleteV3();
+                v163Assert(mdV3Err2.error && mdV3Err2.error.includes('邮件ID'), 'mail.delete v3 missing mailId error');
+
+                // Test 16: mcpAnnounceListV3 returns announcement list
+                const alV3 = server.mcpAnnounceListV3();
+                v163Assert(alV3.success === true, 'announce.list v3 returns success');
+                v163Assert(alV3.announcements.length === 4, 'announce.list v3 shows 4 announcements');
+                v163Assert(alV3.total === 4, 'announce.list v3 total is 4');
+
+                // Test 17: mcpAnnounceListV3 filters expired announcements
+                const alV3_2 = server.mcpAnnounceListV3();
+                const expiredAnn = alV3_2.announcements.find(a => a.id === 'ann_v3_004');
+                v163Assert(expiredAnn !== undefined, 'announce.list v3 non-expired announcement included');
+
+                // Test 18: mcpAnnounceViewV3 views announcement
+                const avV3 = server.mcpAnnounceViewV3('ann_v3_001');
+                v163Assert(avV3.success === true, 'announce.view v3 returns success');
+                v163Assert(avV3.title === '欢迎来到修仙世界v3', 'announce.view v3 title correct');
+                v163Assert(avV3.content.includes('修士'), 'announce.view v3 content correct');
+                v163Assert(avV3.priority === 'high', 'announce.view v3 priority correct');
+
+                // Test 19: mcpAnnounceViewV3 marks as viewed
+                window.gameState.announceV3 = null;
+                server._initAnnounceStateV3();
+                server.mcpAnnounceViewV3('ann_v3_002');
+                const avV3_2 = server.mcpAnnounceViewV3('ann_v3_002');
+                v163Assert(window.gameState.announceV3.viewed.includes('ann_v3_002'), 'announce.view v3 marks as viewed');
+
+                // Test 20: mcpAnnounceViewV3 returns content field
+                const avV3_3 = server.mcpAnnounceViewV3('ann_v3_003');
+                v163Assert(avV3_3.content === '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', 'announce.view v3 content field correct');
+                v163Assert(avV3_3.expiresAt !== null, 'announce.view v3 has expiresAt');
+
+                // Test 21: mcpAnnounceViewV3 fails for invalid announceId
+                const avV3Err1 = server.mcpAnnounceViewV3('invalid_announce');
+                v163Assert(avV3Err1.error && avV3Err1.error.includes('不存在'), 'announce.view v3 invalid announce error');
+
+                // Test 22: mcpAnnounceViewV3 fails without announceId
+                const avV3Err2 = server.mcpAnnounceViewV3();
+                v163Assert(avV3Err2.error && avV3Err2.error.includes('公告ID'), 'announce.view v3 missing announceId error');
+
+                // Test 23: mail.list v3 inbox mail structure
+                const mlV3_3 = server.mcpMailListV3();
+                const inboxMail = mlV3_3.inbox[0];
+                v163Assert(inboxMail.id !== undefined, 'mail.list v3 inbox mail has id');
+                v163Assert(inboxMail.from !== undefined, 'mail.list v3 inbox mail has from');
+                v163Assert(inboxMail.title !== undefined, 'mail.list v3 inbox mail has title');
+                v163Assert(inboxMail.timestamp !== undefined, 'mail.list v3 inbox mail has timestamp');
+                v163Assert(inboxMail.read !== undefined, 'mail.list v3 inbox mail has read');
+
+                // Test 24: mail.send v3 adds to sent array
+                window.gameState.mailV3 = null;
+                window.gameState.spiritStones = 50000;
+                server._initMailStateV3();
+                server.mcpMailSendV3('player_003', 'Another test v3', 'More content v3');
+                const mlV3_4 = server.mcpMailListV3();
+                v163Assert(mlV3_4.sentCount === 2, 'mail.send v3 adds to sent array');
+
+                // Test 25: mail.list v3 sent mail structure
+                const mlV3_5 = server.mcpMailListV3();
+                v163Assert(mlV3_5.sentCount === 2, 'mail.list v3 sentCount is 2');
+
+                // Test 26: mail.read v3 returns hasAttachment field
+                const mrV3_3 = server.mcpMailReadV3('mail_v3_002');
+                v163Assert(mrV3_3.hasAttachment === true, 'mail.read v3 returns hasAttachment field');
+
+                // Test 27: mail.read v3 returns fromId field
+                const mrV3_4 = server.mcpMailReadV3('mail_v3_001');
+                v163Assert(mrV3_4.fromId === 'system', 'mail.read v3 returns fromId field');
+
+                // Test 28: announce.list v3 announcement structure
+                const alV3_3 = server.mcpAnnounceListV3();
+                const ann = alV3_3.announcements[0];
+                v163Assert(ann.id !== undefined, 'announce.list v3 announcement has id');
+                v163Assert(ann.title !== undefined, 'announce.list v3 announcement has title');
+                v163Assert(ann.timestamp !== undefined, 'announce.list v3 announcement has timestamp');
+                v163Assert(ann.priority !== undefined, 'announce.list v3 announcement has priority');
+
+                // Test 29: mail.delete v3 only deletes from inbox
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                server.mcpMailDeleteV3('mail_v3_001');
+                const mlV3_6 = server.mcpMailListV3();
+                v163Assert(mlV3_6.sentCount === 1, 'mail.delete v3 does not affect sent');
+
+                // Test 30: mcpAnnounceViewV3 second call returns same content
+                const avV3_4 = server.mcpAnnounceViewV3('ann_v3_001');
+                v163Assert(avV3_4.content === avV3.content, 'announce.view v3 content is consistent');
+
+                // Test 31: _initMailStateV3 reuses existing state
+                const mailV3State2 = server._initMailStateV3();
+                v163Assert(mailV3State === mailV3State2, '_initMailStateV3 reuses existing state');
+
+                // Test 32: _initAnnounceStateV3 reuses existing state
+                const announceV3State2 = server._initAnnounceStateV3();
+                v163Assert(announceV3State === announceV3State2, '_initAnnounceStateV3 reuses existing state');
+
+                // Test 33: mail.send v3 generates unique mailId
+                window.gameState.spiritStones = 50000;
+                const msV3_2 = server.mcpMailSendV3('player_004', 'Test 2', 'Content 2');
+                const msV3_3 = server.mcpMailSendV3('player_005', 'Test 3', 'Content 3');
+                v163Assert(msV3_2.mailId !== msV3_3.mailId, 'mail.send v3 generates unique mailIds');
+
+                // Test 34: mail.delete v3 returns success even for already deleted
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                server.mcpMailDeleteV3('mail_v3_001');
+                const mdV3_3 = server.mcpMailDeleteV3('mail_v3_001');
+                v163Assert(mdV3_3.error && mdV3_3.error.includes('不存在'), 'mail.delete v3 fails for already deleted mail');
+
+                // Test 35: announce.list v3 returns active announcements only
+                window.gameState.announceV3 = null;
+                server._initAnnounceStateV3();
+                window.gameState.announceV3.announcements[3].expiresAt = Date.now() - 1000;
+                const alV3_4 = server.mcpAnnounceListV3();
+                v163Assert(alV3_4.announcements.length === 3, 'announce.list v3 filters expired');
+
+                // Test 36: mail.list v3 message format
+                const mlV3_7 = server.mcpMailListV3();
+                v163Assert(mlV3_7.message.includes('收件箱'), 'mail.list v3 message format correct');
+
+                // Test 37: announce.list v3 message format
+                const alV3_5 = server.mcpAnnounceListV3();
+                v163Assert(alV3_5.message.includes('公告'), 'announce.list v3 message format correct');
+
+                // Test 38: mcpMailSendV3 deducts correct amount
+                window.gameState.spiritStones = 100;
+                const msV3_4 = server.mcpMailSendV3('player_006', 'Cost Test', 'Testing cost');
+                v163Assert(msV3_4.remainingSpiritStones === 90, 'mail.send v3 deducts exactly 10');
+
+                // Test 39: mcpAnnounceViewV3 does not duplicate viewed entries
+                window.gameState.announceV3 = null;
+                server._initAnnounceStateV3();
+                server.mcpAnnounceViewV3('ann_v3_003');
+                server.mcpAnnounceViewV3('ann_v3_003');
+                server.mcpAnnounceViewV3('ann_v3_003');
+                v163Assert(window.gameState.announceV3.viewed.length === 1, 'announce.view v3 no duplicate viewed entries');
+                v163Assert(window.gameState.announceV3.viewed[0] === 'ann_v3_003', 'announce.view v3 viewed entry correct');
+
+                // Test 40: mail.list v3 after delete shows correct unreadCount
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                server.mcpMailDeleteV3('mail_v3_002');
+                const mlV3_8 = server.mcpMailListV3();
+                v163Assert(mlV3_8.unreadCount === 1, 'mail.list v3 correct unreadCount after delete');
+
+                // Test 41: mcpMailReadV3 sets read to true on mail object
+                window.gameState.mailV3 = null;
+                server._initMailStateV3();
+                server.mcpMailReadV3('mail_v3_001');
+                v163Assert(window.gameState.mailV3.inbox.find(m => m.id === 'mail_v3_001').read === true, 'mail.read v3 sets read flag on mail object');
+
+                // Test 42: mcpAnnounceViewV3 returns expiresAt field
+                const avV3_5 = server.mcpAnnounceViewV3('ann_v3_003');
+                v163Assert(avV3_5.expiresAt !== null && avV3_5.expiresAt > Date.now(), 'announce.view v3 returns valid expiresAt');
+
+                // Test 43: announce.list v3 with all expired returns empty
+                window.gameState.announceV3 = null;
+                server._initAnnounceStateV3();
+                window.gameState.announceV3.announcements.forEach(a => a.expiresAt = Date.now() - 1000);
+                const alV3_6 = server.mcpAnnounceListV3();
+                v163Assert(alV3_6.announcements.length === 0, 'announce.list v3 returns empty when all expired');
+                v163Assert(alV3_6.total === 0, 'announce.list v3 total is 0 when all expired');
+
+                // Test 44: mail.send v3 with edge case empty strings
+                window.gameState.spiritStones = 50000;
+                const msV3Err3 = server.mcpMailSendV3('', 'Title', 'Content');
+                v163Assert(msV3Err3.error && msV3Err3.error.includes('收件人ID'), 'mail.send v3 rejects empty to');
+
+                // Test 45: mcpAnnounceViewV3 for expired announcement fails
+                window.gameState.announceV3 = null;
+                server._initAnnounceStateV3();
+                window.gameState.announceV3.announcements[0].expiresAt = Date.now() - 1000;
+                const avV3Err3 = server.mcpAnnounceViewV3('ann_v3_001');
+                v163Assert(avV3Err3.error && avV3Err3.error.includes('已过期'), 'announce.view v3 fails for expired');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V163 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V163', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v163Results = runV163Tests();
 
         const v150Results = runV150Tests();
 
