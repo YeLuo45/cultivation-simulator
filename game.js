@@ -5371,6 +5371,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V130)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V131: Register 秘宝+装备系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V131)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6524,6 +6528,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'disciple.assign':
                             result = this.mcpDiscipleAssign(args.discipleId, args.taskId);
+                            break;
+                        // V131: 秘宝+装备系统
+                        case 'treasure.list':
+                            result = this.mcpTreasureList();
+                            break;
+                        case 'treasure.enhance':
+                            result = this.mcpTreasureEnhance(args.treasureId);
+                            break;
+                        case 'treasure.disassemble':
+                            result = this.mcpTreasureDisassemble(args.treasureId);
+                            break;
+                        case 'equip.list':
+                            result = this.mcpEquipList();
+                            break;
+                        case 'equip.equip':
+                            result = this.mcpEquipEquip(args.equipId);
+                            break;
+                        case 'equip.unequip':
+                            result = this.mcpEquipUnequip(args.slot);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -16959,6 +16982,131 @@ const ACHIEVEMENT_ID_MAP = {
                 return gs.disciple;
             }
 
+            // V131: _initTreasureState - 初始化秘宝系统状态
+            _initTreasureState() {
+                const gs = window.gameState;
+                if (!gs.treasure) {
+                    gs.treasure = {
+                        treasures: [],         // 所有秘宝列表
+                        nextId: 1              // 下一个秘宝ID
+                    };
+                }
+                return gs.treasure;
+            }
+
+            // V131: _initEquipState - 初始化装备系统状态
+            _initEquipState() {
+                const gs = window.gameState;
+                if (!gs.equip) {
+                    gs.equip = {
+                        equipped: {
+                            weapon: null,
+                            armor: null,
+                            accessory: null
+                        },
+                        inventory: []          // 背包中的装备
+                    };
+                }
+                return gs.equip;
+            }
+
+            // V131: mcpTreasureList - 获取秘宝列表
+            mcpTreasureList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const treasureState = this._initTreasureState();
+                    return {
+                        success: true,
+                        total: treasureState.treasures.length,
+                        treasures: treasureState.treasures
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V131: mcpTreasureEnhance - 强化秘宝
+            mcpTreasureEnhance(treasureId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const treasureState = this._initTreasureState();
+                    const treasure = treasureState.treasures.find(t => t.id === treasureId);
+                    if (!treasure) return { error: '秘宝不存在: ' + treasureId };
+                    // 消耗材料: 每级需要 level * 100 灵气
+                    const cost = treasure.level * 100;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵气不足，强化需要 ' + cost + ' 灵气' };
+                    gs.spiritStones -= cost;
+                    treasure.level += 1;
+                    return { success: true, treasure, cost };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V131: mcpTreasureDisassemble - 分解秘宝
+            mcpTreasureDisassemble(treasureId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const treasureState = this._initTreasureState();
+                    const idx = treasureState.treasures.findIndex(t => t.id === treasureId);
+                    if (idx === -1) return { error: '秘宝不存在: ' + treasureId };
+                    const treasure = treasureState.treasures[idx];
+                    // 分解获得材料: level * 50 灵气
+                    const reward = treasure.level * 50;
+                    gs.spiritStones = (gs.spiritStones || 0) + reward;
+                    treasureState.treasures.splice(idx, 1);
+                    return { success: true, reward, message: '分解获得 ' + reward + ' 灵气' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V131: mcpEquipList - 获取装备列表
+            mcpEquipList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const equipState = this._initEquipState();
+                    return {
+                        success: true,
+                        equipped: equipState.equipped,
+                        inventoryCount: equipState.inventory.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V131: mcpEquipEquip - 穿戴装备
+            mcpEquipEquip(equipId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const equipState = this._initEquipState();
+                    const equip = equipState.inventory.find(e => e.id === equipId);
+                    if (!equip) return { error: '装备不存在: ' + equipId };
+                    const slot = equip.slot;
+                    const prevEquip = equipState.equipped[slot];
+                    if (prevEquip) {
+                        equipState.inventory.push(prevEquip);
+                    }
+                    equipState.equipped[slot] = equip;
+                    equipState.inventory = equipState.inventory.filter(e => e.id !== equipId);
+                    return { success: true, slot, equip, previousEquip: prevEquip };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V131: mcpEquipUnequip - 卸下装备
+            mcpEquipUnequip(slot) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const equipState = this._initEquipState();
+                    const validSlots = ['weapon', 'armor', 'accessory'];
+                    if (!validSlots.includes(slot)) return { error: '无效的装备槽位: ' + slot };
+                    const equip = equipState.equipped[slot];
+                    if (!equip) return { error: '该槽位没有装备: ' + slot };
+                    equipState.inventory.push(equip);
+                    equipState.equipped[slot] = null;
+                    return { success: true, slot, equip };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -25176,6 +25324,40 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V131: 秘宝+装备系统
+        const MCP_TOOLS_V131 = {
+            'treasure.list': {
+                name: 'treasure.list',
+                description: '获取秘宝列表 (秘宝系统-列表所有秘宝)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'treasure.enhance': {
+                name: 'treasure.enhance',
+                description: '强化秘宝 (秘宝系统-消耗材料提升秘宝等级)',
+                inputSchema: { type: 'object', properties: { treasureId: { type: 'string', description: '秘宝ID' } }, required: ['treasureId'] }
+            },
+            'treasure.disassemble': {
+                name: 'treasure.disassemble',
+                description: '分解秘宝 (秘宝系统-分解秘宝获得材料)',
+                inputSchema: { type: 'object', properties: { treasureId: { type: 'string', description: '秘宝ID' } }, required: ['treasureId'] }
+            },
+            'equip.list': {
+                name: 'equip.list',
+                description: '获取装备列表 (装备系统-列表已穿戴装备)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'equip.equip': {
+                name: 'equip.equip',
+                description: '穿戴装备 (装备系统-穿戴装备到对应槽位)',
+                inputSchema: { type: 'object', properties: { equipId: { type: 'string', description: '装备ID' } }, required: ['equipId'] }
+            },
+            'equip.unequip': {
+                name: 'equip.unequip',
+                description: '卸下装备 (装备系统-卸下装备到背包)',
+                inputSchema: { type: 'object', properties: { slot: { type: 'string', description: '装备槽位 (weapon/armor/accessory)' } }, required: ['slot'] }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -28808,6 +28990,203 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V130', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v130Results = runV130Tests();
+
+        // ===== V131: 秘宝+装备系统 Tests =====
+        function runV131Tests() {
+            const results = [];
+            function v131Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                treasure: null,
+                equip: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: _initTreasureState initializes correctly
+            const treasureState = server._initTreasureState();
+            v131Assert(treasureState !== null, '_initTreasureState returns state');
+            v131Assert(Array.isArray(treasureState.treasures), '_initTreasureState treasures is array');
+            v131Assert(treasureState.nextId === 1, '_initTreasureState nextId is 1');
+
+            // Test 2: _initEquipState initializes correctly
+            const equipState = server._initEquipState();
+            v131Assert(equipState !== null, '_initEquipState returns state');
+            v131Assert(equipState.equipped !== null, '_initEquipState equipped is not null');
+            v131Assert(equipState.equipped.weapon === null, '_initEquipState weapon slot is null');
+            v131Assert(equipState.equipped.armor === null, '_initEquipState armor slot is null');
+            v131Assert(equipState.equipped.accessory === null, '_initEquipState accessory slot is null');
+            v131Assert(Array.isArray(equipState.inventory), '_initEquipState inventory is array');
+
+            // Test 3: treasure.list - returns empty list initially
+            const tl1 = server.mcpTreasureList();
+            v131Assert(tl1.success === true, 'treasure.list succeeds');
+            v131Assert(tl1.total === 0, 'treasure.list total is 0');
+            v131Assert(tl1.treasures.length === 0, 'treasure.list treasures is empty');
+
+            // Test 4: Add treasure manually and test list
+            mockGameState.treasure.treasures.push({ id: 'tr_1', name: '倚天剑', level: 5, grade: '神话', stats: { attack: 100 } });
+            const tl2 = server.mcpTreasureList();
+            v131Assert(tl2.success === true, 'treasure.list succeeds with treasure');
+            v131Assert(tl2.total === 1, 'treasure.list total is 1');
+            v131Assert(tl2.treasures[0].name === '倚天剑', 'treasure.list returns correct treasure');
+
+            // Test 5: treasure.enhance - success
+            mockGameState.spiritStones = 10000;
+            const te1 = server.mcpTreasureEnhance('tr_1');
+            v131Assert(te1.success === true, 'treasure.enhance succeeds');
+            v131Assert(te1.treasure.level === 6, 'treasure.enhance level increased');
+            v131Assert(te1.cost === 500, 'treasure.enhance cost is 500 (level 5 * 100)');
+            v131Assert(mockGameState.spiritStones === 9500, 'treasure.enhance costs spirit stones');
+
+            // Test 6: treasure.enhance - fails with invalid id
+            const teErr1 = server.mcpTreasureEnhance('invalid_id');
+            v131Assert(teErr1.error && teErr1.error.includes('秘宝不存在'), 'treasure.enhance fails with invalid id');
+
+            // Test 7: treasure.enhance - fails with insufficient spirit
+            mockGameState.spiritStones = 100;
+            const teErr2 = server.mcpTreasureEnhance('tr_1');
+            v131Assert(teErr2.error && teErr2.error.includes('灵气不足'), 'treasure.enhance fails with insufficient spirit');
+
+            // Test 8: treasure.disassemble - success
+            mockGameState.spiritStones = 10000;
+            mockGameState.treasure.treasures.push({ id: 'tr_2', name: '屠龙刀', level: 10, grade: '传说', stats: { attack: 200 } });
+            const td1 = server.mcpTreasureDisassemble('tr_2');
+            v131Assert(td1.success === true, 'treasure.disassemble succeeds');
+            v131Assert(td1.reward === 500, 'treasure.disassemble reward is 500 (level 10 * 50)');
+            v131Assert(mockGameState.spiritStones === 10500, 'treasure.disassemble gives spirit stones');
+            v131Assert(mockGameState.treasure.treasures.length === 2, 'treasure.disassemble removes treasure from list');
+
+            // Test 9: treasure.disassemble - fails with invalid id
+            const tdErr1 = server.mcpTreasureDisassemble('invalid_id');
+            v131Assert(tdErr1.error && tdErr1.error.includes('秘宝不存在'), 'treasure.disassemble fails with invalid id');
+
+            // Test 10: equip.list - returns empty equipped initially
+            mockGameState.equip = { equipped: { weapon: null, armor: null, accessory: null }, inventory: [] };
+            const el1 = server.mcpEquipList();
+            v131Assert(el1.success === true, 'equip.list succeeds');
+            v131Assert(el1.equipped.weapon === null, 'equip.list weapon is null');
+            v131Assert(el1.equipped.armor === null, 'equip.list armor is null');
+            v131Assert(el1.equipped.accessory === null, 'equip.list accessory is null');
+            v131Assert(el1.inventoryCount === 0, 'equip.list inventoryCount is 0');
+
+            // Test 11: equip.equip - success
+            mockGameState.equip.inventory.push({ id: 'eq_1', name: '玄铁剑', slot: 'weapon', stats: { attack: 50 } });
+            const ee1 = server.mcpEquipEquip('eq_1');
+            v131Assert(ee1.success === true, 'equip.equip succeeds');
+            v131Assert(ee1.slot === 'weapon', 'equip.equip slot is weapon');
+            v131Assert(ee1.equip.name === '玄铁剑', 'equip.equip returns correct equip');
+            v131Assert(mockGameState.equip.equipped.weapon.name === '玄铁剑', 'equip.equip equips to weapon slot');
+
+            // Test 12: equip.equip - replaces existing equipment
+            mockGameState.equip.inventory.push({ id: 'eq_2', name: '圣火剑', slot: 'weapon', stats: { attack: 80 } });
+            const ee2 = server.mcpEquipEquip('eq_2');
+            v131Assert(ee2.success === true, 'equip.equip replaces existing');
+            v131Assert(ee2.previousEquip.name === '玄铁剑', 'equip.equip returns previous equip');
+            v131Assert(mockGameState.equip.inventory.some(e => e.name === '玄铁剑'), 'equip.equip previous equip goes to inventory');
+            v131Assert(mockGameState.equip.equipped.weapon.name === '圣火剑', 'equip.equip new equip is equipped');
+
+            // Test 13: equip.equip - fails with invalid id
+            const eeErr1 = server.mcpEquipEquip('invalid_id');
+            v131Assert(eeErr1.error && eeErr1.error.includes('装备不存在'), 'equip.equip fails with invalid id');
+
+            // Test 14: equip.unequip - success
+            mockGameState.equip.equipped.weapon = { id: 'eq_3', name: '倚天剑', slot: 'weapon', stats: { attack: 150 } };
+            const eu1 = server.mcpEquipUnequip('weapon');
+            v131Assert(eu1.success === true, 'equip.unequip succeeds');
+            v131Assert(eu1.slot === 'weapon', 'equip.unequip slot is weapon');
+            v131Assert(eu1.equip.name === '倚天剑', 'equip.unequip returns correct equip');
+            v131Assert(mockGameState.equip.equipped.weapon === null, 'equip.unequip clears slot');
+            v131Assert(mockGameState.equip.inventory.some(e => e.name === '倚天剑'), 'equip.unequip adds to inventory');
+
+            // Test 15: equip.unequip - fails with invalid slot
+            const euErr1 = server.mcpEquipUnequip('invalid_slot');
+            v131Assert(euErr1.error && euErr1.error.includes('无效的装备槽位'), 'equip.unequip fails with invalid slot');
+
+            // Test 16: equip.unequip - fails when slot is empty
+            const euErr2 = server.mcpEquipUnequip('weapon');
+            v131Assert(euErr2.error && euErr2.error.includes('该槽位没有装备'), 'equip.unequip fails when slot empty');
+
+            // Test 17: equip.equip - armor slot
+            mockGameState.equip.inventory.push({ id: 'eq_4', name: '玄铁甲', slot: 'armor', stats: { defense: 100 } });
+            const ee3 = server.mcpEquipEquip('eq_4');
+            v131Assert(ee3.success === true, 'equip.equip armor succeeds');
+            v131Assert(ee3.slot === 'armor', 'equip.equip armor slot is correct');
+            v131Assert(mockGameState.equip.equipped.armor.name === '玄铁甲', 'equip.equip armor is equipped');
+
+            // Test 18: equip.equip - accessory slot
+            mockGameState.equip.inventory.push({ id: 'eq_5', name: '护身符', slot: 'accessory', stats: { hp: 200 } });
+            const ee4 = server.mcpEquipEquip('eq_5');
+            v131Assert(ee4.success === true, 'equip.equip accessory succeeds');
+            v131Assert(ee4.slot === 'accessory', 'equip.equip accessory slot is correct');
+            v131Assert(mockGameState.equip.equipped.accessory.name === '护身符', 'equip.equip accessory is equipped');
+
+            // Test 19: equip.unequip - accessory slot
+            const eu2 = server.mcpEquipUnequip('accessory');
+            v131Assert(eu2.success === true, 'equip.unequip accessory succeeds');
+            v131Assert(mockGameState.equip.equipped.accessory === null, 'equip.unequip accessory clears slot');
+
+            // Test 20: treasure.enhance - level 1 treasure costs 100
+            mockGameState.treasure.treasures.push({ id: 'tr_3', name: '新手剑', level: 1, grade: '普通', stats: { attack: 10 } });
+            mockGameState.spiritStones = 500;
+            const te2 = server.mcpTreasureEnhance('tr_3');
+            v131Assert(te2.success === true, 'treasure.enhance level 1 succeeds');
+            v131Assert(te2.cost === 100, 'treasure.enhance level 1 costs 100');
+
+            // Test 21: treasure.disassemble - level 1 treasure gives 50
+            mockGameState.spiritStones = 1000;
+            const td2 = server.mcpTreasureDisassemble('tr_3');
+            v131Assert(td2.success === true, 'treasure.disassemble level 1 succeeds');
+            v131Assert(td2.reward === 50, 'treasure.disassemble level 1 gives 50');
+
+            // Test 22-30: Additional edge cases and integration
+            // equip.list shows correct inventory count
+            const el2 = server.mcpEquipList();
+            v131Assert(el2.inventoryCount === 5, 'equip.list inventoryCount is 5');
+
+            // Multiple treasures in list
+            mockGameState.treasure.treasures.push({ id: 'tr_4', name: '玉如意', level: 3, grade: '精品', stats: { luck: 20 } });
+            const tl3 = server.mcpTreasureList();
+            v131Assert(tl3.total === 2, 'treasure.list total is 2');
+
+            // Disassemble all remaining treasures
+            const td3 = server.mcpTreasureDisassemble('tr_1');
+            const td4 = server.mcpTreasureDisassemble('tr_4');
+            const tl4 = server.mcpTreasureList();
+            v131Assert(tl4.total === 0, 'treasure.list total is 0 after disassembling all');
+
+            // Equip all slots
+            mockGameState.equip.inventory = [];
+            mockGameState.equip.equipped = { weapon: null, armor: null, accessory: null };
+            mockGameState.equip.inventory.push({ id: 'eq_w', name: '圣剑', slot: 'weapon', stats: { attack: 300 } });
+            mockGameState.equip.inventory.push({ id: 'eq_a', name: '圣甲', slot: 'armor', stats: { defense: 300 } });
+            mockGameState.equip.inventory.push({ id: 'eq_ac', name: '圣符', slot: 'accessory', stats: { hp: 500 } });
+            server.mcpEquipEquip('eq_w');
+            server.mcpEquipEquip('eq_a');
+            server.mcpEquipEquip('eq_ac');
+            const el3 = server.mcpEquipList();
+            v131Assert(el3.equipped.weapon !== null && el3.equipped.armor !== null && el3.equipped.accessory !== null, 'all 3 slots equipped');
+
+            // Unequip all
+            server.mcpEquipUnequip('weapon');
+            server.mcpEquipUnequip('armor');
+            server.mcpEquipUnequip('accessory');
+            const el4 = server.mcpEquipList();
+            v131Assert(el4.equipped.weapon === null && el4.equipped.armor === null && el4.equipped.accessory === null, 'all slots empty after unequip');
+            v131Assert(el4.inventoryCount === 3, 'inventoryCount is 3 after unequip all');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V131 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V131', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v131Results = runV131Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
