@@ -3465,6 +3465,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V135)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V136: Register 悬赏+任务链系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V136)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4713,6 +4717,25 @@
                             break;
                         case 'event.resolve':
                             result = this.mcpEventResolve(args.eventId);
+                            break;
+                        // V136: 悬赏+任务链系统
+                        case 'bounty.list':
+                            result = this.mcpBountyList();
+                            break;
+                        case 'bounty.accept':
+                            result = this.mcpBountyAccept(args.bountyId);
+                            break;
+                        case 'bounty.complete':
+                            result = this.mcpBountyComplete(args.bountyId);
+                            break;
+                        case 'questline.list':
+                            result = this.mcpQuestlineList();
+                            break;
+                        case 'questline.activate':
+                            result = this.mcpQuestlineActivate(args.questlineId);
+                            break;
+                        case 'questline.advance':
+                            result = this.mcpQuestlineAdvance(args.questlineId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -16116,6 +16139,194 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V136: _initBountyState - 初始化悬赏系统状态
+            _initBountyState() {
+                const gs = window.gameState;
+                if (!gs.bounty) {
+                    gs.bounty = {
+                        bounties: [
+                            { id: 'hunt_beast', title: '猎杀妖兽', description: '前往妖兽山脉猎杀一头筑基期妖兽', reward: { spiritStones: 2000, reputation: 50 }, difficulty: 'medium', expiresAt: null },
+                            { id: 'deliver_msg', title: '传递密信', description: '将密信送往青云宗', reward: { spiritStones: 500, reputation: 20 }, difficulty: 'easy', expiresAt: null },
+                            { id: 'collect_herb', title: '采集灵药', description: '在灵药谷采集10株百年灵药', reward: { spiritStones: 1500, materials: { herb: 5 } }, difficulty: 'medium', expiresAt: null },
+                            { id: 'escort_treasure', title: '护送宝物', description: '护送一件宝物穿越危险区域', reward: { spiritStones: 3000, reputation: 100 }, difficulty: 'hard', expiresAt: null },
+                            { id: 'elite_hunt', title: '精英猎杀', description: '猎杀一头金丹期妖兽', reward: { spiritStones: 8000, reputation: 200 }, difficulty: 'legendary', expiresAt: null }
+                        ],
+                        acceptedBounty: null
+                    };
+                }
+                return gs.bounty;
+            }
+
+            // V136: _initQuestlineState - 初始化任务链系统状态
+            _initQuestlineState() {
+                const gs = window.gameState;
+                if (!gs.questline) {
+                    gs.questline = {
+                        available: [
+                            { id: 'shadow_devil', name: '暗影恶魔篇', description: '调查暗影恶魔的踪迹', stages: ['调查村庄失踪事件', '进入废弃矿洞', '击败暗影领主力竭', '获得恶魔核心'], reward: { spiritStones: 5000, reputation: 150 } },
+                            { id: 'dragon_blood', name: '龙血觉醒篇', description: '寻找传说中的龙血传承', stages: ['寻找古籍记载', '前往龙墓遗址', '解开封印机关', '接受龙血洗礼'], reward: { spiritStones: 8000, reputation: 200 } },
+                            { id: 'immortal_clue', name: '仙人遗迹篇', description: '探索上古仙人的遗迹', stages: ['获取遗迹地图', '穿越迷阵', '解开仙人考验', '获得仙人传承'], reward: { spiritStones: 12000, reputation: 300 } }
+                        ],
+                        activeQuestline: null,
+                        currentStage: 0
+                    };
+                }
+                return gs.questline;
+            }
+
+            // V136: mcpBountyList - 获取悬赏列表
+            mcpBountyList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const bountyState = this._initBountyState();
+                    return {
+                        success: true,
+                        total: bountyState.bounties.length,
+                        bounties: bountyState.bounties,
+                        acceptedBounty: bountyState.acceptedBounty,
+                        message: '获取悬赏列表成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V136: mcpBountyAccept - 接取悬赏
+            mcpBountyAccept(bountyId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const bountyState = this._initBountyState();
+                    if (bountyState.acceptedBounty) {
+                        return { error: '已有进行中的悬赏任务: ' + bountyState.acceptedBounty.id };
+                    }
+                    const bounty = bountyState.bounties.find(b => b.id === bountyId);
+                    if (!bounty) return { error: '悬赏不存在: ' + bountyId };
+                    bountyState.acceptedBounty = { ...bounty, acceptedAt: Date.now() };
+                    return {
+                        success: true,
+                        bountyId: bounty.id,
+                        title: bounty.title,
+                        description: bounty.description,
+                        reward: bounty.reward,
+                        difficulty: bounty.difficulty,
+                        message: '接取悬赏成功: ' + bounty.title
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V136: mcpBountyComplete - 完成悬赏
+            mcpBountyComplete(bountyId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const bountyState = this._initBountyState();
+                    if (!bountyState.acceptedBounty) {
+                        return { error: '没有进行中的悬赏任务' };
+                    }
+                    if (bountyState.acceptedBounty.id !== bountyId) {
+                        return { error: '悬赏ID不匹配: ' + bountyId };
+                    }
+                    const bounty = bountyState.acceptedBounty;
+                    const reward = bounty.reward || {};
+                    // 发放奖励
+                    if (reward.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    }
+                    if (reward.reputation) {
+                        gs.reputation = (gs.reputation || 0) + reward.reputation;
+                    }
+                    if (reward.materials) {
+                        if (!gs.materials) gs.materials = {};
+                        for (const [mat, qty] of Object.entries(reward.materials)) {
+                            gs.materials[mat] = (gs.materials[mat] || 0) + qty;
+                        }
+                    }
+                    const completed = { ...bounty, completedAt: Date.now() };
+                    bountyState.acceptedBounty = null;
+                    return {
+                        success: true,
+                        bountyId: bounty.id,
+                        title: bounty.title,
+                        reward: reward,
+                        message: '完成悬赏: ' + bounty.title
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V136: mcpQuestlineList - 获取任务链列表
+            mcpQuestlineList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questlineState = this._initQuestlineState();
+                    return {
+                        success: true,
+                        total: questlineState.available.length,
+                        available: questlineState.available,
+                        activeQuestline: questlineState.activeQuestline,
+                        currentStage: questlineState.currentStage,
+                        message: '获取任务链列表成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V136: mcpQuestlineActivate - 激活任务链
+            mcpQuestlineActivate(questlineId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questlineState = this._initQuestlineState();
+                    if (questlineState.activeQuestline) {
+                        return { error: '已有进行中的任务链: ' + questlineState.activeQuestline.id };
+                    }
+                    const questline = questlineState.available.find(q => q.id === questlineId);
+                    if (!questline) return { error: '任务链不存在: ' + questlineId };
+                    questlineState.activeQuestline = { ...questline };
+                    questlineState.currentStage = 0;
+                    return {
+                        success: true,
+                        questlineId: questline.id,
+                        name: questline.name,
+                        description: questline.description,
+                        currentStage: 0,
+                        stageName: questline.stages[0],
+                        totalStages: questline.stages.length,
+                        message: '激活任务链: ' + questline.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V136: mcpQuestlineAdvance - 推进任务链
+            mcpQuestlineAdvance(questlineId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questlineState = this._initQuestlineState();
+                    if (!questlineState.activeQuestline) {
+                        return { error: '没有进行中的任务链' };
+                    }
+                    if (questlineState.activeQuestline.id !== questlineId) {
+                        return { error: '任务链ID不匹配: ' + questlineId };
+                    }
+                    const ql = questlineState.activeQuestline;
+                    const nextStage = questlineState.currentStage + 1;
+                    if (nextStage >= ql.stages.length) {
+                        return { error: '任务链已完成，无法继续推进' };
+                    }
+                    questlineState.currentStage = nextStage;
+                    return {
+                        success: true,
+                        questlineId: ql.id,
+                        name: ql.name,
+                        currentStage: nextStage,
+                        stageName: ql.stages[nextStage],
+                        totalStages: ql.stages.length,
+                        isCompleted: nextStage === ql.stages.length - 1,
+                        message: '推进任务链: ' + ql.name + ' - ' + ql.stages[nextStage]
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -24503,6 +24714,40 @@
             }
         };
 
+        // V136: 悬赏+任务链系统
+        const MCP_TOOLS_V136 = {
+            'bounty.list': {
+                name: 'bounty.list',
+                description: '获取悬赏列表 (悬赏系统-列出可用悬赏任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'bounty.accept': {
+                name: 'bounty.accept',
+                description: '接取悬赏 (悬赏系统-接受悬赏任务)',
+                inputSchema: { type: 'object', properties: { bountyId: { type: 'string', description: '悬赏ID' } }, required: ['bountyId'] }
+            },
+            'bounty.complete': {
+                name: 'bounty.complete',
+                description: '完成悬赏 (悬赏系统-提交完成悬赏任务获得奖励)',
+                inputSchema: { type: 'object', properties: { bountyId: { type: 'string', description: '悬赏ID' } }, required: ['bountyId'] }
+            },
+            'questline.list': {
+                name: 'questline.list',
+                description: '获取任务链列表 (任务链系统-列出可用任务链)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'questline.activate': {
+                name: 'questline.activate',
+                description: '激活任务链 (任务链系统-激活任务链开始第一阶段)',
+                inputSchema: { type: 'object', properties: { questlineId: { type: 'string', description: '任务链ID' } }, required: ['questlineId'] }
+            },
+            'questline.advance': {
+                name: 'questline.advance',
+                description: '推进任务链 (任务链系统-推进任务链到下一阶段)',
+                inputSchema: { type: 'object', properties: { questlineId: { type: 'string', description: '任务链ID' } }, required: ['questlineId'] }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -29196,6 +29441,299 @@
             return { version: 'V135', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v135Results = runV135Tests();
+
+        // ===== V136: 悬赏+任务链系统 Tests =====
+        function runV136Tests() {
+            const results = [];
+            function v136Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 2,
+                stage: 1,
+                reputation: 0,
+                materials: {},
+                bounty: null,
+                questline: null,
+                bonusEffects: {}
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // === Bounty Tests ===
+
+            // Test 1: bounty.list - returns available bounties
+            const bl1 = server.mcpBountyList();
+            v136Assert(bl1.success === true, 'bounty.list returns success');
+            v136Assert(bl1.total === 5, 'bounty.list returns 5 bounties');
+            v136Assert(Array.isArray(bl1.bounties), 'bounty.list returns bounties array');
+            v136Assert(bl1.bounties[0].id === 'hunt_beast', 'bounty.list first is hunt_beast');
+            v136Assert(bl1.bounties[0].title === '猎杀妖兽', 'bounty.list first has correct title');
+
+            // Test 2: bounty.list - has legendary difficulty bounty
+            const hasLegendary = bl1.bounties.some(b => b.difficulty === 'legendary');
+            v136Assert(hasLegendary === true, 'bounty.list has legendary difficulty bounty');
+
+            // Test 3: bounty.accept - accept hunt_beast bounty
+            const ba1 = server.mcpBountyAccept('hunt_beast');
+            v136Assert(ba1.success === true, 'bounty.accept succeeds');
+            v136Assert(ba1.bountyId === 'hunt_beast', 'bounty.accept returns correct id');
+            v136Assert(ba1.title === '猎杀妖兽', 'bounty.accept returns correct title');
+            v136Assert(ba1.reward && ba1.reward.spiritStones === 2000, 'bounty.accept has correct reward');
+            v136Assert(ba1.difficulty === 'medium', 'bounty.accept returns correct difficulty');
+
+            // Test 4: bounty.accept - acceptedBounty is set
+            v136Assert(mockGameState.bounty.acceptedBounty !== null, 'bounty.accept sets acceptedBounty');
+            v136Assert(mockGameState.bounty.acceptedBounty.id === 'hunt_beast', 'bounty.accept acceptedBounty has correct id');
+
+            // Test 5: bounty.accept - duplicate accept fails
+            const ba2 = server.mcpBountyAccept('deliver_msg');
+            v136Assert(ba2.error && ba2.error.includes('已有进行中的悬赏任务'), 'bounty.accept fails for duplicate');
+
+            // Test 6: bounty.accept - invalid id fails
+            const ba3 = server.mcpBountyAccept('invalid_bounty');
+            v136Assert(ba3.error && ba3.error.includes('悬赏不存在'), 'bounty.accept fails for invalid id');
+
+            // Test 7: bounty.complete - complete hunt_beast bounty
+            mockGameState.spiritStones = 10000;
+            mockGameState.reputation = 0;
+            const bc1 = server.mcpBountyComplete('hunt_beast');
+            v136Assert(bc1.success === true, 'bounty.complete succeeds');
+            v136Assert(bc1.bountyId === 'hunt_beast', 'bounty.complete returns correct id');
+            v136Assert(bc1.title === '猎杀妖兽', 'bounty.complete returns correct title');
+            v136Assert(bc1.reward && bc1.reward.spiritStones === 2000, 'bounty.complete has reward');
+
+            // Test 8: bounty.complete - rewards are given
+            v136Assert(mockGameState.spiritStones === 12000, 'bounty.complete gives spirit stones');
+            v136Assert(mockGameState.reputation === 50, 'bounty.complete gives reputation');
+
+            // Test 9: bounty.complete - acceptedBounty is cleared
+            v136Assert(mockGameState.bounty.acceptedBounty === null, 'bounty.complete clears acceptedBounty');
+
+            // Test 10: bounty.complete - id mismatch fails
+            const bc2 = server.mcpBountyComplete('deliver_msg');
+            v136Assert(bc2.error && bc2.error.includes('悬赏ID不匹配'), 'bounty.complete fails for id mismatch');
+
+            // Test 11: bounty.complete - no active bounty fails
+            const bc3 = server.mcpBountyComplete('hunt_beast');
+            v136Assert(bc3.error && bc3.error.includes('没有进行中的悬赏任务'), 'bounty.complete fails when no active bounty');
+
+            // Test 12: bounty.accept + complete with materials reward
+            const ba4 = server.mcpBountyAccept('collect_herb');
+            v136Assert(ba4.success === true, 'bounty.accept succeeds for collect_herb');
+            v136Assert(ba4.reward.materials, 'bounty.accept has materials reward');
+            const bc4 = server.mcpBountyComplete('collect_herb');
+            v136Assert(bc4.success === true, 'bounty.complete succeeds for collect_herb');
+            v136Assert(mockGameState.materials && mockGameState.materials.herb === 5, 'bounty.complete gives herb materials');
+
+            // === Questline Tests ===
+
+            // Test 13: questline.list - returns available questlines
+            const ql1 = server.mcpQuestlineList();
+            v136Assert(ql1.success === true, 'questline.list returns success');
+            v136Assert(ql1.total === 3, 'questline.list returns 3 questlines');
+            v136Assert(Array.isArray(ql1.available), 'questline.list returns available array');
+            v136Assert(ql1.available[0].id === 'shadow_devil', 'questline.list first is shadow_devil');
+            v136Assert(ql1.available[0].stages.length === 4, 'questline.list first has 4 stages');
+
+            // Test 14: questline.list - no active questline initially
+            v136Assert(ql1.activeQuestline === null, 'questline.list has no active questline initially');
+
+            // Test 15: questline.activate - activate shadow_devil questline
+            const qa1 = server.mcpQuestlineActivate('shadow_devil');
+            v136Assert(qa1.success === true, 'questline.activate succeeds');
+            v136Assert(qa1.questlineId === 'shadow_devil', 'questline.activate returns correct id');
+            v136Assert(qa1.name === '暗影恶魔篇', 'questline.activate returns correct name');
+            v136Assert(qa1.currentStage === 0, 'questline.activate starts at stage 0');
+            v136Assert(qa1.stageName === '调查村庄失踪事件', 'questline.activate first stage name is correct');
+            v136Assert(qa1.totalStages === 4, 'questline.activate returns correct total stages');
+
+            // Test 16: questline.activate - activeQuestline is set
+            v136Assert(mockGameState.questline.activeQuestline !== null, 'questline.activate sets activeQuestline');
+            v136Assert(mockGameState.questline.currentStage === 0, 'questline.activate sets currentStage');
+
+            // Test 17: questline.activate - duplicate activate fails
+            const qa2 = server.mcpQuestlineActivate('dragon_blood');
+            v136Assert(qa2.error && qa2.error.includes('已有进行中的任务链'), 'questline.activate fails for duplicate');
+
+            // Test 18: questline.activate - invalid id fails
+            const qa3 = server.mcpQuestlineActivate('invalid_questline');
+            v136Assert(qa3.error && qa3.error.includes('任务链不存在'), 'questline.activate fails for invalid id');
+
+            // Test 19: questline.advance - advance to stage 1
+            mockGameState.questline.activeQuestline.stages = ['调查村庄失踪事件', '进入废弃矿洞', '击败暗影领主力竭', '获得恶魔核心'];
+            const qadv1 = server.mcpQuestlineAdvance('shadow_devil');
+            v136Assert(qadv1.success === true, 'questline.advance succeeds');
+            v136Assert(qadv1.currentStage === 1, 'questline.advance advances to stage 1');
+            v136Assert(qadv1.stageName === '进入废弃矿洞', 'questline.advance new stage name is correct');
+            v136Assert(qadv1.isCompleted === false, 'questline.advance is not completed');
+
+            // Test 20: questline.advance - id mismatch fails
+            const qadv2 = server.mcpQuestlineAdvance('dragon_blood');
+            v136Assert(qadv2.error && qadv2.error.includes('任务链ID不匹配'), 'questline.advance fails for id mismatch');
+
+            // Test 21: questline.advance - no active questline fails
+            mockGameState.questline.activeQuestline = null;
+            const qadv3 = server.mcpQuestlineAdvance('shadow_devil');
+            v136Assert(qadv3.error && qadv3.error.includes('没有进行中的任务链'), 'questline.advance fails when no active questline');
+
+            // Test 22: questline.advance - complete all stages
+            mockGameState.questline.activeQuestline = { id: 'shadow_devil', name: '暗影恶魔篇', stages: ['调查村庄失踪事件', '进入废弃矿洞', '击败暗影领主力竭', '获得恶魔核心'] };
+            mockGameState.questline.currentStage = 0;
+            server.mcpQuestlineAdvance('shadow_devil'); // 0 -> 1
+            server.mcpQuestlineAdvance('shadow_devil'); // 1 -> 2
+            const qadv4 = server.mcpQuestlineAdvance('shadow_devil'); // 2 -> 3
+            v136Assert(qadv4.success === true, 'questline.advance completes final stage');
+            v136Assert(qadv4.isCompleted === true, 'questline.advance isCompleted is true');
+            v136Assert(qadv4.currentStage === 3, 'questline.advance final stage is 3');
+
+            // Test 23: questline.advance - cannot advance past final stage
+            const qadv5 = server.mcpQuestlineAdvance('shadow_devil');
+            v136Assert(qadv5.error && qadv5.error.includes('任务链已完成'), 'questline.advance fails after completion');
+
+            // Test 24: questline.list - shows active questline
+            const ql2 = server.mcpQuestlineList();
+            v136Assert(ql2.activeQuestline !== null, 'questline.list shows active questline');
+            v136Assert(ql2.currentStage === 3, 'questline.list shows correct stage');
+
+            // === Integration Tests ===
+
+            // Test 25: bounty and questline can work independently
+            mockGameState.bounty = { bounties: server._initBountyState().bounties, acceptedBounty: null };
+            mockGameState.questline = { available: server._initQuestlineState().available, activeQuestline: null, currentStage: 0 };
+            const ba5 = server.mcpBountyAccept('deliver_msg');
+            const qa4 = server.mcpQuestlineActivate('dragon_blood');
+            v136Assert(ba5.success === true, 'can accept bounty while questline active');
+            v136Assert(qa4.success === true, 'can activate questline while bounty accepted');
+
+            // Test 26: bounty complete doesn't affect questline
+            server.mcpBountyComplete('deliver_msg');
+            const ql3 = server.mcpQuestlineList();
+            v136Assert(ql3.activeQuestline !== null, 'questline still active after bounty complete');
+            v136Assert(ql3.activeQuestline.id === 'dragon_blood', 'questline still same after bounty complete');
+
+            // Test 27: questline advance doesn't affect bounty
+            server.mcpQuestlineAdvance('dragon_blood');
+            const bl2 = server.mcpBountyList();
+            v136Assert(bl2.acceptedBounty === null, 'bounty still completed after questline advance');
+
+            // Test 28: list after both active
+            mockGameState.questline.activeQuestline = { id: 'immortal_clue', name: '仙人遗迹篇', stages: ['获取遗迹地图', '穿越迷阵', '解开仙人考验', '获得仙人传承'] };
+            mockGameState.questline.currentStage = 1;
+            const ql4 = server.mcpQuestlineList();
+            v136Assert(ql4.currentStage === 1, 'questline.list returns correct stage');
+            v136Assert(ql4.activeQuestline.stages[1] === '穿越迷阵', 'questline.list returns correct stage name');
+
+            // Test 29: bounty list with all difficulties represented
+            const bl3 = server.mcpBountyList();
+            const difficulties = bl3.bounties.map(b => b.difficulty);
+            v136Assert(difficulties.includes('easy'), 'bounty.list has easy difficulty');
+            v136Assert(difficulties.includes('medium'), 'bounty.list has medium difficulty');
+            v136Assert(difficulties.includes('hard'), 'bounty.list has hard difficulty');
+            v136Assert(difficulties.includes('legendary'), 'bounty.list has legendary difficulty');
+
+            // Test 30: questline list with all questlines
+            const ql5 = server.mcpQuestlineList();
+            v136Assert(ql5.available.length === 3, 'questline.list has all 3 questlines');
+            const questlineIds = ql5.available.map(q => q.id);
+            v136Assert(questlineIds.includes('shadow_devil'), 'questline.list has shadow_devil');
+            v136Assert(questlineIds.includes('dragon_blood'), 'questline.list has dragon_blood');
+            v136Assert(questlineIds.includes('immortal_clue'), 'questline.list has immortal_clue');
+
+            // Test 31: complete legendary bounty
+            mockGameState.bounty.acceptedBounty = null;
+            const ba6 = server.mcpBountyAccept('elite_hunt');
+            v136Assert(ba6.success === true, 'can accept elite_hunt bounty');
+            v136Assert(ba6.difficulty === 'legendary', 'elite_hunt is legendary');
+            v136Assert(ba6.reward.spiritStones === 8000, 'elite_hunt has 8000 spirit stones');
+            const bc5 = server.mcpBountyComplete('elite_hunt');
+            v136Assert(bc5.success === true, 'can complete elite_hunt bounty');
+            v136Assert(mockGameState.spiritStones === 17000, 'spirit stones after elite_hunt');
+
+            // Test 32: questline with different stage counts
+            mockGameState.questline.activeQuestline = null;
+            const qa5 = server.mcpQuestlineActivate('shadow_devil');
+            v136Assert(qa5.totalStages === 4, 'shadow_devil has 4 stages');
+            server.mcpQuestlineAdvance('shadow_devil');
+            server.mcpQuestlineAdvance('shadow_devil');
+            server.mcpQuestlineAdvance('shadow_devil');
+            const qadv6 = server.mcpQuestlineAdvance('shadow_devil');
+            v136Assert(qadv6.isCompleted === true, 'shadow_devil completed after 4 advances');
+
+            // Test 33: bounty reward structure
+            const bl4 = server.mcpBountyList();
+            const escortBounty = bl4.bounties.find(b => b.id === 'escort_treasure');
+            v136Assert(escortBounty.reward.spiritStones === 3000, 'escort_treasure has correct spirit stones');
+            v136Assert(escortBounty.reward.reputation === 100, 'escort_treasure has correct reputation');
+
+            // Test 34: questline reward structure
+            const ql6 = server.mcpQuestlineList();
+            const immortalQuestline = ql6.available.find(q => q.id === 'immortal_clue');
+            v136Assert(immortalQuestline.reward.spiritStones === 12000, 'immortal_clue has correct spirit stones');
+            v136Assert(immortalQuestline.reward.reputation === 300, 'immortal_clue has correct reputation');
+
+            // Test 35: error handling - invalid bounty id on complete
+            mockGameState.bounty.acceptedBounty = { id: 'hunt_beast' };
+            const bc6 = server.mcpBountyComplete('nonexistent');
+            v136Assert(bc6.error && bc6.error.includes('悬赏ID不匹配'), 'complete fails for wrong id');
+
+            // Test 36: error handling - invalid questline id on advance
+            mockGameState.questline.activeQuestline = { id: 'shadow_devil', stages: ['a', 'b', 'c', 'd'] };
+            mockGameState.questline.currentStage = 0;
+            const qadv7 = server.mcpQuestlineAdvance('wrong_id');
+            v136Assert(qadv7.error && qadv7.error.includes('任务链ID不匹配'), 'advance fails for wrong id');
+
+            // Test 37: list shows accepted bounty info
+            mockGameState.bounty.acceptedBounty = { id: 'deliver_msg', title: '传递密信', reward: { spiritStones: 500 } };
+            const bl5 = server.mcpBountyList();
+            v136Assert(bl5.acceptedBounty !== null, 'bounty.list shows accepted bounty');
+            v136Assert(bl5.acceptedBounty.id === 'deliver_msg', 'bounty.list acceptedBounty has correct id');
+
+            // Test 38: list shows active questline info
+            mockGameState.questline.activeQuestline = { id: 'dragon_blood', name: '龙血觉醒篇', stages: ['a', 'b', 'c', 'd'] };
+            mockGameState.questline.currentStage = 2;
+            const ql7 = server.mcpQuestlineList();
+            v136Assert(ql7.activeQuestline !== null, 'questline.list shows active questline');
+            v136Assert(ql7.currentStage === 2, 'questline.list shows correct currentStage');
+
+            // Test 39: message fields are present
+            const ba7 = server.mcpBountyAccept('hunt_beast');
+            v136Assert(ba7.message && ba7.message.includes('接取悬赏成功'), 'bounty.accept has correct message');
+            const bc7 = server.mcpBountyComplete('hunt_beast');
+            v136Assert(bc7.message && bc7.message.includes('完成悬赏'), 'bounty.complete has correct message');
+            const qa6 = server.mcpQuestlineActivate('shadow_devil');
+            v136Assert(qa6.message && qa6.message.includes('激活任务链'), 'questline.activate has correct message');
+            const qadv8 = server.mcpQuestlineAdvance('shadow_devil');
+            v136Assert(qadv8.message && qadv8.message.includes('推进任务链'), 'questline.advance has correct message');
+
+            // Test 40: multiple complete and activate cycles
+            for (let i = 0; i < 3; i++) {
+                server.mcpBountyAccept('deliver_msg');
+                server.mcpBountyComplete('deliver_msg');
+            }
+            for (let i = 0; i < 3; i++) {
+                server.mcpQuestlineActivate('immortal_clue');
+                server.mcpQuestlineAdvance('immortal_clue');
+                server.mcpQuestlineAdvance('immortal_clue');
+                server.mcpQuestlineAdvance('immortal_clue');
+                server.mcpQuestlineAdvance('immortal_clue');
+            }
+            const bl6 = server.mcpBountyList();
+            const ql8 = server.mcpQuestlineList();
+            v136Assert(bl6.acceptedBounty === null, 'bounty acceptedBounty is null after multiple cycles');
+            v136Assert(ql8.activeQuestline === null, 'questline activeQuestline is null after multiple cycles');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V136 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V136', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v136Results = runV136Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
