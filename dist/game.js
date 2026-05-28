@@ -5495,6 +5495,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V144)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V145: Register 宠物探险+派遣系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V145)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6914,6 +6918,24 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'friend.add':
                             result = this.mcpFriendAdd(args.playerName);
+                            break;
+                        case 'explore.list':
+                            result = this.mcpExploreList();
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStart(args.areaId, args.petId);
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreComplete(args.exploreId);
+                            break;
+                        case 'dispatch.list':
+                            result = this.mcpDispatchList();
+                            break;
+                        case 'dispatch.accept':
+                            result = this.mcpDispatchAccept(args.taskId);
+                            break;
+                        case 'dispatch.complete':
+                            result = this.mcpDispatchComplete(args.taskId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -15745,6 +15767,272 @@ const ACHIEVEMENT_ID_MAP = {
                         },
                         total: friends.list.length,
                         message: '已添加' + playerName + '为道友'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: _initExploreState - 初始化宠物探险状态
+            _initExploreState() {
+                const gs = window.gameState;
+                if (!gs.explore) {
+                    gs.explore = {
+                        areas: [
+                            { id: 'explore_forest', name: '幽冥森林', difficulty: 1, rewards: ['灵草', '灵石', '妖兽内丹'], cooldown: 300000 },
+                            { id: 'explore_cave', name: '上古洞府', difficulty: 2, rewards: ['功法残页', '灵石', '灵器碎片'], cooldown: 600000 },
+                            { id: 'explore_tomb', name: '仙人墓穴', difficulty: 3, rewards: ['仙丹', '仙器', '传承'], cooldown: 900000 },
+                            { id: 'explore_sea', name: '东海龙宫', difficulty: 4, rewards: ['龙珠', '仙晶', '海域宝藏'], cooldown: 1200000 },
+                            { id: 'explore_sky', name: '九天之上', difficulty: 5, rewards: ['天雷', '神凤羽', '天道碎片'], cooldown: 1800000 }
+                        ],
+                        activeExplorations: [],
+                        history: []
+                    };
+                }
+                return gs.explore;
+            }
+
+            // V145: _initDispatchState - 初始化派遣系统状态
+            _initDispatchState() {
+                const gs = window.gameState;
+                if (!gs.dispatch) {
+                    gs.dispatch = {
+                        tasks: [
+                            { id: 'dispatch_gather', name: '采集灵石', description: '前往灵矿采集灵石', duration: 600000, reward: { spiritStones: 500 }, requiredLevel: 1 },
+                            { id: 'dispatch_herb', name: '采集灵草', description: '采集各类灵草灵药', duration: 600000, reward: { items: ['灵草x10'] }, requiredLevel: 1 },
+                            { id: 'dispatch_delivery', name: '送快递', description: '将物资送往指定地点', duration: 900000, reward: { spiritStones: 800, reputation: 10 }, requiredLevel: 5 },
+                            { id: 'dispatch_escort', name: '护送商队', description: '护送商队安全到达', duration: 1200000, reward: { spiritStones: 1500, reputation: 20 }, requiredLevel: 10 },
+                            { id: 'dispatch_hunt', name: '猎杀妖兽', description: '猎杀指定妖兽获取材料', duration: 1800000, reward: { items: ['妖兽内丹x3'], spiritStones: 2000 }, requiredLevel: 15 },
+                            { id: 'dispatch_explore', name: '秘境探索', description: '探索小型秘境', duration: 2400000, reward: { items: ['秘境钥匙'], spiritStones: 3000 }, requiredLevel: 20 }
+                        ],
+                        activeTasks: [],
+                        completedTasks: []
+                    };
+                }
+                return gs.dispatch;
+            }
+
+            // V145: mcpExploreList - 获取探险区域列表
+            mcpExploreList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const explore = this._initExploreState();
+                    const now = Date.now();
+                    return {
+                        success: true,
+                        areas: explore.areas.map(a => {
+                            // 检查该区域是否有宠物正在探险
+                            const activeInArea = explore.activeExplorations.filter(e => e.areaId === a.id && e.status === 'active');
+                            return {
+                                id: a.id,
+                                name: a.name,
+                                difficulty: a.difficulty,
+                                rewards: a.rewards,
+                                cooldown: a.cooldown,
+                                activeCount: activeInArea.length,
+                                canExplore: activeInArea.length === 0 || activeInArea.length < 3
+                            };
+                        }),
+                        total: explore.areas.length,
+                        message: '共' + explore.areas.length + '个探险区域'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: mcpExploreStart - 开始探险
+            mcpExploreStart(areaId, petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!areaId) return { error: '请指定探险区域ID' };
+                    if (!petId) return { error: '请指定宠物ID' };
+
+                    const explore = this._initExploreState();
+                    const area = explore.areas.find(a => a.id === areaId);
+                    if (!area) return { error: '探险区域不存在' };
+
+                    // 检查该区域是否已有太多探险
+                    const activeInArea = explore.activeExplorations.filter(e => e.areaId === areaId && e.status === 'active');
+                    if (activeInArea.length >= 3) return { error: '该区域探险宠物过多，请稍后再试' };
+
+                    // 检查宠物是否已在探险中
+                    const petExploring = explore.activeExplorations.find(e => e.petId === petId && e.status === 'active');
+                    if (petExploring) return { error: '该宠物正在探险中' };
+
+                    // 创建探险记录
+                    const exploreId = 'exp_' + Date.now();
+                    const startTime = Date.now();
+                    const newExploration = {
+                        id: exploreId,
+                        areaId: areaId,
+                        areaName: area.name,
+                        petId: petId,
+                        startTime: startTime,
+                        duration: area.cooldown,
+                        status: 'active',
+                        rewards: area.rewards
+                    };
+                    explore.activeExplorations.push(newExploration);
+
+                    return {
+                        success: true,
+                        exploreId: exploreId,
+                        areaName: area.name,
+                        petId: petId,
+                        startTime: startTime,
+                        duration: area.cooldown,
+                        message: '宠物开始探险，预计' + (area.cooldown / 60000) + '分钟后完成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: mcpExploreComplete - 完成探险
+            mcpExploreComplete(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+
+                    const explore = this._initExploreState();
+                    const exploration = explore.activeExplorations.find(e => e.id === exploreId);
+                    if (!exploration) return { error: '探险记录不存在' };
+                    if (exploration.status === 'completed') return { error: '该探险已完成' };
+
+                    const now = Date.now();
+                    const elapsed = now - exploration.startTime;
+                    if (elapsed < exploration.duration) {
+                        const remaining = Math.ceil((exploration.duration - elapsed) / 60000);
+                        return { success: false, error: '探险还未完成，还需' + remaining + '分钟', remainingTime: exploration.duration - elapsed };
+                    }
+
+                    // 探险完成，发放奖励
+                    exploration.status = 'completed';
+                    exploration.endTime = now;
+
+                    // 随机奖励
+                    const rewardPool = exploration.rewards;
+                    const numRewards = Math.floor(Math.random() * 3) + 1;
+                    const selectedRewards = [];
+                    for (let i = 0; i < numRewards && i < rewardPool.length; i++) {
+                        const idx = Math.floor(Math.random() * rewardPool.length);
+                        selectedRewards.push(rewardPool[idx]);
+                    }
+
+                    // 添加到历史
+                    explore.history.push(exploration);
+
+                    return {
+                        success: true,
+                        exploreId: exploreId,
+                        areaName: exploration.areaName,
+                        rewards: selectedRewards,
+                        message: '探险完成！获得奖励：' + selectedRewards.join('、')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: mcpDispatchList - 获取派遣任务列表
+            mcpDispatchList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatch = this._initDispatchState();
+                    const playerLevel = gs.level || 1;
+                    return {
+                        success: true,
+                        tasks: dispatch.tasks.map(t => ({
+                            id: t.id,
+                            name: t.name,
+                            description: t.description,
+                            duration: t.duration,
+                            reward: t.reward,
+                            requiredLevel: t.requiredLevel,
+                            available: playerLevel >= t.requiredLevel
+                        })),
+                        total: dispatch.tasks.length,
+                        message: '共' + dispatch.tasks.length + '个派遣任务'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: mcpDispatchAccept - 接受派遣任务
+            mcpDispatchAccept(taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!taskId) return { error: '请指定任务ID' };
+
+                    const dispatch = this._initDispatchState();
+                    const task = dispatch.tasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在' };
+
+                    const playerLevel = gs.level || 1;
+                    if (playerLevel < task.requiredLevel) return { error: '等级不足，需要' + task.requiredLevel + '级' };
+
+                    // 检查是否已有相同任务在进行中
+                    const activeSameTask = dispatch.activeTasks.find(t => t.taskId === taskId && t.status === 'active');
+                    if (activeSameTask) return { error: '该任务正在进行中' };
+
+                    // 创建任务记录
+                    const dispatchId = 'dp_' + Date.now();
+                    const startTime = Date.now();
+                    const newTask = {
+                        id: dispatchId,
+                        taskId: taskId,
+                        taskName: task.name,
+                        startTime: startTime,
+                        duration: task.duration,
+                        reward: task.reward,
+                        status: 'active'
+                    };
+                    dispatch.activeTasks.push(newTask);
+
+                    return {
+                        success: true,
+                        dispatchId: dispatchId,
+                        taskName: task.name,
+                        startTime: startTime,
+                        duration: task.duration,
+                        message: '已接受任务：' + task.name + '，预计' + (task.duration / 60000) + '分钟后完成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V145: mcpDispatchComplete - 完成派遣任务
+            mcpDispatchComplete(taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!taskId) return { error: '请指定任务ID' };
+
+                    const dispatch = this._initDispatchState();
+                    const task = dispatch.activeTasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在或已完成' };
+
+                    const now = Date.now();
+                    const elapsed = now - task.startTime;
+                    if (elapsed < task.duration) {
+                        const remaining = Math.ceil((task.duration - elapsed) / 60000);
+                        return { success: false, error: '任务还未完成，还需' + remaining + '分钟', remainingTime: task.duration - elapsed };
+                    }
+
+                    // 任务完成，发放奖励
+                    task.status = 'completed';
+                    task.endTime = now;
+
+                    // 发放灵石奖励
+                    if (task.reward.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + task.reward.spiritStones;
+                    }
+
+                    // 添加到已完成记录
+                    dispatch.completedTasks.push(task);
+
+                    return {
+                        success: true,
+                        dispatchId: taskId,
+                        taskName: task.taskName,
+                        reward: task.reward,
+                        message: '任务完成！获得奖励：' + JSON.stringify(task.reward)
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -28881,6 +29169,40 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'friend.add',
                 description: '添加好友 (社交系统-添加好友，AI模拟，不需要对方同意)',
                 inputSchema: { type: 'object', properties: { playerName: { type: 'string', description: '玩家名称' } }, required: ['playerName'] }
+            }
+        };
+
+        // V145: 宠物探险+派遣系统
+        const MCP_TOOLS_V145 = {
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取探险区域列表 (宠物探险-列出可探险区域)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始探险 (宠物探险-派宠物去探险区域探险)',
+                inputSchema: { type: 'object', properties: { areaId: { type: 'string', description: '探险区域ID' }, petId: { type: 'string', description: '宠物ID' } }, required: ['areaId', 'petId'] }
+            },
+            'explore.complete': {
+                name: 'explore.complete',
+                description: '完成探险 (宠物探险-完成探险并领取奖励)',
+                inputSchema: { type: 'object', properties: { exploreId: { type: 'string', description: '探险ID' } }, required: ['exploreId'] }
+            },
+            'dispatch.list': {
+                name: 'dispatch.list',
+                description: '获取派遣任务列表 (派遣系统-列出可接受的派遣任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'dispatch.accept': {
+                name: 'dispatch.accept',
+                description: '接受派遣任务 (派遣系统-接受派遣任务)',
+                inputSchema: { type: 'object', properties: { taskId: { type: 'string', description: '任务ID' } }, required: ['taskId'] }
+            },
+            'dispatch.complete': {
+                name: 'dispatch.complete',
+                description: '完成派遣任务 (派遣系统-完成派遣任务并领取奖励)',
+                inputSchema: { type: 'object', properties: { taskId: { type: 'string', description: '任务ID' } }, required: ['taskId'] }
             }
         };
 
@@ -50774,6 +51096,289 @@ const ACHIEVEMENT_ID_MAP = {
             console.log('V144 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
             return { version: 'V144', passed, total, passRate: passRate.toFixed(3), results };
         }
+        function runV145Tests() {
+            const results = [];
+            const v145Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+            // Setup mock gameState
+            window.gameState = {
+                spiritStones: 50000,
+                name: 'TestUser',
+                level: 10,
+                playerId: 'player_TestUser'
+            };
+
+            const server = new MockMCPServer();
+
+            // Test 1: _initExploreState initializes correctly
+            const expState = server._initExploreState();
+            v145Assert(expState !== null, '_initExploreState returns state');
+            v145Assert(Array.isArray(expState.areas), 'explore areas is array');
+            v145Assert(Array.isArray(expState.activeExplorations), 'explore activeExplorations is array');
+            v145Assert(expState.areas.length === 5, 'explore has 5 areas');
+
+            // Test 2: _initDispatchState initializes correctly
+            const dispState = server._initDispatchState();
+            v145Assert(dispState !== null, '_initDispatchState returns state');
+            v145Assert(Array.isArray(dispState.tasks), 'dispatch tasks is array');
+            v145Assert(Array.isArray(dispState.activeTasks), 'dispatch activeTasks is array');
+            v145Assert(dispState.tasks.length === 6, 'dispatch has 6 tasks');
+
+            // Test 3: mcpExploreList returns areas
+            const el1 = server.mcpExploreList();
+            v145Assert(el1.success === true, 'explore.list returns success');
+            v145Assert(el1.areas && el1.areas.length === 5, 'explore.list returns 5 areas');
+            v145Assert(el1.areas[0].id === 'explore_forest', 'explore.list first area is forest');
+            v145Assert(el1.areas[0].name === '幽冥森林', 'explore.list first area name correct');
+
+            // Test 4: mcpExploreStart creates exploration
+            const es1 = server.mcpExploreStart('explore_forest', 'pet_001');
+            v145Assert(es1.success === true, 'explore.start returns success');
+            v145Assert(es1.exploreId && es1.exploreId.startsWith('exp_'), 'explore.start returns valid id');
+            v145Assert(es1.areaName === '幽冥森林', 'explore.start areaName correct');
+            v145Assert(es1.petId === 'pet_001', 'explore.start petId correct');
+
+            // Test 5: mcpExploreStart fails for invalid area
+            const esErr1 = server.mcpExploreStart('invalid_area', 'pet_001');
+            v145Assert(esErr1.error && esErr1.error.includes('不存在'), 'explore.start invalid area error');
+
+            // Test 6: mcpExploreStart fails for missing areaId
+            const esErr2 = server.mcpExploreStart(null, 'pet_001');
+            v145Assert(esErr2.error && esErr2.error.includes('请指定'), 'explore.start missing areaId error');
+
+            // Test 7: mcpExploreStart fails for missing petId
+            const esErr3 = server.mcpExploreStart('explore_forest', null);
+            v145Assert(esErr3.error && esErr3.error.includes('请指定'), 'explore.start missing petId error');
+
+            // Test 8: mcpExploreStart fails for pet already exploring
+            const esErr4 = server.mcpExploreStart('explore_cave', 'pet_001');
+            v145Assert(esErr4.error && esErr4.error.includes('正在探险中'), 'explore.start pet already exploring error');
+
+            // Test 9: mcpExploreComplete fails for non-existent exploration
+            const ecErr1 = server.mcpExploreComplete('exp_nonexistent');
+            v145Assert(ecErr1.error && ecErr1.error.includes('不存在'), 'explore.complete non-existent error');
+
+            // Test 10: mcpExploreComplete fails for missing exploreId
+            const ecErr2 = server.mcpExploreComplete(null);
+            v145Assert(ecErr2.error && ecErr2.error.includes('请指定'), 'explore.complete missing id error');
+
+            // Test 11: mcpExploreComplete returns not completed when still in progress (fast test)
+            const expState2 = server._initExploreState();
+            expState2.activeExplorations = [];
+            const es2 = server.mcpExploreStart('explore_cave', 'pet_002');
+            const ecErr3 = server.mcpExploreComplete(es2.exploreId);
+            v145Assert(ecErr3.success === false && ecErr3.error.includes('还未完成'), 'explore.complete not finished error');
+
+            // Test 12: mcpExploreComplete succeeds after duration (simulated)
+            const expState3 = server._initExploreState();
+            const expToComplete = expState3.activeExplorations.find(e => e.id === es2.exploreId);
+            if (expToComplete) {
+                expToComplete.startTime = Date.now() - expToComplete.duration - 1000; // set to past
+            }
+            const ec1 = server.mcpExploreComplete(es2.exploreId);
+            v145Assert(ec1.success === true, 'explore.complete after duration succeeds');
+            v145Assert(Array.isArray(ec1.rewards), 'explore.complete returns rewards array');
+            v145Assert(ec1.rewards.length > 0, 'explore.complete returns at least 1 reward');
+
+            // Test 13: mcpDispatchList returns tasks
+            const dl1 = server.mcpDispatchList();
+            v145Assert(dl1.success === true, 'dispatch.list returns success');
+            v145Assert(dl1.tasks && dl1.tasks.length === 6, 'dispatch.list returns 6 tasks');
+            v145Assert(dl1.tasks[0].id === 'dispatch_gather', 'dispatch.list first task correct');
+            v145Assert(dl1.tasks[0].requiredLevel === 1, 'dispatch.list first task requiredLevel correct');
+
+            // Test 14: mcpDispatchAccept creates task
+            const da1 = server.mcpDispatchAccept('dispatch_gather');
+            v145Assert(da1.success === true, 'dispatch.accept returns success');
+            v145Assert(da1.dispatchId && da1.dispatchId.startsWith('dp_'), 'dispatch.accept returns valid id');
+            v145Assert(da1.taskName === '采集灵石', 'dispatch.accept taskName correct');
+
+            // Test 15: mcpDispatchAccept fails for invalid taskId
+            const daErr1 = server.mcpDispatchAccept('invalid_task');
+            v145Assert(daErr1.error && daErr1.error.includes('不存在'), 'dispatch.accept invalid task error');
+
+            // Test 16: mcpDispatchAccept fails for missing taskId
+            const daErr2 = server.mcpDispatchAccept(null);
+            v145Assert(daErr2.error && daErr2.error.includes('请指定'), 'dispatch.accept missing taskId error');
+
+            // Test 17: mcpDispatchAccept fails for insufficient level
+            window.gameState.level = 1;
+            const daErr3 = server.mcpDispatchAccept('dispatch_escort');
+            v145Assert(daErr3.error && daErr3.error.includes('等级不足'), 'dispatch.accept level insufficient error');
+
+            // Test 18: mcpDispatchAccept fails for task already active
+            window.gameState.level = 10;
+            const daErr4 = server.mcpDispatchAccept('dispatch_gather');
+            v145Assert(daErr4.error && daErr4.error.includes('正在进行中'), 'dispatch.accept task already active error');
+
+            // Test 19: mcpDispatchComplete fails for non-existent task
+            const dcErr1 = server.mcpDispatchComplete('dp_nonexistent');
+            v145Assert(dcErr1.error && dcErr1.error.includes('不存在'), 'dispatch.complete non-existent error');
+
+            // Test 20: mcpDispatchComplete fails for missing taskId
+            const dcErr2 = server.mcpDispatchComplete(null);
+            v145Assert(dcErr2.error && dcErr2.error.includes('请指定'), 'dispatch.complete missing taskId error');
+
+            // Test 21: mcpDispatchComplete returns not completed when still in progress (fast test)
+            const dispState2 = server._initDispatchState();
+            dispState2.activeTasks = [];
+            const da2 = server.mcpDispatchAccept('dispatch_herb');
+            const dcErr3 = server.mcpDispatchComplete(da2.dispatchId);
+            v145Assert(dcErr3.success === false && dcErr3.error.includes('还未完成'), 'dispatch.complete not finished error');
+
+            // Test 22: mcpDispatchComplete succeeds after duration (simulated)
+            const dispState3 = server._initDispatchState();
+            const taskToComplete = dispState3.activeTasks.find(t => t.id === da2.dispatchId);
+            if (taskToComplete) {
+                taskToComplete.startTime = Date.now() - taskToComplete.duration - 1000; // set to past
+            }
+            const dc1 = server.mcpDispatchComplete(da2.dispatchId);
+            v145Assert(dc1.success === true, 'dispatch.complete after duration succeeds');
+            v145Assert(dc1.reward && dc1.reward.items, 'dispatch.complete returns reward');
+
+            // Test 23: Explore tools are registered
+            v145Assert(server.toolRegistry.has('explore.list'), 'explore.list is registered');
+            v145Assert(server.toolRegistry.has('explore.start'), 'explore.start is registered');
+            v145Assert(server.toolRegistry.has('explore.complete'), 'explore.complete is registered');
+
+            // Test 24: Dispatch tools are registered
+            v145Assert(server.toolRegistry.has('dispatch.list'), 'dispatch.list is registered');
+            v145Assert(server.toolRegistry.has('dispatch.accept'), 'dispatch.accept is registered');
+            v145Assert(server.toolRegistry.has('dispatch.complete'), 'dispatch.complete is registered');
+
+            // Test 25: Multiple explorations can be started
+            window.gameState.level = 10;
+            const es3 = server.mcpExploreStart('explore_forest', 'pet_003');
+            const es4 = server.mcpExploreStart('explore_cave', 'pet_004');
+            v145Assert(es3.success === true, 'multiple explore.start 1 succeeds');
+            v145Assert(es4.success === true, 'multiple explore.start 2 succeeds');
+
+            // Test 26: Area limits concurrent explorations to 3
+            const expState4 = server._initExploreState();
+            expState4.activeExplorations = [
+                { id: 'exp_1', areaId: 'explore_forest', petId: 'pet_a', status: 'active' },
+                { id: 'exp_2', areaId: 'explore_forest', petId: 'pet_b', status: 'active' },
+                { id: 'exp_3', areaId: 'explore_forest', petId: 'pet_c', status: 'active' }
+            ];
+            const esErr5 = server.mcpExploreStart('explore_forest', 'pet_d');
+            v145Assert(esErr5.error && esErr5.error.includes('过多'), 'explore.start area limit error');
+
+            // Test 27: Exploration state persists
+            const expState5 = server._initExploreState();
+            v145Assert(expState5.activeExplorations.length >= 1, 'explore state persists');
+
+            // Test 28: Dispatch state persists
+            const dispState5 = server._initDispatchState();
+            v145Assert(dispState5.tasks.length === 6, 'dispatch state persists');
+
+            // Test 29: mcpExploreList shows active count
+            const expState6 = server._initExploreState();
+            expState6.activeExplorations = [
+                { id: 'exp_1', areaId: 'explore_forest', status: 'active' },
+                { id: 'exp_2', areaId: 'explore_forest', status: 'active' }
+            ];
+            const el2 = server.mcpExploreList();
+            v145Assert(el2.areas[0].activeCount === 2, 'explore.list shows active count');
+
+            // Test 30: mcpExploreComplete fails for already completed
+            const expState7 = server._initExploreState();
+            expState7.activeExplorations = [{ id: 'exp_completed_test', status: 'completed' }];
+            const ecErr4 = server.mcpExploreComplete('exp_completed_test');
+            v145Assert(ecErr4.error && ecErr4.error.includes('已完成'), 'explore.complete already completed error');
+
+            // Test 31: Different difficulty levels for areas
+            const el3 = server.mcpExploreList();
+            v145Assert(el3.areas[0].difficulty === 1, 'forest difficulty is 1');
+            v145Assert(el3.areas[4].difficulty === 5, 'sky difficulty is 5');
+
+            // Test 32: Tasks have different durations
+            const dl2 = server.mcpDispatchList();
+            v145Assert(dl2.tasks[0].duration === 600000, 'gather task duration is 10min');
+            v145Assert(dl2.tasks[5].duration === 2400000, 'explore task duration is 40min');
+
+            // Test 33: Level requirements vary
+            const dl3 = server.mcpDispatchList();
+            v145Assert(dl3.tasks[0].requiredLevel === 1, 'gather required level is 1');
+            v145Assert(dl3.tasks[5].requiredLevel === 20, 'explore required level is 20');
+
+            // Test 34: mcpDispatchComplete adds spirit stones
+            window.gameState.spiritStones = 10000;
+            const dispState6 = server._initDispatchState();
+            dispState6.activeTasks = [];
+            const da3 = server.mcpDispatchAccept('dispatch_delivery');
+            const taskForStones = dispState6.activeTasks.find(t => t.id === da3.dispatchId);
+            if (taskForStones) {
+                taskForStones.startTime = Date.now() - taskForStones.duration - 1000;
+            }
+            const beforeStones = window.gameState.spiritStones;
+            const dc2 = server.mcpDispatchComplete(da3.dispatchId);
+            const afterStones = window.gameState.spiritStones;
+            v145Assert(afterStones > beforeStones, 'dispatch.complete adds spirit stones');
+
+            // Test 35: mcpExploreStart returns correct duration
+            const expState8 = server._initExploreState();
+            expState8.activeExplorations = [];
+            const es5 = server.mcpExploreStart('explore_tomb', 'pet_005');
+            v145Assert(es5.duration === 900000, 'explore.start returns correct duration for tomb (15min)');
+
+            // Test 36: mcpDispatchAccept returns correct duration
+            const dispState7 = server._initDispatchState();
+            dispState7.activeTasks = [];
+            const da4 = server.mcpDispatchAccept('dispatch_hunt');
+            v145Assert(da4.duration === 1800000, 'dispatch.accept returns correct duration for hunt (30min)');
+
+            // Test 37: mcpDispatchList shows availability based on player level
+            window.gameState.level = 5;
+            const dl4 = server.mcpDispatchList();
+            v145Assert(dl4.tasks[0].available === true, 'gather available at level 5');
+            v145Assert(dl4.tasks[4].available === false, 'hunt not available at level 5');
+
+            // Test 38: mcpExploreList areas have correct reward types
+            const el4 = server.mcpExploreList();
+            v145Assert(el4.areas[0].rewards.includes('灵草'), 'forest rewards include herb');
+            v145Assert(el4.areas[3].rewards.includes('龙珠'), 'sea rewards include dragon orb');
+
+            // Test 39: Exploration complete adds to history
+            const expState9 = server._initExploreState();
+            const beforeHistory = expState9.history.length;
+            expState9.activeExplorations = [{
+                id: 'exp_history_test',
+                areaId: 'explore_cave',
+                areaName: '上古洞府',
+                petId: 'pet_test',
+                startTime: Date.now() - 900000,
+                duration: 600000,
+                status: 'active',
+                rewards: ['功法残页', '灵石']
+            }];
+            server.mcpExploreComplete('exp_history_test');
+            const afterHistory = expState9.history.length;
+            v145Assert(afterHistory > beforeHistory, 'explore.complete adds to history');
+
+            // Test 40: Dispatch complete adds to completedTasks
+            const dispState8 = server._initDispatchState();
+            const beforeCompleted = dispState8.completedTasks.length;
+            dispState8.activeTasks = [{
+                id: 'dp_complete_test',
+                taskId: 'dispatch_gather',
+                taskName: '采集灵石',
+                startTime: Date.now() - 900000,
+                duration: 600000,
+                reward: { spiritStones: 500 },
+                status: 'active'
+            }];
+            server.mcpDispatchComplete('dp_complete_test');
+            const afterCompleted = dispState8.completedTasks.length;
+            v145Assert(afterCompleted > beforeCompleted, 'dispatch.complete adds to completedTasks');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V145 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V145', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v145Results = runV145Tests();
         const v144Results = runV144Tests();
         const v143Results = runV143Tests();
         const v142Results = runV142Tests();
