@@ -5559,6 +5559,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V160)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V161: Register 宠物探险+派遣系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V161)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5619,6 +5623,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'mcp.switch_provider':
                             result = this.mcpSwitchProvider(args.providerId);
+                            break;
+                        // V161: 宠物探险+派遣系统v3
+                        case 'explore.list':
+                            result = this.mcpExploreListV3();
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStartV3(args.areaId, args.petId);
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreCompleteV3(args.exploreId);
+                            break;
+                        case 'dispatch.list':
+                            result = this.mcpDispatchListV3();
+                            break;
+                        case 'dispatch.accept':
+                            result = this.mcpDispatchAcceptV3(args.taskId, args.petId);
+                            break;
+                        case 'dispatch.complete':
+                            result = this.mcpDispatchCompleteV3(args.taskId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -17242,6 +17265,334 @@ const ACHIEVEMENT_ID_MAP = {
                         reward: task.reward,
                         completedAt: now
                     });
+
+                    return {
+                        success: true,
+                        taskId: taskId,
+                        taskName: task.name,
+                        reward: task.reward,
+                        message: '任务完成！获得奖励：' + JSON.stringify(task.reward)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: _initExploreStateV3 - 初始化宠物探险状态v3
+            _initExploreStateV3() {
+                const gs = window.gameState;
+                if (!gs.exploreV3) {
+                    gs.exploreV3 = {
+                        areas: [
+                            { id: 'explore_forest', name: '幽冥森林', description: '灵气充沛的原始森林', difficulty: 1, cooldown: 300000, energyCost: 10, rewards: ['灵草', '妖兽内丹', '灵石'] },
+                            { id: 'explore_cave', name: '上古洞府', description: '仙人遗留下来的洞府遗迹', difficulty: 2, cooldown: 600000, energyCost: 20, rewards: ['功法残页', '灵石', '灵器碎片'] },
+                            { id: 'explore_tomb', name: '仙人墓穴', description: '远古仙人的安息之地', difficulty: 3, cooldown: 900000, energyCost: 30, rewards: ['仙丹', '仙器', '传承碎片'] },
+                            { id: 'explore_sea', name: '东海龙宫', description: '神秘的海底宫殿', difficulty: 4, cooldown: 1200000, energyCost: 50, rewards: ['龙珠', '仙晶', '海域宝藏'] },
+                            { id: 'explore_sky', name: '九天之上', description: '高耸入云的天界碎片', difficulty: 5, cooldown: 1800000, energyCost: 80, rewards: ['天雷', '神凤羽', '天道碎片'] }
+                        ],
+                        explorations: [],
+                        history: [],
+                        cooldownMap: {} // areaId -> lastCompletedTimestamp
+                    };
+                }
+                return gs.exploreV3;
+            }
+
+            // V161: _initDispatchStateV3 - 初始化派遣系统状态v3
+            _initDispatchStateV3() {
+                const gs = window.gameState;
+                if (!gs.dispatchV3) {
+                    gs.dispatchV3 = {
+                        tasks: [
+                            { id: 'dispatch_gather', name: '采集灵石', description: '前往灵矿采集灵石', duration: 600000, reward: { spiritStones: 500 }, levelReq: 1 },
+                            { id: 'dispatch_herb', name: '采集灵草', description: '采集各类灵草灵药', duration: 600000, reward: { items: ['灵草x10'] }, levelReq: 1 },
+                            { id: 'dispatch_delivery', name: '护送货物', description: '将货物安全送达目的地', duration: 900000, reward: { spiritStones: 800, reputation: 10 }, levelReq: 5 },
+                            { id: 'dispatch_escort', name: '护送商队', description: '保护商队免受妖兽袭击', duration: 1200000, reward: { spiritStones: 1500, reputation: 20 }, levelReq: 10 },
+                            { id: 'dispatch_hunt', name: '猎杀妖兽', description: '猎杀指定妖兽获取材料', duration: 1800000, reward: { items: ['妖兽内丹x3'], spiritStones: 2000 }, levelReq: 15 },
+                            { id: 'dispatch_explore', name: '秘境探索', description: '探索小型秘境获取宝藏', duration: 2400000, reward: { items: ['秘境钥匙'], spiritStones: 3000 }, levelReq: 20 }
+                        ],
+                        activeTasks: [],
+                        completedTasks: [],
+                        availableTasks: []
+                    };
+                }
+                return gs.dispatchV3;
+            }
+
+            // V161: mcpExploreListV3 - 获取探险区域列表v3
+            mcpExploreListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreV3 = this._initExploreStateV3();
+                    const now = Date.now();
+                    return {
+                        success: true,
+                        areas: exploreV3.areas.map(a => {
+                            const lastCooldown = exploreV3.cooldownMap[a.id] || 0;
+                            const cooldownRemaining = Math.max(0, a.cooldown - (now - lastCooldown));
+                            return {
+                                id: a.id,
+                                name: a.name,
+                                description: a.description,
+                                difficulty: a.difficulty,
+                                rewards: a.rewards,
+                                cooldown: a.cooldown,
+                                energyCost: a.energyCost,
+                                cooldownRemaining: cooldownRemaining,
+                                inCooldown: cooldownRemaining > 0,
+                                activeExplorations: exploreV3.explorations.filter(e => e.areaId === a.id && e.status === 'active')
+                            };
+                        }),
+                        total: exploreV3.areas.length,
+                        message: '共' + exploreV3.areas.length + '个探险区域'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: mcpExploreStartV3 - 开始探险v3
+            mcpExploreStartV3(areaId, petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!areaId) return { error: '请指定探险区域ID' };
+                    if (!petId) return { error: '请指定宠物ID' };
+
+                    const exploreV3 = this._initExploreStateV3();
+                    const area = exploreV3.areas.find(a => a.id === areaId);
+                    if (!area) return { error: '探险区域不存在' };
+
+                    // 检查冷却
+                    const now = Date.now();
+                    const lastCooldown = exploreV3.cooldownMap[areaId] || 0;
+                    if (now - lastCooldown < area.cooldown) {
+                        return { error: '该区域还在冷却中，请稍后再试' };
+                    }
+
+                    // 检查宠物是否已在探险中
+                    const petExploring = exploreV3.explorations.find(e => e.petId === petId && e.status === 'active');
+                    if (petExploring) return { error: '该宠物正在探险中' };
+
+                    // 检查精力
+                    const playerEnergy = gs.energy || 100;
+                    if (playerEnergy < area.energyCost) {
+                        return { error: '精力不足，需要' + area.energyCost + '点精力' };
+                    }
+
+                    // 消耗精力
+                    gs.energy = playerEnergy - area.energyCost;
+
+                    // 创建探险记录
+                    const exploreId = 'exp_v3_' + Date.now();
+                    const newExploration = {
+                        id: exploreId,
+                        areaId: areaId,
+                        areaName: area.name,
+                        petId: petId,
+                        startTime: now,
+                        duration: area.cooldown,
+                        energyCost: area.energyCost,
+                        status: 'active',
+                        rewards: area.rewards,
+                        difficulty: area.difficulty
+                    };
+                    exploreV3.explorations.push(newExploration);
+
+                    return {
+                        success: true,
+                        exploreId: exploreId,
+                        areaName: area.name,
+                        energyCost: area.energyCost,
+                        duration: area.cooldown,
+                        message: '宠物开始探险：' + area.name + '，消耗' + area.energyCost + '点精力'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: mcpExploreCompleteV3 - 完成探险v3
+            mcpExploreCompleteV3(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+
+                    const exploreV3 = this._initExploreStateV3();
+                    const exploration = exploreV3.explorations.find(e => e.id === exploreId);
+                    if (!exploration) return { error: '探险不存在' };
+                    if (exploration.status !== 'active') return { error: '探险已完成或已取消' };
+
+                    const now = Date.now();
+                    const elapsed = now - exploration.startTime;
+                    if (elapsed < exploration.duration) {
+                        return { error: '探险尚未完成，剩余' + Math.ceil((exploration.duration - elapsed) / 60000) + '分钟' };
+                    }
+
+                    // 完成探险
+                    exploration.status = 'completed';
+
+                    // 设置冷却
+                    exploreV3.cooldownMap[exploration.areaId] = now;
+
+                    // 添加到历史
+                    exploreV3.history.push({
+                        id: exploration.id,
+                        areaId: exploration.areaId,
+                        areaName: exploration.areaName,
+                        petId: exploration.petId,
+                        startTime: exploration.startTime,
+                        endTime: now,
+                        rewards: exploration.rewards,
+                        difficulty: exploration.difficulty
+                    });
+
+                    // 发放奖励
+                    const spiritStoneReward = Math.floor(50 * exploration.difficulty * (1 + Math.random() * 0.5));
+                    gs.spiritStones = (gs.spiritStones || 0) + spiritStoneReward;
+
+                    // 宠物经验
+                    if (!gs.pets) gs.pets = [];
+                    const pet = gs.pets.find(p => p.id === exploration.petId);
+                    if (pet) {
+                        pet.experience = (pet.experience || 0) + exploration.difficulty * 20;
+                        pet.level = pet.level || 1;
+                        if (pet.experience >= pet.level * 100) {
+                            pet.experience -= pet.level * 100;
+                            pet.level++;
+                        }
+                    }
+
+                    return {
+                        success: true,
+                        exploreId: exploreId,
+                        spiritStones: spiritStoneReward,
+                        petExperience: pet ? exploration.difficulty * 20 : 0,
+                        rewards: exploration.rewards,
+                        message: '探险完成！获得' + spiritStoneReward + '灵石' + (pet ? '，宠物获得' + (exploration.difficulty * 20) + '点经验' : '')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: mcpDispatchListV3 - 获取派遣任务列表v3
+            mcpDispatchListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatchV3 = this._initDispatchStateV3();
+                    const now = Date.now();
+                    const playerLevel = gs.level || 1;
+
+                    return {
+                        success: true,
+                        tasks: dispatchV3.tasks.map(t => {
+                            const activeTask = dispatchV3.activeTasks.find(at => at.taskId === t.id);
+                            const status = activeTask ? (activeTask.completed ? 'completed' : 'active') : 'available';
+                            return {
+                                id: t.id,
+                                name: t.name,
+                                description: t.description,
+                                duration: t.duration,
+                                reward: t.reward,
+                                levelReq: t.levelReq,
+                                available: playerLevel >= t.levelReq,
+                                status: status,
+                                startTime: activeTask ? activeTask.startTime : null,
+                                remainingTime: activeTask && !activeTask.completed ? Math.max(0, t.duration - (now - activeTask.startTime)) : 0
+                            };
+                        }),
+                        total: dispatchV3.tasks.length,
+                        message: '共' + dispatchV3.tasks.length + '个派遣任务'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: mcpDispatchAcceptV3 - 接受派遣任务v3
+            mcpDispatchAcceptV3(taskId, petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!taskId) return { error: '请指定任务ID' };
+                    if (!petId) return { error: '请指定宠物ID' };
+
+                    const dispatchV3 = this._initDispatchStateV3();
+                    const task = dispatchV3.tasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在' };
+
+                    const playerLevel = gs.level || 1;
+                    if (playerLevel < task.levelReq) {
+                        return { error: '等级不足，需要' + task.levelReq + '级' };
+                    }
+
+                    // 检查宠物是否已在任务中
+                    const petOnTask = dispatchV3.activeTasks.find(at => at.petId === petId && !at.completed);
+                    if (petOnTask) return { error: '该宠物正在执行其他任务' };
+
+                    // 检查任务是否已在进行中
+                    const existingTask = dispatchV3.activeTasks.find(at => at.taskId === taskId && !at.completed);
+                    if (existingTask) return { error: '该任务正在进行中' };
+
+                    // 接受任务
+                    dispatchV3.activeTasks.push({
+                        taskId: taskId,
+                        petId: petId,
+                        startTime: Date.now(),
+                        completed: false
+                    });
+
+                    return {
+                        success: true,
+                        taskId: taskId,
+                        petId: petId,
+                        taskName: task.name,
+                        startTime: Date.now(),
+                        duration: task.duration,
+                        message: '宠物已接受任务：' + task.name + '，预计' + (task.duration / 60000) + '分钟后完成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V161: mcpDispatchCompleteV3 - 完成派遣任务v3
+            mcpDispatchCompleteV3(taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!taskId) return { error: '请指定任务ID' };
+
+                    const dispatchV3 = this._initDispatchStateV3();
+                    const task = dispatchV3.tasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在' };
+
+                    const activeTask = dispatchV3.activeTasks.find(at => at.taskId === taskId && !at.completed);
+                    if (!activeTask) return { error: '任务未开始或已完成' };
+
+                    const now = Date.now();
+                    const elapsed = now - activeTask.startTime;
+                    if (elapsed < task.duration) {
+                        return { error: '任务尚未完成，剩余' + Math.ceil((task.duration - elapsed) / 60000) + '分钟' };
+                    }
+
+                    // 标记完成
+                    activeTask.completed = true;
+
+                    // 发放奖励
+                    if (task.reward.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + task.reward.spiritStones;
+                    }
+                    if (task.reward.reputation) {
+                        gs.reputation = (gs.reputation || 0) + task.reward.reputation;
+                    }
+                    if (task.reward.items) {
+                        if (!gs.inventory) gs.inventory = [];
+                        gs.inventory.push(...task.reward.items);
+                    }
+
+                    // 添加到完成历史
+                    dispatchV3.completedTasks.push({
+                        taskId: taskId,
+                        petId: activeTask.petId,
+                        completedAt: now,
+                        reward: task.reward
+                    });
+
+                    // 清理active task
+                    dispatchV3.activeTasks = dispatchV3.activeTasks.filter(at => at.taskId !== taskId || at.completed);
 
                     return {
                         success: true,
@@ -33168,6 +33519,66 @@ const ACHIEVEMENT_ID_MAP = {
                         applyId: { type: 'string', description: '申请ID' }
                     },
                     required: ['applyId']
+                }
+            }
+        };
+
+        // V161: 宠物探险+派遣系统v3
+        const MCP_TOOLS_V161 = {
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取探险区域列表 (宠物探险系统v3-获取所有探险区域及冷却状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始探险 (宠物探险系统v3-消耗精力开始探险)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        areaId: { type: 'string', description: '探险区域ID' },
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['areaId', 'petId']
+                }
+            },
+            'explore.complete': {
+                name: 'explore.complete',
+                description: '完成探险领取奖励 (宠物探险系统v3-完成探险获得灵石和宠物经验)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'dispatch.list': {
+                name: 'dispatch.list',
+                description: '获取派遣任务列表 (派遣系统v3-获取所有可接受的派遣任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'dispatch.accept': {
+                name: 'dispatch.accept',
+                description: '接受派遣任务 (派遣系统v3-接受派遣任务，需宠物空闲)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        taskId: { type: 'string', description: '任务ID' },
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['taskId', 'petId']
+                }
+            },
+            'dispatch.complete': {
+                name: 'dispatch.complete',
+                description: '完成派遣任务 (派遣系统v3-完成派遣任务获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        taskId: { type: 'string', description: '任务ID' }
+                    },
+                    required: ['taskId']
                 }
             }
         };
@@ -59353,9 +59764,268 @@ const ACHIEVEMENT_ID_MAP = {
 
         const v160Results = runV160Tests();
 
-        const v152Results = runV152Tests();
+const v152Results = runV152Tests();
+            const v151Results = runV151Tests();
 
-        const v151Results = runV151Tests();
+            // V161 Tests (P-20260528-156)
+            function runV161Tests() {
+                const results = [];
+                const v161Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+                window.gameState = {
+                    spiritStones: 50000,
+                    energy: 100,
+                    level: 15,
+                    name: 'TestUser',
+                    pets: [
+                        { id: 'pet_001', name: '小青蛇', level: 5, experience: 50 },
+                        { id: 'pet_002', name: '小火鸦', level: 3, experience: 20 }
+                    ],
+                    inventory: []
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V161 definition exists and has 6 tools
+                v161Assert(typeof MCP_TOOLS_V161 === 'object', 'MCP_TOOLS_V161 is defined');
+                v161Assert(Object.keys(MCP_TOOLS_V161).length === 6, 'MCP_TOOLS_V161 has 6 tools');
+                v161Assert('explore.list' in MCP_TOOLS_V161, 'explore.list tool exists');
+                v161Assert('explore.start' in MCP_TOOLS_V161, 'explore.start tool exists');
+                v161Assert('explore.complete' in MCP_TOOLS_V161, 'explore.complete tool exists');
+                v161Assert('dispatch.list' in MCP_TOOLS_V161, 'dispatch.list tool exists');
+                v161Assert('dispatch.accept' in MCP_TOOLS_V161, 'dispatch.accept tool exists');
+                v161Assert('dispatch.complete' in MCP_TOOLS_V161, 'dispatch.complete tool exists');
+
+                // Test 2: _initExploreStateV3 initializes correctly
+                const expStateV3 = server._initExploreStateV3();
+                v161Assert(expStateV3 !== null, '_initExploreStateV3 returns state');
+                v161Assert(Array.isArray(expStateV3.areas), 'exploreV3 areas is array');
+                v161Assert(expStateV3.areas.length === 5, 'exploreV3 has 5 areas');
+                v161Assert(Array.isArray(expStateV3.explorations), 'exploreV3 explorations is array');
+                v161Assert(Array.isArray(expStateV3.history), 'exploreV3 history is array');
+                v161Assert(typeof expStateV3.cooldownMap === 'object', 'exploreV3 has cooldownMap');
+
+                // Test 3: _initDispatchStateV3 initializes correctly
+                const dispStateV3 = server._initDispatchStateV3();
+                v161Assert(dispStateV3 !== null, '_initDispatchStateV3 returns state');
+                v161Assert(Array.isArray(dispStateV3.tasks), 'dispatchV3 tasks is array');
+                v161Assert(dispStateV3.tasks.length === 6, 'dispatchV3 has 6 tasks');
+                v161Assert(Array.isArray(dispStateV3.activeTasks), 'dispatchV3 activeTasks is array');
+                v161Assert(Array.isArray(dispStateV3.completedTasks), 'dispatchV3 completedTasks is array');
+
+                // Test 4: mcpExploreListV3 returns all areas
+                const elV3 = server.mcpExploreListV3();
+                v161Assert(elV3.success === true, 'explore.list v3 returns success');
+                v161Assert(elV3.areas.length === 5, 'explore.list v3 shows 5 areas');
+                v161Assert(elV3.areas[0].energyCost === 10, 'first area energyCost is 10');
+                v161Assert(elV3.areas[0].inCooldown === false, 'first area not in cooldown initially');
+
+                // Test 5: mcpExploreStartV3 starts exploration
+                const esV3 = server.mcpExploreStartV3('explore_forest', 'pet_001');
+                v161Assert(esV3.success === true, 'explore.start v3 returns success');
+                v161Assert(esV3.exploreId && esV3.exploreId.startsWith('exp_v3_'), 'explore.start v3 returns exp_v3_ id');
+                v161Assert(esV3.energyCost === 10, 'explore.start v3 energyCost is 10');
+                v161Assert(esV3.areaName === '幽冥森林', 'explore.start v3 areaName is correct');
+
+                // Test 6: mcpExploreStartV3 consumes energy
+                v161Assert(window.gameState.energy === 90, 'explore.start v3 consumes 10 energy');
+
+                // Test 7: mcpExploreStartV3 fails for invalid area
+                const esV3Err1 = server.mcpExploreStartV3('invalid_area', 'pet_001');
+                v161Assert(esV3Err1.error && esV3Err1.error.includes('不存在'), 'explore.start v3 invalid area error');
+
+                // Test 8: mcpExploreStartV3 fails without areaId
+                const esV3Err2 = server.mcpExploreStartV3(null, 'pet_001');
+                v161Assert(esV3Err2.error && esV3Err2.error.includes('区域ID'), 'explore.start v3 missing areaId error');
+
+                // Test 9: mcpExploreStartV3 fails without petId
+                const esV3Err3 = server.mcpExploreStartV3('explore_cave', null);
+                v161Assert(esV3Err3.error && esV3Err3.error.includes('宠物ID'), 'explore.start v3 missing petId error');
+
+                // Test 10: mcpExploreStartV3 fails when pet already exploring
+                const esV3Err4 = server.mcpExploreStartV3('explore_cave', 'pet_001');
+                v161Assert(esV3Err4.error && esV3Err4.error.includes('正在探险中'), 'explore.start v3 pet already exploring error');
+
+                // Test 11: mcpExploreListV3 shows active explorations
+                const elV3_2 = server.mcpExploreListV3();
+                v161Assert(elV3_2.areas[0].activeExplorations.length === 1, 'explore.list v3 shows 1 active exploration');
+
+                // Test 12: mcpExploreStartV3 fails when insufficient energy
+                window.gameState.energy = 5;
+                const esV3Err5 = server.mcpExploreStartV3('explore_cave', 'pet_002');
+                v161Assert(esV3Err5.error && esV3Err5.error.includes('精力不足'), 'explore.start v3 insufficient energy error');
+
+                // Test 13: mcpDispatchListV3 returns all tasks
+                window.gameState.energy = 100;
+                const dlV3 = server.mcpDispatchListV3();
+                v161Assert(dlV3.success === true, 'dispatch.list v3 returns success');
+                v161Assert(dlV3.tasks.length === 6, 'dispatch.list v3 shows 6 tasks');
+                v161Assert(dlV3.tasks[0].levelReq === 1, 'first task levelReq is 1');
+                v161Assert(dlV3.tasks[4].levelReq === 15, '5th task levelReq is 15');
+
+                // Test 14: mcpDispatchAcceptV3 accepts task
+                const daV3 = server.mcpDispatchAcceptV3('dispatch_gather', 'pet_002');
+                v161Assert(daV3.success === true, 'dispatch.accept v3 returns success');
+                v161Assert(daV3.taskId === 'dispatch_gather', 'dispatch.accept v3 taskId correct');
+                v161Assert(daV3.petId === 'pet_002', 'dispatch.accept v3 petId correct');
+
+                // Test 15: mcpDispatchAcceptV3 fails for invalid task
+                const daV3Err1 = server.mcpDispatchAcceptV3('invalid_task', 'pet_002');
+                v161Assert(daV3Err1.error && daV3Err1.error.includes('不存在'), 'dispatch.accept v3 invalid task error');
+
+                // Test 16: mcpDispatchAcceptV3 fails without taskId
+                const daV3Err2 = server.mcpDispatchAcceptV3(null, 'pet_002');
+                v161Assert(daV3Err2.error && daV3Err2.error.includes('任务ID'), 'dispatch.accept v3 missing taskId error');
+
+                // Test 17: mcpDispatchAcceptV3 fails without petId
+                const daV3Err3 = server.mcpDispatchAcceptV3('dispatch_gather', null);
+                v161Assert(daV3Err3.error && daV3Err3.error.includes('宠物ID'), 'dispatch.accept v3 missing petId error');
+
+                // Test 18: mcpDispatchAcceptV3 fails when pet already on task
+                const daV3Err4 = server.mcpDispatchAcceptV3('dispatch_herb', 'pet_002');
+                v161Assert(daV3Err4.error && daV3Err4.error.includes('正在执行其他任务'), 'dispatch.accept v3 pet busy error');
+
+                // Test 19: mcpDispatchAcceptV3 fails when task already active
+                const daV3Err5 = server.mcpDispatchAcceptV3('dispatch_gather', 'pet_001');
+                v161Assert(daV3Err5.error && daV3Err5.error.includes('正在进行中'), 'dispatch.accept v3 task already active error');
+
+                // Test 20: dispatch.list v3 shows active task
+                const dlV3_2 = server.mcpDispatchListV3();
+                v161Assert(dlV3_2.tasks[0].status === 'active', 'dispatch.list v3 first task status is active');
+
+                // Test 21: mcpDispatchCompleteV3 fails when task not ready
+                const dcV3Err1 = server.mcpDispatchCompleteV3('dispatch_gather');
+                v161Assert(dcV3Err1.error && dcV3Err1.error.includes('尚未完成'), 'dispatch.complete v3 not ready error');
+
+                // Test 22: V161 tools registered in tool registry
+                const tools = server.toolRegistry ? Array.from(server.toolRegistry.keys()) : [];
+                v161Assert(tools.includes('explore.list'), 'explore.list registered');
+                v161Assert(tools.includes('explore.start'), 'explore.start registered');
+                v161Assert(tools.includes('explore.complete'), 'explore.complete registered');
+                v161Assert(tools.includes('dispatch.list'), 'dispatch.list registered');
+                v161Assert(tools.includes('dispatch.accept'), 'dispatch.accept registered');
+                v161Assert(tools.includes('dispatch.complete'), 'dispatch.complete registered');
+
+                // Test 23: exploreV3 areas have correct energyCost
+                const elV3_3 = server.mcpExploreListV3();
+                v161Assert(elV3_3.areas[0].energyCost === 10, 'forest energyCost is 10');
+                v161Assert(elV3_3.areas[1].energyCost === 20, 'cave energyCost is 20');
+                v161Assert(elV3_3.areas[2].energyCost === 30, 'tomb energyCost is 30');
+                v161Assert(elV3_3.areas[3].energyCost === 50, 'sea energyCost is 50');
+                v161Assert(elV3_3.areas[4].energyCost === 80, 'sky energyCost is 80');
+
+                // Test 24: exploreV3 areas have correct difficulty
+                v161Assert(elV3_3.areas[0].difficulty === 1, 'forest difficulty is 1');
+                v161Assert(elV3_3.areas[4].difficulty === 5, 'sky difficulty is 5');
+
+                // Test 25: dispatchV3 task rewards structure correct
+                const dlV3_3 = server.mcpDispatchListV3();
+                v161Assert(dlV3_3.tasks[0].reward.spiritStones === 500, 'gather task spiritStones reward is 500');
+                v161Assert(dlV3_3.tasks[1].reward.items, 'herb task has items reward');
+                v161Assert(dlV3_3.tasks[3].reward.reputation === 20, 'escort task reputation reward is 20');
+
+                // Test 26: explore.complete v3 fails for invalid exploreId
+                const ecV3Err1 = server.mcpExploreCompleteV3('invalid_exp');
+                v161Assert(ecV3Err1.error && ecV3Err1.error.includes('不存在'), 'explore.complete v3 invalid id error');
+
+                // Test 27: explore.complete v3 fails without exploreId
+                const ecV3Err2 = server.mcpExploreCompleteV3();
+                v161Assert(ecV3Err2.error && ecV3Err2.error.includes('探险ID'), 'explore.complete v3 missing id error');
+
+                // Test 28: dispatch.complete v3 fails without taskId
+                const dcV3Err2 = server.mcpDispatchCompleteV3();
+                v161Assert(dcV3Err2.error && dcV3Err2.error.includes('任务ID'), 'dispatch.complete v3 missing id error');
+
+                // Test 29: dispatch.complete v3 fails for invalid task
+                const dcV3Err3 = server.mcpDispatchCompleteV3('invalid_task');
+                v161Assert(dcV3Err3.error && dcV3Err3.error.includes('不存在'), 'dispatch.complete v3 invalid task error');
+
+                // Test 30: dispatch.list v3 shows level requirements
+                v161Assert(dlV3_3.tasks[2].levelReq === 5, 'delivery task levelReq is 5');
+                v161Assert(dlV3_3.tasks[5].levelReq === 20, 'explore task levelReq is 20');
+
+                // Test 31: explore.list v3 cooldown state
+                const elV3_4 = server.mcpExploreListV3();
+                v161Assert(typeof elV3_4.areas[0].cooldownRemaining === 'number', 'cooldownRemaining is number');
+                v161Assert(typeof elV3_4.areas[0].inCooldown === 'boolean', 'inCooldown is boolean');
+
+                // Test 32: mcpExploreStartV3 respects cooldown
+                window.gameState.exploreV3.cooldownMap['explore_forest'] = Date.now() - 100000; // 100s ago
+                const esV3Err6 = server.mcpExploreStartV3('explore_forest', 'pet_002');
+                v161Assert(esV3Err6.error && esV3Err6.error.includes('冷却中'), 'explore.start v3 cooldown error');
+
+                // Test 33: dispatch.accept v3 respects level requirement
+                window.gameState.level = 1;
+                const daV3Err6 = server.mcpDispatchAcceptV3('dispatch_explore', 'pet_001');
+                v161Assert(daV3Err6.error && daV3Err6.error.includes('等级不足'), 'dispatch.accept v3 level error');
+
+                // Test 34: exploreV3 history tracking
+                window.gameState.level = 15;
+                const expV3 = server._initExploreStateV3();
+                expV3.explorations[0].startTime = Date.now() - 400000;
+                const ecV3 = server.mcpExploreCompleteV3(expV3.explorations[0].id);
+                v161Assert(ecV3.success === true, 'explore.complete v3 succeeds after duration');
+
+                // Test 35: exploreV3 history has entry after completion
+                const expV3State = server._initExploreStateV3();
+                v161Assert(expV3State.history.length === 1, 'exploreV3 history has 1 entry');
+                v161Assert(expV3State.history[0].areaName === '幽冥森林', 'exploreV3 history areaName correct');
+
+                // Test 36: dispatchV3 completes and clears active task
+                const dispV3 = server._initDispatchStateV3();
+                dispV3.activeTasks[0].startTime = Date.now() - 700000;
+                const dcV3 = server.mcpDispatchCompleteV3('dispatch_gather');
+                v161Assert(dcV3.success === true, 'dispatch.complete v3 succeeds');
+                v161Assert(dcV3.reward.spiritStones === 500, 'dispatch.complete v3 reward correct');
+
+                // Test 37: dispatchV3 completedTasks tracking
+                v161Assert(dispV3.completedTasks.length === 1, 'dispatchV3 completedTasks has 1 entry');
+
+                // Test 38: mcpExploreListV3 shows updated cooldown
+                const elV3_5 = server.mcpExploreListV3();
+                v161Assert(elV3_5.areas[0].inCooldown === true, 'explore.list v3 forest is now in cooldown');
+
+                // Test 39: mcpDispatchListV3 task status after completion
+                const dlV3_4 = server.mcpDispatchListV3();
+                v161Assert(dlV3_4.tasks[0].status === 'available', 'dispatch.list v3 task available after completion');
+
+                // Test 40: exploreV3 second exploration in different area works
+                const esV3_2 = server.mcpExploreStartV3('explore_cave', 'pet_002');
+                v161Assert(esV3_2.success === true, 'explore.start v3 second exploration succeeds');
+
+                // Test 41: explore.complete v3 updates spirit stones
+                const gsBefore = window.gameState.spiritStones;
+                const expV3_2 = server._initExploreStateV3();
+                expV3_2.explorations[0].startTime = Date.now() - 400000;
+                const ecV3_2 = server.mcpExploreCompleteV3(expV3_2.explorations[0].id);
+                v161Assert(window.gameState.spiritStones > gsBefore, 'explore.complete v3 increases spirit stones');
+
+                // Test 42: mcpExploreListV3 returns correct message
+                v161Assert(elV3.message === '共5个探险区域', 'explore.list v3 message correct');
+
+                // Test 43: mcpDispatchListV3 returns correct message
+                v161Assert(dlV3.message === '共6个派遣任务', 'dispatch.list v3 message correct');
+
+                // Test 44: exploreV3 difficulty affects rewards
+                const expV3_3 = server._initExploreStateV3();
+                expV3_3.explorations[0].startTime = Date.now() - 700000;
+                const ecV3_3 = server.mcpExploreCompleteV3(expV3_3.explorations[0].id);
+                v161Assert(ecV3_3.difficulty === 2, 'explore.complete v3 difficulty is 2 for cave');
+
+                // Test 45: dispatchV3 rewards include reputation
+                const dispV3_2 = server._initDispatchStateV3();
+                dispV3_2.activeTasks.push({ taskId: 'dispatch_escort', petId: 'pet_001', startTime: Date.now() - 1300000, completed: false });
+                const dcV3_2 = server.mcpDispatchCompleteV3('dispatch_escort');
+                v161Assert(dcV3_2.reward.reputation === 20, 'dispatch.complete v3 reputation reward is 20');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V161 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V161', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v161Results = runV161Tests();
 
         const v150Results = runV150Tests();
 
