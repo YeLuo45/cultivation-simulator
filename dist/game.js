@@ -5331,6 +5331,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V120)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V121: Register 宠物探险+派遣系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V121)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6294,6 +6298,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'monthcard.claim':
                             result = this.mcpMonthcardClaim();
+                            break;
+                        // V121: 宠物探险+派遣系统
+                        case 'petexplore.list':
+                            result = this.mcpPetexploreList();
+                            break;
+                        case 'petexplore.start':
+                            result = this.mcpPetexploreStart(args.petId, args.exploreId);
+                            break;
+                        case 'petexplore.harvest':
+                            result = this.mcpPetexploreHarvest(args.exploreId);
+                            break;
+                        case 'dispatch.list':
+                            result = this.mcpDispatchList();
+                            break;
+                        case 'dispatch.execute':
+                            result = this.mcpDispatchExecute(args.taskId);
+                            break;
+                        case 'dispatch.complete':
+                            result = this.mcpDispatchComplete(args.taskId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -15084,6 +15107,120 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V121: 宠物探险+派遣系统
+            _initPetExploreState() {
+                const gs = window.gameState;
+                if (!gs.petExplore) {
+                    gs.petExplore = { activeExpeditions: [], completedCount: 0 };
+                }
+                return gs.petExplore;
+            }
+            _initDispatchState() {
+                const gs = window.gameState;
+                if (!gs.dispatch) {
+                    gs.dispatch = {
+                        tasks: [
+                            { id: 'dispatch_1', name: '采集灵草', cost: 100, duration: 1800000, reward: { spiritStones: 300, reputation: 10 }, status: 'available' },
+                            { id: 'dispatch_2', name: '护送商队', cost: 300, duration: 3600000, reward: { spiritStones: 800, reputation: 30 }, status: 'available' },
+                            { id: 'dispatch_3', name: '探索遗迹', cost: 500, duration: 7200000, reward: { spiritStones: 2000, reputation: 80 }, status: 'available' },
+                        ],
+                        nextTaskRefresh: null
+                    };
+                }
+                return gs.dispatch;
+            }
+            mcpPetexploreList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const explore = this._initPetExploreState();
+                    return { success: true, active: explore.activeExpeditions, completedCount: explore.completedCount };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpPetexploreStart(petId, exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId || !exploreId) return { error: 'petId和exploreId不能为空' };
+                    const explore = this._initPetExploreState();
+                    const EXPLORE_CONFIG = {
+                        explore_a: { name: '普通探险', duration: 1800000, rewardMin: 100, rewardMax: 300 },
+                        explore_b: { name: '稀有探险', duration: 3600000, rewardMin: 500, rewardMax: 1000 },
+                        explore_c: { name: '传说探险', duration: 7200000, rewardMin: 2000, rewardMax: 5000 }
+                    };
+                    const config = EXPLORE_CONFIG[exploreId];
+                    if (!config) return { error: '无效的exploreId' };
+                    const activeCount = explore.activeExpeditions.filter(e => e.petId === petId).length;
+                    if (activeCount > 0) return { error: '该宠物已在探险中' };
+                    if (explore.activeExpeditions.length >= 3) return { error: '最多同时3个探险' };
+                    const startTime = Date.now();
+                    explore.activeExpeditions.push({ petId, exploreId, startTime, duration: config.duration });
+                    return { success: true, message: '探险开始', petId, exploreId, startTime, endTime: startTime + config.duration };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpPetexploreHarvest(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const explore = this._initPetExploreState();
+                    const idx = explore.activeExpeditions.findIndex(e => e.exploreId === exploreId);
+                    if (idx === -1) return { error: '探险不存在' };
+                    const exp = explore.activeExpeditions[idx];
+                    const elapsed = Date.now() - exp.startTime;
+                    if (elapsed < exp.duration) return { error: '探险尚未完成，还需' + Math.ceil((exp.duration - elapsed) / 60000) + '分钟' };
+                    const EXPLORE_CONFIG = {
+                        explore_a: { name: '普通探险', rewardMin: 100, rewardMax: 300 },
+                        explore_b: { name: '稀有探险', rewardMin: 500, rewardMax: 1000 },
+                        explore_c: { name: '传说探险', rewardMin: 2000, rewardMax: 5000 }
+                    };
+                    const config = EXPLORE_CONFIG[exp.exploreId];
+                    const reward = Math.floor(Math.random() * (config.rewardMax - config.rewardMin + 1)) + config.rewardMin;
+                    gs.spiritStones = (gs.spiritStones || 0) + reward;
+                    explore.activeExpeditions.splice(idx, 1);
+                    explore.completedCount++;
+                    return { success: true, message: '收获探险奖励', reward: { spiritStones: reward }, balance: gs.spiritStones };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpDispatchList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatch = this._initDispatchState();
+                    return { success: true, tasks: dispatch.tasks.filter(t => t.status !== 'completed') };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpDispatchExecute(taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatch = this._initDispatchState();
+                    const task = dispatch.tasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在' };
+                    if (task.status !== 'available') return { error: '任务不可执行' };
+                    if ((gs.spiritStones || 0) < task.cost) return { error: '灵石不足' };
+                    gs.spiritStones -= task.cost;
+                    task.status = 'running';
+                    task.startTime = Date.now();
+                    return { success: true, message: '派遣开始', taskId, cost: task.cost, balance: gs.spiritStones, endTime: task.startTime + task.duration };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpDispatchComplete(taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatch = this._initDispatchState();
+                    const task = dispatch.tasks.find(t => t.id === taskId);
+                    if (!task) return { error: '任务不存在' };
+                    if (task.status !== 'running') return { error: '任务未在执行中' };
+                    const elapsed = Date.now() - task.startTime;
+                    if (elapsed < task.duration) return { error: '任务尚未完成，还需' + Math.ceil((task.duration - elapsed) / 60000) + '分钟' };
+                    gs.spiritStones = (gs.spiritStones || 0) + task.reward.spiritStones;
+                    gs.reputation = (gs.reputation || 0) + task.reward.reputation;
+                    task.status = 'completed';
+                    return { success: true, message: '任务完成', reward: task.reward, balance: gs.spiritStones, reputation: gs.reputation };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V117: mcpCheckinQuery - 查询签到状态
             mcpCheckinQuery() {
                 try {
@@ -23191,6 +23328,32 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V120: 仙界投资+月卡系统
+        const MCP_TOOLS_V120 = {
+            'investment.query': { name: 'investment.query', description: '查询投资状态', inputSchema: { type: 'object', properties: {} } },
+            'investment.buy': { name: 'investment.buy', description: '购买投资产品', inputSchema: { type: 'object', properties: { investmentId: { type: 'string' } }, required: ['investmentId'] } },
+            'investment.claim': { name: 'investment.claim', description: '领取投资收益', inputSchema: { type: 'object', properties: { investmentId: { type: 'string' } }, required: ['investmentId'] } },
+            'monthcard.query': { name: 'monthcard.query', description: '查询月卡状态', inputSchema: { type: 'object', properties: {} } },
+            'monthcard.buy': { name: 'monthcard.buy', description: '购买月卡', inputSchema: { type: 'object', properties: {} } },
+            'monthcard.claim': { name: 'monthcard.claim', description: '每日领取月卡奖励', inputSchema: { type: 'object', properties: {} } }
+        };
+        const INVESTMENT_PRODUCTS = [
+            { id: 'inv_001', name: '稳赢投资', cost: 1000, dailyReturn: 100, totalDays: 15 },
+            { id: 'inv_002', name: '高回报投资', cost: 5000, dailyReturn: 800, totalDays: 10 },
+            { id: 'inv_003', name: '天道基金', cost: 20000, dailyReturn: 5000, totalDays: 7 }
+        ];
+        const MONTHCARD_CONFIG = { cost: 500, dailyReward: 200, durationDays: 30, claimCooldownHours: 24 };
+
+        // V121: 宠物探险+派遣系统
+        const MCP_TOOLS_V121 = {
+            'petexplore.list': { name: 'petexplore.list', description: '获取探险列表', inputSchema: { type: 'object', properties: {} } },
+            'petexplore.start': { name: 'petexplore.start', description: '开始探险', inputSchema: { type: 'object', properties: { petId: { type: 'string' }, exploreId: { type: 'string' } }, required: ['petId', 'exploreId'] } },
+            'petexplore.harvest': { name: 'petexplore.harvest', description: '收获探险奖励', inputSchema: { type: 'object', properties: { exploreId: { type: 'string' } }, required: ['exploreId'] } },
+            'dispatch.list': { name: 'dispatch.list', description: '获取派遣任务列表', inputSchema: { type: 'object', properties: {} } },
+            'dispatch.execute': { name: 'dispatch.execute', description: '执行派遣任务', inputSchema: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] } },
+            'dispatch.complete': { name: 'dispatch.complete', description: '完成派遣领取奖励', inputSchema: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] } }
+        };
+
         // V117: Check-in Streak Rewards
         const CHECKIN_STREAK_REWARDS = {
             day3: { need: 3, reward: { spiritStones: 500 }, claimed: false },
@@ -25250,6 +25413,107 @@ const ACHIEVEMENT_ID_MAP = {
             return summary;
         }
         const v120Results = runV120Tests();
+
+        // ===== V121: 宠物探险+派遣系统 Tests =====
+        function runV121Tests() {
+            const results = [];
+            function v121Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 10000, reputation: 0,
+                petExplore: null, dispatch: null, pets: []
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // petexplore.list
+            const list1 = server.mcpPetexploreList();
+            v121Assert(list1.success === true, 'petexplore.list succeeds');
+            v121Assert(Array.isArray(list1.active), 'petexplore.list returns active array');
+
+            // petexplore.start - pet not found
+            const start1 = server.mcpPetexploreStart('pet1', 'explore_a');
+            v121Assert(start1.error && start1.error.includes('宠物不存在'), 'petexplore.start fails without pet');
+
+            // Add pet and try again
+            mockGameState.pets = [{ id: 'pet1', name: '小灵狐' }];
+            mockGameState.petExplore = null;
+            const start2 = server.mcpPetexploreStart('pet1', 'explore_a');
+            v121Assert(start2.success === true, 'petexplore.start succeeds');
+            v121Assert(start2.petId === 'pet1', 'petexplore.start returns petId');
+            v121Assert(start2.endTime > start2.startTime, 'petexplore.start returns endTime');
+
+            // petexplore.start - same pet again
+            const start2b = server.mcpPetexploreStart('pet1', 'explore_b');
+            v121Assert(start2b.error && start2b.error.includes('已在探险中'), 'petexplore.start blocks same pet');
+
+            // petexplore.start - invalid exploreId
+            const start3 = server.mcpPetexploreStart('pet1', 'invalid');
+            v121Assert(start3.error && start3.error.includes('无效的exploreId'), 'petexplore.start rejects invalid exploreId');
+
+            // dispatch.list
+            const dlist1 = server.mcpDispatchList();
+            v121Assert(dlist1.success === true, 'dispatch.list succeeds');
+            v121Assert(dlist1.tasks && dlist1.tasks.length >= 3, 'dispatch.list returns tasks');
+
+            // dispatch.execute - insufficient funds
+            mockGameState.spiritStones = 10;
+            const dex1 = server.mcpDispatchExecute('dispatch_1');
+            v121Assert(dex1.error && dex1.error.includes('灵石不足'), 'dispatch.execute fails with insufficient stones');
+
+            // dispatch.execute - success
+            mockGameState.spiritStones = 10000;
+            const dex2 = server.mcpDispatchExecute('dispatch_1');
+            v121Assert(dex2.success === true, 'dispatch.execute succeeds');
+            v121Assert(dex2.balance === 9900, 'dispatch.execute deducts cost');
+            v121Assert(dex2.endTime > dex2.startTime, 'dispatch.execute returns endTime');
+
+            // dispatch.execute - task not available
+            const dex2b = server.mcpDispatchExecute('dispatch_1');
+            v121Assert(dex2b.error && dex2b.error.includes('任务不可执行'), 'dispatch.execute fails on running task');
+
+            // dispatch.execute - task not found
+            const dex3 = server.mcpDispatchExecute('nonexistent');
+            v121Assert(dex3.error && dex3.error.includes('不存在'), 'dispatch.execute fails on nonexistent task');
+
+            // dispatch.complete - task not running
+            mockGameState.dispatch = {
+                tasks: [{ id: 'd1', name: 'Test', cost: 100, duration: 1000, reward: { spiritStones: 300, reputation: 10 }, status: 'available', startTime: null }]
+            };
+            const dc1 = server.mcpDispatchComplete('d1');
+            v121Assert(dc1.error && dc1.error.includes('未在执行中'), 'dispatch.complete fails when not running');
+
+            // dispatch.complete - not enough time
+            mockGameState.dispatch = {
+                tasks: [{ id: 'd2', name: 'Test', cost: 100, duration: 1000000, reward: { spiritStones: 300, reputation: 10 }, status: 'running', startTime: Date.now() - 100 }]
+            };
+            const dc2 = server.mcpDispatchComplete('d2');
+            v121Assert(dc2.error && dc2.error.includes('尚未完成'), 'dispatch.complete fails when time not elapsed');
+
+            // dispatch.complete - success (time manipulated)
+            mockGameState.dispatch = {
+                tasks: [{ id: 'd3', name: 'Test', cost: 100, duration: 100, reward: { spiritStones: 300, reputation: 10 }, status: 'running', startTime: Date.now() - 1000 }]
+            };
+            mockGameState.spiritStones = 9900;
+            const dc3 = server.mcpDispatchComplete('d3');
+            v121Assert(dc3.success === true, 'dispatch.complete succeeds');
+            v121Assert(dc3.reward.spiritStones === 300, 'dispatch.complete returns reward');
+            v121Assert(dc3.balance === 10200, 'dispatch.complete adds reward to balance');
+
+            // petexplore.harvest - not found
+            const h1 = server.mcpPetexploreHarvest('nonexistent');
+            v121Assert(h1.error && h1.error.includes('探险不存在'), 'petexplore.harvest fails when not found');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V121 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V121', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v121Results = runV121Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
