@@ -3441,6 +3441,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V129)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V130: Register 宗门+弟子系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V130)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4575,6 +4579,25 @@
                             break;
                         case 'breakthrough.result':
                             result = this.mcpBreakthroughResult();
+                            break;
+                        // V130: 宗门+弟子系统
+                        case 'sect.list':
+                            result = this.mcpSectList();
+                            break;
+                        case 'sect.create':
+                            result = this.mcpSectCreate(args.sectName);
+                            break;
+                        case 'sect.upgrade':
+                            result = this.mcpSectUpgrade();
+                            break;
+                        case 'disciple.list':
+                            result = this.mcpDiscipleList();
+                            break;
+                        case 'disciple.recruit':
+                            result = this.mcpDiscipleRecruit();
+                            break;
+                        case 'disciple.assign':
+                            result = this.mcpDiscipleAssign(args.discipleId, args.taskId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -14986,6 +15009,30 @@
                 return gs.breakthrough;
             }
 
+            // V130: _initSectState - 初始化宗门系统状态
+            _initSectState() {
+                const gs = window.gameState;
+                if (!gs.sect) {
+                    gs.sect = {
+                        sects: [],              // 所有宗门列表
+                        playerSect: null        // 玩家所属宗门
+                    };
+                }
+                return gs.sect;
+            }
+
+            // V130: _initDiscipleState - 初始化弟子系统状态
+            _initDiscipleState() {
+                const gs = window.gameState;
+                if (!gs.disciple) {
+                    gs.disciple = {
+                        disciples: [],          // 所有弟子列表
+                        recruitCost: 500        // 招募消耗灵石
+                    };
+                }
+                return gs.disciple;
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -15197,6 +15244,163 @@
                         currentRealm: realmState.currentRealm,
                         currentRealmName: realms[realmState.currentRealm],
                         historyCount: realmState.realmHistory.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpSectList - 获取宗门列表
+            mcpSectList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const sectState = this._initSectState();
+                    return {
+                        success: true,
+                        total: sectState.sects.length,
+                        sects: sectState.sects,
+                        playerSect: sectState.playerSect
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpSectCreate - 创建宗门
+            mcpSectCreate(sectName) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!sectName || sectName.trim() === '') return { error: '宗门名称不能为空' };
+                    const sectState = this._initSectState();
+                    // 检查是否已有宗门
+                    if (sectState.playerSect) return { error: '您已拥有宗门，无法重复创建' };
+                    // 消耗灵石创建 (10000灵石)
+                    const cost = 10000;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，创建宗门需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    const newSect = {
+                        id: 'sect_' + Date.now(),
+                        name: sectName.trim(),
+                        level: 1,
+                        memberCount: 1,
+                        resources: { spiritStones: 0 },
+                        createdAt: Date.now()
+                    };
+                    sectState.sects.push(newSect);
+                    sectState.playerSect = newSect;
+                    return { success: true, sect: newSect, message: '宗门【' + sectName + '】创建成功！' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpSectUpgrade - 升级宗门
+            mcpSectUpgrade() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const sectState = this._initSectState();
+                    if (!sectState.playerSect) return { error: '您还没有宗门，请先创建宗门' };
+                    const sect = sectState.playerSect;
+                    // 升级消耗灵石
+                    const cost = sect.level * 5000;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，升级宗门需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    sect.level += 1;
+                    return {
+                        success: true,
+                        level: sect.level,
+                        message: '宗门升级成功！当前等级：' + sect.level
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpDiscipleList - 获取弟子列表
+            mcpDiscipleList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const discipleState = this._initDiscipleState();
+                    return {
+                        success: true,
+                        total: discipleState.disciples.length,
+                        disciples: discipleState.disciples,
+                        recruitCost: discipleState.recruitCost
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpDiscipleRecruit - 招募弟子
+            mcpDiscipleRecruit() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const discipleState = this._initDiscipleState();
+                    const cost = discipleState.recruitCost;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，招募弟子需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    // 随机天赋生成弟子
+                    const talents = ['ordinary', 'good', 'excellent', 'rare'];
+                    const talentWeights = [0.5, 0.3, 0.15, 0.05];
+                    const rand = Math.random();
+                    let talent = 'ordinary';
+                    let cumWeight = 0;
+                    for (let i = 0; i < talents.length; i++) {
+                        cumWeight += talentWeights[i];
+                        if (rand < cumWeight) { talent = talents[i]; break; }
+                    }
+                    const talentNames = { ordinary: '普通', good: '良好', excellent: '优秀', rare: '稀有' };
+                    const names = ['弟子', '修士', '真人', '天君', '大能'];
+                    const newDisciple = {
+                        id: 'd_' + Date.now(),
+                        name: names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random() * 1000),
+                        level: 1,
+                        assignment: null,
+                        skills: [],
+                        talent: talent,
+                        talentName: talentNames[talent],
+                        recruitedAt: Date.now()
+                    };
+                    discipleState.disciples.push(newDisciple);
+                    discipleState.recruitCost = Math.floor(cost * 1.2); // 每次招募费用增加20%
+                    return {
+                        success: true,
+                        disciple: newDisciple,
+                        totalDisciples: discipleState.disciples.length,
+                        nextRecruitCost: discipleState.recruitCost,
+                        message: '招募弟子【' + newDisciple.name + '】成功，天赋：' + talentNames[talent]
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V130: mcpDiscipleAssign - 派遣弟子任务
+            mcpDiscipleAssign(discipleId, taskId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!discipleId) return { error: '弟子ID不能为空' };
+                    if (!taskId) return { error: '任务ID不能为空' };
+                    const discipleState = this._initDiscipleState();
+                    const disciple = discipleState.disciples.find(d => d.id === discipleId);
+                    if (!disciple) return { error: '弟子不存在：' + discipleId };
+                    if (disciple.assignment) return { error: '弟子已在任务中，无法派遣' };
+                    // 任务配置
+                    const tasks = {
+                        'gather': { name: '灵石采集', duration: 3600000, reward: 100 },
+                        'cultivate': { name: '灵气修炼', duration: 7200000, reward: 200 },
+                        'explore': { name: '秘境探索', duration: 10800000, reward: 500 }
+                    };
+                    const task = tasks[taskId];
+                    if (!task) return { error: '任务不存在：' + taskId };
+                    disciple.assignment = {
+                        taskId: taskId,
+                        taskName: task.name,
+                        startTime: Date.now(),
+                        duration: task.duration,
+                        reward: task.reward,
+                        status: 'active'
+                    };
+                    return {
+                        success: true,
+                        disciple: { id: disciple.id, name: disciple.name },
+                        assignment: disciple.assignment,
+                        message: '弟子【' + disciple.name + '】已派遣执行【' + task.name + '】'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -23012,6 +23216,40 @@
             }
         };
 
+        // V130: 宗门+弟子系统
+        const MCP_TOOLS_V130 = {
+            'sect.list': {
+                name: 'sect.list',
+                description: '获取宗门列表 (宗门系统-列表所有宗门)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'sect.create': {
+                name: 'sect.create',
+                description: '创建宗门 (宗门系统-消耗灵石创建宗门)',
+                inputSchema: { type: 'object', properties: { sectName: { type: 'string', description: '宗门名称' } }, required: ['sectName'] }
+            },
+            'sect.upgrade': {
+                name: 'sect.upgrade',
+                description: '升级宗门 (宗门系统-提升宗门等级上限)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'disciple.list': {
+                name: 'disciple.list',
+                description: '获取弟子列表 (弟子系统-列表所有弟子)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'disciple.recruit': {
+                name: 'disciple.recruit',
+                description: '招募弟子 (弟子系统-消耗灵石招募弟子)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'disciple.assign': {
+                name: 'disciple.assign',
+                description: '派遣弟子任务 (弟子系统-派遣弟子执行任务)',
+                inputSchema: { type: 'object', properties: { discipleId: { type: 'string', description: '弟子ID' }, taskId: { type: 'string', description: '任务ID' } }, required: ['discipleId', 'taskId'] }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -26424,6 +26662,226 @@
             return { version: 'V129', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v129Results = runV129Tests();
+
+        // ===== V130: 宗门+弟子系统 Tests =====
+        function runV130Tests() {
+            const results = [];
+            function v130Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 500000,
+                realm: 2,
+                stage: 1,
+                sect: null,
+                disciple: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: _initSectState initializes correctly
+            const sectState = server._initSectState();
+            v130Assert(sectState !== null, '_initSectState returns state');
+            v130Assert(Array.isArray(sectState.sects), '_initSectState sects is array');
+            v130Assert(sectState.playerSect === null, '_initSectState playerSect is null');
+
+            // Test 2: _initDiscipleState initializes correctly
+            const discipleState = server._initDiscipleState();
+            v130Assert(discipleState !== null, '_initDiscipleState returns state');
+            v130Assert(Array.isArray(discipleState.disciples), '_initDiscipleState disciples is array');
+            v130Assert(discipleState.recruitCost === 500, '_initDiscipleState recruitCost is 500');
+
+            // Test 3: sect.list - returns empty list initially
+            const sl1 = server.mcpSectList();
+            v130Assert(sl1.success === true, 'sect.list succeeds');
+            v130Assert(sl1.total === 0, 'sect.list total is 0');
+            v130Assert(sl1.sects.length === 0, 'sect.list sects is empty');
+
+            // Test 4: sect.create - success
+            const sc1 = server.mcpSectCreate({ sectName: '青云宗' });
+            v130Assert(sc1.success === true, 'sect.create succeeds');
+            v130Assert(sc1.sect.name === '青云宗', 'sect.create name is 青云宗');
+            v130Assert(sc1.sect.level === 1, 'sect.create level is 1');
+            v130Assert(mockGameState.spiritStones === 490000, 'sect.create costs 10000 spirit');
+
+            // Test 5: sect.create - fails with empty name
+            const scErr1 = server.mcpSectCreate({ sectName: '' });
+            v130Assert(scErr1.error && scErr1.error.includes('不能为空'), 'sect.create fails with empty name');
+
+            // Test 6: sect.create - fails when already has sect
+            const scErr2 = server.mcpSectCreate({ sectName: '另一个宗门' });
+            v130Assert(scErr2.error && scErr2.error.includes('已拥有宗门'), 'sect.create fails when already has sect');
+
+            // Test 7: sect.list - returns created sect
+            const sl2 = server.mcpSectList();
+            v130Assert(sl2.total === 1, 'sect.list total is 1');
+            v130Assert(sl2.playerSect.name === '青云宗', 'sect.list playerSect is 青云宗');
+
+            // Test 8: sect.upgrade - success
+            mockGameState.spiritStones = 100000;
+            const su1 = server.mcpSectUpgrade();
+            v130Assert(su1.success === true, 'sect.upgrade succeeds');
+            v130Assert(su1.level === 2, 'sect.upgrade level is 2');
+            v130Assert(mockGameState.spiritStones === 95000, 'sect.upgrade costs 5000 spirit');
+
+            // Test 9: sect.upgrade - fails without sect
+            mockGameState.sect = { sects: [], playerSect: null };
+            const suErr1 = server.mcpSectUpgrade();
+            v130Assert(suErr1.error && suErr1.error.includes('还没有宗门'), 'sect.upgrade fails without sect');
+
+            // Test 10: sect.upgrade - fails with insufficient spirit
+            mockGameState.spiritStones = 100;
+            mockGameState.sect.playerSect = { id: 'sect_1', name: '测试宗门', level: 2 };
+            const suErr2 = server.mcpSectUpgrade();
+            v130Assert(suErr2.error && suErr2.error.includes('灵石不足'), 'sect.upgrade fails with insufficient spirit');
+
+            // Test 11: disciple.list - returns empty list initially
+            const dl1 = server.mcpDiscipleList();
+            v130Assert(dl1.success === true, 'disciple.list succeeds');
+            v130Assert(dl1.total === 0, 'disciple.list total is 0');
+            v130Assert(dl1.disciples.length === 0, 'disciple.list disciples is empty');
+
+            // Test 12: disciple.recruit - success
+            mockGameState.spiritStones = 50000;
+            mockGameState.disciple = null;
+            const dr1 = server.mcpDiscipleRecruit();
+            v130Assert(dr1.success === true, 'disciple.recruit succeeds');
+            v130Assert(dr1.disciple !== undefined, 'disciple.recruit returns disciple');
+            v130Assert(dr1.disciple.level === 1, 'disciple.recruit level is 1');
+            v130Assert(mockGameState.spiritStones === 49500, 'disciple.recruit costs 500 spirit');
+            v130Assert(dr1.nextRecruitCost === 600, 'disciple.recruit next cost is 600 (20% increase)');
+
+            // Test 13: disciple.recruit - fails with insufficient spirit
+            mockGameState.spiritStones = 100;
+            const drErr1 = server.mcpDiscipleRecruit();
+            v130Assert(drErr1.error && drErr1.error.includes('灵石不足'), 'disciple.recruit fails with insufficient spirit');
+
+            // Test 14: disciple.list - returns recruited disciple
+            const dl2 = server.mcpDiscipleList();
+            v130Assert(dl2.total === 1, 'disciple.list total is 1');
+            v130Assert(dl2.disciples[0].talent !== undefined, 'disciple.list has talent');
+
+            // Test 15: disciple.assign - success
+            const discipleId = dl2.disciples[0].id;
+            const da1 = server.mcpDiscipleAssign({ discipleId: discipleId, taskId: 'gather' });
+            v130Assert(da1.success === true, 'disciple.assign succeeds');
+            v130Assert(da1.assignment.taskName === '灵石采集', 'disciple.assign task name is 灵石采集');
+
+            // Test 16: disciple.assign - fails with invalid disciple
+            const daErr1 = server.mcpDiscipleAssign({ discipleId: 'invalid_id', taskId: 'gather' });
+            v130Assert(daErr1.error && daErr1.error.includes('弟子不存在'), 'disciple.assign fails with invalid disciple');
+
+            // Test 17: disciple.assign - fails with invalid task
+            const daErr2 = server.mcpDiscipleAssign({ discipleId: discipleId, taskId: 'invalid_task' });
+            v130Assert(daErr2.error && daErr2.error.includes('任务不存在'), 'disciple.assign fails with invalid task');
+
+            // Test 18: disciple.assign - fails when already assigned
+            const daErr3 = server.mcpDiscipleAssign({ discipleId: discipleId, taskId: 'cultivate' });
+            v130Assert(daErr3.error && daErr3.error.includes('已在任务中'), 'disciple.assign fails when already assigned');
+
+            // Test 19: disciple.assign - fails with missing discipleId
+            const daErr4 = server.mcpDiscipleAssign({ taskId: 'gather' });
+            v130Assert(daErr4.error && daErr4.error.includes('弟子ID不能为空'), 'disciple.assign fails with missing discipleId');
+
+            // Test 20: disciple.assign - fails with missing taskId
+            const daErr5 = server.mcpDiscipleAssign({ discipleId: discipleId });
+            v130Assert(daErr5.error && daErr5.error.includes('任务ID不能为空'), 'disciple.assign fails with missing taskId');
+
+            // Test 21: multiple disciples can be recruited
+            mockGameState.spiritStones = 50000;
+            server.mcpDiscipleRecruit();
+            server.mcpDiscipleRecruit();
+            const dl3 = server.mcpDiscipleList();
+            v130Assert(dl3.total === 3, 'disciple.list total is 3 after 2 more recruits');
+
+            // Test 22: sect.create - fails with insufficient spirit
+            mockGameState.spiritStones = 5000;
+            mockGameState.sect = { sects: [], playerSect: null };
+            const scErr3 = server.mcpSectCreate({ sectName: '穷宗' });
+            v130Assert(scErr3.error && scErr3.error.includes('灵石不足'), 'sect.create fails with insufficient spirit');
+
+            // Test 23: sect.list - contains multiple sects
+            mockGameState.sect = {
+                sects: [
+                    { id: 'sect_1', name: '青云宗', level: 2 },
+                    { id: 'sect_2', name: '天剑门', level: 1 }
+                ],
+                playerSect: { id: 'sect_1', name: '青云宗', level: 2 }
+            };
+            const sl3 = server.mcpSectList();
+            v130Assert(sl3.total === 2, 'sect.list total is 2');
+
+            // Test 24: disciple.recruit - talent distribution
+            mockGameState.spiritStones = 100000;
+            mockGameState.disciple = { disciples: [], recruitCost: 500 };
+            let talents = { ordinary: 0, good: 0, excellent: 0, rare: 0 };
+            for (let i = 0; i < 100; i++) {
+                server.mcpDiscipleRecruit();
+            }
+            const dl4 = server.mcpDiscipleList();
+            dl4.disciples.forEach(d => {
+                if (d.talent in talents) talents[d.talent]++;
+            });
+            v130Assert(talents.ordinary > 0, 'disciple.recruit produces ordinary talent');
+            v130Assert(talents.good > 0, 'disciple.recruit produces good talent');
+
+            // Test 25: sect.upgrade - level increases properly
+            mockGameState.spiritStones = 100000;
+            mockGameState.sect.playerSect = { id: 'sect_1', name: '测试宗', level: 1 };
+            server.mcpSectUpgrade();
+            server.mcpSectUpgrade();
+            const su2 = server.mcpSectUpgrade();
+            v130Assert(su2.level === 3, 'sect.upgrade level is 3 after 3 upgrades');
+
+            // Test 26: disciple.assign - all task types work
+            mockGameState.disciple = { disciples: [], recruitCost: 500 };
+            mockGameState.spiritStones = 50000;
+            server.mcpDiscipleRecruit();
+            const dId = mockGameState.disciple.disciples[0].id;
+            const daCultivate = server.mcpDiscipleAssign({ discipleId: dId, taskId: 'cultivate' });
+            v130Assert(daCultivate.success === true, 'disciple.assign cultivate task works');
+
+            // Reset and test explore task
+            mockGameState.disciple.disciples[0].assignment = null;
+            const daExplore = server.mcpDiscipleAssign({ discipleId: dId, taskId: 'explore' });
+            v130Assert(daExplore.success === true, 'disciple.assign explore task works');
+            v130Assert(daExplore.assignment.taskName === '秘境探索', 'disciple.assign explore task name is 秘境探索');
+
+            // Test 27: sect.create - trims whitespace
+            mockGameState.spiritStones = 100000;
+            mockGameState.sect = { sects: [], playerSect: null };
+            const scTrim = server.mcpSectCreate({ sectName: '  天地宗  ' });
+            v130Assert(scTrim.success === true, 'sect.create trims whitespace');
+            v130Assert(scTrim.sect.name === '天地宗', 'sect.create trimmed name is 天地宗');
+
+            // Test 28: disciple.list - includes skills array
+            mockGameState.disciple = { disciples: [{ id: 'd_1', name: '测试', level: 1, skills: [], talent: 'good' }], recruitCost: 500 };
+            const dl5 = server.mcpDiscipleList();
+            v130Assert(Array.isArray(dl5.disciples[0].skills), 'disciple.list disciple has skills array');
+
+            // Test 29: sect.list - playerSect is null when none
+            mockGameState.sect = { sects: [], playerSect: null };
+            const sl4 = server.mcpSectList();
+            v130Assert(sl4.playerSect === null, 'sect.list playerSect is null when none');
+
+            // Test 30: sect.upgrade - cost scales with level
+            mockGameState.spiritStones = 1000000;
+            mockGameState.sect.playerSect = { id: 'sect_1', name: ' Scaling宗', level: 5 };
+            const costBefore = mockGameState.sect.playerSect.level * 5000;
+            server.mcpSectUpgrade();
+            const costAfter = mockGameState.sect.playerSect.level * 5000;
+            v130Assert(costAfter > costBefore, 'sect.upgrade cost scales with level');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V130 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V130', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v130Results = runV130Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
