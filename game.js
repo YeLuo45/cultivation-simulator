@@ -3609,6 +3609,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V154)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V155: Register 成就+徽章系统v2 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V155)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5141,6 +5145,25 @@
                             break;
                         case 'welfare.claim':
                             result = this.mcpWelfareClaimV2(args.welfareId);
+                            break;
+                        // V155: 成就+徽章系统v2
+                        case 'achievement.list':
+                            result = this.mcpAchievementListV2();
+                            break;
+                        case 'achievement.view':
+                            result = this.mcpAchievementViewV2(args.achievementId);
+                            break;
+                        case 'achievement.unlock':
+                            result = this.mcpAchievementUnlockV2(args.achievementId);
+                            break;
+                        case 'badge.list':
+                            result = this.mcpBadgeListV2();
+                            break;
+                        case 'badge.equip':
+                            result = this.mcpBadgeEquipV2(args.badgeId);
+                            break;
+                        case 'badge.unequip':
+                            result = this.mcpBadgeUnequipV2(args.badgeId);
                             break;
                         // V150: 投资+月卡系统v2
                         case 'investment.list':
@@ -14979,6 +15002,193 @@
                     });
                 }
                 return gs.welfareV2;
+            }
+
+            // V155: _initAchievementStateV2 - 初始化成就系统状态v2
+            _initAchievementStateV2() {
+                const gs = window.gameState;
+                if (!gs.achievementV2) {
+                    gs.achievementV2 = {
+                        achievements: [
+                            { id: 'ach_first_login', name: '初入仙途', description: '首次登录游戏', category: 'beginner', reward: { type: 'spiritStone', amount: 100 }, progress: 0, target: 1, unlocked: false, unlockedAt: null },
+                            { id: 'ach_realm_1', name: '炼气初期', description: '境界达到炼气初期', category: 'realm', reward: { type: 'spiritStone', amount: 200 }, progress: 0, target: 1, unlocked: false, unlockedAt: null },
+                            { id: 'ach_realm_2', name: '筑基成功', description: '境界达到筑基', category: 'realm', reward: { type: 'spiritStone', amount: 500 }, progress: 0, target: 1, unlocked: false, unlockedAt: null },
+                            { id: 'ach_spirit_1000', name: '灵气充裕', description: '累计获得1000灵气', category: 'resource', reward: { type: 'spiritStone', amount: 300 }, progress: 0, target: 1000, unlocked: false, unlockedAt: null },
+                            { id: 'ach_stone_5000', name: '富甲一方', description: '累计获得5000灵石', category: 'resource', reward: { type: 'spiritStone', amount: 500 }, progress: 0, target: 5000, unlocked: false, unlockedAt: null },
+                            { id: 'ach_battle_10', name: '初试锋芒', description: '完成10次战斗', category: 'battle', reward: { type: 'spiritStone', amount: 200 }, progress: 0, target: 10, unlocked: false, unlockedAt: null },
+                            { id: 'ach_quest_5', name: '任务达人', description: '完成5个任务', category: 'quest', reward: { type: 'spiritStone', amount: 300 }, progress: 0, target: 5, unlocked: false, unlockedAt: null },
+                            { id: 'ach_signin_7', name: '连续签到', description: '累计签到7天', category: 'activity', reward: { type: 'spiritStone', amount: 200 }, progress: 0, target: 7, unlocked: false, unlockedAt: null }
+                        ],
+                        totalUnlocked: 0
+                    };
+                }
+                return gs.achievementV2;
+            }
+
+            // V155: _initBadgeStateV2 - 初始化徽章系统状态v2
+            _initBadgeStateV2() {
+                const gs = window.gameState;
+                if (!gs.badgeV2) {
+                    gs.badgeV2 = {
+                        badges: [
+                            { id: 'badge_first_login', name: '初入仙途', description: '首次登录游戏', rarity: 'common', effect: '灵气+10%', equipped: false },
+                            { id: 'badge_realm_qi', name: '炼气期修士', description: '境界达到炼气期', rarity: 'common', effect: '修炼速度+5%', equipped: false },
+                            { id: 'badge_realm_zhu', name: '筑基期修士', description: '境界达到筑基期', rarity: 'rare', effect: '修炼速度+10%', equipped: false },
+                            { id: 'badge_spirit_rich', name: '灵气充裕', description: '累计获得1000灵气', rarity: 'common', effect: '灵气获取+5%', equipped: false },
+                            { id: 'badge_battle_master', name: '战斗达人', description: '完成100次战斗', rarity: 'rare', effect: '攻击力+10%', equipped: false },
+                            { id: 'badge_quest_master', name: '任务达人', description: '完成50个任务', rarity: 'rare', effect: '任务奖励+10%', equipped: false },
+                            { id: 'badge_signin_30', name: '签到之星', description: '累计签到30天', rarity: 'epic', effect: '全属性+5%', equipped: false },
+                            { id: 'badge_wealth', name: '富甲一方', description: '累计获得10000灵石', rarity: 'rare', effect: '灵石获取+10%', equipped: false }
+                        ],
+                        equippedBadges: []
+                    };
+                }
+                return gs.badgeV2;
+            }
+
+            // V155: mcpAchievementListV2 - 获取成就列表
+            mcpAchievementListV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const achV2 = this._initAchievementStateV2();
+                    return {
+                        success: true,
+                        achievements: achV2.achievements.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            description: a.description,
+                            category: a.category,
+                            progress: a.progress,
+                            target: a.target,
+                            unlocked: a.unlocked,
+                            unlockedAt: a.unlockedAt
+                        })),
+                        totalUnlocked: achV2.totalUnlocked,
+                        message: '成就列表共' + achV2.achievements.length + '项，已解锁' + achV2.totalUnlocked + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V155: mcpAchievementViewV2 - 查看成就详情
+            mcpAchievementViewV2(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '请指定成就ID' };
+                    const achV2 = this._initAchievementStateV2();
+                    const ach = achV2.achievements.find(a => a.id === achievementId);
+                    if (!ach) return { error: '成就不存在' };
+                    return {
+                        success: true,
+                        id: ach.id,
+                        name: ach.name,
+                        description: ach.description,
+                        category: ach.category,
+                        reward: ach.reward,
+                        progress: ach.progress,
+                        target: ach.target,
+                        unlocked: ach.unlocked,
+                        unlockedAt: ach.unlockedAt,
+                        progressText: ach.progress + '/' + ach.target
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V155: mcpAchievementUnlockV2 - 解锁成就
+            mcpAchievementUnlockV2(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '请指定成就ID' };
+                    const achV2 = this._initAchievementStateV2();
+                    const ach = achV2.achievements.find(a => a.id === achievementId);
+                    if (!ach) return { error: '成就不存在' };
+                    if (ach.unlocked) return { error: '成就已经解锁' };
+                    // Unlock and apply reward
+                    ach.unlocked = true;
+                    ach.unlockedAt = Date.now();
+                    achV2.totalUnlocked++;
+                    if (ach.reward && ach.reward.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + ach.reward.amount;
+                    }
+                    return {
+                        success: true,
+                        achievementId: ach.id,
+                        name: ach.name,
+                        reward: ach.reward,
+                        totalUnlocked: achV2.totalUnlocked,
+                        message: '成就"' + ach.name + '"解锁成功，奖励' + ach.reward.amount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V155: mcpBadgeListV2 - 获取徽章列表
+            mcpBadgeListV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const badgeV2 = this._initBadgeStateV2();
+                    return {
+                        success: true,
+                        badges: badgeV2.badges.map(b => ({
+                            id: b.id,
+                            name: b.name,
+                            description: b.description,
+                            rarity: b.rarity,
+                            effect: b.effect,
+                            equipped: b.equipped
+                        })),
+                        equippedBadges: badgeV2.equippedBadges,
+                        message: '徽章列表共' + badgeV2.badges.length + '项，已装备' + badgeV2.equippedBadges.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V155: mcpBadgeEquipV2 - 装备徽章
+            mcpBadgeEquipV2(badgeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!badgeId) return { error: '请指定徽章ID' };
+                    const badgeV2 = this._initBadgeStateV2();
+                    const badge = badgeV2.badges.find(b => b.id === badgeId);
+                    if (!badge) return { error: '徽章不存在' };
+                    if (badge.equipped) return { error: '徽章已经装备' };
+                    if (badgeV2.equippedBadges.length >= 3) return { error: '最多只能装备3个徽章' };
+                    badge.equipped = true;
+                    badgeV2.equippedBadges.push(badgeId);
+                    return {
+                        success: true,
+                        badgeId: badge.id,
+                        name: badge.name,
+                        effect: badge.effect,
+                        equippedCount: badgeV2.equippedBadges.length,
+                        message: '徽章"' + badge.name + '"装备成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V155: mcpBadgeUnequipV2 - 卸下徽章
+            mcpBadgeUnequipV2(badgeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!badgeId) return { error: '请指定徽章ID' };
+                    const badgeV2 = this._initBadgeStateV2();
+                    const badge = badgeV2.badges.find(b => b.id === badgeId);
+                    if (!badge) return { error: '徽章不存在' };
+                    if (!badge.equipped) return { error: '徽章未装备' };
+                    badge.equipped = false;
+                    badgeV2.equippedBadges = badgeV2.equippedBadges.filter(id => id !== badgeId);
+                    return {
+                        success: true,
+                        badgeId: badge.id,
+                        name: badge.name,
+                        remainingSlots: 3 - badgeV2.equippedBadges.length,
+                        message: '徽章"' + badge.name + '"已卸下'
+                    };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V153: mcpMailListV2 - 获取邮件列表
@@ -29701,6 +29911,40 @@
                 name: 'welfare.claim',
                 description: '领取福利 (福利系统v2-领取指定福利)',
                 inputSchema: { type: 'object', properties: { welfareId: { type: 'string', description: '福利ID' } }, required: ['welfareId'] }
+            }
+        };
+
+        // V155: 成就+徽章系统v2 (P-20260528-135)
+        const MCP_TOOLS_V155 = {
+            'achievement.list': {
+                name: 'achievement.list',
+                description: '获取成就列表 (成就系统v2-获取所有成就及解锁状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'achievement.view': {
+                name: 'achievement.view',
+                description: '查看成就详情 (成就系统v2-查看指定成就的详细信息)',
+                inputSchema: { type: 'object', properties: { achievementId: { type: 'string', description: '成就ID' } }, required: ['achievementId'] }
+            },
+            'achievement.unlock': {
+                name: 'achievement.unlock',
+                description: '解锁成就 (成就系统v2-手动解锁成就，需要满足条件)',
+                inputSchema: { type: 'object', properties: { achievementId: { type: 'string', description: '成就ID' } }, required: ['achievementId'] }
+            },
+            'badge.list': {
+                name: 'badge.list',
+                description: '获取徽章列表 (徽章系统v2-获取所有徽章及装备状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'badge.equip': {
+                name: 'badge.equip',
+                description: '装备徽章 (徽章系统v2-装备指定徽章，最多装备3个)',
+                inputSchema: { type: 'object', properties: { badgeId: { type: 'string', description: '徽章ID' } }, required: ['badgeId'] }
+            },
+            'badge.unequip': {
+                name: 'badge.unequip',
+                description: '卸下徽章 (徽章系统v2-卸下指定徽章)',
+                inputSchema: { type: 'object', properties: { badgeId: { type: 'string', description: '徽章ID' } }, required: ['badgeId'] }
             }
         };
 
@@ -56162,8 +56406,225 @@
             return { version: 'V154', passed, total, passRate: passRate.toFixed(3), results };
         }
 
+        // V155: runV155Tests - 成就+徽章系统v2 测试
+        function runV155Tests() {
+            const results = [];
+            const v155Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+                if (!condition) console.log('V155 FAIL:', name);
+            };
+
+            // Test 1: _initAchievementStateV2 initializes correctly
+            window.gameState.achievementV2 = null;
+            const achState = server._initAchievementStateV2();
+            v155Assert(achState !== null, '_initAchievementStateV2 returns state');
+            v155Assert(achState.achievements !== undefined, 'achievementV2 has achievements array');
+            v155Assert(Array.isArray(achState.achievements), 'achievements is array');
+            v155Assert(achState.totalUnlocked === 0, 'totalUnlocked starts at 0');
+
+            // Test 2: _initBadgeStateV2 initializes correctly
+            window.gameState.badgeV2 = null;
+            const badgeState = server._initBadgeStateV2();
+            v155Assert(badgeState !== null, '_initBadgeStateV2 returns state');
+            v155Assert(badgeState.badges !== undefined, 'badgeV2 has badges array');
+            v155Assert(Array.isArray(badgeState.badges), 'badges is array');
+            v155Assert(badgeState.equippedBadges !== undefined, 'badgeV2 has equippedBadges array');
+            v155Assert(badgeState.equippedBadges.length === 0, 'equippedBadges starts empty');
+
+            // Test 3: achievement.list returns success
+            window.gameState.achievementV2 = null;
+            const achList = server.mcpAchievementListV2();
+            v155Assert(achList.success === true, 'achievement.list returns success');
+            v155Assert(Array.isArray(achList.achievements), 'achievement.list returns achievements array');
+
+            // Test 4: achievement.list has 8 achievements
+            v155Assert(achList.achievements.length === 8, 'achievement.list has 8 achievements');
+
+            // Test 5: achievement.list includes totalUnlocked
+            v155Assert('totalUnlocked' in achList, 'achievement.list includes totalUnlocked');
+
+            // Test 6: achievement.view returns achievement details
+            const achView = server.mcpAchievementViewV2('ach_first_login');
+            v155Assert(achView.success === true, 'achievement.view returns success');
+            v155Assert(achView.id === 'ach_first_login', 'achievement.view returns correct id');
+            v155Assert(achView.name !== undefined, 'achievement.view includes name');
+            v155Assert(achView.description !== undefined, 'achievement.view includes description');
+            v155Assert(achView.reward !== undefined, 'achievement.view includes reward');
+            v155Assert(achView.progress !== undefined, 'achievement.view includes progress');
+
+            // Test 7: achievement.view returns error for invalid id
+            const invalidAch = server.mcpAchievementViewV2('invalid_id');
+            v155Assert(invalidAch.error !== undefined, 'achievement.view returns error for invalid id');
+
+            // Test 8: achievement.unlock unlocks achievement
+            window.gameState.achievementV2 = null;
+            window.gameState.spiritStones = 0;
+            const unlock1 = server.mcpAchievementUnlockV2('ach_first_login');
+            v155Assert(unlock1.success === true, 'achievement.unlock returns success');
+            v155Assert(unlock1.reward !== undefined, 'unlock returns reward');
+            v155Assert(window.gameState.spiritStones > 0, 'unlock grants spirit stones');
+
+            // Test 9: achievement.unlock fails for already unlocked
+            window.gameState.achievementV2 = null;
+            server.mcpAchievementUnlockV2('ach_first_login');
+            const doubleUnlock = server.mcpAchievementUnlockV2('ach_first_login');
+            v155Assert(doubleUnlock.error !== undefined, 'achievement.unlock fails for already unlocked');
+
+            // Test 10: achievement.unlock updates totalUnlocked
+            window.gameState.achievementV2 = null;
+            server.mcpAchievementUnlockV2('ach_realm_1');
+            const achState2 = server._initAchievementStateV2();
+            v155Assert(achState2.totalUnlocked === 1, 'totalUnlocked increments');
+
+            // Test 11: badge.list returns success
+            window.gameState.badgeV2 = null;
+            const badgeList = server.mcpBadgeListV2();
+            v155Assert(badgeList.success === true, 'badge.list returns success');
+            v155Assert(Array.isArray(badgeList.badges), 'badge.list returns badges array');
+
+            // Test 12: badge.list has 8 badges
+            v155Assert(badgeList.badges.length === 8, 'badge.list has 8 badges');
+
+            // Test 13: badge.list includes equippedBadges
+            v155Assert('equippedBadges' in badgeList, 'badge.list includes equippedBadges');
+
+            // Test 14: badge.equip equips a badge
+            window.gameState.badgeV2 = null;
+            const equip1 = server.mcpBadgeEquipV2('badge_first_login');
+            v155Assert(equip1.success === true, 'badge.equip returns success');
+            v155Assert(equip1.badgeId === 'badge_first_login', 'equip returns correct badge id');
+            v155Assert(equip1.equippedCount === 1, 'equippedCount increments');
+
+            // Test 15: badge.equip fails for already equipped
+            const doubleEquip = server.mcpBadgeEquipV2('badge_first_login');
+            v155Assert(doubleEquip.error !== undefined, 'badge.equip fails for already equipped');
+
+            // Test 16: badge.equip fails when 3 badges equipped
+            window.gameState.badgeV2 = null;
+            server.mcpBadgeEquipV2('badge_first_login');
+            server.mcpBadgeEquipV2('badge_realm_qi');
+            server.mcpBadgeEquipV2('badge_realm_zhu');
+            const overEquip = server.mcpBadgeEquipV2('badge_spirit_rich');
+            v155Assert(overEquip.error !== undefined, 'badge.equip fails when 3 equipped');
+
+            // Test 17: badge.unequip unequips a badge
+            window.gameState.badgeV2 = null;
+            server.mcpBadgeEquipV2('badge_first_login');
+            const unequip1 = server.mcpBadgeUnequipV2('badge_first_login');
+            v155Assert(unequip1.success === true, 'badge.unequip returns success');
+            v155Assert(unequip1.badgeId === 'badge_first_login', 'unequip returns correct badge id');
+            v155Assert('remainingSlots' in unequip1, 'unequip returns remainingSlots');
+
+            // Test 18: badge.unequip fails for not equipped
+            const doubleUnequip = server.mcpBadgeUnequipV2('badge_first_login');
+            v155Assert(doubleUnequip.error !== undefined, 'badge.unequip fails for not equipped');
+
+            // Test 19: badge.unequip returns error for invalid badge
+            const invalidBadge = server.mcpBadgeUnequipV2('invalid_badge');
+            v155Assert(invalidBadge.error !== undefined, 'badge.unequip returns error for invalid badge');
+
+            // Test 20: achievement.list shows correct unlocked status
+            window.gameState.achievementV2 = null;
+            server.mcpAchievementUnlockV2('ach_first_login');
+            const achList2 = server.mcpAchievementListV2();
+            const firstAch = achList2.achievements.find(a => a.id === 'ach_first_login');
+            v155Assert(firstAch.unlocked === true, 'achievement.list shows unlocked=true');
+
+            // Test 21: achievement.view includes progressText
+            window.gameState.achievementV2 = null;
+            const achView2 = server.mcpAchievementViewV2('ach_spirit_1000');
+            v155Assert('progressText' in achView2, 'achievement.view includes progressText');
+
+            // Test 22: badge.list shows correct equipped status
+            window.gameState.badgeV2 = null;
+            server.mcpBadgeEquipV2('badge_first_login');
+            const badgeList2 = server.mcpBadgeListV2();
+            const firstBadge = badgeList2.badges.find(b => b.id === 'badge_first_login');
+            v155Assert(firstBadge.equipped === true, 'badge.list shows equipped=true');
+
+            // Test 23: MCP_TOOLS_V155 definition exists and has 6 tools
+            v155Assert(typeof MCP_TOOLS_V155 === 'object', 'MCP_TOOLS_V155 is defined');
+            v155Assert(Object.keys(MCP_TOOLS_V155).length === 6, 'MCP_TOOLS_V155 has 6 tools');
+
+            // Test 24: achievement.list tool exists
+            v155Assert('achievement.list' in MCP_TOOLS_V155, 'achievement.list tool exists');
+
+            // Test 25: achievement.view tool exists
+            v155Assert('achievement.view' in MCP_TOOLS_V155, 'achievement.view tool exists');
+
+            // Test 26: achievement.unlock tool exists
+            v155Assert('achievement.unlock' in MCP_TOOLS_V155, 'achievement.unlock tool exists');
+
+            // Test 27: badge.list tool exists
+            v155Assert('badge.list' in MCP_TOOLS_V155, 'badge.list tool exists');
+
+            // Test 28: badge.equip tool exists
+            v155Assert('badge.equip' in MCP_TOOLS_V155, 'badge.equip tool exists');
+
+            // Test 29: badge.unequip tool exists
+            v155Assert('badge.unequip' in MCP_TOOLS_V155, 'badge.unequip tool exists');
+
+            // Test 30: achievement.view requires achievementId parameter
+            v155Assert(MCP_TOOLS_V155['achievement.view'].inputSchema.required.includes('achievementId'), 'achievement.view requires achievementId');
+
+            // Test 31: achievement.unlock requires achievementId parameter
+            v155Assert(MCP_TOOLS_V155['achievement.unlock'].inputSchema.required.includes('achievementId'), 'achievement.unlock requires achievementId');
+
+            // Test 32: badge.equip requires badgeId parameter
+            v155Assert(MCP_TOOLS_V155['badge.equip'].inputSchema.required.includes('badgeId'), 'badge.equip requires badgeId');
+
+            // Test 33: badge.unequip requires badgeId parameter
+            v155Assert(MCP_TOOLS_V155['badge.unequip'].inputSchema.required.includes('badgeId'), 'badge.unequip requires badgeId');
+
+            // Test 34: achievement.list response has message
+            window.gameState.achievementV2 = null;
+            const achList3 = server.mcpAchievementListV2();
+            v155Assert('message' in achList3, 'achievement.list response has message');
+
+            // Test 35: badge.list response has message
+            window.gameState.badgeV2 = null;
+            const badgeList3 = server.mcpBadgeListV2();
+            v155Assert('message' in badgeList3, 'badge.list response has message');
+
+            // Test 36: achievement.unlock returns totalUnlocked
+            window.gameState.achievementV2 = null;
+            server.mcpAchievementUnlockV2('ach_first_login');
+            const unlock2 = server.mcpAchievementUnlockV2('ach_realm_1');
+            v155Assert('totalUnlocked' in unlock2, 'unlock returns totalUnlocked');
+
+            // Test 37: badge.equip returns effect
+            window.gameState.badgeV2 = null;
+            const equip2 = server.mcpBadgeEquipV2('badge_first_login');
+            v155Assert('effect' in equip2, 'equip returns effect');
+
+            // Test 38: badge.unequip returns remainingSlots
+            window.gameState.badgeV2 = null;
+            server.mcpBadgeEquipV2('badge_first_login');
+            const unequip2 = server.mcpBadgeUnequipV2('badge_first_login');
+            v155Assert(unequip2.remainingSlots === 3, 'unequip returns remainingSlots=3');
+
+            // Test 39: achievement categories are correct
+            window.gameState.achievementV2 = null;
+            const achView3 = server.mcpAchievementViewV2('ach_first_login');
+            v155Assert(achView3.category === 'beginner', 'achievement category is correct');
+
+            // Test 40: badge rarities are correct
+            window.gameState.badgeV2 = null;
+            const badgeView = server.mcpBadgeListV2();
+            const epicBadge = badgeView.badges.find(b => b.rarity === 'epic');
+            v155Assert(epicBadge !== undefined, 'epic badge exists');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V155 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V155', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
         const v153Results = runV153Tests();
         const v154Results = runV154Tests();
+        const v155Results = runV155Tests();
 
         const v152Results = runV152Tests();
 
