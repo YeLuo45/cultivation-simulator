@@ -5523,6 +5523,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V151)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V152: Register 图鉴+收集系统v2 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V152)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6998,6 +7002,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'dispatch.complete':
                             result = this.mcpDispatchCompleteV2(args.taskId);
+                            break;
+                        // V152: 图鉴+收集系统v2
+                        case 'codex.list':
+                            result = this.mcpCodexListV2();
+                            break;
+                        case 'codex.view':
+                            result = this.mcpCodexViewV2(args.categoryId);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlockV2(args.entryId);
+                            break;
+                        case 'collection.stats':
+                            result = this.mcpCollectionStatsV2();
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionRewardV2(args.rewardId);
+                            break;
+                        case 'collection.reset':
+                            result = this.mcpCollectionResetV2();
                             break;
                         // V150: 投资+月卡系统v2
                         case 'investment.list':
@@ -16656,6 +16679,271 @@ const ACHIEVEMENT_ID_MAP = {
                         taskName: task.name,
                         reward: task.reward,
                         message: '任务完成！获得奖励：' + JSON.stringify(task.reward)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: _initCodexStateV2 - 初始化图鉴系统状态v2
+            _initCodexStateV2() {
+                const gs = window.gameState;
+                if (!gs.codexV2) {
+                    gs.codexV2 = {
+                        categories: [
+                            {
+                                id: 'beast',
+                                name: '灵兽',
+                                entries: [
+                                    { id: 'beast_001', name: '青鳞蛇', description: '低级灵兽，常见于湿地', cost: 100, unlocked: false, unlockedAt: null },
+                                    { id: 'beast_002', name: '火鸦', description: '操控火焰的灵禽', cost: 200, unlocked: false, unlockedAt: null },
+                                    { id: 'beast_003', name: '玄冰龟', description: '防御型灵兽，壳坚如铁', cost: 300, unlocked: false, unlockedAt: null },
+                                    { id: 'beast_004', name: '风刃狼', description: '速度极快的群居灵兽', cost: 500, unlocked: false, unlockedAt: null },
+                                    { id: 'beast_005', name: '金翅鹏', description: '高级灵禽，飞行速度极快', cost: 1000, unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'pill',
+                                name: '丹药',
+                                entries: [
+                                    { id: 'pill_001', name: '聚气丹', description: '加速灵气聚集', cost: 150, unlocked: false, unlockedAt: null },
+                                    { id: 'pill_002', name: '筑基丹', description: '辅助筑基突破', cost: 500, unlocked: false, unlockedAt: null },
+                                    { id: 'pill_003', name: '结金丹', description: '辅助结丹', cost: 1500, unlocked: false, unlockedAt: null },
+                                    { id: 'pill_004', name: '化婴丹', description: '辅助元婴形成', cost: 5000, unlocked: false, unlockedAt: null },
+                                    { id: 'pill_005', name: '飞升丹', description: '辅助飞升仙界', cost: 20000, unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'technique',
+                                name: '功法',
+                                entries: [
+                                    { id: 'tech_001', name: '引气诀', description: '最基础的引气功法', cost: 80, unlocked: false, unlockedAt: null },
+                                    { id: 'tech_002', name: '玄元诀', description: '中等功法', cost: 300, unlocked: false, unlockedAt: null },
+                                    { id: 'tech_003', name: '大衍诀', description: '高等功法', cost: 800, unlocked: false, unlockedAt: null },
+                                    { id: 'tech_004', name: '天玄经', description: '顶级功法', cost: 2000, unlocked: false, unlockedAt: null },
+                                    { id: 'tech_005', name: '道藏真经', description: '仙界功法', cost: 10000, unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'material',
+                                name: '材料',
+                                entries: [
+                                    { id: 'mat_001', name: '灵草', description: '常见的灵药材料', cost: 50, unlocked: false, unlockedAt: null },
+                                    { id: 'mat_002', name: '妖兽内丹', description: '妖兽的灵力结晶', cost: 200, unlocked: false, unlockedAt: null },
+                                    { id: 'mat_003', name: '灵石矿脉', description: '蕴含丰富灵石的矿脉', cost: 1000, unlocked: false, unlockedAt: null },
+                                    { id: 'mat_004', name: '仙晶', description: '仙界通用货币', cost: 5000, unlocked: false, unlockedAt: null },
+                                    { id: 'mat_005', name: '天道碎片', description: '蕴含天道法则的碎片', cost: 20000, unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'dungeon',
+                                name: '副本',
+                                entries: [
+                                    { id: 'dun_001', name: '幽冥森林', description: '低级副本', cost: 100, unlocked: false, unlockedAt: null },
+                                    { id: 'dun_002', name: '上古洞府', description: '中级副本', cost: 300, unlocked: false, unlockedAt: null },
+                                    { id: 'dun_003', name: '仙人墓穴', description: '高级副本', cost: 800, unlocked: false, unlockedAt: null },
+                                    { id: 'dun_004', name: '东海龙宫', description: '顶级副本', cost: 2000, unlocked: false, unlockedAt: null },
+                                    { id: 'dun_005', name: '九天之上', description: '仙界副本', cost: 10000, unlocked: false, unlockedAt: null }
+                                ]
+                            }
+                        ],
+                        totalEntries: 25
+                    };
+                }
+                return gs.codexV2;
+            }
+
+            // V152: _initCollectionStateV2 - 初始化收集系统状态v2
+            _initCollectionStateV2() {
+                const gs = window.gameState;
+                if (!gs.collectionV2) {
+                    gs.collectionV2 = {
+                        categories: [
+                            { id: 'beast', name: '灵兽', collected: 0, total: 5, rewards: [
+                                { id: 'beast_reward_1', name: '灵兽图鉴奖励', claimed: false }
+                            ]},
+                            { id: 'pill', name: '丹药', collected: 0, total: 5, rewards: [
+                                { id: 'pill_reward_1', name: '丹药图鉴奖励', claimed: false }
+                            ]},
+                            { id: 'technique', name: '功法', collected: 0, total: 5, rewards: [
+                                { id: 'technique_reward_1', name: '功法图鉴奖励', claimed: false }
+                            ]},
+                            { id: 'material', name: '材料', collected: 0, total: 5, rewards: [
+                                { id: 'material_reward_1', name: '材料图鉴奖励', claimed: false }
+                            ]},
+                            { id: 'dungeon', name: '副本', collected: 0, total: 5, rewards: [
+                                { id: 'dungeon_reward_1', name: '副本图鉴奖励', claimed: false }
+                            ]}
+                        ],
+                        totalCollected: 0
+                    };
+                }
+                return gs.collectionV2;
+            }
+
+            // V152: mcpCodexListV2 - 获取图鉴分类列表
+            mcpCodexListV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codexV2 = this._initCodexStateV2();
+                    return {
+                        success: true,
+                        categories: codexV2.categories.map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            total: c.entries.length,
+                            unlocked: c.entries.filter(e => e.unlocked).length
+                        })),
+                        totalEntries: codexV2.totalEntries,
+                        message: '共' + codexV2.categories.length + '个分类，' + codexV2.totalEntries + '个条目'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: mcpCodexViewV2 - 查看指定分类的图鉴详情
+            mcpCodexViewV2(categoryId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!categoryId) return { error: '请指定分类ID' };
+                    const codexV2 = this._initCodexStateV2();
+                    const category = codexV2.categories.find(c => c.id === categoryId);
+                    if (!category) return { error: '分类不存在' };
+                    return {
+                        success: true,
+                        categoryId: category.id,
+                        categoryName: category.name,
+                        entries: category.entries.map(e => ({
+                            id: e.id,
+                            name: e.name,
+                            description: e.description,
+                            cost: e.cost,
+                            unlocked: e.unlocked,
+                            unlockedAt: e.unlockedAt
+                        })),
+                        total: category.entries.length,
+                        unlocked: category.entries.filter(e => e.unlocked).length,
+                        message: category.name + '分类，共' + category.entries.length + '个条目'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: mcpCodexUnlockV2 - 解锁图鉴条目
+            mcpCodexUnlockV2(entryId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!entryId) return { error: '请指定条目ID' };
+                    const codexV2 = this._initCodexStateV2();
+                    let entry = null;
+                    let category = null;
+                    for (const cat of codexV2.categories) {
+                        const found = cat.entries.find(e => e.id === entryId);
+                        if (found) { entry = found; category = cat; break; }
+                    }
+                    if (!entry) return { error: '条目不存在' };
+                    if (entry.unlocked) return { error: '该条目已解锁' };
+                    const cost = entry.cost || 100;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，需要' + cost + '灵石' };
+                    gs.spiritStones -= cost;
+                    entry.unlocked = true;
+                    entry.unlockedAt = Date.now();
+                    // Update collection
+                    const collectionV2 = this._initCollectionStateV2();
+                    const collCat = collectionV2.categories.find(c => c.id === category.id);
+                    if (collCat) {
+                        collCat.collected = Math.min(collCat.total, collCat.collected + 1);
+                        collectionV2.totalCollected = collectionV2.categories.reduce((sum, c) => sum + c.collected, 0);
+                    }
+                    return {
+                        success: true,
+                        entryId: entry.id,
+                        entryName: entry.name,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '解锁成功！消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: mcpCollectionStatsV2 - 获取收集进度统计
+            mcpCollectionStatsV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const collectionV2 = this._initCollectionStateV2();
+                    return {
+                        success: true,
+                        categories: collectionV2.categories.map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            collected: c.collected,
+                            total: c.total,
+                            progress: c.total > 0 ? (c.collected / c.total * 100).toFixed(1) + '%' : '0%',
+                            rewardClaimed: c.rewards[0]?.claimed || false
+                        })),
+                        totalCollected: collectionV2.totalCollected,
+                        totalEntries: 25,
+                        overallProgress: (collectionV2.totalCollected / 25 * 100).toFixed(1) + '%',
+                        message: '总收集进度：' + collectionV2.totalCollected + '/25'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: mcpCollectionRewardV2 - 领取收集奖励
+            mcpCollectionRewardV2(rewardId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rewardId) return { error: '请指定奖励ID' };
+                    const collectionV2 = this._initCollectionStateV2();
+                    let foundReward = null;
+                    let foundCategory = null;
+                    for (const cat of collectionV2.categories) {
+                        const r = cat.rewards.find(r => r.id === rewardId);
+                        if (r) { foundReward = r; foundCategory = cat; break; }
+                    }
+                    if (!foundReward) return { error: '奖励不存在' };
+                    if (foundReward.claimed) return { error: '该奖励已领取' };
+                    if (foundCategory.collected < foundCategory.total) return { error: '该分类收集未完成，无法领取奖励' };
+                    foundReward.claimed = true;
+                    const rewardSpiritStones = foundCategory.total * 100;
+                    gs.spiritStones = (gs.spiritStones || 0) + rewardSpiritStones;
+                    return {
+                        success: true,
+                        rewardId: rewardId,
+                        categoryId: foundCategory.id,
+                        reward: { spiritStones: rewardSpiritStones },
+                        totalSpiritStones: gs.spiritStones,
+                        message: '奖励领取成功！获得' + rewardSpiritStones + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V152: mcpCollectionResetV2 - 重置收集进度
+            mcpCollectionResetV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codexV2 = this._initCodexStateV2();
+                    const collectionV2 = this._initCollectionStateV2();
+                    // Reset all entries
+                    for (const cat of codexV2.categories) {
+                        for (const entry of cat.entries) {
+                            entry.unlocked = false;
+                            entry.unlockedAt = null;
+                        }
+                    }
+                    // Reset collection
+                    for (const cat of collectionV2.categories) {
+                        cat.collected = 0;
+                        for (const reward of cat.rewards) {
+                            reward.claimed = false;
+                        }
+                    }
+                    collectionV2.totalCollected = 0;
+                    return {
+                        success: true,
+                        message: '收集进度已重置'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -30734,6 +31022,40 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'dispatch.complete',
                 description: '完成派遣任务 (派遣系统v2-完成派遣任务并领取奖励)',
                 inputSchema: { type: 'object', properties: { taskId: { type: 'string', description: '任务ID' } }, required: ['taskId'] }
+            }
+        };
+
+        // V152: 图鉴+收集系统v2 (P-20260528-127)
+        const MCP_TOOLS_V152 = {
+            'codex.list': {
+                name: 'codex.list',
+                description: '获取图鉴分类列表 (图鉴系统v2-获取所有图鉴分类)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'codex.view': {
+                name: 'codex.view',
+                description: '查看指定分类的图鉴详情 (图鉴系统v2-查看分类内所有条目)',
+                inputSchema: { type: 'object', properties: { categoryId: { type: 'string', description: '分类ID' } }, required: ['categoryId'] }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴条目 (图鉴系统v2-解锁条目，消耗灵石)',
+                inputSchema: { type: 'object', properties: { entryId: { type: 'string', description: '条目ID' } }, required: ['entryId'] }
+            },
+            'collection.stats': {
+                name: 'collection.stats',
+                description: '获取收集进度统计 (收集系统v2-获取各分类收集进度)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集系统v2-领取达成100%分类的奖励)',
+                inputSchema: { type: 'object', properties: { rewardId: { type: 'string', description: '奖励ID' } }, required: ['rewardId'] }
+            },
+            'collection.reset': {
+                name: 'collection.reset',
+                description: '重置收集进度 (收集系统v2-重置所有收集进度)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -54546,6 +54868,290 @@ const ACHIEVEMENT_ID_MAP = {
             console.log('V151 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
             return { version: 'V151', passed, total, passRate: passRate.toFixed(3), results };
         }
+
+        // V152 Tests (P-20260528-127)
+        function runV152Tests() {
+            const results = [];
+            const v152Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+            // Setup mock gameState
+            window.gameState = {
+                spiritStones: 100000,
+                name: 'TestUser',
+                level: 15
+            };
+
+            const server = new MockMCPServer();
+
+            // Test 1: _initCodexStateV2 initializes correctly
+            const codexState = server._initCodexStateV2();
+            v152Assert(codexState !== null, '_initCodexStateV2 returns state');
+            v152Assert(Array.isArray(codexState.categories), 'codexV2 categories is array');
+            v152Assert(codexState.categories.length === 5, 'codexV2 has 5 categories');
+            v152Assert(codexState.totalEntries === 25, 'codexV2 totalEntries is 25');
+
+            // Test 2: _initCollectionStateV2 initializes correctly
+            const collState = server._initCollectionStateV2();
+            v152Assert(collState !== null, '_initCollectionStateV2 returns state');
+            v152Assert(Array.isArray(collState.categories), 'collectionV2 categories is array');
+            v152Assert(collState.categories.length === 5, 'collectionV2 has 5 categories');
+            v152Assert(collState.totalCollected === 0, 'collectionV2 starts with 0 collected');
+
+            // Test 3: mcpCodexListV2 returns all categories
+            const cl1 = server.mcpCodexListV2();
+            v152Assert(cl1.success === true, 'codex.list returns success');
+            v152Assert(cl1.categories.length === 5, 'codex.list shows 5 categories');
+            v152Assert(cl1.categories[0].name === '灵兽', 'codex.list first category is 灵兽');
+            v152Assert(cl1.totalEntries === 25, 'codex.list totalEntries is 25');
+
+            // Test 4: mcpCodexListV2 shows correct unlocked counts
+            v152Assert(cl1.categories[0].total === 5, 'codex.list beast total is 5');
+            v152Assert(cl1.categories[0].unlocked === 0, 'codex.list beast unlocked starts at 0');
+
+            // Test 5: mcpCodexViewV2 returns category entries
+            const cv1 = server.mcpCodexViewV2('beast');
+            v152Assert(cv1.success === true, 'codex.view returns success');
+            v152Assert(cv1.categoryId === 'beast', 'codex.view categoryId correct');
+            v152Assert(cv1.categoryName === '灵兽', 'codex.view categoryName correct');
+            v152Assert(cv1.entries.length === 5, 'codex.view has 5 entries');
+            v152Assert(cv1.entries[0].name === '青鳞蛇', 'codex.view first entry name correct');
+
+            // Test 6: mcpCodexViewV2 fails for invalid category
+            const cvErr1 = server.mcpCodexViewV2('invalid_cat');
+            v152Assert(cvErr1.error && cvErr1.error.includes('不存在'), 'codex.view invalid category returns error');
+
+            // Test 7: mcpCodexViewV2 fails without categoryId
+            const cvErr2 = server.mcpCodexViewV2();
+            v152Assert(cvErr2.error && cvErr2.error.includes('分类ID'), 'codex.view missing categoryId returns error');
+
+            // Test 8: mcpCodexUnlockV2 unlocks entry
+            const cu1 = server.mcpCodexUnlockV2('beast_001');
+            v152Assert(cu1.success === true, 'codex.unlock returns success');
+            v152Assert(cu1.entryId === 'beast_001', 'codex.unlock entryId correct');
+            v152Assert(cu1.entryName === '青鳞蛇', 'codex.unlock entryName correct');
+            v152Assert(cu1.cost === 100, 'codex.unlock cost is 100');
+            v152Assert(cu1.remainingSpiritStones === 99900, 'codex.unlock deducts spirit stones');
+
+            // Test 9: mcpCodexUnlockV2 fails for invalid entry
+            const cuErr1 = server.mcpCodexUnlockV2('invalid_entry');
+            v152Assert(cuErr1.error && cuErr1.error.includes('不存在'), 'codex.unlock invalid entry returns error');
+
+            // Test 10: mcpCodexUnlockV2 fails without entryId
+            const cuErr2 = server.mcpCodexUnlockV2();
+            v152Assert(cuErr2.error && cuErr2.error.includes('条目ID'), 'codex.unlock missing entryId returns error');
+
+            // Test 11: mcpCodexUnlockV2 fails when already unlocked
+            const cuErr3 = server.mcpCodexUnlockV2('beast_001');
+            v152Assert(cuErr3.error && cuErr3.error.includes('已解锁'), 'codex.unlock already unlocked returns error');
+
+            // Test 12: mcpCodexUnlockV2 fails with insufficient spirit stones
+            window.gameState.spiritStones = 50;
+            const cuErr4 = server.mcpCodexUnlockV2('beast_002');
+            v152Assert(cuErr4.error && cuErr4.error.includes('灵石不足'), 'codex.unlock insufficient stones returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 13: mcpCodexUnlockV2 updates collection progress
+            server.mcpCodexUnlockV2('beast_002');
+            const coll1 = server.mcpCollectionStatsV2();
+            v152Assert(coll1.categories[0].collected === 2, 'collection beast collected is 2 after 2 unlocks');
+
+            // Test 14: mcpCollectionStatsV2 returns correct stats
+            const cs1 = server.mcpCollectionStatsV2();
+            v152Assert(cs1.success === true, 'collection.stats returns success');
+            v152Assert(cs1.categories.length === 5, 'collection.stats has 5 categories');
+            v152Assert(cs1.totalCollected === 2, 'collection.stats totalCollected is 2');
+            v152Assert(cs1.totalEntries === 25, 'collection.stats totalEntries is 25');
+            v152Assert(cs1.overallProgress === '8.0%', 'collection.stats overallProgress is 8.0%');
+
+            // Test 15: mcpCollectionStatsV2 shows correct progress per category
+            v152Assert(cs1.categories[0].progress === '40.0%', 'collection.stats beast progress is 40.0%');
+            v152Assert(cs1.categories[1].progress === '0.0%', 'collection.stats pill progress is 0.0%');
+
+            // Test 16: mcpCollectionRewardV2 fails for incomplete category
+            const crErr1 = server.mcpCollectionRewardV2('beast_reward_1');
+            v152Assert(crErr1.error && crErr1.error.includes('未完成'), 'collection.reward incomplete category returns error');
+
+            // Test 17: mcpCollectionRewardV2 fails for invalid reward
+            const crErr2 = server.mcpCollectionRewardV2('invalid_reward');
+            v152Assert(crErr2.error && crErr2.error.includes('不存在'), 'collection.reward invalid reward returns error');
+
+            // Test 18: mcpCollectionRewardV2 fails without rewardId
+            const crErr3 = server.mcpCollectionRewardV2();
+            v152Assert(crErr3.error && crErr3.error.includes('奖励ID'), 'collection.reward missing rewardId returns error');
+
+            // Test 19: Complete beast category and claim reward
+            server.mcpCodexUnlockV2('beast_003');
+            server.mcpCodexUnlockV2('beast_004');
+            server.mcpCodexUnlockV2('beast_005');
+            const cr1 = server.mcpCollectionRewardV2('beast_reward_1');
+            v152Assert(cr1.success === true, 'collection.reward returns success when complete');
+            v152Assert(cr1.rewardId === 'beast_reward_1', 'collection.reward rewardId correct');
+            v152Assert(cr1.reward.spiritStones === 500, 'collection.reward gives 500 stones (5*100)');
+            v152Assert(cr1.totalSpiritStones > 100000, 'collection.reward adds stones to total');
+
+            // Test 20: mcpCollectionRewardV2 fails when already claimed
+            const crErr4 = server.mcpCollectionRewardV2('beast_reward_1');
+            v152Assert(crErr4.error && crErr4.error.includes('已领取'), 'collection.reward already claimed returns error');
+
+            // Test 21: mcpCollectionResetV2 resets all progress
+            const crst1 = server.mcpCollectionResetV2();
+            v152Assert(crst1.success === true, 'collection.reset returns success');
+
+            // Test 22: Reset clears codexV2 unlocked states
+            const cv2 = server.mcpCodexViewV2('beast');
+            v152Assert(cv2.entries.filter(e => e.unlocked).length === 0, 'after reset, all beast entries are locked');
+
+            // Test 23: Reset clears collection stats
+            const cs2 = server.mcpCollectionStatsV2();
+            v152Assert(cs2.totalCollected === 0, 'after reset, totalCollected is 0');
+            v152Assert(cs2.categories[0].collected === 0, 'after reset, beast collected is 0');
+
+            // Test 24: Reset clears reward claimed status
+            v152Assert(cs2.categories[0].rewardClaimed === false, 'after reset, rewardClaimed is false');
+
+            // Test 25: Full unlock cycle test - pill category
+            server.mcpCodexUnlockV2('pill_001');
+            server.mcpCodexUnlockV2('pill_002');
+            server.mcpCodexUnlockV2('pill_003');
+            server.mcpCodexUnlockV2('pill_004');
+            server.mcpCodexUnlockV2('pill_005');
+            const cs3 = server.mcpCollectionStatsV2();
+            v152Assert(cs3.categories[1].collected === 5, 'pill category fully collected');
+            v152Assert(cs3.categories[1].progress === '100.0%', 'pill progress is 100.0%');
+
+            // Test 26: mcpCodexUnlockV2 for all categories works
+            server.mcpCodexUnlockV2('tech_001');
+            server.mcpCodexUnlockV2('tech_002');
+            server.mcpCodexUnlockV2('tech_003');
+            server.mcpCodexUnlockV2('tech_004');
+            server.mcpCodexUnlockV2('tech_005');
+            server.mcpCodexUnlockV2('mat_001');
+            server.mcpCodexUnlockV2('mat_002');
+            server.mcpCodexUnlockV2('mat_003');
+            server.mcpCodexUnlockV2('mat_004');
+            server.mcpCodexUnlockV2('mat_005');
+            server.mcpCodexUnlockV2('dun_001');
+            server.mcpCodexUnlockV2('dun_002');
+            server.mcpCodexUnlockV2('dun_003');
+            server.mcpCodexUnlockV2('dun_004');
+            server.mcpCodexUnlockV2('dun_005');
+            const cs4 = server.mcpCollectionStatsV2();
+            v152Assert(cs4.totalCollected === 25, 'all 25 entries collected');
+
+            // Test 27: Complete collection reward claims
+            const cr2 = server.mcpCollectionRewardV2('pill_reward_1');
+            v152Assert(cr2.success === true, 'pill reward claimed');
+            const cr3 = server.mcpCollectionRewardV2('technique_reward_1');
+            v152Assert(cr3.success === true, 'technique reward claimed');
+            const cr4 = server.mcpCollectionRewardV2('material_reward_1');
+            v152Assert(cr4.success === true, 'material reward claimed');
+            const cr5 = server.mcpCollectionRewardV2('dungeon_reward_1');
+            v152Assert(cr5.success === true, 'dungeon reward claimed');
+
+            // Test 28: Verify all categories work
+            const categories = ['beast', 'pill', 'technique', 'material', 'dungeon'];
+            for (let i = 0; i < categories.length; i++) {
+                const cv = server.mcpCodexViewV2(categories[i]);
+                v152Assert(cv.entries.length === 5, categories[i] + ' has 5 entries');
+            }
+
+            // Test 29: mcpCodexListV2 shows correct unlock counts after full unlock
+            const cl2 = server.mcpCodexListV2();
+            v152Assert(cl2.categories.every(c => c.unlocked === 5), 'all categories show 5 unlocked');
+
+            // Test 30: Invalid category view still fails
+            const cvErr3 = server.mcpCodexViewV2('nonexistent');
+            v152Assert(cvErr3.error && cvErr3.error.includes('不存在'), 'nonexistent category fails');
+
+            // Test 31: Reset twice is idempotent
+            server.mcpCollectionResetV2();
+            server.mcpCollectionResetV2();
+            const cs5 = server.mcpCollectionStatsV2();
+            v152Assert(cs5.totalCollected === 0, 'double reset still works');
+
+            // Test 32: Unlock preserves data integrity
+            window.gameState.spiritStones = 50000;
+            server.mcpCodexUnlockV2('beast_001');
+            const beforeUnlock = window.gameState.spiritStones;
+            server.mcpCodexUnlockV2('beast_002');
+            const afterUnlock = window.gameState.spiritStones;
+            v152Assert(beforeUnlock - afterUnlock === 200, 'second unlock costs 200 (beast_002)');
+
+            // Test 33: View after unlock shows correct state
+            const cv3 = server.mcpCodexViewV2('beast');
+            v152Assert(cv3.entries[0].unlocked === true, 'first entry is unlocked');
+            v152Assert(cv3.entries[0].unlockedAt !== null, 'first entry has unlockedAt');
+            v152Assert(cv3.entries[1].unlocked === true, 'second entry is unlocked');
+            v152Assert(cv3.unlocked === 2, 'view shows 2 unlocked');
+
+            // Test 34: Multiple unlocks in same category update collection
+            server.mcpCollectionResetV2();
+            window.gameState.spiritStones = 100000;
+            server.mcpCodexUnlockV2('beast_001');
+            server.mcpCodexUnlockV2('beast_002');
+            server.mcpCodexUnlockV2('beast_003');
+            const cs6 = server.mcpCollectionStatsV2();
+            v152Assert(cs6.categories[0].collected === 3, '3 beast entries collected');
+
+            // Test 35: Overall progress calculation
+            server.mcpCollectionResetV2();
+            server.mcpCodexUnlockV2('beast_001');
+            const cs7 = server.mcpCollectionStatsV2();
+            v152Assert(cs7.overallProgress === '4.0%', 'overall progress is 4.0% (1/25)');
+
+            // Test 36: View all categories individually
+            const allCats = server.mcpCodexListV2();
+            v152Assert(allCats.categories[0].id === 'beast', 'first category id is beast');
+            v152Assert(allCats.categories[1].id === 'pill', 'second category id is pill');
+            v152Assert(allCats.categories[2].id === 'technique', 'third category id is technique');
+            v152Assert(allCats.categories[3].id === 'material', 'fourth category id is material');
+            v152Assert(allCats.categories[4].id === 'dungeon', 'fifth category id is dungeon');
+
+            // Test 37: Collection categories match codex categories
+            const cs8 = server.mcpCollectionStatsV2();
+            for (let i = 0; i < allCats.categories.length; i++) {
+                v152Assert(allCats.categories[i].id === cs8.categories[i].id, 'codex and collection category ids match');
+                v152Assert(allCats.categories[i].name === cs8.categories[i].name, 'codex and collection category names match');
+            }
+
+            // Test 38: V152 MCP_TOOLS_V152 definition exists and has 6 tools
+            v152Assert(typeof MCP_TOOLS_V152 === 'object', 'MCP_TOOLS_V152 is defined');
+            v152Assert(Object.keys(MCP_TOOLS_V152).length === 6, 'MCP_TOOLS_V152 has 6 tools');
+
+            // Test 39: Verify 6 tools are codex.list, codex.view, codex.unlock, collection.stats, collection.reward, collection.reset
+            v152Assert('codex.list' in MCP_TOOLS_V152, 'codex.list tool exists');
+            v152Assert('codex.view' in MCP_TOOLS_V152, 'codex.view tool exists');
+            v152Assert('codex.unlock' in MCP_TOOLS_V152, 'codex.unlock tool exists');
+            v152Assert('collection.stats' in MCP_TOOLS_V152, 'collection.stats tool exists');
+            v152Assert('collection.reward' in MCP_TOOLS_V152, 'collection.reward tool exists');
+            v152Assert('collection.reset' in MCP_TOOLS_V152, 'collection.reset tool exists');
+
+            // Test 40: Full integration test - complete cycle
+            server.mcpCollectionResetV2();
+            window.gameState.spiritStones = 200000;
+            // Unlock all
+            const allEntries = ['beast_001','beast_002','beast_003','beast_004','beast_005',
+                               'pill_001','pill_002','pill_003','pill_004','pill_005',
+                               'tech_001','tech_002','tech_003','tech_004','tech_005',
+                               'mat_001','mat_002','mat_003','mat_004','mat_005',
+                               'dun_001','dun_002','dun_003','dun_004','dun_005'];
+            for (const entryId of allEntries) {
+                server.mcpCodexUnlockV2(entryId);
+            }
+            const finalStats = server.mcpCollectionStatsV2();
+            v152Assert(finalStats.totalCollected === 25, 'final totalCollected is 25');
+            v152Assert(finalStats.overallProgress === '100.0%', 'final overallProgress is 100.0%');
+            v152Assert(finalStats.categories.every(c => c.collected === 5), 'all categories have 5 collected');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V152 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V152', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v152Results = runV152Tests();
 
         const v151Results = runV151Tests();
 
