@@ -5343,6 +5343,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V123)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V124: Register 成就+称号系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V124)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6363,6 +6367,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'survey.complete':
                             result = this.mcpSurveyComplete(args.surveyId);
+                            break;
+                        // V124: 成就+称号系统
+                        case 'achievement.list':
+                            result = this.mcpAchievementList();
+                            break;
+                        case 'achievement.claim':
+                            result = this.mcpAchievementClaim(args.achievementId);
+                            break;
+                        case 'achievement.progress':
+                            result = this.mcpAchievementProgress(args.achievementId);
+                            break;
+                        case 'title.list':
+                            result = this.mcpTitleList();
+                            break;
+                        case 'title.activate':
+                            result = this.mcpTitleActivate(args.titleId);
+                            break;
+                        case 'title.remove':
+                            result = this.mcpTitleRemove();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -15942,6 +15965,154 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V124: _initTitleState - 初始化称号系统状态
+            _initTitleState() {
+                const gs = window.gameState;
+                if (!gs.title) {
+                    gs.title = {
+                        titles: TITLE_POOL.map(t => ({ ...t })),
+                        activeTitle: null
+                    };
+                }
+                return gs.title;
+            }
+
+            // V124: mcpAchievementList - 获取成就列表
+            mcpAchievementList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const achievement = this._initAchievementState();
+                    const allAchievements = ACHIEVEMENT_POOL;
+                    return {
+                        success: true,
+                        total: allAchievements.length,
+                        achievements: allAchievements.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            description: a.description,
+                            progress: this._getAchievementProgress(a),
+                            target: this._getAchievementTarget(a),
+                            reward: a.reward,
+                            claimed: achievement.rewardsClaimed.includes(a.id)
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V124: _getAchievementProgress - 获取成就当前进度
+            _getAchievementProgress(achData) {
+                const gs = window.gameState;
+                const cond = achData.condition;
+                switch (cond.type) {
+                    case 'questCompleted': return gs.totalQuestCompleted || 0;
+                    case 'totalStone': return gs.totalStone || 0;
+                    case 'realm': return gs.realm || 0;
+                    case 'rank': return gs.rank || 999999;
+                    case 'pillCrafted': return gs.pillCrafted || 0;
+                    case 'skillLearned': return gs.skillLearned || 0;
+                    case 'equipmentEnhanced': return gs.equipmentEnhanced || 0;
+                    case 'serendipity': return gs.serendipity || 0;
+                    case 'inSect': return gs.sect && gs.sect.name ? 1 : 0;
+                    case 'sectContribution': return gs.sect?.contribution || 0;
+                    default: return 0;
+                }
+            }
+
+            // V124: _getAchievementTarget - 获取成就目标值
+            _getAchievementTarget(achData) {
+                const cond = achData.condition;
+                if (cond.type === 'realm' || cond.type === 'rank' || cond.type === 'sectLeader') return cond.level || cond.position || cond.amount;
+                return cond.amount || 0;
+            }
+
+            // V124: mcpAchievementClaim - 领取成就奖励
+            mcpAchievementClaim(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '成就ID不能为空' };
+                    const achievement = this._initAchievementState();
+                    const achData = ACHIEVEMENT_POOL.find(a => a.id === achievementId);
+                    if (!achData) return { error: '成就不存在: ' + achievementId };
+                    if (!achievement.unlocked.includes(achievementId)) return { error: '成就未解锁' };
+                    if (achievement.rewardsClaimed.includes(achievementId)) return { error: '奖励已领取' };
+                    achievement.rewardsClaimed.push(achievementId);
+                    const reward = achData.reward || { spiritStones: 100, exp: 10 };
+                    gs.spiritStones = (gs.spiritStones || 0) + (reward.spiritStones || 0);
+                    return { success: true, achievementId, reward, message: '奖励已领取' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V124: mcpAchievementProgress - 查看成就进度
+            mcpAchievementProgress(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '成就ID不能为空' };
+                    const achData = ACHIEVEMENT_POOL.find(a => a.id === achievementId);
+                    if (!achData) return { error: '成就不存在: ' + achievementId };
+                    const progress = this._getAchievementProgress(achData);
+                    const target = this._getAchievementTarget(achData);
+                    const complete = progress >= target;
+                    return {
+                        success: true,
+                        achievementId,
+                        name: achData.name,
+                        progress,
+                        target,
+                        complete
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V124: mcpTitleList - 获取称号列表
+            mcpTitleList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const title = this._initTitleState();
+                    const unlockedTitles = title.titles.filter(t => t.unlocked);
+                    return {
+                        success: true,
+                        total: unlockedTitles.length,
+                        titles: unlockedTitles.map(t => ({
+                            id: t.id,
+                            name: t.name,
+                            description: t.description
+                        })),
+                        activeTitle: title.activeTitle
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V124: mcpTitleActivate - 激活称号
+            mcpTitleActivate(titleId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!titleId) return { error: '称号ID不能为空' };
+                    const title = this._initTitleState();
+                    const titleData = title.titles.find(t => t.id === titleId);
+                    if (!titleData) return { error: '称号不存在: ' + titleId };
+                    if (!titleData.unlocked) return { error: '称号未解锁' };
+                    title.activeTitle = titleId;
+                    return { success: true, titleId, name: titleData.name, message: '称号已激活' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V124: mcpTitleRemove - 卸下称号
+            mcpTitleRemove() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const title = this._initTitleState();
+                    if (!title.activeTitle) return { success: true, message: '当前未佩戴称号' };
+                    title.activeTitle = null;
+                    return { success: true, message: '称号已卸下' };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -23660,6 +23831,16 @@ const ACHIEVEMENT_ID_MAP = {
             'friend.accept': { name: 'friend.accept', description: '通过好友申请', inputSchema: { type: 'object', properties: { applyId: { type: 'string' } }, required: ['applyId'] } }
         };
 
+        // V124: 成就+称号系统
+        const MCP_TOOLS_V124 = {
+            'achievement.list': { name: 'achievement.list', description: '获取成就列表', inputSchema: { type: 'object', properties: {} } },
+            'achievement.claim': { name: 'achievement.claim', description: '领取成就奖励', inputSchema: { type: 'object', properties: { achievementId: { type: 'string' } }, required: ['achievementId'] } },
+            'achievement.progress': { name: 'achievement.progress', description: '查看成就进度', inputSchema: { type: 'object', properties: { achievementId: { type: 'string' } }, required: ['achievementId'] } },
+            'title.list': { name: 'title.list', description: '获取称号列表', inputSchema: { type: 'object', properties: {} } },
+            'title.activate': { name: 'title.activate', description: '激活称号', inputSchema: { type: 'object', properties: { titleId: { type: 'string' } }, required: ['titleId'] } },
+            'title.remove': { name: 'title.remove', description: '卸下称号', inputSchema: { type: 'object', properties: {} } }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -23789,6 +23970,22 @@ const ACHIEVEMENT_ID_MAP = {
             { id: 'ach_018', name: '运气加身', description: '触发10次机缘', condition: { type: 'serendipity', amount: 10 }, reward: { spiritStones: 1000, exp: 200 } },
             { id: 'ach_019', name: '仙盟成员', description: '加入仙盟', condition: { type: 'inSect', amount: 1 }, reward: { spiritStones: 500, exp: 100 } },
             { id: 'ach_020', name: '仙盟精英', description: '仙盟贡献10000', condition: { type: 'sectContribution', amount: 10000 }, reward: { spiritStones: 3000, exp: 600 } }
+        ];
+
+        // V124: Title Pool - 称号池
+        const TITLE_POOL = [
+            { id: 'title_001', name: '初入仙途', description: '完成第一个任务', requirement: { type: 'questCompleted', amount: 1 }, unlocked: false },
+            { id: 'title_002', name: '小有名气', description: '累计拥有1000灵石', requirement: { type: 'totalStone', amount: 1000 }, unlocked: false },
+            { id: 'title_003', name: '筑基修士', description: '达到筑基期', requirement: { type: 'realm', level: 1 }, unlocked: false },
+            { id: 'title_004', name: '金丹真人', description: '达到金丹期', requirement: { type: 'realm', level: 2 }, unlocked: false },
+            { id: 'title_005', name: '元婴真君', description: '达到元婴期', requirement: { type: 'realm', level: 3 }, unlocked: false },
+            { id: 'title_006', name: '化神大能', description: '达到化神期', requirement: { type: 'realm', level: 4 }, unlocked: false },
+            { id: 'title_007', name: '炼丹宗师', description: '炼制50枚丹药', requirement: { type: 'pillCrafted', amount: 50 }, unlocked: false },
+            { id: 'title_008', name: '技能大师', description: '学会5个技能', requirement: { type: 'skillLearned', amount: 5 }, unlocked: false },
+            { id: 'title_009', name: '天榜高手', description: '进入天榜前100', requirement: { type: 'rank', position: 100 }, unlocked: false },
+            { id: 'title_010', name: '天榜至尊', description: '进入天榜前10', requirement: { type: 'rank', position: 10 }, unlocked: false },
+            { id: 'title_011', name: '仙盟盟主', description: '成为仙盟盟主', requirement: { type: 'sectLeader', amount: 1 }, unlocked: false },
+            { id: 'title_012', name: '机缘深厚', description: '触发5次机缘', requirement: { type: 'serendipity', amount: 5 }, unlocked: false }
         ];
 
         // V114 Tests
@@ -26040,6 +26237,181 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V123', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v123Results = runV123Tests();
+
+        // ===== V124: 成就+称号系统 Tests =====
+        function runV124Tests() {
+            const results = [];
+            function v124Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 2,
+                stage: 1,
+                reputation: 100,
+                items: [],
+                quest: null,
+                achievement: null,
+                title: null,
+                totalStone: 0,
+                totalQuestCompleted: 0,
+                pillCrafted: 0,
+                skillLearned: 0,
+                equipmentEnhanced: 0,
+                serendipity: 0,
+                sect: null,
+                rank: 999999
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // achievement.list - initial
+            const al1 = server.mcpAchievementList();
+            v124Assert(al1.success === true, 'achievement.list succeeds');
+            v124Assert(Array.isArray(al1.achievements), 'achievement.list returns achievements array');
+            v124Assert(al1.total === 20, 'achievement.list returns 20 achievements');
+
+            // achievement.progress - valid id
+            const ap1 = server.mcpAchievementProgress('ach_001');
+            v124Assert(ap1.success === true, 'achievement.progress succeeds');
+            v124Assert(ap1.achievementId === 'ach_001', 'achievement.progress returns correct id');
+            v124Assert(ap1.name === '初入仙途', 'achievement.progress returns name');
+            v124Assert(ap1.progress === 0, 'achievement.progress progress is 0 initially');
+            v124Assert(ap1.target === 1, 'achievement.progress target is 1');
+            v124Assert(ap1.complete === false, 'achievement.progress complete is false initially');
+
+            // achievement.progress - invalid id
+            const ap2 = server.mcpAchievementProgress('invalid_ach');
+            v124Assert(ap2.error && ap2.error.includes('不存在'), 'achievement.progress fails with invalid id');
+
+            // achievement.progress - no id
+            const ap3 = server.mcpAchievementProgress(null);
+            v124Assert(ap3.error && ap3.error.includes('成就ID不能为空'), 'achievement.progress requires id');
+
+            // achievement.claim - no id
+            const ac1 = server.mcpAchievementClaim(null);
+            v124Assert(ac1.error && ac1.error.includes('成就ID不能为空'), 'achievement.claim requires id');
+
+            // achievement.claim - invalid id
+            const ac2 = server.mcpAchievementClaim('invalid_ach');
+            v124Assert(ac2.error && ac2.error.includes('不存在'), 'achievement.claim fails with invalid id');
+
+            // achievement.claim - not unlocked
+            const ac3 = server.mcpAchievementClaim('ach_001');
+            v124Assert(ac3.error && ac3.error.includes('成就未解锁'), 'achievement.claim fails when not unlocked');
+
+            // title.list - initial
+            const tl1 = server.mcpTitleList();
+            v124Assert(tl1.success === true, 'title.list succeeds');
+            v124Assert(Array.isArray(tl1.titles), 'title.list returns titles array');
+            v124Assert(tl1.total === 0, 'title.list returns 0 initially');
+
+            // title.activate - no id
+            const ta1 = server.mcpTitleActivate(null);
+            v124Assert(ta1.error && ta1.error.includes('称号ID不能为空'), 'title.activate requires id');
+
+            // title.activate - invalid id
+            const ta2 = server.mcpTitleActivate('invalid_title');
+            v124Assert(ta2.error && ta2.error.includes('称号不存在'), 'title.activate fails with invalid id');
+
+            // title.remove - no title equipped
+            const tr1 = server.mcpTitleRemove();
+            v124Assert(tr1.success === true, 'title.remove succeeds');
+            v124Assert(tr1.message && tr1.message.includes('未佩戴'), 'title.remove handles no title');
+
+            // Simulate title unlock via quest completion
+            server._initTitleState();
+            mockGameState.title.titles[0].unlocked = true; // title_001 unlocked
+
+            // title.list - after unlock
+            const tl2 = server.mcpTitleList();
+            v124Assert(tl2.success === true, 'title.list succeeds after unlock');
+            v124Assert(tl2.total === 1, 'title.list returns 1 unlocked title');
+            v124Assert(tl2.titles[0].id === 'title_001', 'title.list returns correct title');
+
+            // title.activate - success
+            const ta3 = server.mcpTitleActivate('title_001');
+            v124Assert(ta3.success === true, 'title.activate succeeds');
+            v124Assert(ta3.titleId === 'title_001', 'title.activate returns correct id');
+            v124Assert(ta3.name === '初入仙途', 'title.activate returns name');
+
+            // title.list - after activate
+            const tl3 = server.mcpTitleList();
+            v124Assert(tl3.activeTitle === 'title_001', 'title.list shows activeTitle');
+
+            // title.activate - already unlocked title
+            const ta4 = server.mcpTitleActivate('title_002');
+            v124Assert(ta4.error && ta4.error.includes('称号未解锁'), 'title.activate fails when not unlocked');
+
+            // title.remove - with title equipped
+            const tr2 = server.mcpTitleRemove();
+            v124Assert(tr2.success === true, 'title.remove succeeds with title');
+            v124Assert(tr2.message === '称号已卸下', 'title.remove returns correct message');
+
+            // title.list - after remove
+            const tl4 = server.mcpTitleList();
+            v124Assert(tl4.activeTitle === null, 'title.list activeTitle is null after remove');
+
+            // Simulate achievement unlock
+            mockGameState.totalQuestCompleted = 1;
+            server._initAchievementState();
+            mockGameState.achievement.unlocked.push('ach_001');
+
+            // achievement.list - after unlock
+            const al2 = server.mcpAchievementList();
+            v124Assert(al2.success === true, 'achievement.list succeeds after unlock');
+            v124Assert(al2.achievements[0].progress === 1, 'achievement.list shows progress 1');
+            v124Assert(al2.achievements[0].target === 1, 'achievement.list shows target 1');
+            v124Assert(al2.achievements[0].claimed === false, 'achievement.list shows not claimed');
+
+            // achievement.progress - after condition met
+            const ap4 = server.mcpAchievementProgress('ach_001');
+            v124Assert(ap4.success === true, 'achievement.progress succeeds');
+            v124Assert(ap4.progress === 1, 'achievement.progress shows progress 1');
+            v124Assert(ap4.complete === true, 'achievement.progress complete is true');
+
+            // achievement.claim - success
+            const ac4 = server.mcpAchievementClaim('ach_001');
+            v124Assert(ac4.success === true, 'achievement.claim succeeds');
+            v124Assert(ac4.achievementId === 'ach_001', 'achievement.claim returns correct id');
+            v124Assert(ac4.reward && ac4.reward.spiritStones === 100, 'achievement.claim returns reward');
+
+            // achievement.list - after claim
+            const al3 = server.mcpAchievementList();
+            v124Assert(al3.achievements[0].claimed === true, 'achievement.list shows claimed');
+
+            // achievement.claim - already claimed
+            const ac5 = server.mcpAchievementClaim('ach_001');
+            v124Assert(ac5.error && ac5.error.includes('奖励已领取'), 'achievement.claim fails when already claimed');
+
+            // Multiple achievements unlock test
+            mockGameState.totalQuestCompleted = 10;
+            mockGameState.achievement.unlocked.push('ach_002');
+            const ap5 = server.mcpAchievementProgress('ach_002');
+            v124Assert(ap5.complete === true, 'achievement.progress complete for ach_002');
+
+            // title with realm unlock
+            mockGameState.realm = 1;
+            server._initTitleState();
+            mockGameState.title.titles[2].unlocked = true; // title_003: 筑基修士
+
+            const tl5 = server.mcpTitleList();
+            v124Assert(tl5.total === 2, 'title.list returns 2 unlocked titles');
+
+            // achievement.progress for realm-based achievement
+            const ap6 = server.mcpAchievementProgress('ach_007'); // 筑基成功
+            v124Assert(ap6.progress === 1, 'achievement.progress shows realm progress');
+            v124Assert(ap6.complete === true, 'achievement.progress complete for realm achievement');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V124 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V124', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v124Results = runV124Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
