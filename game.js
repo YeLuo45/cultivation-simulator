@@ -5351,6 +5351,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V125)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V126: Register 地图+探索系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V126)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6409,6 +6413,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'message.clear':
                             result = this.mcpMessageClear();
+                            break;
+                        // V126: 地图+探索系统
+                        case 'map.list':
+                            result = this.mcpMapList();
+                            break;
+                        case 'map.detail':
+                            result = this.mcpMapDetail(args.mapId);
+                            break;
+                        case 'map.unlock':
+                            result = this.mcpMapUnlock(args.mapId);
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStart(args.mapId);
+                            break;
+                        case 'explore.status':
+                            result = this.mcpExploreStatus();
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreComplete();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -16271,6 +16294,165 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V126: _initMapState - 初始化地图状态
+            _initMapState() {
+                const gs = window.gameState;
+                if (!gs.map) {
+                    gs.map = {
+                        areas: MAP_AREAS.map(a => ({ ...a, unlocked: a.level === 1 })),
+                        currentArea: null
+                    };
+                }
+                return gs.map;
+            }
+
+            // V126: _initExploreState - 初始化探索状态
+            _initExploreState() {
+                const gs = window.gameState;
+                if (!gs.explore) {
+                    gs.explore = {
+                        active: null,
+                        history: []
+                    };
+                }
+                return gs.explore;
+            }
+
+            // V126: mcpMapList - 获取地图区域列表
+            mcpMapList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mapState = this._initMapState();
+                    return {
+                        success: true,
+                        areas: mapState.areas.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            level: a.level,
+                            unlocked: a.unlocked,
+                            description: a.description
+                        })),
+                        currentArea: mapState.currentArea
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V126: mcpMapDetail - 获取地图详情
+            mcpMapDetail(mapId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mapId) return { error: '地图ID不能为空' };
+                    const mapState = this._initMapState();
+                    const area = mapState.areas.find(a => a.id === mapId);
+                    if (!area) return { error: '地图区域不存在: ' + mapId };
+                    return {
+                        success: true,
+                        id: area.id,
+                        name: area.name,
+                        description: area.description,
+                        level: area.level,
+                        unlocked: area.unlocked,
+                        unlockCost: area.unlockCost,
+                        reward: area.reward,
+                        duration: area.duration
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V126: mcpMapUnlock - 解锁地图区域
+            mcpMapUnlock(mapId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mapId) return { error: '地图ID不能为空' };
+                    const mapState = this._initMapState();
+                    const area = mapState.areas.find(a => a.id === mapId);
+                    if (!area) return { error: '地图区域不存在: ' + mapId };
+                    if (area.unlocked) return { error: '该区域已解锁' };
+                    if (gs.spiritStones < area.unlockCost) return { error: '灵石不足，需要 ' + area.unlockCost + ' 灵石' };
+                    gs.spiritStones -= area.unlockCost;
+                    area.unlocked = true;
+                    return { success: true, message: '区域已解锁: ' + area.name, cost: area.unlockCost };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V126: mcpExploreStart - 开始探索
+            mcpExploreStart(mapId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mapId) return { error: '地图ID不能为空' };
+                    const mapState = this._initMapState();
+                    const exploreState = this._initExploreState();
+                    const area = mapState.areas.find(a => a.id === mapId);
+                    if (!area) return { error: '地图区域不存在: ' + mapId };
+                    if (!area.unlocked) return { error: '该区域未解锁，请先解锁' };
+                    if (exploreState.active) return { error: '已有正在进行的探索，请先完成' };
+                    exploreState.active = {
+                        areaId: mapId,
+                        areaName: area.name,
+                        startTime: Date.now(),
+                        duration: area.duration * 1000
+                    };
+                    return { success: true, message: '开始探索: ' + area.name, duration: area.duration };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V126: mcpExploreStatus - 查看探索状态
+            mcpExploreStatus() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreState = this._initExploreState();
+                    if (!exploreState.active) return { active: false, message: '当前没有正在进行的探索' };
+                    const elapsed = Date.now() - exploreState.active.startTime;
+                    const remaining = Math.max(0, exploreState.active.duration - elapsed);
+                    const completed = remaining === 0;
+                    return {
+                        active: true,
+                        areaId: exploreState.active.areaId,
+                        areaName: exploreState.active.areaName,
+                        elapsed: Math.floor(elapsed / 1000),
+                        remaining: Math.floor(remaining / 1000),
+                        completed,
+                        message: completed ? '探索已完成，可以领取奖励' : '探索进行中'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V126: mcpExploreComplete - 领取探索奖励
+            mcpExploreComplete() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreState = this._initExploreState();
+                    if (!exploreState.active) return { error: '当前没有正在进行的探索' };
+                    const elapsed = Date.now() - exploreState.active.startTime;
+                    if (elapsed < exploreState.active.duration) return { error: '探索尚未完成' };
+                    const mapState = this._initMapState();
+                    const area = mapState.areas.find(a => a.id === exploreState.active.areaId);
+                    if (!area) return { error: '地图区域不存在' };
+                    gs.spiritStones = (gs.spiritStones || 0) + area.reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + area.reward.exp;
+                    const historyEntry = {
+                        areaId: exploreState.active.areaId,
+                        areaName: exploreState.active.areaName,
+                        reward: area.reward,
+                        completedAt: Date.now()
+                    };
+                    exploreState.history.push(historyEntry);
+                    exploreState.active = null;
+                    return {
+                        success: true,
+                        message: '探索完成: ' + area.name,
+                        reward: area.reward,
+                        totalHistory: exploreState.history.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -24009,6 +24191,25 @@ const ACHIEVEMENT_ID_MAP = {
             'message.clear': { name: 'message.clear', description: '清空所有消息', inputSchema: { type: 'object', properties: {} } }
         };
 
+        // V126: 地图+探索系统
+        const MAP_AREAS = [
+            { id: 'area_001', name: '灵气山谷', description: '灵气充沛的修炼圣地，适合初学者', level: 1, unlockCost: 0, reward: { spiritStones: 100, exp: 50 }, duration: 60 },
+            { id: 'area_002', name: '灵石矿脉', description: '蕴含丰富灵石的矿脉', level: 2, unlockCost: 500, reward: { spiritStones: 300, exp: 100 }, duration: 120 },
+            { id: 'area_003', name: '妖兽森林', description: '危险与机遇并存的森林', level: 3, unlockCost: 1500, reward: { spiritStones: 500, exp: 200 }, duration: 180 },
+            { id: 'area_004', name: '金丹秘境', description: '金丹期修士的遗迹', level: 4, unlockCost: 5000, reward: { spiritStones: 1000, exp: 500 }, duration: 300 },
+            { id: 'area_005', name: '元婴洞府', description: '元婴期大能的闭关之所', level: 5, unlockCost: 15000, reward: { spiritStones: 3000, exp: 1000 }, duration: 480 },
+            { id: 'area_006', name: '化神废墟', description: '上古化神修士的遗迹', level: 6, unlockCost: 50000, reward: { spiritStones: 10000, exp: 3000 }, duration: 720 }
+        ];
+
+        const MCP_TOOLS_V126 = {
+            'map.list': { name: 'map.list', description: '获取地图区域列表', inputSchema: { type: 'object', properties: {} } },
+            'map.detail': { name: 'map.detail', description: '获取地图详情', inputSchema: { type: 'object', properties: { mapId: { type: 'string' } }, required: ['mapId'] } },
+            'map.unlock': { name: 'map.unlock', description: '解锁地图区域', inputSchema: { type: 'object', properties: { mapId: { type: 'string' } }, required: ['mapId'] } },
+            'explore.start': { name: 'explore.start', description: '开始探索', inputSchema: { type: 'object', properties: { mapId: { type: 'string' } }, required: ['mapId'] } },
+            'explore.status': { name: 'explore.status', description: '查看探索状态', inputSchema: { type: 'object', properties: {} } },
+            'explore.complete': { name: 'explore.complete', description: '领取探索奖励', inputSchema: { type: 'object', properties: {} } }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -26733,6 +26934,144 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V125', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v125Results = runV125Tests();
+
+        // ===== V126: 地图+探索系统 Tests =====
+        function runV126Tests() {
+            const results = [];
+            function v126Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 2,
+                stage: 1,
+                exp: 0,
+                items: [],
+                map: null,
+                explore: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // map.list - initial state (area_001 unlocked by default)
+            const ml1 = server.mcpMapList();
+            v126Assert(ml1.success === true, 'map.list succeeds');
+            v126Assert(ml1.areas && ml1.areas.length === 6, 'map.list returns 6 areas');
+            v126Assert(ml1.areas[0].unlocked === true, 'area_001 unlocked by default');
+            v126Assert(ml1.areas[1].unlocked === false, 'area_002 locked initially');
+
+            // map.detail - success
+            const md1 = server.mcpMapDetail('area_001');
+            v126Assert(md1.success === true, 'map.detail succeeds');
+            v126Assert(md1.name === '灵气山谷', 'map.detail returns correct name');
+            v126Assert(md1.level === 1, 'map.detail returns correct level');
+            v126Assert(md1.unlockCost === 0, 'map.detail area_001 has 0 unlock cost');
+
+            // map.detail - area_002 locked with cost
+            const md2 = server.mcpMapDetail('area_002');
+            v126Assert(md2.unlocked === false, 'area_002 is locked');
+            v126Assert(md2.unlockCost === 500, 'area_002 unlock cost is 500');
+
+            // map.detail - missing id
+            const mdErr1 = server.mcpMapDetail(null);
+            v126Assert(mdErr1.error && mdErr1.error.includes('不能为空'), 'map.detail requires mapId');
+
+            // map.detail - invalid id
+            const mdErr2 = server.mcpMapDetail('invalid_area');
+            v126Assert(mdErr2.error && mdErr2.error.includes('不存在'), 'map.detail fails with invalid id');
+
+            // map.unlock - area_001 already unlocked
+            const mu1 = server.mcpMapUnlock('area_001');
+            v126Assert(mu1.error && mu1.error.includes('已解锁'), 'map.unlock fails for already unlocked area');
+
+            // map.unlock - area_002 success
+            mockGameState.spiritStones = 50000;
+            const mu2 = server.mcpMapUnlock('area_002');
+            v126Assert(mu2.success === true, 'map.unlock area_002 succeeds');
+            v126Assert(mu2.cost === 500, 'map.unlock area_002 costs 500');
+            v126Assert(mockGameState.spiritStones === 49500, 'map.unlock deducts spirit stones');
+
+            // map.unlock - area_003 insufficient funds
+            mockGameState.spiritStones = 1000;
+            const mu3 = server.mcpMapUnlock('area_003');
+            v126Assert(mu3.error && mu3.error.includes('灵石不足'), 'map.unlock fails with insufficient funds');
+
+            // map.unlock - missing id
+            const muErr1 = server.mcpMapUnlock(null);
+            v126Assert(muErr1.error && muErr1.error.includes('不能为空'), 'map.unlock requires mapId');
+
+            // map.unlock - invalid id
+            const muErr2 = server.mcpMapUnlock('invalid_area');
+            v126Assert(muErr2.error && muErr2.error.includes('不存在'), 'map.unlock fails with invalid id');
+
+            // explore.start - area_001 success
+            const es1 = server.mcpExploreStart('area_001');
+            v126Assert(es1.success === true, 'explore.start succeeds');
+            v126Assert(es1.duration === 60, 'explore.start area_001 duration is 60s');
+
+            // explore.start - already exploring
+            const es2 = server.mcpExploreStart('area_001');
+            v126Assert(es2.error && es2.error.includes('已有正在进行的探索'), 'explore.start fails when already exploring');
+
+            // explore.status - in progress
+            const es3 = server.mcpExploreStatus();
+            v126Assert(es3.active === true, 'explore.status shows active');
+            v126Assert(es3.areaName === '灵气山谷', 'explore.status shows correct area name');
+            v126Assert(es3.completed === false, 'explore.status shows not completed');
+
+            // explore.complete - not ready yet
+            const ec1 = server.mcpExploreComplete();
+            v126Assert(ec1.error && ec1.error.includes('尚未完成'), 'explore.complete fails when not ready');
+
+            // explore.status - simulate time passage (mock startTime to past)
+            mockGameState.explore.active.startTime = Date.now() - 70000;
+            const es4 = server.mcpExploreStatus();
+            v126Assert(es4.completed === true, 'explore.status shows completed after time');
+
+            // explore.complete - success
+            const ec2 = server.mcpExploreComplete();
+            v126Assert(ec2.success === true, 'explore.complete succeeds');
+            v126Assert(ec2.reward.spiritStones === 100, 'explore.complete gives spirit stones reward');
+            v126Assert(ec2.reward.exp === 50, 'explore.complete gives exp reward');
+            v126Assert(mockGameState.spiritStones === 100 + 49500, 'explore.complete adds spirit stones to balance');
+            v126Assert(ec2.totalHistory === 1, 'explore.complete records history');
+
+            // explore.status - no active explore
+            const es5 = server.mcpExploreStatus();
+            v126Assert(es5.active === false, 'explore.status shows no active after complete');
+
+            // explore.complete - no active exploration
+            const ec3 = server.mcpExploreComplete();
+            v126Assert(ec3.error && ec3.error.includes('没有正在进行的探索'), 'explore.complete fails with no active');
+
+            // explore.start - locked area
+            mockGameState.explore = { active: null, history: [] };
+            const esErr = server.mcpExploreStart('area_005');
+            v126Assert(esErr.error && esErr.error.includes('未解锁'), 'explore.start fails for locked area');
+
+            // map.list - verify all areas listed
+            const ml2 = server.mcpMapList();
+            v126Assert(ml2.areas.length === 6, 'map.list still returns 6 areas');
+            v126Assert(ml2.areas[2].unlocked === true, 'area_003 is now unlocked');
+            v126Assert(ml2.areas[4].unlocked === false, 'area_005 still locked');
+
+            // explore.start - area_002 and complete with reward
+            mockGameState.explore = { active: null, history: [] };
+            mockGameState.explore.active = { areaId: 'area_002', areaName: '灵石矿脉', startTime: Date.now() - 125000, duration: 120000 };
+            const ec4 = server.mcpExploreComplete();
+            v126Assert(ec4.success === true, 'explore.complete area_002 succeeds');
+            v126Assert(ec4.reward.spiritStones === 300, 'explore.complete area_002 gives 300 spirit stones');
+            v126Assert(ec4.reward.exp === 100, 'explore.complete area_002 gives 100 exp');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V126 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V126', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v126Results = runV126Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
