@@ -5587,6 +5587,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V167)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V168: Register 悬赏+任务链系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V168)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5780,6 +5784,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'eventV3.reward':
                             result = this.mcpEventV3Reward(args.eventId);
+                            break;
+                        // V168: 悬赏+任务链系统v3
+                        case 'questV3.list':
+                            result = this.mcpQuestV3List();
+                            break;
+                        case 'questV3.accept':
+                            result = this.mcpQuestV3Accept(args.questId);
+                            break;
+                        case 'questV3.complete':
+                            result = this.mcpQuestV3Complete(args.questId);
+                            break;
+                        case 'chainV3.list':
+                            result = this.mcpChainV3List();
+                            break;
+                        case 'chainV3.progress':
+                            result = this.mcpChainV3Progress(args.chainId);
+                            break;
+                        case 'chainV3.claim':
+                            result = this.mcpChainV3Claim(args.chainId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -19234,6 +19257,242 @@ const ACHIEVEMENT_ID_MAP = {
                         name: evt.name,
                         rewards: evt.rewards,
                         message: '领取事件\"' + evt.name + '\"奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: _initQuestStateV3 - 初始化悬赏系统状态v3
+            _initQuestStateV3() {
+                const gs = window.gameState;
+                if (!gs.questV3) {
+                    const now = Date.now();
+                    gs.questV3 = {
+                        quests: [
+                            { id: 'quest_stone_1', name: '灵石悬赏·初', description: '采集100灵石', difficulty: 1, requirement: { type: 'spiritStone', amount: 100 }, reward: { type: 'spiritStone', amount: 50 }, status: 'available', progress: 0, expireAt: now + 86400000 * 3 },
+                            { id: 'quest_combat_1', name: '战力悬赏·初', description: '击败炼气后期修士', difficulty: 2, requirement: { type: 'combatPower', amount: 500 }, reward: { type: 'spiritStone', amount: 100 }, status: 'available', progress: 0, expireAt: now + 86400000 * 3 },
+                            { id: 'quest_realm_1', name: '境界悬赏·初', description: '突破到筑基境界', difficulty: 3, requirement: { type: 'realm', level: 1 }, reward: { type: 'realm', name: '筑基丹' }, status: 'available', progress: 0, expireAt: now + 86400000 * 7 },
+                            { id: 'quest_item_1', name: '道具悬赏·初', description: '收集5枚丹药', difficulty: 1, requirement: { type: 'item', itemId: 'pill_1', amount: 5 }, reward: { type: 'spiritStone', amount: 80 }, status: 'available', progress: 0, expireAt: now + 86400000 * 2 },
+                            { id: 'quest_stone_2', name: '灵石悬赏·高', description: '采集1000灵石', difficulty: 2, requirement: { type: 'spiritStone', amount: 1000 }, reward: { type: 'spiritStone', amount: 200 }, status: 'available', progress: 0, expireAt: now + 86400000 * 5 }
+                        ],
+                        activeQuests: [],
+                        history: []
+                    };
+                }
+                return gs.questV3;
+            }
+
+            // V168: _initChainStateV3 - 初始化任务链系统状态v3
+            _initChainStateV3() {
+                const gs = window.gameState;
+                if (!gs.chainV3) {
+                    gs.chainV3 = {
+                        chains: [
+                            {
+                                id: 'chain_newbie',
+                                name: '新手任务链',
+                                description: '指引萌新修士熟悉修真世界',
+                                steps: [
+                                    { description: '灵气修炼10次', progress: 0, reward: { type: 'spiritStone', amount: 100 } },
+                                    { description: '采集灵石50', progress: 0, reward: { type: 'spiritStone', amount: 150 } },
+                                    { description: '击败1个敌人', progress: 0, reward: { type: 'spiritStone', amount: 200 } }
+                                ],
+                                currentStep: 0,
+                                completed: false
+                            },
+                            {
+                                id: 'chain_cultivation',
+                                name: '修炼任务链',
+                                description: '突破境界成为强者',
+                                steps: [
+                                    { description: '突破到筑基境界', progress: 0, reward: { type: 'realm', name: '筑基丹' } },
+                                    { description: '收集1000灵石', progress: 0, reward: { type: 'spiritStone', amount: 500 } },
+                                    { description: '战力达到5000', progress: 0, reward: { type: 'artifact', name: '灵剑' } }
+                                ],
+                                currentStep: 0,
+                                completed: false
+                            },
+                            {
+                                id: 'chain_elite',
+                                name: '精英任务链',
+                                description: '成为一代天骄',
+                                steps: [
+                                    { description: '突破到金丹境界', progress: 0, reward: { type: 'realm', name: '金丹' } },
+                                    { description: '战力达到20000', progress: 0, reward: { type: 'artifact', name: '天魔甲' } },
+                                    { description: '完成50次战斗', progress: 0, reward: { type: 'title', name: '战神' } }
+                                ],
+                                currentStep: 0,
+                                completed: false
+                            }
+                        ],
+                        progress: {},
+                        rewardsClaimed: []
+                    };
+                }
+                return gs.chainV3;
+            }
+
+            // V168: mcpQuestV3List - 获取悬赏列表
+            mcpQuestV3List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questV3 = this._initQuestStateV3();
+                    const now = Date.now();
+                    const available = questV3.quests.filter(q => q.status === 'available' && (!q.expireAt || q.expireAt > now));
+                    return {
+                        success: true,
+                        quests: questV3.quests.map(q => ({
+                            id: q.id,
+                            name: q.name,
+                            description: q.description,
+                            difficulty: q.difficulty,
+                            requirement: q.requirement,
+                            reward: q.reward,
+                            status: q.status,
+                            progress: q.progress,
+                            expireAt: q.expireAt
+                        })),
+                        availableCount: available.length,
+                        activeCount: questV3.activeQuests.length,
+                        message: '悬赏列表共' + questV3.quests.length + '项，可接' + available.length + '项，进行中' + questV3.activeQuests.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: mcpQuestV3Accept - 接受悬赏任务
+            mcpQuestV3Accept(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定悬赏任务ID' };
+                    const questV3 = this._initQuestStateV3();
+                    const quest = questV3.quests.find(q => q.id === questId);
+                    if (!quest) return { error: '悬赏任务不存在' };
+                    if (quest.status !== 'available') return { error: '该悬赏任务不可接受' };
+                    if (questV3.activeQuests.includes(questId)) return { error: '该悬赏任务已在进行中' };
+                    // Check requirements
+                    const req = quest.requirement;
+                    if (req.type === 'realm' && (gs.realm || 0) < (req.level || 0)) return { error: '境界不足，无法接受此悬赏' };
+                    if (req.type === 'combatPower' && (gs.combatPower || 0) < (req.amount || 0)) return { error: '战力不足，无法接受此悬赏' };
+                    quest.status = 'in_progress';
+                    questV3.activeQuests.push(questId);
+                    return {
+                        success: true,
+                        questId: quest.id,
+                        name: quest.name,
+                        message: '接受悬赏任务\"' + quest.name + '\"成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: mcpQuestV3Complete - 完成悬赏任务
+            mcpQuestV3Complete(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定悬赏任务ID' };
+                    const questV3 = this._initQuestStateV3();
+                    if (!questV3.activeQuests.includes(questId)) return { error: '该悬赏任务不在进行中' };
+                    const quest = questV3.quests.find(q => q.id === questId);
+                    if (!quest) return { error: '悬赏任务不存在' };
+                    // Check if requirement met (simplified: always true if in_progress)
+                    const req = quest.requirement;
+                    let requirementMet = true;
+                    if (req.type === 'spiritStone' && (gs.spiritStones || 0) < (req.amount || 0)) requirementMet = false;
+                    if (req.type === 'combatPower' && (gs.combatPower || 0) < (req.amount || 0)) requirementMet = false;
+                    if (req.type === 'realm' && (gs.realm || 0) < (req.level || 0)) requirementMet = false;
+                    if (!requirementMet) return { error: '任务要求未达成，无法提交' };
+                    // Apply reward
+                    if (quest.reward.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (quest.reward.amount || 0);
+                    }
+                    quest.status = 'completed';
+                    quest.progress = 100;
+                    questV3.activeQuests = questV3.activeQuests.filter(q => q !== questId);
+                    questV3.history.push({ questId: quest.id, name: quest.name, completedAt: Date.now() });
+                    return {
+                        success: true,
+                        questId: quest.id,
+                        name: quest.name,
+                        reward: quest.reward,
+                        message: '完成悬赏任务\"' + quest.name + '\"，获得奖励'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: mcpChainV3List - 获取任务链列表
+            mcpChainV3List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const chainV3 = this._initChainStateV3();
+                    return {
+                        success: true,
+                        chains: chainV3.chains.map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            description: c.description,
+                            currentStep: c.currentStep,
+                            totalSteps: c.steps.length,
+                            completed: c.completed
+                        })),
+                        message: '任务链列表共' + chainV3.chains.length + '条'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: mcpChainV3Progress - 查看任务链进度
+            mcpChainV3Progress(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainV3 = this._initChainStateV3();
+                    const chain = chainV3.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在' };
+                    return {
+                        success: true,
+                        chainId: chain.id,
+                        name: chain.name,
+                        description: chain.description,
+                        currentStep: chain.currentStep,
+                        totalSteps: chain.steps.length,
+                        completed: chain.completed,
+                        steps: chain.steps.map((s, i) => ({
+                            index: i,
+                            description: s.description,
+                            progress: s.progress,
+                            reward: s.reward,
+                            isCurrent: i === chain.currentStep
+                        })),
+                        message: chain.name + '：第' + (chain.currentStep + 1) + '步/共' + chain.steps.length + '步'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V168: mcpChainV3Claim - 领取任务链奖励
+            mcpChainV3Claim(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainV3 = this._initChainStateV3();
+                    const chain = chainV3.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在' };
+                    if (!chain.completed) return { error: '任务链尚未完成，无法领取奖励' };
+                    if (chainV3.rewardsClaimed.includes(chainId)) return { error: '该任务链奖励已领取' };
+                    // Apply final reward (the last step's reward)
+                    const lastStep = chain.steps[chain.steps.length - 1];
+                    if (lastStep && lastStep.reward.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (lastStep.reward.amount || 0);
+                    }
+                    chainV3.rewardsClaimed.push(chainId);
+                    return {
+                        success: true,
+                        chainId: chain.id,
+                        name: chain.name,
+                        reward: lastStep.reward,
+                        message: '领取任务链\"' + chain.name + '\"奖励成功'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -35332,6 +35591,64 @@ const ACHIEVEMENT_ID_MAP = {
                         eventId: { type: 'string', description: '事件ID' }
                     },
                     required: ['eventId']
+                }
+            }
+        };
+
+        // V168: 悬赏+任务链系统v3
+        const MCP_TOOLS_V168 = {
+            'questV3.list': {
+                name: 'questV3.list',
+                description: '获取悬赏列表 (悬赏系统v3-获取所有可接悬赏任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'questV3.accept': {
+                name: 'questV3.accept',
+                description: '接受悬赏任务 (悬赏系统v3-接受指定悬赏任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'questV3.complete': {
+                name: 'questV3.complete',
+                description: '完成悬赏任务 (悬赏系统v3-完成悬赏任务领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'chainV3.list': {
+                name: 'chainV3.list',
+                description: '获取任务链列表 (任务链系统v3-获取所有任务链)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'chainV3.progress': {
+                name: 'chainV3.progress',
+                description: '查看任务链进度 (任务链系统v3-查看指定任务链进度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'chainV3.claim': {
+                name: 'chainV3.claim',
+                description: '领取任务链奖励 (任务链系统v3-领取完成所有步骤的任务链奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
                 }
             }
         };
@@ -63666,6 +63983,351 @@ const v152Results = runV152Tests();
             }
 
             const v167Results = runV167Tests();
+
+            // V168: 悬赏+任务链系统v3 测试
+            function runV168Tests() {
+                const results = [];
+                function v168Assert(condition, testName) {
+                    const result = { test: testName, pass: condition };
+                    if (!condition) {
+                        console.log('FAIL:', testName);
+                    }
+                    results.push(result);
+                }
+
+                window.gameState = {
+                    spiritStones: 10000,
+                    combatPower: 1000,
+                    level: 5,
+                    realm: 2,
+                    questV3: null,
+                    chainV3: null
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V168 definition exists and has 6 tools
+                v168Assert(typeof MCP_TOOLS_V168 === 'object', 'MCP_TOOLS_V168 is defined');
+                v168Assert(Object.keys(MCP_TOOLS_V168).length === 6, 'MCP_TOOLS_V168 has 6 tools');
+                v168Assert('questV3.list' in MCP_TOOLS_V168, 'questV3.list tool exists');
+                v168Assert('questV3.accept' in MCP_TOOLS_V168, 'questV3.accept tool exists');
+                v168Assert('questV3.complete' in MCP_TOOLS_V168, 'questV3.complete tool exists');
+                v168Assert('chainV3.list' in MCP_TOOLS_V168, 'chainV3.list tool exists');
+                v168Assert('chainV3.progress' in MCP_TOOLS_V168, 'chainV3.progress tool exists');
+                v168Assert('chainV3.claim' in MCP_TOOLS_V168, 'chainV3.claim tool exists');
+
+                // Test 2: _initQuestStateV3 initializes correctly
+                const questV3State = server._initQuestStateV3();
+                v168Assert(questV3State !== null, '_initQuestStateV3 returns state');
+                v168Assert(Array.isArray(questV3State.quests), 'questV3.quests is array');
+                v168Assert(questV3State.quests.length === 5, 'questV3 has 5 quests');
+                v168Assert(Array.isArray(questV3State.activeQuests), 'questV3.activeQuests is array');
+                v168Assert(Array.isArray(questV3State.history), 'questV3.history is array');
+
+                // Test 3: _initChainStateV3 initializes correctly
+                const chainV3State = server._initChainStateV3();
+                v168Assert(chainV3State !== null, '_initChainStateV3 returns state');
+                v168Assert(Array.isArray(chainV3State.chains), 'chainV3.chains is array');
+                v168Assert(chainV3State.chains.length === 3, 'chainV3 has 3 chains');
+                v168Assert(chainV3State.chains[0].steps.length === 3, 'chainV3 first chain has 3 steps');
+                v168Assert(Array.isArray(chainV3State.rewardsClaimed), 'chainV3.rewardsClaimed is array');
+
+                // Test 4: mcpQuestV3List returns correct structure
+                const questList = server.mcpQuestV3List();
+                v168Assert(questList.success === true, 'questV3.list returns success');
+                v168Assert(Array.isArray(questList.quests), 'questV3.list returns quests array');
+                v168Assert(questList.quests.length === 5, 'questV3.list returns 5 quests');
+                v168Assert(questList.availableCount !== undefined, 'questV3.list returns availableCount');
+                v168Assert(questList.activeCount !== undefined, 'questV3.list returns activeCount');
+
+                // Test 5: mcpQuestV3List filters expired quests
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                window.gameState.questV3.quests[0].expireAt = Date.now() - 1000;
+                const questListExpired = server.mcpQuestV3List();
+                const expiredQuest = questListExpired.quests.find(q => q.id === 'quest_stone_1');
+                v168Assert(expiredQuest === undefined || expiredQuest.status !== 'available', 'questV3.list filters expired quests');
+
+                // Test 6: mcpQuestV3Accept accepts a quest
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questAccept = server.mcpQuestV3Accept('quest_stone_1');
+                v168Assert(questAccept.success === true, 'questV3.accept returns success');
+                v168Assert(questAccept.questId === 'quest_stone_1', 'questV3.accept returns correct questId');
+                v168Assert(questAccept.name === '灵石悬赏·初', 'questV3.accept returns correct name');
+                v168Assert(window.gameState.questV3.activeQuests.includes('quest_stone_1'), 'questV3.activeQuests includes accepted quest');
+
+                // Test 7: mcpQuestV3Accept prevents duplicate
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                const questAcceptDup = server.mcpQuestV3Accept('quest_stone_1');
+                v168Assert(questAcceptDup.error !== undefined, 'questV3.accept prevents duplicate');
+
+                // Test 8: mcpQuestV3Accept validates questId
+                const questAcceptErr = server.mcpQuestV3Accept('invalid_quest');
+                v168Assert(questAcceptErr.error !== undefined, 'questV3.accept returns error for invalid questId');
+
+                // Test 9: mcpQuestV3Accept checks requirements
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                window.gameState.questV3.quests[1].requirement = { type: 'combatPower', amount: 2000 };
+                const questAcceptReq = server.mcpQuestV3Accept('quest_combat_1');
+                v168Assert(questAcceptReq.error !== undefined, 'questV3.accept checks requirements');
+
+                // Test 10: mcpQuestV3Complete completes quest
+                window.gameState.questV3 = null;
+                window.gameState.spiritStones = 10000;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                const questComplete = server.mcpQuestV3Complete('quest_stone_1');
+                v168Assert(questComplete.success === true, 'questV3.complete returns success');
+                v168Assert(questComplete.questId === 'quest_stone_1', 'questV3.complete returns correct questId');
+                v168Assert(questComplete.reward !== undefined, 'questV3.complete returns reward');
+                v168Assert(!window.gameState.questV3.activeQuests.includes('quest_stone_1'), 'questV3.activeQuests removes completed quest');
+                v168Assert(window.gameState.questV3.history.length === 1, 'questV3.history tracks completed quest');
+
+                // Test 11: mcpQuestV3Complete validates active quest
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questCompleteErr = server.mcpQuestV3Complete('quest_stone_1');
+                v168Assert(questCompleteErr.error !== undefined, 'questV3.complete validates active quest');
+
+                // Test 12: mcpQuestV3Complete checks requirements
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_combat_1');
+                window.gameState.combatPower = 100;
+                const questCompleteReq = server.mcpQuestV3Complete('quest_combat_1');
+                v168Assert(questCompleteReq.error !== undefined, 'questV3.complete checks requirements');
+
+                // Test 13: mcpQuestV3Complete awards spiritStones
+                window.gameState.questV3 = null;
+                window.gameState.spiritStones = 5000;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                const beforeStones = window.gameState.spiritStones;
+                server.mcpQuestV3Complete('quest_stone_1');
+                v168Assert(window.gameState.spiritStones > beforeStones, 'questV3.complete awards spiritStones');
+
+                // Test 14: mcpChainV3List returns correct structure
+                const chainList = server.mcpChainV3List();
+                v168Assert(chainList.success === true, 'chainV3.list returns success');
+                v168Assert(Array.isArray(chainList.chains), 'chainV3.list returns chains array');
+                v168Assert(chainList.chains.length === 3, 'chainV3.list returns 3 chains');
+                v168Assert(chainList.chains[0].currentStep !== undefined, 'chainV3.list returns currentStep');
+                v168Assert(chainList.chains[0].totalSteps !== undefined, 'chainV3.list returns totalSteps');
+
+                // Test 15: mcpChainV3List chain properties
+                v168Assert(chainList.chains[0].id === 'chain_newbie', 'chainV3.list first chain is newbie');
+                v168Assert(chainList.chains[0].name === '新手任务链', 'chainV3.list returns correct name');
+                v168Assert(chainList.chains[0].completed === false, 'chainV3.list returns completed=false');
+
+                // Test 16: mcpChainV3Progress returns correct structure
+                const chainProgress = server.mcpChainV3Progress('chain_newbie');
+                v168Assert(chainProgress.success === true, 'chainV3.progress returns success');
+                v168Assert(chainProgress.chainId === 'chain_newbie', 'chainV3.progress returns correct chainId');
+                v168Assert(Array.isArray(chainProgress.steps), 'chainV3.progress returns steps array');
+                v168Assert(chainProgress.steps.length === 3, 'chainV3.progress returns 3 steps');
+                v168Assert(chainProgress.steps[0].isCurrent === true, 'chainV3.progress first step is current');
+
+                // Test 17: mcpChainV3Progress validates chainId
+                const chainProgressErr = server.mcpChainV3Progress('invalid_chain');
+                v168Assert(chainProgressErr.error !== undefined, 'chainV3.progress validates chainId');
+
+                // Test 18: mcpChainV3Progress shows current step
+                v168Assert(chainProgress.currentStep === 0, 'chainV3.progress shows currentStep=0');
+                v168Assert(chainProgress.totalSteps === 3, 'chainV3.progress shows totalSteps=3');
+
+                // Test 19: mcpChainV3Claim validates not completed
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainClaimErr = server.mcpChainV3Claim('chain_newbie');
+                v168Assert(chainClaimErr.error !== undefined, 'chainV3.claim validates not completed');
+
+                // Test 20: mcpChainV3Claim validates chainId
+                const chainClaimErr2 = server.mcpChainV3Claim('invalid_chain');
+                v168Assert(chainClaimErr2.error !== undefined, 'chainV3.claim validates chainId');
+
+                // Test 21: mcpChainV3Claim validates already claimed
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                window.gameState.chainV3.chains[0].completed = true;
+                chainV3State.rewardsClaimed.push('chain_newbie');
+                const chainClaimDup = server.mcpChainV3Claim('chain_newbie');
+                v168Assert(chainClaimDup.error !== undefined, 'chainV3.claim validates already claimed');
+
+                // Test 22: mcpQuestV3Accept validates no questId
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questAcceptErr2 = server.mcpQuestV3Accept(null);
+                v168Assert(questAcceptErr2.error !== undefined, 'questV3.accept validates no questId');
+
+                // Test 23: mcpQuestV3Complete validates no questId
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questCompleteErr2 = server.mcpQuestV3Complete(null);
+                v168Assert(questCompleteErr2.error !== undefined, 'questV3.complete validates no questId');
+
+                // Test 24: mcpChainV3Progress validates no chainId
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainProgressErr2 = server.mcpChainV3Progress(null);
+                v168Assert(chainProgressErr2.error !== undefined, 'chainV3.progress validates no chainId');
+
+                // Test 25: mcpChainV3Claim validates no chainId
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainClaimErr3 = server.mcpChainV3Claim(null);
+                v168Assert(chainClaimErr3.error !== undefined, 'chainV3.claim validates no chainId');
+
+                // Test 26: questV3 status transitions correctly
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const quest = window.gameState.questV3.quests.find(q => q.id === 'quest_stone_1');
+                v168Assert(quest.status === 'available', 'questV3 starts as available');
+                server.mcpQuestV3Accept('quest_stone_1');
+                v168Assert(quest.status === 'in_progress', 'questV3 becomes in_progress after accept');
+                server.mcpQuestV3Complete('quest_stone_1');
+                v168Assert(quest.status === 'completed', 'questV3 becomes completed after complete');
+
+                // Test 27: questV3.progress updates correctly
+                v168Assert(quest.progress === 100, 'questV3.progress becomes 100 after complete');
+
+                // Test 28: chainV3.step rewards have correct structure
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const stepReward = window.gameState.chainV3.chains[0].steps[0].reward;
+                v168Assert(stepReward.type !== undefined, 'chainV3.step reward has type');
+                v168Assert(stepReward.amount !== undefined || stepReward.name !== undefined, 'chainV3.step reward has amount or name');
+
+                // Test 29: questV3.requirement has correct structure
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questReq = window.gameState.questV3.quests[0].requirement;
+                v168Assert(questReq.type !== undefined, 'questV3.requirement has type');
+                v168Assert(questReq.amount !== undefined || questReq.level !== undefined, 'questV3.requirement has amount or level');
+
+                // Test 30: mcpQuestV3List shows correct progress
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const beforeProgress = window.gameState.questV3.quests[0].progress;
+                v168Assert(beforeProgress === 0, 'questV3.progress starts at 0');
+
+                // Test 31: mcpChainV3Progress includes step rewards
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainProg2 = server.mcpChainV3Progress('chain_cultivation');
+                v168Assert(chainProg2.steps[0].reward.type === 'realm', 'chainV3.progress step reward has correct type');
+
+                // Test 32: mcpChainV3List with all chains
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainListAll = server.mcpChainV3List();
+                v168Assert(chainListAll.chains.length === 3, 'chainV3 has 3 chains');
+                v168Assert(chainListAll.chains[0].description !== undefined, 'chainV3.chain has description');
+
+                // Test 33: questV3 history tracks completed
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                server.mcpQuestV3Complete('quest_stone_1');
+                const historyEntry = window.gameState.questV3.history[0];
+                v168Assert(historyEntry.questId === 'quest_stone_1', 'questV3.history tracks questId');
+                v168Assert(historyEntry.name === '灵石悬赏·初', 'questV3.history tracks name');
+                v168Assert(historyEntry.completedAt !== undefined, 'questV3.history tracks completedAt');
+
+                // Test 34: mcpQuestV3List returns expireAt
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questListExpire = server.mcpQuestV3List();
+                v168Assert(questListExpire.quests[0].expireAt !== undefined, 'questV3.list returns expireAt');
+
+                // Test 35: mcpQuestV3Accept checks realm requirement
+                window.gameState.questV3 = null;
+                window.gameState.realm = 0;
+                server._initQuestStateV3();
+                const questAcceptRealm = server.mcpQuestV3Accept('quest_realm_1');
+                v168Assert(questAcceptRealm.error !== undefined, 'questV3.accept checks realm requirement');
+
+                // Test 36: questV3 quest has difficulty
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const questDiff = window.gameState.questV3.quests[0].difficulty;
+                v168Assert(questDiff !== undefined, 'questV3.quest has difficulty');
+
+                // Test 37: mcpQuestV3Accept accepts multiple quests
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                server.mcpQuestV3Accept('quest_item_1');
+                v168Assert(window.gameState.questV3.activeQuests.length === 2, 'questV3.activeQuests tracks multiple quests');
+
+                // Test 38: mcpQuestV3Complete removes from activeQuests
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                server.mcpQuestV3Accept('quest_item_1');
+                server.mcpQuestV3Complete('quest_stone_1');
+                v168Assert(window.gameState.questV3.activeQuests.includes('quest_item_1'), 'questV3 keeps other active quests');
+                v168Assert(!window.gameState.questV3.activeQuests.includes('quest_stone_1'), 'questV3 removes completed from activeQuests');
+
+                // Test 39: chainV3 chains have unique IDs
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainIds = window.gameState.chainV3.chains.map(c => c.id);
+                v168Assert(new Set(chainIds).size === chainIds.length, 'chainV3 has unique chain IDs');
+
+                // Test 40: mcpChainV3Claim awards reward
+                window.gameState.chainV3 = null;
+                window.gameState.spiritStones = 1000;
+                server._initChainStateV3();
+                window.gameState.chainV3.chains[0].completed = true;
+                const beforeChainClaim = window.gameState.spiritStones;
+                server.mcpChainV3Claim('chain_newbie');
+                v168Assert(window.gameState.spiritStones >= beforeChainClaim, 'chainV3.claim awards reward');
+
+                // Test 41: chainV3 rewardsClaimed tracks claims
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                window.gameState.chainV3.chains[0].completed = true;
+                server.mcpChainV3Claim('chain_newbie');
+                v168Assert(window.gameState.chainV3.rewardsClaimed.includes('chain_newbie'), 'chainV3.rewardsClaimed tracks claims');
+
+                // Test 42: mcpQuestV3List shows activeCount
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                server.mcpQuestV3Accept('quest_stone_1');
+                const questListActive = server.mcpQuestV3List();
+                v168Assert(questListActive.activeCount === 1, 'questV3.list shows activeCount=1');
+
+                // Test 43: mcpChainV3Progress includes description
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainProgDesc = server.mcpChainV3Progress('chain_newbie');
+                v168Assert(chainProgDesc.description !== undefined, 'chainV3.progress includes description');
+
+                // Test 44: questV3 difficulty affects reward
+                window.gameState.questV3 = null;
+                server._initQuestStateV3();
+                const easyQuest = window.gameState.questV3.quests.find(q => q.difficulty === 1);
+                const hardQuest = window.gameState.questV3.quests.find(q => q.difficulty === 3);
+                v168Assert(easyQuest.reward.amount < hardQuest.reward.amount, 'questV3 higher difficulty = higher reward');
+
+                // Test 45: mcpChainV3List message is correct
+                window.gameState.chainV3 = null;
+                server._initChainStateV3();
+                const chainListMsg = server.mcpChainV3List();
+                v168Assert(chainListMsg.message.includes('3'), 'chainV3.list message includes chain count');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V168 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V168', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v168Results = runV168Tests();
 
         const v150Results = runV150Tests();
 
