@@ -3553,6 +3553,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V140)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V141: Register 邮件+公告系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V141)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4895,6 +4899,25 @@
                             break;
                         case 'collection.reset':
                             result = this.mcpCollectionReset();
+                            break;
+                        // V141: 邮件+公告系统
+                        case 'mail.list':
+                            result = this.mcpMailList();
+                            break;
+                        case 'mail.send':
+                            result = this.mcpMailSend(args.to, args.title, args.content);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailRead(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = this.mcpMailDelete(args.mailId);
+                            break;
+                        case 'announce.list':
+                            result = this.mcpAnnounceList();
+                            break;
+                        case 'announce.view':
+                            result = this.mcpAnnounceView(args.announceId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -13098,6 +13121,169 @@
                         previousUnlocked,
                         previousRewardsCount: previousRewards.length,
                         message: '收集进度已重置，之前已解锁' + previousUnlocked + '个图鉴，领取了' + previousRewards.length + '个奖励'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: _initMailState - 初始化邮件系统状态
+            _initMailState() {
+                const gs = window.gameState;
+                if (!gs.mail) {
+                    gs.mail = {
+                        inbox: [],
+                        sent: []
+                    };
+                }
+                return gs.mail;
+            }
+
+            // V141: _initAnnounceState - 初始化公告系统状态
+            _initAnnounceState() {
+                const gs = window.gameState;
+                if (!gs.announce) {
+                    gs.announce = {
+                        announcements: [
+                            { id: 'ann_001', title: '欢迎来到修仙世界', content: '各位修士，欢迎踏入修仙之路！完成每日任务可获得丰厚奖励。', priority: 'high', timestamp: Date.now() - 86400000 },
+                            { id: 'ann_002', title: '新版本更新公告', content: 'V141版本已更新，新增邮件系统和公告系统，详情请查看游戏内说明。', priority: 'medium', timestamp: Date.now() - 172800000 },
+                            { id: 'ann_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', priority: 'high', timestamp: Date.now() - 259200000 }
+                        ],
+                        lastView: 0
+                    };
+                }
+                return gs.announce;
+            }
+
+            // V141: mcpMailList - 获取邮件列表
+            mcpMailList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mail = this._initMailState();
+                    return {
+                        success: true,
+                        inbox: mail.inbox.map(m => ({
+                            id: m.id,
+                            from: m.from,
+                            title: m.title,
+                            read: m.read || false,
+                            timestamp: m.timestamp
+                        })),
+                        total: mail.inbox.length,
+                        unreadCount: mail.inbox.filter(m => !m.read).length,
+                        message: '收件箱共' + mail.inbox.length + '封邮件，' + mail.inbox.filter(m => !m.read).length + '封未读'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: mcpMailSend - 发送邮件
+            mcpMailSend(to, title, content) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!to) return { error: '收件人不能为空' };
+                    if (!title) return { error: '邮件标题不能为空' };
+                    if (!content) return { error: '邮件内容不能为空' };
+                    const mail = this._initMailState();
+                    const mailId = 'mail_' + Date.now();
+                    const sentMail = {
+                        id: mailId,
+                        to,
+                        title,
+                        content,
+                        from: gs.name || '你',
+                        timestamp: Date.now(),
+                        read: true
+                    };
+                    mail.sent.push(sentMail);
+                    return {
+                        success: true,
+                        mailId,
+                        to,
+                        title,
+                        message: '邮件已发送给' + to
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: mcpMailRead - 读取邮件
+            mcpMailRead(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '邮件ID不能为空' };
+                    const mail = this._initMailState();
+                    const email = mail.inbox.find(m => m.id === mailId);
+                    if (!email) return { error: '邮件不存在: ' + mailId };
+                    email.read = true;
+                    return {
+                        success: true,
+                        id: email.id,
+                        from: email.from,
+                        title: email.title,
+                        content: email.content,
+                        timestamp: email.timestamp,
+                        read: true,
+                        message: '已读取邮件: ' + email.title
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: mcpMailDelete - 删除邮件
+            mcpMailDelete(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '邮件ID不能为空' };
+                    const mail = this._initMailState();
+                    const idx = mail.inbox.findIndex(m => m.id === mailId);
+                    if (idx === -1) return { error: '邮件不存在: ' + mailId };
+                    const deleted = mail.inbox.splice(idx, 1)[0];
+                    return {
+                        success: true,
+                        mailId,
+                        deletedTitle: deleted.title,
+                        message: '已删除邮件: ' + deleted.title
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: mcpAnnounceList - 获取公告列表
+            mcpAnnounceList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announce = this._initAnnounceState();
+                    return {
+                        success: true,
+                        announcements: announce.announcements.map(a => ({
+                            id: a.id,
+                            title: a.title,
+                            priority: a.priority,
+                            timestamp: a.timestamp
+                        })),
+                        total: announce.announcements.length,
+                        message: '共' + announce.announcements.length + '条公告'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V141: mcpAnnounceView - 查看公告详情
+            mcpAnnounceView(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '公告ID不能为空' };
+                    const announce = this._initAnnounceState();
+                    const ann = announce.announcements.find(a => a.id === announceId);
+                    if (!ann) return { error: '公告不存在: ' + announceId };
+                    return {
+                        success: true,
+                        id: ann.id,
+                        title: ann.title,
+                        content: ann.content,
+                        priority: ann.priority,
+                        timestamp: ann.timestamp,
+                        message: '已查看公告: ' + ann.title
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -25997,6 +26183,40 @@
                 name: 'collection.reset',
                 description: '重置收集进度 (收集-重置所有收集进度)',
                 inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V141: 邮件+公告系统
+        const MCP_TOOLS_V141 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统-列出收件箱邮件)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统-发送邮件给指定玩家)',
+                inputSchema: { type: 'object', properties: { to: { type: 'string', description: '收件人玩家名' }, title: { type: 'string', description: '邮件标题' }, content: { type: 'string', description: '邮件内容' } }, required: ['to', 'title', 'content'] }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件 (邮件系统-读取邮件内容并标记为已读)',
+                inputSchema: { type: 'object', properties: { mailId: { type: 'string', description: '邮件ID' } }, required: ['mailId'] }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统-删除指定邮件)',
+                inputSchema: { type: 'object', properties: { mailId: { type: 'string', description: '邮件ID' } }, required: ['mailId'] }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统-列出所有公告)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统-查看指定公告详情)',
+                inputSchema: { type: 'object', properties: { announceId: { type: 'string', description: '公告ID' } }, required: ['announceId'] }
             }
         };
 
@@ -48977,4 +49197,134 @@
             console.log('V140 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
             return { version: 'V140', passed, total, passRate: passRate.toFixed(3), results };
         }
+
+        // V141: 邮件+公告系统测试
+        function runV141Tests() {
+            const results = [];
+            function v141Assert(condition, testName) {
+                const pass = condition === true;
+                results.push({ pass, testName });
+                if (!pass) console.log('FAIL:', testName);
+            }
+
+            const server = new MCPGameServer();
+
+            // Test 1: _initMailState initializes correctly
+            const mailState = server._initMailState();
+            v141Assert(mailState !== null, '_initMailState returns state');
+            v141Assert(Array.isArray(mailState.inbox), '_initMailState inbox is array');
+            v141Assert(Array.isArray(mailState.sent), '_initMailState sent is array');
+            v141Assert(mailState.inbox.length === 0, '_initMailState starts with empty inbox');
+
+            // Test 2: _initAnnounceState initializes correctly
+            const announceState = server._initAnnounceState();
+            v141Assert(announceState !== null, '_initAnnounceState returns state');
+            v141Assert(Array.isArray(announceState.announcements), '_initAnnounceState announcements is array');
+            v141Assert(announceState.announcements.length === 3, '_initAnnounceState has 3 default announcements');
+
+            // Test 3: mcpMailList returns empty inbox
+            const ml1 = server.mcpMailList();
+            v141Assert(ml1.success === true, 'mail.list returns success');
+            v141Assert(ml1.total === 0, 'mail.list empty inbox total is 0');
+            v141Assert(ml1.unreadCount === 0, 'mail.list empty inbox unreadCount is 0');
+
+            // Test 4: mcpMailSend creates sent mail
+            const ms1 = server.mcpMailSend('张三', '测试邮件', '这是一封测试邮件内容');
+            v141Assert(ms1.success === true, 'mail.send returns success');
+            v141Assert(ms1.to === '张三', 'mail.send to field correct');
+            v141Assert(ms1.title === '测试邮件', 'mail.send title field correct');
+            v141Assert(ms1.mailId && ms1.mailId.startsWith('mail_'), 'mail.send generates mailId');
+
+            // Test 5: mcpMailSend with missing 'to' returns error
+            const msErr1 = server.mcpMailSend('', '标题', '内容');
+            v141Assert(msErr1.error && msErr1.error.includes('收件人'), 'mail.send missing to returns error');
+
+            // Test 6: mcpMailSend with missing 'title' returns error
+            const msErr2 = server.mcpMailSend('张三', '', '内容');
+            v141Assert(msErr2.error && msErr2.error.includes('标题'), 'mail.send missing title returns error');
+
+            // Test 7: mcpMailSend with missing 'content' returns error
+            const msErr3 = server.mcpMailSend('张三', '标题', '');
+            v141Assert(msErr3.error && msErr3.error.includes('内容'), 'mail.send missing content returns error');
+
+            // Test 8: Simulate receiving a mail (inject into inbox)
+            const mailState2 = server._initMailState();
+            mailState2.inbox.push({ id: 'mail_test_001', from: '李四', title: '欢迎邮件', content: '欢迎加入修仙世界！', read: false, timestamp: Date.now() });
+            mailState2.inbox.push({ id: 'mail_test_002', from: '王五', title: '交易请求', content: '我有灵石想和你交换物品', read: false, timestamp: Date.now() });
+
+            // Test 9: mcpMailList returns inbox with 2 mails
+            const ml2 = server.mcpMailList();
+            v141Assert(ml2.success === true, 'mail.list after inject returns success');
+            v141Assert(ml2.total === 2, 'mail.list total is 2');
+            v141Assert(ml2.unreadCount === 2, 'mail.list unreadCount is 2');
+
+            // Test 10: mcpMailRead reads mail and marks as read
+            const mr1 = server.mcpMailRead('mail_test_001');
+            v141Assert(mr1.success === true, 'mail.read returns success');
+            v141Assert(mr1.from === '李四', 'mail.read from field correct');
+            v141Assert(mr1.title === '欢迎邮件', 'mail.read title field correct');
+            v141Assert(mr1.content === '欢迎加入修仙世界！', 'mail.read content field correct');
+            v141Assert(mr1.read === true, 'mail.read marks mail as read');
+
+            // Test 11: mcpMailRead with invalid mailId returns error
+            const mrErr = server.mcpMailRead('nonexistent_mail');
+            v141Assert(mrErr.error && mrErr.error.includes('不存在'), 'mail.read invalid mailId returns error');
+
+            // Test 12: mcpMailDelete removes mail from inbox
+            const md1 = server.mcpMailDelete('mail_test_001');
+            v141Assert(md1.success === true, 'mail.delete returns success');
+            v141Assert(md1.mailId === 'mail_test_001', 'mail.delete returns correct mailId');
+            v141Assert(md1.deletedTitle === '欢迎邮件', 'mail.delete returns deleted title');
+
+            // Test 13: mcpMailDelete with invalid mailId returns error
+            const mdErr = server.mcpMailDelete('nonexistent_mail');
+            v141Assert(mdErr.error && mdErr.error.includes('不存在'), 'mail.delete invalid mailId returns error');
+
+            // Test 14: Verify mail was actually deleted
+            const ml3 = server.mcpMailList();
+            v141Assert(ml3.total === 1, 'mail.list after delete has 1 mail');
+            v141Assert(ml3.inbox[0].id === 'mail_test_002', 'mail.list remaining mail is mail_test_002');
+
+            // Test 15: mcpAnnounceList returns announcements
+            const al1 = server.mcpAnnounceList();
+            v141Assert(al1.success === true, 'announce.list returns success');
+            v141Assert(al1.total === 3, 'announce.list total is 3');
+            v141Assert(Array.isArray(al1.announcements), 'announce.list returns announcements array');
+            v141Assert(al1.announcements[0].id === 'ann_001', 'announce.list first announcement id correct');
+            v141Assert(al1.announcements[0].title && al1.announcements[0].priority, 'announce.list announcement has title and priority');
+
+            // Test 16: mcpAnnounceView returns announcement details
+            const av1 = server.mcpAnnounceView('ann_001');
+            v141Assert(av1.success === true, 'announce.view returns success');
+            v141Assert(av1.id === 'ann_001', 'announce.view id correct');
+            v141Assert(av1.title === '欢迎来到修仙世界', 'announce.view title correct');
+            v141Assert(av1.content && av1.content.length > 0, 'announce.view content exists');
+            v141Assert(av1.priority === 'high', 'announce.view priority correct');
+
+            // Test 17: mcpAnnounceView with invalid announceId returns error
+            const avErr = server.mcpAnnounceView('nonexistent_ann');
+            v141Assert(avErr.error && avErr.error.includes('不存在'), 'announce.view invalid id returns error');
+
+            // Test 18: mail.list shows updated unread count after reading
+            const ml4 = server.mcpMailList();
+            v141Assert(ml4.unreadCount === 1, 'mail.list unreadCount is 1 after reading mail_test_001');
+
+            // Test 19: mail.send adds to sent array
+            const mailState3 = server._initMailState();
+            v141Assert(mailState3.sent.length === 1, 'mail.sent has 1 sent mail');
+            v141Assert(mailState3.sent[0].to === '张三', 'sent mail to field correct');
+
+            // Test 20: announce.view ann_002 has correct content
+            const av2 = server.mcpAnnounceView('ann_002');
+            v141Assert(av2.title === '新版本更新公告', 'announce.view ann_002 title correct');
+            v141Assert(av2.priority === 'medium', 'announce.view ann_002 priority correct');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V141 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V141', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v141Results = runV141Tests();
         const v140Results = runV140Tests();
