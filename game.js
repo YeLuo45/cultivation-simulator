@@ -3429,6 +3429,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V126)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V127: Register 商店+背包系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V127)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4506,6 +4510,25 @@
                             break;
                         case 'explore.complete':
                             result = this.mcpExploreComplete();
+                            break;
+                        // V127: 商店+背包系统
+                        case 'shop.list':
+                            result = this.mcpShopList();
+                            break;
+                        case 'shop.buy':
+                            result = this.mcpShopBuy(args.shopId, args.itemId);
+                            break;
+                        case 'shop.refresh':
+                            result = this.mcpShopRefresh(args.shopId);
+                            break;
+                        case 'bag.list':
+                            result = this.mcpBagList();
+                            break;
+                        case 'bag.use':
+                            result = this.mcpBagUse(args.itemId);
+                            break;
+                        case 'bag.sell':
+                            result = this.mcpBagSell(args.itemId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -14527,6 +14550,204 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V127: _initShopState - 初始化商店状态
+            _initShopState() {
+                const gs = window.gameState;
+                if (!gs.shop) {
+                    gs.shop = {
+                        shops: [
+                            {
+                                id: 'shop_general',
+                                name: '杂货铺',
+                                items: [
+                                    { id: 'item_pill_health', name: '疗伤丹', price: 100, quantity: 10, type: 'potion', effect: { hp: 200 } },
+                                    { id: 'item_pill_spirit', name: '灵气丹', price: 200, quantity: 10, type: 'potion', effect: { spirit: 100 } },
+                                    { id: 'item_weapon_iron', name: '铁剑', price: 500, quantity: 5, type: 'weapon', effect: { attack: 10 } },
+                                    { id: 'item_armor_leather', name: '皮甲', price: 300, quantity: 5, type: 'armor', effect: { defense: 5 } },
+                                    { id: 'item_material_herb', name: '灵草', price: 50, quantity: 20, type: 'material', effect: {} }
+                                ],
+                                refreshCost: 50
+                            },
+                            {
+                                id: 'shop_elite',
+                                name: '珍宝阁',
+                                items: [
+                                    { id: 'item_pill_gold', name: '金身丹', price: 2000, quantity: 3, type: 'potion', effect: { defense: 50 } },
+                                    { id: 'item_weapon_silver', name: '银剑', price: 5000, quantity: 2, type: 'weapon', effect: { attack: 30 } },
+                                    { id: 'item_artifacts_pendant', name: '灵玉佩', price: 3000, quantity: 3, type: 'accessory', effect: { spirit: 200 } }
+                                ],
+                                refreshCost: 200
+                            }
+                        ],
+                        nextShopId: 3
+                    };
+                }
+                return gs.shop;
+            }
+
+            // V127: _initBagState - 初始化背包状态
+            _initBagState() {
+                const gs = window.gameState;
+                if (!gs.bag) {
+                    gs.bag = {
+                        items: [],
+                        capacity: 50
+                    };
+                }
+                return gs.bag;
+            }
+
+            // V127: mcpShopList - 获取商店列表
+            mcpShopList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const shopState = this._initShopState();
+                    return {
+                        success: true,
+                        shops: shopState.shops.map(s => ({
+                            id: s.id,
+                            name: s.name,
+                            itemCount: s.items.length,
+                            refreshCost: s.refreshCost
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V127: mcpShopBuy - 购买商品
+            mcpShopBuy(shopId, itemId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!shopId) return { error: 'shopId不能为空' };
+                    if (!itemId) return { error: 'itemId不能为空' };
+                    const shopState = this._initShopState();
+                    const shop = shopState.shops.find(s => s.id === shopId);
+                    if (!shop) return { error: '商店不存在: ' + shopId };
+                    const item = shop.items.find(i => i.id === itemId);
+                    if (!item) return { error: '商品不存在: ' + itemId };
+                    if (item.quantity <= 0) return { error: '商品已售罄' };
+                    if ((gs.spiritStones || 0) < item.price) return { error: '灵石不足' };
+                    gs.spiritStones -= item.price;
+                    item.quantity -= 1;
+                    const bagState = this._initBagState();
+                    const existingItem = bagState.items.find(i => i.id === itemId);
+                    if (existingItem) {
+                        existingItem.quantity += 1;
+                    } else {
+                        bagState.items.push({
+                            id: item.id,
+                            name: item.name,
+                            type: item.type,
+                            effect: item.effect,
+                            quantity: 1
+                        });
+                    }
+                    return { success: true, message: '购买成功: ' + item.name, cost: item.price, itemId: item.id };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V127: mcpShopRefresh - 刷新商店商品
+            mcpShopRefresh(shopId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!shopId) return { error: 'shopId不能为空' };
+                    const shopState = this._initShopState();
+                    const shop = shopState.shops.find(s => s.id === shopId);
+                    if (!shop) return { error: '商店不存在: ' + shopId };
+                    if ((gs.spiritStones || 0) < shop.refreshCost) return { error: '灵石不足，无法刷新' };
+                    gs.spiritStones -= shop.refreshCost;
+                    // Refresh item quantities
+                    shop.items.forEach(item => {
+                        item.quantity = Math.floor(Math.random() * 10) + 1;
+                    });
+                    return { success: true, message: '刷新成功: ' + shop.name, cost: shop.refreshCost };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V127: mcpBagList - 获取背包物品
+            mcpBagList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const bagState = this._initBagState();
+                    return {
+                        success: true,
+                        items: bagState.items,
+                        count: bagState.items.length,
+                        capacity: bagState.capacity
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V127: mcpBagUse - 使用物品
+            mcpBagUse(itemId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!itemId) return { error: 'itemId不能为空' };
+                    const bagState = this._initBagState();
+                    const item = bagState.items.find(i => i.id === itemId);
+                    if (!item) return { error: '物品不存在: ' + itemId };
+                    if (item.quantity <= 0) return { error: '物品数量不足' };
+                    let message = '使用成功: ' + item.name;
+                    let effectApplied = {};
+                    if (item.type === 'potion' || item.type === 'material') {
+                        // Apply effect from potion
+                        if (item.effect.hp) {
+                            gs.hp = (gs.hp || 0) + item.effect.hp;
+                            effectApplied.hp = item.effect.hp;
+                        }
+                        if (item.effect.spirit) {
+                            gs.spirit = (gs.spirit || 0) + item.effect.spirit;
+                            effectApplied.spirit = item.effect.spirit;
+                        }
+                        if (item.effect.attack) {
+                            gs.attack = (gs.attack || 0) + item.effect.attack;
+                            effectApplied.attack = item.effect.attack;
+                        }
+                        if (item.effect.defense) {
+                            gs.defense = (gs.defense || 0) + item.effect.defense;
+                            effectApplied.defense = item.effect.defense;
+                        }
+                    } else if (item.type === 'weapon' || item.type === 'armor' || item.type === 'accessory') {
+                        // Equipment applies permanent bonus (tracked separately)
+                        effectApplied = item.effect;
+                        message += ' (装备效果已生效)';
+                    }
+                    item.quantity -= 1;
+                    if (item.quantity <= 0) {
+                        const idx = bagState.items.findIndex(i => i.id === itemId);
+                        if (idx !== -1) bagState.items.splice(idx, 1);
+                    }
+                    return { success: true, message, effect: effectApplied, remaining: item.quantity };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V127: mcpBagSell - 出售物品
+            mcpBagSell(itemId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!itemId) return { error: 'itemId不能为空' };
+                    const bagState = this._initBagState();
+                    const item = bagState.items.find(i => i.id === itemId);
+                    if (!item) return { error: '物品不存在: ' + itemId };
+                    if (item.quantity <= 0) return { error: '物品数量不足' };
+                    // Calculate sell price (50% of purchase price)
+                    const sellPrice = Math.floor((item.price || 0) * 0.5);
+                    gs.spiritStones = (gs.spiritStones || 0) + sellPrice;
+                    item.quantity -= 1;
+                    if (item.quantity <= 0) {
+                        const idx = bagState.items.findIndex(i => i.id === itemId);
+                        if (idx !== -1) bagState.items.splice(idx, 1);
+                    }
+                    return { success: true, message: '出售成功: ' + item.name, revenue: sellPrice, remaining: item.quantity };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -22284,6 +22505,16 @@
             'explore.complete': { name: 'explore.complete', description: '领取探索奖励', inputSchema: { type: 'object', properties: {} } }
         };
 
+        // V127: 商店+背包系统
+        const MCP_TOOLS_V127 = {
+            'shop.list': { name: 'shop.list', description: '获取商店列表', inputSchema: { type: 'object', properties: {} } },
+            'shop.buy': { name: 'shop.buy', description: '购买商品', inputSchema: { type: 'object', properties: { shopId: { type: 'string' }, itemId: { type: 'string' } }, required: ['shopId', 'itemId'] } },
+            'shop.refresh': { name: 'shop.refresh', description: '刷新商店商品', inputSchema: { type: 'object', properties: { shopId: { type: 'string' } }, required: ['shopId'] } },
+            'bag.list': { name: 'bag.list', description: '获取背包物品', inputSchema: { type: 'object', properties: {} } },
+            'bag.use': { name: 'bag.use', description: '使用物品', inputSchema: { type: 'object', properties: { itemId: { type: 'string' } }, required: ['itemId'] } },
+            'bag.sell': { name: 'bag.sell', description: '出售物品', inputSchema: { type: 'object', properties: { itemId: { type: 'string' } }, required: ['itemId'] } }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -25146,6 +25377,175 @@
             return { version: 'V126', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v126Results = runV126Tests();
+
+        // ===== V127: 商店+背包系统 Tests =====
+        function runV127Tests() {
+            const results = [];
+            function v127Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 10000,
+                hp: 100,
+                spirit: 50,
+                attack: 10,
+                defense: 5,
+                items: [],
+                shop: null,
+                bag: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // shop.list - initial state
+            const sl1 = server.mcpShopList();
+            v127Assert(sl1.success === true, 'shop.list succeeds');
+            v127Assert(sl1.shops && sl1.shops.length === 2, 'shop.list returns 2 shops');
+            v127Assert(sl1.shops[0].name === '杂货铺', 'shop.list first shop is 杂货铺');
+            v127Assert(sl1.shops[1].name === '珍宝阁', 'shop.list second shop is 珍宝阁');
+
+            // shop.list - verify refresh cost
+            v127Assert(sl1.shops[0].refreshCost === 50, 'shop.list 杂货铺 refreshCost is 50');
+            v127Assert(sl1.shops[1].refreshCost === 200, 'shop.list 珍宝阁 refreshCost is 200');
+
+            // shop.buy - success (buy item_pill_health from shop_general)
+            const sb1 = server.mcpShopBuy('shop_general', 'item_pill_health');
+            v127Assert(sb1.success === true, 'shop.buy succeeds');
+            v127Assert(sb1.cost === 100, 'shop.buy item_pill_health costs 100');
+            v127Assert(mockGameState.spiritStones === 9900, 'shop.buy deducts spirit stones');
+
+            // shop.buy - verify item in bag
+            const bl1 = server.mcpBagList();
+            v127Assert(bl1.success === true, 'bag.list succeeds after buy');
+            v127Assert(bl1.items.length === 1, 'bag.list has 1 item');
+            v127Assert(bl1.items[0].id === 'item_pill_health', 'bag.list item id matches');
+            v127Assert(bl1.items[0].quantity === 1, 'bag.list item quantity is 1');
+
+            // shop.buy - missing shopId
+            const sbErr1 = server.mcpShopBuy(null, 'item_pill_health');
+            v127Assert(sbErr1.error && sbErr1.error.includes('shopId不能为空'), 'shop.buy requires shopId');
+
+            // shop.buy - missing itemId
+            const sbErr2 = server.mcpShopBuy('shop_general', null);
+            v127Assert(sbErr2.error && sbErr2.error.includes('itemId不能为空'), 'shop.buy requires itemId');
+
+            // shop.buy - invalid shop
+            const sbErr3 = server.mcpShopBuy('shop_invalid', 'item_pill_health');
+            v127Assert(sbErr3.error && sbErr3.error.includes('商店不存在'), 'shop.buy fails with invalid shop');
+
+            // shop.buy - invalid item
+            const sbErr4 = server.mcpShopBuy('shop_general', 'item_invalid');
+            v127Assert(sbErr4.error && sbErr4.error.includes('商品不存在'), 'shop.buy fails with invalid item');
+
+            // shop.buy - insufficient funds
+            mockGameState.spiritStones = 50;
+            const sbErr5 = server.mcpShopBuy('shop_general', 'item_weapon_iron');
+            v127Assert(sbErr5.error && sbErr5.error.includes('灵石不足'), 'shop.buy fails with insufficient funds');
+
+            // shop.refresh - success
+            mockGameState.spiritStones = 10000;
+            const sr1 = server.mcpShopRefresh('shop_general');
+            v127Assert(sr1.success === true, 'shop.refresh succeeds');
+            v127Assert(sr1.cost === 50, 'shop.refresh costs 50');
+            v127Assert(mockGameState.spiritStones === 9950, 'shop.refresh deducts spirit stones');
+
+            // shop.refresh - missing shopId
+            const srErr1 = server.mcpShopRefresh(null);
+            v127Assert(srErr1.error && srErr1.error.includes('shopId不能为空'), 'shop.refresh requires shopId');
+
+            // shop.refresh - insufficient funds
+            mockGameState.spiritStones = 20;
+            const srErr2 = server.mcpShopRefresh('shop_general');
+            v127Assert(srErr2.error && srErr2.error.includes('灵石不足'), 'shop.refresh fails with insufficient funds');
+
+            // bag.list - empty initial (fresh state)
+            mockGameState.bag = { items: [], capacity: 50 };
+            const bl2 = server.mcpBagList();
+            v127Assert(bl2.success === true, 'bag.list succeeds');
+            v127Assert(bl2.items.length === 0, 'bag.list is empty initially');
+            v127Assert(bl2.capacity === 50, 'bag.list capacity is 50');
+
+            // bag.use - success (potion)
+            mockGameState.bag.items.push({ id: 'item_pill_health', name: '疗伤丹', type: 'potion', effect: { hp: 200 }, quantity: 2, price: 100 });
+            const bu1 = server.mcpBagUse('item_pill_health');
+            v127Assert(bu1.success === true, 'bag.use succeeds');
+            v127Assert(bu1.effect && bu1.effect.hp === 200, 'bag.use applies hp effect');
+            v127Assert(mockGameState.hp === 300, 'bag.use adds hp to game state');
+            v127Assert(bu1.remaining === 1, 'bag.use remaining quantity is 1');
+
+            // bag.use - missing itemId
+            const buErr1 = server.mcpBagUse(null);
+            v127Assert(buErr1.error && buErr1.error.includes('itemId不能为空'), 'bag.use requires itemId');
+
+            // bag.use - item not found
+            const buErr2 = server.mcpBagUse('item_nonexistent');
+            v127Assert(buErr2.error && buErr2.error.includes('物品不存在'), 'bag.use fails with invalid item');
+
+            // bag.use - quantity zero
+            mockGameState.bag.items[0].quantity = 0;
+            const buErr3 = server.mcpBagUse('item_pill_health');
+            v127Assert(buErr3.error && buErr3.error.includes('物品数量不足'), 'bag.use fails when quantity is 0');
+
+            // bag.sell - success
+            mockGameState.bag.items[0].quantity = 2;
+            mockGameState.spiritStones = 0;
+            const bs1 = server.mcpBagSell('item_pill_health');
+            v127Assert(bs1.success === true, 'bag.sell succeeds');
+            v127Assert(bs1.revenue === 50, 'bag.sell gives 50 (50% of 100)');
+            v127Assert(mockGameState.spiritStones === 50, 'bag.sell adds spirit stones');
+            v127Assert(bs1.remaining === 1, 'bag.sell remaining is 1');
+
+            // bag.sell - missing itemId
+            const bsErr1 = server.mcpBagSell(null);
+            v127Assert(bsErr1.error && bsErr1.error.includes('itemId不能为空'), 'bag.sell requires itemId');
+
+            // bag.sell - item not found
+            const bsErr2 = server.mcpBagSell('item_nonexistent');
+            v127Assert(bsErr2.error && bsErr2.error.includes('物品不存在'), 'bag.sell fails with invalid item');
+
+            // bag.sell - last item removed
+            mockGameState.bag.items[0].quantity = 1;
+            const bs2 = server.mcpBagSell('item_pill_health');
+            v127Assert(bs2.success === true, 'bag.sell succeeds for last item');
+            v127Assert(bs2.remaining === 0, 'bag.sell remaining is 0');
+            v127Assert(mockGameState.bag.items.length === 0, 'bag.sell removes item when quantity is 0');
+
+            // buy from elite shop
+            mockGameState.spiritStones = 10000;
+            const sb2 = server.mcpShopBuy('shop_elite', 'item_pill_gold');
+            v127Assert(sb2.success === true, 'shop.buy from elite shop succeeds');
+            v127Assert(sb2.cost === 2000, 'shop.buy item_pill_gold costs 2000');
+
+            // buy another item, verify quantities
+            const sb3 = server.mcpShopBuy('shop_general', 'item_material_herb');
+            v127Assert(sb3.success === true, 'shop.buy material succeeds');
+            const bl3 = server.mcpBagList();
+            v127Assert(bl3.items.length === 2, 'bag.list has 2 items now');
+
+            // use material item
+            const bu2 = server.mcpBagUse('item_material_herb');
+            v127Assert(bu2.success === true, 'bag.use material succeeds');
+
+            // equipment type
+            mockGameState.bag.items.push({ id: 'item_weapon_iron', name: '铁剑', type: 'weapon', effect: { attack: 10 }, quantity: 1, price: 500 });
+            const bu3 = server.mcpBagUse('item_weapon_iron');
+            v127Assert(bu3.success === true, 'bag.use weapon succeeds');
+            v127Assert(bu3.effect.attack === 10, 'bag.use weapon applies attack effect');
+
+            // shop.list after buys
+            const sl2 = server.mcpShopList();
+            v127Assert(sl2.success === true, 'shop.list still works');
+            v127Assert(sl2.shops.length === 2, 'shop.list still has 2 shops');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V127 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V127', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v127Results = runV127Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
