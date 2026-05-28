@@ -5607,6 +5607,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V172)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V173: Register 邮件+公告系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V173)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7471,6 +7475,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'collection.reset':
                             result = this.mcpCollectionResetV4();
+                            break;
+                        // V173: 邮件+公告系统v4
+                        case 'mail.list':
+                            result = this.mcpMailListV4();
+                            break;
+                        case 'mail.send':
+                            result = this.mcpMailSendV4(args.to, args.title, args.content);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailReadV4(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = this.mcpMailDeleteV4(args.mailId);
+                            break;
+                        case 'announce.list':
+                            result = this.mcpAnnounceListV4();
+                            break;
+                        case 'announce.view':
+                            result = this.mcpAnnounceViewV4(args.announceId);
                             break;
                         // V160: 红包+社交系统v2
                         case 'redpacket.list':
@@ -17406,6 +17429,217 @@ const ACHIEVEMENT_ID_MAP = {
                     return {
                         success: true,
                         message: '收集进度已重置，消耗 重置符x1'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: _initMailStateV4 - 初始化邮件系统状态v4
+            _initMailStateV4() {
+                const gs = window.gameState;
+                if (!gs.mailV4) {
+                    gs.mailV4 = {
+                        inbox: [
+                            { id: 'mail_v4_001', from: '系统', fromId: 'system', title: '欢迎使用邮件系统v4', content: '邮件系统v4已启用，新增星标邮件和收件箱上限功能。', timestamp: Date.now() - 86400000, read: false, starred: false, hasAttachment: false },
+                            { id: 'mail_v4_002', from: '掌门', fromId: 'elder_001', title: '门派任务通知', content: '门派有新任务发布，请及时查看。', timestamp: Date.now() - 172800000, read: false, starred: true, hasAttachment: true }
+                        ],
+                        sent: [
+                            { id: 'mail_sent_v4_001', to: '道友', toId: 'fellow_001', title: '切磋邀请', content: '近日修为有所精进，想与道友切磋一番。', timestamp: Date.now() - 3600000, cost: 15 }
+                        ],
+                        maxInbox: 50,
+                        nextId: 3
+                    };
+                }
+                return gs.mailV4;
+            }
+
+            // V173: _initAnnounceStateV4 - 初始化公告系统状态v4
+            _initAnnounceStateV4() {
+                const gs = window.gameState;
+                if (!gs.announceV4) {
+                    gs.announceV4 = {
+                        announcements: [
+                            { id: 'ann_v4_001', title: '欢迎来到修仙世界v4', content: '各位修士，欢迎踏入修仙之路！邮件系统和公告系统已升级至v4。', author: '系统', timestamp: Date.now() - 86400000, pinned: true, expiresAt: null },
+                            { id: 'ann_v4_002', title: '新版本更新公告', content: 'V173版本已更新，邮件系统v4新增星标和收件箱上限功能。', author: '运营团队', timestamp: Date.now() - 172800000, pinned: false, expiresAt: null },
+                            { id: 'ann_v4_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', author: '活动组', timestamp: Date.now() - 259200000, pinned: false, expiresAt: Date.now() + 604800000 },
+                            { id: 'ann_v4_004', title: '系统维护通知', content: '系统将于明日凌晨进行维护，请提前做好准备。', author: '技术组', timestamp: Date.now() - 432000000, pinned: false, expiresAt: Date.now() + 86400000 }
+                        ],
+                        unreadCount: 4
+                    };
+                }
+                return gs.announceV4;
+            }
+
+            // V173: mcpMailListV4 - 获取邮件列表v4
+            mcpMailListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mailV4 = this._initMailStateV4();
+                    const inbox = mailV4.inbox.map(m => ({
+                        id: m.id,
+                        from: m.from,
+                        fromId: m.fromId,
+                        title: m.title,
+                        timestamp: m.timestamp,
+                        read: m.read,
+                        starred: m.starred,
+                        hasAttachment: m.hasAttachment
+                    }));
+                    return {
+                        success: true,
+                        inbox: inbox,
+                        sent: mailV4.sent.map(m => ({
+                            id: m.id,
+                            to: m.to,
+                            toId: m.toId,
+                            title: m.title,
+                            timestamp: m.timestamp,
+                            cost: m.cost
+                        })),
+                        inboxCount: inbox.length,
+                        sentCount: mailV4.sent.length,
+                        maxInbox: mailV4.maxInbox,
+                        unreadCount: inbox.filter(m => !m.read).length,
+                        starredCount: inbox.filter(m => m.starred).length,
+                        message: '收件箱共' + inbox.length + '/' + mailV4.maxInbox + '封邮件，' + (inbox.length - inbox.filter(m => !m.read).length) + '封已读，' + inbox.filter(m => m.starred).length + '封星标'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: mcpMailSendV4 - 发送邮件v4
+            mcpMailSendV4(to, title, content) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!to || !title || !content) return { error: '请提供收件人ID、标题和内容' };
+                    const cost = 15;
+                    if (gs.spiritStones < cost) return { error: '灵石不足，发送邮件需要' + cost + '灵石' };
+                    gs.spiritStones -= cost;
+                    const mailV4 = this._initMailStateV4();
+                    const newMail = {
+                        id: 'mail_sent_v4_' + mailV4.nextId++,
+                        to: to,
+                        toId: to,
+                        title: title,
+                        content: content,
+                        timestamp: Date.now(),
+                        cost: cost
+                    };
+                    mailV4.sent.push(newMail);
+                    return {
+                        success: true,
+                        mailId: newMail.id,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '邮件已发送给' + to + '，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: mcpMailReadV4 - 读取邮件v4
+            mcpMailReadV4(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV4 = this._initMailStateV4();
+                    const mail = mailV4.inbox.find(m => m.id === mailId);
+                    if (!mail) {
+                        // Check sent folder
+                        const sentMail = mailV4.sent.find(m => m.id === mailId);
+                        if (!sentMail) return { error: '邮件不存在' };
+                        return {
+                            success: true,
+                            id: sentMail.id,
+                            to: sentMail.to,
+                            title: sentMail.title,
+                            content: sentMail.content,
+                            timestamp: sentMail.timestamp,
+                            sent: true
+                        };
+                    }
+                    mail.read = true;
+                    return {
+                        success: true,
+                        id: mail.id,
+                        from: mail.from,
+                        fromId: mail.fromId,
+                        title: mail.title,
+                        content: mail.content,
+                        timestamp: mail.timestamp,
+                        read: mail.read,
+                        starred: mail.starred,
+                        hasAttachment: mail.hasAttachment
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: mcpMailDeleteV4 - 删除邮件v4
+            mcpMailDeleteV4(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV4 = this._initMailStateV4();
+                    const idx = mailV4.inbox.findIndex(m => m.id === mailId);
+                    if (idx === -1) return { error: '邮件不存在' };
+                    mailV4.inbox.splice(idx, 1);
+                    return {
+                        success: true,
+                        message: '邮件已删除'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: mcpAnnounceListV4 - 获取公告列表v4
+            mcpAnnounceListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announceV4 = this._initAnnounceStateV4();
+                    const now = Date.now();
+                    const validAnnouncements = announceV4.announcements.filter(a => !a.expiresAt || a.expiresAt > now);
+                    // Sort: pinned first, then by timestamp desc
+                    validAnnouncements.sort((a, b) => {
+                        if (a.pinned && !b.pinned) return -1;
+                        if (!a.pinned && b.pinned) return 1;
+                        return b.timestamp - a.timestamp;
+                    });
+                    return {
+                        success: true,
+                        announcements: validAnnouncements.map(a => ({
+                            id: a.id,
+                            title: a.title,
+                            author: a.author,
+                            timestamp: a.timestamp,
+                            pinned: a.pinned,
+                            priority: a.priority
+                        })),
+                        total: validAnnouncements.length,
+                        unreadCount: announceV4.unreadCount,
+                        message: '公告列表共' + validAnnouncements.length + '条'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V173: mcpAnnounceViewV4 - 查看公告详情v4
+            mcpAnnounceViewV4(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '请指定公告ID' };
+                    const announceV4 = this._initAnnounceStateV4();
+                    const ann = announceV4.announcements.find(a => a.id === announceId);
+                    if (!ann) return { error: '公告不存在' };
+                    return {
+                        success: true,
+                        id: ann.id,
+                        title: ann.title,
+                        content: ann.content,
+                        author: ann.author,
+                        timestamp: ann.timestamp,
+                        pinned: ann.pinned,
+                        expiresAt: ann.expiresAt
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -36742,6 +36976,66 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'collection.reset',
                 description: '重置收集进度 (收集系统v4-重置收集进度，需消耗道具)',
                 inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V173: 邮件+公告系统v4 (P-20260529-052)
+        const MCP_TOOLS_V173 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统v4-获取收件箱和已发送邮件列表，支持星标和更多邮件状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统v4-发送邮件，消耗15灵石，支持附件标记)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        to: { type: 'string', description: '收件人ID' },
+                        title: { type: 'string', description: '邮件标题' },
+                        content: { type: 'string', description: '邮件内容' }
+                    },
+                    required: ['to', 'title', 'content']
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件内容 (邮件系统v4-读取邮件并标记为已读，支持星标邮件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统v4-删除指定邮件，支持批量删除收件箱邮件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统v4-获取未过期的公告列表，支持置顶公告)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统v4-查看公告详情并标记为已查看，支持置顶功能)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
+                }
             }
         };
 
@@ -66463,6 +66757,279 @@ const v152Results = runV152Tests();
         }
 
         const v172Results = runV172Tests();
+
+        // V173: 邮件+公告系统v4 Tests (P-20260529-052)
+        function runV173Tests() {
+            const results = [];
+            function v173Assert(condition, testName) {
+                const result = { test: testName, pass: condition };
+                if (!condition) console.warn('V173 FAILED:', testName);
+                results.push(result);
+            }
+
+            window.gameState = {
+                spiritStones: 10000,
+                mailV4: null,
+                announceV4: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V173 definition exists and has 6 tools
+            v173Assert(typeof MCP_TOOLS_V173 === 'object', 'MCP_TOOLS_V173 is defined');
+            v173Assert(Object.keys(MCP_TOOLS_V173).length === 6, 'MCP_TOOLS_V173 has 6 tools');
+            v173Assert('mail.list' in MCP_TOOLS_V173, 'mail.list tool exists');
+            v173Assert('mail.send' in MCP_TOOLS_V173, 'mail.send tool exists');
+            v173Assert('mail.read' in MCP_TOOLS_V173, 'mail.read tool exists');
+            v173Assert('mail.delete' in MCP_TOOLS_V173, 'mail.delete tool exists');
+            v173Assert('announce.list' in MCP_TOOLS_V173, 'announce.list tool exists');
+            v173Assert('announce.view' in MCP_TOOLS_V173, 'announce.view tool exists');
+
+            // Test 2: _initMailStateV4 initializes correctly
+            const mailV4State = server._initMailStateV4();
+            v173Assert(mailV4State !== null, '_initMailStateV4 returns state');
+            v173Assert(Array.isArray(mailV4State.inbox), 'mailV4 inbox is array');
+            v173Assert(mailV4State.inbox.length === 2, 'mailV4 has 2 initial inbox mails');
+            v173Assert(Array.isArray(mailV4State.sent), 'mailV4 sent is array');
+            v173Assert(mailV4State.sent.length === 1, 'mailV4 has 1 initial sent mail');
+            v173Assert(mailV4State.maxInbox === 50, 'mailV4 maxInbox is 50');
+            v173Assert(mailV4State.nextId === 3, 'mailV4 nextId is 3');
+
+            // Test 3: _initAnnounceStateV4 initializes correctly
+            const announceV4State = server._initAnnounceStateV4();
+            v173Assert(announceV4State !== null, '_initAnnounceStateV4 returns state');
+            v173Assert(Array.isArray(announceV4State.announcements), 'announceV4 announcements is array');
+            v173Assert(announceV4State.announcements.length === 4, 'announceV4 has 4 initial announcements');
+            v173Assert(announceV4State.unreadCount === 4, 'announceV4 unreadCount is 4');
+
+            // Test 4: mcpMailListV4 returns mail list
+            const mlV4 = server.mcpMailListV4();
+            v173Assert(mlV4.success === true, 'mail.list v4 returns success');
+            v173Assert(mlV4.inbox.length === 2, 'mail.list v4 shows 2 inbox mails');
+            v173Assert(mlV4.sentCount === 1, 'mail.list v4 shows 1 sent mail');
+            v173Assert(mlV4.maxInbox === 50, 'mail.list v4 shows maxInbox=50');
+            v173Assert(mlV4.unreadCount === 2, 'mail.list v4 shows 2 unread mails');
+            v173Assert(mlV4.starredCount === 1, 'mail.list v4 shows 1 starred mail');
+
+            // Test 5: mcpMailSendV4 sends mail
+            window.gameState.spiritStones = 50000;
+            const msV4 = server.mcpMailSendV4('player_002', '测试邮件v4', '这是测试内容v4');
+            v173Assert(msV4.success === true, 'mail.send v4 returns success');
+            v173Assert(msV4.mailId && msV4.mailId.startsWith('mail_sent_v4_'), 'mail.send v4 returns mailSent_v4_ id');
+            v173Assert(msV4.cost === 15, 'mail.send v4 costs 15 spirit stones');
+            v173Assert(msV4.remainingSpiritStones === 49985, 'mail.send v4 deducts cost');
+
+            // Test 6: mcpMailSendV4 fails without parameters
+            const msV4Err1 = server.mcpMailSendV4();
+            v173Assert(msV4Err1.error && msV4Err1.error.includes('收件人ID'), 'mail.send v4 missing params error');
+
+            // Test 7: mcpMailSendV4 fails when insufficient spirit stones
+            window.gameState.spiritStones = 5;
+            const msV4Err2 = server.mcpMailSendV4('player_002', '测试', '内容');
+            v173Assert(msV4Err2.error && msV4Err2.error.includes('灵石不足'), 'mail.send v4 insufficient stones error');
+
+            // Test 8: mcpMailReadV4 reads mail
+            const mrV4 = server.mcpMailReadV4('mail_v4_001');
+            v173Assert(mrV4.success === true, 'mail.read v4 returns success');
+            v173Assert(mrV4.title === '欢迎使用邮件系统v4', 'mail.read v4 title correct');
+            v173Assert(mrV4.content === '邮件系统v4已启用，新增星标邮件和收件箱上限功能。', 'mail.read v4 content correct');
+            v173Assert(mrV4.from === '系统', 'mail.read v4 from correct');
+            v173Assert(mrV4.starred === false, 'mail.read v4 starred is false');
+
+            // Test 9: mcpMailReadV4 marks mail as read
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            const mrV4_2 = server.mcpMailReadV4('mail_v4_002');
+            v173Assert(mrV4_2.read !== false, 'mail.read v4 marks as read');
+
+            // Test 10: mcpMailReadV4 returns starred status
+            v173Assert(mrV4_2.starred === true, 'mail.read v4 returns correct starred status');
+
+            // Test 11: mcpMailReadV4 fails for invalid mailId
+            const mrV4Err1 = server.mcpMailReadV4('invalid_mail');
+            v173Assert(mrV4Err1.error && mrV4Err1.error.includes('不存在'), 'mail.read v4 invalid mail error');
+
+            // Test 12: mcpMailReadV4 fails without mailId
+            const mrV4Err2 = server.mcpMailReadV4();
+            v173Assert(mrV4Err2.error && mrV4Err2.error.includes('邮件ID'), 'mail.read v4 missing mailId error');
+
+            // Test 13: mcpMailDeleteV4 deletes mail
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            const mdV4 = server.mcpMailDeleteV4('mail_v4_001');
+            v173Assert(mdV4.success === true, 'mail.delete v4 returns success');
+            v173Assert(mdV4.message.includes('删除成功'), 'mail.delete v4 message correct');
+
+            // Test 14: mcpMailDeleteV4 reduces inbox count
+            const mlV4_2 = server.mcpMailListV4();
+            v173Assert(mlV4_2.inbox.length === 1, 'mail.delete v4 reduces inbox count');
+
+            // Test 15: mcpMailDeleteV4 fails for invalid mailId
+            const mdV4Err1 = server.mcpMailDeleteV4('invalid_mail');
+            v173Assert(mdV4Err1.error && mdV4Err1.error.includes('不存在'), 'mail.delete v4 invalid mail error');
+
+            // Test 16: mcpMailDeleteV4 fails without mailId
+            const mdV4Err2 = server.mcpMailDeleteV4();
+            v173Assert(mdV4Err2.error && mdV4Err2.error.includes('邮件ID'), 'mail.delete v4 missing mailId error');
+
+            // Test 17: mcpAnnounceListV4 returns announcement list
+            const alV4 = server.mcpAnnounceListV4();
+            v173Assert(alV4.success === true, 'announce.list v4 returns success');
+            v173Assert(alV4.announcements.length === 4, 'announce.list v4 shows 4 announcements');
+            v173Assert(alV4.total === 4, 'announce.list v4 total is 4');
+
+            // Test 18: mcpAnnounceListV4 sorts pinned first
+            v173Assert(alV4.announcements[0].pinned === true, 'announce.list v4 first announcement is pinned');
+            v173Assert(alV4.announcements[0].title === '欢迎来到修仙世界v4', 'announce.list v4 pinned announcement is correct');
+
+            // Test 19: mcpAnnounceViewV4 returns announcement details
+            const avV4 = server.mcpAnnounceViewV4('ann_v4_001');
+            v173Assert(avV4.success === true, 'announce.view v4 returns success');
+            v173Assert(avV4.id === 'ann_v4_001', 'announce.view v4 id correct');
+            v173Assert(avV4.title === '欢迎来到修仙世界v4', 'announce.view v4 title correct');
+            v173Assert(avV4.content.includes('邮件系统已升级'), 'announce.view v4 content correct');
+            v173Assert(avV4.author === '系统', 'announce.view v4 author correct');
+            v173Assert(avV4.pinned === true, 'announce.view v4 pinned is true');
+
+            // Test 20: mcpAnnounceViewV4 fails for non-existent announcement
+            const avV4Err = server.mcpAnnounceViewV4('ann_non_exist');
+            v173Assert(avV4Err.error !== undefined, 'announce.view v4 fails for non-existent id');
+
+            // Test 21: mcpAnnounceViewV4 fails without announceId
+            const avV4Err2 = server.mcpAnnounceViewV4();
+            v173Assert(avV4Err2.error && avV4Err2.error.includes('公告ID'), 'announce.view v4 missing id error');
+
+            // Test 22: _initMailStateV4 is idempotent
+            const mailV4First = server._initMailStateV4();
+            const mailV4Second = server._initMailStateV4();
+            v173Assert(mailV4First === mailV4Second, '_initMailStateV4 is idempotent');
+
+            // Test 23: _initAnnounceStateV4 is idempotent
+            const announceV4First = server._initAnnounceStateV4();
+            const announceV4Second = server._initAnnounceStateV4();
+            v173Assert(announceV4First === announceV4Second, '_initAnnounceStateV4 is idempotent');
+
+            // Test 24: mail.list tool registered in toolRegistry
+            const hasMailList = server.toolRegistry.has('mail.list');
+            v173Assert(hasMailList === true, 'mail.list registered in toolRegistry');
+
+            // Test 25: mail.send tool registered in toolRegistry
+            const hasMailSend = server.toolRegistry.has('mail.send');
+            v173Assert(hasMailSend === true, 'mail.send registered in toolRegistry');
+
+            // Test 26: mail.read tool registered in toolRegistry
+            const hasMailRead = server.toolRegistry.has('mail.read');
+            v173Assert(hasMailRead === true, 'mail.read registered in toolRegistry');
+
+            // Test 27: mail.delete tool registered in toolRegistry
+            const hasMailDelete = server.toolRegistry.has('mail.delete');
+            v173Assert(hasMailDelete === true, 'mail.delete registered in toolRegistry');
+
+            // Test 28: announce.list tool registered in toolRegistry
+            const hasAnnounceList = server.toolRegistry.has('announce.list');
+            v173Assert(hasAnnounceList === true, 'announce.list registered in toolRegistry');
+
+            // Test 29: announce.view tool registered in toolRegistry
+            const hasAnnounceView = server.toolRegistry.has('announce.view');
+            v173Assert(hasAnnounceView === true, 'announce.view registered in toolRegistry');
+
+            // Test 30: callTool dispatch for mail.list V173
+            const dispatchedMail = server.callTool('mail.list', {});
+            const parsedMailResult = JSON.parse(dispatchedMail.content[0].text);
+            v173Assert(parsedMailResult.success === true, 'callTool dispatches mail.list successfully');
+
+            // Test 31: callTool dispatch for mail.send V173
+            window.gameState.spiritStones = 50000;
+            const dispatchedSend = server.callTool('mail.send', { to: 'player_003', title: 'Test', content: 'Content' });
+            const parsedSendResult = JSON.parse(dispatchedSend.content[0].text);
+            v173Assert(parsedSendResult.success === true, 'callTool dispatches mail.send successfully');
+
+            // Test 32: callTool dispatch for announce.list V173
+            const dispatchedAnnounce = server.callTool('announce.list', {});
+            const parsedAnnounceResult = JSON.parse(dispatchedAnnounce.content[0].text);
+            v173Assert(parsedAnnounceResult.success === true, 'callTool dispatches announce.list successfully');
+
+            // Test 33: mcpMailReadV4 can read sent mail
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            window.gameState.spiritStones = 50000;
+            const sentMailResult = server.mcpMailSendV4('player_004', 'Sent Test', 'Sent content');
+            const readSentResult = server.mcpMailReadV4(sentMailResult.mailId);
+            v173Assert(readSentResult.sent === true, 'mcpMailReadV4 can read sent mail');
+            v173Assert(readSentResult.to === 'player_004', 'mcpMailReadV4 shows correct recipient');
+
+            // Test 34: mcpMailListV4 returns correct sent folder
+            const listWithSent = server.mcpMailListV4();
+            v173Assert(listWithSent.sent.length === 2, 'mcpMailListV4 shows 2 sent mails after send');
+
+            // Test 35: mcpMailListV4 message format correct
+            v173Assert(listWithSent.message.includes('/50'), 'mcpMailListV4 message includes inbox limit');
+
+            // Test 36: mcpAnnounceListV4 filters expired announcements
+            window.gameState.announceV4 = null;
+            server._initAnnounceStateV4();
+            const alV4Filtered = server.mcpAnnounceListV4();
+            v173Assert(alV4Filtered.announcements.length >= 3, 'announce.list v4 filters expired announcements');
+
+            // Test 37: mail.list V173 shows inboxCount and sentCount
+            v173Assert(listWithSent.inboxCount === 2, 'mail.list v4 inboxCount correct');
+            v173Assert(listWithSent.sentCount === 2, 'mail.list v4 sentCount correct');
+
+            // Test 38: mail.send v4 increments sent count
+            window.gameState.spiritStones = 50000;
+            const beforeCount = server.mcpMailListV4().sentCount;
+            server.mcpMailSendV4('player_005', 'Another Test', 'More content');
+            const afterCount = server.mcpMailListV4().sentCount;
+            v173Assert(afterCount === beforeCount + 1, 'mail.send v4 increments sent count');
+
+            // Test 39: mcpMailDeleteV4 only deletes from inbox (not sent)
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            const delResult = server.mcpMailDeleteV4('mail_v4_001');
+            v173Assert(delResult.success === true, 'mail.delete v4 returns success for inbox mail');
+
+            // Test 40: mcpAnnounceViewV4 returns expiresAt
+            const avV4WithExpiry = server.mcpAnnounceViewV4('ann_v4_003');
+            v173Assert(avV4WithExpiry.expiresAt !== null, 'announce.view v4 returns expiresAt');
+
+            // Test 41: mail.list v4 supports starred property in response
+            const listWithStarred = server.mcpMailListV4();
+            v173Assert(listWithStarred.inbox[0].starred !== undefined, 'mail.list v4 inbox items have starred property');
+
+            // Test 42: announce.list v4 announcements have pinned property
+            v173Assert(alV4Filtered.announcements[0].pinned !== undefined, 'announce.list v4 announcements have pinned property');
+
+            // Test 43: mcpMailSendV4 adds to sent array
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            window.gameState.spiritStones = 50000;
+            server.mcpMailSendV4('player_006', 'Sent v4 test', 'Content');
+            const sentMailCheck = server.mcpMailListV4();
+            v173Assert(sentMailCheck.sent.length === 2, 'mcpMailSendV4 adds to sent array');
+
+            // Test 44: mcpAnnounceListV4 returns unreadCount
+            const alV4WithUnread = server.mcpAnnounceListV4();
+            v173Assert(typeof alV4WithUnread.unreadCount === 'number', 'announce.list v4 returns unreadCount');
+
+            // Test 45: Full flow - send mail, read it, check sent folder
+            window.gameState.mailV4 = null;
+            server._initMailStateV4();
+            window.gameState.spiritStones = 100000;
+            const sentResult = server.mcpMailSendV4('player_recipient', 'Flow Test', 'Testing full flow');
+            const readResult = server.mcpMailReadV4(sentResult.mailId);
+            v173Assert(readResult.success === true, 'Full flow: send and read mail');
+            v173Assert(readResult.sent === true, 'Full flow: read mail shows sent=true');
+            v173Assert(readResult.to === 'player_recipient', 'Full flow: read mail shows correct recipient');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V173 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V173', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v173Results = runV173Tests();
 
 
         // ===== closeAchievements =====
