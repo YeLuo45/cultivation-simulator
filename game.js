@@ -5511,6 +5511,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V148)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V149: Register 悬赏+任务链系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V149)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6834,6 +6838,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'event.reward':
                             result = this.mcpEventReward(args.eventId);
+                            break;
+                        // V149: 悬赏+任务链系统
+                        case 'quest.list':
+                            result = this.mcpQuestList();
+                            break;
+                        case 'quest.accept':
+                            result = this.mcpQuestAccept(args.questId);
+                            break;
+                        case 'quest.complete':
+                            result = this.mcpQuestComplete(args.questId);
+                            break;
+                        case 'chain.list':
+                            result = this.mcpChainList();
+                            break;
+                        case 'chain.progress':
+                            result = this.mcpChainProgress(args.chainId);
+                            break;
+                        case 'chain.claim':
+                            result = this.mcpChainClaim(args.chainId);
                             break;
                         // GM: GM工具系统
                         case 'gm.toggle':
@@ -16210,6 +16233,221 @@ const ACHIEVEMENT_ID_MAP = {
                     };
                 }
                 return gs.event;
+            }
+
+            // V149: _initQuestState - 初始化悬赏系统状态
+            _initQuestState() {
+                const gs = window.gameState;
+                if (!gs.quest) {
+                    gs.quest = {
+                        quests: [
+                            { id: 'q001', name: '采集灵草', description: '前往幽冥森林采集10株灵草', difficulty: 'easy', reward: { spiritStones: 200, exp: 500 }, accepted: false, completed: false },
+                            { id: 'q002', name: '击败妖兽', description: '在森林中击败3只妖兽', difficulty: 'medium', reward: { spiritStones: 500, exp: 1000 }, accepted: false, completed: false },
+                            { id: 'q003', name: '探索遗迹', description: '探索飞升遗迹并获得一件文物', difficulty: 'hard', reward: { spiritStones: 1000, exp: 3000 }, accepted: false, completed: false },
+                            { id: 'q004', name: '炼制丹药', description: '成功炼制一颗筑基丹', difficulty: 'medium', reward: { spiritStones: 300, items: ['筑基丹'] }, accepted: false, completed: false },
+                            { id: 'q005', name: '护送商队', description: '护送商队安全通过危险区域', difficulty: 'hard', reward: { spiritStones: 800, exp: 2000 }, accepted: false, completed: false }
+                        ],
+                        activeQuests: []
+                    };
+                }
+                return gs.quest;
+            }
+
+            // V149: _initChainState - 初始化任务链系统状态
+            _initChainState() {
+                const gs = window.gameState;
+                if (!gs.chain) {
+                    gs.chain = {
+                        chains: [
+                            {
+                                id: 'c001',
+                                name: '新手试炼',
+                                description: '完成一系列新手任务，熟悉修仙世界',
+                                progress: 0,
+                                reward: { spiritStones: 1000, items: ['新手礼包'] },
+                                claimed: false,
+                                steps: [
+                                    { desc: '接受悬赏任务', completed: false },
+                                    { desc: '击败1只妖兽', completed: false },
+                                    { desc: '收集5株灵草', completed: false },
+                                    { desc: '领取奖励', completed: false }
+                                ]
+                            },
+                            {
+                                id: 'c002',
+                                name: '筑基之路',
+                                description: '完成筑基境界的试炼',
+                                progress: 0,
+                                reward: { spiritStones: 5000, exp: 10000, items: ['筑基丹x3'] },
+                                claimed: false,
+                                steps: [
+                                    { desc: '完成3个悬赏任务', completed: false },
+                                    { desc: '击败筑基期妖兽', completed: false },
+                                    { desc: '炼制丹药成功', completed: false },
+                                    { desc: '探索秘境获得宝物', completed: false },
+                                    { desc: '领取奖励', completed: false }
+                                ]
+                            },
+                            {
+                                id: 'c003',
+                                name: '金丹成就',
+                                description: '迈向金丹境界的挑战',
+                                progress: 0,
+                                reward: { spiritStones: 20000, exp: 50000, items: ['金丹辅助丹x5'] },
+                                claimed: false,
+                                steps: [
+                                    { desc: '完成5个困难悬赏', completed: false },
+                                    { desc: '挑战天榜排位赛', completed: false },
+                                    { desc: '获得一件紫色装备', completed: false },
+                                    { desc: '击败元婴期强敌', completed: false },
+                                    { desc: '领取奖励', completed: false }
+                                ]
+                            }
+                        ],
+                        activeChain: null
+                    };
+                }
+                return gs.chain;
+            }
+
+            // V149: mcpQuestList - 获取悬赏任务列表
+            mcpQuestList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questState = this._initQuestState();
+                    return {
+                        success: true,
+                        quests: questState.quests.map(q => ({
+                            id: q.id,
+                            name: q.name,
+                            description: q.description,
+                            difficulty: q.difficulty,
+                            reward: q.reward,
+                            status: q.completed ? 'completed' : (q.accepted ? 'active' : 'available')
+                        })),
+                        total: questState.quests.length,
+                        message: '共' + questState.quests.length + '个悬赏任务'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V149: mcpQuestAccept - 接受悬赏任务
+            mcpQuestAccept(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定任务ID' };
+                    const questState = this._initQuestState();
+                    const quest = questState.quests.find(q => q.id === questId);
+                    if (!quest) return { error: '任务不存在: ' + questId };
+                    if (quest.accepted) return { error: '任务已接受' };
+                    if (quest.completed) return { error: '任务已完成' };
+                    if (questState.activeQuests.length >= 3) return { error: '最多同时接受3个任务' };
+                    quest.accepted = true;
+                    questState.activeQuests.push(questId);
+                    return { success: true, questId, questName: quest.name, message: '已接受悬赏：' + quest.name };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V149: mcpQuestComplete - 完成任务领取奖励
+            mcpQuestComplete(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定任务ID' };
+                    const questState = this._initQuestState();
+                    const quest = questState.quests.find(q => q.id === questId);
+                    if (!quest) return { error: '任务不存在: ' + questId };
+                    if (!quest.accepted) return { error: '任务未接受，请先接受任务' };
+                    if (quest.completed) return { error: '任务已完成' };
+                    quest.completed = true;
+                    quest.accepted = false;
+                    questState.activeQuests = questState.activeQuests.filter(id => id !== questId);
+                    const reward = quest.reward;
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    if (reward.exp) gs.cultivationProgress = (gs.cultivationProgress || 0) + reward.exp;
+                    if (reward.items && Array.isArray(reward.items)) {
+                        gs.items = gs.items || [];
+                        reward.items.forEach(item => gs.items.push(item));
+                    }
+                    return { success: true, questId, questName: quest.name, reward, message: '任务完成！获得奖励：灵石' + (reward.spiritStones || 0) };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V149: mcpChainList - 获取任务链列表
+            mcpChainList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const chainState = this._initChainState();
+                    return {
+                        success: true,
+                        chains: chainState.chains.map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            description: c.description,
+                            progress: c.progress,
+                            totalSteps: c.steps.length,
+                            completedSteps: c.steps.filter(s => s.completed).length,
+                            reward: c.reward,
+                            status: c.claimed ? 'claimed' : (c.progress >= c.steps.length ? 'claimable' : 'in_progress')
+                        })),
+                        total: chainState.chains.length,
+                        message: '共' + chainState.chains.length + '个任务链'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V149: mcpChainProgress - 查看任务链进度
+            mcpChainProgress(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainState = this._initChainState();
+                    const chain = chainState.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在: ' + chainId };
+                    return {
+                        success: true,
+                        chainId: chain.id,
+                        name: chain.name,
+                        description: chain.description,
+                        progress: chain.progress,
+                        totalSteps: chain.steps.length,
+                        steps: chain.steps.map((s, i) => ({
+                            index: i + 1,
+                            desc: s.desc,
+                            completed: s.completed
+                        })),
+                        reward: chain.reward,
+                        claimed: chain.claimed,
+                        message: chain.name + '：进度 ' + chain.progress + '/' + chain.steps.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V149: mcpChainClaim - 领取任务链奖励
+            mcpChainClaim(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainState = this._initChainState();
+                    const chain = chainState.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在: ' + chainId };
+                    if (chain.claimed) return { error: '奖励已领取' };
+                    if (chain.progress < chain.steps.length) return { error: '任务链未完成，无法领取奖励' };
+                    chain.claimed = true;
+                    const reward = chain.reward;
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    if (reward.exp) gs.cultivationProgress = (gs.cultivationProgress || 0) + reward.exp;
+                    if (reward.items && Array.isArray(reward.items)) {
+                        gs.items = gs.items || [];
+                        reward.items.forEach(item => gs.items.push(item));
+                    }
+                    return { success: true, chainId, chainName: chain.name, reward, message: '奖励已领取！获得灵石' + (reward.spiritStones || 0) };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V146: mcpAchievementList - 获取成就列表
@@ -29820,6 +30058,64 @@ const ACHIEVEMENT_ID_MAP = {
                 name: 'badge.unequip',
                 description: '卸下徽章 (徽章系统-卸下徽章)',
                 inputSchema: { type: 'object', properties: { badgeId: { type: 'string', description: '徽章ID' } }, required: ['badgeId'] }
+            }
+        };
+
+        // V149: 悬赏+任务链系统
+        const MCP_TOOLS_V149 = {
+            'quest.list': {
+                name: 'quest.list',
+                description: '获取悬赏任务列表 (悬赏系统-列出所有可接悬赏任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'quest.accept': {
+                name: 'quest.accept',
+                description: '接受悬赏任务 (悬赏系统-接受指定的悬赏任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'quest.complete': {
+                name: 'quest.complete',
+                description: '完成任务领取奖励 (悬赏系统-完成悬赏任务并领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'chain.list': {
+                name: 'chain.list',
+                description: '获取任务链 (任务链系统-列出所有任务链)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'chain.progress': {
+                name: 'chain.progress',
+                description: '查看任务链进度 (任务链系统-查看指定任务链进度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'chain.claim': {
+                name: 'chain.claim',
+                description: '领取任务链奖励 (任务链系统-领取任务链全部完成的奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
+                }
             }
         };
 
@@ -52845,6 +53141,231 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V148', passed, total, passRate: passRate.toFixed(3), results };
         }
 
+        // V149 Tests: 悬赏+任务链系统
+        function runV149Tests() {
+            const results = [];
+            function v149Assert(condition, testName) {
+                results.push({ pass: condition, test: testName });
+                if (!condition) console.log('FAIL:', testName);
+            }
+            
+            const server = window.mcpServer || {};
+            
+            // Test 1: quest.list returns success
+            window.gameState = { quest: null, spiritStones: 0, cultivationProgress: 0, items: [] };
+            const ql1 = server.mcpQuestList ? server.mcpQuestList() : {};
+            v149Assert(ql1.success === true, 'quest.list returns success');
+            
+            // Test 2: quest.list has quests array
+            v149Assert(Array.isArray(ql1.quests), 'quest.list has quests array');
+            
+            // Test 3: quest.list has 5 quests
+            v149Assert(ql1.total === 5, 'quest.list has 5 quests');
+            
+            // Test 4: quest.list returns quests with correct structure
+            if (ql1.quests && ql1.quests.length > 0) {
+                const q = ql1.quests[0];
+                v149Assert(q.id && q.name && q.description, 'quest has id, name, description');
+                v149Assert(q.difficulty && q.reward, 'quest has difficulty and reward');
+            }
+            
+            // Test 5: quest.accept requires questId
+            const qa1 = server.mcpQuestAccept ? server.mcpQuestAccept() : {};
+            v149Assert(qa1.error, 'quest.accept without questId returns error');
+            
+            // Test 6: quest.accept with invalid id returns error
+            const qa2 = server.mcpQuestAccept ? server.mcpQuestAccept('invalid_q') : {};
+            v149Assert(qa2.error, 'quest.accept with invalid id returns error');
+            
+            // Test 7: quest.accept with valid id succeeds
+            window.gameState.quest = null;
+            const qa3 = server.mcpQuestAccept ? server.mcpQuestAccept('q001') : {};
+            v149Assert(qa3.success === true, 'quest.accept with q001 succeeds');
+            
+            // Test 8: quest.accept sets quest as accepted
+            const qs = server._initQuestState ? server._initQuestState() : window.gameState.quest;
+            const acceptedQuest = qs.quests.find(q => q.id === 'q001');
+            v149Assert(acceptedQuest && acceptedQuest.accepted, 'quest.accept marks quest as accepted');
+            
+            // Test 9: quest.accept adds to activeQuests
+            v149Assert(qs.activeQuests.includes('q001'), 'quest.accept adds to activeQuests');
+            
+            // Test 10: quest.accept limits to 3 active quests
+            window.gameState.quest = null;
+            server._initQuestState ? server._initQuestState() : null;
+            server.mcpQuestAccept ? server.mcpQuestAccept('q001') : null;
+            server.mcpQuestAccept ? server.mcpQuestAccept('q002') : null;
+            server.mcpQuestAccept ? server.mcpQuestAccept('q003') : null;
+            const qa4 = server.mcpQuestAccept ? server.mcpQuestAccept('q004') : {};
+            v149Assert(qa4.error === '最多同时接受3个任务', 'quest.accept limits to 3 active quests');
+            
+            // Test 11: quest.complete requires questId
+            const qc1 = server.mcpQuestComplete ? server.mcpQuestComplete() : {};
+            v149Assert(qc1.error, 'quest.complete without questId returns error');
+            
+            // Test 12: quest.complete with invalid id returns error
+            const qc2 = server.mcpQuestComplete ? server.mcpQuestComplete('invalid_q') : {};
+            v149Assert(qc2.error, 'quest.complete with invalid id returns error');
+            
+            // Test 13: quest.complete with unaccepted quest returns error
+            window.gameState.quest = null;
+            server._initQuestState ? server._initQuestState() : null;
+            const qc3 = server.mcpQuestComplete ? server.mcpQuestComplete('q002') : {};
+            v149Assert(qc3.error, 'quest.complete with unaccepted quest returns error');
+            
+            // Test 14: quest.complete with accepted quest succeeds
+            server.mcpQuestAccept ? server.mcpQuestAccept('q002') : null;
+            const qc4 = server.mcpQuestComplete ? server.mcpQuestComplete('q002') : {};
+            v149Assert(qc4.success === true, 'quest.complete with accepted quest succeeds');
+            
+            // Test 15: quest.complete marks quest as completed
+            const qs2 = server._initQuestState ? server._initQuestState() : window.gameState.quest;
+            const completedQuest = qs2.quests.find(q => q.id === 'q002');
+            v149Assert(completedQuest && completedQuest.completed, 'quest.complete marks quest as completed');
+            
+            // Test 16: quest.complete gives rewards
+            v149Assert(qc4.reward && qc4.reward.spiritStones, 'quest.complete gives spiritStones reward');
+            
+            // Test 17: chain.list returns success
+            window.gameState.chain = null;
+            const cl1 = server.mcpChainList ? server.mcpChainList() : {};
+            v149Assert(cl1.success === true, 'chain.list returns success');
+            
+            // Test 18: chain.list has chains array
+            v149Assert(Array.isArray(cl1.chains), 'chain.list has chains array');
+            
+            // Test 19: chain.list has 3 chains
+            v149Assert(cl1.total === 3, 'chain.list has 3 chains');
+            
+            // Test 20: chain.list returns chains with correct structure
+            if (cl1.chains && cl1.chains.length > 0) {
+                const c = cl1.chains[0];
+                v149Assert(c.id && c.name && c.description, 'chain has id, name, description');
+                v149Assert(c.progress !== undefined && c.totalSteps, 'chain has progress and totalSteps');
+            }
+            
+            // Test 21: chain.progress requires chainId
+            const cp1 = server.mcpChainProgress ? server.mcpChainProgress() : {};
+            v149Assert(cp1.error, 'chain.progress without chainId returns error');
+            
+            // Test 22: chain.progress with invalid id returns error
+            const cp2 = server.mcpChainProgress ? server.mcpChainProgress('invalid_c') : {};
+            v149Assert(cp2.error, 'chain.progress with invalid id returns error');
+            
+            // Test 23: chain.progress with valid id succeeds
+            const cp3 = server.mcpChainProgress ? server.mcpChainProgress('c001') : {};
+            v149Assert(cp3.success === true, 'chain.progress with c001 succeeds');
+            
+            // Test 24: chain.progress returns chain details
+            v149Assert(cp3.chainId === 'c001', 'chain.progress returns correct chainId');
+            v149Assert(Array.isArray(cp3.steps), 'chain.progress returns steps array');
+            
+            // Test 25: chain.claim requires chainId
+            const cc1 = server.mcpChainClaim ? server.mcpChainClaim() : {};
+            v149Assert(cc1.error, 'chain.claim without chainId returns error');
+            
+            // Test 26: chain.claim with invalid id returns error
+            const cc2 = server.mcpChainClaim ? server.mcpChainClaim('invalid_c') : {};
+            v149Assert(cc2.error, 'chain.claim with invalid id returns error');
+            
+            // Test 27: chain.claim with incomplete chain returns error
+            const cc3 = server.mcpChainClaim ? server.mcpChainClaim('c001') : {};
+            v149Assert(cc3.error, 'chain.claim with incomplete chain returns error');
+            
+            // Test 28: chain.claim with complete chain succeeds (simulate complete)
+            const chainState = server._initChainState ? server._initChainState() : window.gameState.chain;
+            const chain = chainState.chains.find(c => c.id === 'c001');
+            if (chain) {
+                chain.progress = chain.steps.length;
+                chain.steps.forEach(s => s.completed = true);
+            }
+            const cc4 = server.mcpChainClaim ? server.mcpChainClaim('c001') : {};
+            v149Assert(cc4.success === true, 'chain.claim with complete chain succeeds');
+            
+            // Test 29: chain.claim marks chain as claimed
+            v149Assert(chain && chain.claimed, 'chain.claim marks chain as claimed');
+            
+            // Test 30: chain.claim gives rewards
+            v149Assert(cc4.reward && cc4.reward.spiritStones, 'chain.claim gives spiritStones reward');
+            
+            // Test 31: quest cannot accept already accepted quest
+            window.gameState.quest = null;
+            server._initQuestState ? server._initQuestState() : null;
+            server.mcpQuestAccept ? server.mcpQuestAccept('q003') : null;
+            const qa5 = server.mcpQuestAccept ? server.mcpQuestAccept('q003') : {};
+            v149Assert(qa5.error === '任务已接受', 'quest cannot accept already accepted quest');
+            
+            // Test 32: quest cannot accept completed quest
+            const qa6 = server.mcpQuestAccept ? server.mcpQuestAccept('q002') : {};
+            v149Assert(qa6.error === '任务已完成', 'quest cannot accept completed quest');
+            
+            // Test 33: chain.status shows correct status
+            window.gameState.chain = null;
+            const cl2 = server.mcpChainList ? server.mcpChainList() : {};
+            const newChain = cl2.chains.find(c => c.id === 'c002');
+            v149Assert(newChain.status === 'in_progress', 'new chain has in_progress status');
+            newChain.progress = newChain.totalSteps;
+            newChain.steps.forEach(s => s.completed = true);
+            const cl3 = server.mcpChainList ? server.mcpChainList() : {};
+            const claimableChain = cl3.chains.find(c => c.id === 'c002');
+            v149Assert(claimableChain.status === 'claimable', 'completed chain has claimable status');
+            
+            // Test 34: quest list returns correct status for each quest
+            window.gameState.quest = null;
+            server._initQuestState ? server._initQuestState() : null;
+            const ql2 = server.mcpQuestList ? server.mcpQuestList() : {};
+            const availableQuest = ql2.quests.find(q => q.status === 'available');
+            v149Assert(availableQuest, 'quest.list shows available status');
+            
+            // Test 35: chain.progress shows correct step info
+            const cp5 = server.mcpChainProgress ? server.mcpChainProgress('c003') : {};
+            v149Assert(cp5.steps && cp5.steps.length === 5, 'chain.progress shows 5 steps for c003');
+            v149Assert(cp5.steps[0].index === 1, 'chain.progress steps have correct index');
+            
+            // Test 36: quest.complete removes from activeQuests
+            window.gameState.quest = null;
+            server._initQuestState ? server._initQuestState() : null;
+            server.mcpQuestAccept ? server.mcpQuestAccept('q005') : null;
+            const qs3 = server._initQuestState ? server._initQuestState() : window.gameState.quest;
+            v149Assert(qs3.activeQuests.includes('q005'), 'accepted quest is in activeQuests');
+            server.mcpQuestComplete ? server.mcpQuestComplete('q005') : null;
+            v149Assert(!qs3.activeQuests.includes('q005'), 'completed quest removed from activeQuests');
+            
+            // Test 37: chain cannot be claimed twice
+            const cc5 = server.mcpChainClaim ? server.mcpChainClaim('c001') : {};
+            v149Assert(cc5.error === '奖励已领取', 'chain cannot be claimed twice');
+            
+            // Test 38: _initQuestState creates correct structure
+            window.gameState.quest = null;
+            const qs4 = server._initQuestState ? server._initQuestState() : null;
+            v149Assert(qs4 !== null, '_initQuestState creates quest state');
+            v149Assert(Array.isArray(qs4.quests), '_initQuestState creates quests array');
+            v149Assert(Array.isArray(qs4.activeQuests), '_initQuestState creates activeQuests array');
+            
+            // Test 39: _initChainState creates correct structure
+            window.gameState.chain = null;
+            const cs2 = server._initChainState ? server._initChainState() : null;
+            v149Assert(cs2 !== null, '_initChainState creates chain state');
+            v149Assert(Array.isArray(cs2.chains), '_initChainState creates chains array');
+            v149Assert(cs2.chains.length === 3, '_initChainState creates 3 chains');
+            
+            // Test 40: V149 tools registered in tool registry
+            const tools = server.toolRegistry ? Array.from(server.toolRegistry.keys()) : [];
+            v149Assert(tools.includes('quest.list'), 'quest.list registered');
+            v149Assert(tools.includes('quest.accept'), 'quest.accept registered');
+            v149Assert(tools.includes('quest.complete'), 'quest.complete registered');
+            v149Assert(tools.includes('chain.list'), 'chain.list registered');
+            v149Assert(tools.includes('chain.progress'), 'chain.progress registered');
+            v149Assert(tools.includes('chain.claim'), 'chain.claim registered');
+            
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V149 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V149', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v149Results = runV149Tests();
         const v148Results = runV148Tests();
         const v146Results = runV146Tests();
         const v145Results = runV145Tests();
