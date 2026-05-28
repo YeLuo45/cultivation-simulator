@@ -5339,6 +5339,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V122)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V123: Register 投票+问卷系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V123)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6340,6 +6344,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'friend.accept':
                             result = this.mcpFriendAccept(args.applyId);
+                            break;
+                        // V123: 投票+问卷系统
+                        case 'vote.list':
+                            result = this.mcpVoteList();
+                            break;
+                        case 'vote.create':
+                            result = this.mcpVoteCreate(args.title, args.options, args.duration);
+                            break;
+                        case 'vote.join':
+                            result = this.mcpVoteJoin(args.voteId, args.optionIndex);
+                            break;
+                        case 'survey.list':
+                            result = this.mcpSurveyList();
+                            break;
+                        case 'survey.answer':
+                            result = this.mcpSurveyAnswer(args.surveyId, args.answers);
+                            break;
+                        case 'survey.complete':
+                            result = this.mcpSurveyComplete(args.surveyId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -15404,6 +15427,96 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V123: 投票+问卷系统
+            _initVoteState() {
+                const gs = window.gameState;
+                if (!gs.vote) {
+                    gs.vote = { votes: [], nextVoteId: 1 };
+                }
+                return gs.vote;
+            }
+            _initSurveyState() {
+                const gs = window.gameState;
+                if (!gs.survey) {
+                    gs.survey = {
+                        surveys: [
+                            { id: 'survey_1', title: '修仙境界问卷', questions: [{ q: '你最向往哪个境界?', options: ['筑基', '金丹', '元婴', '化神'] }], reward: { spiritStones: 200 }, status: 'available', answers: null },
+                            { id: 'survey_2', title: '功法偏好调查', questions: [{ q: '你喜欢哪种功法?', options: ['剑修', '体修', '法修', '杂修'] }], reward: { spiritStones: 150 }, status: 'available', answers: null }
+                        ],
+                        nextSurveyId: 3
+                    };
+                }
+                return gs.survey;
+            }
+            mcpVoteList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const vote = this._initVoteState();
+                    return { success: true, votes: vote.votes.filter(v => Date.now() < v.endTime) };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpVoteCreate(title, options, duration) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!title || !options || options.length < 2) return { error: '标题和至少2个选项不能为空' };
+                    const vote = this._initVoteState();
+                    const voteId = 'vote_' + (vote.nextVoteId++);
+                    vote.votes.push({ id: voteId, title, options: options.map((text, i) => ({ text, count: 0 })), creator: gs.playerName || '玩家', endTime: Date.now() + (duration || 3600000), participants: [] });
+                    return { success: true, voteId, endTime: Date.now() + (duration || 3600000) };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpVoteJoin(voteId, optionIndex) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const vote = this._initVoteState();
+                    const v = vote.votes.find(v => v.id === voteId);
+                    if (!v) return { error: '投票不存在' };
+                    if (Date.now() >= v.endTime) return { error: '投票已结束' };
+                    if (v.participants.includes(gs.playerName || '玩家')) return { error: '已投过票' };
+                    if (optionIndex < 0 || optionIndex >= v.options.length) return { error: '无效的选项索引' };
+                    v.options[optionIndex].count++;
+                    v.participants.push(gs.playerName || '玩家');
+                    return { success: true, message: '投票成功', option: v.options[optionIndex].text };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpSurveyList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const survey = this._initSurveyState();
+                    return { success: true, surveys: survey.surveys.filter(s => s.status === 'available') };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpSurveyAnswer(surveyId, answers) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const survey = this._initSurveyState();
+                    const s = survey.surveys.find(s => s.id === surveyId);
+                    if (!s) return { error: '问卷不存在' };
+                    if (s.status !== 'available') return { error: '问卷不可作答' };
+                    s.answers = answers;
+                    return { success: true, message: '答案已提交' };
+                } catch (e) { return { error: e.message }; }
+            }
+            mcpSurveyComplete(surveyId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const survey = this._initSurveyState();
+                    const s = survey.surveys.find(s => s.id === surveyId);
+                    if (!s) return { error: '问卷不存在' };
+                    if (!s.answers) return { error: '请先提交答案' };
+                    if (s.status !== 'available') return { error: '问卷已完成' };
+                    s.status = 'completed';
+                    gs.spiritStones = (gs.spiritStones || 0) + s.reward.spiritStones;
+                    return { success: true, message: '问卷完成', reward: s.reward, balance: gs.spiritStones };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V117: mcpCheckinQuery - 查询签到状态
             mcpCheckinQuery() {
                 try {
@@ -23547,6 +23660,16 @@ const ACHIEVEMENT_ID_MAP = {
             'friend.accept': { name: 'friend.accept', description: '通过好友申请', inputSchema: { type: 'object', properties: { applyId: { type: 'string' } }, required: ['applyId'] } }
         };
 
+        // V123: 投票+问卷系统
+        const MCP_TOOLS_V123 = {
+            'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
+            'vote.create': { name: 'vote.create', description: '创建投票', inputSchema: { type: 'object', properties: { title: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, duration: { type: 'number' } }, required: ['title', 'options'] } },
+            'vote.join': { name: 'vote.join', description: '参与投票', inputSchema: { type: 'object', properties: { voteId: { type: 'string' }, optionIndex: { type: 'number' } }, required: ['voteId', 'optionIndex'] } },
+            'survey.list': { name: 'survey.list', description: '获取问卷列表', inputSchema: { type: 'object', properties: {} } },
+            'survey.answer': { name: 'survey.answer', description: '提交问卷答案', inputSchema: { type: 'object', properties: { surveyId: { type: 'string' }, answers: { type: 'array' } }, required: ['surveyId', 'answers'] } },
+            'survey.complete': { name: 'survey.complete', description: '完成问卷领取奖励', inputSchema: { type: 'object', properties: { surveyId: { type: 'string' } }, required: ['surveyId'] } }
+        };
+
         // V117: Check-in Streak Rewards
         const CHECKIN_STREAK_REWARDS = {
             day3: { need: 3, reward: { spiritStones: 500 }, claimed: false },
@@ -25818,6 +25941,105 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V122', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v122Results = runV122Tests();
+
+        // ===== V123: 投票+问卷系统 Tests =====
+        function runV123Tests() {
+            const results = [];
+            function v123Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            const mockGameState = {
+                spiritStones: 10000, reputation: 0, playerName: '测试玩家',
+                vote: null, survey: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // vote.list - empty
+            const vl1 = server.mcpVoteList();
+            v123Assert(vl1.success === true, 'vote.list succeeds');
+            v123Assert(Array.isArray(vl1.votes), 'vote.list returns votes array');
+
+            // vote.create - success
+            const vc1 = server.mcpVoteCreate('你喜欢哪个境界?', ['筑基', '金丹', '元婴'], 3600000);
+            v123Assert(vc1.success === true, 'vote.create succeeds');
+            v123Assert(vc1.voteId && vc1.voteId.startsWith('vote_'), 'vote.create returns voteId');
+            v123Assert(vc1.endTime > Date.now(), 'vote.create returns endTime');
+
+            // vote.create - no title
+            const vc2 = server.mcpVoteCreate('', ['a', 'b'], 3600000);
+            v123Assert(vc2.error && vc2.error.includes('标题'), 'vote.create fails without title');
+
+            // vote.create - only 1 option
+            const vc3 = server.mcpVoteCreate('test', ['only'], 3600000);
+            v123Assert(vc3.error && vc3.error.includes('至少2个'), 'vote.create fails with <2 options');
+
+            // vote.list - now has 1 vote
+            const vl2 = server.mcpVoteList();
+            v123Assert(vl2.success === true, 'vote.list returns votes');
+            v123Assert(vl2.votes.length === 1, 'vote.list returns 1 vote');
+
+            // vote.join - success
+            const vj1 = server.mcpVoteJoin(vc1.voteId, 1);
+            v123Assert(vj1.success === true, 'vote.join succeeds');
+            v123Assert(vj1.option === '金丹', 'vote.join returns selected option');
+
+            // vote.join - duplicate
+            const vj1b = server.mcpVoteJoin(vc1.voteId, 0);
+            v123Assert(vj1b.error && vj1b.error.includes('已投过'), 'vote.join blocks duplicate');
+
+            // vote.join - invalid option index
+            const vj2 = server.mcpVoteJoin(vc1.voteId, 99);
+            v123Assert(vj2.error && vj2.error.includes('无效的选项'), 'vote.join rejects invalid index');
+
+            // vote.join - nonexistent vote
+            const vj3 = server.mcpVoteJoin('nonexistent', 0);
+            v123Assert(vj3.error && vj3.error.includes('不存在'), 'vote.join fails on nonexistent');
+
+            // survey.list
+            const sl1 = server.mcpSurveyList();
+            v123Assert(sl1.success === true, 'survey.list succeeds');
+            v123Assert(sl1.surveys && sl1.surveys.length >= 2, 'survey.list returns surveys');
+
+            // survey.answer - success
+            const sa1 = server.mcpSurveyAnswer('survey_1', { q0: 1 });
+            v123Assert(sa1.success === true, 'survey.answer succeeds');
+
+            // survey.answer - invalid survey
+            const sa2 = server.mcpSurveyAnswer('nonexistent', {});
+            v123Assert(sa2.error && sa2.error.includes('不存在'), 'survey.answer fails on nonexistent');
+
+            // survey.complete - success
+            const sc1 = server.mcpSurveyComplete('survey_1');
+            v123Assert(sc1.success === true, 'survey.complete succeeds');
+            v123Assert(sc1.reward && sc1.reward.spiritStones === 200, 'survey.complete returns reward');
+            v123Assert(sc1.balance === 10200, 'survey.complete adds reward');
+
+            // survey.complete - no answer first
+            mockGameState.survey = {
+                surveys: [{ id: 's_test', title: 'Test', questions: [], reward: { spiritStones: 100 }, status: 'available', answers: null }],
+                nextSurveyId: 2
+            };
+            const sc2 = server.mcpSurveyComplete('s_test');
+            v123Assert(sc2.error && sc2.error.includes('先提交答案'), 'survey.complete fails without answer');
+
+            // survey.complete - already completed
+            mockGameState.survey = {
+                surveys: [{ id: 's_done', title: 'Test', questions: [], reward: { spiritStones: 100 }, status: 'completed', answers: { a: 1 } }],
+                nextSurveyId: 2
+            };
+            const sc3 = server.mcpSurveyComplete('s_done');
+            v123Assert(sc3.error && sc3.error.includes('已完成'), 'survey.complete fails when already done');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V123 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V123', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v123Results = runV123Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
