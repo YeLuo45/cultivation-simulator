@@ -3437,6 +3437,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V128)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V129: Register 境界+突破系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V129)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4552,6 +4556,25 @@
                             break;
                         case 'daily.reset':
                             result = this.mcpDailyReset();
+                            break;
+                        // V129: 境界+突破系统
+                        case 'realm.list':
+                            result = this.mcpRealmList();
+                            break;
+                        case 'realm.detail':
+                            result = this.mcpRealmDetail(args.realmId);
+                            break;
+                        case 'realm.breakthrough':
+                            result = this.mcpRealmBreakthrough();
+                            break;
+                        case 'breakthrough.prepare':
+                            result = this.mcpBreakthroughPrepare();
+                            break;
+                        case 'breakthrough.start':
+                            result = this.mcpBreakthroughStart();
+                            break;
+                        case 'breakthrough.result':
+                            result = this.mcpBreakthroughResult();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -14901,6 +14924,283 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V129: 境界+突破系统 - 境界定义
+            // V129使用扩展境界列表: 炼气、筑基、金丹、元婴、化神、炼虚、合道、大乘、真仙、金仙、太乙、大罗、道祖
+            _getRealmList() {
+                return ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合道', '大乘', '真仙', '金仙', '太乙', '大罗', '道祖'];
+            }
+
+            _getRealmDetail(realmIndex) {
+                const realms = this._getRealmList();
+                if (realmIndex < 0 || realmIndex >= realms.length) return null;
+                const realmNames = realms[realmIndex];
+                // 每个境界的突破条件: 需要灵气值和完成度
+                const conditions = {
+                    炼气: { minSpirit: 0, description: '初入修炼之路' },
+                    筑基: { minSpirit: 1000, description: '凝聚根基，踏入修炼' },
+                    金丹: { minSpirit: 5000, description: '金丹成型，灵力凝聚' },
+                    元婴: { minSpirit: 20000, description: '元婴出窍，神识已成' },
+                    化神: { minSpirit: 50000, description: '化神入虚，天人合一' },
+                    炼虚: { minSpirit: 100000, description: '炼虚合道，返璞归真' },
+                    合道: { minSpirit: 300000, description: '合道天地，万法归一' },
+                    大乘: { minSpirit: 800000, description: '大乘境界，神通无量' },
+                    真仙: { minSpirit: 2000000, description: '超凡入圣，真仙之境' },
+                    金仙: { minSpirit: 5000000, description: '金仙不朽，万劫不灭' },
+                    太乙: { minSpirit: 10000000, description: '太乙无量，大道独尊' },
+                    大罗: { minSpirit: 30000000, description: '大罗混元，诸天至高' },
+                    道祖: { minSpirit: 100000000, description: '道祖之境，天地同寿' }
+                };
+                return {
+                    index: realmIndex,
+                    name: realmNames,
+                    condition: conditions[realmNames] || { minSpirit: 0, description: '未知境界' }
+                };
+            }
+
+            // V129: _initRealmState - 初始化境界系统状态
+            _initRealmState() {
+                const gs = window.gameState;
+                if (!gs.realm) {
+                    gs.realm = {
+                        currentRealm: 0,  // 炼气期 (index 0)
+                        realmHistory: [],
+                        realmProgress: 0  // 当前境界进度 0-100
+                    };
+                }
+                return gs.realm;
+            }
+
+            // V129: _initBreakthroughState - 初始化突破系统状态
+            _initBreakthroughState() {
+                const gs = window.gameState;
+                if (!gs.breakthrough) {
+                    gs.breakthrough = {
+                        preparing: false,
+                        inProgress: false,
+                        startTime: null,
+                        duration: 0,        // 突破持续时间(ms)
+                        result: null,       // 'success' | 'failed' | null
+                        success: false
+                    };
+                }
+                return gs.breakthrough;
+            }
+
+            // V129: mcpRealmList - 获取境界列表
+            mcpRealmList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmState = this._initRealmState();
+                    const realms = this._getRealmList();
+                    const currentRealm = realmState.currentRealm;
+                    return {
+                        success: true,
+                        currentRealm: currentRealm,
+                        currentRealmName: realms[currentRealm] || '未知',
+                        totalRealms: realms.length,
+                        realms: realms.map((name, index) => ({
+                            index,
+                            name,
+                            isCurrent: index === currentRealm,
+                            isPast: index < currentRealm,
+                            isFuture: index > currentRealm
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V129: mcpRealmDetail - 获取境界详情
+            mcpRealmDetail(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmIndex = parseInt(realmId) || 0;
+                    const realmState = this._initRealmState();
+                    const realms = this._getRealmList();
+                    if (realmIndex < 0 || realmIndex >= realms.length) {
+                        return { error: '无效的境界ID: ' + realmId };
+                    }
+                    const detail = this._getRealmDetail(realmIndex);
+                    const isCurrentOrPast = realmIndex <= realmState.currentRealm;
+                    return {
+                        success: true,
+                        ...detail,
+                        isCurrentOrPast: isCurrentOrPast,
+                        progress: isCurrentOrPast ? (realmIndex < realmState.currentRealm ? 100 : realmState.realmProgress) : 0
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V129: mcpRealmBreakthrough - 尝试突破到下一境界
+            mcpRealmBreakthrough() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmState = this._initRealmState();
+                    const realms = this._getRealmList();
+                    const currentRealm = realmState.currentRealm;
+                    const nextRealm = currentRealm + 1;
+                    if (nextRealm >= realms.length) {
+                        return { error: '已达到最高境界: ' + realms[currentRealm], isMaxRealm: true };
+                    }
+                    // 检查是否满足突破条件
+                    const minSpirit = this._getRealmDetail(nextRealm).condition.minSpirit;
+                    const currentSpirit = gs.spiritStones || 0;
+                    if (currentSpirit < minSpirit) {
+                        return {
+                            success: false,
+                            error: '灵力不足，无法突破到' + realms[nextRealm],
+                            required: minSpirit,
+                            current: currentSpirit,
+                            shortage: minSpirit - currentSpirit
+                        };
+                    }
+                    // 灵力足够，扣除灵力并突破
+                    gs.spiritStones -= minSpirit;
+                    realmState.currentRealm = nextRealm;
+                    realmState.realmHistory.push({
+                        from: currentRealm,
+                        to: nextRealm,
+                        timestamp: Date.now(),
+                        spiritCost: minSpirit
+                    });
+                    realmState.realmProgress = 0;
+                    return {
+                        success: true,
+                        message: '突破成功！从' + realms[currentRealm] + '突破到' + realms[nextRealm],
+                        newRealm: nextRealm,
+                        newRealmName: realms[nextRealm],
+                        spiritSpent: minSpirit
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V129: mcpBreakthroughPrepare - 准备突破
+            mcpBreakthroughPrepare() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmState = this._initRealmState();
+                    const breakthroughState = this._initBreakthroughState();
+                    const realms = this._getRealmList();
+                    const currentRealm = realmState.currentRealm;
+                    const nextRealm = currentRealm + 1;
+                    if (nextRealm >= realms.length) {
+                        return { error: '已达到最高境界，无法准备突破' };
+                    }
+                    // 检查是否已经在突破中
+                    if (breakthroughState.inProgress) {
+                        return { error: '突破正在进行中，无法准备' };
+                    }
+                    // 设置准备状态
+                    breakthroughState.preparing = true;
+                    breakthroughState.result = null;
+                    breakthroughState.success = false;
+                    return {
+                        success: true,
+                        message: '已准备好突破到' + realms[nextRealm],
+                        currentRealm: realmState.currentRealm,
+                        currentRealmName: realms[currentRealm],
+                        targetRealm: nextRealm,
+                        targetRealmName: realms[nextRealm],
+                        preparing: true
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V129: mcpBreakthroughStart - 开始突破
+            mcpBreakthroughStart() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmState = this._initRealmState();
+                    const breakthroughState = this._initBreakthroughState();
+                    const realms = this._getRealmList();
+                    const currentRealm = realmState.currentRealm;
+                    const nextRealm = currentRealm + 1;
+                    if (nextRealm >= realms.length) {
+                        return { error: '已达到最高境界' };
+                    }
+                    if (!breakthroughState.preparing) {
+                        return { error: '请先调用breakthrough.prepare准备突破' };
+                    }
+                    if (breakthroughState.inProgress) {
+                        return { error: '突破已在进行中' };
+                    }
+                    // 开始突破，消耗时间 (基于境界等级，10秒基础+每境界2秒)
+                    const duration = 10000 + nextRealm * 2000;
+                    breakthroughState.preparing = false;
+                    breakthroughState.inProgress = true;
+                    breakthroughState.startTime = Date.now();
+                    breakthroughState.duration = duration;
+                    breakthroughState.result = null;
+                    return {
+                        success: true,
+                        message: '突破已开始，目标：' + realms[nextRealm],
+                        startTime: breakthroughState.startTime,
+                        duration: duration,
+                        estimatedEndTime: breakthroughState.startTime + duration,
+                        inProgress: true
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V129: mcpBreakthroughResult - 获取突破结果
+            mcpBreakthroughResult() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const realmState = this._initRealmState();
+                    const breakthroughState = this._initBreakthroughState();
+                    const realms = this._getRealmList();
+                    if (!breakthroughState.inProgress && breakthroughState.result === null) {
+                        return { error: '当前没有进行中的突破' };
+                    }
+                    // 如果正在突破中，检查是否完成
+                    if (breakthroughState.inProgress) {
+                        const elapsed = Date.now() - breakthroughState.startTime;
+                        if (elapsed < breakthroughState.duration) {
+                            const remaining = breakthroughState.duration - elapsed;
+                            return {
+                                inProgress: true,
+                                progress: Math.min(100, (elapsed / breakthroughState.duration) * 100).toFixed(1),
+                                remainingMs: remaining,
+                                message: '突破进行中，还需' + (remaining / 1000).toFixed(1) + '秒'
+                            };
+                        }
+                        // 突破时间到，判断结果 (基础成功率85%，境界越高越难)
+                        const baseSuccessRate = 0.85;
+                        const realmPenalty = realmState.currentRealm * 0.03;
+                        const successRate = Math.max(0.3, baseSuccessRate - realmPenalty);
+                        const random = Math.random();
+                        const success = random < successRate;
+                        breakthroughState.inProgress = false;
+                        breakthroughState.result = success ? 'success' : 'failed';
+                        breakthroughState.success = success;
+                        if (success) {
+                            realmState.currentRealm += 1;
+                            realmState.realmProgress = 0;
+                            realmState.realmHistory.push({
+                                from: realmState.currentRealm - 1,
+                                to: realmState.currentRealm,
+                                timestamp: Date.now(),
+                                type: 'timed_breakthrough'
+                            });
+                        }
+                    }
+                    // 返回最终结果
+                    return {
+                        success: breakthroughState.success,
+                        result: breakthroughState.result,
+                        message: breakthroughState.success ? '突破成功！进入' + realms[realmState.currentRealm] : '突破失败，保持当前境界',
+                        currentRealm: realmState.currentRealm,
+                        currentRealmName: realms[realmState.currentRealm],
+                        historyCount: realmState.realmHistory.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             mcpPetList() {
                 try {
                     const gs = window.gameState;
@@ -22678,6 +22978,40 @@
             'daily.reset': { name: 'daily.reset', description: '重置日常任务', inputSchema: { type: 'object', properties: {} } }
         };
 
+        // V129: 境界+突破系统
+        const MCP_TOOLS_V129 = {
+            'realm.list': {
+                name: 'realm.list',
+                description: '获取境界列表 (境界系统-列表所有境界)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'realm.detail': {
+                name: 'realm.detail',
+                description: '获取境界详情 (境界系统-查看特定境界信息)',
+                inputSchema: { type: 'object', properties: { realmId: { type: 'number', description: '境界ID (0-12)' } }, required: ['realmId'] }
+            },
+            'realm.breakthrough': {
+                name: 'realm.breakthrough',
+                description: '突破到下一境界 (境界系统-尝试突破)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'breakthrough.prepare': {
+                name: 'breakthrough.prepare',
+                description: '准备突破 (突破系统-开始准备突破)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'breakthrough.start': {
+                name: 'breakthrough.start',
+                description: '开始突破 (突破系统-正式开始突破)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'breakthrough.result': {
+                name: 'breakthrough.result',
+                description: '获取突破结果 (突破系统-查看突破结果)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -25887,6 +26221,209 @@
             return { version: 'V128', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v128Results = runV128Tests();
+
+        // ===== V129: 境界+突破系统 Tests =====
+        function runV129Tests() {
+            const results = [];
+            function v129Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 5000000,
+                realm: 0,
+                stage: 0,
+                breakthrough: null,
+                realmHistory: []
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: _getRealmList returns 13 realms
+            const realmList = server._getRealmList();
+            v129Assert(realmList.length === 13, '_getRealmList returns 13 realms');
+            v129Assert(realmList[0] === '炼气', '_getRealmList[0] is 炼气');
+            v129Assert(realmList[12] === '道祖', '_getRealmList[12] is 道祖');
+
+            // Test 2: _getRealmDetail returns correct data
+            const realmDetail = server._getRealmDetail(1); // 筑基
+            v129Assert(realmDetail.index === 1, '_getRealmDetail index is 1');
+            v129Assert(realmDetail.name === '筑基', '_getRealmDetail name is 筑基');
+            v129Assert(realmDetail.condition.minSpirit === 1000, '_getRealmDetail 筑基 requires 1000 spirit');
+
+            // Test 3: _initRealmState initializes correctly
+            const realmState = server._initRealmState();
+            v129Assert(realmState !== null, '_initRealmState returns state');
+            v129Assert(realmState.currentRealm === 0, '_initRealmState currentRealm is 0');
+            v129Assert(Array.isArray(realmState.realmHistory), '_initRealmState realmHistory is array');
+
+            // Test 4: _initBreakthroughState initializes correctly
+            const btState = server._initBreakthroughState();
+            v129Assert(btState !== null, '_initBreakthroughState returns state');
+            v129Assert(btState.preparing === false, '_initBreakthroughState preparing is false');
+            v129Assert(btState.inProgress === false, '_initBreakthroughState inProgress is false');
+            v129Assert(btState.result === null, '_initBreakthroughState result is null');
+
+            // Test 5: mcpRealmList - basic
+            const rl1 = server.mcpRealmList();
+            v129Assert(rl1.success === true, 'mcpRealmList succeeds');
+            v129Assert(rl1.currentRealm === 0, 'mcpRealmList currentRealm is 0');
+            v129Assert(rl1.totalRealms === 13, 'mcpRealmList totalRealms is 13');
+            v129Assert(rl1.realms.length === 13, 'mcpRealmList realms array has 13 elements');
+
+            // Test 6: mcpRealmList - isCurrent flag
+            v129Assert(rl1.realms[0].isCurrent === true, 'mcpRealmList realms[0] isCurrent is true');
+            v129Assert(rl1.realms[1].isCurrent === false, 'mcpRealmList realms[1] isCurrent is false');
+            v129Assert(rl1.realms[1].isFuture === true, 'mcpRealmList realms[1] isFuture is true');
+
+            // Test 7: mcpRealmDetail - valid realm
+            const rd1 = server.mcpRealmDetail(2); // 金丹
+            v129Assert(rd1.success === true, 'mcpRealmDetail(2) succeeds');
+            v129Assert(rd1.index === 2, 'mcpRealmDetail(2) index is 2');
+            v129Assert(rd1.name === '金丹', 'mcpRealmDetail(2) name is 金丹');
+            v129Assert(rd1.condition.minSpirit === 5000, 'mcpRealmDetail(2) requires 5000 spirit');
+
+            // Test 8: mcpRealmDetail - invalid realm
+            const rdErr = server.mcpRealmDetail(20);
+            v129Assert(rdErr.error !== undefined, 'mcpRealmDetail(20) returns error');
+
+            // Test 9: mcpRealmBreakthrough - success at 筑基
+            mockGameState.spiritStones = 5000;
+            mockGameState.realm = 0;
+            const rb1 = server.mcpRealmBreakthrough();
+            v129Assert(rb1.success === true, 'mcpRealmBreakthrough succeeds');
+            v129Assert(rb1.newRealm === 1, 'mcpRealmBreakthrough newRealm is 1');
+            v129Assert(rb1.newRealmName === '筑基', 'mcpRealmBreakthrough newRealmName is 筑基');
+            v129Assert(rb1.spiritSpent === 1000, 'mcpRealmBreakthrough spent 1000 spirit');
+            v129Assert(mockGameState.spiritStones === 4000, 'mcpRealmBreakthrough remaining spirit is 4000');
+
+            // Test 10: mcpRealmBreakthrough - insufficient spirit
+            mockGameState.spiritStones = 100;
+            const rbErr = server.mcpRealmBreakthrough();
+            v129Assert(rbErr.success === false, 'mcpRealmBreakthrough fails with insufficient spirit');
+            v129Assert(rbErr.shortage > 0, 'mcpRealmBreakthrough shows shortage');
+            v129Assert(rbErr.required !== undefined, 'mcpRealmBreakthrough shows required amount');
+
+            // Test 11: mcpRealmBreakthrough - already at max realm
+            mockGameState.realm = 12; // 道祖
+            const rbMax = server.mcpRealmBreakthrough();
+            v129Assert(rbMax.isMaxRealm === true, 'mcpRealmBreakthrough at max realm returns isMaxRealm');
+
+            // Test 12: mcpBreakthroughPrepare - success
+            mockGameState.realm = 1; // 筑基
+            mockGameState.breakthrough = { preparing: false, inProgress: false };
+            const bp1 = server.mcpBreakthroughPrepare();
+            v129Assert(bp1.success === true, 'mcpBreakthroughPrepare succeeds');
+            v129Assert(bp1.preparing === true, 'mcpBreakthroughPrepare preparing is true');
+            v129Assert(bp1.targetRealm === 2, 'mcpBreakthroughPrepare targetRealm is 2');
+            v129Assert(bp1.targetRealmName === '金丹', 'mcpBreakthroughPrepare targetRealmName is 金丹');
+
+            // Test 13: mcpBreakthroughPrepare - already in progress
+            mockGameState.breakthrough = { preparing: false, inProgress: true };
+            const bpErr = server.mcpBreakthroughPrepare();
+            v129Assert(bpErr.error !== undefined, 'mcpBreakthroughPrepare fails when in progress');
+
+            // Test 14: mcpBreakthroughPrepare - at max realm
+            mockGameState.realm = 12;
+            mockGameState.breakthrough = { preparing: false, inProgress: false };
+            const bpMax = server.mcpBreakthroughPrepare();
+            v129Assert(bpMax.error !== undefined, 'mcpBreakthroughPrepare fails at max realm');
+
+            // Test 15: mcpBreakthroughStart - success
+            mockGameState.realm = 1;
+            mockGameState.breakthrough = { preparing: true, inProgress: false, result: null };
+            const bs1 = server.mcpBreakthroughStart();
+            v129Assert(bs1.success === true, 'mcpBreakthroughStart succeeds');
+            v129Assert(bs1.inProgress === true, 'mcpBreakthroughStart inProgress is true');
+            v129Assert(bs1.duration > 0, 'mcpBreakthroughStart has duration');
+            v129Assert(mockGameState.breakthrough.preparing === false, 'mcpBreakthroughStart clears preparing');
+
+            // Test 16: mcpBreakthroughStart - not prepared
+            mockGameState.breakthrough = { preparing: false, inProgress: false, result: null };
+            const bsErr = server.mcpBreakthroughStart();
+            v129Assert(bsErr.error !== undefined, 'mcpBreakthroughStart fails if not prepared');
+
+            // Test 17: mcpBreakthroughStart - already in progress
+            mockGameState.breakthrough = { preparing: false, inProgress: true, startTime: Date.now() };
+            const bsErr2 = server.mcpBreakthroughStart();
+            v129Assert(bsErr2.error !== undefined, 'mcpBreakthroughStart fails if already in progress');
+
+            // Test 18: mcpBreakthroughResult - no breakthrough
+            mockGameState.breakthrough = { inProgress: false, result: null };
+            const br1 = server.mcpBreakthroughResult();
+            v129Assert(br1.error !== undefined, 'mcpBreakthroughResult returns error when no breakthrough');
+
+            // Test 19: mcpBreakthroughResult - in progress (complete)
+            mockGameState.breakthrough = {
+                inProgress: true,
+                startTime: Date.now() - 20000, // 20 seconds ago
+                duration: 10000, // 10 second duration
+                preparing: false,
+                result: null,
+                success: false
+            };
+            const br2 = server.mcpBreakthroughResult();
+            v129Assert(br2.result !== null || br2.success !== undefined, 'mcpBreakthroughResult returns result');
+
+            // Test 20: mcpBreakthroughResult - in progress (not complete)
+            mockGameState.breakthrough = {
+                inProgress: true,
+                startTime: Date.now() - 1000, // 1 second ago
+                duration: 15000, // 15 second duration
+                preparing: false,
+                result: null
+            };
+            const br3 = server.mcpBreakthroughResult();
+            v129Assert(br3.inProgress === true, 'mcpBreakthroughResult inProgress is true');
+            v129Assert(br3.remainingMs > 0, 'mcpBreakthroughResult shows remaining time');
+
+            // Test 21: mcpRealmList after breakthrough
+            mockGameState.realm = 2; // 金丹
+            const rl2 = server.mcpRealmList();
+            v129Assert(rl2.currentRealm === 2, 'mcpRealmList currentRealm is 2 after breakthrough');
+            v129Assert(rl2.realms[2].isCurrent === true, 'mcpRealmList realms[2] isCurrent is true');
+            v129Assert(rl2.realms[1].isPast === true, 'mcpRealmList realms[1] isPast is true');
+
+            // Test 22: realm list contains all 13 realms
+            const rl3 = server.mcpRealmList();
+            v129Assert(rl3.realms.some(r => r.name === '炼气'), 'realm list contains 炼气');
+            v129Assert(rl3.realms.some(r => r.name === '道祖'), 'realm list contains 道祖');
+            v129Assert(rl3.realms.some(r => r.name === '大罗'), 'realm list contains 大罗');
+
+            // Test 23: realm detail for max realm
+            mockGameState.realm = 12;
+            const rdMax = server.mcpRealmDetail(12);
+            v129Assert(rdMax.name === '道祖', 'mcpRealmDetail(12) is 道祖');
+            v129Assert(rdMax.condition.minSpirit === 100000000, 'mcpRealmDetail(12) requires 100M spirit');
+
+            // Test 24: breakthrough prepare then start flow
+            mockGameState.realm = 2;
+            mockGameState.breakthrough = null;
+            const bp2 = server.mcpBreakthroughPrepare();
+            v129Assert(bp2.success === true, 'prepare flow - prepare succeeds');
+            const bs2 = server.mcpBreakthroughStart();
+            v129Assert(bs2.success === true, 'prepare flow - start succeeds');
+            v129Assert(bs2.estimatedEndTime > Date.now(), 'prepare flow - estimated end time is in future');
+
+            // Test 25: multiple realm history entries
+            mockGameState.realm = 5;
+            mockGameState.realmHistory = [
+                { from: 0, to: 1, timestamp: Date.now() - 10000 },
+                { from: 1, to: 2, timestamp: Date.now() - 8000 },
+                { from: 2, to: 3, timestamp: Date.now() - 6000 }
+            ];
+            const rl4 = server.mcpRealmList();
+            v129Assert(mockGameState.realmHistory.length === 3, 'realm history has 3 entries');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V129 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V129', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v129Results = runV129Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
