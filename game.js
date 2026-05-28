@@ -5379,6 +5379,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V132)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V133: Register 丹药+炼药系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V133)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6570,6 +6574,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'evolve.complete':
                             result = this.mcpEvolveComplete();
+                            break;
+                        // V133: 丹药+炼药系统
+                        case 'pill.list':
+                            result = this.mcpPillList();
+                            break;
+                        case 'pill.refine':
+                            result = this.mcpPillRefine(args.recipeId);
+                            break;
+                        case 'pill.consume':
+                            result = this.mcpPillConsume(args.pillId);
+                            break;
+                        case 'alchemy.list':
+                            result = this.mcpAlchemyList();
+                            break;
+                        case 'alchemy.start':
+                            result = this.mcpAlchemyStart(args.recipeId);
+                            break;
+                        case 'alchemy.complete':
+                            result = this.mcpAlchemyComplete();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -17157,6 +17180,37 @@ const ACHIEVEMENT_ID_MAP = {
                 return gs.evolve;
             }
 
+            // V133: _initPillState - 初始化丹药系统状态
+            _initPillState() {
+                const gs = window.gameState;
+                if (!gs.pill) {
+                    gs.pill = {
+                        inventory: [],       // 丹药背包
+                        nextId: 1,           // 下一个丹药ID
+                        consumeBonus: { attack: 0, defense: 0, spirit: 0, maxHp: 0 }  // 丹药加成
+                    };
+                }
+                return gs.pill;
+            }
+
+            // V133: _initAlchemyState - 初始化炼药系统状态
+            _initAlchemyState() {
+                const gs = window.gameState;
+                if (!gs.alchemy) {
+                    gs.alchemy = {
+                        recipes: [           // 炼药配方
+                            { id: 'qi_spirit', name: '灵气丹', materials: { herb: 2, crystal: 1 }, result: { type: 'qi', effect: { spirit: 50 }, grade: 1 }, time: 5 },
+                            { id: 'body_strengthening', name: '强体丹', materials: { herb: 3, beastCore: 1 }, result: { type: 'body', effect: { attack: 30, defense: 30 }, grade: 1 }, time: 8 },
+                            { id: 'spirit_boost', name: '神识丹', materials: { herb: 5, soulDust: 2 }, result: { type: 'spirit', effect: { spirit: 100 }, grade: 2 }, time: 15 },
+                            { id: 'health_restore', name: '回春丹', materials: { herb: 2, lifeRoot: 1 }, result: { type: 'health', effect: { maxHp: 200 }, grade: 1 }, time: 5 },
+                            { id: 'comprehensive', name: '综合丹', materials: { herb: 4, crystal: 2, beastCore: 1 }, result: { type: 'all', effect: { attack: 20, defense: 20, spirit: 20, maxHp: 100 }, grade: 2 }, time: 20 }
+                        ],
+                        currentAlchemy: null  // 当前炼药状态
+                    };
+                }
+                return gs.alchemy;
+            }
+
             // V132: mcpPetList - 获取灵宠列表
             mcpPetList() {
                 try {
@@ -17306,6 +17360,161 @@ const ACHIEVEMENT_ID_MAP = {
                         newStage: pet.evolutionStage,
                         statsUpgrade: pet.stats,
                         message: pet.name + ' 进化成功！等级 ' + oldLevel + ' -> ' + pet.level + '，阶段 ' + oldStage + ' -> ' + pet.evolutionStage
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpPillList - 获取丹药列表
+            mcpPillList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pillState = this._initPillState();
+                    return {
+                        success: true,
+                        total: pillState.inventory.length,
+                        pills: pillState.inventory,
+                        consumeBonus: pillState.consumeBonus
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpPillRefine - 炼制丹药
+            mcpPillRefine(recipeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pillState = this._initPillState();
+                    const alchemyState = this._initAlchemyState();
+                    // 查找配方
+                    const recipe = alchemyState.recipes.find(r => r.id === recipeId);
+                    if (!recipe) return { error: '炼药配方不存在: ' + recipeId };
+                    // 检查是否正在炼药
+                    if (alchemyState.currentAlchemy) {
+                        return { error: '当前正在炼药中，请先完成炼药' };
+                    }
+                    // 消耗材料并炼制丹药（简化：直接获得丹药）
+                    const pill = {
+                        id: 'pill_' + pillState.nextId++,
+                        name: recipe.name,
+                        type: recipe.result.type,
+                        effect: recipe.result.effect,
+                        grade: recipe.result.grade
+                    };
+                    pillState.inventory.push(pill);
+                    return {
+                        success: true,
+                        pill: pill,
+                        message: '炼制成功！获得 ' + pill.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpPillConsume - 服用丹药
+            mcpPillConsume(pillId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const pillState = this._initPillState();
+                    // 查找丹药
+                    const pillIndex = pillState.inventory.findIndex(p => p.id === pillId);
+                    if (pillIndex === -1) return { error: '丹药不存在: ' + pillId };
+                    const pill = pillState.inventory[pillIndex];
+                    // 移除丹药
+                    pillState.inventory.splice(pillIndex, 1);
+                    // 应用加成
+                    if (pill.effect.attack) pillState.consumeBonus.attack += pill.effect.attack;
+                    if (pill.effect.defense) pillState.consumeBonus.defense += pill.effect.defense;
+                    if (pill.effect.spirit) pillState.consumeBonus.spirit += pill.effect.spirit;
+                    if (pill.effect.maxHp) pillState.consumeBonus.maxHp += pill.effect.maxHp;
+                    return {
+                        success: true,
+                        pillName: pill.name,
+                        effect: pill.effect,
+                        consumeBonus: pillState.consumeBonus,
+                        message: '服用 ' + pill.name + ' 成功，属性加成已更新'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpAlchemyList - 获取炼药配方
+            mcpAlchemyList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const alchemyState = this._initAlchemyState();
+                    return {
+                        success: true,
+                        total: alchemyState.recipes.length,
+                        recipes: alchemyState.recipes
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpAlchemyStart - 开始炼药
+            mcpAlchemyStart(recipeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const alchemyState = this._initAlchemyState();
+                    // 查找配方
+                    const recipe = alchemyState.recipes.find(r => r.id === recipeId);
+                    if (!recipe) return { error: '炼药配方不存在: ' + recipeId };
+                    // 检查是否正在炼药
+                    if (alchemyState.currentAlchemy) {
+                        return { error: '当前正在炼药中，请先完成炼药' };
+                    }
+                    // 开始炼药
+                    alchemyState.currentAlchemy = {
+                        recipeId: recipe.id,
+                        recipeName: recipe.name,
+                        startTime: Date.now(),
+                        duration: recipe.time * 1000
+                    };
+                    return {
+                        success: true,
+                        recipeName: recipe.name,
+                        duration: recipe.time,
+                        message: '开始炼药 ' + recipe.name + '，预计需要 ' + recipe.time + ' 秒'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V133: mcpAlchemyComplete - 完成炼药
+            mcpAlchemyComplete() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const alchemyState = this._initAlchemyState();
+                    const pillState = this._initPillState();
+                    if (!alchemyState.currentAlchemy) {
+                        return { error: '当前没有正在进行的炼药，请先调用 alchemy.start' };
+                    }
+                    const current = alchemyState.currentAlchemy;
+                    // 检查是否完成
+                    const elapsed = Date.now() - current.startTime;
+                    if (elapsed < current.duration) {
+                        const remaining = Math.ceil((current.duration - elapsed) / 1000);
+                        return { error: '炼药尚未完成，还需 ' + remaining + ' 秒' };
+                    }
+                    // 获取配方
+                    const recipe = alchemyState.recipes.find(r => r.id === current.recipeId);
+                    if (!recipe) return { error: '炼药配方不存在' };
+                    // 生成丹药
+                    const pill = {
+                        id: 'pill_' + pillState.nextId++,
+                        name: recipe.name,
+                        type: recipe.result.type,
+                        effect: recipe.result.effect,
+                        grade: recipe.result.grade
+                    };
+                    pillState.inventory.push(pill);
+                    // 清空炼药状态
+                    alchemyState.currentAlchemy = null;
+                    return {
+                        success: true,
+                        pill: pill,
+                        message: '炼药完成！获得 ' + pill.name
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -25595,6 +25804,40 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V133: 丹药+炼药系统
+        const MCP_TOOLS_V133 = {
+            'pill.list': {
+                name: 'pill.list',
+                description: '获取丹药列表 (丹药系统-列表所有丹药)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pill.refine': {
+                name: 'pill.refine',
+                description: '炼制丹药 (丹药系统-消耗材料炼制丹药)',
+                inputSchema: { type: 'object', properties: { recipeId: { type: 'string', description: '配方ID' } }, required: ['recipeId'] }
+            },
+            'pill.consume': {
+                name: 'pill.consume',
+                description: '服用丹药 (丹药系统-服用丹药获得属性加成)',
+                inputSchema: { type: 'object', properties: { pillId: { type: 'string', description: '丹药ID' } }, required: ['pillId'] }
+            },
+            'alchemy.list': {
+                name: 'alchemy.list',
+                description: '获取炼药配方 (炼药系统-列表所有配方)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'alchemy.start': {
+                name: 'alchemy.start',
+                description: '开始炼药 (炼药系统-开始炼药计时)',
+                inputSchema: { type: 'object', properties: { recipeId: { type: 'string', description: '配方ID' } }, required: ['recipeId'] }
+            },
+            'alchemy.complete': {
+                name: 'alchemy.complete',
+                description: '完成炼药 (炼药系统-完成炼药，获得丹药)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -29568,6 +29811,164 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V132', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v132Results = runV132Tests();
+
+        // ===== V133: 丹药+炼药系统 Tests =====
+        function runV133Tests() {
+            const results = [];
+            function v133Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 2,
+                stage: 1,
+                pill: null,
+                alchemy: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: pill.list - returns empty list initially
+            const pl1 = server.mcpPillList();
+            v133Assert(pl1.success === true, 'pill.list returns success');
+            v133Assert(pl1.total === 0, 'pill.list total is 0 initially');
+            v133Assert(Array.isArray(pl1.pills), 'pill.list returns pills array');
+            v133Assert(pl1.consumeBonus, 'pill.list returns consumeBonus');
+
+            // Test 2: alchemy.list - returns 5 recipes
+            const al1 = server.mcpAlchemyList();
+            v133Assert(al1.success === true, 'alchemy.list returns success');
+            v133Assert(al1.total === 5, 'alchemy.list returns 5 recipes');
+            v133Assert(Array.isArray(al1.recipes), 'alchemy.list returns recipes array');
+            v133Assert(al1.recipes[0].id === 'qi_spirit', 'alchemy.list first recipe is qi_spirit');
+
+            // Test 3: pill.refine - refine a pill successfully
+            const pr1 = server.mcpPillRefine('qi_spirit');
+            v133Assert(pr1.success === true, 'pill.refine succeeds');
+            v133Assert(pr1.pill && pr1.pill.id, 'pill.refine returns pill with id');
+            v133Assert(pr1.pill.name === '灵气丹', 'pill.refine returns correct pill name');
+            v133Assert(pr1.pill.type === 'qi', 'pill.refine returns correct type');
+            v133Assert(pr1.pill.effect.spirit === 50, 'pill.refine returns correct effect');
+
+            // Test 4: pill.list - returns refined pill
+            const pl2 = server.mcpPillList();
+            v133Assert(pl2.total === 1, 'pill.list returns 1 pill after refine');
+
+            // Test 5: pill.consume - consume a pill
+            const pc1 = server.mcpPillConsume(pr1.pill.id);
+            v133Assert(pc1.success === true, 'pill.consume succeeds');
+            v133Assert(pc1.pillName === '灵气丹', 'pill.consume returns correct pill name');
+            v133Assert(pc1.effect.spirit === 50, 'pill.consume returns correct effect');
+            v133Assert(pc1.consumeBonus.spirit === 50, 'pill.consume updates consumeBonus');
+
+            // Test 6: pill.list - pill count decreases after consume
+            const pl3 = server.mcpPillList();
+            v133Assert(pl3.total === 0, 'pill.list total is 0 after consume');
+
+            // Test 7: pill.consume - fails with invalid pillId
+            const pcErr1 = server.mcpPillConsume('invalid_id');
+            v133Assert(pcErr1.error && pcErr1.error.includes('丹药不存在'), 'pill.consume fails with invalid id');
+
+            // Test 8: pill.refine - fails with invalid recipeId
+            const prErr1 = server.mcpPillRefine('invalid_recipe');
+            v133Assert(prErr1.error && prErr1.error.includes('炼药配方不存在'), 'pill.refine fails with invalid recipe');
+
+            // Test 9: alchemy.start - start alchemy successfully
+            const as1 = server.mcpAlchemyStart('qi_spirit');
+            v133Assert(as1.success === true, 'alchemy.start succeeds');
+            v133Assert(as1.recipeName === '灵气丹', 'alchemy.start returns correct recipe name');
+            v133Assert(as1.duration === 5, 'alchemy.start returns correct duration');
+            v133Assert(mockGameState.alchemy.currentAlchemy !== null, 'alchemy.start sets currentAlchemy');
+
+            // Test 10: alchemy.start - fails when already alchemy
+            const asErr1 = server.mcpAlchemyStart('body_strengthening');
+            v133Assert(asErr1.error && asErr1.error.includes('当前正在炼药中'), 'alchemy.start fails when already alchemy');
+
+            // Test 11: alchemy.complete - fails before time is up
+            const ac1 = server.mcpAlchemyComplete();
+            v133Assert(ac1.error && ac1.error.includes('炼药尚未完成'), 'alchemy.complete fails before time is up');
+
+            // Test 12: alchemy.complete - succeeds after time passes
+            mockGameState.alchemy.currentAlchemy.startTime = Date.now() - 6000;
+            const ac2 = server.mcpAlchemyComplete();
+            v133Assert(ac2.success === true, 'alchemy.complete succeeds');
+            v133Assert(ac2.pill && ac2.pill.id, 'alchemy.complete returns pill');
+            v133Assert(ac2.pill.name === '灵气丹', 'alchemy.complete returns correct pill name');
+            v133Assert(mockGameState.alchemy.currentAlchemy === null, 'alchemy.complete clears currentAlchemy');
+
+            // Test 13: alchemy.list - verify 5 recipes available
+            const al2 = server.mcpAlchemyList();
+            v133Assert(al2.total === 5, 'alchemy.list still returns 5 recipes');
+            v133Assert(al2.recipes[1].id === 'body_strengthening', 'alchemy.list second recipe is body_strengthening');
+            v133Assert(al2.recipes[2].id === 'spirit_boost', 'alchemy.list third recipe is spirit_boost');
+
+            // Test 14: pill.refine - multiple pills
+            const pr2 = server.mcpPillRefine('body_strengthening');
+            v133Assert(pr2.success === true, 'pill.refine body_strengthening succeeds');
+            const pr3 = server.mcpPillRefine('health_restore');
+            v133Assert(pr3.success === true, 'pill.refine health_restore succeeds');
+            const pl4 = server.mcpPillList();
+            v133Assert(pl4.total === 2, 'pill.list returns 2 pills');
+
+            // Test 15: pill.consume - consume multiple pills accumulates bonus
+            const pc2 = server.mcpPillConsume(pr2.pill.id);
+            v133Assert(pc2.success === true, 'pill.consume second pill succeeds');
+            v133Assert(pc2.consumeBonus.attack === 30, 'pill.consume accumulates attack bonus');
+            v133Assert(pc2.consumeBonus.defense === 30, 'pill.consume accumulates defense bonus');
+
+            // Test 16: alchemy.start and complete - spirit_boost recipe
+            mockGameState.alchemy.currentAlchemy = null;
+            const as2 = server.mcpAlchemyStart('spirit_boost');
+            v133Assert(as2.success === true, 'alchemy.start spirit_boost succeeds');
+            v133Assert(as2.recipeName === '神识丹', 'alchemy.start returns spirit_boost name');
+            mockGameState.alchemy.currentAlchemy.startTime = Date.now() - 16000;
+            const ac3 = server.mcpAlchemyComplete();
+            v133Assert(ac3.success === true, 'alchemy.complete spirit_boost succeeds');
+            v133Assert(ac3.pill.grade === 2, 'alchemy.complete returns grade 2 pill');
+
+            // Test 17: pill.consume - comprehensive pill effect
+            const pr4 = server.mcpPillRefine('comprehensive');
+            v133Assert(pr4.success === true, 'pill.refine comprehensive succeeds');
+            v133Assert(pr4.pill.type === 'all', 'pill.refine comprehensive type is all');
+            const pc3 = server.mcpPillConsume(pr4.pill.id);
+            v133Assert(pc3.success === true, 'pill.consume comprehensive succeeds');
+            v133Assert(pc3.consumeBonus.attack === 50, 'pill.consume comprehensive attack is 50');
+            v133Assert(pc3.consumeBonus.defense === 50, 'pill.consume comprehensive defense is 50');
+            v133Assert(pc3.consumeBonus.spirit === 150, 'pill.consume comprehensive spirit is 150');
+            v133Assert(pc3.consumeBonus.maxHp === 100, 'pill.consume comprehensive maxHp is 100');
+
+            // Test 18: alchemy.complete - fails with no alchemy
+            mockGameState.alchemy.currentAlchemy = null;
+            const acErr1 = server.mcpAlchemyComplete();
+            v133Assert(acErr1.error && acErr1.error.includes('当前没有正在进行的炼药'), 'alchemy.complete fails with no alchemy');
+
+            // Test 19: alchemy.list - all recipes have required fields
+            const al3 = server.mcpAlchemyList();
+            for (const recipe of al3.recipes) {
+                v133Assert(recipe.id, 'recipe has id');
+                v133Assert(recipe.name, 'recipe has name');
+                v133Assert(recipe.materials, 'recipe has materials');
+                v133Assert(recipe.result, 'recipe has result');
+                v133Assert(recipe.time > 0, 'recipe has valid time');
+            }
+
+            // Test 20: pill.consume - health restore pill
+            const pr5 = server.mcpPillRefine('health_restore');
+            v133Assert(pr5.success === true, 'pill.refine health_restore succeeds');
+            const pc4 = server.mcpPillConsume(pr5.pill.id);
+            v133Assert(pc4.success === true, 'pill.consume health_restore succeeds');
+            v133Assert(pc4.effect.maxHp === 200, 'pill.consume health_restore effect is correct');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V133 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V133', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v133Results = runV133Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
