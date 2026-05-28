@@ -3457,6 +3457,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V133)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V134: Register 阵法+符箓系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V134)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4667,6 +4671,25 @@
                             break;
                         case 'alchemy.complete':
                             result = this.mcpAlchemyComplete();
+                            break;
+                        // V134: 阵法+符箓系统
+                        case 'formation.list':
+                            result = this.mcpFormationList();
+                            break;
+                        case 'formation.place':
+                            result = this.mcpFormationPlace(args.formationId, args.x, args.y);
+                            break;
+                        case 'formation.activate':
+                            result = this.mcpFormationActivate(args.formationId);
+                            break;
+                        case 'talisman.list':
+                            result = this.mcpTalismanList();
+                            break;
+                        case 'talisman.draw':
+                            result = this.mcpTalismanDraw(args.talismanId);
+                            break;
+                        case 'talisman.use':
+                            result = this.mcpTalismanUse(args.talismanId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -15593,6 +15616,207 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V134: _initFormationState - 初始化阵法系统状态
+            _initFormationState() {
+                const gs = window.gameState;
+                if (!gs.formation) {
+                    gs.formation = {
+                        available: [
+                            { id: 'spirit_shield', name: '灵气护盾阵', effect: { defense: 50 }, cost: { spiritStones: 100 } },
+                            { id: 'attack_array', name: '攻击阵法', effect: { attack: 30 }, cost: { spiritStones: 150 } },
+                            { id: 'speed_field', name: '加速阵', effect: { speed: 20 }, cost: { spiritStones: 80 } },
+                            { id: 'spirit_gathering', name: '聚灵阵', effect: { spirit: 100 }, cost: { spiritStones: 200 } },
+                            { id: 'healing_array', name: '疗伤阵', effect: { maxHp: 500 }, cost: { spiritStones: 120 } }
+                        ],
+                        placed: []
+                    };
+                }
+                return gs.formation;
+            }
+
+            // V134: _initTalismanState - 初始化符箓系统状态
+            _initTalismanState() {
+                const gs = window.gameState;
+                if (!gs.talisman) {
+                    gs.talisman = {
+                        inventory: [],
+                        nextId: 1,
+                        drawable: [
+                            { id: 'attack符文', name: '攻击符文', type: 'attack', power: 25, materials: { herb: 3, beastCore: 1 } },
+                            { id: 'defense符文', name: '防御符文', type: 'defense', power: 30, materials: { crystal: 2, herb: 1 } },
+                            { id: 'spirit符文', name: '灵气符文', type: 'spirit', power: 50, materials: { soulDust: 2, herb: 2 } },
+                            { id: 'heal符文', name: '治愈符文', type: 'heal', power: 100, materials: { lifeRoot: 2, herb: 3 } }
+                        ]
+                    };
+                }
+                return gs.talisman;
+            }
+
+            // V134: mcpFormationList - 获取阵法列表
+            mcpFormationList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const formationState = this._initFormationState();
+                    return {
+                        success: true,
+                        total: formationState.available.length,
+                        available: formationState.available,
+                        placed: formationState.placed
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V134: mcpFormationPlace - 布置阵法
+            mcpFormationPlace(formationId, x, y) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const formationState = this._initFormationState();
+                    const formation = formationState.available.find(f => f.id === formationId);
+                    if (!formation) return { error: '阵法不存在: ' + formationId };
+                    // 检查灵石是否足够
+                    const cost = formation.cost.spiritStones || 0;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，布置阵法需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    // 添加到已布置列表
+                    const placedFormation = {
+                        id: 'placed_' + Date.now(),
+                        formationId: formation.id,
+                        name: formation.name,
+                        x: x,
+                        y: y,
+                        active: false,
+                        activatedAt: null
+                    };
+                    formationState.placed.push(placedFormation);
+                    return {
+                        success: true,
+                        placed: placedFormation,
+                        message: '布置 ' + formation.name + ' 成功，消耗 ' + cost + ' 灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V134: mcpFormationActivate - 激活阵法
+            mcpFormationActivate(placedFormationId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const formationState = this._initFormationState();
+                    const placed = formationState.placed.find(f => f.id === placedFormationId);
+                    if (!placed) return { error: '布置的阵法不存在: ' + placedFormationId };
+                    if (placed.active) return { error: '阵法已经激活' };
+                    // 找到阵法定义获取效果
+                    const formationDef = formationState.available.find(f => f.id === placed.formationId);
+                    if (!formationDef) return { error: '阵法定义不存在' };
+                    // 激活阵法
+                    placed.active = true;
+                    placed.activatedAt = Date.now();
+                    // 应用效果
+                    if (!gs.bonusEffects) gs.bonusEffects = {};
+                    const effect = formationDef.effect;
+                    if (effect.attack) gs.bonusEffects.attack = (gs.bonusEffects.attack || 0) + effect.attack;
+                    if (effect.defense) gs.bonusEffects.defense = (gs.bonusEffects.defense || 0) + effect.defense;
+                    if (effect.spirit) gs.bonusEffects.spirit = (gs.bonusEffects.spirit || 0) + effect.spirit;
+                    if (effect.maxHp) gs.bonusEffects.maxHp = (gs.bonusEffects.maxHp || 0) + effect.maxHp;
+                    if (effect.speed) gs.bonusEffects.speed = (gs.bonusEffects.speed || 0) + effect.speed;
+                    return {
+                        success: true,
+                        name: placed.name,
+                        effect: effect,
+                        message: '激活 ' + placed.name + ' 成功，获得属性加成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V134: mcpTalismanList - 获取符箓列表
+            mcpTalismanList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const talismanState = this._initTalismanState();
+                    return {
+                        success: true,
+                        total: talismanState.inventory.length,
+                        inventory: talismanState.inventory,
+                        drawable: talismanState.drawable
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V134: mcpTalismanDraw - 绘制符箓
+            mcpTalismanDraw(talismanId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const talismanState = this._initTalismanState();
+                    const talismanDef = talismanState.drawable.find(t => t.id === talismanId);
+                    if (!talismanDef) return { error: '符箓类型不存在: ' + talismanId };
+                    // 检查材料是否足够
+                    const materials = talismanDef.materials;
+                    for (const [mat, count] of Object.entries(materials)) {
+                        if ((gs.materials && gs.materials[mat] || 0) < count) {
+                            return { error: '材料不足: ' + mat + ' 需要 ' + count + ' 当前 ' + (gs.materials && gs.materials[mat] || 0) };
+                        }
+                    }
+                    // 消耗材料
+                    for (const [mat, count] of Object.entries(materials)) {
+                        gs.materials[mat] -= count;
+                    }
+                    // 添加到背包
+                    const talisman = {
+                        id: 'talisman_' + talismanState.nextId++,
+                        name: talismanDef.name,
+                        type: talismanDef.type,
+                        power: talismanDef.power
+                    };
+                    talismanState.inventory.push(talisman);
+                    return {
+                        success: true,
+                        talisman: talisman,
+                        message: '绘制 ' + talismanDef.name + ' 成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V134: mcpTalismanUse - 使用符箓
+            mcpTalismanUse(talismanId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const talismanState = this._initTalismanState();
+                    const talismanIndex = talismanState.inventory.findIndex(t => t.id === talismanId);
+                    if (talismanIndex === -1) return { error: '符箓不存在: ' + talismanId };
+                    const talisman = talismanState.inventory[talismanIndex];
+                    // 移除符箓
+                    talismanState.inventory.splice(talismanIndex, 1);
+                    // 应用效果
+                    if (!gs.bonusEffects) gs.bonusEffects = {};
+                    switch (talisman.type) {
+                        case 'attack':
+                            gs.bonusEffects.attack = (gs.bonusEffects.attack || 0) + talisman.power;
+                            break;
+                        case 'defense':
+                            gs.bonusEffects.defense = (gs.bonusEffects.defense || 0) + talisman.power;
+                            break;
+                        case 'spirit':
+                            gs.bonusEffects.spirit = (gs.bonusEffects.spirit || 0) + talisman.power;
+                            break;
+                        case 'heal':
+                            gs.bonusEffects.maxHp = (gs.bonusEffects.maxHp || 0) + talisman.power;
+                            break;
+                    }
+                    return {
+                        success: true,
+                        name: talisman.name,
+                        type: talisman.type,
+                        power: talisman.power,
+                        message: '使用 ' + talisman.name + ' 成功，获得 ' + talisman.power + ' 属性加成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -23912,6 +24136,40 @@
             }
         };
 
+        // V134: 阵法+符箓系统
+        const MCP_TOOLS_V134 = {
+            'formation.list': {
+                name: 'formation.list',
+                description: '获取阵法列表 (阵法系统-列表所有阵法)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'formation.place': {
+                name: 'formation.place',
+                description: '布置阵法 (阵法系统-在指定位置布置阵法)',
+                inputSchema: { type: 'object', properties: { formationId: { type: 'string', description: '阵法ID' }, x: { type: 'number', description: 'X坐标' }, y: { type: 'number', description: 'Y坐标' } }, required: ['formationId', 'x', 'y'] }
+            },
+            'formation.activate': {
+                name: 'formation.activate',
+                description: '激活阵法 (阵法系统-激活阵法获得效果)',
+                inputSchema: { type: 'object', properties: { formationId: { type: 'string', description: '阵法ID' } }, required: ['formationId'] }
+            },
+            'talisman.list': {
+                name: 'talisman.list',
+                description: '获取符箓列表 (符箓系统-列表背包中的符箓)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'talisman.draw': {
+                name: 'talisman.draw',
+                description: '绘制符箓 (符箓系统-消耗材料绘制符箓)',
+                inputSchema: { type: 'object', properties: { talismanId: { type: 'string', description: '符箓ID' } }, required: ['talismanId'] }
+            },
+            'talisman.use': {
+                name: 'talisman.use',
+                description: '使用符箓 (符箓系统-使用符箓获得效果)',
+                inputSchema: { type: 'object', properties: { talismanId: { type: 'string', description: '符箓ID' } }, required: ['talismanId'] }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -28043,6 +28301,295 @@
             return { version: 'V133', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v133Results = runV133Tests();
+
+        // ===== V134: 阵法+符箓系统 Tests =====
+        function runV134Tests() {
+            const results = [];
+            function v134Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 2,
+                stage: 1,
+                formation: null,
+                talisman: null,
+                materials: { herb: 20, crystal: 10, beastCore: 5, soulDust: 10, lifeRoot: 10 },
+                bonusEffects: {}
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // === Formation Tests ===
+
+            // Test 1: formation.list - returns 5 formations
+            const fl1 = server.mcpFormationList();
+            v134Assert(fl1.success === true, 'formation.list returns success');
+            v134Assert(fl1.total === 5, 'formation.list returns 5 formations');
+            v134Assert(Array.isArray(fl1.available), 'formation.list returns available array');
+            v134Assert(Array.isArray(fl1.placed), 'formation.list returns placed array');
+            v134Assert(fl1.available[0].id === 'spirit_shield', 'formation.list first formation is spirit_shield');
+
+            // Test 2: formation.place - place a formation successfully
+            mockGameState.spiritStones = 10000;
+            const fp1 = server.mcpFormationPlace('spirit_shield', 10, 20);
+            v134Assert(fp1.success === true, 'formation.place succeeds');
+            v134Assert(fp1.placed && fp1.placed.id, 'formation.place returns placed formation with id');
+            v134Assert(fp1.placed.name === '灵气护盾阵', 'formation.place returns correct name');
+            v134Assert(fp1.placed.x === 10, 'formation.place returns correct x');
+            v134Assert(fp1.placed.y === 20, 'formation.place returns correct y');
+            v134Assert(fp1.placed.active === false, 'formation.place initially not active');
+
+            // Test 3: formation.list - placed array has 1 item
+            const fl2 = server.mcpFormationList();
+            v134Assert(fl2.placed.length === 1, 'formation.list placed has 1 item');
+
+            // Test 4: formation.place - fails with invalid id
+            const fpErr1 = server.mcpFormationPlace('invalid_formation', 0, 0);
+            v134Assert(fpErr1.error && fpErr1.error.includes('阵法不存在'), 'formation.place fails with invalid id');
+
+            // Test 5: formation.place - fails with insufficient spirit stones
+            mockGameState.spiritStones = 50;
+            const fpErr2 = server.mcpFormationPlace('spirit_shield', 0, 0);
+            v134Assert(fpErr2.error && fpErr2.error.includes('灵石不足'), 'formation.place fails with insufficient spirit stones');
+
+            // Test 6: formation.activate - activate placed formation
+            mockGameState.spiritStones = 10000;
+            const fp2 = server.mcpFormationPlace('attack_array', 30, 40);
+            v134Assert(fp2.success === true, 'formation.place attack_array succeeds');
+            const fa1 = server.mcpFormationActivate(fp2.placed.id);
+            v134Assert(fa1.success === true, 'formation.activate succeeds');
+            v134Assert(fa1.name === '攻击阵法', 'formation.activate returns correct name');
+            v134Assert(fa1.effect.attack === 30, 'formation.activate returns correct effect');
+            v134Assert(mockGameState.bonusEffects.attack === 30, 'formation.activate applies effect to bonusEffects');
+
+            // Test 7: formation.activate - fails with invalid id
+            const faErr1 = server.mcpFormationActivate('invalid_id');
+            v134Assert(faErr1.error && faErr1.error.includes('布置的阵法不存在'), 'formation.activate fails with invalid id');
+
+            // Test 8: formation.activate - fails if already activated
+            const faErr2 = server.mcpFormationActivate(fp2.placed.id);
+            v134Assert(faErr2.error && faErr2.error.includes('阵法已经激活'), 'formation.activate fails if already activated');
+
+            // Test 9: formation.place - place spirit_gathering (spirit effect)
+            const fp3 = server.mcpFormationPlace('spirit_gathering', 50, 60);
+            v134Assert(fp3.success === true, 'formation.place spirit_gathering succeeds');
+            const fa2 = server.mcpFormationActivate(fp3.placed.id);
+            v134Assert(fa2.success === true, 'formation.activate spirit_gathering succeeds');
+            v134Assert(fa2.effect.spirit === 100, 'formation.activate spirit effect is correct');
+
+            // Test 10: formation.place - place healing_array (maxHp effect)
+            const fp4 = server.mcpFormationPlace('healing_array', 70, 80);
+            v134Assert(fp4.success === true, 'formation.place healing_array succeeds');
+            const fa3 = server.mcpFormationActivate(fp4.placed.id);
+            v134Assert(fa3.success === true, 'formation.activate healing_array succeeds');
+            v134Assert(fa3.effect.maxHp === 500, 'formation.activate maxHp effect is correct');
+
+            // === Talisman Tests ===
+
+            // Test 11: talisman.list - returns empty inventory initially
+            const tl1 = server.mcpTalismanList();
+            v134Assert(tl1.success === true, 'talisman.list returns success');
+            v134Assert(tl1.total === 0, 'talisman.list total is 0 initially');
+            v134Assert(Array.isArray(tl1.inventory), 'talisman.list returns inventory array');
+            v134Assert(Array.isArray(tl1.drawable), 'talisman.list returns drawable array');
+            v134Assert(tl1.drawable.length === 4, 'talisman.list returns 4 drawable types');
+
+            // Test 12: talisman.draw - draw attack符文 successfully
+            const td1 = server.mcpTalismanDraw('attack符文');
+            v134Assert(td1.success === true, 'talisman.draw succeeds');
+            v134Assert(td1.talisman && td1.talisman.id, 'talisman.draw returns talisman with id');
+            v134Assert(td1.talisman.name === '攻击符文', 'talisman.draw returns correct name');
+            v134Assert(td1.talisman.type === 'attack', 'talisman.draw returns correct type');
+            v134Assert(td1.talisman.power === 25, 'talisman.draw returns correct power');
+
+            // Test 13: talisman.list - inventory has 1 item
+            const tl2 = server.mcpTalismanList();
+            v134Assert(tl2.total === 1, 'talisman.list total is 1 after draw');
+
+            // Test 14: talisman.draw - fails with invalid id
+            const tdErr1 = server.mcpTalismanDraw('invalid_talisman');
+            v134Assert(tdErr1.error && tdErr1.error.includes('符箓类型不存在'), 'talisman.draw fails with invalid id');
+
+            // Test 15: talisman.draw - fails with insufficient materials
+            mockGameState.materials.herb = 0;
+            const tdErr2 = server.mcpTalismanDraw('attack符文');
+            v134Assert(tdErr2.error && tdErr2.error.includes('材料不足'), 'talisman.draw fails with insufficient materials');
+
+            // Test 16: talisman.use - use a talisman
+            mockGameState.materials = { herb: 20, crystal: 10, beastCore: 5, soulDust: 10, lifeRoot: 10 };
+            const td2 = server.mcpTalismanDraw('defense符文');
+            v134Assert(td2.success === true, 'talisman.draw defense符文 succeeds');
+            const tu1 = server.mcpTalismanUse(td2.talisman.id);
+            v134Assert(tu1.success === true, 'talisman.use succeeds');
+            v134Assert(tu1.name === '防御符文', 'talisman.use returns correct name');
+            v134Assert(tu1.type === 'defense', 'talisman.use returns correct type');
+            v134Assert(tu1.power === 30, 'talisman.use returns correct power');
+            v134Assert(mockGameState.bonusEffects.defense === 30, 'talisman.use applies defense effect');
+
+            // Test 17: talisman.list - inventory decreases after use
+            const tl3 = server.mcpTalismanList();
+            v134Assert(tl3.total === 1, 'talisman.list total is 1 after use');
+
+            // Test 18: talisman.use - fails with invalid id
+            const tuErr1 = server.mcpTalismanUse('invalid_id');
+            v134Assert(tuErr1.error && tuErr1.error.includes('符箓不存在'), 'talisman.use fails with invalid id');
+
+            // Test 19: talisman.draw - draw spirit符文
+            const td3 = server.mcpTalismanDraw('spirit符文');
+            v134Assert(td3.success === true, 'talisman.draw spirit符文 succeeds');
+            v134Assert(td3.talisman.type === 'spirit', 'talisman.draw spirit type is correct');
+            v134Assert(td3.talisman.power === 50, 'talisman.draw spirit power is correct');
+
+            // Test 20: talisman.use - use spirit符文
+            const tu2 = server.mcpTalismanUse(td3.talisman.id);
+            v134Assert(tu2.success === true, 'talisman.use spirit符文 succeeds');
+            v134Assert(mockGameState.bonusEffects.spirit === 50, 'talisman.use applies spirit effect');
+
+            // Test 21: talisman.draw - draw heal符文
+            const td4 = server.mcpTalismanDraw('heal符文');
+            v134Assert(td4.success === true, 'talisman.draw heal符文 succeeds');
+            v134Assert(td4.talisman.type === 'heal', 'talisman.draw heal type is correct');
+            v134Assert(td4.talisman.power === 100, 'talisman.draw heal power is correct');
+
+            // Test 22: talisman.use - use heal符文 (maxHp)
+            const tu3 = server.mcpTalismanUse(td4.talisman.id);
+            v134Assert(tu3.success === true, 'talisman.use heal符文 succeeds');
+            v134Assert(mockGameState.bonusEffects.maxHp === 100, 'talisman.use applies maxHp effect');
+
+            // Test 23: talisman.list - verify all 4 drawable types have required fields
+            const tl4 = server.mcpTalismanList();
+            for (const t of tl4.drawable) {
+                v134Assert(t.id, 'drawable talisman has id');
+                v134Assert(t.name, 'drawable talisman has name');
+                v134Assert(t.type, 'drawable talisman has type');
+                v134Assert(t.power > 0, 'drawable talisman has valid power');
+                v134Assert(t.materials, 'drawable talisman has materials');
+            }
+
+            // Test 24: formation.list - verify all 5 formations have required fields
+            const fl3 = server.mcpFormationList();
+            for (const f of fl3.available) {
+                v134Assert(f.id, 'formation has id');
+                v134Assert(f.name, 'formation has name');
+                v134Assert(f.effect, 'formation has effect');
+                v134Assert(f.cost && f.cost.spiritStones, 'formation has spirit stone cost');
+            }
+
+            // Test 25: formation.place - multiple placements
+            const fp5 = server.mcpFormationPlace('speed_field', 100, 200);
+            v134Assert(fp5.success === true, 'formation.place speed_field succeeds');
+            const fl4 = server.mcpFormationList();
+            v134Assert(fl4.placed.length === 5, 'formation.list placed has 5 items');
+
+            // Test 26: formation.activate - activate speed field
+            const fa4 = server.mcpFormationActivate(fp5.placed.id);
+            v134Assert(fa4.success === true, 'formation.activate speed_field succeeds');
+            v134Assert(fa4.effect.speed === 20, 'formation.activate speed effect is correct');
+
+            // Test 27: talisman.draw - consumes materials
+            const materialsBefore = { ...mockGameState.materials };
+            const td5 = server.mcpTalismanDraw('attack符文');
+            v134Assert(td5.success === true, 'talisman.draw consumes materials');
+            v134Assert(mockGameState.materials.herb < materialsBefore.herb, 'talisman.draw reduces herb');
+            v134Assert(mockGameState.materials.beastCore < materialsBefore.beastCore, 'talisman.draw reduces beastCore');
+
+            // Test 28: mcpFormationList - all placed formations have coordinates
+            const fl5 = server.mcpFormationList();
+            for (const p of fl5.placed) {
+                v134Assert(typeof p.x === 'number', 'placed formation has x');
+                v134Assert(typeof p.y === 'number', 'placed formation has y');
+            }
+
+            // Test 29: mcpTalismanUse - multiple talismans stack effects
+            const td6 = server.mcpTalismanDraw('defense符文');
+            v134Assert(td6.success === true, 'talisman.draw second defense succeeds');
+            const tu4 = server.mcpTalismanUse(td6.talisman.id);
+            v134Assert(tu4.success === true, 'talisman.use second defense succeeds');
+            v134Assert(mockGameState.bonusEffects.defense === 60, 'talisman.use stacks defense effects');
+
+            // Test 30: mcpFormationActivate - multiple formations stack effects
+            const fp6 = server.mcpFormationPlace('spirit_shield', 0, 0);
+            const fa5 = server.mcpFormationActivate(fp6.placed.id);
+            v134Assert(fa5.success === true, 'formation.activate spirit_shield succeeds');
+            v134Assert(mockGameState.bonusEffects.defense === 100, 'formation.activate stacks defense (50+50)');
+
+            // Test 31: mcpFormationList - placed formations track active status
+            const placedFormation = fl5.placed.find(p => p.id === fp5.placed.id);
+            v134Assert(placedFormation && placedFormation.active === true, 'formation.list shows active status');
+
+            // Test 32: mcpTalismanList - nextId increments correctly
+            const currentNextId = mockGameState.talisman.nextId;
+            const td7 = server.mcpTalismanDraw('spirit符文');
+            v134Assert(td7.success === true, 'talisman.draw increments nextId');
+            v134Assert(mockGameState.talisman.nextId === currentNextId + 1, 'talisman.nextId incremented');
+
+            // Test 33: mcpFormationPlace - all 5 formation types can be placed
+            const formationTypes = ['spirit_shield', 'attack_array', 'speed_field', 'spirit_gathering', 'healing_array'];
+            for (const fid of formationTypes) {
+                const fp = server.mcpFormationPlace(fid, Math.random() * 100, Math.random() * 100);
+                v134Assert(fp.success === true, 'formation.place ' + fid + ' succeeds');
+            }
+
+            // Test 34: mcpTalismanDraw - all 4 talisman types can be drawn
+            const talismanTypes = ['attack符文', 'defense符文', 'spirit符文', 'heal符文'];
+            for (const tid of talismanTypes) {
+                const td = server.mcpTalismanDraw(tid);
+                v134Assert(td.success === true, 'talisman.draw ' + tid + ' succeeds');
+            }
+
+            // Test 35: mcpFormationPlace - cost deducted correctly
+            const ssBefore = mockGameState.spiritStones;
+            const fpCost = server.mcpFormationPlace('speed_field', 0, 0);
+            v134Assert(fpCost.success === true, 'formation.place deducts cost');
+            v134Assert(mockGameState.spiritStones < ssBefore, 'spiritStones deducted');
+
+            // Test 36: mcpTalismanUse - removes from inventory
+            const tdTail = server.mcpTalismanDraw('attack符文');
+            v134Assert(tdTail.success === true, 'talisman.draw for removal test succeeds');
+            const invBefore = mockGameState.talisman.inventory.length;
+            server.mcpTalismanUse(tdTail.talisman.id);
+            v134Assert(mockGameState.talisman.inventory.length === invBefore - 1, 'talisman.use removes from inventory');
+
+            // Test 37: mcpFormationList - returns correct placed formation structure
+            const fl6 = server.mcpFormationList();
+            const placed = fl6.placed[0];
+            v134Assert(placed.formationId, 'placed formation has formationId');
+            v134Assert(placed.name, 'placed formation has name');
+            v134Assert(placed.activatedAt, 'placed formation has activatedAt timestamp when active');
+
+            // Test 38: mcpTalismanList - inventory items have correct structure
+            const tl5 = server.mcpTalismanList();
+            if (tl5.inventory.length > 0) {
+                const inv = tl5.inventory[0];
+                v134Assert(inv.id, 'inventory talisman has id');
+                v134Assert(inv.name, 'inventory talisman has name');
+                v134Assert(inv.type, 'inventory talisman has type');
+                v134Assert(typeof inv.power === 'number', 'inventory talisman has numeric power');
+            }
+
+            // Test 39: mcpFormationActivate - returns message
+            const fpMsg = server.mcpFormationPlace('spirit_shield', 1, 1);
+            v134Assert(fpMsg.success === true, 'formation.place for message test succeeds');
+            const faMsg = server.mcpFormationActivate(fpMsg.placed.id);
+            v134Assert(faMsg.message && faMsg.message.includes('激活'), 'formation.activate returns message');
+
+            // Test 40: mcpTalismanUse - returns message
+            const tdMsg = server.mcpTalismanDraw('heal符文');
+            v134Assert(tdMsg.success === true, 'talisman.draw for message test succeeds');
+            const tuMsg = server.mcpTalismanUse(tdMsg.talisman.id);
+            v134Assert(tuMsg.message && tuMsg.message.includes('使用'), 'talisman.use returns message');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V134 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V134', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v134Results = runV134Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
