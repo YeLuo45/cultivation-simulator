@@ -5627,6 +5627,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V177)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V178: Register 悬赏+任务链系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V178)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5877,6 +5881,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'chainV3.claim':
                             result = this.mcpChainV3Claim(args.chainId);
+                            break;
+                        // V178: 悬赏+任务链系统v4
+                        case 'quest.list':
+                            result = this.mcpQuestV4List();
+                            break;
+                        case 'quest.accept':
+                            result = this.mcpQuestV4Accept(args.questId);
+                            break;
+                        case 'quest.complete':
+                            result = this.mcpQuestV4Complete(args.questId);
+                            break;
+                        case 'chain.list':
+                            result = this.mcpChainV4List();
+                            break;
+                        case 'chain.progress':
+                            result = this.mcpChainV4Progress(args.chainId);
+                            break;
+                        case 'chain.claim':
+                            result = this.mcpChainV4Claim(args.chainId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -21112,6 +21135,243 @@ const ACHIEVEMENT_ID_MAP = {
                         chainId: chain.id,
                         name: chain.name,
                         reward: lastStep.reward,
+                        message: '领取任务链\"' + chain.name + '\"奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: _initQuestStateV4 - 初始化悬赏系统状态v4
+            _initQuestStateV4() {
+                const gs = window.gameState;
+                if (!gs.questV4) {
+                    const now = Date.now();
+                    gs.questV4 = {
+                        available: [
+                            { id: 'quest_v4_stone_1', name: '灵石悬赏·初', description: '采集100灵石', difficulty: 1, requirement: { type: 'spiritStone', amount: 100 }, reward: { type: 'spiritStone', amount: 50 }, progress: 0, expireAt: now + 86400000 * 3 },
+                            { id: 'quest_v4_stone_2', name: '灵石悬赏·中', description: '采集500灵石', difficulty: 2, requirement: { type: 'spiritStone', amount: 500 }, reward: { type: 'spiritStone', amount: 200 }, progress: 0, expireAt: now + 86400000 * 3 },
+                            { id: 'quest_v4_combat_1', name: '战力悬赏·初', description: '击败炼气后期修士', difficulty: 2, requirement: { type: 'combatPower', amount: 500 }, reward: { type: 'spiritStone', amount: 100 }, progress: 0, expireAt: now + 86400000 * 3 },
+                            { id: 'quest_v4_realm_1', name: '境界悬赏·初', description: '突破到筑基境界', difficulty: 3, requirement: { type: 'realm', level: 1 }, reward: { type: 'realm', name: '筑基丹' }, progress: 0, expireAt: now + 86400000 * 7 },
+                            { id: 'quest_v4_item_1', name: '道具悬赏·初', description: '收集5枚丹药', difficulty: 1, requirement: { type: 'item', itemId: 'pill_1', amount: 5 }, reward: { type: 'spiritStone', amount: 80 }, progress: 0, expireAt: now + 86400000 * 2 }
+                        ],
+                        active: [],
+                        completed: [],
+                        dailyLimit: 5,
+                        refreshCost: 100,
+                        acceptedToday: 0
+                    };
+                }
+                return gs.questV4;
+            }
+
+            // V178: _initChainStateV4 - 初始化任务链系统状态v4
+            _initChainStateV4() {
+                const gs = window.gameState;
+                if (!gs.chainV4) {
+                    gs.chainV4 = {
+                        chains: [
+                            {
+                                id: 'chain_v4_newbie',
+                                name: '新手任务链',
+                                description: '指引萌新修士熟悉修真世界',
+                                steps: [
+                                    { id: 'step_1', description: '灵气修炼10次', completed: false, reward: { type: 'spiritStone', amount: 100 } },
+                                    { id: 'step_2', description: '采集灵石50', completed: false, reward: { type: 'spiritStone', amount: 150 } },
+                                    { id: 'step_3', description: '击败1个敌人', completed: false, reward: { type: 'spiritStone', amount: 200 } }
+                                ],
+                                progress: 0,
+                                claimed: false
+                            },
+                            {
+                                id: 'chain_v4_cultivation',
+                                name: '修炼任务链',
+                                description: '突破境界成为强者',
+                                steps: [
+                                    { id: 'step_1', description: '突破到筑基境界', completed: false, reward: { type: 'realm', name: '筑基丹' } },
+                                    { id: 'step_2', description: '收集1000灵石', completed: false, reward: { type: 'spiritStone', amount: 500 } },
+                                    { id: 'step_3', description: '战力达到5000', completed: false, reward: { type: 'artifact', name: '灵剑' } }
+                                ],
+                                progress: 0,
+                                claimed: false
+                            },
+                            {
+                                id: 'chain_v4_elite',
+                                name: '精英任务链',
+                                description: '成为一代天骄',
+                                steps: [
+                                    { id: 'step_1', description: '突破到金丹境界', completed: false, reward: { type: 'realm', name: '金丹' } },
+                                    { id: 'step_2', description: '战力达到20000', completed: false, reward: { type: 'artifact', name: '天魔甲' } },
+                                    { id: 'step_3', description: '完成50次战斗', completed: false, reward: { type: 'title', name: '战神' } }
+                                ],
+                                progress: 0,
+                                claimed: false
+                            }
+                        ],
+                        totalChains: 3
+                    };
+                }
+                return gs.chainV4;
+            }
+
+            // V178: mcpQuestV4List - 获取悬赏列表
+            mcpQuestV4List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const questV4 = this._initQuestStateV4();
+                    const now = Date.now();
+                    const available = questV4.available.filter(q => (!q.expireAt || q.expireAt > now));
+                    return {
+                        success: true,
+                        quests: questV4.available.map(q => ({
+                            id: q.id,
+                            name: q.name,
+                            description: q.description,
+                            difficulty: q.difficulty,
+                            requirement: q.requirement,
+                            reward: q.reward,
+                            progress: q.progress,
+                            expireAt: q.expireAt
+                        })),
+                        availableCount: available.length,
+                        activeCount: questV4.active.length,
+                        dailyLimit: questV4.dailyLimit,
+                        acceptedToday: questV4.acceptedToday,
+                        refreshCost: questV4.refreshCost,
+                        message: '悬赏列表共' + questV4.available.length + '项，可接' + available.length + '项，进行中' + questV4.active.length + '项，今日已接' + questV4.acceptedToday + '次'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: mcpQuestV4Accept - 接受悬赏任务
+            mcpQuestV4Accept(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定悬赏任务ID' };
+                    const questV4 = this._initQuestStateV4();
+                    if (questV4.acceptedToday >= questV4.dailyLimit) return { error: '今日悬赏次数已用尽（每日5次）' };
+                    const quest = questV4.available.find(q => q.id === questId);
+                    if (!quest) return { error: '悬赏任务不存在' };
+                    if (questV4.active.includes(questId)) return { error: '该悬赏任务已在进行中' };
+                    const req = quest.requirement;
+                    if (req.type === 'realm' && (gs.realmIndex || 0) < (req.level || 0)) return { error: '境界不足，无法接受此悬赏' };
+                    if (req.type === 'combatPower' && (gs.combatPower || 0) < (req.amount || 0)) return { error: '战力不足，无法接受此悬赏' };
+                    questV4.active.push(questId);
+                    questV4.acceptedToday++;
+                    return {
+                        success: true,
+                        questId: quest.id,
+                        name: quest.name,
+                        message: '接受悬赏任务\"' + quest.name + '\"成功（' + questV4.acceptedToday + '/' + questV4.dailyLimit + '）'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: mcpQuestV4Complete - 完成悬赏任务
+            mcpQuestV4Complete(questId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!questId) return { error: '请指定悬赏任务ID' };
+                    const questV4 = this._initQuestStateV4();
+                    if (!questV4.active.includes(questId)) return { error: '该悬赏任务不在进行中' };
+                    const quest = questV4.available.find(q => q.id === questId);
+                    if (!quest) return { error: '悬赏任务不存在' };
+                    const req = quest.requirement;
+                    let requirementMet = true;
+                    if (req.type === 'spiritStone' && (gs.spiritStones || 0) < (req.amount || 0)) requirementMet = false;
+                    if (req.type === 'combatPower' && (gs.combatPower || 0) < (req.amount || 0)) requirementMet = false;
+                    if (req.type === 'realm' && (gs.realmIndex || 0) < (req.level || 0)) requirementMet = false;
+                    if (!requirementMet) return { error: '任务要求未达成，无法提交' };
+                    if (quest.reward.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (quest.reward.amount || 0);
+                    }
+                    quest.progress = 100;
+                    questV4.active = questV4.active.filter(q => q !== questId);
+                    questV4.completed.push(questId);
+                    return {
+                        success: true,
+                        questId: quest.id,
+                        name: quest.name,
+                        reward: quest.reward,
+                        reputation: Math.floor((quest.difficulty || 1) * 10),
+                        message: '完成悬赏任务\"' + quest.name + '\"，获得奖励+' + (quest.reward.amount || 0) + '灵石，声誉+' + Math.floor((quest.difficulty || 1) * 10)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: mcpChainV4List - 获取任务链列表
+            mcpChainV4List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const chainV4 = this._initChainStateV4();
+                    return {
+                        success: true,
+                        chains: chainV4.chains.map(c => ({
+                            id: c.id,
+                            name: c.name,
+                            description: c.description,
+                            progress: c.progress,
+                            totalSteps: c.steps.length,
+                            completedSteps: c.steps.filter(s => s.completed).length,
+                            claimed: c.claimed
+                        })),
+                        totalChains: chainV4.totalChains,
+                        message: '任务链列表共' + chainV4.chains.length + '条'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: mcpChainV4Progress - 查看任务链进度
+            mcpChainV4Progress(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainV4 = this._initChainStateV4();
+                    const chain = chainV4.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在' };
+                    return {
+                        success: true,
+                        chainId: chain.id,
+                        name: chain.name,
+                        description: chain.description,
+                        progress: chain.progress,
+                        steps: chain.steps.map(s => ({
+                            id: s.id,
+                            description: s.description,
+                            completed: s.completed,
+                            reward: s.reward
+                        })),
+                        claimed: chain.claimed,
+                        message: '任务链\"' + chain.name + '\"进度：' + chain.steps.filter(s => s.completed).length + '/' + chain.steps.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V178: mcpChainV4Claim - 领取任务链奖励
+            mcpChainV4Claim(chainId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!chainId) return { error: '请指定任务链ID' };
+                    const chainV4 = this._initChainStateV4();
+                    const chain = chainV4.chains.find(c => c.id === chainId);
+                    if (!chain) return { error: '任务链不存在' };
+                    const allCompleted = chain.steps.every(s => s.completed);
+                    if (!allCompleted) return { error: '任务链尚未完成，无法领取奖励' };
+                    if (chain.claimed) return { error: '该任务链奖励已领取' };
+                    const lastStep = chain.steps[chain.steps.length - 1];
+                    if (lastStep && lastStep.reward.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (lastStep.reward.amount || 0);
+                    }
+                    chain.claimed = true;
+                    return {
+                        success: true,
+                        chainId: chain.id,
+                        name: chain.name,
+                        reward: lastStep ? lastStep.reward : null,
                         message: '领取任务链\"' + chain.name + '\"奖励成功'
                     };
                 } catch (e) { return { error: e.message }; }
@@ -38221,6 +38481,64 @@ const ACHIEVEMENT_ID_MAP = {
                         rewardType: { type: 'string', description: '奖励类型: ranking/participation' }
                     },
                     required: ['eventId', 'rewardType']
+                }
+            }
+        };
+
+        // V178: 悬赏+任务链系统v4 (P-20260529-067)
+        const MCP_TOOLS_V178 = {
+            'quest.list': {
+                name: 'quest.list',
+                description: '获取悬赏列表 (悬赏+任务链系统v4-获取所有可接悬赏任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'quest.accept': {
+                name: 'quest.accept',
+                description: '接受悬赏任务 (悬赏+任务链系统v4-接受指定悬赏任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'quest.complete': {
+                name: 'quest.complete',
+                description: '完成悬赏任务 (悬赏+任务链系统v4-完成指定悬赏任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        questId: { type: 'string', description: '悬赏任务ID' }
+                    },
+                    required: ['questId']
+                }
+            },
+            'chain.list': {
+                name: 'chain.list',
+                description: '获取任务链列表 (悬赏+任务链系统v4-获取所有任务链)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'chain.progress': {
+                name: 'chain.progress',
+                description: '查看任务链进度 (悬赏+任务链系统v4-查看指定任务链详细进度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
+                }
+            },
+            'chain.claim': {
+                name: 'chain.claim',
+                description: '领取任务链奖励 (悬赏+任务链系统v4-领取指定任务链完成奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        chainId: { type: 'string', description: '任务链ID' }
+                    },
+                    required: ['chainId']
                 }
             }
         };
@@ -69202,6 +69520,258 @@ const v152Results = runV152Tests();
         const v175Results = runV175Tests();
         const v176Results = runV176Tests();
         const v177Results = runV177Tests();
+
+        function runV178Tests() {
+            const results = [];
+            function v178Assert(condition, testName) {
+                results.push({ pass: condition === true, test: testName });
+                if (condition !== true) console.warn('V178 FAIL:', testName);
+            }
+
+            // Setup game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                realm: '筑基',
+                realmIndex: 1,
+                level: 5,
+                combatPower: 1500,
+                techniques: [],
+                artifacts: [],
+                pets: [],
+                titles: [],
+                inventory: []
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V178 definition exists and has 6 tools
+            v178Assert(typeof MCP_TOOLS_V178 === 'object', 'MCP_TOOLS_V178 is defined');
+            v178Assert(Object.keys(MCP_TOOLS_V178).length === 6, 'MCP_TOOLS_V178 has 6 tools');
+
+            // Test 2: quest.list tool exists
+            v178Assert('quest.list' in MCP_TOOLS_V178, 'quest.list tool exists');
+
+            // Test 3: quest.accept tool exists
+            v178Assert('quest.accept' in MCP_TOOLS_V178, 'quest.accept tool exists');
+
+            // Test 4: quest.complete tool exists
+            v178Assert('quest.complete' in MCP_TOOLS_V178, 'quest.complete tool exists');
+
+            // Test 5: chain.list tool exists
+            v178Assert('chain.list' in MCP_TOOLS_V178, 'chain.list tool exists');
+
+            // Test 6: chain.progress tool exists
+            v178Assert('chain.progress' in MCP_TOOLS_V178, 'chain.progress tool exists');
+
+            // Test 7: chain.claim tool exists
+            v178Assert('chain.claim' in MCP_TOOLS_V178, 'chain.claim tool exists');
+
+            // Test 8: _initQuestStateV4 creates state
+            server._initQuestStateV4();
+            v178Assert(window.gameState.questV4 !== undefined, '_initQuestStateV4 creates questV4');
+            v178Assert(Array.isArray(window.gameState.questV4.available), 'questV4.available is array');
+            v178Assert(Array.isArray(window.gameState.questV4.active), 'questV4.active is array');
+            v178Assert(Array.isArray(window.gameState.questV4.completed), 'questV4.completed is array');
+            v178Assert(window.gameState.questV4.dailyLimit === 5, 'questV4.dailyLimit is 5');
+            v178Assert(window.gameState.questV4.refreshCost === 100, 'questV4.refreshCost is 100');
+
+            // Test 9: _initChainStateV4 creates state
+            server._initChainStateV4();
+            v178Assert(window.gameState.chainV4 !== undefined, '_initChainStateV4 creates chainV4');
+            v178Assert(Array.isArray(window.gameState.chainV4.chains), 'chainV4.chains is array');
+            v178Assert(window.gameState.chainV4.totalChains === 3, 'chainV4.totalChains is 3');
+
+            // Test 10: mcpQuestV4List returns correct structure
+            const questList = server.mcpQuestV4List();
+            v178Assert(questList.success === true, 'quest.list v4 returns success');
+            v178Assert(Array.isArray(questList.quests), 'quest.list v4 has quests array');
+            v178Assert(questList.availableCount !== undefined, 'quest.list v4 has availableCount');
+            v178Assert(questList.activeCount !== undefined, 'quest.list v4 has activeCount');
+            v178Assert(questList.dailyLimit === 5, 'quest.list v4 has dailyLimit=5');
+
+            // Test 11: mcpQuestV4List has 5 quests
+            v178Assert(questList.quests.length === 5, 'quest.list v4 has 5 quests');
+
+            // Test 12: mcpQuestV4Accept works
+            const questAccept = server.mcpQuestV4Accept('quest_v4_stone_1');
+            v178Assert(questAccept.success === true, 'quest.accept v4 returns success');
+            v178Assert(questAccept.questId === 'quest_v4_stone_1', 'quest.accept v4 returns correct id');
+            v178Assert(questAccept.name !== undefined, 'quest.accept v4 returns name');
+
+            // Test 13: mcpQuestV4Accept updates active and acceptedToday
+            v178Assert(window.gameState.questV4.active.includes('quest_v4_stone_1'), 'quest.accept v4 adds to active');
+            v178Assert(window.gameState.questV4.acceptedToday === 1, 'quest.accept v4 increments acceptedToday');
+
+            // Test 14: mcpQuestV4Accept with invalid id returns error
+            const questAcceptBad = server.mcpQuestV4Accept('invalid_id');
+            v178Assert(questAcceptBad.error !== undefined, 'quest.accept v4 with invalid id returns error');
+
+            // Test 15: mcpQuestV4Accept with already active returns error
+            const questAcceptDup = server.mcpQuestV4Accept('quest_v4_stone_1');
+            v178Assert(questAcceptDup.error !== undefined, 'quest.accept v4 with already active returns error');
+
+            // Test 16: mcpQuestV4Accept with insufficient realm returns error
+            window.gameState.realmIndex = 0;
+            const questAcceptRealm = server.mcpQuestV4Accept('quest_v4_realm_1');
+            v178Assert(questAcceptRealm.error !== undefined, 'quest.accept v4 with insufficient realm returns error');
+
+            // Test 17: mcpQuestV4Accept reaches daily limit
+            window.gameState.realmIndex = 1;
+            for (let i = 0; i < 4; i++) {
+                server.mcpQuestV4Accept('quest_v4_stone_2');
+            }
+            const questAcceptLimit = server.mcpQuestV4Accept('quest_v4_item_1');
+            v178Assert(questAcceptLimit.error !== undefined, 'quest.accept v4 respects daily limit');
+
+            // Test 18: mcpQuestV4Complete works
+            window.gameState.spiritStones = 200;
+            window.gameState.questV4.acceptedToday = 0;
+            server.mcpQuestV4Accept('quest_v4_stone_1');
+            const questComplete = server.mcpQuestV4Complete('quest_v4_stone_1');
+            v178Assert(questComplete.success === true, 'quest.complete v4 returns success');
+            v178Assert(questComplete.questId === 'quest_v4_stone_1', 'quest.complete v4 returns correct id');
+            v178Assert(questComplete.reward !== undefined, 'quest.complete v4 returns reward');
+            v178Assert(questComplete.reputation !== undefined, 'quest.complete v4 returns reputation');
+
+            // Test 19: mcpQuestV4Complete updates state
+            v178Assert(!window.gameState.questV4.active.includes('quest_v4_stone_1'), 'quest.complete v4 removes from active');
+            v178Assert(window.gameState.questV4.completed.includes('quest_v4_stone_1'), 'quest.complete v4 adds to completed');
+
+            // Test 20: mcpQuestV4Complete with invalid id returns error
+            const questCompleteBad = server.mcpQuestV4Complete('invalid_id');
+            v178Assert(questCompleteBad.error !== undefined, 'quest.complete v4 with invalid id returns error');
+
+            // Test 21: mcpQuestV4Complete with not in active returns error
+            const questCompleteNotActive = server.mcpQuestV4Complete('quest_v4_stone_2');
+            v178Assert(questCompleteNotActive.error !== undefined, 'quest.complete v4 with not in active returns error');
+
+            // Test 22: mcpChainV4List returns correct structure
+            const chainList = server.mcpChainV4List();
+            v178Assert(chainList.success === true, 'chain.list v4 returns success');
+            v178Assert(Array.isArray(chainList.chains), 'chain.list v4 has chains array');
+            v178Assert(chainList.totalChains === 3, 'chain.list v4 has totalChains=3');
+
+            // Test 23: mcpChainV4List has 3 chains
+            v178Assert(chainList.chains.length === 3, 'chain.list v4 has 3 chains');
+
+            // Test 24: mcpChainV4Progress works
+            const chainProgress = server.mcpChainV4Progress('chain_v4_newbie');
+            v178Assert(chainProgress.success === true, 'chain.progress v4 returns success');
+            v178Assert(chainProgress.chainId === 'chain_v4_newbie', 'chain.progress v4 returns correct id');
+            v178Assert(Array.isArray(chainProgress.steps), 'chain.progress v4 has steps array');
+            v178Assert(chainProgress.claimed === false, 'chain.progress v4 shows claimed=false');
+
+            // Test 25: mcpChainV4Progress with invalid id returns error
+            const chainProgressBad = server.mcpChainV4Progress('invalid_id');
+            v178Assert(chainProgressBad.error !== undefined, 'chain.progress v4 with invalid id returns error');
+
+            // Test 26: mcpChainV4Progress with no chainId returns error
+            const chainProgressNoId = server.mcpChainV4Progress(null);
+            v178Assert(chainProgressNoId.error !== undefined, 'chain.progress v4 with no chainId returns error');
+
+            // Test 27: mcpChainV4Claim with not completed returns error
+            const chainClaimNotDone = server.mcpChainV4Claim('chain_v4_newbie');
+            v178Assert(chainClaimNotDone.error !== undefined, 'chain.claim v4 with not completed returns error');
+
+            // Test 28: mcpChainV4Claim with invalid id returns error
+            const chainClaimBad = server.mcpChainV4Claim('invalid_id');
+            v178Assert(chainClaimBad.error !== undefined, 'chain.claim v4 with invalid id returns error');
+
+            // Test 29: mcpChainV4Claim with already claimed returns error
+            window.gameState.chainV4.chains[0].steps.forEach(s => s.completed = true);
+            window.gameState.chainV4.chains[0].claimed = true;
+            const chainClaimDup = server.mcpChainV4Claim('chain_v4_newbie');
+            v178Assert(chainClaimDup.error !== undefined, 'chain.claim v4 with already claimed returns error');
+
+            // Test 30: mcpChainV4Claim works when all steps completed
+            window.gameState.chainV4 = null;
+            server._initChainStateV4();
+            window.gameState.chainV4.chains[0].steps.forEach(s => s.completed = true);
+            const chainClaim = server.mcpChainV4Claim('chain_v4_newbie');
+            v178Assert(chainClaim.success === true, 'chain.claim v4 returns success');
+            v178Assert(chainClaim.chainId === 'chain_v4_newbie', 'chain.claim v4 returns correct id');
+            v178Assert(chainClaim.reward !== undefined, 'chain.claim v4 returns reward');
+
+            // Test 31: _initQuestStateV4 is idempotent
+            const questV4First = server._initQuestStateV4();
+            const questV4Second = server._initQuestStateV4();
+            v178Assert(questV4First === questV4Second, '_initQuestStateV4 is idempotent');
+
+            // Test 32: _initChainStateV4 is idempotent
+            const chainV4First = server._initChainStateV4();
+            const chainV4Second = server._initChainStateV4();
+            v178Assert(chainV4First === chainV4Second, '_initChainStateV4 is idempotent');
+
+            // Test 33: quest.list tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('quest.list'), 'quest.list is in toolRegistry');
+
+            // Test 34: quest.accept tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('quest.accept'), 'quest.accept is in toolRegistry');
+
+            // Test 35: quest.complete tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('quest.complete'), 'quest.complete is in toolRegistry');
+
+            // Test 36: chain.list tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('chain.list'), 'chain.list is in toolRegistry');
+
+            // Test 37: chain.progress tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('chain.progress'), 'chain.progress is in toolRegistry');
+
+            // Test 38: chain.claim tool registered in toolRegistry
+            v178Assert(server.toolRegistry.has('chain.claim'), 'chain.claim is in toolRegistry');
+
+            // Test 39: quest.list v4 returns refreshCost
+            const questListRefresh = server.mcpQuestV4List();
+            v178Assert(questListRefresh.refreshCost === 100, 'quest.list v4 returns refreshCost');
+
+            // Test 40: quest.complete v4 adds reputation
+            window.gameState.questV4 = null;
+            server._initQuestStateV4();
+            window.gameState.spiritStones = 200;
+            server.mcpQuestV4Accept('quest_v4_stone_1');
+            const questComplete2 = server.mcpQuestV4Complete('quest_v4_stone_1');
+            v178Assert(questComplete2.reputation === 10, 'quest.complete v4 returns correct reputation (difficulty 1 = 10)');
+
+            // Test 41: quest.complete v4 with difficulty 2 returns 20 reputation
+            window.gameState.questV4 = null;
+            server._initQuestStateV4();
+            window.gameState.spiritStones = 600;
+            server.mcpQuestV4Accept('quest_v4_stone_2');
+            const questComplete3 = server.mcpQuestV4Complete('quest_v4_stone_2');
+            v178Assert(questComplete3.reputation === 20, 'quest.complete v4 returns correct reputation (difficulty 2 = 20)');
+
+            // Test 42: chain.list v4 shows completedSteps for each chain
+            window.gameState.chainV4 = null;
+            server._initChainStateV4();
+            const chainList2 = server.mcpChainV4List();
+            v178Assert(chainList2.chains[0].completedSteps === 0, 'chain.list v4 shows completedSteps=0 initially');
+            v178Assert(chainList2.chains[0].totalSteps === 3, 'chain.list v4 shows totalSteps=3');
+
+            // Test 43: chain.progress v4 shows all step details
+            const chainProgress2 = server.mcpChainV4Progress('chain_v4_cultivation');
+            v178Assert(chainProgress2.steps.length === 3, 'chain.progress v4 shows 3 steps');
+            v178Assert(chainProgress2.steps[0].description !== undefined, 'chain.progress v4 step has description');
+            v178Assert(chainProgress2.steps[0].reward !== undefined, 'chain.progress v4 step has reward');
+            v178Assert(chainProgress2.steps[0].completed === false, 'chain.progress v4 step shows completed=false');
+
+            // Test 44: chain.claim with no chainId returns error
+            const chainClaimNoId = server.mcpChainV4Claim(null);
+            v178Assert(chainClaimNoId.error !== undefined, 'chain.claim v4 with no chainId returns error');
+
+            // Test 45: quest.accept with no questId returns error
+            const questAcceptNoId = server.mcpQuestV4Accept(null);
+            v178Assert(questAcceptNoId.error !== undefined, 'quest.accept v4 with no questId returns error');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V178 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V178', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v178Results = runV178Tests();
 
 
         // ===== closeAchievements =====
