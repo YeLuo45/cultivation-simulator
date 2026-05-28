@@ -3645,6 +3645,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V163)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V164: Register 签到+福利系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V164)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3762,6 +3766,25 @@
                             break;
                         case 'announce.view':
                             result = this.mcpAnnounceViewV3(args.announceId);
+                            break;
+                        // V164: 签到+福利系统v3
+                        case 'signin.list':
+                            result = this.mcpSigninListV3();
+                            break;
+                        case 'signin.checkin':
+                            result = this.mcpSigninCheckinV3();
+                            break;
+                        case 'signin.reward':
+                            result = this.mcpSigninRewardV3(args.day);
+                            break;
+                        case 'signin.makeup':
+                            result = this.mcpSigninMakeupV3();
+                            break;
+                        case 'welfare.list':
+                            result = this.mcpWelfareListV3();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaimV3(args.welfareId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -16186,6 +16209,206 @@
                         priority: announcement.priority,
                         expiresAt: announcement.expiresAt,
                         message: '公告读取成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: _initSigninStateV3 - 初始化签到系统状态v3
+            _initSigninStateV3() {
+                const gs = window.gameState;
+                if (!gs.signinV3) {
+                    gs.signinV3 = {
+                        records: [],
+                        todaySigned: false,
+                        totalDays: 0,
+                        streakDays: 0,
+                        lastSignDate: null,
+                        makeupUsed: false,
+                        rewards: [
+                            { day: 1, name: '第1天奖励', reward: '灵气x100', claimed: false },
+                            { day: 2, name: '第2天奖励', reward: '灵石x50', claimed: false },
+                            { day: 3, name: '第3天奖励', reward: '灵气x200', claimed: false },
+                            { day: 4, name: '第4天奖励', reward: '灵石x100', claimed: false },
+                            { day: 5, name: '第5天奖励', reward: '灵气x500', claimed: false },
+                            { day: 6, name: '第6天奖励', reward: '灵石x200', claimed: false },
+                            { day: 7, name: '第7天奖励', reward: '稀有丹药x1', claimed: false }
+                        ]
+                    };
+                }
+                return gs.signinV3;
+            }
+
+            // V164: _initWelfareStateV3 - 初始化福利系统状态v3
+            _initWelfareStateV3() {
+                const gs = window.gameState;
+                if (!gs.welfareV3) {
+                    gs.welfareV3 = {
+                        welfares: [
+                            { id: 'welfare_daily_login', name: '每日登录礼包', description: '每日登录游戏即可领取', cost: 0, reward: '灵石x20', claimed: false, claimable: true },
+                            { id: 'welfare_level_up', name: '升级礼包', description: '每次境界突破可领取', cost: 0, reward: '灵气x100', claimed: false, claimable: false, requires: 'cultivation_advance' },
+                            { id: 'welfare_first_charge', name: '首充礼包', description: '首次充值任意金额', cost: 0, reward: '限定外观x1', claimed: false, claimable: false, requires: 'first_recharge' },
+                            { id: 'welfare_vip_daily', name: 'VIP每日礼包', description: 'VIP用户每日可领', cost: 0, reward: '灵石x50', claimed: false, claimable: false, requires: 'vip_level_1' },
+                            { id: 'welfare_share', name: '分享礼包', description: '分享游戏给好友', cost: 0, reward: '灵石x30', claimed: false, claimable: true, requires: 'share' },
+                            { id: 'welfare_invite', name: '邀请礼包', description: '成功邀请1位好友', cost: 0, reward: '灵气x500', claimed: false, claimable: false, requires: 'invite_friend' }
+                        ]
+                    };
+                }
+                return gs.welfareV3;
+            }
+
+            // V164: mcpSigninListV3 - 获取签到列表v3
+            mcpSigninListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV3 = this._initSigninStateV3();
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                    const monthRecords = signinV3.records.filter(r => r.date >= firstDayOfMonth);
+                    const canMakeup = !signinV3.makeupUsed && signinV3.records.length > 0;
+                    return {
+                        success: true,
+                        todaySigned: signinV3.todaySigned,
+                        totalDays: signinV3.totalDays,
+                        streakDays: signinV3.streakDays,
+                        monthRecords: monthRecords,
+                        rewards: signinV3.rewards.map(r => ({ day: r.day, name: r.name, reward: r.reward, claimed: r.claimed })),
+                        canMakeup: canMakeup,
+                        message: '本月已签到' + monthRecords.length + '天，连续签到' + signinV3.streakDays + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: mcpSigninCheckinV3 - 执行签到v3
+            mcpSigninCheckinV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV3 = this._initSigninStateV3();
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    if (signinV3.todaySigned) return { error: '今日已签到，请勿重复签到' };
+                    const yesterday = today - 86400000;
+                    const lastSignDate = signinV3.lastSignDate;
+                    if (lastSignDate === yesterday) {
+                        signinV3.streakDays++;
+                    } else if (lastSignDate !== today) {
+                        signinV3.streakDays = 1;
+                    }
+                    signinV3.records.push({ date: today, rewarded: false, makeup: false });
+                    signinV3.todaySigned = true;
+                    signinV3.totalDays++;
+                    signinV3.lastSignDate = today;
+                    const streakBonus = signinV3.streakDays > 1 ? '+' + (signinV3.streakDays - 1) * 10 + '%连续签到加成' : '';
+                    return {
+                        success: true,
+                        streakDays: signinV3.streakDays,
+                        totalDays: signinV3.totalDays,
+                        streakBonus: streakBonus,
+                        message: '签到成功！已连续签到' + signinV3.streakDays + '天' + (streakBonus ? '，' + streakBonus : '')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: mcpSigninRewardV3 - 领取签到奖励v3
+            mcpSigninRewardV3(day) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!day || day < 1 || day > 7) return { error: '奖励天数必须为1-7' };
+                    const signinV3 = this._initSigninStateV3();
+                    const reward = signinV3.rewards.find(r => r.day === day);
+                    if (!reward) return { error: '奖励不存在' };
+                    if (reward.claimed) return { error: '该奖励已领取' };
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                    const monthSignins = signinV3.records.filter(r => r.date >= firstDayOfMonth && r.date <= today).length;
+                    if (monthSignins < day) return { error: '本月签到天数不足，无法领取第' + day + '天奖励' };
+                    reward.claimed = true;
+                    const record = signinV3.records.find(r => r.date === today || r.date >= firstDayOfMonth);
+                    if (record) record.rewarded = true;
+                    return {
+                        success: true,
+                        day: day,
+                        reward: reward.reward,
+                        message: '领取成功！获得' + reward.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: mcpSigninMakeupV3 - 补签v3
+            mcpSigninMakeupV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV3 = this._initSigninStateV3();
+                    if (signinV3.makeupUsed) return { error: '今日已使用补签机会，请明天再来' };
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                    const yesterday = today - 86400000;
+                    const alreadySigned = signinV3.records.some(r => r.date === yesterday);
+                    if (alreadySigned) return { error: '昨天已签到，无需补签' };
+                    const cost = 50;
+                    if (gs.spiritStones < cost) return { error: '灵石不足，补签需要' + cost + '灵石' };
+                    gs.spiritStones -= cost;
+                    signinV3.records.push({ date: yesterday, rewarded: false, makeup: true });
+                    signinV3.makeupUsed = true;
+                    return {
+                        success: true,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '补签成功！消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: mcpWelfareListV3 - 获取福利列表v3
+            mcpWelfareListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfareV3 = this._initWelfareStateV3();
+                    const claimable = welfareV3.welfares.filter(w => {
+                        if (w.claimed) return false;
+                        if (!w.claimable) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        welfares: welfareV3.welfares.map(w => ({
+                            id: w.id,
+                            name: w.name,
+                            description: w.description,
+                            cost: w.cost,
+                            reward: w.reward,
+                            claimed: w.claimed,
+                            claimable: w.claimable
+                        })),
+                        claimableCount: claimable.length,
+                        message: '共有' + welfareV3.welfares.length + '项福利，其中' + claimable.length + '项可领取'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V164: mcpWelfareClaimV3 - 领取福利v3
+            mcpWelfareClaimV3(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '请指定福利ID' };
+                    const welfareV3 = this._initWelfareStateV3();
+                    const welfare = welfareV3.welfares.find(w => w.id === welfareId);
+                    if (!welfare) return { error: '福利不存在' };
+                    if (welfare.claimed) return { error: '该福利已领取' };
+                    if (!welfare.claimable) return { error: '该福利暂不可领取，请满足条件后再试' };
+                    welfare.claimed = true;
+                    return {
+                        success: true,
+                        welfareId: welfareId,
+                        reward: welfare.reward,
+                        message: '领取成功！获得' + welfare.reward
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -32285,6 +32508,52 @@
                         announceId: { type: 'string', description: '公告ID' }
                     },
                     required: ['announceId']
+                }
+            }
+        };
+
+        // V164: 签到+福利系统v3
+        const MCP_TOOLS_V164 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到列表 (签到系统v3-获取本月签到记录和奖励状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '执行签到 (签到系统v3-执行今日签到，连续签到获得加成)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.reward': {
+                name: 'signin.reward',
+                description: '领取签到奖励 (签到系统v3-领取指定天数的签到奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        day: { type: 'number', description: '奖励天数(1-7)' }
+                    },
+                    required: ['day']
+                }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签前一天 (签到系统v3-补签前一天，消耗50灵石，每天限1次)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统v3-获取可用福利列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利 (福利系统v3-领取指定福利，消耗积分或完成任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID' }
+                    },
+                    required: ['welfareId']
                 }
             }
         };
@@ -61164,5 +61433,325 @@ const v152Results = runV152Tests();
             }
 
             const v163Results = runV163Tests();
+
+            // V164: 签到+福利系统v3 测试
+            function runV164Tests() {
+                const results = [];
+                function v164Assert(condition, testName) {
+                    const result = { test: testName, pass: condition };
+                    if (!condition) {
+                        console.log('FAIL:', testName);
+                    }
+                    results.push(result);
+                }
+
+                window.gameState = {
+                    spiritStones: 10000,
+                    realm: '筑基',
+                    stage: '中期',
+                    signinV3: null,
+                    welfareV3: null
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V164 definition exists and has 6 tools
+                v164Assert(typeof MCP_TOOLS_V164 === 'object', 'MCP_TOOLS_V164 is defined');
+                v164Assert(Object.keys(MCP_TOOLS_V164).length === 6, 'MCP_TOOLS_V164 has 6 tools');
+                v164Assert('signin.list' in MCP_TOOLS_V164, 'signin.list tool exists');
+                v164Assert('signin.checkin' in MCP_TOOLS_V164, 'signin.checkin tool exists');
+                v164Assert('signin.reward' in MCP_TOOLS_V164, 'signin.reward tool exists');
+                v164Assert('signin.makeup' in MCP_TOOLS_V164, 'signin.makeup tool exists');
+                v164Assert('welfare.list' in MCP_TOOLS_V164, 'welfare.list tool exists');
+                v164Assert('welfare.claim' in MCP_TOOLS_V164, 'welfare.claim tool exists');
+
+                // Test 2: _initSigninStateV3 initializes correctly
+                const signinV3State = server._initSigninStateV3();
+                v164Assert(signinV3State !== null, '_initSigninStateV3 returns state');
+                v164Assert(Array.isArray(signinV3State.records), 'signinV3 records is array');
+                v164Assert(signinV3State.records.length === 0, 'signinV3 initial records is empty');
+                v164Assert(signinV3State.todaySigned === false, 'signinV3 todaySigned is false initially');
+                v164Assert(signinV3State.totalDays === 0, 'signinV3 totalDays is 0');
+                v164Assert(signinV3State.streakDays === 0, 'signinV3 streakDays is 0');
+                v164Assert(signinV3State.rewards.length === 7, 'signinV3 has 7 rewards');
+
+                // Test 3: _initWelfareStateV3 initializes correctly
+                const welfareV3State = server._initWelfareStateV3();
+                v164Assert(welfareV3State !== null, '_initWelfareStateV3 returns state');
+                v164Assert(Array.isArray(welfareV3State.welfares), 'welfareV3 welfares is array');
+                v164Assert(welfareV3State.welfares.length === 6, 'welfareV3 has 6 welfares');
+
+                // Test 4: mcpSigninListV3 returns correct structure
+                const slV3 = server.mcpSigninListV3();
+                v164Assert(slV3.success === true, 'signin.list v3 returns success');
+                v164Assert(slV3.todaySigned === false, 'signin.list v3 todaySigned is false');
+                v164Assert(slV3.totalDays === 0, 'signin.list v3 totalDays is 0');
+                v164Assert(slV3.streakDays === 0, 'signin.list v3 streakDays is 0');
+                v164Assert(Array.isArray(slV3.monthRecords), 'signin.list v3 monthRecords is array');
+                v164Assert(Array.isArray(slV3.rewards), 'signin.list v3 rewards is array');
+                v164Assert(slV3.rewards.length === 7, 'signin.list v3 has 7 rewards');
+
+                // Test 5: mcpSigninCheckinV3 performs checkin
+                const scV3 = server.mcpSigninCheckinV3();
+                v164Assert(scV3.success === true, 'signin.checkin v3 returns success');
+                v164Assert(scV3.streakDays === 1, 'signin.checkin v3 streakDays is 1 for first checkin');
+                v164Assert(scV3.totalDays === 1, 'signin.checkin v3 totalDays is 1');
+
+                // Test 6: mcpSigninCheckinV3 prevents duplicate checkin
+                const scV3Err1 = server.mcpSigninCheckinV3();
+                v164Assert(scV3Err1.error && scV3Err1.error.includes('今日已签到'), 'signin.checkin v3 prevents duplicate checkin');
+
+                // Test 7: mcpSigninCheckinV3 tracks streak correctly
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                window.gameState.signinV3.lastSignDate = Date.now() - 86400000;
+                const scV3_2 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_2.success === true, 'signin.checkin v3 succeeds for second day');
+                v164Assert(scV3_2.streakDays === 2, 'signin.checkin v3 streakDays is 2');
+
+                // Test 8: mcpSigninRewardV3 claims reward
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                const srV3 = server.mcpSigninRewardV3(1);
+                v164Assert(srV3.success === true, 'signin.reward v3 returns success');
+                v164Assert(srV3.day === 1, 'signin.reward v3 day is 1');
+                v164Assert(srV3.reward === '灵气x100', 'signin.reward v3 reward is correct');
+
+                // Test 9: mcpSigninRewardV3 prevents duplicate claim
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                server.mcpSigninRewardV3(1);
+                const srV3Err1 = server.mcpSigninRewardV3(1);
+                v164Assert(srV3Err1.error && srV3Err1.error.includes('已领取'), 'signin.reward v3 prevents duplicate claim');
+
+                // Test 10: mcpSigninRewardV3 validates day range
+                const srV3Err2 = server.mcpSigninRewardV3(0);
+                v164Assert(srV3Err2.error && srV3Err2.error.includes('1-7'), 'signin.reward v3 rejects day 0');
+                const srV3Err3 = server.mcpSigninRewardV3(8);
+                v164Assert(srV3Err3.error && srV3Err3.error.includes('1-7'), 'signin.reward v3 rejects day 8');
+
+                // Test 11: mcpSigninMakeupV3 performs makeup
+                window.gameState.signinV3 = null;
+                window.gameState.spiritStones = 10000;
+                server._initSigninStateV3();
+                const smV3 = server.mcpSigninMakeupV3();
+                v164Assert(smV3.success === true, 'signin.makeup v3 returns success');
+                v164Assert(smV3.cost === 50, 'signin.makeup v3 cost is 50');
+                v164Assert(smV3.remainingSpiritStones === 9950, 'signin.makeup v3 deducts spirit stones');
+
+                // Test 12: mcpSigninMakeupV3 prevents duplicate use
+                const smV3Err1 = server.mcpSigninMakeupV3();
+                v164Assert(smV3Err1.error && smV3Err1.error.includes('已使用补签机会'), 'signin.makeup v3 prevents duplicate use');
+
+                // Test 13: mcpSigninMakeupV3 fails when insufficient stones
+                window.gameState.signinV3 = null;
+                window.gameState.spiritStones = 10;
+                server._initSigninStateV3();
+                const smV3Err2 = server.mcpSigninMakeupV3();
+                v164Assert(smV3Err2.error && smV3Err2.error.includes('灵石不足'), 'signin.makeup v3 fails with insufficient stones');
+
+                // Test 14: mcpWelfareListV3 returns correct structure
+                const wlV3 = server.mcpWelfareListV3();
+                v164Assert(wlV3.success === true, 'welfare.list v3 returns success');
+                v164Assert(Array.isArray(wlV3.welfares), 'welfare.list v3 welfares is array');
+                v164Assert(wlV3.welfares.length === 6, 'welfare.list v3 has 6 welfares');
+                v164Assert(wlV3.claimableCount >= 0, 'welfare.list v3 claimableCount is number');
+
+                // Test 15: mcpWelfareClaimV3 claims welfare
+                window.gameState.welfareV3 = null;
+                server._initWelfareStateV3();
+                const wcV3 = server.mcpWelfareClaimV3('welfare_daily_login');
+                v164Assert(wcV3.success === true, 'welfare.claim v3 returns success');
+                v164Assert(wcV3.welfareId === 'welfare_daily_login', 'welfare.claim v3 welfareId correct');
+                v164Assert(wcV3.reward === '灵石x20', 'welfare.claim v3 reward correct');
+
+                // Test 16: mcpWelfareClaimV3 prevents duplicate claim
+                const wcV3Err1 = server.mcpWelfareClaimV3('welfare_daily_login');
+                v164Assert(wcV3Err1.error && wcV3Err1.error.includes('已领取'), 'welfare.claim v3 prevents duplicate claim');
+
+                // Test 17: mcpWelfareClaimV3 fails for invalid welfareId
+                const wcV3Err2 = server.mcpWelfareClaimV3('invalid_welfare');
+                v164Assert(wcV3Err2.error && wcV3Err2.error.includes('不存在'), 'welfare.claim v3 fails for invalid id');
+
+                // Test 18: mcpWelfareClaimV3 fails for unclaimable welfare
+                const wcV3Err3 = server.mcpWelfareClaimV3('welfare_level_up');
+                v164Assert(wcV3Err3.error && wcV3Err3.error.includes('暂不可领取'), 'welfare.claim v3 fails for unclaimable');
+
+                // Test 19: mcpSigninListV3 shows correct monthRecords after checkin
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                server.mcpSigninCheckinV3();
+                const slV3_2 = server.mcpSigninListV3();
+                v164Assert(slV3_2.todaySigned === true, 'signin.list v3 todaySigned is true after checkin');
+                v164Assert(slV3_2.monthRecords.length >= 1, 'signin.list v3 has month records');
+
+                // Test 20: mcpSigninListV3 shows canMakeup correctly
+                const slV3_3 = server.mcpSigninListV3();
+                v164Assert(typeof slV3_3.canMakeup === 'boolean', 'signin.list v3 canMakeup is boolean');
+
+                // Test 21: mcpSigninCheckinV3 message includes streak bonus
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                window.gameState.signinV3.lastSignDate = Date.now() - 86400000;
+                window.gameState.signinV3.streakDays = 1;
+                const scV3_3 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_3.message.includes('连续签到'), 'signin.checkin v3 message mentions streak');
+
+                // Test 22: _initSigninStateV3 reuses existing state
+                const signinV3State2 = server._initSigninStateV3();
+                v164Assert(signinV3State === signinV3State2, '_initSigninStateV3 reuses existing state');
+
+                // Test 23: _initWelfareStateV3 reuses existing state
+                const welfareV3State2 = server._initWelfareStateV3();
+                v164Assert(welfareV3State === welfareV3State2, '_initWelfareStateV3 reuses existing state');
+
+                // Test 24: mcpSigninMakeupV3 fails when yesterday already signed
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                const yesterday = today - 86400000;
+                window.gameState.signinV3.records.push({ date: yesterday, rewarded: false, makeup: false });
+                const smV3Err3 = server.mcpSigninMakeupV3();
+                v164Assert(smV3Err3.error && smV3Err3.error.includes('昨天已签到'), 'signin.makeup v3 fails when yesterday signed');
+
+                // Test 25: mcpWelfareListV3 returns claimable field
+                const wlV3_2 = server.mcpWelfareListV3();
+                const dailyWelfare = wlV3_2.welfares.find(w => w.id === 'welfare_daily_login');
+                v164Assert(dailyWelfare.claimable === true, 'welfare.list v3 daily_login is claimable');
+
+                // Test 26: mcpWelfareListV3 returns claimed field
+                const levelUpWelfare = wlV3_2.welfares.find(w => w.id === 'welfare_level_up');
+                v164Assert(levelUpWelfare.claimed === false, 'welfare.list v3 level_up not claimed');
+                v164Assert(levelUpWelfare.claimable === false, 'welfare.list v3 level_up not claimable');
+
+                // Test 27: signin.reward v3 fails without day parameter
+                const srV3Err4 = server.mcpSigninRewardV3();
+                v164Assert(srV3Err4.error && srV3Err4.error.includes('1-7'), 'signin.reward v3 fails without day');
+
+                // Test 28: welfare.claim v3 fails without welfareId
+                window.gameState.welfareV3 = null;
+                server._initWelfareStateV3();
+                const wcV3Err4 = server.mcpWelfareClaimV3();
+                v164Assert(wcV3Err4.error && wcV3Err4.error.includes('福利ID'), 'welfare.claim v3 fails without welfareId');
+
+                // Test 29: mcpSigninListV3 returns rewards with correct structure
+                const slV3_4 = server.mcpSigninListV3();
+                const reward1 = slV3_4.rewards.find(r => r.day === 1);
+                v164Assert(reward1.day === 1, 'signin.list v3 reward day correct');
+                v164Assert(reward1.name === '第1天奖励', 'signin.list v3 reward name correct');
+                v164Assert(reward1.reward === '灵气x100', 'signin.list v3 reward reward correct');
+
+                // Test 30: mcpSigninCheckinV3 streak bonus message format
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                window.gameState.signinV3.lastSignDate = Date.now() - 86400000;
+                window.gameState.signinV3.streakDays = 3;
+                const scV3_4 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_4.streakBonus.includes('20%'), 'signin.checkin v3 streak bonus shows percentage');
+
+                // Test 31: mcpWelfareListV3 message format
+                const wlV3_3 = server.mcpWelfareListV3();
+                v164Assert(wlV3_3.message.includes('福利'), 'welfare.list v3 message includes welfare word');
+
+                // Test 32: mcpSigninListV3 message format
+                const slV3_5 = server.mcpSigninListV3();
+                v164Assert(slV3_5.message.includes('已签到'), 'signin.list v3 message includes signin word');
+
+                // Test 33: mcpSigninRewardV3 marks reward as claimed in state
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                server.mcpSigninRewardV3(2);
+                v164Assert(window.gameState.signinV3.rewards[1].claimed === true, 'signin.reward v3 marks claimed in state');
+
+                // Test 34: mcpSigninCheckinV3 handles first ever checkin streak
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                window.gameState.signinV3.lastSignDate = null;
+                const scV3_5 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_5.streakDays === 1, 'signin.checkin v3 first checkin streak is 1');
+
+                // Test 35: mcpWelfareClaimV3 sets claimed flag in state
+                window.gameState.welfareV3 = null;
+                server._initWelfareStateV3();
+                server.mcpWelfareClaimV3('welfare_share');
+                v164Assert(window.gameState.welfareV3.welfares.find(w => w.id === 'welfare_share').claimed === true, 'welfare.claim v3 marks claimed in state');
+
+                // Test 36: mcpSigninMakeupV3 adds record with makeup flag
+                window.gameState.signinV3 = null;
+                window.gameState.spiritStones = 10000;
+                server._initSigninStateV3();
+                window.gameState.signinV3.records = [];
+                window.gameState.signinV3.makeupUsed = false;
+                server.mcpSigninMakeupV3();
+                const makeupRecord = window.gameState.signinV3.records.find(r => r.makeup === true);
+                v164Assert(makeupRecord !== undefined, 'signin.makeup v3 adds record with makeup flag');
+
+                // Test 37: mcpSigninCheckinV3 streak resets after gap
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                window.gameState.signinV3.lastSignDate = Date.now() - 172800000;
+                window.gameState.signinV3.streakDays = 5;
+                const scV3_6 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_6.streakDays === 1, 'signin.checkin v3 streak resets after gap');
+
+                // Test 38: mcpWelfareListV3 has all required fields
+                const wlV3_4 = server.mcpWelfareListV3();
+                const welfare = wlV3_4.welfares[0];
+                v164Assert(welfare.id !== undefined, 'welfare.list v3 welfare has id');
+                v164Assert(welfare.name !== undefined, 'welfare.list v3 welfare has name');
+                v164Assert(welfare.description !== undefined, 'welfare.list v3 welfare has description');
+                v164Assert(welfare.cost !== undefined, 'welfare.list v3 welfare has cost');
+                v164Assert(welfare.reward !== undefined, 'welfare.list v3 welfare has reward');
+
+                // Test 39: signin.list v3 reward day 7 has correct value
+                const slV3_6 = server.mcpSigninListV3();
+                const reward7 = slV3_6.rewards.find(r => r.day === 7);
+                v164Assert(reward7.reward === '稀有丹药x1', 'signin.list v3 day 7 reward correct');
+
+                // Test 40: mcpSigninCheckinV3 updates lastSignDate
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                server.mcpSigninCheckinV3();
+                v164Assert(window.gameState.signinV3.lastSignDate !== null, 'signin.checkin v3 updates lastSignDate');
+
+                // Test 41: mcpSigninMakeupV3 deducts exact 50 stones
+                window.gameState.signinV3 = null;
+                window.gameState.spiritStones = 100;
+                server._initSigninStateV3();
+                window.gameState.signinV3.makeupUsed = false;
+                server.mcpSigninMakeupV3();
+                v164Assert(window.gameState.spiritStones === 50, 'signin.makeup v3 deducts exactly 50');
+
+                // Test 42: mcpSigninRewardV3 requires current month checkins
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                const srV3Err5 = server.mcpSigninRewardV3(3);
+                v164Assert(srV3Err5.error && srV3Err5.error.includes('签到天数不足'), 'signin.reward v3 requires enough checkins');
+
+                // Test 43: welfare.list v3 claimableCount counts correctly
+                const wlV3_5 = server.mcpWelfareListV3();
+                v164Assert(wlV3_5.claimableCount === wlV3_5.welfares.filter(w => w.claimed === false && w.claimable === true).length, 'welfare.list v3 claimableCount accurate');
+
+                // Test 44: mcpSigninCheckinV3 no streak bonus on first day
+                window.gameState.signinV3 = null;
+                server._initSigninStateV3();
+                const scV3_7 = server.mcpSigninCheckinV3();
+                v164Assert(scV3_7.streakBonus === '', 'signin.checkin v3 no streak bonus on first day');
+
+                // Test 45: mcpWelfareClaimV3 returns correct message
+                window.gameState.welfareV3 = null;
+                server._initWelfareStateV3();
+                const wcV3Result = server.mcpWelfareClaimV3('welfare_daily_login');
+                v164Assert(wcV3Result.message.includes('领取成功'), 'welfare.claim v3 message correct');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V164 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V164', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v164Results = runV164Tests();
 
         const v150Results = runV150Tests();
