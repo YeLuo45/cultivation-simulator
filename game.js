@@ -5579,6 +5579,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V165)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V166: Register 排行榜+竞技系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V166)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5734,6 +5738,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV3(args.badgeId);
+                            break;
+                        // V166: 排行榜+竞技系统v3
+                        case 'rank.list':
+                            result = this.mcpRankListV3();
+                            break;
+                        case 'rank.view':
+                            result = this.mcpRankViewV3(args.rankType, args.period);
+                            break;
+                        case 'rank.reward':
+                            result = this.mcpRankRewardV3(args.rankType, args.period);
+                            break;
+                        case 'arena.match':
+                            result = this.mcpArenaMatchV3();
+                            break;
+                        case 'arena.fight':
+                            result = this.mcpArenaFightV3(args.matchId);
+                            break;
+                        case 'arena.reward':
+                            result = this.mcpArenaRewardV3(args.period);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -18930,6 +18953,211 @@ const ACHIEVEMENT_ID_MAP = {
                         name: badge.name,
                         stats: badge.stats,
                         message: '徽章"' + badge.name + '"装备成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: _initRankStateV3 - 初始化排行榜系统状态v3
+            _initRankStateV3() {
+                const gs = window.gameState;
+                if (!gs.rankV3) {
+                    gs.rankV3 = {
+                        rankings: {
+                            power: [
+                                { id: 'player', name: '道友', value: gs.combatPower || 1000 },
+                                { id: 'npc_1', name: '李师兄', value: 1200 },
+                                { id: 'npc_2', name: '王师姐', value: 1100 },
+                                { id: 'npc_3', name: '张师弟', value: 2000 },
+                                { id: 'npc_4', name: '赵师叔', value: 3500 }
+                            ],
+                            level: [
+                                { id: 'player', name: '道友', value: gs.level || 1 },
+                                { id: 'npc_1', name: '李师兄', value: 2 },
+                                { id: 'npc_2', name: '王师姐', value: 3 },
+                                { id: 'npc_3', name: '张师弟', value: 5 },
+                                { id: 'npc_4', name: '赵师叔', value: 8 }
+                            ],
+                            realm: [
+                                { id: 'player', name: '道友', value: gs.realm || 0 },
+                                { id: 'npc_1', name: '李师兄', value: 1 },
+                                { id: 'npc_2', name: '王师姐', value: 2 },
+                                { id: 'npc_3', name: '张师弟', value: 3 },
+                                { id: 'npc_4', name: '赵师叔', value: 4 }
+                            ],
+                            wealth: [
+                                { id: 'player', name: '道友', value: gs.spiritStones || 0 },
+                                { id: 'npc_1', name: '李师兄', value: 1500 },
+                                { id: 'npc_2', name: '王师姐', value: 2300 },
+                                { id: 'npc_3', name: '张师弟', value: 5000 },
+                                { id: 'npc_4', name: '赵师叔', value: 8500 }
+                            ]
+                        },
+                        lastUpdate: null,
+                        rewardClaimed: {}
+                    };
+                }
+                return gs.rankV3;
+            }
+
+            // V166: _initArenaStateV3 - 初始化竞技系统状态v3
+            _initArenaStateV3() {
+                const gs = window.gameState;
+                if (!gs.arenaV3) {
+                    gs.arenaV3 = {
+                        matches: [],
+                        currentStreak: 0,
+                        totalFights: 0
+                    };
+                }
+                return gs.arenaV3;
+            }
+
+            // V166: mcpRankListV3 - 获取排行榜列表
+            mcpRankListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankV3 = this._initRankStateV3();
+                    return {
+                        success: true,
+                        types: ['power', 'level', 'realm', 'wealth'],
+                        typeNames: { power: '战力榜', level: '等级榜', realm: '境界榜', wealth: '财富榜' },
+                        message: '排行榜共4类榜单'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: mcpRankViewV3 - 查看排行详情
+            mcpRankViewV3(rankType, period) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rankType) return { error: '请指定排行榜类型' };
+                    const rankV3 = this._initRankStateV3();
+                    const validTypes = ['power', 'level', 'realm', 'wealth'];
+                    if (!validTypes.includes(rankType)) return { error: '无效的排行榜类型' };
+                    const rankings = rankV3.rankings[rankType] || [];
+                    const sortedRankings = [...rankings].sort((a, b) => b.value - a.value);
+                    const playerRank = sortedRankings.findIndex(r => r.id === 'player') + 1;
+                    return {
+                        success: true,
+                        rankType: rankType,
+                        rankings: sortedRankings.slice(0, 50),
+                        playerRank: playerRank || null,
+                        period: period || 'all',
+                        message: rankType + '排行榜共' + sortedRankings.length + '名，玩家排名第' + playerRank
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: mcpRankRewardV3 - 领取排行奖励
+            mcpRankRewardV3(rankType, period) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rankType || !period) return { error: '请指定排行榜类型和周期' };
+                    const rankV3 = this._initRankStateV3();
+                    const claimKey = rankType + '_' + period;
+                    if (rankV3.rewardClaimed[claimKey]) return { error: '该周期奖励已领取' };
+                    const rankings = rankV3.rankings[rankType] || [];
+                    const sortedRankings = [...rankings].sort((a, b) => b.value - a.value);
+                    const playerRank = sortedRankings.findIndex(r => r.id === 'player') + 1;
+                    if (!playerRank) return { error: '未上榜，无法领取奖励' };
+                    const rewardAmount = playerRank <= 3 ? (4 - playerRank) * 100 : 50;
+                    rankV3.rewardClaimed[claimKey] = true;
+                    gs.spiritStones = (gs.spiritStones || 0) + rewardAmount;
+                    return {
+                        success: true,
+                        rank: playerRank,
+                        reward: { type: 'spiritStone', amount: rewardAmount },
+                        message: '领取' + rankType + '榜第' + playerRank + '名奖励成功，获得' + rewardAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: mcpArenaMatchV3 - 开始匹配
+            mcpArenaMatchV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV3 = this._initArenaStateV3();
+                    if (arenaV3.matches.some(m => m.status === 'pending')) {
+                        return { error: '已有匹配中的对手，请先完成战斗' };
+                    }
+                    const matchId = 'match_' + Date.now();
+                    const opponentPower = (gs.combatPower || 1000) * (0.8 + Math.random() * 0.4);
+                    const match = {
+                        id: matchId,
+                        player1: 'player',
+                        player2: 'opponent_' + Date.now(),
+                        status: 'pending',
+                        opponentName: '匿名修士',
+                        opponentPower: Math.floor(opponentPower),
+                        winner: null
+                    };
+                    arenaV3.matches.push(match);
+                    return {
+                        success: true,
+                        matchId: matchId,
+                        opponentName: '匿名修士',
+                        opponentPower: Math.floor(opponentPower),
+                        message: '匹配成功，当前对手战力' + Math.floor(opponentPower)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: mcpArenaFightV3 - 发起战斗
+            mcpArenaFightV3(matchId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV3 = this._initArenaStateV3();
+                    const match = arenaV3.matches.find(m => m.id === matchId);
+                    if (!match) return { error: '匹配不存在' };
+                    if (match.status !== 'pending') return { error: '战斗已结束' };
+                    const playerPower = gs.combatPower || 1000;
+                    const playerWin = playerPower > match.opponentPower * (0.8 + Math.random() * 0.4);
+                    match.status = 'finished';
+                    match.winner = playerWin ? 'player' : 'opponent';
+                    if (playerWin) {
+                        arenaV3.currentStreak++;
+                    } else {
+                        arenaV3.currentStreak = 0;
+                    }
+                    arenaV3.totalFights++;
+                    return {
+                        success: true,
+                        matchId: matchId,
+                        result: playerWin ? '胜利' : '失败',
+                        playerPower: playerPower,
+                        opponentPower: match.opponentPower,
+                        currentStreak: arenaV3.currentStreak,
+                        message: playerWin ? '战斗胜利，当前连胜' + arenaV3.currentStreak + '场' : '战斗失败，连胜中断'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V166: mcpArenaRewardV3 - 领取竞技奖励
+            mcpArenaRewardV3(period) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!period) return { error: '请指定周期' };
+                    const arenaV3 = this._initArenaStateV3();
+                    const claimKey = 'arena_' + period;
+                    if (gs.rankV3 && gs.rankV3.rewardClaimed[claimKey]) {
+                        return { error: '该周期奖励已领取' };
+                    }
+                    if (!gs.rankV3) this._initRankStateV3();
+                    gs.rankV3.rewardClaimed[claimKey] = true;
+                    const wins = arenaV3.currentStreak;
+                    const rewardAmount = Math.min(wins * 30, 300);
+                    gs.spiritStones = (gs.spiritStones || 0) + rewardAmount;
+                    return {
+                        success: true,
+                        streak: wins,
+                        reward: { type: 'spiritStone', amount: rewardAmount },
+                        message: '领取本周' + wins + '场连胜奖励成功，获得' + rewardAmount + '灵石'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -34760,6 +34988,66 @@ const ACHIEVEMENT_ID_MAP = {
                         badgeId: { type: 'string', description: '徽章ID' }
                     },
                     required: ['badgeId']
+                }
+            }
+        };
+
+        // V166: 排行榜+竞技系统v3
+        const MCP_TOOLS_V166 = {
+            'rank.list': {
+                name: 'rank.list',
+                description: '获取排行榜列表 (排行榜+竞技系统v3-获取所有类型排行榜概览)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'rank.view': {
+                name: 'rank.view',
+                description: '查看排行详情 (排行榜+竞技系统v3-查看指定排行详情及玩家排名)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rankType: { type: 'string', description: '排行榜类型: power/level/realm/wealth' },
+                        period: { type: 'string', description: '周期: weekly/monthly/all' }
+                    },
+                    required: ['rankType']
+                }
+            },
+            'rank.reward': {
+                name: 'rank.reward',
+                description: '领取排行奖励 (排行榜+竞技系统v3-领取指定周期排行榜奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rankType: { type: 'string', description: '排行榜类型: power/level/realm/wealth' },
+                        period: { type: 'string', description: '周期: weekly/monthly/all' }
+                    },
+                    required: ['rankType', 'period']
+                }
+            },
+            'arena.match': {
+                name: 'arena.match',
+                description: '开始匹配 (排行榜+竞技系统v3-开始匹配对手进行竞技)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'arena.fight': {
+                name: 'arena.fight',
+                description: '发起战斗 (排行榜+竞技系统v3-发起战斗并自动结算)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        matchId: { type: 'string', description: '匹配ID' }
+                    },
+                    required: ['matchId']
+                }
+            },
+            'arena.reward': {
+                name: 'arena.reward',
+                description: '领取竞技奖励 (排行榜+竞技系统v3-领取赛季段位奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        period: { type: 'string', description: '周期: weekly/monthly' }
+                    },
+                    required: ['period']
                 }
             }
         };
@@ -62424,6 +62712,339 @@ const v152Results = runV152Tests();
             }
 
             const v165Results = runV165Tests();
+
+            // V166: 排行榜+竞技系统v3 测试
+            function runV166Tests() {
+                const results = [];
+                function v166Assert(condition, testName) {
+                    const result = { test: testName, pass: condition };
+                    if (!condition) {
+                        console.log('FAIL:', testName);
+                    }
+                    results.push(result);
+                }
+
+                window.gameState = {
+                    spiritStones: 10000,
+                    combatPower: 1000,
+                    level: 1,
+                    realm: 0,
+                    rankV3: null,
+                    arenaV3: null
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V166 definition exists and has 6 tools
+                v166Assert(typeof MCP_TOOLS_V166 === 'object', 'MCP_TOOLS_V166 is defined');
+                v166Assert(Object.keys(MCP_TOOLS_V166).length === 6, 'MCP_TOOLS_V166 has 6 tools');
+                v166Assert('rank.list' in MCP_TOOLS_V166, 'rank.list tool exists');
+                v166Assert('rank.view' in MCP_TOOLS_V166, 'rank.view tool exists');
+                v166Assert('rank.reward' in MCP_TOOLS_V166, 'rank.reward tool exists');
+                v166Assert('arena.match' in MCP_TOOLS_V166, 'arena.match tool exists');
+                v166Assert('arena.fight' in MCP_TOOLS_V166, 'arena.fight tool exists');
+                v166Assert('arena.reward' in MCP_TOOLS_V166, 'arena.reward tool exists');
+
+                // Test 2: _initRankStateV3 initializes correctly
+                const rankV3State = server._initRankStateV3();
+                v166Assert(rankV3State !== null, '_initRankStateV3 returns state');
+                v166Assert(rankV3State.rankings !== undefined, 'rankV3 has rankings');
+                v166Assert(rankV3State.rankings.power !== undefined, 'rankV3 has power rankings');
+                v166Assert(rankV3State.rankings.level !== undefined, 'rankV3 has level rankings');
+                v166Assert(rankV3State.rankings.realm !== undefined, 'rankV3 has realm rankings');
+                v166Assert(rankV3State.rankings.wealth !== undefined, 'rankV3 has wealth rankings');
+                v166Assert(rankV3State.rewardClaimed !== undefined, 'rankV3 has rewardClaimed');
+
+                // Test 3: _initArenaStateV3 initializes correctly
+                const arenaV3State = server._initArenaStateV3();
+                v166Assert(arenaV3State !== null, '_initArenaStateV3 returns state');
+                v166Assert(Array.isArray(arenaV3State.matches), 'arenaV3 matches is array');
+                v166Assert(arenaV3State.currentStreak === 0, 'arenaV3 currentStreak is 0');
+                v166Assert(arenaV3State.totalFights === 0, 'arenaV3 totalFights is 0');
+
+                // Test 4: mcpRankListV3 returns correct structure
+                const rlV3 = server.mcpRankListV3();
+                v166Assert(rlV3.success === true, 'rank.list v3 returns success');
+                v166Assert(rlV3.types !== undefined, 'rank.list v3 has types');
+                v166Assert(rlV3.types.length === 4, 'rank.list v3 has 4 types');
+                v166Assert(rlV3.typeNames !== undefined, 'rank.list v3 has typeNames');
+
+                // Test 5: mcpRankViewV3 returns correct structure
+                const rvV3 = server.mcpRankViewV3('power', 'weekly');
+                v166Assert(rvV3.success === true, 'rank.view v3 returns success');
+                v166Assert(rvV3.rankings !== undefined, 'rank.view v3 has rankings');
+                v166Assert(rvV3.playerRank !== undefined, 'rank.view v3 has playerRank');
+                v166Assert(Array.isArray(rvV3.rankings), 'rank.view v3 rankings is array');
+
+                // Test 6: mcpRankViewV3 with invalid type returns error
+                const rvV3Err = server.mcpRankViewV3('invalid', 'weekly');
+                v166Assert(rvV3Err.error !== undefined, 'rank.view v3 invalid type returns error');
+
+                // Test 7: mcpRankRewardV3 claims reward
+                const rrV3 = server.mcpRankRewardV3('power', 'weekly');
+                v166Assert(rrV3.success === true, 'rank.reward v3 returns success');
+                v166Assert(rrV3.rank !== undefined, 'rank.reward v3 has rank');
+                v166Assert(rrV3.reward !== undefined, 'rank.reward v3 has reward');
+
+                // Test 8: mcpRankRewardV3 prevents duplicate claim
+                const rrV3Err = server.mcpRankRewardV3('power', 'weekly');
+                v166Assert(rrV3Err.error === '该周期奖励已领取', 'rank.reward v3 prevents duplicate claim');
+
+                // Test 9: mcpArenaMatchV3 creates match
+                window.gameState.arenaV3 = null;
+                const amV3 = server.mcpArenaMatchV3();
+                v166Assert(amV3.success === true, 'arena.match v3 returns success');
+                v166Assert(amV3.matchId !== undefined, 'arena.match v3 has matchId');
+                v166Assert(amV3.opponentName !== undefined, 'arena.match v3 has opponentName');
+                v166Assert(amV3.opponentPower !== undefined, 'arena.match v3 has opponentPower');
+
+                // Test 10: mcpArenaFightV3 resolves battle
+                const afV3 = server.mcpArenaFightV3(amV3.matchId);
+                v166Assert(afV3.success === true, 'arena.fight v3 returns success');
+                v166Assert(afV3.result !== undefined, 'arena.fight v3 has result');
+                v166Assert(afV3.currentStreak !== undefined, 'arena.fight v3 has currentStreak');
+
+                // Test 11: mcpArenaFightV3 with invalid matchId returns error
+                const afV3Err = server.mcpArenaFightV3('invalid_match');
+                v166Assert(afV3Err.error !== undefined, 'arena.fight v3 invalid matchId returns error');
+
+                // Test 12: mcpArenaRewardV3 claims reward
+                window.gameState.arenaV3.currentStreak = 5;
+                const arV3 = server.mcpArenaRewardV3('weekly');
+                v166Assert(arV3.success === true, 'arena.reward v3 returns success');
+                v166Assert(arV3.streak !== undefined, 'arena.reward v3 has streak');
+                v166Assert(arV3.reward !== undefined, 'arena.reward v3 has reward');
+
+                // Test 13: mcpArenaRewardV3 prevents duplicate claim
+                const arV3Err = server.mcpArenaRewardV3('weekly');
+                v166Assert(arV3Err.error === '该周期奖励已领取', 'arena.reward v3 prevents duplicate claim');
+
+                // Test 14: mcpRankListV3 includes all type names
+                const rlV3_2 = server.mcpRankListV3();
+                v166Assert(rlV3_2.typeNames.power === '战力榜', 'rank.list v3 typeNames power correct');
+                v166Assert(rlV3_2.typeNames.level === '等级榜', 'rank.list v3 typeNames level correct');
+                v166Assert(rlV3_2.typeNames.realm === '境界榜', 'rank.list v3 typeNames realm correct');
+                v166Assert(rlV3_2.typeNames.wealth === '财富榜', 'rank.list v3 typeNames wealth correct');
+
+                // Test 15: mcpRankViewV3 sorts rankings correctly
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                const rvV3_2 = server.mcpRankViewV3('power', 'all');
+                v166Assert(rvV3_2.rankings[0].value >= rvV3_2.rankings[1].value, 'rank.view v3 rankings sorted desc');
+
+                // Test 16: mcpArenaMatchV3 prevents duplicate pending match
+                const amV3Err = server.mcpArenaMatchV3();
+                v166Assert(amV3Err.error !== undefined, 'arena.match v3 prevents duplicate pending match');
+
+                // Test 17: _initRankStateV3 uses game state values
+                window.gameState.combatPower = 5000;
+                window.gameState.rankV3 = null;
+                const rankV3State2 = server._initRankStateV3();
+                const playerPowerRank = rankV3State2.rankings.power.find(r => r.id === 'player');
+                v166Assert(playerPowerRank.value === 5000, '_initRankStateV3 uses player combatPower');
+
+                // Test 18: mcpRankRewardV3 requires rankType and period
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                const rrV3Err2 = server.mcpRankRewardV3(null, 'weekly');
+                v166Assert(rrV3Err2.error !== undefined, 'rank.reward v3 requires rankType');
+
+                // Test 19: mcpArenaRewardV3 requires period
+                const arV3Err2 = server.mcpArenaRewardV3(null);
+                v166Assert(arV3Err2.error !== undefined, 'arena.reward v3 requires period');
+
+                // Test 20: mcpRankViewV3 returns player rank
+                const rvV3_3 = server.mcpRankViewV3('level', 'monthly');
+                v166Assert(rvV3_3.playerRank !== null, 'rank.view v3 returns playerRank for level');
+
+                // Test 21: mcpArenaFightV3 updates totalFights
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                const amV3_2 = server.mcpArenaMatchV3();
+                server.mcpArenaFightV3(amV3_2.matchId);
+                v166Assert(window.gameState.arenaV3.totalFights === 1, 'arena.fight v3 updates totalFights');
+
+                // Test 22: mcpArenaFightV3 sets winner correctly
+                window.gameState.arenaV3 = null;
+                window.gameState.combatPower = 10000;
+                server._initArenaStateV3();
+                const amV3_3 = server.mcpArenaMatchV3();
+                const afV3_2 = server.mcpArenaFightV3(amV3_3.matchId);
+                v166Assert(afV3_2.result === '胜利' || afV3_2.result === '失败', 'arena.fight v3 result is valid');
+
+                // Test 23: mcpRankRewardV3 calculates reward by rank
+                window.gameState.rankV3 = null;
+                window.gameState.spiritStones = 10000;
+                server._initRankStateV3();
+                const rrV3_2 = server.mcpRankRewardV3('wealth', 'monthly');
+                v166Assert(rrV3_2.success === true, 'rank.reward v3 wealth reward success');
+
+                // Test 24: mcpRankViewV3 period defaults to all
+                const rvV3_4 = server.mcpRankViewV3('power');
+                v166Assert(rvV3_4.period === 'all', 'rank.view v3 period defaults to all');
+
+                // Test 25: mcpArenaMatchV3 generates unique matchId
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                const amV3_4 = server.mcpArenaMatchV3();
+                const amV3_5 = server.mcpArenaMatchV3();
+                server.mcpArenaFightV3(amV3_4.matchId);
+                const amV3_6 = server.mcpArenaMatchV3();
+                v166Assert(amV3_6.matchId !== amV3_4.matchId, 'arena.match v3 generates unique matchId');
+
+                // Test 26: _initArenaStateV3 preserves existing state
+                window.gameState.arenaV3 = null;
+                const arenaV3State2 = server._initArenaStateV3();
+                arenaV3State2.matches.push({ id: 'test', status: 'finished' });
+                const arenaV3State3 = server._initArenaStateV3();
+                v166Assert(arenaV3State3.matches.length === 1, '_initArenaStateV3 preserves existing matches');
+
+                // Test 27: mcpRankRewardV3 with unlisted player returns error
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                window.gameState.rankV3.rankings.power = [
+                    { id: 'npc_1', name: '李师兄', value: 1200 },
+                    { id: 'npc_2', name: '王师姐', value: 1100 }
+                ];
+                const rrV3Err3 = server.mcpRankRewardV3('power', 'weekly');
+                v166Assert(rrV3Err3.error === '未上榜，无法领取奖励', 'rank.reward v3 unlisted player error');
+
+                // Test 28: mcpArenaFightV3 prevents fight on non-pending match
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                const amV3_7 = server.mcpArenaMatchV3();
+                server.mcpArenaFightV3(amV3_7.matchId);
+                const afV3Err2 = server.mcpArenaFightV3(amV3_7.matchId);
+                v166Assert(afV3Err2.error === '战斗已结束', 'arena.fight v3 non-pending match error');
+
+                // Test 29: mcpRankViewV3 returns up to 50 rankings
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                const rvV3_5 = server.mcpRankViewV3('power', 'all');
+                v166Assert(rvV3_5.rankings.length <= 50, 'rank.view v3 limits to 50 rankings');
+
+                // Test 30: mcpArenaRewardV3 calculates correct amount
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                window.gameState.arenaV3.currentStreak = 10;
+                window.gameState.spiritStones = 1000;
+                const arV3_2 = server.mcpArenaRewardV3('monthly');
+                v166Assert(arV3_2.reward.amount === 300, 'arena.reward v3 caps at 300');
+
+                // Test 31: mcpRankListV3 message format
+                const rlV3_3 = server.mcpRankListV3();
+                v166Assert(rlV3_3.message.includes('排行榜共4类榜单'), 'rank.list v3 message format correct');
+
+                // Test 32: mcpRankViewV3 message includes rank count
+                const rvV3_6 = server.mcpRankViewV3('realm', 'all');
+                v166Assert(rvV3_6.message.includes('名'), 'rank.view v3 message includes count');
+
+                // Test 33: mcpArenaMatchV3 opponent power varies
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                window.gameState.combatPower = 1000;
+                const amV3_8 = server.mcpArenaMatchV3();
+                v166Assert(amV3_8.opponentPower > 0, 'arena.match v3 opponent power is positive');
+
+                // Test 34: _initRankStateV3 handles null realm
+                window.gameState.rankV3 = null;
+                window.gameState.realm = null;
+                const rankV3State4 = server._initRankStateV3();
+                v166Assert(rankV3State4.rankings.realm[0].value === 0, '_initRankStateV3 defaults realm to 0');
+
+                // Test 35: mcpRankRewardV3 top 3 reward amounts
+                window.gameState.rankV3 = null;
+                window.gameState.spiritStones = 1000;
+                server._initRankStateV3();
+                const rrV3_3 = server.mcpRankRewardV3('level', 'weekly');
+                v166Assert(rrV3_3.reward.amount > 0, 'rank.reward v3 reward amount is positive');
+
+                // Test 36: mcpArenaFightV3 streak updates
+                window.gameState.arenaV3 = null;
+                window.gameState.combatPower = 10000;
+                server._initArenaStateV3();
+                const amV3_9 = server.mcpArenaMatchV3();
+                const afV3_3 = server.mcpArenaFightV3(amV3_9.matchId);
+                const expectedStreak = afV3_3.result === '胜利' ? 1 : 0;
+                v166Assert(afV3_3.currentStreak === expectedStreak, 'arena.fight v3 streak updates correctly');
+
+                // Test 37: mcpRankViewV3 wealth type works
+                const rvV3_7 = server.mcpRankViewV3('wealth', 'monthly');
+                v166Assert(rvV3_7.success === true, 'rank.view v3 wealth type works');
+
+                // Test 38: mcpArenaRewardV3 with zero streak gives zero reward
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                window.gameState.arenaV3.currentStreak = 0;
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                delete window.gameState.rankV3.rewardClaimed['arena_weekly'];
+                const arV3_3 = server.mcpArenaRewardV3('weekly');
+                v166Assert(arV3_3.reward.amount === 0, 'arena.reward v3 zero streak gives zero');
+
+                // Test 39: mcpRankListV3 returns correct types array
+                const rlV3_4 = server.mcpRankListV3();
+                v166Assert(rlV3_4.types.includes('power'), 'rank.list v3 types includes power');
+                v166Assert(rlV3_4.types.includes('level'), 'rank.list v3 types includes level');
+                v166Assert(rlV3_4.types.includes('realm'), 'rank.list v3 types includes realm');
+                v166Assert(rlV3_4.types.includes('wealth'), 'rank.list v3 types includes wealth');
+
+                // Test 40: mcpArenaFightV3 returns player and opponent power
+                window.gameState.arenaV3 = null;
+                window.gameState.combatPower = 1500;
+                server._initArenaStateV3();
+                const amV3_10 = server.mcpArenaMatchV3();
+                const afV3_4 = server.mcpArenaFightV3(amV3_10.matchId);
+                v166Assert(afV3_4.playerPower === 1500, 'arena.fight v3 returns correct playerPower');
+                v166Assert(afV3_4.opponentPower !== undefined, 'arena.fight v3 returns opponentPower');
+
+                // Test 41: mcpRankRewardV3 updates spirit stones
+                window.gameState.rankV3 = null;
+                window.gameState.spiritStones = 5000;
+                server._initRankStateV3();
+                window.gameState.rankV3.rewardClaimed = {};
+                const rrV3_4 = server.mcpRankRewardV3('realm', 'weekly');
+                v166Assert(window.gameState.spiritStones > 5000, 'rank.reward v3 updates spirit stones');
+
+                // Test 42: mcpArenaRewardV3 updates spirit stones
+                window.gameState.arenaV3 = null;
+                window.gameState.spiritStones = 5000;
+                server._initArenaStateV3();
+                window.gameState.arenaV3.currentStreak = 5;
+                if (!window.gameState.rankV3) server._initRankStateV3();
+                window.gameState.rankV3.rewardClaimed = {};
+                const arV3_4 = server.mcpArenaRewardV3('weekly');
+                v166Assert(window.gameState.spiritStones > 5000, 'arena.reward v3 updates spirit stones');
+
+                // Test 43: _initRankStateV3 realm rankings use numeric values
+                window.gameState.rankV3 = null;
+                const rankV3State5 = server._initRankStateV3();
+                v166Assert(typeof rankV3State5.rankings.realm[0].value === 'number', '_initRankStateV3 realm uses numbers');
+
+                // Test 44: mcpRankViewV3 playerRank is null for unlisted player
+                window.gameState.rankV3 = null;
+                server._initRankStateV3();
+                window.gameState.rankV3.rankings.power = [
+                    { id: 'npc_1', name: '李师兄', value: 2000 },
+                    { id: 'npc_2', name: '王师姐', value: 1800 }
+                ];
+                const rvV3_8 = server.mcpRankViewV3('power', 'all');
+                v166Assert(rvV3_8.playerRank === null, 'rank.view v3 playerRank is null when unlisted');
+
+                // Test 45: mcpArenaMatchV3 adds match to arenaV3.matches
+                window.gameState.arenaV3 = null;
+                server._initArenaStateV3();
+                const amV3_11 = server.mcpArenaMatchV3();
+                v166Assert(window.gameState.arenaV3.matches.some(m => m.id === amV3_11.matchId), 'arena.match v3 adds match to matches array');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V166 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V166', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v166Results = runV166Tests();
 
         const v150Results = runV150Tests();
 
