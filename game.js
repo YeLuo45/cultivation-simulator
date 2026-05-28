@@ -3709,6 +3709,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V179)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V180: Register 红包+社交系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V180)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5603,13 +5607,33 @@
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV5(args.monthcardType);
                             break;
+                        // V180: 红包+社交系统v4
                         case 'redpacket.list':
-                        case 'redpacket.receive':
+                            result = this.mcpRedpacketListV4();
+                            break;
                         case 'redpacket.send':
+                            result = this.mcpRedpacketSendV4(args.redpacketId, args.amount);
+                            break;
+                        case 'redpacket.receive':
+                            result = this.mcpRedpacketReceiveV4(args.redpacketId);
+                            break;
+                        case 'redpacket.redeem':
+                            result = this.mcpRedpacketRedeemV4(args.redpacketId);
+                            break;
+                        case 'social.list':
+                            result = this.mcpSocialListV4();
+                            break;
+                        case 'social.invite':
+                            result = this.mcpSocialInviteV4(args.playerName);
+                            break;
+                        // V170: 红包+社交系统v3 (legacy)
                         case 'friend.list':
+                            result = this._callRedpacketFriendV3(name, args);
+                            break;
                         case 'friend.apply':
+                            result = this._callRedpacketFriendV3(name, args);
+                            break;
                         case 'friend.accept':
-                            // V170: 红包+社交系统v3 - delegate to V3 methods
                             result = this._callRedpacketFriendV3(name, args);
                             break;
                         // V171: 宠物探险+派遣系统v4
@@ -15061,6 +15085,35 @@
                 return gs.monthcardV5;
             }
 
+            // V180: _initRedpacketStateV4 - 初始化红包系统v4状态
+            _initRedpacketStateV4() {
+                const gs = window.gameState;
+                if (!gs.redpacketV4) {
+                    gs.redpacketV4 = {
+                        available: [],
+                        received: [],
+                        sent: [],
+                        totalSent: 0,
+                        totalReceived: 0
+                    };
+                }
+                return gs.redpacketV4;
+            }
+
+            // V180: _initSocialStateV4 - 初始化社交系统v4状态
+            _initSocialStateV4() {
+                const gs = window.gameState;
+                if (!gs.socialV4) {
+                    gs.socialV4 = {
+                        friends: [],
+                        invitations: [],
+                        blacklist: [],
+                        giftHistory: []
+                    };
+                }
+                return gs.socialV4;
+            }
+
             // V179: mcpInvestmentListV5 - 获取投资项目列表v5
             mcpInvestmentListV5() {
                 try {
@@ -15275,6 +15328,179 @@
                         benefitMultiplier: tierInfo.benefitMultiplier,
                         remainingSpiritStones: gs.spiritStones,
                         message: tierInfo.name + '购买成功！' + tierInfo.durationDays + '天有效期，每日可领取' + tierInfo.dailyReward + '灵石，权益倍数' + tierInfo.benefitMultiplier
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpRedpacketListV4 - 获取红包列表v4
+            mcpRedpacketListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpacketStateV4();
+                    // Return available (unclaimed) redpackets
+                    const available = rp.available.filter(r => {
+                        const age = Date.now() - r.createdAt;
+                        return age < REDPACKET_CONFIG_V4.红包有效期 && r.remaining > 0;
+                    });
+                    return {
+                        success: true,
+                        available,
+                        totalAvailable: available.length,
+                        totalReceived: rp.totalReceived,
+                        totalSent: rp.totalSent,
+                        history: rp.received.slice(-10)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpRedpacketSendV4 - 发送红包v4
+            mcpRedpacketSendV4(redpacketId, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpacketId) return { error: '请指定红包ID' };
+                    const sendAmount = amount || REDPACKET_CONFIG_V4.minSendAmount;
+                    if (sendAmount < REDPACKET_CONFIG_V4.minSendAmount) {
+                        return { error: '红包最低金额为' + REDPACKET_CONFIG_V4.minSendAmount + '灵石' };
+                    }
+                    if ((gs.spiritStones || 0) < sendAmount) {
+                        return { error: '灵石不足，发送红包需要' + sendAmount + '灵石' };
+                    }
+                    if (sendAmount > REDPACKET_CONFIG_V4.maxRedpacketAmount) {
+                        return { error: '单红包最高金额为' + REDPACKET_CONFIG_V4.maxRedpacketAmount + '灵石' };
+                    }
+                    gs.spiritStones -= sendAmount;
+                    const rp = this._initRedpacketStateV4();
+                    const redpacket = {
+                        id: redpacketId || 'rp_' + Date.now(),
+                        sender: gs.playerName || '玩家',
+                        amount: sendAmount,
+                        remaining: sendAmount,
+                        createdAt: Date.now(),
+                        count: 1,
+                        type: 'normal'
+                    };
+                    rp.available.push(redpacket);
+                    rp.sent.push(redpacket);
+                    rp.totalSent += sendAmount;
+                    return {
+                        success: true,
+                        redpacketId: redpacket.id,
+                        amount: sendAmount,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '红包"' + redpacket.id + '"发送成功，金额' + sendAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpRedpacketReceiveV4 - 领取红包v4
+            mcpRedpacketReceiveV4(redpacketId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpacketId) return { error: '请指定红包ID' };
+                    const rp = this._initRedpacketStateV4();
+                    const idx = rp.available.findIndex(r => r.id === redpacketId);
+                    if (idx === -1) return { error: '红包不存在或已过期: ' + redpacketId };
+                    const redpacket = rp.available[idx];
+                    if (redpacket.remaining <= 0) return { error: '红包已被领完' };
+                    // Random amount between 10% and 50% of remaining
+                    const minReceive = Math.floor(redpacket.remaining * 0.1);
+                    const maxReceive = Math.floor(redpacket.remaining * 0.5);
+                    const receivedAmount = Math.floor(Math.random() * (maxReceive - minReceive + 1)) + minReceive;
+                    redpacket.remaining -= receivedAmount;
+                    gs.spiritStones = (gs.spiritStones || 0) + receivedAmount;
+                    rp.totalReceived += receivedAmount;
+                    const record = {
+                        id: redpacketId,
+                        amount: receivedAmount,
+                        receivedAt: Date.now()
+                    };
+                    rp.received.push(record);
+                    return {
+                        success: true,
+                        redpacketId,
+                        amount: receivedAmount,
+                        remaining: redpacket.remaining,
+                        totalReceived: rp.totalReceived,
+                        message: '领取红包成功，获得' + receivedAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpRedpacketRedeemV4 - 兑换红包v4
+            mcpRedpacketRedeemV4(redpacketId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpacketId) return { error: '请指定红包ID' };
+                    const rp = this._initRedpacketStateV4();
+                    const idx = rp.received.findIndex(r => r.id === redpacketId);
+                    if (idx === -1) return { error: '红包记录不存在: ' + redpacketId };
+                    const record = rp.received[idx];
+                    if (record.amount < REDPACKET_CONFIG_V4.minRedeemAmount) {
+                        return { error: '红包金额不足' + REDPACKET_CONFIG_V4.minRedeemAmount + '灵石，无法兑换' };
+                    }
+                    record.redeemed = true;
+                    return {
+                        success: true,
+                        redpacketId,
+                        amount: record.amount,
+                        message: '红包兑换成功，' + record.amount + '灵石已到账'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpSocialListV4 - 获取社交列表v4
+            mcpSocialListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const social = this._initSocialStateV4();
+                    return {
+                        success: true,
+                        friends: social.friends,
+                        invitations: social.invitations,
+                        blacklist: social.blacklist,
+                        totalFriends: social.friends.length,
+                        maxFriends: SOCIAL_CONFIG_V4.maxFriends,
+                        giftHistory: social.giftHistory.slice(-20)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V180: mcpSocialInviteV4 - 邀请好友v4
+            mcpSocialInviteV4(playerName) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!playerName) return { error: '请指定玩家名称' };
+                    const social = this._initSocialStateV4();
+                    if (social.friends.length >= SOCIAL_CONFIG_V4.maxFriends) {
+                        return { error: '好友数量已达上限(' + SOCIAL_CONFIG_V4.maxFriends + ')' };
+                    }
+                    if (social.blacklist.includes(playerName)) {
+                        return { error: '该玩家在黑名单中，无法邀请' };
+                    }
+                    const existingInvite = social.invitations.find(i => i.playerName === playerName && i.status === 'pending');
+                    if (existingInvite) {
+                        return { error: '已向' + playerName + '发送邀请，请等待回复' };
+                    }
+                    const invitation = {
+                        id: 'inv_' + Date.now(),
+                        playerName,
+                        from: gs.playerName || '玩家',
+                        sentAt: Date.now(),
+                        status: 'pending'
+                    };
+                    social.invitations.push(invitation);
+                    return {
+                        success: true,
+                        invitationId: invitation.id,
+                        playerName,
+                        inviteReward: SOCIAL_CONFIG_V4.inviteReward,
+                        message: '已向' + playerName + '发送好友邀请，邀请成功奖励' + SOCIAL_CONFIG_V4.inviteReward + '灵石'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -36974,6 +37200,79 @@
             { id: 'inv_v3_long', name: '长期增长v3', description: '长期投资，90天期限，日收益率3%', cost: 20000, dailyReturn: 600, duration: 90 }
         ];
         const MONTHCARD_CONFIG_V3 = { cost: 300, dailyReward: 100, durationDays: 30 };
+
+        // V180: 红包+社交系统v4 (P-20260529-077)
+        const MCP_TOOLS_V180 = {
+            'redpacket.list': {
+                name: 'redpacket.list',
+                description: '获取红包列表 (红包系统v4-获取所有可领取红包列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpacket.send': {
+                name: 'redpacket.send',
+                description: '发送红包 (红包系统v4-发送红包，消耗灵石，可设置金额和数量)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpacketId: { type: 'string', description: '红包ID' },
+                        amount: { type: 'number', description: '红包总金额' }
+                    },
+                    required: ['redpacketId']
+                }
+            },
+            'redpacket.receive': {
+                name: 'redpacket.receive',
+                description: '领取红包 (红包系统v4-随机分配金额)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpacketId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpacketId']
+                }
+            },
+            'redpacket.redeem': {
+                name: 'redpacket.redeem',
+                description: '兑换红包 (红包系统v4-兑换红包，需达到最低金额)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpacketId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpacketId']
+                }
+            },
+            'social.list': {
+                name: 'social.list',
+                description: '获取社交列表 (社交系统v4-获取好友列表和社交状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.invite': {
+                name: 'social.invite',
+                description: '邀请好友 (社交系统v4-邀请玩家成为好友)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerName: { type: 'string', description: '玩家名称' }
+                    },
+                    required: ['playerName']
+                }
+            }
+        };
+
+        const REDPACKET_CONFIG_V4 = {
+            minRedeemAmount: 100,
+            maxRedpacketAmount: 10000,
+            minSendAmount: 50,
+           红包有效期: 24 * 60 * 60 * 1000,
+            types: ['normal', 'lucky', 'fixed']
+        };
+
+        const SOCIAL_CONFIG_V4 = {
+            maxFriends: 100,
+            inviteReward: 500,
+            blacklistMax: 50
+        };
 
         // V148: 奇遇+事件系统
         const MCP_TOOLS_V148 = {
@@ -70306,3 +70605,286 @@ const v152Results = runV152Tests();
         }
 
         const v179Results = runV179Tests();
+
+        // V180: 红包+社交系统v4 Tests
+        function runV180Tests() {
+            const results = [];
+            function v180Assert(condition, testName) {
+                const result = { test: testName, pass: condition };
+                if (!condition) {
+                    console.log('FAIL:', testName);
+                }
+                results.push(result);
+            }
+
+            window.gameState = {
+                spiritStones: 100000,
+                combatPower: 1000,
+                level: 5,
+                realm: 2,
+                playerName: '测试玩家',
+                redpacketV4: null,
+                socialV4: null
+            };
+
+            const server = new MockMCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V180 definition exists and has 6 tools
+            v180Assert(typeof MCP_TOOLS_V180 === 'object', 'MCP_TOOLS_V180 is defined');
+            v180Assert(Object.keys(MCP_TOOLS_V180).length === 6, 'MCP_TOOLS_V180 has 6 tools');
+            v180Assert('redpacket.list' in MCP_TOOLS_V180, 'redpacket.list tool exists');
+            v180Assert('redpacket.send' in MCP_TOOLS_V180, 'redpacket.send tool exists');
+            v180Assert('redpacket.receive' in MCP_TOOLS_V180, 'redpacket.receive tool exists');
+            v180Assert('redpacket.redeem' in MCP_TOOLS_V180, 'redpacket.redeem tool exists');
+            v180Assert('social.list' in MCP_TOOLS_V180, 'social.list tool exists');
+            v180Assert('social.invite' in MCP_TOOLS_V180, 'social.invite tool exists');
+
+            // Test 2: REDPACKET_CONFIG_V4 is defined with correct values
+            v180Assert(typeof REDPACKET_CONFIG_V4 === 'object', 'REDPACKET_CONFIG_V4 is defined');
+            v180Assert(REDPACKET_CONFIG_V4.minRedeemAmount === 100, 'REDPACKET_CONFIG_V4 has correct minRedeemAmount');
+            v180Assert(REDPACKET_CONFIG_V4.minSendAmount === 50, 'REDPACKET_CONFIG_V4 has correct minSendAmount');
+            v180Assert(REDPACKET_CONFIG_V4.maxRedpacketAmount === 10000, 'REDPACKET_CONFIG_V4 has correct maxRedpacketAmount');
+
+            // Test 3: SOCIAL_CONFIG_V4 is defined with correct values
+            v180Assert(typeof SOCIAL_CONFIG_V4 === 'object', 'SOCIAL_CONFIG_V4 is defined');
+            v180Assert(SOCIAL_CONFIG_V4.maxFriends === 100, 'SOCIAL_CONFIG_V4 has correct maxFriends');
+            v180Assert(SOCIAL_CONFIG_V4.inviteReward === 500, 'SOCIAL_CONFIG_V4 has correct inviteReward');
+
+            // Test 4: _initRedpacketStateV4 creates state
+            const rpV4State = server._initRedpacketStateV4();
+            v180Assert(rpV4State !== null, '_initRedpacketStateV4 returns state');
+            v180Assert(Array.isArray(rpV4State.available), '_initRedpacketStateV4 has available array');
+            v180Assert(Array.isArray(rpV4State.received), '_initRedpacketStateV4 has received array');
+            v180Assert(Array.isArray(rpV4State.sent), '_initRedpacketStateV4 has sent array');
+
+            // Test 5: _initSocialStateV4 creates state
+            const socialV4State = server._initSocialStateV4();
+            v180Assert(socialV4State !== null, '_initSocialStateV4 returns state');
+            v180Assert(Array.isArray(socialV4State.friends), '_initSocialStateV4 has friends array');
+            v180Assert(Array.isArray(socialV4State.invitations), '_initSocialStateV4 has invitations array');
+            v180Assert(Array.isArray(socialV4State.blacklist), '_initSocialStateV4 has blacklist array');
+
+            // Test 6: mcpRedpacketListV4 returns correct structure
+            const rpList = server.mcpRedpacketListV4();
+            v180Assert(rpList.success === true, 'redpacket.list v4 returns success');
+            v180Assert(Array.isArray(rpList.available), 'redpacket.list v4 has available array');
+            v180Assert(typeof rpList.totalAvailable === 'number', 'redpacket.list v4 has totalAvailable');
+
+            // Test 7: mcpRedpacketSendV4 works correctly
+            const rpSend = server.mcpRedpacketSendV4('rp_test_001', 500);
+            v180Assert(rpSend.success === true, 'redpacket.send v4 returns success');
+            v180Assert(rpSend.redpacketId === 'rp_test_001', 'redpacket.send v4 returns correct id');
+            v180Assert(rpSend.amount === 500, 'redpacket.send v4 returns correct amount');
+
+            // Test 8: mcpRedpacketSendV4 reduces spirit stones
+            v180Assert(window.gameState.spiritStones === 99500, 'redpacket.send v4 reduces spirit stones by 500');
+
+            // Test 9: mcpRedpacketSendV4 fails for insufficient funds
+            window.gameState.spiritStones = 10;
+            const rpSendPoor = server.mcpRedpacketSendV4('rp_test_002', 100);
+            v180Assert(rpSendPoor.error !== undefined, 'redpacket.send v4 insufficient funds returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 10: mcpRedpacketSendV4 fails for amount below minimum
+            const rpSendLow = server.mcpRedpacketSendV4('rp_test_003', 20);
+            v180Assert(rpSendLow.error !== undefined, 'redpacket.send v4 below min amount returns error');
+
+            // Test 11: mcpRedpacketSendV4 fails without redpacketId
+            const rpSendNoId = server.mcpRedpacketSendV4(null, 100);
+            v180Assert(rpSendNoId.error !== undefined, 'redpacket.send v4 without id returns error');
+
+            // Test 12: mcpRedpacketReceiveV4 works correctly
+            const rpReceive = server.mcpRedpacketReceiveV4('rp_test_001');
+            v180Assert(rpReceive.success === true, 'redpacket.receive v4 returns success');
+            v180Assert(typeof rpReceive.amount === 'number', 'redpacket.receive v4 returns amount');
+            v180Assert(rpReceive.amount > 0, 'redpacket.receive v4 returns positive amount');
+
+            // Test 13: mcpRedpacketReceiveV4 increases spirit stones
+            v180Assert(window.gameState.spiritStones > 99500, 'redpacket.receive v4 increases spirit stones');
+
+            // Test 14: mcpRedpacketReceiveV4 fails for non-existent redpacket
+            const rpReceiveBad = server.mcpRedpacketReceiveV4('rp_nonexistent');
+            v180Assert(rpReceiveBad.error !== undefined, 'redpacket.receive v4 non-existent returns error');
+
+            // Test 15: mcpRedpacketReceiveV4 fails without redpacketId
+            const rpReceiveNoId = server.mcpRedpacketReceiveV4(null);
+            v180Assert(rpReceiveNoId.error !== undefined, 'redpacket.receive v4 without id returns error');
+
+            // Test 16: mcpRedpacketRedeemV4 works correctly
+            const rpRedeem = server.mcpRedpacketRedeemV4('rp_test_001');
+            v180Assert(rpRedeem.success === true, 'redpacket.redeem v4 returns success');
+            v180Assert(typeof rpRedeem.amount === 'number', 'redpacket.redeem v4 returns amount');
+
+            // Test 17: mcpRedpacketRedeemV4 fails for non-existent redpacket
+            const rpRedeemBad = server.mcpRedpacketRedeemV4('rp_nonexistent');
+            v180Assert(rpRedeemBad.error !== undefined, 'redpacket.redeem v4 non-existent returns error');
+
+            // Test 18: mcpRedpacketRedeemV4 fails without redpacketId
+            const rpRedeemNoId = server.mcpRedpacketRedeemV4(null);
+            v180Assert(rpRedeemNoId.error !== undefined, 'redpacket.redeem v4 without id returns error');
+
+            // Test 19: mcpSocialListV4 returns correct structure
+            const socialList = server.mcpSocialListV4();
+            v180Assert(socialList.success === true, 'social.list v4 returns success');
+            v180Assert(Array.isArray(socialList.friends), 'social.list v4 has friends array');
+            v180Assert(Array.isArray(socialList.invitations), 'social.list v4 has invitations array');
+            v180Assert(typeof socialList.totalFriends === 'number', 'social.list v4 has totalFriends');
+            v180Assert(socialList.maxFriends === 100, 'social.list v4 has correct maxFriends');
+
+            // Test 20: mcpSocialInviteV4 works correctly
+            const socialInvite = server.mcpSocialInviteV4('好友A');
+            v180Assert(socialInvite.success === true, 'social.invite v4 returns success');
+            v180Assert(socialInvite.playerName === '好友A', 'social.invite v4 returns correct playerName');
+            v180Assert(socialInvite.inviteReward === 500, 'social.invite v4 returns correct inviteReward');
+
+            // Test 21: mcpSocialInviteV4 fails for duplicate invitation
+            const socialInviteDup = server.mcpSocialInviteV4('好友A');
+            v180Assert(socialInviteDup.error !== undefined, 'social.invite v4 duplicate returns error');
+
+            // Test 22: mcpSocialInviteV4 fails for max friends reached
+            window.gameState.socialV4.friends = Array(100).fill({ name: 'friend' });
+            const socialInviteFull = server.mcpSocialInviteV4('好友B');
+            v180Assert(socialInviteFull.error !== undefined, 'social.invite v4 max friends returns error');
+            window.gameState.socialV4.friends = [];
+
+            // Test 23: mcpSocialInviteV4 fails for blacklisted player
+            window.gameState.socialV4.blacklist.push('黑名单玩家');
+            const socialInviteBl = server.mcpSocialInviteV4('黑名单玩家');
+            v180Assert(socialInviteBl.error !== undefined, 'social.invite v4 blacklisted returns error');
+            window.gameState.socialV4.blacklist = [];
+
+            // Test 24: mcpSocialInviteV4 fails without playerName
+            const socialInviteNoName = server.mcpSocialInviteV4(null);
+            v180Assert(socialInviteNoName.error !== undefined, 'social.invite v4 without name returns error');
+
+            // Test 25: _initRedpacketStateV4 is idempotent
+            const rpV4First = server._initRedpacketStateV4();
+            const rpV4Second = server._initRedpacketStateV4();
+            v180Assert(rpV4First === rpV4Second, '_initRedpacketStateV4 is idempotent');
+
+            // Test 26: _initSocialStateV4 is idempotent
+            const socialV4First = server._initSocialStateV4();
+            const socialV4Second = server._initSocialStateV4();
+            v180Assert(socialV4First === socialV4Second, '_initSocialStateV4 is idempotent');
+
+            // Test 27: redpacket.list tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('redpacket.list'), 'redpacket.list is in toolRegistry');
+
+            // Test 28: redpacket.send tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('redpacket.send'), 'redpacket.send is in toolRegistry');
+
+            // Test 29: redpacket.receive tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('redpacket.receive'), 'redpacket.receive is in toolRegistry');
+
+            // Test 30: redpacket.redeem tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('redpacket.redeem'), 'redpacket.redeem is in toolRegistry');
+
+            // Test 31: social.list tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('social.list'), 'social.list is in toolRegistry');
+
+            // Test 32: social.invite tool registered in toolRegistry
+            v180Assert(server.toolRegistry.has('social.invite'), 'social.invite is in toolRegistry');
+
+            // Test 33: redpacket.list v4 shows totalSent and totalReceived
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            server.mcpRedpacketSendV4('rp_v4_test', 1000);
+            const rpListStats = server.mcpRedpacketListV4();
+            v180Assert(rpListStats.totalSent === 1000, 'redpacket.list v4 shows correct totalSent');
+            v180Assert(typeof rpListStats.totalReceived === 'number', 'redpacket.list v4 shows totalReceived');
+
+            // Test 34: redpacket.send v4 with default amount uses minSendAmount
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            const rpSendDefault = server.mcpRedpacketSendV4('rp_default', null);
+            v180Assert(rpSendDefault.success === true, 'redpacket.send v4 with null amount returns success');
+            v180Assert(rpSendDefault.amount === 50, 'redpacket.send v4 defaults to minSendAmount');
+
+            // Test 35: redpacket.send v4 with amount above max returns error
+            const rpSendMax = server.mcpRedpacketSendV4('rp_max', 20000);
+            v180Assert(rpSendMax.error !== undefined, 'redpacket.send v4 amount above max returns error');
+
+            // Test 36: redpacket.receive v4 updates remaining
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            server.mcpRedpacketSendV4('rp_remain_test', 1000);
+            const rpReceive2 = server.mcpRedpacketReceiveV4('rp_remain_test');
+            v180Assert(typeof rpReceive2.remaining === 'number', 'redpacket.receive v4 returns remaining');
+
+            // Test 37: social.invite v4 adds to invitations array
+            window.gameState.socialV4 = null;
+            server._initSocialStateV4();
+            server.mcpSocialInviteV4('新好友');
+            v180Assert(window.gameState.socialV4.invitations.length === 1, 'social.invite v4 adds invitation');
+
+            // Test 38: social.list v4 returns giftHistory
+            const socialListHistory = server.mcpSocialListV4();
+            v180Assert(Array.isArray(socialListHistory.giftHistory), 'social.list v4 has giftHistory array');
+
+            // Test 39: social.list v4 shows pending invitations
+            const socialInvitations = server.mcpSocialListV4();
+            v180Assert(socialInvitations.invitations.length > 0, 'social.list v4 shows invitations');
+
+            // Test 40: All V180 tools are callable via callTool
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            const callResult1 = server.callTool('redpacket.list', {});
+            v180Assert(callResult1.success === true, 'redpacket.list v4 callable via callTool');
+
+            window.gameState.spiritStones = 100000;
+            const callResult2 = server.callTool('redpacket.send', { redpacketId: 'rp_call_test', amount: 100 });
+            v180Assert(callResult2.success === true, 'redpacket.send v4 callable via callTool');
+
+            const callResult3 = server.callTool('social.list', {});
+            v180Assert(callResult3.success === true, 'social.list v4 callable via callTool');
+
+            // Test 41: redpacket.receive v4 for empty redpacket returns error
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            server.mcpRedpacketSendV4('rp_empty', 50);
+            // Receive until empty
+            for (let i = 0; i < 10; i++) {
+                const r = server.mcpRedpacketReceiveV4('rp_empty');
+                if (r.error) break;
+            }
+            const rpReceiveEmpty = server.mcpRedpacketReceiveV4('rp_empty');
+            v180Assert(rpReceiveEmpty.error !== undefined, 'redpacket.receive v4 empty redpacket returns error');
+
+            // Test 42: redpacket.list v4 filters expired redpackets
+            window.gameState.redpacketV4 = {
+                available: [{ id: 'rp_expired', remaining: 100, createdAt: Date.now() - 25 * 60 * 60 * 1000 }],
+                received: [], sent: [], totalSent: 0, totalReceived: 0
+            };
+            const rpListExpired = server.mcpRedpacketListV4();
+            v180Assert(rpListExpired.totalAvailable === 0, 'redpacket.list v4 filters expired');
+
+            // Test 43: social.invite v4 creates invitation with correct id format
+            window.gameState.socialV4 = null;
+            server._initSocialStateV4();
+            const inviteResult = server.mcpSocialInviteV4('测试玩家2');
+            v180Assert(inviteResult.invitationId.startsWith('inv_'), 'social.invite v4 has correct id format');
+
+            // Test 44: redpacket.redeem v4 marks record as redeemed
+            window.gameState.redpacketV4 = null;
+            server._initRedpacketStateV4();
+            server.mcpRedpacketSendV4('rp_redeem_test', 500);
+            server.mcpRedpacketReceiveV4('rp_redeem_test');
+            server.mcpRedpacketRedeemV4('rp_redeem_test');
+            const redeemRecord = window.gameState.redpacketV4.received.find(r => r.id === 'rp_redeem_test');
+            v180Assert(redeemRecord && redeemRecord.redeemed === true, 'redpacket.redeem v4 marks record as redeemed');
+
+            // Test 45: social.list v4 respects maxFriends limit in response
+            window.gameState.socialV4 = null;
+            server._initSocialStateV4();
+            const socialResp = server.mcpSocialListV4();
+            v180Assert(socialResp.maxFriends === 100, 'social.list v4 shows correct maxFriends limit');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V180 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V180', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v180Results = runV180Tests();
