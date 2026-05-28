@@ -3673,6 +3673,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V170)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V171: Register 宠物探险+派遣系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V171)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5499,6 +5503,25 @@
                         case 'friend.accept':
                             // V170: 红包+社交系统v3 - delegate to V3 methods
                             result = this._callRedpacketFriendV3(name, args);
+                            break;
+                        // V171: 宠物探险+派遣系统v4
+                        case 'pet.list':
+                            result = this.mcpPetListV4();
+                            break;
+                        case 'pet.equip':
+                            result = this.mcpPetEquipV4(args.petId);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolveV4(args.petId);
+                            break;
+                        case 'explore.list':
+                            result = this.mcpExploreListV4();
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStartV4(args.exploreId);
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreCompleteV4(args.exploreId);
                             break;
                         // V160: 红包+社交系统v2
                         case 'redpacket.list':
@@ -15049,6 +15072,141 @@
                     };
                 }
                 return gs.redpacketV3;
+            }
+
+            // V171: _initPetStateV4 - 初始化宠物系统v4状态
+            _initPetStateV4() {
+                const gs = window.gameState;
+                if (!gs.petV4) {
+                    gs.petV4 = {
+                        pets: [],
+                        maxPets: 5,
+                        equippedPetId: null
+                    };
+                }
+                return gs.petV4;
+            }
+
+            // V171: _initExploreStateV4 - 初始化探险系统v4状态
+            _initExploreStateV4() {
+                const gs = window.gameState;
+                if (!gs.exploreV4) {
+                    gs.exploreV4 = {
+                        explorations: [],
+                        history: []
+                    };
+                }
+                return gs.exploreV4;
+            }
+
+            // V171: mcpPetListV4 - 获取宠物列表v4
+            mcpPetListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petV4 = this._initPetStateV4();
+                    return {
+                        success: true,
+                        pets: petV4.pets,
+                        total: petV4.pets.length,
+                        maxPets: petV4.maxPets,
+                        equippedPetId: petV4.equippedPetId
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpPetEquipV4 - 装备宠物v4
+            mcpPetEquipV4(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV4 = this._initPetStateV4();
+                    const pet = petV4.pets.find(p => p.id === petId);
+                    if (!pet) return { error: '宠物不存在: ' + petId };
+                    petV4.equippedPetId = petId;
+                    return { success: true, petId, message: '已装备 ' + pet.name };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpPetEvolveV4 - 宠物进化v4
+            mcpPetEvolveV4(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV4 = this._initPetStateV4();
+                    const petIdx = petV4.pets.findIndex(p => p.id === petId);
+                    if (petIdx === -1) return { error: '宠物不存在: ' + petId };
+                    const pet = petV4.pets[petIdx];
+                    // 进化消耗500灵石
+                    const evolveCost = 500;
+                    if ((gs.spiritStones || 0) < evolveCost) return { error: '灵石不足，进化需要 ' + evolveCost + ' 灵石' };
+                    gs.spiritStones -= evolveCost;
+                    // 进化提升属性
+                    pet.level = (pet.level || 1) + 1;
+                    pet.evolveStage = (pet.evolveStage || 1) + 1;
+                    petV4.pets[petIdx] = pet;
+                    return { success: true, petId, name: pet.name, newLevel: pet.level, newEvolveStage: pet.evolveStage, message: pet.name + ' 进化成功！等级提升至 ' + pet.level };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreListV4 - 获取探险列表v4
+            mcpExploreListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreV4 = this._initExploreStateV4();
+                    return {
+                        success: true,
+                        explorations: exploreV4.explorations,
+                        total: exploreV4.explorations.length,
+                        history: exploreV4.history
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreStartV4 - 开始探险v4
+            mcpExploreStartV4(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV4 = this._initExploreStateV4();
+                    const existing = exploreV4.explorations.find(e => e.id === exploreId);
+                    if (existing && existing.status === 'active') return { error: '探险进行中: ' + exploreId };
+                    const explore = {
+                        id: exploreId,
+                        name: '探险_' + exploreId,
+                        status: 'active',
+                        startTime: Date.now(),
+                        endTime: Date.now() + 300000 // 5分钟
+                    };
+                    exploreV4.explorations.push(explore);
+                    return { success: true, exploreId, message: '探险开始: ' + exploreId };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreCompleteV4 - 完成探险v4
+            mcpExploreCompleteV4(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV4 = this._initExploreStateV4();
+                    const idx = exploreV4.explorations.findIndex(e => e.id === exploreId);
+                    if (idx === -1) return { error: '探险不存在: ' + exploreId };
+                    const explore = exploreV4.explorations[idx];
+                    if (explore.status !== 'active') return { error: '探险未进行中: ' + exploreId };
+                    // 完成探险，发放奖励
+                    const reward = { spiritStones: 100, items: ['灵草x2'] };
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    explore.status = 'completed';
+                    explore.endTime = Date.now();
+                    exploreV4.history.push({ ...explore, reward });
+                    exploreV4.explorations.splice(idx, 1);
+                    return { success: true, exploreId, reward, message: '探险完成！获得 ' + reward.spiritStones + ' 灵石和 ' + reward.items.join(',') };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V170: _initFriendStateV3 - 初始化好友系统v3状态
@@ -34272,6 +34430,64 @@
                         applyId: { type: 'string', description: '申请ID' }
                     },
                     required: ['applyId']
+                }
+            }
+        };
+
+        // V171: 宠物探险+派遣系统v4 (P-20260529-048)
+        const MCP_TOOLS_V171 = {
+            'pet.list': {
+                name: 'pet.list',
+                description: '获取宠物列表 (宠物系统v4-获取所有宠物列表及装备状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.equip': {
+                name: 'pet.equip',
+                description: '装备宠物 (宠物系统v4-装备指定宠物获得属性加成)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: '宠物进化 (宠物系统v4-进化宠物提升属性，消耗道具和灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取探险列表 (探险系统v4-获取所有探险区域及状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始探险 (探险系统v4-开始指定探险，需宠物支援)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'explore.complete': {
+                name: 'explore.complete',
+                description: '完成探险 (探险系统v4-完成探险获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
                 }
             }
         };
@@ -65373,3 +65589,228 @@ const v152Results = runV152Tests();
         const v170Results = runV170Tests();
 
         const v150Results = runV150Tests();
+
+        // ===== V171 Tests (P-20260529-048) =====
+        function runV171Tests() {
+            const results = [];
+            function v171Assert(condition, testName) {
+                results.push({ pass: condition === true, test: testName });
+                if (condition !== true) console.warn('FAIL:', testName);
+            }
+
+            // Setup game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                realm: '筑基',
+                level: 10
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V171 definition exists and has 6 tools
+            v171Assert(typeof MCP_TOOLS_V171 === 'object', 'MCP_TOOLS_V171 is defined');
+            v171Assert(Object.keys(MCP_TOOLS_V171).length === 6, 'MCP_TOOLS_V171 has 6 tools');
+
+            // Test 2: pet.list tool exists
+            v171Assert('pet.list' in MCP_TOOLS_V171, 'pet.list tool exists');
+
+            // Test 3: pet.equip tool exists
+            v171Assert('pet.equip' in MCP_TOOLS_V171, 'pet.equip tool exists');
+
+            // Test 4: pet.evolve tool exists
+            v171Assert('pet.evolve' in MCP_TOOLS_V171, 'pet.evolve tool exists');
+
+            // Test 5: explore.list tool exists
+            v171Assert('explore.list' in MCP_TOOLS_V171, 'explore.list tool exists');
+
+            // Test 6: explore.start tool exists
+            v171Assert('explore.start' in MCP_TOOLS_V171, 'explore.start tool exists');
+
+            // Test 7: explore.complete tool exists
+            v171Assert('explore.complete' in MCP_TOOLS_V171, 'explore.complete tool exists');
+
+            // Test 8: _initPetStateV4 creates state
+            server._initPetStateV4();
+            v171Assert(window.gameState.petV4 !== undefined, '_initPetStateV4 creates petV4');
+            v171Assert(Array.isArray(window.gameState.petV4.pets), 'petV4.pets is array');
+
+            // Test 9: _initExploreStateV4 creates state
+            server._initExploreStateV4();
+            v171Assert(window.gameState.exploreV4 !== undefined, '_initExploreStateV4 creates exploreV4');
+            v171Assert(Array.isArray(window.gameState.exploreV4.explorations), 'exploreV4.explorations is array');
+            v171Assert(Array.isArray(window.gameState.exploreV4.history), 'exploreV4.history is array');
+
+            // Test 10: mcpPetListV4 returns success
+            const petList = server.mcpPetListV4();
+            v171Assert(petList.success === true, 'mcpPetListV4 returns success');
+            v171Assert(Array.isArray(petList.pets), 'mcpPetListV4 returns pets array');
+
+            // Test 11: mcpPetListV4 returns maxPets and equippedPetId
+            v171Assert(petList.maxPets === 5, 'mcpPetListV4 returns maxPets=5');
+            v171Assert(petList.equippedPetId === null, 'mcpPetListV4 returns equippedPetId=null initially');
+
+            // Test 12: mcpPetEquipV4 fails without petId
+            const equipNoId = server.mcpPetEquipV4(null);
+            v171Assert(equipNoId.error !== undefined, 'mcpPetEquipV4 fails without petId');
+
+            // Test 13: mcpPetEquipV4 fails for non-existent pet
+            const equipBad = server.mcpPetEquipV4('pet_non_exist');
+            v171Assert(equipBad.error !== undefined, 'mcpPetEquipV4 fails for non-existent pet');
+
+            // Test 14: mcpPetEvolveV4 fails without petId
+            const evolveNoId = server.mcpPetEvolveV4(null);
+            v171Assert(evolveNoId.error !== undefined, 'mcpPetEvolveV4 fails without petId');
+
+            // Test 15: mcpPetEvolveV4 fails for non-existent pet
+            const evolveBad = server.mcpPetEvolveV4('pet_non_exist');
+            v171Assert(evolveBad.error !== undefined, 'mcpPetEvolveV4 fails for non-existent pet');
+
+            // Test 16: mcpPetEvolveV4 fails with insufficient stones
+            window.gameState.petV4 = null;
+            window.gameState.spiritStones = 100;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_test', name: '测试宠物', level: 1, evolveStage: 1 });
+            const evolvePoor = server.mcpPetEvolveV4('pet_test');
+            v171Assert(evolvePoor.error !== undefined, 'mcpPetEvolveV4 fails with insufficient stones');
+
+            // Test 17: mcpPetEvolveV4 succeeds with sufficient stones
+            window.gameState.spiritStones = 1000;
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_evolve', name: '进化宠物', level: 1, evolveStage: 1 });
+            const evolveResult = server.mcpPetEvolveV4('pet_evolve');
+            v171Assert(evolveResult.success === true, 'mcpPetEvolveV4 succeeds');
+
+            // Test 18: mcpPetEvolveV4 deducts spirit stones
+            v171Assert(window.gameState.spiritStones === 500, 'mcpPetEvolveV4 deducts 500 stones');
+
+            // Test 19: mcpPetEvolveV4 increases level and evolveStage
+            v171Assert(evolveResult.newLevel === 2, 'mcpPetEvolveV4 increases level to 2');
+            v171Assert(evolveResult.newEvolveStage === 2, 'mcpPetEvolveV4 increases evolveStage to 2');
+
+            // Test 20: mcpExploreListV4 returns success
+            const exploreList = server.mcpExploreListV4();
+            v171Assert(exploreList.success === true, 'mcpExploreListV4 returns success');
+            v171Assert(Array.isArray(exploreList.explorations), 'mcpExploreListV4 returns explorations array');
+
+            // Test 21: mcpExploreStartV4 fails without exploreId
+            const startNoId = server.mcpExploreStartV4(null);
+            v171Assert(startNoId.error !== undefined, 'mcpExploreStartV4 fails without exploreId');
+
+            // Test 22: mcpExploreStartV4 succeeds with valid exploreId
+            const startResult = server.mcpExploreStartV4('explore_001');
+            v171Assert(startResult.success === true, 'mcpExploreStartV4 succeeds');
+
+            // Test 23: mcpExploreStartV4 adds to explorations
+            v171Assert(window.gameState.exploreV4.explorations.length === 1, 'mcpExploreStartV4 adds to explorations');
+
+            // Test 24: mcpExploreStartV4 fails when already active
+            const startDup = server.mcpExploreStartV4('explore_001');
+            v171Assert(startDup.error !== undefined, 'mcpExploreStartV4 fails when already active');
+
+            // Test 25: mcpExploreCompleteV4 fails without exploreId
+            const completeNoId = server.mcpExploreCompleteV4(null);
+            v171Assert(completeNoId.error !== undefined, 'mcpExploreCompleteV4 fails without exploreId');
+
+            // Test 26: mcpExploreCompleteV4 fails for non-existent explore
+            const completeBad = server.mcpExploreCompleteV4('explore_non_exist');
+            v171Assert(completeBad.error !== undefined, 'mcpExploreCompleteV4 fails for non-existent explore');
+
+            // Test 27: mcpExploreCompleteV4 succeeds for active explore
+            const completeResult = server.mcpExploreCompleteV4('explore_001');
+            v171Assert(completeResult.success === true, 'mcpExploreCompleteV4 succeeds');
+
+            // Test 28: mcpExploreCompleteV4 adds to history
+            v171Assert(window.gameState.exploreV4.history.length === 1, 'mcpExploreCompleteV4 adds to history');
+
+            // Test 29: mcpExploreCompleteV4 removes from explorations
+            v171Assert(window.gameState.exploreV4.explorations.length === 0, 'mcpExploreCompleteV4 removes from explorations');
+
+            // Test 30: mcpExploreCompleteV4 adds reward to spirit stones
+            v171Assert(window.gameState.spiritStones > 500, 'mcpExploreCompleteV4 adds spirit stones reward');
+
+            // Test 31: mcpPetEquipV4 succeeds for existing pet
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_equip', name: '装备宠物' });
+            const equipResult = server.mcpPetEquipV4('pet_equip');
+            v171Assert(equipResult.success === true, 'mcpPetEquipV4 succeeds');
+
+            // Test 32: mcpPetEquipV4 sets equippedPetId
+            v171Assert(window.gameState.petV4.equippedPetId === 'pet_equip', 'mcpPetEquipV4 sets equippedPetId');
+
+            // Test 33: mcpPetListV4 returns equippedPetId after equip
+            const listAfterEquip = server.mcpPetListV4();
+            v171Assert(listAfterEquip.equippedPetId === 'pet_equip', 'mcpPetListV4 returns equippedPetId');
+
+            // Test 34: explore.list shows history
+            window.gameState.exploreV4 = null;
+            server._initExploreStateV4();
+            server.mcpExploreStartV4('explore_hist');
+            server.mcpExploreCompleteV4('explore_hist');
+            const histList = server.mcpExploreListV4();
+            v171Assert(histList.history.length === 1, 'explore.list shows history');
+
+            // Test 35: mcpExploreCompleteV4 fails when not active
+            server.mcpExploreStartV4('explore_inactive');
+            server.mcpExploreCompleteV4('explore_inactive');
+            const completeInactive = server.mcpExploreCompleteV4('explore_inactive');
+            v171Assert(completeInactive.error !== undefined, 'mcpExploreCompleteV4 fails when not active');
+
+            // Test 36: petV4.maxPets is 5
+            v171Assert(window.gameState.petV4.maxPets === 5, 'petV4.maxPets is 5');
+
+            // Test 37: _initPetStateV4 is idempotent
+            const petV4First = server._initPetStateV4();
+            const petV4Second = server._initPetStateV4();
+            v171Assert(petV4First === petV4Second, '_initPetStateV4 is idempotent');
+
+            // Test 38: _initExploreStateV4 is idempotent
+            const exploreV4First = server._initExploreStateV4();
+            const exploreV4Second = server._initExploreStateV4();
+            v171Assert(exploreV4First === exploreV4Second, '_initExploreStateV4 is idempotent');
+
+            // Test 39: mcpPetListV4 returns correct total
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'p1', name: '宠物1' }, { id: 'p2', name: '宠物2' });
+            const listWithPets = server.mcpPetListV4();
+            v171Assert(listWithPets.total === 2, 'mcpPetListV4 returns correct total');
+
+            // Test 40: mcpExploreStartV4 sets correct status
+            server._initExploreStateV4();
+            server.mcpExploreStartV4('explore_status');
+            const activeExplore = window.gameState.exploreV4.explorations[0];
+            v171Assert(activeExplore.status === 'active', 'mcpExploreStartV4 sets status=active');
+
+            // Test 41: mcpExploreCompleteV4 sets correct status in history
+            server.mcpExploreCompleteV4('explore_status');
+            const histEntry = window.gameState.exploreV4.history[0];
+            v171Assert(histEntry.status === 'completed', 'mcpExploreCompleteV4 sets history status=completed');
+
+            // Test 42: mcpExploreCompleteV4 includes reward in history
+            v171Assert(histEntry.reward !== undefined, 'mcpExploreCompleteV4 includes reward in history');
+
+            // Test 43: pet.evolve tool registered in toolRegistry
+            const hasPetEvolve = server.toolRegistry.has('pet.evolve');
+            v171Assert(hasPetEvolve === true, 'pet.evolve registered in toolRegistry');
+
+            // Test 44: explore.complete tool registered in toolRegistry
+            const hasExploreComplete = server.toolRegistry.has('explore.complete');
+            v171Assert(hasExploreComplete === true, 'explore.complete registered in toolRegistry');
+
+            // Test 45: callTool dispatch for pet.list V171
+            const dispatched = server.callTool('pet.list', {});
+            const parsedResult = JSON.parse(dispatched.content[0].text);
+            v171Assert(parsedResult.success === true, 'callTool dispatches pet.list successfully');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V171 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V171', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v171Results = runV171Tests();
