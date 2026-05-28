@@ -5563,6 +5563,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V161)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V162: Register 图鉴+收集系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V162)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5642,6 +5646,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'dispatch.complete':
                             result = this.mcpDispatchCompleteV3(args.taskId);
+                            break;
+                        // V162: 图鉴+收集系统v3
+                        case 'codex.list':
+                            result = this.mcpCodexListV3();
+                            break;
+                        case 'codex.view':
+                            result = this.mcpCodexViewV3(args.codexId);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlockV3(args.codexId);
+                            break;
+                        case 'collection.stats':
+                            result = this.mcpCollectionStatsV3();
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionRewardV3(args.tier);
+                            break;
+                        case 'collection.reset':
+                            result = this.mcpCollectionResetV3();
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -17317,6 +17340,74 @@ const ACHIEVEMENT_ID_MAP = {
                 return gs.dispatchV3;
             }
 
+            // V162: _initCodexStateV3 - 初始化图鉴系统状态v3
+            _initCodexStateV3() {
+                const gs = window.gameState;
+                if (!gs.codexV3) {
+                    gs.codexV3 = {
+                        categories: [
+                            {
+                                id: 'realm', name: '境界图鉴', items: [
+                                    { id: 'codex_realm_qi', name: '炼气期', description: '吸纳灵气，淬炼肉身，步入修行第一步', rarity: 'N', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_realm_foundation', name: '筑基期', description: '丹田凝聚，根基稳固，正式踏入仙途', rarity: 'R', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_realm_golden', name: '金丹期', description: '金丹凝结，神识初成，一颗金丹吞入腹', rarity: 'SR', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_realm_yuan', name: '元婴期', description: '元婴出窍，神游太虚，寿元大幅增长', rarity: 'SSR', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_realm_transcend', name: '化神期', description: '化神为虚，感悟天道，一念之间天地变', rarity: 'SSR', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_realm_celestial', name: '飞升期', description: '飞升仙界，超脱轮回，成为长生仙人', rarity: 'UR', unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'technique', name: '功法图鉴', items: [
+                                    { id: 'codex_tech_fire', name: '烈火诀', description: '火属性功法，攻击力强', rarity: 'N', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_tech_water', name: '水月诀', description: '水属性功法，防守出色', rarity: 'N', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_tech_wood', name: '青木诀', description: '木属性功法，恢复力强', rarity: 'R', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_tech_tianyi', name: '天一诀', description: '顶级功法，万法之源', rarity: 'UR', unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'beast', name: '灵兽图鉴', items: [
+                                    { id: 'codex_beast_snake', name: '青鳞蛇', description: '速度极快的蛇类灵兽', rarity: 'N', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_beast_bird', name: '火鸦', description: '操控火焰的鸟类灵兽', rarity: 'R', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_beast_fox', name: '九尾狐', description: '魅惑众生的狐族灵兽', rarity: 'SR', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_beast_dragon', name: '青龙', description: '掌控风雨的海兽之王', rarity: 'UR', unlocked: false, unlockedAt: null }
+                                ]
+                            },
+                            {
+                                id: 'pill', name: '丹药图鉴', items: [
+                                    { id: 'codex_pill_qi', name: '聚气丹', description: '辅助修炼，加快灵气聚集', rarity: 'N', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_pill_break', name: '破境丹', description: '辅助突破境界瓶颈', rarity: 'R', unlocked: false, unlockedAt: null },
+                                    { id: 'codex_pill_rebirth', name: '涅槃丹', description: '生死人肉白骨，重塑根基', rarity: 'SSR', unlocked: false, unlockedAt: null }
+                                ]
+                            }
+                        ],
+                        progress: {},
+                        totalItems: 0
+                    };
+                    // Calculate total items
+                    gs.codexV3.totalItems = gs.codexV3.categories.reduce((sum, cat) => sum + cat.items.length, 0);
+                }
+                return gs.codexV3;
+            }
+
+            // V162: _initCollectionStateV3 - 初始化收集系统状态v3
+            _initCollectionStateV3() {
+                const gs = window.gameState;
+                if (!gs.collectionV3) {
+                    gs.collectionV3 = {
+                        tiers: [
+                            { id: 1, name: '初窥门径', required: 5, reward: { spiritStones: 1000, title: '收藏家·初' }, claimed: false },
+                            { id: 2, name: '小有所成', required: 15, reward: { spiritStones: 5000, title: '收藏家·小成' }, claimed: false },
+                            { id: 3, name: '融会贯通', required: 30, reward: { spiritStones: 15000, title: '收藏家·大成' }, claimed: false },
+                            { id: 4, name: '炉火纯青', required: 50, reward: { spiritStones: 50000, title: '收藏家·圆满' }, claimed: false },
+                            { id: 5, name: '登峰造极', required: 80, reward: { spiritStones: 200000, title: '收藏家·极致' }, claimed: false }
+                        ],
+                        totalCollected: 0,
+                        lastReset: null
+                    };
+                }
+                return gs.collectionV3;
+            }
+
             // V161: mcpExploreListV3 - 获取探险区域列表v3
             mcpExploreListV3() {
                 try {
@@ -17602,6 +17693,232 @@ const ACHIEVEMENT_ID_MAP = {
                         message: '任务完成！获得奖励：' + JSON.stringify(task.reward)
                     };
                 } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCodexListV3 - 获取图鉴列表v3
+            mcpCodexListV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codexV3 = this._initCodexStateV3();
+                    const now = Date.now();
+
+                    return {
+                        success: true,
+                        categories: codexV3.categories.map(cat => ({
+                            id: cat.id,
+                            name: cat.name,
+                            totalItems: cat.items.length,
+                            unlockedItems: cat.items.filter(i => i.unlocked).length,
+                            items: cat.items.map(item => ({
+                                id: item.id,
+                                name: item.name,
+                                rarity: item.rarity,
+                                unlocked: item.unlocked,
+                                unlockedAt: item.unlockedAt
+                            }))
+                        })),
+                        totalItems: codexV3.totalItems,
+                        totalUnlocked: codexV3.categories.reduce((sum, cat) => sum + cat.items.filter(i => i.unlocked).length, 0),
+                        message: '共' + codexV3.categories.length + '个分类，' + codexV3.totalItems + '个图鉴'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCodexViewV3 - 查看图鉴详情v3
+            mcpCodexViewV3(codexId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!codexId) return { error: '请指定图鉴ID' };
+
+                    const codexV3 = this._initCodexStateV3();
+                    let foundItem = null;
+                    let categoryName = '';
+
+                    for (const cat of codexV3.categories) {
+                        const item = cat.items.find(i => i.id === codexId);
+                        if (item) {
+                            foundItem = item;
+                            categoryName = cat.name;
+                            break;
+                        }
+                    }
+
+                    if (!foundItem) return { error: '图鉴不存在' };
+
+                    return {
+                        success: true,
+                        id: foundItem.id,
+                        name: foundItem.name,
+                        description: foundItem.description,
+                        rarity: foundItem.rarity,
+                        category: categoryName,
+                        unlocked: foundItem.unlocked,
+                        unlockedAt: foundItem.unlockedAt,
+                        message: foundItem.unlocked ? '已解锁' : '尚未解锁'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCodexUnlockV3 - 解锁图鉴v3
+            mcpCodexUnlockV3(codexId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!codexId) return { error: '请指定图鉴ID' };
+
+                    const codexV3 = this._initCodexStateV3();
+                    let foundItem = null;
+
+                    for (const cat of codexV3.categories) {
+                        const item = cat.items.find(i => i.id === codexId);
+                        if (item) {
+                            foundItem = item;
+                            break;
+                        }
+                    }
+
+                    if (!foundItem) return { error: '图鉴不存在' };
+                    if (foundItem.unlocked) return { error: '图鉴已解锁' };
+
+                    // 计算解锁费用（根据稀有度）
+                    const rarityCost = { 'N': 100, 'R': 500, 'SR': 2000, 'SSR': 8000, 'UR': 30000 };
+                    const cost = rarityCost[foundItem.rarity] || 1000;
+
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: '灵石不足，解锁需要' + cost + '灵石' };
+                    }
+
+                    gs.spiritStones -= cost;
+                    foundItem.unlocked = true;
+                    foundItem.unlockedAt = Date.now();
+
+                    // 更新收集统计
+                    this._updateCollectionV3();
+
+                    return {
+                        success: true,
+                        codexId: codexId,
+                        name: foundItem.name,
+                        cost: cost,
+                        message: '解锁成功！消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCollectionStatsV3 - 获取收集统计v3
+            mcpCollectionStatsV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const collectionV3 = this._initCollectionStateV3();
+                    const codexV3 = this._initCodexStateV3();
+
+                    const totalUnlocked = codexV3.categories.reduce((sum, cat) => sum + cat.items.filter(i => i.unlocked).length, 0);
+                    collectionV3.totalCollected = totalUnlocked;
+
+                    return {
+                        success: true,
+                        totalCollected: totalUnlocked,
+                        totalItems: codexV3.totalItems,
+                        completionRate: codexV3.totalItems > 0 ? (totalUnlocked / codexV3.totalItems * 100).toFixed(1) + '%' : '0%',
+                        tiers: collectionV3.tiers.map(tier => ({
+                            id: tier.id,
+                            name: tier.name,
+                            required: tier.required,
+                            progress: Math.min(totalUnlocked, tier.required),
+                            claimed: tier.claimed,
+                            available: totalUnlocked >= tier.required && !tier.claimed
+                        })),
+                        message: '已收集' + totalUnlocked + '/' + codexV3.totalItems + '个图鉴'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCollectionRewardV3 - 领取收集奖励v3
+            mcpCollectionRewardV3(tier) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!tier) return { error: '请指定奖励档位' };
+
+                    const collectionV3 = this._initCollectionStateV3();
+                    const codexV3 = this._initCodexStateV3();
+                    const totalUnlocked = codexV3.categories.reduce((sum, cat) => sum + cat.items.filter(i => i.unlocked).length, 0);
+
+                    const tierData = collectionV3.tiers.find(t => t.id === tier);
+                    if (!tierData) return { error: '奖励档位不存在' };
+
+                    if (totalUnlocked < tierData.required) {
+                        return { error: '收集进度不足，需要' + tierData.required + '个图鉴，当前' + totalUnlocked + '个' };
+                    }
+
+                    if (tierData.claimed) return { error: '该奖励已领取' };
+
+                    // 发放奖励
+                    tierData.claimed = true;
+                    if (tierData.reward.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + tierData.reward.spiritStones;
+                    }
+                    if (tierData.reward.title) {
+                        gs.title = tierData.reward.title;
+                    }
+
+                    return {
+                        success: true,
+                        tier: tier,
+                        name: tierData.name,
+                        reward: tierData.reward,
+                        message: '领取成功！获得' + JSON.stringify(tierData.reward)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: mcpCollectionResetV3 - 重置收集进度v3
+            mcpCollectionResetV3() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+
+                    const collectionV3 = this._initCollectionStateV3();
+                    const resetCost = 10000;
+
+                    if ((gs.spiritStones || 0) < resetCost) {
+                        return { error: '灵石不足，重置需要' + resetCost + '灵石' };
+                    }
+
+                    gs.spiritStones -= resetCost;
+
+                    // 重置所有图鉴为未解锁
+                    for (const cat of gs.codexV3.categories) {
+                        for (const item of cat.items) {
+                            item.unlocked = false;
+                            item.unlockedAt = null;
+                        }
+                    }
+
+                    // 重置收集状态
+                    collectionV3.totalCollected = 0;
+                    collectionV3.lastReset = Date.now();
+                    for (const tier of collectionV3.tiers) {
+                        tier.claimed = false;
+                    }
+
+                    return {
+                        success: true,
+                        cost: resetCost,
+                        message: '重置成功！消耗' + resetCost + '灵石，所有图鉴已重置为未解锁'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V162: _updateCollectionV3 - 更新收集统计
+            _updateCollectionV3() {
+                const gs = window.gameState;
+                if (!gs.codexV3 || !gs.collectionV3) return;
+                const totalUnlocked = gs.codexV3.categories.reduce((sum, cat) => sum + cat.items.filter(i => i.unlocked).length, 0);
+                gs.collectionV3.totalCollected = totalUnlocked;
             }
 
             // V152: _initCodexStateV2 - 初始化图鉴系统状态v2
@@ -33580,6 +33897,58 @@ const ACHIEVEMENT_ID_MAP = {
                     },
                     required: ['taskId']
                 }
+            }
+        };
+
+        // V162: 图鉴+收集系统v3
+        const MCP_TOOLS_V162 = {
+            'codex.list': {
+                name: 'codex.list',
+                description: '获取图鉴列表 (图鉴系统v3-获取所有分类及解锁进度)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'codex.view': {
+                name: 'codex.view',
+                description: '查看图鉴详情 (图鉴系统v3-查看指定图鉴详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴 (图鉴系统v3-消耗灵石解锁图鉴)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'collection.stats': {
+                name: 'collection.stats',
+                description: '获取收集统计 (收集系统v3-获取收集完成度和奖励状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集系统v3-领取指定档位的收集奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        tier: { type: 'number', description: '奖励档位(1-5)' }
+                    },
+                    required: ['tier']
+                }
+            },
+            'collection.reset': {
+                name: 'collection.reset',
+                description: '重置收集进度 (收集系统v3-重置所有收集进度，需消耗灵石)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -60026,6 +60395,303 @@ const v152Results = runV152Tests();
             }
 
             const v161Results = runV161Tests();
+
+            // V162 Tests (P-20260529-003)
+            function runV162Tests() {
+                const results = [];
+                const v162Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+                window.gameState = {
+                    spiritStones: 50000,
+                    level: 15,
+                    name: 'TestUser',
+                    title: ''
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V162 definition exists and has 6 tools
+                v162Assert(typeof MCP_TOOLS_V162 === 'object', 'MCP_TOOLS_V162 is defined');
+                v162Assert(Object.keys(MCP_TOOLS_V162).length === 6, 'MCP_TOOLS_V162 has 6 tools');
+                v162Assert('codex.list' in MCP_TOOLS_V162, 'codex.list tool exists');
+                v162Assert('codex.view' in MCP_TOOLS_V162, 'codex.view tool exists');
+                v162Assert('codex.unlock' in MCP_TOOLS_V162, 'codex.unlock tool exists');
+                v162Assert('collection.stats' in MCP_TOOLS_V162, 'collection.stats tool exists');
+                v162Assert('collection.reward' in MCP_TOOLS_V162, 'collection.reward tool exists');
+                v162Assert('collection.reset' in MCP_TOOLS_V162, 'collection.reset tool exists');
+
+                // Test 2: _initCodexStateV3 initializes correctly
+                const codexStateV3 = server._initCodexStateV3();
+                v162Assert(codexStateV3 !== null, '_initCodexStateV3 returns state');
+                v162Assert(Array.isArray(codexStateV3.categories), 'codexV3 categories is array');
+                v162Assert(codexStateV3.categories.length === 4, 'codexV3 has 4 categories');
+                v162Assert(codexStateV3.totalItems === 17, 'codexV3 totalItems is 17');
+
+                // Test 3: _initCollectionStateV3 initializes correctly
+                const collStateV3 = server._initCollectionStateV3();
+                v162Assert(collStateV3 !== null, '_initCollectionStateV3 returns state');
+                v162Assert(Array.isArray(collStateV3.tiers), 'collectionV3 tiers is array');
+                v162Assert(collStateV3.tiers.length === 5, 'collectionV3 has 5 tiers');
+                v162Assert(collStateV3.totalCollected === 0, 'collectionV3 totalCollected is 0');
+
+                // Test 4: mcpCodexListV3 returns all categories
+                const clV3 = server.mcpCodexListV3();
+                v162Assert(clV3.success === true, 'codex.list v3 returns success');
+                v162Assert(clV3.categories.length === 4, 'codex.list v3 shows 4 categories');
+                v162Assert(clV3.totalItems === 17, 'codex.list v3 totalItems is 17');
+                v162Assert(clV3.totalUnlocked === 0, 'codex.list v3 totalUnlocked is 0');
+
+                // Test 5: mcpCodexViewV3 returns item details
+                const cvV3 = server.mcpCodexViewV3('codex_realm_qi');
+                v162Assert(cvV3.success === true, 'codex.view v3 returns success');
+                v162Assert(cvV3.name === '炼气期', 'codex.view v3 name correct');
+                v162Assert(cvV3.rarity === 'N', 'codex.view v3 rarity is N');
+                v162Assert(cvV3.unlocked === false, 'codex.view v3 not unlocked initially');
+
+                // Test 6: mcpCodexViewV3 fails for invalid id
+                const cvV3Err1 = server.mcpCodexViewV3('invalid_codex');
+                v162Assert(cvV3Err1.error && cvV3Err1.error.includes('不存在'), 'codex.view v3 invalid id error');
+
+                // Test 7: mcpCodexViewV3 fails without codexId
+                const cvV3Err2 = server.mcpCodexViewV3();
+                v162Assert(cvV3Err2.error && cvV3Err2.error.includes('图鉴ID'), 'codex.view v3 missing id error');
+
+                // Test 8: mcpCodexUnlockV3 unlocks successfully
+                const cuV3 = server.mcpCodexUnlockV3('codex_realm_qi');
+                v162Assert(cuV3.success === true, 'codex.unlock v3 returns success');
+                v162Assert(cuV3.cost === 100, 'codex.unlock v3 cost is 100 for N rarity');
+                v162Assert(window.gameState.spiritStones === 49900, 'codex.unlock v3 deducts spirit stones');
+
+                // Test 9: mcpCodexUnlockV3 fails for already unlocked
+                const cuV3Err1 = server.mcpCodexUnlockV3('codex_realm_qi');
+                v162Assert(cuV3Err1.error && cuV3Err1.error.includes('已解锁'), 'codex.unlock v3 already unlocked error');
+
+                // Test 10: mcpCodexUnlockV3 fails without codexId
+                const cuV3Err2 = server.mcpCodexUnlockV3();
+                v162Assert(cuV3Err2.error && cuV3Err2.error.includes('图鉴ID'), 'codex.unlock v3 missing id error');
+
+                // Test 11: mcpCodexUnlockV3 fails for insufficient spirit stones
+                window.gameState.spiritStones = 50;
+                const cuV3Err3 = server.mcpCodexUnlockV3('codex_realm_foundation');
+                v162Assert(cuV3Err3.error && cuV3Err3.error.includes('灵石不足'), 'codex.unlock v3 insufficient stones error');
+
+                // Test 12: mcpCodexUnlockV3 unlocks R rarity correctly
+                window.gameState.spiritStones = 50000;
+                const cuV3R = server.mcpCodexUnlockV3('codex_realm_foundation');
+                v162Assert(cuV3R.success === true, 'codex.unlock v3 R rarity unlocks');
+                v162Assert(cuV3R.cost === 500, 'codex.unlock v3 cost is 500 for R rarity');
+
+                // Test 13: mcpCodexUnlockV3 unlocks SR rarity correctly
+                const cuV3SR = server.mcpCodexUnlockV3('codex_beast_fox');
+                v162Assert(cuV3SR.success === true, 'codex.unlock v3 SR rarity unlocks');
+                v162Assert(cuV3SR.cost === 2000, 'codex.unlock v3 cost is 2000 for SR rarity');
+
+                // Test 14: mcpCodexUnlockV3 unlocks SSR rarity correctly
+                const cuV3SSR = server.mcpCodexUnlockV3('codex_realm_golden');
+                v162Assert(cuV3SSR.success === true, 'codex.unlock v3 SSR rarity unlocks');
+                v162Assert(cuV3SSR.cost === 8000, 'codex.unlock v3 cost is 8000 for SSR rarity');
+
+                // Test 15: mcpCodexUnlockV3 unlocks UR rarity correctly
+                const cuV3UR = server.mcpCodexUnlockV3('codex_realm_celestial');
+                v162Assert(cuV3UR.success === true, 'codex.unlock v3 UR rarity unlocks');
+                v162Assert(cuV3UR.cost === 30000, 'codex.unlock v3 cost is 30000 for UR rarity');
+
+                // Test 16: mcpCollectionStatsV3 returns correct stats
+                window.gameState.spiritStones = 50000;
+                const csV3 = server.mcpCollectionStatsV3();
+                v162Assert(csV3.success === true, 'collection.stats v3 returns success');
+                v162Assert(csV3.totalCollected === 5, 'collection.stats v3 totalCollected is 5');
+                v162Assert(csV3.totalItems === 17, 'collection.stats v3 totalItems is 17');
+                v162Assert(csV3.completionRate === '29.4%', 'collection.stats v3 completionRate correct');
+
+                // Test 17: mcpCollectionStatsV3 shows tier progress
+                v162Assert(csV3.tiers[0].progress === 5, 'collection.stats v3 tier 1 progress correct');
+                v162Assert(csV3.tiers[0].available === true, 'collection.stats v3 tier 1 available');
+                v162Assert(csV3.tiers[1].available === false, 'collection.stats v3 tier 2 not available');
+
+                // Test 18: mcpCollectionRewardV3 claims tier 1 reward
+                const crV3 = server.mcpCollectionRewardV3(1);
+                v162Assert(crV3.success === true, 'collection.reward v3 tier 1 claims');
+                v162Assert(crV3.reward.spiritStones === 1000, 'collection.reward v3 tier 1 stones correct');
+                v162Assert(window.gameState.title === '收藏家·初', 'collection.reward v3 grants title');
+
+                // Test 19: mcpCollectionRewardV3 fails when already claimed
+                const crV3Err1 = server.mcpCollectionRewardV3(1);
+                v162Assert(crV3Err1.error && crV3Err1.error.includes('已领取'), 'collection.reward v3 already claimed error');
+
+                // Test 20: mcpCollectionRewardV3 fails for insufficient progress
+                const crV3Err2 = server.mcpCollectionRewardV3(5);
+                v162Assert(crV3Err2.error && crV3Err2.error.includes('收集进度不足'), 'collection.reward v3 insufficient progress error');
+
+                // Test 21: mcpCollectionRewardV3 fails without tier
+                const crV3Err3 = server.mcpCollectionRewardV3();
+                v162Assert(crV3Err3.error && crV3Err3.error.includes('档位'), 'collection.reward v3 missing tier error');
+
+                // Test 22: V162 tools registered in tool registry
+                const tools = server.toolRegistry ? Array.from(server.toolRegistry.keys()) : [];
+                v162Assert(tools.includes('codex.list'), 'codex.list registered');
+                v162Assert(tools.includes('codex.view'), 'codex.view registered');
+                v162Assert(tools.includes('codex.unlock'), 'codex.unlock registered');
+                v162Assert(tools.includes('collection.stats'), 'collection.stats registered');
+                v162Assert(tools.includes('collection.reward'), 'collection.reward registered');
+                v162Assert(tools.includes('collection.reset'), 'collection.reset registered');
+
+                // Test 23: codex.list v3 shows unlocked items correctly
+                const clV3_2 = server.mcpCodexListV3();
+                v162Assert(clV3_2.categories[0].unlockedItems === 5, 'codex.list v3 realm category unlocked items correct');
+                v162Assert(clV3_2.totalUnlocked === 5, 'codex.list v3 totalUnlocked correct after unlocks');
+
+                // Test 24: codex.view v3 returns description
+                const cvV3_2 = server.mcpCodexViewV3('codex_beast_dragon');
+                v162Assert(cvV3_2.description === '掌控风雨的海兽之王', 'codex.view v3 description correct');
+
+                // Test 25: codex.view v3 returns category name
+                v162Assert(cvV3_2.category === '灵兽图鉴', 'codex.view v3 category name correct');
+
+                // Test 26: mcpCodexUnlockV3 fails for invalid codex
+                const cuV3Err4 = server.mcpCodexUnlockV3('invalid_codex');
+                v162Assert(cuV3Err4.error && cuV3Err4.error.includes('不存在'), 'codex.unlock v3 invalid codex error');
+
+                // Test 27: mcpCollectionResetV3 resets all progress
+                const resetV3 = server.mcpCollectionResetV3();
+                v162Assert(resetV3.success === true, 'collection.reset v3 returns success');
+                v162Assert(resetV3.cost === 10000, 'collection.reset v3 cost is 10000');
+                v162Assert(window.gameState.spiritStones === 39000, 'collection.reset v3 deducts stones');
+
+                // Test 28: mcpCollectionResetV3 unlocks all codex entries
+                const clV3_3 = server.mcpCodexListV3();
+                v162Assert(clV3_3.totalUnlocked === 0, 'collection.reset v3 resets codex unlocked');
+
+                // Test 29: mcpCollectionResetV3 resets tier claimed status
+                const csV3_2 = server.mcpCollectionStatsV3();
+                v162Assert(csV3_2.tiers[0].claimed === false, 'collection.reset v3 resets tier claimed');
+                v162Assert(csV3_2.totalCollected === 0, 'collection.reset v3 resets totalCollected');
+
+                // Test 30: mcpCollectionResetV3 fails for insufficient stones
+                window.gameState.spiritStones = 5000;
+                const resetV3Err1 = server.mcpCollectionResetV3();
+                v162Assert(resetV3Err1.error && resetV3Err1.error.includes('灵石不足'), 'collection.reset v3 insufficient stones error');
+
+                // Test 31: collection.stats v3 message correct
+                v162Assert(csV3_2.message === '已收集0/17个图鉴', 'collection.stats v3 message correct');
+
+                // Test 32: codex.list v3 message correct
+                v162Assert(clV3_3.message === '共4个分类，17个图鉴', 'codex.list v3 message correct');
+
+                // Test 33: Unlock all items for collection reward test
+                window.gameState.spiritStones = 500000;
+                server.mcpCodexUnlockV3('codex_tech_fire');
+                server.mcpCodexUnlockV3('codex_tech_water');
+                server.mcpCodexUnlockV3('codex_tech_wood');
+                server.mcpCodexUnlockV3('codex_tech_tianyi');
+                server.mcpCodexUnlockV3('codex_beast_snake');
+                server.mcpCodexUnlockV3('codex_beast_bird');
+                server.mcpCodexUnlockV3('codex_pill_qi');
+                server.mcpCodexUnlockV3('codex_pill_break');
+                server.mcpCodexUnlockV3('codex_pill_rebirth');
+                server.mcpCodexUnlockV3('codex_realm_transcend');
+                server.mcpCodexUnlockV3('codex_realm_yuan');
+                server.mcpCodexUnlockV3('codex_realm_celestial');
+
+                // Test 34: collection.stats v3 shows higher tier available after unlock
+                const csV3_3 = server.mcpCollectionStatsV3();
+                v162Assert(csV3_3.totalCollected === 17, 'collection.stats v3 totalCollected is 17 after all unlocks');
+                v162Assert(csV3_3.completionRate === '100.0%', 'collection.stats v3 completionRate is 100%');
+
+                // Test 35: mcpCollectionRewardV3 can claim tier 5 at 100%
+                const crV3_2 = server.mcpCollectionRewardV3(5);
+                v162Assert(crV3_2.success === true, 'collection.reward v3 tier 5 claims');
+                v162Assert(crV3_2.reward.spiritStones === 200000, 'collection.reward v3 tier 5 stones correct');
+
+                // Test 36: codexV3 categories have correct structure
+                const clV3_4 = server.mcpCodexListV3();
+                v162Assert(clV3_4.categories[0].id === 'realm', 'codex.list v3 first category id is realm');
+                v162Assert(clV3_4.categories[1].id === 'technique', 'codex.list v3 second category id is technique');
+                v162Assert(clV3_4.categories[2].id === 'beast', 'codex.list v3 third category id is beast');
+                v162Assert(clV3_4.categories[3].id === 'pill', 'codex.list v3 fourth category id is pill');
+
+                // Test 37: codexV3 item rarities correct
+                v162Assert(clV3_4.categories[0].items[5].rarity === 'UR', 'codex.list v3 celestial realm is UR');
+                v162Assert(clV3_4.categories[1].items[3].rarity === 'UR', 'codex.list v3 tianyi is UR');
+                v162Assert(clV3_4.categories[2].items[3].rarity === 'UR', 'codex.list v3 dragon is UR');
+                v162Assert(clV3_4.categories[3].items[2].rarity === 'SSR', 'codex.list v3 rebirth pill is SSR');
+
+                // Test 38: collectionV3 tiers have correct requirements
+                const csV3_4 = server.mcpCollectionStatsV3();
+                v162Assert(csV3_4.tiers[0].required === 5, 'collection.stats v3 tier 1 requirement is 5');
+                v162Assert(csV3_4.tiers[1].required === 15, 'collection.stats v3 tier 2 requirement is 15');
+                v162Assert(csV3_4.tiers[2].required === 30, 'collection.stats v3 tier 3 requirement is 30');
+                v162Assert(csV3_4.tiers[3].required === 50, 'collection.stats v3 tier 4 requirement is 50');
+                v162Assert(csV3_4.tiers[4].required === 80, 'collection.stats v3 tier 5 requirement is 80');
+
+                // Test 39: mcpCodexUnlockV3 updates collection stats
+                window.gameState.spiritStones = 500000;
+                window.gameState.codexV3 = null;
+                server._initCodexStateV3();
+                server.mcpCodexUnlockV3('codex_realm_qi');
+                const csV3_5 = server.mcpCollectionStatsV3();
+                v162Assert(csV3_5.totalCollected === 1, 'collection updates after unlock');
+
+                // Test 40: mcpCodexUnlockV3 unlocks specific item id
+                const cuV3Specific = server.mcpCodexUnlockV3('codex_beast_dragon');
+                v162Assert(cuV3Specific.success === true, 'codex.unlock v3 can unlock dragon');
+                v162Assert(cuV3Specific.name === '青龙', 'codex.unlock v3 dragon name correct');
+
+                // Test 41: codex.view v3 shows unlockedAt after unlock
+                window.gameState.codexV3 = null;
+                server._initCodexStateV3();
+                server.mcpCodexUnlockV3('codex_pill_qi');
+                const cvV3_3 = server.mcpCodexViewV3('codex_pill_qi');
+                v162Assert(cvV3_3.unlocked === true, 'codex.view v3 shows unlocked');
+                v162Assert(cvV3_3.unlockedAt !== null, 'codex.view v3 has unlockedAt');
+
+                // Test 42: mcpCollectionRewardV3 claims tier 2
+                window.gameState.spiritStones = 500000;
+                window.gameState.codexV3 = null;
+                server._initCodexStateV3();
+                // Unlock 15 items
+                for (let i = 0; i < 15; i++) {
+                    const cats = server._initCodexStateV3().categories;
+                    let unlockedCount = 0;
+                    for (const cat of cats) {
+                        for (const item of cat.items) {
+                            if (unlockedCount < 15) {
+                                item.unlocked = true;
+                                item.unlockedAt = Date.now();
+                                unlockedCount++;
+                            }
+                        }
+                    }
+                }
+                const crV3_3 = server.mcpCollectionRewardV3(2);
+                v162Assert(crV3_3.success === true, 'collection.reward v3 tier 2 claims');
+                v162Assert(crV3_3.reward.spiritStones === 5000, 'collection.reward v3 tier 2 stones correct');
+
+                // Test 43: mcpCollectionRewardV3 claims tier 3
+                const crV3_4 = server.mcpCollectionRewardV3(3);
+                v162Assert(crV3_4.success === true, 'collection.reward v3 tier 3 claims');
+                v162Assert(crV3_4.reward.spiritStones === 15000, 'collection.reward v3 tier 3 stones correct');
+
+                // Test 44: mcpCollectionRewardV3 claims tier 4
+                const crV3_5 = server.mcpCollectionRewardV3(4);
+                v162Assert(crV3_5.success === true, 'collection.reward v3 tier 4 claims');
+                v162Assert(crV3_5.reward.spiritStones === 50000, 'collection.reward v3 tier 4 stones correct');
+
+                // Test 45: codex.list v3 item structure has name, rarity, unlocked
+                const clV3_5 = server.mcpCodexListV3();
+                const firstItem = clV3_5.categories[0].items[0];
+                v162Assert(firstItem.name === '炼气期', 'codex.list v3 item has name');
+                v162Assert(firstItem.rarity === 'N', 'codex.list v3 item has rarity');
+                v162Assert(firstItem.unlocked === true, 'codex.list v3 item has unlocked status');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V162 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V162', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v162Results = runV162Tests();
 
         const v150Results = runV150Tests();
 
