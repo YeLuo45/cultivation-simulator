@@ -3629,6 +3629,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V159)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V160: Register 红包+社交系统v2 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V160)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5275,6 +5279,25 @@
                             break;
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV3();
+                            break;
+                        // V160: 红包+社交系统v2
+                        case 'redpacket.list':
+                            result = this.mcpRedpacketListV2();
+                            break;
+                        case 'redpacket.receive':
+                            result = this.mcpRedpacketReceiveV2(args.redpacketId);
+                            break;
+                        case 'redpacket.send':
+                            result = this.mcpRedpacketSendV2(args.amount, args.message);
+                            break;
+                        case 'friend.list':
+                            result = this.mcpFriendListV2();
+                            break;
+                        case 'friend.apply':
+                            result = this.mcpFriendApplyV2(args.playerId);
+                            break;
+                        case 'friend.accept':
+                            result = this.mcpFriendAcceptV2(args.applyId);
                             break;
                         // V146: 成就+徽章系统
                         case 'achievement.list':
@@ -14372,6 +14395,178 @@
                     };
                 }
                 return gs.friends;
+            }
+
+            // V160: _initRedpacketStateV2 - 初始化红包系统v2状态
+            _initRedpacketStateV2() {
+                const gs = window.gameState;
+                if (!gs.redpacketV2) {
+                    gs.redpacketV2 = {
+                        redpackets: [],
+                        history: []
+                    };
+                }
+                return gs.redpacketV2;
+            }
+
+            // V160: _initFriendStateV2 - 初始化好友系统v2状态
+            _initFriendStateV2() {
+                const gs = window.gameState;
+                if (!gs.friendV2) {
+                    gs.friendV2 = {
+                        friends: [],
+                        applications: [],
+                        blocked: []
+                    };
+                }
+                return gs.friendV2;
+            }
+
+            // V160: mcpRedpacketListV2 - 获取红包列表v2
+            mcpRedpacketListV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpacketStateV2();
+                    const now = Date.now();
+                    // 过滤出可领取的红包（未过期、未领完）
+                    const available = rp.redpackets.filter(r => {
+                        if (r.remaining <= 0) return false;
+                        if (r.expiresAt && r.expiresAt < now) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        redpackets: available,
+                        total: available.length,
+                        message: '共' + available.length + '个可领取红包'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V160: mcpRedpacketSendV2 - 发送红包v2
+            mcpRedpacketSendV2(amount, message) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!amount || amount <= 0) return { error: '红包金额必须大于0' };
+                    if ((gs.spiritStones || 0) < amount) return { error: '灵石不足' };
+                    const rp = this._initRedpacketStateV2();
+                    const now = Date.now();
+                    gs.spiritStones -= amount;
+                    const redpacket = {
+                        id: 'rp2_' + Date.now(),
+                        sender: gs.playerName || '道友',
+                        amount: amount,
+                        remaining: amount,
+                        claimedBy: [],
+                        expiresAt: now + 24 * 3600 * 1000,
+                        createdAt: now,
+                        message: message || '恭喜发财，大吉大利'
+                    };
+                    rp.redpackets.push(redpacket);
+                    rp.history.push({ type: 'sent', amount, timestamp: now });
+                    return {
+                        success: true,
+                        redpacketId: redpacket.id,
+                        balance: gs.spiritStones,
+                        message: '红包已发出'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V160: mcpRedpacketReceiveV2 - 领取红包v2
+            mcpRedpacketReceiveV2(redpacketId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpacketId) return { error: 'redpacketId不能为空' };
+                    const rp = this._initRedpacketStateV2();
+                    const idx = rp.redpackets.findIndex(r => r.id === redpacketId);
+                    if (idx === -1) return { error: '红包不存在' };
+                    const pack = rp.redpackets[idx];
+                    const now = Date.now();
+                    if (pack.expiresAt && pack.expiresAt < now) return { error: '红包已过期' };
+                    const playerId = gs.playerName || 'anonymous';
+                    if (pack.claimedBy.some(c => c.player === playerId)) {
+                        return { error: '您已领取过该红包' };
+                    }
+                    if (pack.remaining <= 0) return { error: '红包已被抢完' };
+                    // 随机金额
+                    const maxGrab = Math.floor(pack.amount * 0.3);
+                    const grabAmount = Math.floor(Math.random() * maxGrab) + 1;
+                    gs.spiritStones = (gs.spiritStones || 0) + grabAmount;
+                    pack.claimedBy.push({ player: playerId, amount: grabAmount, time: now });
+                    pack.remaining -= grabAmount;
+                    return {
+                        success: true,
+                        amount: grabAmount,
+                        balance: gs.spiritStones,
+                        message: '领取成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V160: mcpFriendListV2 - 获取好友列表v2
+            mcpFriendListV2() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const friend = this._initFriendStateV2();
+                    return {
+                        success: true,
+                        friends: friend.friends,
+                        applications: friend.applications,
+                        total: friend.friends.length,
+                        message: '共有' + friend.friends.length + '位道友'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V160: mcpFriendApplyV2 - 发送好友申请v2
+            mcpFriendApplyV2(playerId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!playerId) return { error: '玩家ID不能为空' };
+                    const friend = this._initFriendStateV2();
+                    if (friend.friends.some(f => f.id === playerId)) {
+                        return { error: '已是好友' };
+                    }
+                    if (friend.applications.some(a => a.from === playerId)) {
+                        return { error: '已发送过申请' };
+                    }
+                    const apply = {
+                        id: 'apply2_' + Date.now(),
+                        from: playerId,
+                        timestamp: Date.now()
+                    };
+                    friend.applications.push(apply);
+                    return { success: true, applyId: apply.id, message: '好友申请已发送' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V160: mcpFriendAcceptV2 - 接受好友申请v2
+            mcpFriendAcceptV2(applyId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!applyId) return { error: 'applyId不能为空' };
+                    const friend = this._initFriendStateV2();
+                    const idx = friend.applications.findIndex(a => a.id === applyId);
+                    if (idx === -1) return { error: '好友申请不存在' };
+                    const apply = friend.applications[idx];
+                    friend.applications.splice(idx, 1);
+                    friend.friends.push({
+                        id: 'friend2_' + Date.now(),
+                        name: apply.from,
+                        realm: '炼气',
+                        level: 1,
+                        intimacy: 0,
+                        since: Date.now()
+                    });
+                    return { success: true, message: '已添加好友 ' + apply.from };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V144: mcpRedpackList - 获取红包列表
@@ -30991,6 +31186,66 @@
                 inputSchema: { type: 'object', properties: {} }
             }
         };
+
+        // V160: 红包+社交系统v2
+        const MCP_TOOLS_V160 = {
+            'redpacket.list': {
+                name: 'redpacket.list',
+                description: '获取红包列表 (红包系统v2-获取所有可领取红包)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpacket.receive': {
+                name: 'redpacket.receive',
+                description: '领取红包 (红包系统v2-领取指定红包)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpacketId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpacketId']
+                }
+            },
+            'redpacket.send': {
+                name: 'redpacket.send',
+                description: '发送红包 (红包系统v2-发送红包)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '红包总金额' },
+                        message: { type: 'string', description: '红包留言' }
+                    },
+                    required: ['amount']
+                }
+            },
+            'friend.list': {
+                name: 'friend.list',
+                description: '获取好友列表 (社交系统v2-获取好友和申请列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'friend.apply': {
+                name: 'friend.apply',
+                description: '发送好友申请 (社交系统v2-申请添加好友)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: '玩家ID' }
+                    },
+                    required: ['playerId']
+                }
+            },
+            'friend.accept': {
+                name: 'friend.accept',
+                description: '接受好友申请 (社交系统v2-接受好友申请)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        applyId: { type: 'string', description: '申请ID' }
+                    },
+                    required: ['applyId']
+                }
+            }
+        };
+
         const INVESTMENT_PRODUCTS_V3 = [
             { id: 'inv_v3_quick', name: '灵石速赢v3', description: '短期投资，7天期限，日收益率2%', cost: 1000, dailyReturn: 20, duration: 7 },
             { id: 'inv_v3_stable', name: '稳健理财v3', description: '中期投资，30天期限，日收益率2.5%', cost: 5000, dailyReturn: 125, duration: 30 },
@@ -58684,6 +58939,340 @@
         }
 
         const v159Results = runV159Tests();
+
+        // V160: runV160Tests - 红包+社交系统v2 测试
+        function runV160Tests() {
+            const results = [];
+            const v160Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+                if (!condition) console.log('V160 FAIL:', name);
+            };
+
+            // Test 1: MCP_TOOLS_V160 definition exists and has 6 tools
+            v160Assert(typeof MCP_TOOLS_V160 === 'object', 'MCP_TOOLS_V160 is defined');
+            v160Assert(Object.keys(MCP_TOOLS_V160).length === 6, 'MCP_TOOLS_V160 has 6 tools');
+            v160Assert('redpacket.list' in MCP_TOOLS_V160, 'redpacket.list tool exists');
+            v160Assert('redpacket.receive' in MCP_TOOLS_V160, 'redpacket.receive tool exists');
+            v160Assert('redpacket.send' in MCP_TOOLS_V160, 'redpacket.send tool exists');
+            v160Assert('friend.list' in MCP_TOOLS_V160, 'friend.list tool exists');
+            v160Assert('friend.apply' in MCP_TOOLS_V160, 'friend.apply tool exists');
+            v160Assert('friend.accept' in MCP_TOOLS_V160, 'friend.accept tool exists');
+
+            // Test 2: _initRedpacketStateV2 initializes correctly
+            window.gameState.redpacketV2 = null;
+            const rpStateV2 = server._initRedpacketStateV2();
+            v160Assert(rpStateV2 !== null, '_initRedpacketStateV2 returns state');
+            v160Assert(rpStateV2.redpackets !== undefined, 'redpacketV2 has redpackets array');
+            v160Assert(rpStateV2.history !== undefined, 'redpacketV2 has history array');
+            v160Assert(rpStateV2.redpackets.length === 0, 'redpacketV2 starts empty');
+
+            // Test 3: _initFriendStateV2 initializes correctly
+            window.gameState.friendV2 = null;
+            const friendStateV2 = server._initFriendStateV2();
+            v160Assert(friendStateV2 !== null, '_initFriendStateV2 returns state');
+            v160Assert(friendStateV2.friends !== undefined, 'friendV2 has friends array');
+            v160Assert(friendStateV2.applications !== undefined, 'friendV2 has applications array');
+            v160Assert(friendStateV2.blocked !== undefined, 'friendV2 has blocked array');
+            v160Assert(friendStateV2.friends.length === 0, 'friendV2 starts with no friends');
+
+            // Test 4: redpacket.list returns success and empty list initially
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpList1 = server.mcpRedpacketListV2();
+            v160Assert(rpList1.success === true, 'redpacket.list returns success');
+            v160Assert(Array.isArray(rpList1.redpackets), 'redpacket.list returns redpackets array');
+            v160Assert(rpList1.redpackets.length === 0, 'redpacket.list returns empty initially');
+            v160Assert(rpList1.total === 0, 'redpacket.list returns total 0');
+
+            // Test 5: redpacket.send creates a redpacket
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend1 = server.mcpRedpacketSendV2(100, 'Test红包');
+            v160Assert(rpSend1.success === true, 'redpacket.send returns success');
+            v160Assert(rpSend1.redpacketId !== undefined, 'redpacket.send returns redpacketId');
+            v160Assert(rpSend1.balance === 49900, 'redpacket.send deducts stones');
+            v160Assert(rpSend1.message === '红包已发出', 'redpacket.send returns correct message');
+
+            // Test 6: redpacket.send fails for insufficient stones
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50;
+            const rpSendErr1 = server.mcpRedpacketSendV2(100);
+            v160Assert(rpSendErr1.error !== undefined, 'redpacket.send fails for insufficient stones');
+            v160Assert(rpSendErr1.error === '灵石不足', 'redpacket.send error is灵石不足');
+
+            // Test 7: redpacket.send fails for invalid amount
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSendErr2 = server.mcpRedpacketSendV2(-100);
+            v160Assert(rpSendErr2.error !== undefined, 'redpacket.send fails for negative amount');
+            v160Assert(rpSendErr2.error === '红包金额必须大于0', 'redpacket.send error is红包金额必须大于0');
+
+            // Test 8: redpacket.send fails for zero amount
+            const rpSendErr3 = server.mcpRedpacketSendV2(0);
+            v160Assert(rpSendErr3.error !== undefined, 'redpacket.send fails for zero amount');
+
+            // Test 9: redpacket.list shows sent redpacket
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100, 'Test');
+            const rpList2 = server.mcpRedpacketListV2();
+            v160Assert(rpList2.redpackets.length === 1, 'redpacket.list shows sent redpacket');
+            v160Assert(rpList2.redpackets[0].amount === 100, 'redpacket.list shows correct amount');
+            v160Assert(rpList2.redpackets[0].remaining === 100, 'redpacket.list shows remaining = amount');
+
+            // Test 10: redpacket.receive receives a redpacket
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend2 = server.mcpRedpacketSendV2(1000, 'Test');
+            const rpReceive1 = server.mcpRedpacketReceiveV2(rpSend2.redpacketId);
+            v160Assert(rpReceive1.success === true, 'redpacket.receive returns success');
+            v160Assert(rpReceive1.amount > 0, 'redpacket.receive returns positive amount');
+            v160Assert(rpReceive1.balance > 50000, 'redpacket.receive adds stones');
+
+            // Test 11: redpacket.receive fails for invalid id
+            const rpReceiveErr1 = server.mcpRedpacketReceiveV2('invalid_id');
+            v160Assert(rpReceiveErr1.error !== undefined, 'redpacket.receive fails for invalid id');
+            v160Assert(rpReceiveErr1.error === '红包不存在', 'redpacket.receive error is红包不存在');
+
+            // Test 12: redpacket.receive fails for already received
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend3 = server.mcpRedpacketSendV2(1000, 'Test');
+            server.mcpRedpacketReceiveV2(rpSend3.redpacketId);
+            const rpReceiveErr2 = server.mcpRedpacketReceiveV2(rpSend3.redpacketId);
+            v160Assert(rpReceiveErr2.error !== undefined, 'redpacket.receive fails for already received');
+            v160Assert(rpReceiveErr2.error === '您已领取过该红包', 'redpacket.receive error is您已领取过该红包');
+
+            // Test 13: friend.list returns success and empty initially
+            window.gameState.friendV2 = null;
+            const friendList1 = server.mcpFriendListV2();
+            v160Assert(friendList1.success === true, 'friend.list returns success');
+            v160Assert(Array.isArray(friendList1.friends), 'friend.list returns friends array');
+            v160Assert(friendList1.friends.length === 0, 'friend.list returns empty initially');
+            v160Assert(friendList1.total === 0, 'friend.list returns total 0');
+
+            // Test 14: friend.apply creates application
+            window.gameState.friendV2 = null;
+            const friendApply1 = server.mcpFriendApplyV2('player_123');
+            v160Assert(friendApply1.success === true, 'friend.apply returns success');
+            v160Assert(friendApply1.applyId !== undefined, 'friend.apply returns applyId');
+            v160Assert(friendApply1.message === '好友申请已发送', 'friend.apply returns correct message');
+
+            // Test 15: friend.apply fails for already applied
+            const friendApplyErr1 = server.mcpFriendApplyV2('player_123');
+            v160Assert(friendApplyErr1.error !== undefined, 'friend.apply fails for duplicate');
+            v160Assert(friendApplyErr1.error === '已发送过申请', 'friend.apply error is已发送过申请');
+
+            // Test 16: friend.apply fails for empty playerId
+            window.gameState.friendV2 = null;
+            const friendApplyErr2 = server.mcpFriendApplyV2('');
+            v160Assert(friendApplyErr2.error !== undefined, 'friend.apply fails for empty playerId');
+            v160Assert(friendApplyErr2.error === '玩家ID不能为空', 'friend.apply error is玩家ID不能为空');
+
+            // Test 17: friend.accept accepts application
+            window.gameState.friendV2 = null;
+            const friendApply2 = server.mcpFriendApplyV2('player_456');
+            const friendAccept1 = server.mcpFriendAcceptV2(friendApply2.applyId);
+            v160Assert(friendAccept1.success === true, 'friend.accept returns success');
+            v160Assert(friendAccept1.message.includes('player_456'), 'friend.accept shows player name');
+
+            // Test 18: friend.list shows accepted friend
+            const friendList2 = server.mcpFriendListV2();
+            v160Assert(friendList2.friends.length === 1, 'friend.list shows accepted friend');
+            v160Assert(friendList2.friends[0].name === 'player_456', 'friend.list shows correct player name');
+            v160Assert(friendList2.total === 1, 'friend.list returns total 1');
+
+            // Test 19: friend.accept fails for invalid applyId
+            const friendAcceptErr1 = server.mcpFriendAcceptV2('invalid_apply_id');
+            v160Assert(friendAcceptErr1.error !== undefined, 'friend.accept fails for invalid id');
+            v160Assert(friendAcceptErr1.error === '好友申请不存在', 'friend.accept error is好友申请不存在');
+
+            // Test 20: friend.accept fails for empty applyId
+            const friendAcceptErr2 = server.mcpFriendAcceptV2('');
+            v160Assert(friendAcceptErr2.error !== undefined, 'friend.accept fails for empty applyId');
+
+            // Test 21: friend.apply fails when already friends
+            window.gameState.friendV2 = null;
+            const friendApply3 = server.mcpFriendApplyV2('player_789');
+            server.mcpFriendAcceptV2(friendApply3.applyId);
+            const friendApplyErr3 = server.mcpFriendApplyV2('player_789');
+            v160Assert(friendApplyErr3.error !== undefined, 'friend.apply fails when already friends');
+            v160Assert(friendApplyErr3.error === '已是好友', 'friend.apply error is已是好友');
+
+            // Test 22: redpacket.list filters expired
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100);
+            // Manually set expired
+            window.gameState.redpacketV2.redpackets[0].expiresAt = Date.now() - 1000;
+            const rpList3 = server.mcpRedpacketListV2();
+            v160Assert(rpList3.redpackets.length === 0, 'redpacket.list filters expired');
+
+            // Test 23: redpacket.list filters fully grabbed
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100);
+            window.gameState.redpacketV2.redpackets[0].remaining = 0;
+            const rpList4 = server.mcpRedpacketListV2();
+            v160Assert(rpList4.redpackets.length === 0, 'redpacket.list filters fully grabbed');
+
+            // Test 24: redpacket.send adds to history
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100);
+            v160Assert(window.gameState.redpacketV2.history.length === 1, 'redpacket.send adds to history');
+            v160Assert(window.gameState.redpacketV2.history[0].type === 'sent', 'history type is sent');
+
+            // Test 25: friend.list shows applications
+            window.gameState.friendV2 = null;
+            server.mcpFriendApplyV2('player_app1');
+            const friendList3 = server.mcpFriendListV2();
+            v160Assert(friendList3.applications.length === 1, 'friend.list shows pending applications');
+
+            // Test 26: friend.accept removes application
+            const friendApply4 = server.mcpFriendApplyV2('player_app2');
+            server.mcpFriendAcceptV2(friendApply4.applyId);
+            const friendList4 = server.mcpFriendListV2();
+            v160Assert(friendList4.applications.length === 1, 'friend.accept removes application from list');
+
+            // Test 27: redpacket.send with default message
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSendDefault = server.mcpRedpacketSendV2(100);
+            v160Assert(rpSendDefault.success === true, 'redpacket.send works with default message');
+            v160Assert(window.gameState.redpacketV2.redpackets[0].message === '恭喜发财，大吉大利', 'default message is correct');
+
+            // Test 28: redpacket.receive reduces remaining
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend5 = server.mcpRedpacketSendV2(1000);
+            const beforeReceive = window.gameState.redpacketV2.redpackets[0].remaining;
+            server.mcpRedpacketReceiveV2(rpSend5.redpacketId);
+            const afterReceive = window.gameState.redpacketV2.redpackets[0].remaining;
+            v160Assert(afterReceive < beforeReceive, 'redpacket.receive reduces remaining');
+
+            // Test 29: redpacket.receive adds to claimedBy
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend6 = server.mcpRedpacketSendV2(1000);
+            server.mcpRedpacketReceiveV2(rpSend6.redpacketId);
+            v160Assert(window.gameState.redpacketV2.redpackets[0].claimedBy.length === 1, 'redpacket.receive adds to claimedBy');
+
+            // Test 30: friend.friends has required fields after accept
+            window.gameState.friendV2 = null;
+            const friendApply5 = server.mcpFriendApplyV2('player_fields');
+            server.mcpFriendAcceptV2(friendApply5.applyId);
+            const friend = window.gameState.friendV2.friends[0];
+            v160Assert(friend.id !== undefined, 'friend has id field');
+            v160Assert(friend.name !== undefined, 'friend has name field');
+            v160Assert(friend.realm !== undefined, 'friend has realm field');
+            v160Assert(friend.level !== undefined, 'friend has level field');
+            v160Assert(friend.intimacy !== undefined, 'friend has intimacy field');
+            v160Assert(friend.since !== undefined, 'friend has since field');
+
+            // Test 31: redpacket.send requires amount
+            window.gameState.spiritStones = 50000;
+            const rpSendNoAmount = server.mcpRedpacketSendV2();
+            v160Assert(rpSendNoAmount.error !== undefined, 'redpacket.send requires amount');
+
+            // Test 32: friend.apply requires playerId
+            window.gameState.friendV2 = null;
+            const friendApplyNoId = server.mcpFriendApplyV2();
+            v160Assert(friendApplyNoId.error !== undefined, 'friend.apply requires playerId');
+
+            // Test 33: friend.accept requires applyId
+            const friendAcceptNoId = server.mcpFriendAcceptV2();
+            v160Assert(friendAcceptNoId.error !== undefined, 'friend.accept requires applyId');
+
+            // Test 34: redpacket.receive requires redpacketId
+            const rpReceiveNoId = server.mcpRedpacketReceiveV2();
+            v160Assert(rpReceiveNoId.error !== undefined, 'redpacket.receive requires redpacketId');
+
+            // Test 35: redpacket.list handles multiple redpackets
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100);
+            server.mcpRedpacketSendV2(200);
+            server.mcpRedpacketSendV2(300);
+            const rpList5 = server.mcpRedpacketListV2();
+            v160Assert(rpList5.redpackets.length === 3, 'redpacket.list handles multiple redpackets');
+            v160Assert(rpList5.total === 3, 'redpacket.list total is 3');
+
+            // Test 36: friend.list handles multiple friends
+            window.gameState.friendV2 = null;
+            const fa1 = server.mcpFriendApplyV2('friend1');
+            const fa2 = server.mcpFriendApplyV2('friend2');
+            server.mcpFriendAcceptV2(fa1.applyId);
+            server.mcpFriendAcceptV2(fa2.applyId);
+            const friendList5 = server.mcpFriendListV2();
+            v160Assert(friendList5.friends.length === 2, 'friend.list handles multiple friends');
+            v160Assert(friendList5.total === 2, 'friend.list total is 2');
+
+            // Test 37: redpacket.receive respects max grab (30% of total)
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend7 = server.mcpRedpacketSendV2(1000);
+            const rpReceive2 = server.mcpRedpacketReceiveV2(rpSend7.redpacketId);
+            v160Assert(rpReceive2.amount <= 300, 'redpacket.receive amount <= 30% of total');
+
+            // Test 38: _initRedpacketStateV2 is idempotent
+            window.gameState.redpacketV2 = null;
+            const rpState1 = server._initRedpacketStateV2();
+            const rpState2 = server._initRedpacketStateV2();
+            v160Assert(rpState1 === rpState2, '_initRedpacketStateV2 is idempotent');
+
+            // Test 39: _initFriendStateV2 is idempotent
+            window.gameState.friendV2 = null;
+            const friendState1 = server._initFriendStateV2();
+            const friendState2 = server._initFriendStateV2();
+            v160Assert(friendState1 === friendState2, '_initFriendStateV2 is idempotent');
+
+            // Test 40: redpacket list has sender field
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            window.gameState.playerName = 'TestPlayer';
+            server.mcpRedpacketSendV2(100);
+            const rpList6 = server.mcpRedpacketListV2();
+            v160Assert(rpList6.redpackets[0].sender === 'TestPlayer', 'redpacket has sender field');
+
+            // Test 41: friend applications have timestamp
+            window.gameState.friendV2 = null;
+            server.mcpFriendApplyV2('player_ts');
+            v160Assert(window.gameState.friendV2.applications[0].timestamp !== undefined, 'application has timestamp');
+
+            // Test 42: redpacket has createdAt field
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            server.mcpRedpacketSendV2(100);
+            v160Assert(window.gameState.redpacketV2.redpackets[0].createdAt !== undefined, 'redpacket has createdAt');
+
+            // Test 43: redpacket has expiresAt field
+            v160Assert(window.gameState.redpacketV2.redpackets[0].expiresAt !== undefined, 'redpacket has expiresAt');
+            v160Assert(window.gameState.redpacketV2.redpackets[0].expiresAt > Date.now(), 'redpacket expiresAt is in future');
+
+            // Test 44: friend.accept updates applications correctly
+            window.gameState.friendV2 = null;
+            const fa3 = server.mcpFriendApplyV2('player_remove');
+            v160Assert(window.gameState.friendV2.applications.length === 1, 'application added');
+            server.mcpFriendAcceptV2(fa3.applyId);
+            v160Assert(window.gameState.friendV2.applications.length === 0, 'application removed after accept');
+
+            // Test 45: redpacket.receive returns balance
+            window.gameState.redpacketV2 = null;
+            window.gameState.spiritStones = 50000;
+            const rpSend8 = server.mcpRedpacketSendV2(1000);
+            const beforeStones = window.gameState.spiritStones;
+            const rpReceive3 = server.mcpRedpacketReceiveV2(rpSend8.redpacketId);
+            v160Assert(rpReceive3.balance === beforeStones + rpReceive3.amount, 'redpacket.receive returns correct balance');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V160 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V160', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v160Results = runV160Tests();
 
         const v152Results = runV152Tests();
 
