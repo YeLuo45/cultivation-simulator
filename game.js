@@ -3581,6 +3581,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V147)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V148: Register 奇遇+事件系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V148)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4885,6 +4889,25 @@
                             break;
                         case 'arena.reward':
                             result = this.mcpArenaReward();
+                            break;
+                        // V148: 奇遇+事件系统
+                        case 'serendipity.list':
+                            result = this.mcpSerendipityList();
+                            break;
+                        case 'serendipity.start':
+                            result = this.mcpSerendipityStart(args.areaId);
+                            break;
+                        case 'serendipity.complete':
+                            result = this.mcpSerendipityComplete(args.serendipityId);
+                            break;
+                        case 'event.list':
+                            result = this.mcpEventList();
+                            break;
+                        case 'event.join':
+                            result = this.mcpEventJoin(args.eventId);
+                            break;
+                        case 'event.reward':
+                            result = this.mcpEventReward(args.eventId);
                             break;
                         // GM: GM工具系统
                         case 'gm.toggle':
@@ -14229,6 +14252,40 @@
                 return gs.arena;
             }
 
+            // V148: _initSerendipityState - 初始化奇遇系统状态
+            _initSerendipityState() {
+                const gs = window.gameState;
+                if (!gs.serendipity) {
+                    gs.serendipity = {
+                        areas: [
+                            { id: 'forest', name: '幽冥森林', description: '雾气缭绕的古林，机缘遍布', difficulty: 'low', activeSerendipity: null },
+                            { id: 'cave', name: '天机洞府', description: '神秘莫测的洞天，福缘深厚', difficulty: 'medium', activeSerendipity: null },
+                            { id: 'temple', name: '飞升遗迹', description: '上古仙人遗址，危机四伏', difficulty: 'high', activeSerendipity: null },
+                            { id: 'secluded', name: '隐秘禁地', description: '禁断之地，奇遇难测', difficulty: 'extreme', activeSerendipity: null }
+                        ],
+                        completedSerendipities: []
+                    };
+                }
+                return gs.serendipity;
+            }
+
+            // V148: _initEventState - 初始化事件系统状态
+            _initEventState() {
+                const gs = window.gameState;
+                if (!gs.event) {
+                    const now = Date.now();
+                    gs.event = {
+                        events: [
+                            { id: 'weekly_cultivate', name: '双倍修炼周', description: '修炼效率翻倍', startTime: now - 86400000 * 3, endTime: now + 86400000 * 4, reward: { spiritStones: 5000, exp: 10000 }, joined: false, completed: false },
+                            { id: 'monthly_battle', name: '决战天榜', description: '月终排位赛', startTime: now - 86400000 * 15, endTime: now + 86400000 * 15, reward: { spiritStones: 20000, title: '天榜强者' }, joined: false, completed: false },
+                            { id: 'limited_explore', name: '秘境探索季', description: '秘境探索额外奖励', startTime: now - 86400000 * 7, endTime: now + 86400000 * 7, reward: { items: ['秘境钥匙', '灵草'] }, joined: false, completed: false }
+                        ],
+                        eventHistory: []
+                    };
+                }
+                return gs.event;
+            }
+
             // V146: mcpAchievementList - 获取成就列表
             mcpAchievementList() {
                 try {
@@ -14489,6 +14546,151 @@
                     gs.spirit = (gs.spirit || 0) + spiritReward;
                     if (gs.arena) gs.arena.weeklyRewardClaimed = true;
                     return { success: true, spiritReward, message: '已领取本周竞技奖励：500灵石' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpSerendipityList - 获取奇遇区域列表
+            mcpSerendipityList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const ser = this._initSerendipityState();
+                    return {
+                        success: true,
+                        areas: ser.areas.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            description: a.description,
+                            difficulty: a.difficulty,
+                            hasActive: a.activeSerendipity !== null
+                        })),
+                        total: ser.areas.length,
+                        message: '共' + ser.areas.length + '个奇遇区域'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpSerendipityStart - 开始奇遇
+            mcpSerendipityStart(areaId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!areaId) return { error: '请指定区域ID' };
+                    const ser = this._initSerendipityState();
+                    const area = ser.areas.find(a => a.id === areaId);
+                    if (!area) return { error: '区域不存在: ' + areaId };
+                    if (area.activeSerendipity) return { error: '该区域已有进行中的奇遇' };
+                    const staminaCost = { low: 10, medium: 20, high: 30, extreme: 50 };
+                    const cost = staminaCost[area.difficulty] || 20;
+                    if ((gs.stamina || 0) < cost) return { error: '精力不足，需要' + cost + '点精力' };
+                    gs.stamina = Math.max(0, (gs.stamina || 0) - cost);
+                    const serendipityId = 'ser_' + areaId + '_' + Date.now();
+                    const rewards = {
+                        low: { spiritStones: Math.floor(Math.random() * 500) + 200, exp: Math.floor(Math.random() * 1000) + 500 },
+                        medium: { spiritStones: Math.floor(Math.random() * 1000) + 500, exp: Math.floor(Math.random() * 2000) + 1000 },
+                        high: { spiritStones: Math.floor(Math.random() * 2000) + 1000, exp: Math.floor(Math.random() * 5000) + 2000 },
+                        extreme: { spiritStones: Math.floor(Math.random() * 5000) + 2000, exp: Math.floor(Math.random() * 10000) + 5000 }
+                    };
+                    const serendipity = {
+                        id: serendipityId,
+                        areaId,
+                        startTime: new Date().toISOString(),
+                        completed: false,
+                        reward: rewards[area.difficulty] || rewards.medium
+                    };
+                    area.activeSerendipity = serendipity;
+                    return { success: true, serendipityId, areaId, areaName: area.name, staminaCost: cost, message: '奇遇开始：' + area.name + '，消耗' + cost + '点精力' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpSerendipityComplete - 完成奇遇
+            mcpSerendipityComplete(serendipityId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!serendipityId) return { error: '请指定奇遇ID' };
+                    const ser = this._initSerendipityState();
+                    let foundSerendipity = null;
+                    let foundArea = null;
+                    for (const area of ser.areas) {
+                        if (area.activeSerendipity && area.activeSerendipity.id === serendipityId) {
+                            foundSerendipity = area.activeSerendipity;
+                            foundArea = area;
+                            break;
+                        }
+                    }
+                    if (!foundSerendipity) return { error: '奇遇不存在或已完成: ' + serendipityId };
+                    foundSerendipity.completed = true;
+                    const reward = foundSerendipity.reward;
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    if (reward.exp) gs.cultivationProgress = (gs.cultivationProgress || 0) + reward.exp;
+                    ser.completedSerendipities.push(foundSerendipity);
+                    foundArea.activeSerendipity = null;
+                    return { success: true, serendipityId, reward, message: '奇遇完成！获得' + reward.spiritStones + '灵石和' + reward.exp + '修为' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpEventList - 获取事件列表
+            mcpEventList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const evtState = this._initEventState();
+                    const now = Date.now();
+                    const activeEvents = evtState.events.filter(e => now >= e.startTime && now <= e.endTime);
+                    return {
+                        success: true,
+                        events: activeEvents.map(e => ({
+                            id: e.id,
+                            name: e.name,
+                            description: e.description,
+                            startTime: e.startTime,
+                            endTime: e.endTime,
+                            reward: e.reward,
+                            joined: e.joined,
+                            completed: e.completed
+                        })),
+                        total: activeEvents.length,
+                        message: '当前有' + activeEvents.length + '个进行中的事件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpEventJoin - 参与事件
+            mcpEventJoin(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtState = this._initEventState();
+                    const event = evtState.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    const now = Date.now();
+                    if (now < event.startTime) return { error: '事件尚未开始' };
+                    if (now > event.endTime) return { error: '事件已结束' };
+                    if (event.joined) return { error: '已参与该事件' };
+                    event.joined = true;
+                    return { success: true, eventId, eventName: event.name, message: '成功参与事件：' + event.name };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V148: mcpEventReward - 领取事件奖励
+            mcpEventReward(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtState = this._initEventState();
+                    const event = evtState.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    if (!event.joined) return { error: '请先参与事件' };
+                    if (event.completed) return { error: '奖励已领取' };
+                    event.completed = true;
+                    const reward = event.reward;
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    if (reward.exp) gs.cultivationProgress = (gs.cultivationProgress || 0) + reward.exp;
+                    evtState.eventHistory.push({ eventId, completedAt: new Date().toISOString(), reward });
+                    return { success: true, eventId, eventName: event.name, reward, message: '领取事件奖励成功：' + event.name };
                 } catch (e) { return { error: e.message }; }
             }
 
@@ -27692,6 +27894,64 @@
                 name: 'badge.unequip',
                 description: '卸下徽章 (徽章系统-卸下徽章)',
                 inputSchema: { type: 'object', properties: { badgeId: { type: 'string', description: '徽章ID' } }, required: ['badgeId'] }
+            }
+        };
+
+        // V148: 奇遇+事件系统
+        const MCP_TOOLS_V148 = {
+            'serendipity.list': {
+                name: 'serendipity.list',
+                description: '获取奇遇区域 (奇遇系统-列出所有奇遇区域)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'serendipity.start': {
+                name: 'serendipity.start',
+                description: '开始奇遇 (奇遇系统-在指定区域开始奇遇)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        areaId: { type: 'string', description: '奇遇区域ID' }
+                    },
+                    required: ['areaId']
+                }
+            },
+            'serendipity.complete': {
+                name: 'serendipity.complete',
+                description: '完成奇遇 (奇遇系统-完成进行中的奇遇并获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['serendipityId']
+                }
+            },
+            'event.list': {
+                name: 'event.list',
+                description: '获取当前事件 (事件系统-列出所有进行中的事件)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'event.join': {
+                name: 'event.join',
+                description: '参与事件 (事件系统-参与指定事件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
+            },
+            'event.reward': {
+                name: 'event.reward',
+                description: '领取事件奖励 (事件系统-领取完成事件的奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
             }
         };
 
@@ -52273,6 +52533,240 @@
         }
 
 
+        // V148 Tests
+        function runV148Tests() {
+            const results = [];
+            function v148Assert(condition, testName) {
+                results.push({ pass: condition, test: testName });
+                if (!condition) console.log('FAIL:', testName);
+            }
+            
+            // V148: 奇遇+事件系统测试
+            const server = window.mcpServer || {};
+            
+            // Test 1: serendipity.list returns success
+            window.gameState = { serendipity: null, stamina: 100, spiritStones: 0, cultivationProgress: 0 };
+            const sl1 = server.mcpSerendipityList ? server.mcpSerendipityList() : {};
+            v148Assert(sl1.success === true, 'serendipity.list returns success');
+            
+            // Test 2: serendipity.list has areas array
+            v148Assert(Array.isArray(sl1.areas), 'serendipity.list has areas array');
+            
+            // Test 3: serendipity.list has 4 areas
+            v148Assert(sl1.total === 4, 'serendipity.list has 4 areas');
+            
+            // Test 4: serendipity.start requires areaId
+            const ss1 = server.mcpSerendipityStart ? server.mcpSerendipityStart() : {};
+            v148Assert(ss1.error, 'serendipity.start without areaId returns error');
+            
+            // Test 5: serendipity.start with valid area
+            window.gameState.stamina = 100;
+            const ss2 = server.mcpSerendipityStart ? server.mcpSerendipityStart('forest') : {};
+            v148Assert(ss2.success === true, 'serendipity.start with forest succeeds');
+            
+            // Test 6: serendipity.start returns serendipityId
+            v148Assert(ss2.serendipityId, 'serendipity.start returns serendipityId');
+            
+            // Test 7: serendipity.start deducts stamina
+            v148Assert(window.gameState.stamina === 90, 'serendipity.start deducts 10 stamina for low difficulty');
+            
+            // Test 8: serendipity.start creates active serendipity
+            const ser = server._initSerendipityState ? server._initSerendipityState() : { areas: [] };
+            const forestArea = ser.areas.find(a => a.id === 'forest');
+            v148Assert(forestArea && forestArea.activeSerendipity, 'serendipity.start creates active serendipity in area');
+            
+            // Test 9: serendipity.complete requires serendipityId
+            const sc1 = server.mcpSerendipityComplete ? server.mcpSerendipityComplete() : {};
+            v148Assert(sc1.error, 'serendipity.complete without serendipityId returns error');
+            
+            // Test 10: serendipity.complete with invalid id returns error
+            const sc2 = server.mcpSerendipityComplete ? server.mcpSerendipityComplete('invalid_id') : {};
+            v148Assert(sc2.error, 'serendipity.complete with invalid id returns error');
+            
+            // Test 11: serendipity.complete with valid id succeeds
+            if (ss2.serendipityId) {
+                const sc3 = server.mcpSerendipityComplete ? server.mcpSerendipityComplete(ss2.serendipityId) : {};
+                v148Assert(sc3.success === true, 'serendipity.complete with valid id succeeds');
+            }
+            
+            // Test 12: serendipity.complete gives rewards
+            if (sc3 && sc3.success) {
+                v148Assert(sc3.reward && sc3.reward.spiritStones, 'serendipity.complete gives spiritStones reward');
+                v148Assert(sc3.reward && sc3.reward.exp, 'serendipity.complete gives exp reward');
+            }
+            
+            // Test 13: event.list returns success
+            window.gameState.event = null;
+            const el1 = server.mcpEventList ? server.mcpEventList() : {};
+            v148Assert(el1.success === true, 'event.list returns success');
+            
+            // Test 14: event.list has events array
+            v148Assert(Array.isArray(el1.events), 'event.list has events array');
+            
+            // Test 15: event.list has active events
+            v148Assert(el1.total >= 1, 'event.list has at least 1 active event');
+            
+            // Test 16: event.join requires eventId
+            const ej1 = server.mcpEventJoin ? server.mcpEventJoin() : {};
+            v148Assert(ej1.error, 'event.join without eventId returns error');
+            
+            // Test 17: event.join with invalid event returns error
+            const ej2 = server.mcpEventJoin ? server.mcpEventJoin('invalid_event') : {};
+            v148Assert(ej2.error, 'event.join with invalid event returns error');
+            
+            // Test 18: event.join with valid id succeeds
+            if (el1.events && el1.events.length > 0) {
+                const eventId = el1.events[0].id;
+                const ej3 = server.mcpEventJoin ? server.mcpEventJoin(eventId) : {};
+                v148Assert(ej3.success === true, 'event.join with valid id succeeds');
+            }
+            
+            // Test 19: event.join marks event as joined
+            if (el1.events && el1.events.length > 0) {
+                const eventId = el1.events[0].id;
+                const evtState = server._initEventState ? server._initEventState() : window.gameState.event;
+                const joinedEvent = evtState.events.find(e => e.id === eventId);
+                v148Assert(joinedEvent && joinedEvent.joined, 'event.join marks event as joined');
+            }
+            
+            // Test 20: event.reward requires eventId
+            const er1 = server.mcpEventReward ? server.mcpEventReward() : {};
+            v148Assert(er1.error, 'event.reward without eventId returns error');
+            
+            // Test 21: event.reward without joining returns error
+            window.gameState.event = null;
+            const evtState2 = server._initEventState ? server._initEventState() : null;
+            if (evtState2 && evtState2.events.length > 0) {
+                const unjoinedEvent = evtState2.events.find(e => !e.joined);
+                if (unjoinedEvent) {
+                    const er2 = server.mcpEventReward ? server.mcpEventReward(unjoinedEvent.id) : {};
+                    v148Assert(er2.error, 'event.reward without joining returns error');
+                }
+            }
+            
+            // Test 22: event.reward with joined event succeeds
+            if (el1.events && el1.events.length > 0) {
+                window.gameState.event = null;
+                const evtState3 = server._initEventState ? server._initEventState() : null;
+                if (evtState3 && evtState3.events.length > 0) {
+                    evtState3.events[0].joined = true;
+                    evtState3.events[0].completed = false;
+                    const er3 = server.mcpEventReward ? server.mcpEventReward(evtState3.events[0].id) : {};
+                    v148Assert(er3.success === true, 'event.reward with joined event succeeds');
+                }
+            }
+            
+            // Test 23: event.reward gives reward
+            if (el1.events && el1.events.length > 0) {
+                const evtState4 = server._initEventState ? server._initEventState() : null;
+                if (evtState4 && evtState4.events.length > 0) {
+                    evtState4.events[0].joined = true;
+                    evtState4.events[0].completed = false;
+                    const er4 = server.mcpEventReward ? server.mcpEventReward(evtState4.events[0].id) : {};
+                    if (er4.success) {
+                        v148Assert(er4.reward, 'event.reward gives reward object');
+                    }
+                }
+            }
+            
+            // Test 24: serendipity.start with different difficulty costs different stamina
+            window.gameState.stamina = 100;
+            window.gameState.serendipity = null;
+            const ss3 = server.mcpSerendipityStart ? server.mcpSerendipityStart('cave') : {};
+            if (ss3.success) {
+                v148Assert(window.gameState.stamina === 80, 'serendipity.start deducts 20 stamina for medium difficulty');
+            }
+            
+            // Test 25: _initSerendipityState creates correct structure
+            window.gameState.serendipity = null;
+            if (server._initSerendipityState) {
+                server._initSerendipityState();
+                v148Assert(window.gameState.serendipity !== null, '_initSerendipityState creates serendipity state');
+                v148Assert(Array.isArray(window.gameState.serendipity.areas), '_initSerendipityState creates areas array');
+            }
+            
+            // Test 26: _initEventState creates correct structure
+            window.gameState.event = null;
+            if (server._initEventState) {
+                server._initEventState();
+                v148Assert(window.gameState.event !== null, '_initEventState creates event state');
+                v148Assert(Array.isArray(window.gameState.event.events), '_initEventState creates events array');
+            }
+            
+            // Test 27: serendipity.list returns area details
+            const sl2 = server.mcpSerendipityList ? server.mcpSerendipityList() : {};
+            if (sl2.areas && sl2.areas.length > 0) {
+                const area = sl2.areas[0];
+                v148Assert(area.id, 'area has id');
+                v148Assert(area.name, 'area has name');
+                v148Assert(area.description, 'area has description');
+                v148Assert(area.difficulty, 'area has difficulty');
+            }
+            
+            // Test 28: event.list returns event details
+            const el2 = server.mcpEventList ? server.mcpEventList() : {};
+            if (el2.events && el2.events.length > 0) {
+                const event = el2.events[0];
+                v148Assert(event.id, 'event has id');
+                v148Assert(event.name, 'event has name');
+                v148Assert(event.description, 'event has description');
+                v148Assert(event.reward, 'event has reward');
+            }
+            
+            // Test 29: serendipity.start cannot start if area already has active serendipity
+            window.gameState.stamina = 100;
+            window.gameState.serendipity = null;
+            const ss4 = server.mcpSerendipityStart ? server.mcpSerendipityStart('forest') : {};
+            if (ss4.success) {
+                const ss5 = server.mcpSerendipityStart ? server.mcpSerendipityStart('forest') : {};
+                v148Assert(ss5.error, 'serendipity.start fails when area already has active serendipity');
+            }
+            
+            // Test 30: serendipity.start fails with insufficient stamina
+            window.gameState.stamina = 5;
+            window.gameState.serendipity = null;
+            const ss6 = server.mcpSerendipityStart ? server.mcpSerendipityStart('forest') : {};
+            v148Assert(ss6.error, 'serendipity.start fails with insufficient stamina');
+            
+            // Test 31: event.list filters by time (only active events)
+            const el3 = server.mcpEventList ? server.mcpEventList() : {};
+            const now = Date.now();
+            if (el3.events) {
+                const allActive = el3.events.every(e => now >= e.startTime && now <= e.endTime);
+                v148Assert(allActive, 'event.list only returns active events (within time range)');
+            }
+            
+            // Test 32: event.reward cannot be claimed twice
+            window.gameState.event = null;
+            const evtState5 = server._initEventState ? server._initEventState() : null;
+            if (evtState5 && evtState5.events.length > 0) {
+                evtState5.events[0].joined = true;
+                evtState5.events[0].completed = true;
+                const er5 = server.mcpEventReward ? server.mcpEventReward(evtState5.events[0].id) : {};
+                v148Assert(er5.error, 'event.reward fails when already claimed');
+            }
+            
+            // Test 33-40: All V148 tools return object format
+            const v148Tools = [
+                server.mcpSerendipityList ? server.mcpSerendipityList() : {},
+                server.mcpSerendipityStart ? server.mcpSerendipityStart('temple') : {},
+                server.mcpSerendipityComplete ? server.mcpSerendipityComplete('test') : {},
+                server.mcpEventList ? server.mcpEventList() : {},
+                server.mcpEventJoin ? server.mcpEventJoin('test') : {},
+                server.mcpEventReward ? server.mcpEventReward('test') : {}
+            ];
+            v148Tools.forEach((result, i) => {
+                v148Assert(typeof result === 'object', `V148 tool ${i} returns object`);
+            });
+            
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V148 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V148', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v148Results = runV148Tests();
         const v146Results = runV146Tests();
         const v145Results = runV145Tests();
         const v144Results = runV144Tests();
