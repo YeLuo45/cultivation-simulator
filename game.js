@@ -3557,6 +3557,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V141)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V142: Register 签到+福利系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V142)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4918,6 +4922,25 @@
                             break;
                         case 'announce.view':
                             result = this.mcpAnnounceView(args.announceId);
+                            break;
+                        // V142: 签到+福利系统
+                        case 'signin.list':
+                            result = this.mcpSigninList();
+                            break;
+                        case 'signin.checkin':
+                            result = this.mcpSigninCheckin();
+                            break;
+                        case 'signin.reward':
+                            result = this.mcpSigninReward(args.dayCount);
+                            break;
+                        case 'signin.makeup':
+                            result = this.mcpSigninMakeup(args.date);
+                            break;
+                        case 'welfare.list':
+                            result = this.mcpWelfareList();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaim(args.welfareId);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -13151,6 +13174,176 @@
                     };
                 }
                 return gs.announce;
+            }
+
+            // V142: _initSigninState - 初始化签到系统状态
+            _initSigninState() {
+                const gs = window.gameState;
+                if (!gs.signin) {
+                    gs.signin = {
+                        calendar: [],
+                        consecutiveDays: 0,
+                        lastSigninDate: null,
+                        totalSignins: 0,
+                        claimedRewards: []
+                    };
+                }
+                return gs.signin;
+            }
+
+            // V142: _initWelfareState - 初始化福利系统状态
+            _initWelfareState() {
+                const gs = window.gameState;
+                if (!gs.welfare) {
+                    gs.welfare = {
+                        welfareList: [
+                            { id: 'welfare_daily', name: '每日福利', description: '每日登录可领取', requirement: { type: 'login' }, reward: { spiritStones: 100 }, claimed: false, lastClaimDate: null },
+                            { id: 'welfare_level', name: '等级福利', description: '每提升10级可领取', requirement: { type: 'level', amount: 10 }, reward: { spiritStones: 500 }, claimed: false, lastClaimDate: null },
+                            { id: 'welfare_realm', name: '境界福利', description: '每突破一个境界可领取', requirement: { type: 'realm' }, reward: { spiritStones: 1000 }, claimed: false, lastClaimDate: null },
+                            { id: 'welfare_weekly', name: '每周福利', description: '每周可领取', requirement: { type: 'weekly' }, reward: { spiritStones: 300 }, claimed: false, lastClaimDate: null }
+                        ],
+                        lastClaimDate: null
+                    };
+                }
+                return gs.welfare;
+            }
+
+            // V142: mcpSigninList - 获取签到日历
+            mcpSigninList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signin = this._initSigninState();
+                    return {
+                        success: true,
+                        calendar: signin.calendar,
+                        consecutiveDays: signin.consecutiveDays,
+                        lastSigninDate: signin.lastSigninDate,
+                        totalSignins: signin.totalSignins,
+                        claimedRewards: signin.claimedRewards,
+                        message: '本月签到' + signin.calendar.length + '天，连续签到' + signin.consecutiveDays + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V142: mcpSigninCheckin - 执行签到
+            mcpSigninCheckin() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signin = this._initSigninState();
+                    const today = new Date().toISOString().split('T')[0];
+                    if (signin.lastSigninDate === today) {
+                        return { success: false, error: '今日已签到，请勿重复签到' };
+                    }
+                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                    if (signin.lastSigninDate === yesterday) {
+                        signin.consecutiveDays += 1;
+                    } else {
+                        signin.consecutiveDays = 1;
+                    }
+                    signin.calendar.push({ date: today, timestamp: Date.now() });
+                    signin.lastSigninDate = today;
+                    signin.totalSignins += 1;
+                    return {
+                        success: true,
+                        date: today,
+                        consecutiveDays: signin.consecutiveDays,
+                        totalSignins: signin.totalSignins,
+                        message: '签到成功！已连续签到' + signin.consecutiveDays + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V142: mcpSigninReward - 领取连续签到奖励
+            mcpSigninReward(dayCount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!dayCount) return { error: '请指定连续签到天数' };
+                    const signin = this._initSigninState();
+                    const rewardKey = 'day' + dayCount;
+                    if (signin.claimedRewards.includes(rewardKey)) {
+                        return { success: false, error: '该奖励已领取' };
+                    }
+                    if (signin.consecutiveDays < dayCount) {
+                        return { success: false, error: '连续签到天数不足，需连续签到' + dayCount + '天，当前连续' + signin.consecutiveDays + '天' };
+                    }
+                    const rewards = { 3: { spiritStones: 300 }, 7: { spiritStones: 700 }, 30: { spiritStones: 3000 } };
+                    const reward = rewards[dayCount] || { spiritStones: dayCount * 100 };
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    signin.claimedRewards.push(rewardKey);
+                    return {
+                        success: true,
+                        dayCount,
+                        reward,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + reward.spiritStones + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V142: mcpSigninMakeup - 补签漏签日期
+            mcpSigninMakeup(date) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!date) return { error: '请指定补签日期' };
+                    const signin = this._initSigninState();
+                    if (signin.calendar.find(c => c.date === date)) {
+                        return { success: false, error: '该日期已签到，无需补签' };
+                    }
+                    const cost = 50;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { success: false, error: '灵石不足，补签需消耗' + cost + '灵石' };
+                    }
+                    gs.spiritStones -= cost;
+                    signin.calendar.push({ date, timestamp: Date.now(), makeup: true });
+                    return {
+                        success: true,
+                        date,
+                        cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '补签成功！消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V142: mcpWelfareList - 获取福利列表
+            mcpWelfareList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfare = this._initWelfareState();
+                    return {
+                        success: true,
+                        welfareList: welfare.welfareList,
+                        message: '共有' + welfare.welfareList.length + '项福利可领取'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V142: mcpWelfareClaim - 领取福利奖励
+            mcpWelfareClaim(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '请指定福利ID' };
+                    const welfare = this._initWelfareState();
+                    const item = welfare.welfareList.find(w => w.id === welfareId);
+                    if (!item) return { error: '福利不存在: ' + welfareId };
+                    if (item.claimed) return { success: false, error: '该福利已领取' };
+                    gs.spiritStones = (gs.spiritStones || 0) + item.reward.spiritStones;
+                    item.claimed = true;
+                    item.lastClaimDate = new Date().toISOString();
+                    return {
+                        success: true,
+                        welfareId,
+                        reward: item.reward,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + item.reward.spiritStones + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V141: mcpMailList - 获取邮件列表
@@ -26217,6 +26410,40 @@
                 name: 'announce.view',
                 description: '查看公告详情 (公告系统-查看指定公告详情)',
                 inputSchema: { type: 'object', properties: { announceId: { type: 'string', description: '公告ID' } }, required: ['announceId'] }
+            }
+        };
+
+        // V142: 签到+福利系统
+        const MCP_TOOLS_V142 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到日历 (签到系统-列出本月签到状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '执行签到 (签到系统-执行每日签到)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.reward': {
+                name: 'signin.reward',
+                description: '领取连续签到奖励 (签到系统-领取连续签到奖励)',
+                inputSchema: { type: 'object', properties: { dayCount: { type: 'number', description: '连续签到天数要求' } }, required: ['dayCount'] }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签漏签日期 (签到系统-补签指定日期，消耗灵石)',
+                inputSchema: { type: 'object', properties: { date: { type: 'string', description: '补签日期 YYYY-MM-DD' } }, required: ['date'] }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统-列出可用福利)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利奖励 (福利系统-领取指定福利奖励)',
+                inputSchema: { type: 'object', properties: { welfareId: { type: 'string', description: '福利ID' } }, required: ['welfareId'] }
             }
         };
 
@@ -49326,5 +49553,129 @@
             console.log('V141 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
             return { version: 'V141', passed, total, passRate: passRate.toFixed(3), results };
         }
+
+        // V142: 签到+福利系统测试
+        function runV142Tests() {
+            const results = [];
+            function v142Assert(condition, testName) {
+                const pass = condition === true;
+                results.push({ pass, testName });
+                if (!pass) console.log('FAIL:', testName);
+            }
+
+            const server = new MCPGameServer();
+
+            // Test 1: _initSigninState initializes correctly
+            const signinState = server._initSigninState();
+            v142Assert(signinState !== null, '_initSigninState returns state');
+            v142Assert(Array.isArray(signinState.calendar), '_initSigninState calendar is array');
+            v142Assert(signinState.consecutiveDays === 0, '_initSigninState consecutiveDays starts at 0');
+            v142Assert(signinState.totalSignins === 0, '_initSigninState totalSignins starts at 0');
+            v142Assert(signinState.claimedRewards.length === 0, '_initSigninState claimedRewards starts empty');
+
+            // Test 2: _initWelfareState initializes correctly
+            const welfareState = server._initWelfareState();
+            v142Assert(welfareState !== null, '_initWelfareState returns state');
+            v142Assert(Array.isArray(welfareState.welfareList), '_initWelfareState welfareList is array');
+            v142Assert(welfareState.welfareList.length === 4, '_initWelfareState has 4 welfare items');
+
+            // Test 3: mcpSigninList returns initial state
+            const sl1 = server.mcpSigninList();
+            v142Assert(sl1.success === true, 'signin.list returns success');
+            v142Assert(sl1.calendar.length === 0, 'signin.list empty calendar');
+            v142Assert(sl1.consecutiveDays === 0, 'signin.list consecutiveDays is 0');
+
+            // Test 4: mcpSigninCheckin succeeds
+            const sc1 = server.mcpSigninCheckin();
+            v142Assert(sc1.success === true, 'signin.checkin returns success');
+            v142Assert(sc1.consecutiveDays === 1, 'signin.checkin consecutiveDays is 1 after first checkin');
+            v142Assert(sc1.totalSignins === 1, 'signin.checkin totalSignins is 1');
+
+            // Test 5: mcpSigninCheckin fails on same day (duplicate)
+            const sc2 = server.mcpSigninCheckin();
+            v142Assert(sc2.success === false, 'signin.checkin same day returns false');
+            v142Assert(sc2.error && sc2.error.includes('已签到'), 'signin.checkin error mentions already signed in');
+
+            // Test 6: mcpWelfareList returns welfare items
+            const wl1 = server.mcpWelfareList();
+            v142Assert(wl1.success === true, 'welfare.list returns success');
+            v142Assert(wl1.welfareList.length === 4, 'welfare.list has 4 items');
+            v142Assert(wl1.welfareList[0].id === 'welfare_daily', 'welfare.list first item id correct');
+
+            // Test 7: mcpWelfareClaim claims a welfare reward
+            const wc1 = server.mcpWelfareClaim('welfare_daily');
+            v142Assert(wc1.success === true, 'welfare.claim returns success');
+            v142Assert(wc1.reward && wc1.reward.spiritStones === 100, 'welfare.claim gives 100 spirit stones');
+            v142Assert(wc1.totalSpiritStones >= 100, 'welfare.claim updates totalSpiritStones');
+
+            // Test 8: mcpWelfareClaim fails for already claimed welfare
+            const wc2 = server.mcpWelfareClaim('welfare_daily');
+            v142Assert(wc2.success === false, 'welfare.claim again returns false');
+            v142Assert(wc2.error && wc2.error.includes('已领取'), 'welfare.claim error mentions already claimed');
+
+            // Test 9: mcpWelfareClaim fails for invalid welfareId
+            const wcErr = server.mcpWelfareClaim('nonexistent_welfare');
+            v142Assert(wcErr.error && wcErr.error.includes('不存在'), 'welfare.claim invalid id returns error');
+
+            // Test 10: mcpSigninReward fails without dayCount
+            const srErr1 = server.mcpSigninReward();
+            v142Assert(srErr1.error && srErr1.error.includes('天数'), 'signin.reward missing dayCount returns error');
+
+            // Test 11: mcpSigninReward fails for insufficient consecutive days
+            const srErr2 = server.mcpSigninReward(7);
+            v142Assert(srErr2.success === false, 'signin.reward insufficient days returns false');
+            v142Assert(srErr2.error && srErr2.error.includes('不足'), 'signin.reward error mentions insufficient days');
+
+            // Test 12: mcpSigninReward succeeds after reaching day 3
+            // Simulate 2 more days (mock calendar)
+            const signinState2 = server._initSigninState();
+            signinState2.consecutiveDays = 3;
+            const sr1 = server.mcpSigninReward(3);
+            v142Assert(sr1.success === true, 'signin.reward day3 returns success');
+            v142Assert(sr1.reward.spiritStones === 300, 'signin.reward day3 gives 300 spirit stones');
+
+            // Test 13: mcpSigninReward fails for already claimed reward
+            const sr2 = server.mcpSigninReward(3);
+            v142Assert(sr2.success === false, 'signin.reward already claimed returns false');
+
+            // Test 14: mcpSigninMakeup fails without date
+            const smErr1 = server.mcpSigninMakeup();
+            v142Assert(smErr1.error && smErr1.error.includes('补签日期'), 'signin.makeup missing date returns error');
+
+            // Test 15: mcpSigninMakeup fails for already signed date
+            const today = new Date().toISOString().split('T')[0];
+            const smErr2 = server.mcpSigninMakeup(today);
+            v142Assert(smErr2.success === false, 'signin.makeup already signed date returns false');
+
+            // Test 16: mcpSigninMakeup fails for insufficient spirit stones
+            const smErr3 = server.mcpSigninMakeup('2025-01-01');
+            v142Assert(smErr3.success === false, 'signin.makeup insufficient stones returns false');
+
+            // Test 17: mcpWelfareList shows claimed status
+            const wl2 = server.mcpWelfareList();
+            v142Assert(wl2.welfareList[0].claimed === true, 'welfare.list daily welfare shows claimed');
+
+            // Test 18: Signin state persists after operations
+            const signinState3 = server._initSigninState();
+            v142Assert(signinState3.calendar.length === 1, 'signin calendar has 1 entry');
+            v142Assert(signinState3.totalSignins === 1, 'signin totalSignins is 1');
+
+            // Test 19: Welfare state structure is correct
+            v142Assert(welfareState.welfareList[0].name === '每日福利', 'welfare item name correct');
+            v142Assert(welfareState.welfareList[0].reward.spiritStones === 100, 'welfare item reward correct');
+            v142Assert(typeof welfareState.welfareList[0].claimed === 'boolean', 'welfare item claimed is boolean');
+
+            // Test 20: mcpSigninList message format correct
+            const sl2 = server.mcpSigninList();
+            v142Assert(sl2.message && sl2.message.includes('签到'), 'signin.list message contains signin text');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V142 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V142', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v142Results = runV142Tests();
         const v141Results = runV141Tests();
         const v140Results = runV140Tests();
