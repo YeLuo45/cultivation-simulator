@@ -5375,6 +5375,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V131)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V132: Register 灵宠+进化系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V132)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6547,6 +6551,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'equip.unequip':
                             result = this.mcpEquipUnequip(args.slot);
+                            break;
+                        // V132: 灵宠+进化系统
+                        case 'pet.list':
+                            result = this.mcpPetList();
+                            break;
+                        case 'pet.capture':
+                            result = this.mcpPetCapture();
+                            break;
+                        case 'pet.release':
+                            result = this.mcpPetRelease(args.petId);
+                            break;
+                        case 'evolve.prepare':
+                            result = this.mcpEvolvePrepare(args.petId);
+                            break;
+                        case 'evolve.start':
+                            result = this.mcpEvolveStart();
+                            break;
+                        case 'evolve.complete':
+                            result = this.mcpEvolveComplete();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -17107,6 +17130,186 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V132: _initPetState - 初始化灵宠系统状态
+            _initPetState() {
+                const gs = window.gameState;
+                if (!gs.pet) {
+                    gs.pet = {
+                        pets: [],            // 所有灵宠列表
+                        nextId: 1,           // 下一个灵宠ID
+                        captureCost: 500     // 捕捉消耗灵石
+                    };
+                }
+                return gs.pet;
+            }
+
+            // V132: _initEvolveState - 初始化进化系统状态
+            _initEvolveState() {
+                const gs = window.gameState;
+                if (!gs.evolve) {
+                    gs.evolve = {
+                        preparing: false,    // 是否准备中
+                        inProgress: false,   // 是否进化中
+                        petId: null,          // 进化中的灵宠ID
+                        startTime: null      // 进化开始时间
+                    };
+                }
+                return gs.evolve;
+            }
+
+            // V132: mcpPetList - 获取灵宠列表
+            mcpPetList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    return {
+                        success: true,
+                        total: petState.pets.length,
+                        pets: petState.pets,
+                        captureCost: petState.captureCost
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V132: mcpPetCapture - 捕捉灵宠
+            mcpPetCapture() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    const cost = petState.captureCost;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，捕捉需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    // 随机生成灵宠
+                    const species = ['灵狐', '玄龟', '火鹤', '玉兔', '银狼', '青蛇', '白虎', '金鹏'];
+                    const speciesIndex = Math.floor(Math.random() * species.length);
+                    const baseLevel = Math.floor(Math.random() * 3) + 1;
+                    const names = ['小仙', '灵儿', '小白', '阿福', '朵朵', '威威', '圆圆', '壮壮'];
+                    const nameIndex = Math.floor(Math.random() * names.length);
+                    const pet = {
+                        id: 'pet_' + (petState.nextId++),
+                        name: names[nameIndex],
+                        species: species[speciesIndex],
+                        level: baseLevel,
+                        evolutionStage: 1,
+                        stats: {
+                            attack: 10 + baseLevel * 5,
+                            defense: 5 + baseLevel * 3,
+                            spirit: 8 + baseLevel * 4
+                        }
+                    };
+                    petState.pets.push(pet);
+                    return { success: true, pet, cost, message: '捕捉成功！获得 ' + pet.species + ' 【' + pet.name + '】' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V132: mcpPetRelease - 放生灵宠
+            mcpPetRelease(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    const idx = petState.pets.findIndex(p => p.id === petId);
+                    if (idx === -1) return { error: '灵宠不存在: ' + petId };
+                    const pet = petState.pets[idx];
+                    petState.pets.splice(idx, 1);
+                    return { success: true, pet, message: '放生了 ' + pet.species + ' 【' + pet.name + '】' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V132: mcpEvolvePrepare - 准备进化
+            mcpEvolvePrepare(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    const evolveState = this._initEvolveState();
+                    const pet = petState.pets.find(p => p.id === petId);
+                    if (!pet) return { error: '灵宠不存在: ' + petId };
+                    // 检查是否可进化（等级>=5可进化）
+                    if (pet.level < 5) {
+                        return { success: false, petId, message: pet.name + ' 等级不足，需要5级才能进化', levelRequired: 5, currentLevel: pet.level };
+                    }
+                    if (pet.evolutionStage >= 3) {
+                        return { success: false, petId, message: pet.name + ' 已达最高进化阶段', maxStage: 3 };
+                    }
+                    evolveState.preparing = true;
+                    evolveState.petId = petId;
+                    return {
+                        success: true,
+                        petId,
+                        petName: pet.name,
+                        currentStage: pet.evolutionStage,
+                        nextStage: pet.evolutionStage + 1,
+                        message: pet.name + ' 已准备好进化，当前阶段 ' + pet.evolutionStage + '，可进化至 ' + (pet.evolutionStage + 1)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V132: mcpEvolveStart - 开始进化
+            mcpEvolveStart() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    const evolveState = this._initEvolveState();
+                    if (!evolveState.preparing || !evolveState.petId) {
+                        return { error: '没有准备进化的灵宠，请先调用 evolve.prepare' };
+                    }
+                    const pet = petState.pets.find(p => p.id === evolveState.petId);
+                    if (!pet) return { error: '灵宠不存在，可能已被放生' };
+                    evolveState.preparing = false;
+                    evolveState.inProgress = true;
+                    evolveState.startTime = Date.now();
+                    return {
+                        success: true,
+                        petId: pet.id,
+                        petName: pet.name,
+                        message: pet.name + ' 开始进化，请等待后调用 evolve.complete 完成进化'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V132: mcpEvolveComplete - 完成进化
+            mcpEvolveComplete() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petState = this._initPetState();
+                    const evolveState = this._initEvolveState();
+                    if (!evolveState.inProgress || !evolveState.petId) {
+                        return { error: '没有正在进化的灵宠，请先调用 evolve.start' };
+                    }
+                    const pet = petState.pets.find(p => p.id === evolveState.petId);
+                    if (!pet) return { error: '灵宠不存在，可能已被放生' };
+                    // 完成进化，提升属性
+                    const oldLevel = pet.level;
+                    const oldStage = pet.evolutionStage;
+                    pet.level += 2;
+                    pet.evolutionStage += 1;
+                    pet.stats.attack = Math.floor(pet.stats.attack * 1.3);
+                    pet.stats.defense = Math.floor(pet.stats.defense * 1.3);
+                    pet.stats.spirit = Math.floor(pet.stats.spirit * 1.3);
+                    // 重置进化状态
+                    const evolvedPetId = evolveState.petId;
+                    evolveState.inProgress = false;
+                    evolveState.petId = null;
+                    evolveState.startTime = null;
+                    return {
+                        success: true,
+                        petId: evolvedPetId,
+                        petName: pet.name,
+                        oldLevel,
+                        newLevel: pet.level,
+                        oldStage: oldStage,
+                        newStage: pet.evolutionStage,
+                        statsUpgrade: pet.stats,
+                        message: pet.name + ' 进化成功！等级 ' + oldLevel + ' -> ' + pet.level + '，阶段 ' + oldStage + ' -> ' + pet.evolutionStage
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -25358,6 +25561,40 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V132: 灵宠+进化系统
+        const MCP_TOOLS_V132 = {
+            'pet.list': {
+                name: 'pet.list',
+                description: '获取灵宠列表 (灵宠系统-列表所有灵宠)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.capture': {
+                name: 'pet.capture',
+                description: '捕捉灵宠 (灵宠系统-消耗灵石捕捉灵宠)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.release': {
+                name: 'pet.release',
+                description: '放生灵宠 (灵宠系统-放生指定灵宠)',
+                inputSchema: { type: 'object', properties: { petId: { type: 'string', description: '灵宠ID' } }, required: ['petId'] }
+            },
+            'evolve.prepare': {
+                name: 'evolve.prepare',
+                description: '准备进化 (进化系统-检查灵宠是否可进化)',
+                inputSchema: { type: 'object', properties: { petId: { type: 'string', description: '灵宠ID' } }, required: ['petId'] }
+            },
+            'evolve.start': {
+                name: 'evolve.start',
+                description: '开始进化 (进化系统-开始进化计时)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'evolve.complete': {
+                name: 'evolve.complete',
+                description: '完成进化 (进化系统-完成进化，提升属性)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -29187,6 +29424,150 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V131', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v131Results = runV131Tests();
+
+        // ===== V132: 灵宠+进化系统 Tests =====
+        function runV132Tests() {
+            const results = [];
+            function v132Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 50000,
+                realm: 2,
+                stage: 1,
+                pet: null,
+                evolve: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: pet.list - returns empty list initially
+            const pl1 = server.mcpPetList();
+            v132Assert(pl1.success === true, 'pet.list returns success');
+            v132Assert(pl1.total === 0, 'pet.list total is 0 initially');
+            v132Assert(Array.isArray(pl1.pets), 'pet.list returns pets array');
+
+            // Test 2: pet.capture - success with enough spirit stones
+            mockGameState.spiritStones = 50000;
+            const pc1 = server.mcpPetCapture();
+            v132Assert(pc1.success === true, 'pet.capture succeeds');
+            v132Assert(pc1.pet && pc1.pet.id, 'pet.capture returns pet with id');
+            v132Assert(pc1.cost === 500, 'pet.capture costs 500');
+            v132Assert(mockGameState.spiritStones === 49500, 'pet.capture deducts spirit stones');
+
+            // Test 3: pet.capture - fails without enough spirit stones
+            mockGameState.spiritStones = 100;
+            const pc2 = server.mcpPetCapture();
+            v132Assert(pc2.error && pc2.error.includes('灵石不足'), 'pet.capture fails with low spirit stones');
+
+            // Test 4: pet.list - returns captured pet
+            mockGameState.spiritStones = 50000;
+            const pc3 = server.mcpPetCapture();
+            const petId = pc3.pet.id;
+            const pl2 = server.mcpPetList();
+            v132Assert(pl2.total === 2, 'pet.list returns 2 pets');
+            v132Assert(pl2.captureCost === 500, 'pet.list returns captureCost');
+
+            // Test 5: pet.release - success
+            const pr1 = server.mcpPetRelease(petId);
+            v132Assert(pr1.success === true, 'pet.release succeeds');
+            v132Assert(pr1.pet.id === petId, 'pet.release returns correct pet');
+
+            // Test 6: pet.release - fails with invalid petId
+            const pr2 = server.mcpPetRelease('invalid_id');
+            v132Assert(pr2.error && pr2.error.includes('灵宠不存在'), 'pet.release fails with invalid id');
+
+            // Test 7: pet.list - pet count decreases after release
+            const pl3 = server.mcpPetList();
+            v132Assert(pl3.total === 1, 'pet.list total is 1 after release');
+
+            // Test 8: evolve.prepare - fails with invalid petId
+            const ep1 = server.mcpEvolvePrepare('invalid_id');
+            v132Assert(ep1.error && ep1.error.includes('灵宠不存在'), 'evolve.prepare fails with invalid petId');
+
+            // Test 9: evolve.prepare - fails with low level pet
+            const pl4 = server.mcpPetList();
+            const lowLevelPet = pl4.pets[0];
+            const ep2 = server.mcpEvolvePrepare(lowLevelPet.id);
+            v132Assert(ep2.success === false, 'evolve.prepare fails for low level pet');
+            v132Assert(ep2.levelRequired === 5, 'evolve.prepare requires level 5');
+            v132Assert(ep2.currentLevel === lowLevelPet.level, 'evolve.prepare shows current level');
+
+            // Test 10: evolve.prepare - create a level 5+ pet
+            mockGameState.pet.pets.push({
+                id: 'pet_high',
+                name: '小强',
+                species: '白虎',
+                level: 5,
+                evolutionStage: 1,
+                stats: { attack: 50, defense: 30, spirit: 40 }
+            });
+            const ep3 = server.mcpEvolvePrepare('pet_high');
+            v132Assert(ep3.success === true, 'evolve.prepare succeeds for level 5+ pet');
+            v132Assert(ep3.currentStage === 1, 'evolve.prepare current stage is 1');
+            v132Assert(ep3.nextStage === 2, 'evolve.prepare next stage is 2');
+            v132Assert(mockGameState.evolve.preparing === true, 'evolve.prepare sets preparing state');
+
+            // Test 11: evolve.start - success
+            const es1 = server.mcpEvolveStart();
+            v132Assert(es1.success === true, 'evolve.start succeeds');
+            v132Assert(es1.petName === '小强', 'evolve.start returns correct pet name');
+            v132Assert(mockGameState.evolve.inProgress === true, 'evolve.start sets inProgress state');
+            v132Assert(mockGameState.evolve.preparing === false, 'evolve.start clears preparing state');
+
+            // Test 12: evolve.start - fails without prepare
+            mockGameState.evolve = { preparing: false, inProgress: false, petId: null, startTime: null };
+            const es2 = server.mcpEvolveStart();
+            v132Assert(es2.error && es2.error.includes('没有准备进化的灵宠'), 'evolve.start fails without prepare');
+
+            // Test 13: evolve.complete - success
+            mockGameState.evolve = { preparing: false, inProgress: true, petId: 'pet_high', startTime: Date.now() };
+            const ec1 = server.mcpEvolveComplete();
+            v132Assert(ec1.success === true, 'evolve.complete succeeds');
+            v132Assert(ec1.oldLevel === 5, 'evolve.complete old level is 5');
+            v132Assert(ec1.newLevel === 7, 'evolve.complete new level is 7');
+            v132Assert(ec1.oldStage === 1, 'evolve.complete old stage is 1');
+            v132Assert(ec1.newStage === 2, 'evolve.complete new stage is 2');
+            v132Assert(ec1.statsUpgrade, 'evolve.complete returns stats upgrade');
+            v132Assert(mockGameState.evolve.inProgress === false, 'evolve.complete clears inProgress');
+            v132Assert(mockGameState.evolve.petId === null, 'evolve.complete clears petId');
+
+            // Test 14: evolve.complete - fails without inProgress
+            mockGameState.evolve = { preparing: false, inProgress: false, petId: null, startTime: null };
+            const ec2 = server.mcpEvolveComplete();
+            v132Assert(ec2.error && ec2.error.includes('没有正在进化的灵宠'), 'evolve.complete fails without inProgress');
+
+            // Test 15: evolve.prepare - fails for max stage pet
+            mockGameState.pet.pets.push({
+                id: 'pet_max',
+                name: '大强',
+                species: '金鹏',
+                level: 10,
+                evolutionStage: 3,
+                stats: { attack: 100, defense: 60, spirit: 80 }
+            });
+            const ep4 = server.mcpEvolvePrepare('pet_max');
+            v132Assert(ep4.success === false, 'evolve.prepare fails for max stage pet');
+            v132Assert(ep4.error && ep4.error.includes('已达最高进化阶段'), 'evolve.prepare max stage error');
+
+            // Test 16: pet.capture - generates random species and stats
+            mockGameState.spiritStones = 50000;
+            const pc4 = server.mcpPetCapture();
+            v132Assert(pc4.pet.species, 'pet.capture generates species');
+            v132Assert(pc4.pet.stats.attack > 0, 'pet.capture generates attack stat');
+            v132Assert(pc4.pet.stats.defense > 0, 'pet.capture generates defense stat');
+            v132Assert(pc4.pet.stats.spirit > 0, 'pet.capture generates spirit stat');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V132 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V132', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v132Results = runV132Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
