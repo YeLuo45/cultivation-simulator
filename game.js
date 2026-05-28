@@ -3565,6 +3565,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V143)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V144: Register 红包+社交系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V144)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4965,6 +4969,25 @@
                             break;
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuy();
+                            break;
+                        // V144: 红包+社交系统 tools
+                        case 'redpack.list':
+                            result = this.mcpRedpackList();
+                            break;
+                        case 'redpack.send':
+                            result = this.mcpRedpackSend(args.amount, args.count, args.message);
+                            break;
+                        case 'redpack.grab':
+                            result = this.mcpRedpackGrab(args.redpackId);
+                            break;
+                        case 'redpack.detail':
+                            result = this.mcpRedpackDetail(args.redpackId);
+                            break;
+                        case 'friend.list':
+                            result = this.mcpFriendList();
+                            break;
+                        case 'friend.add':
+                            result = this.mcpFriendAdd(args.playerName);
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -13575,6 +13598,227 @@
                         expireDate: monthcard.expireDate,
                         remainingSpiritStones: gs.spiritStones,
                         message: '月卡购买成功！30天有效期，每日可领取100灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: _initRedpackState - 初始化红包系统状态
+            _initRedpackState() {
+                const gs = window.gameState;
+                if (!gs.redpack) {
+                    gs.redpack = {
+                        activePacks: [],
+                        history: []
+                    };
+                }
+                return gs.redpack;
+            }
+
+            // V144: _initFriendState - 初始化好友系统状态
+            _initFriendState() {
+                const gs = window.gameState;
+                if (!gs.friends) {
+                    gs.friends = {
+                        list: [],
+                        pendingRequests: []
+                    };
+                }
+                return gs.friends;
+            }
+
+            // V144: mcpRedpackList - 获取红包列表
+            mcpRedpackList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const redpack = this._initRedpackState();
+                    const now = Date.now();
+                    // 过滤出可抢的红包（未过期的）
+                    const availablePacks = redpack.activePacks.filter(p => {
+                        return p.remaining > 0 && (now - new Date(p.timestamp).getTime()) < 24 * 60 * 60 * 1000;
+                    });
+                    return {
+                        success: true,
+                        redpackList: availablePacks.map(p => ({
+                            id: p.id,
+                            senderName: p.senderName,
+                            amount: p.amount,
+                            count: p.count,
+                            remaining: p.remaining,
+                            message: p.message,
+                            timestamp: p.timestamp
+                        })),
+                        total: availablePacks.length,
+                        message: '共' + availablePacks.length + '个可抢红包'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: mcpRedpackSend - 发送红包
+            mcpRedpackSend(amount, count, message) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!amount || amount <= 0) return { error: '红包金额必须大于0' };
+                    if (!count || count <= 0) return { error: '红包个数必须大于0' };
+                    if (amount < count) return { error: '红包金额必须大于等于个数' };
+                    if (gs.spiritStones < amount) return { error: '灵石不足' };
+                    
+                    const redpack = this._initRedpackState();
+                    gs.spiritStones -= amount;
+                    
+                    const redpackId = 'rp_' + Date.now();
+                    const newPack = {
+                        id: redpackId,
+                        senderId: gs.playerId || 'player_' + gs.name,
+                        senderName: gs.name,
+                        amount: amount,
+                        count: count,
+                        remaining: count,
+                        message: message || '恭喜发财，大吉大利',
+                        timestamp: new Date().toISOString(),
+                        grabbedRecords: []
+                    };
+                    redpack.activePacks.push(newPack);
+                    redpack.history.push(newPack);
+                    
+                    return {
+                        success: true,
+                        redpackId: redpackId,
+                        amount: amount,
+                        count: count,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '红包已发送，共' + count + '个，总计' + amount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: mcpRedpackGrab - 抢红包
+            mcpRedpackGrab(redpackId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpackId) return { error: '请指定红包ID' };
+                    
+                    const redpack = this._initRedpackState();
+                    const pack = redpack.activePacks.find(p => p.id === redpackId);
+                    if (!pack) return { success: false, error: '红包不存在或已过期' };
+                    if (pack.remaining <= 0) return { success: false, error: '红包已被抢完' };
+                    
+                    // 检查是否已经抢过
+                    const alreadyGrabbed = pack.grabbedRecords && pack.grabbedRecords.some(r => r.playerId === (gs.playerId || 'player_' + gs.name));
+                    if (alreadyGrabbed) return { success: false, error: '您已经抢过该红包了' };
+                    
+                    // 随机分配金额
+                    const minAmount = Math.max(1, Math.floor(pack.amount / pack.count / 2));
+                    const maxAmount = Math.floor(pack.amount / pack.count * 2);
+                    const grabbedAmount = Math.floor(Math.random() * (maxAmount - minAmount + 1)) + minAmount;
+                    
+                    pack.remaining--;
+                    gs.spiritStones += grabbedAmount;
+                    
+                    if (!pack.grabbedRecords) pack.grabbedRecords = [];
+                    pack.grabbedRecords.push({
+                        playerId: gs.playerId || 'player_' + gs.name,
+                        playerName: gs.name,
+                        amount: grabbedAmount,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    return {
+                        success: true,
+                        amount: grabbedAmount,
+                        remaining: pack.remaining,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '恭喜！抢到' + grabbedAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: mcpRedpackDetail - 查看红包详情
+            mcpRedpackDetail(redpackId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpackId) return { error: '请指定红包ID' };
+                    
+                    const redpack = this._initRedpackState();
+                    const pack = redpack.activePacks.find(p => p.id === redpackId) || 
+                                 redpack.history.find(p => p.id === redpackId);
+                    if (!pack) return { error: '红包不存在' };
+                    
+                    return {
+                        success: true,
+                        id: pack.id,
+                        senderName: pack.senderName,
+                        amount: pack.amount,
+                        count: pack.count,
+                        remaining: pack.remaining,
+                        message: pack.message,
+                        timestamp: pack.timestamp,
+                        grabbedRecords: pack.grabbedRecords || [],
+                        totalGrabbed: (pack.grabbedRecords && pack.grabbedRecords.length) || (pack.count - pack.remaining)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: mcpFriendList - 获取好友列表
+            mcpFriendList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const friends = this._initFriendState();
+                    return {
+                        success: true,
+                        friendList: friends.list.map(f => ({
+                            playerId: f.playerId,
+                            playerName: f.playerName,
+                            level: f.level,
+                            realm: f.realm,
+                            addedAt: f.addedAt
+                        })),
+                        total: friends.list.length,
+                        message: '共有' + friends.list.length + '位道友'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V144: mcpFriendAdd - 添加好友
+            mcpFriendAdd(playerName) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!playerName) return { error: '请指定玩家名称' };
+                    if (playerName === gs.name) return { success: false, error: '不能添加自己为好友' };
+                    
+                    const friends = this._initFriendState();
+                    
+                    // 检查是否已是好友
+                    const exists = friends.list.some(f => f.playerName === playerName);
+                    if (exists) return { success: false, error: playerName + '已是道友' };
+                    
+                    // AI模拟好友：随机生成等级和境界
+                    const aiLevels = [1, 10, 20, 30, 50, 70, 100];
+                    const realms = ['炼气', '筑基', '金丹', '元婴', '化神'];
+                    
+                    const newFriend = {
+                        playerId: 'ai_' + Date.now(),
+                        playerName: playerName,
+                        level: aiLevels[Math.floor(Math.random() * aiLevels.length)],
+                        realm: realms[Math.floor(Math.random() * realms.length)],
+                        addedAt: new Date().toISOString()
+                    };
+                    friends.list.push(newFriend);
+                    
+                    return {
+                        success: true,
+                        friend: {
+                            playerName: newFriend.playerName,
+                            level: newFriend.level,
+                            realm: newFriend.realm
+                        },
+                        total: friends.list.length,
+                        message: '已添加' + playerName + '为道友'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -26677,6 +26921,40 @@
                 name: 'monthcard.buy',
                 description: '购买月卡 (月卡系统-购买月卡，30天有效期)',
                 inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V144: 红包+社交系统
+        const MCP_TOOLS_V144 = {
+            'redpack.list': {
+                name: 'redpack.list',
+                description: '获取红包列表 (红包系统-列出可抢的红包)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpack.send': {
+                name: 'redpack.send',
+                description: '发送红包 (红包系统-发送红包，消耗灵石，随机分配给count人)',
+                inputSchema: { type: 'object', properties: { amount: { type: 'number', description: '红包总金额(灵石)' }, count: { type: 'number', description: '红包个数' }, message: { type: 'string', description: '红包留言' } }, required: ['amount', 'count'] }
+            },
+            'redpack.grab': {
+                name: 'redpack.grab',
+                description: '抢红包 (红包系统-抢指定红包)',
+                inputSchema: { type: 'object', properties: { redpackId: { type: 'string', description: '红包ID' } }, required: ['redpackId'] }
+            },
+            'redpack.detail': {
+                name: 'redpack.detail',
+                description: '查看红包详情 (红包系统-查看红包详情和领取记录)',
+                inputSchema: { type: 'object', properties: { redpackId: { type: 'string', description: '红包ID' } }, required: ['redpackId'] }
+            },
+            'friend.list': {
+                name: 'friend.list',
+                description: '获取好友列表 (社交系统-列出好友列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'friend.add': {
+                name: 'friend.add',
+                description: '添加好友 (社交系统-添加好友，AI模拟，不需要对方同意)',
+                inputSchema: { type: 'object', properties: { playerName: { type: 'string', description: '玩家名称' } }, required: ['playerName'] }
             }
         };
 
@@ -50220,6 +50498,204 @@
             console.log('V143 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
             return { version: 'V143', passed, total, passRate: passRate.toFixed(3), results };
         }
+        function runV144Tests() {
+            const results = [];
+            const v144Assert = (cond, msg) => results.push({ pass: !!cond, message: msg });
+
+            // Setup mock gameState
+            window.gameState = {
+                spiritStones: 50000,
+                name: 'TestUser',
+                level: 10,
+                playerId: 'player_TestUser'
+            };
+
+            const server = new MockMCPServer();
+
+            // Test 1: _initRedpackState initializes correctly
+            const rpState = server._initRedpackState();
+            v144Assert(rpState !== null, '_initRedpackState returns state');
+            v144Assert(Array.isArray(rpState.activePacks), 'redpack activePacks is array');
+            v144Assert(Array.isArray(rpState.history), 'redpack history is array');
+
+            // Test 2: _initFriendState initializes correctly
+            const friendState = server._initFriendState();
+            v144Assert(friendState !== null, '_initFriendState returns state');
+            v144Assert(Array.isArray(friendState.list), 'friend list is array');
+            v144Assert(Array.isArray(friendState.pendingRequests), 'friend pendingRequests is array');
+
+            // Test 3: mcpRedpackList returns empty list initially
+            const rl1 = server.mcpRedpackList();
+            v144Assert(rl1.success === true, 'redpack.list returns success');
+            v144Assert(Array.isArray(rl1.redpackList), 'redpackList is array');
+            v144Assert(rl1.total === 0, 'redpack total is 0 initially');
+
+            // Test 4: mcpRedpackSend creates a redpack
+            const rs1 = server.mcpRedpackSend(1000, 10, 'Test红包');
+            v144Assert(rs1.success === true, 'redpack.send returns success');
+            v144Assert(rs1.redpackId && rs1.redpackId.startsWith('rp_'), 'redpack.send returns valid id');
+            v144Assert(rs1.amount === 1000, 'redpack.send amount is 1000');
+            v144Assert(rs1.count === 10, 'redpack.send count is 10');
+            v144Assert(rs1.remainingSpiritStones === 49000, 'redpack.send deducts stones correctly');
+
+            // Test 5: mcpRedpackList shows available redpacks after send
+            const rl2 = server.mcpRedpackList();
+            v144Assert(rl2.success === true, 'redpack.list returns success after send');
+            v144Assert(rl2.redpackList.length >= 1, 'redpack.list shows at least 1 redpack');
+            v144Assert(rl2.redpackList[0].senderName === 'TestUser', 'redpack sender is TestUser');
+
+            // Test 6: mcpRedpackSend fails for insufficient stones
+            window.gameState.spiritStones = 500;
+            const rsErr1 = server.mcpRedpackSend(1000, 10);
+            v144Assert(rsErr1.error && rsErr1.error.includes('不足'), 'redpack.send insufficient stones error');
+
+            // Test 7: mcpRedpackSend fails for invalid amount
+            window.gameState.spiritStones = 50000;
+            const rsErr2 = server.mcpRedpackSend(-100, 10);
+            v144Assert(rsErr2.error && rsErr2.error.includes('大于0'), 'redpack.send negative amount error');
+
+            // Test 8: mcpRedpackSend fails for amount < count
+            const rsErr3 = server.mcpRedpackSend(5, 10);
+            v144Assert(rsErr3.error && rsErr3.error.includes('大于等于'), 'redpack.send amount < count error');
+
+            // Test 9: mcpRedpackGrab succeeds
+            window.gameState.spiritStones = 50000;
+            const rpState2 = server._initRedpackState();
+            rpState2.activePacks = [];
+            const rs2 = server.mcpRedpackSend(1000, 5, 'Grab test');
+            const rg1 = server.mcpRedpackGrab(rs2.redpackId);
+            v144Assert(rg1.success === true, 'redpack.grab returns success');
+            v144Assert(typeof rg1.amount === 'number', 'redpack.grab returns amount');
+            v144Assert(rg1.amount > 0, 'redpack.grab amount > 0');
+            v144Assert(rg1.remaining === 4, 'redpack.grab remaining is 4');
+            v144Assert(rg1.totalSpiritStones > 50000, 'redpack.grab adds stones');
+
+            // Test 10: mcpRedpackGrab fails for non-existent redpack
+            const rgErr1 = server.mcpRedpackGrab('rp_nonexistent');
+            v144Assert(rgErr1.success === false, 'redpack.grab non-existent returns false');
+            v144Assert(rgErr1.error && rgErr1.error.includes('不存在'), 'redpack.grab error mentions non-existent');
+
+            // Test 11: mcpRedpackGrab fails when already grabbed
+            const rgErr2 = server.mcpRedpackGrab(rs2.redpackId);
+            v144Assert(rgErr2.success === false, 'redpack.grab already grabbed returns false');
+            v144Assert(rgErr2.error && rgErr2.error.includes('已经抢过'), 'redpack.grab error mentions already grabbed');
+
+            // Test 12: mcpRedpackDetail returns correct info
+            const rd1 = server.mcpRedpackDetail(rs2.redpackId);
+            v144Assert(rd1.success === true, 'redpack.detail returns success');
+            v144Assert(rd1.senderName === 'TestUser', 'redpack.detail senderName correct');
+            v144Assert(rd1.amount === 1000, 'redpack.detail amount correct');
+            v144Assert(rd1.count === 5, 'redpack.detail count correct');
+
+            // Test 13: mcpRedpackDetail fails for non-existent redpack
+            const rdErr1 = server.mcpRedpackDetail('rp_nonexistent');
+            v144Assert(rdErr1.error && rdErr1.error.includes('不存在'), 'redpack.detail non-existent error');
+
+            // Test 14: mcpFriendList returns empty list initially
+            const fl1 = server.mcpFriendList();
+            v144Assert(fl1.success === true, 'friend.list returns success');
+            v144Assert(Array.isArray(fl1.friendList), 'friendList is array');
+            v144Assert(fl1.total === 0, 'friend total is 0 initially');
+
+            // Test 15: mcpFriendAdd adds a friend
+            const fa1 = server.mcpFriendAdd('ZhangSan');
+            v144Assert(fa1.success === true, 'friend.add returns success');
+            v144Assert(fa1.friend && fa1.friend.playerName === 'ZhangSan', 'friend.add playerName correct');
+            v144Assert(typeof fa1.friend.level === 'number', 'friend.add level is number');
+            v144Assert(typeof fa1.friend.realm === 'string', 'friend.add realm is string');
+
+            // Test 16: mcpFriendList shows friend after add
+            const fl2 = server.mcpFriendList();
+            v144Assert(fl2.success === true, 'friend.list returns success after add');
+            v144Assert(fl2.friendList.length === 1, 'friend.list has 1 friend');
+            v144Assert(fl2.friendList[0].playerName === 'ZhangSan', 'friend.list playerName correct');
+            v144Assert(fl2.total === 1, 'friend total is 1');
+
+            // Test 17: mcpFriendAdd fails for duplicate friend
+            const faErr1 = server.mcpFriendAdd('ZhangSan');
+            v144Assert(faErr1.success === false, 'friend.add duplicate returns false');
+            v144Assert(faErr1.error && faErr1.error.includes('已是道友'), 'friend.add error mentions already friend');
+
+            // Test 18: mcpFriendAdd fails for self
+            const faErr2 = server.mcpFriendAdd('TestUser');
+            v144Assert(faErr2.success === false, 'friend.add self returns false');
+            v144Assert(faErr2.error && faErr2.error.includes('不能添加自己'), 'friend.add error mentions self');
+
+            // Test 19: mcpFriendAdd fails for empty name
+            const faErr3 = server.mcpFriendAdd();
+            v144Assert(faErr3.error && faErr3.error.includes('请指定'), 'friend.add empty name error');
+
+            // Test 20: Redpack tools are registered
+            v144Assert(server.toolRegistry.has('redpack.list'), 'redpack.list is registered');
+            v144Assert(server.toolRegistry.has('redpack.send'), 'redpack.send is registered');
+            v144Assert(server.toolRegistry.has('redpack.grab'), 'redpack.grab is registered');
+            v144Assert(server.toolRegistry.has('redpack.detail'), 'redpack.detail is registered');
+            v144Assert(server.toolRegistry.has('friend.list'), 'friend.list is registered');
+            v144Assert(server.toolRegistry.has('friend.add'), 'friend.add is registered');
+
+            // Test 21: Multiple redpacks can be sent
+            window.gameState.spiritStones = 50000;
+            const rs3 = server.mcpRedpackSend(500, 5, 'Second pack');
+            const rs4 = server.mcpRedpackSend(2000, 8, 'Third pack');
+            const rl3 = server.mcpRedpackList();
+            v144Assert(rl3.redpackList.length >= 3, 'redpack.list shows multiple packs');
+
+            // Test 22: Multiple friends can be added
+            server.mcpFriendAdd('LiSi');
+            server.mcpFriendAdd('WangWu');
+            const fl3 = server.mcpFriendList();
+            v144Assert(fl3.friendList.length >= 3, 'friend.list shows multiple friends');
+
+            // Test 23: Redpack state persists
+            const rpState3 = server._initRedpackState();
+            v144Assert(rpState3.activePacks.length >= 1, 'redpack state persists');
+
+            // Test 24: Friend state persists
+            const friendState2 = server._initFriendState();
+            v144Assert(friendState2.list.length >= 1, 'friend state persists');
+
+            // Test 25: mcpRedpackSend handles default message
+            window.gameState.spiritStones = 50000;
+            const rs5 = server.mcpRedpackSend(100, 2);
+            v144Assert(rs5.success === true, 'redpack.send without message succeeds');
+            const rd2 = server.mcpRedpackDetail(rs5.redpackId);
+            v144Assert(rd2.message === '恭喜发财，大吉大利', 'redpack default message correct');
+
+            // Test 26: mcpRedpackGrab fails when redpack is exhausted
+            const rpState4 = server._initRedpackState();
+            rpState4.activePacks = [];
+            const rs6 = server.mcpRedpackSend(100, 1);
+            server.mcpRedpackGrab(rs6.redpackId);
+            const rgErr3 = server.mcpRedpackGrab(rs6.redpackId);
+            v144Assert(rgErr3.success === false, 'redpack.grab exhausted returns false');
+            v144Assert(rgErr3.error && rgErr3.error.includes('抢完'), 'redpack.grab error mentions exhausted');
+
+            // Test 27: mcpFriendAdd generates random level and realm
+            const fa2 = server.mcpFriendAdd('ZhaoLiu');
+            v144Assert(fa2.friend.level > 0, 'friend.add generated level > 0');
+            v144Assert(fa2.friend.realm && fa2.friend.realm.length > 0, 'friend.add generated realm is valid');
+
+            // Test 28: Redpack id format is unique
+            window.gameState.spiritStones = 50000;
+            const rs7 = server.mcpRedpackSend(100, 2);
+            const rs8 = server.mcpRedpackSend(100, 2);
+            v144Assert(rs7.redpackId !== rs8.redpackId, 'redpack ids are unique');
+
+            // Test 29: Friend playerId format
+            const fa3 = server.mcpFriendAdd('QianQi');
+            v144Assert(fa3.friend.playerId && fa3.friend.playerId.startsWith('ai_'), 'friend playerId starts with ai_');
+
+            // Test 30: Friend addedAt is set
+            v144Assert(fa3.friend.addedAt && fa3.friend.addedAt.length > 0, 'friend addedAt is set');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V144 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V144', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v144Results = runV144Tests();
         const v143Results = runV143Tests();
         const v142Results = runV142Tests();
         const v141Results = runV141Tests();
