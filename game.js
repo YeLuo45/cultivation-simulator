@@ -3657,6 +3657,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V166)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V167: Register 奇遇+事件系统v3 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V167)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3831,6 +3835,25 @@
                             break;
                         case 'arena.reward':
                             result = this.mcpArenaRewardV3(args.period);
+                            break;
+                        // V167: 奇遇+事件系统v3
+                        case 'serendipityV3.list':
+                            result = this.mcpSerendipityV3List();
+                            break;
+                        case 'serendipityV3.start':
+                            result = this.mcpSerendipityV3Start(args.serendipityId);
+                            break;
+                        case 'serendipityV3.complete':
+                            result = this.mcpSerendipityV3Complete(args.serendipityId);
+                            break;
+                        case 'eventV3.list':
+                            result = this.mcpEventV3List();
+                            break;
+                        case 'eventV3.join':
+                            result = this.mcpEventV3Join(args.eventId);
+                            break;
+                        case 'eventV3.reward':
+                            result = this.mcpEventV3Reward(args.eventId);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -17084,6 +17107,209 @@
                     };
                 }
                 return gs.arenaV3;
+            }
+
+            // V167: _initSerendipityStateV3 - 初始化奇遇系统状态v3
+            _initSerendipityStateV3() {
+                const gs = window.gameState;
+                if (!gs.serendipityV3) {
+                    gs.serendipityV3 = {
+                        serendipities: [
+                            { id: 'mysterious_valley', name: '神秘山谷', description: '灵气充沛的隐秘山谷，可能遇到奇珍异宝', requirements: { minRealm: 0, minLevel: 1 }, duration: 3600000, rewards: { type: 'spiritStone', amount: 500 }, status: 'available', progress: 0 },
+                            { id: 'ancient_tomb', name: '上古墓穴', description: '蕴含上古修士传承的神秘墓穴', requirements: { minRealm: 1, minLevel: 3 }, duration: 7200000, rewards: { type: 'technique', name: '上古呼吸法' }, status: 'available', progress: 0 },
+                            { id: 'dragon_lake', name: '龙族湖泊', description: '神龙遗迹，机缘与危险并存', requirements: { minRealm: 2, minLevel: 5 }, duration: 10800000, rewards: { type: 'pet', name: '龙蛋' }, status: 'available', progress: 0 },
+                            { id: 'immortal_cliff', name: '飞升崖', description: '传说中飞升之地，机缘难测', requirements: { minRealm: 3, minLevel: 8 }, duration: 14400000, rewards: { type: 'artifact', name: '飞升令' }, status: 'available', progress: 0 }
+                        ],
+                        active: null,
+                        history: []
+                    };
+                }
+                return gs.serendipityV3;
+            }
+
+            // V167: _initEventStateV3 - 初始化事件系统状态v3
+            _initEventStateV3() {
+                const gs = window.gameState;
+                if (!gs.eventV3) {
+                    const now = Date.now();
+                    gs.eventV3 = {
+                        events: [
+                            { id: 'spirit_awakening', name: '灵气觉醒', description: '全服修炼效率双倍', startTime: now - 86400000 * 2, endTime: now + 86400000 * 5, participants: 0, maxParticipants: 1000, rewards: { type: 'spiritStone', amount: 3000 }, status: 'active' },
+                            { id: 'battle_royal', name: '诸神之战', description: '跨服竞技盛典', startTime: now - 86400000 * 5, endTime: now + 86400000 * 10, participants: 0, maxParticipants: 500, rewards: { type: 'title', name: '战神' }, status: 'active' },
+                            { id: 'treasure_festival', name: '宝物盛典', description: '稀有道具打折', startTime: now - 86400000 * 1, endTime: now + 86400000 * 3, participants: 0, maxParticipants: 2000, rewards: { type: 'items', items: ['神兵图纸', '灵草礼包'] }, status: 'active' }
+                        ],
+                        participated: [],
+                        rewardsClaimed: []
+                    };
+                }
+                return gs.eventV3;
+            }
+
+            // V167: mcpSerendipityV3List - 获取奇遇列表
+            mcpSerendipityV3List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const serV3 = this._initSerendipityStateV3();
+                    const now = Date.now();
+                    const available = serV3.serendipities.filter(s => {
+                        if (s.status !== 'available') return false;
+                        const req = s.requirements || {};
+                        if ((req.minRealm || 0) > (gs.realm || 0)) return false;
+                        if ((req.minLevel || 0) > (gs.level || 1)) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        serendipities: serV3.serendipities.map(s => ({
+                            id: s.id,
+                            name: s.name,
+                            description: s.description,
+                            requirements: s.requirements,
+                            duration: s.duration,
+                            rewards: s.rewards,
+                            status: s.status,
+                            progress: s.progress
+                        })),
+                        availableCount: available.length,
+                        message: '奇遇列表共' + serV3.serendipities.length + '项，可触发' + available.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V167: mcpSerendipityV3Start - 开始奇遇
+            mcpSerendipityV3Start(serendipityId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!serendipityId) return { error: '请指定奇遇ID' };
+                    const serV3 = this._initSerendipityStateV3();
+                    if (serV3.active) return { error: '已有进行中奇遇，请先完成' };
+                    const ser = serV3.serendipities.find(s => s.id === serendipityId);
+                    if (!ser) return { error: '奇遇不存在' };
+                    if (ser.status !== 'available') return { error: '奇遇不可用' };
+                    const req = ser.requirements || {};
+                    if ((req.minRealm || 0) > (gs.realm || 0)) return { error: '境界不足，无法触发此奇遇' };
+                    if ((req.minLevel || 0) > (gs.level || 1)) return { error: '等级不足，无法触发此奇遇' };
+                    ser.status = 'in_progress';
+                    ser.progress = 0;
+                    serV3.active = serendipityId;
+                    return {
+                        success: true,
+                        serendipityId: ser.id,
+                        name: ser.name,
+                        startTime: Date.now(),
+                        duration: ser.duration,
+                        message: '开始奇遇\"' + ser.name + '\"，持续' + (ser.duration / 3600000) + '小时'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V167: mcpSerendipityV3Complete - 完成奇遇
+            mcpSerendipityV3Complete(serendipityId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!serendipityId) return { error: '请指定奇遇ID' };
+                    const serV3 = this._initSerendipityStateV3();
+                    if (serV3.active !== serendipityId) return { error: '该奇遇未在进行中' };
+                    const ser = serV3.serendipities.find(s => s.id === serendipityId);
+                    if (!ser) return { error: '奇遇不存在' };
+                    if (ser.status !== 'in_progress') return { error: '奇遇不在进行中状态' };
+                    // Apply reward
+                    if (ser.rewards.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (ser.rewards.amount || 0);
+                    }
+                    ser.status = 'completed';
+                    ser.progress = 100;
+                    serV3.history.push({ id: ser.id, name: ser.name, completedAt: Date.now(), rewards: ser.rewards });
+                    serV3.active = null;
+                    return {
+                        success: true,
+                        serendipityId: ser.id,
+                        name: ser.name,
+                        rewards: ser.rewards,
+                        message: '奇遇\"' + ser.name + '\"完成，获得奖励'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V167: mcpEventV3List - 获取事件列表
+            mcpEventV3List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const evtV3 = this._initEventStateV3();
+                    const now = Date.now();
+                    const active = evtV3.events.filter(e => now >= e.startTime && now <= e.endTime);
+                    return {
+                        success: true,
+                        events: evtV3.events.map(e => ({
+                            id: e.id,
+                            name: e.name,
+                            description: e.description,
+                            startTime: e.startTime,
+                            endTime: e.endTime,
+                            participants: e.participants,
+                            maxParticipants: e.maxParticipants,
+                            rewards: e.rewards,
+                            status: (now >= e.startTime && now <= e.endTime) ? 'active' : 'inactive'
+                        })),
+                        activeCount: active.length,
+                        message: '事件列表共' + evtV3.events.length + '项，进行中' + active.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V167: mcpEventV3Join - 参与事件
+            mcpEventV3Join(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtV3 = this._initEventStateV3();
+                    const evt = evtV3.events.find(e => e.id === eventId);
+                    if (!evt) return { error: '事件不存在' };
+                    const now = Date.now();
+                    if (now < evt.startTime || now > evt.endTime) return { error: '事件未开始或已结束' };
+                    if (evt.participants >= evt.maxParticipants) return { error: '事件参与人数已满' };
+                    if (evtV3.participated.includes(eventId)) return { error: '已参与过此事件' };
+                    evt.participants++;
+                    evtV3.participated.push(eventId);
+                    return {
+                        success: true,
+                        eventId: evt.id,
+                        name: evt.name,
+                        participants: evt.participants,
+                        message: '成功参与事件\"' + evt.name + '\"'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V167: mcpEventV3Reward - 领取事件奖励
+            mcpEventV3Reward(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtV3 = this._initEventStateV3();
+                    if (!evtV3.participated.includes(eventId)) return { error: '未参与此事件' };
+                    if (evtV3.rewardsClaimed.includes(eventId)) return { error: '奖励已领取' };
+                    const evt = evtV3.events.find(e => e.id === eventId);
+                    if (!evt) return { error: '事件不存在' };
+                    // Apply reward
+                    if (evt.rewards.type === 'spiritStone') {
+                        gs.spiritStones = (gs.spiritStones || 0) + (evt.rewards.amount || 0);
+                    }
+                    evtV3.rewardsClaimed.push(eventId);
+                    return {
+                        success: true,
+                        eventId: evt.id,
+                        name: evt.name,
+                        rewards: evt.rewards,
+                        message: '领取事件\"' + evt.name + '\"奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V166: mcpRankListV3 - 获取排行榜列表
@@ -33122,6 +33348,64 @@
                         period: { type: 'string', description: '周期: weekly/monthly' }
                     },
                     required: ['period']
+                }
+            }
+        };
+
+        // V167: 奇遇+事件系统v3
+        const MCP_TOOLS_V167 = {
+            'serendipityV3.list': {
+                name: 'serendipityV3.list',
+                description: '获取奇遇列表 (奇遇+事件系统v3-获取所有可触发奇遇)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'serendipityV3.start': {
+                name: 'serendipityV3.start',
+                description: '开始奇遇 (奇遇+事件系统v3-开始指定奇遇)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['serendipityId']
+                }
+            },
+            'serendipityV3.complete': {
+                name: 'serendipityV3.complete',
+                description: '完成奇遇 (奇遇+事件系统v3-完成奇遇领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['serendipityId']
+                }
+            },
+            'eventV3.list': {
+                name: 'eventV3.list',
+                description: '获取事件列表 (奇遇+事件系统v3-获取所有进行中事件)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'eventV3.join': {
+                name: 'eventV3.join',
+                description: '参与事件 (奇遇+事件系统v3-参与指定事件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
+            },
+            'eventV3.reward': {
+                name: 'eventV3.reward',
+                description: '领取事件奖励 (奇遇+事件系统v3-领取完成事件奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
                 }
             }
         };
@@ -62966,5 +63250,342 @@ const v152Results = runV152Tests();
             }
 
             const v166Results = runV166Tests();
+
+            // V167: 奇遇+事件系统v3 测试
+            function runV167Tests() {
+                const results = [];
+                function v167Assert(condition, testName) {
+                    const result = { test: testName, pass: condition };
+                    if (!condition) {
+                        console.log('FAIL:', testName);
+                    }
+                    results.push(result);
+                }
+
+                window.gameState = {
+                    spiritStones: 10000,
+                    combatPower: 1000,
+                    level: 5,
+                    realm: 2,
+                    serendipityV3: null,
+                    eventV3: null
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V167 definition exists and has 6 tools
+                v167Assert(typeof MCP_TOOLS_V167 === 'object', 'MCP_TOOLS_V167 is defined');
+                v167Assert(Object.keys(MCP_TOOLS_V167).length === 6, 'MCP_TOOLS_V167 has 6 tools');
+                v167Assert('serendipityV3.list' in MCP_TOOLS_V167, 'serendipityV3.list tool exists');
+                v167Assert('serendipityV3.start' in MCP_TOOLS_V167, 'serendipityV3.start tool exists');
+                v167Assert('serendipityV3.complete' in MCP_TOOLS_V167, 'serendipityV3.complete tool exists');
+                v167Assert('eventV3.list' in MCP_TOOLS_V167, 'eventV3.list tool exists');
+                v167Assert('eventV3.join' in MCP_TOOLS_V167, 'eventV3.join tool exists');
+                v167Assert('eventV3.reward' in MCP_TOOLS_V167, 'eventV3.reward tool exists');
+
+                // Test 2: _initSerendipityStateV3 initializes correctly
+                const serV3State = server._initSerendipityStateV3();
+                v167Assert(serV3State !== null, '_initSerendipityStateV3 returns state');
+                v167Assert(Array.isArray(serV3State.serendipities), 'serendipityV3.serendipities is array');
+                v167Assert(serV3State.serendipities.length === 4, 'serendipityV3 has 4 serendipities');
+                v167Assert(serV3State.active === null, 'serendipityV3.active is null initially');
+                v167Assert(Array.isArray(serV3State.history), 'serendipityV3.history is array');
+
+                // Test 3: _initEventStateV3 initializes correctly
+                const evtV3State = server._initEventStateV3();
+                v167Assert(evtV3State !== null, '_initEventStateV3 returns state');
+                v167Assert(Array.isArray(evtV3State.events), 'eventV3.events is array');
+                v167Assert(evtV3State.events.length === 3, 'eventV3 has 3 events');
+                v167Assert(Array.isArray(evtV3State.participated), 'eventV3.participated is array');
+                v167Assert(Array.isArray(evtV3State.rewardsClaimed), 'eventV3.rewardsClaimed is array');
+
+                // Test 4: mcpSerendipityV3List returns correct structure
+                const serListV3 = server.mcpSerendipityV3List();
+                v167Assert(serListV3.success === true, 'serendipityV3.list returns success');
+                v167Assert(Array.isArray(serListV3.serendipities), 'serendipityV3.list returns serendipities array');
+                v167Assert(serListV3.serendipities.length === 4, 'serendipityV3.list returns 4 serendipities');
+                v167Assert(serListV3.availableCount !== undefined, 'serendipityV3.list has availableCount');
+
+                // Test 5: mcpSerendipityV3List filters by requirements
+                window.gameState.level = 1;
+                window.gameState.realm = 0;
+                const serListV3_2 = server.mcpSerendipityV3List();
+                v167Assert(serListV3_2.availableCount >= 1, 'serendipityV3.list filters by level/realm');
+
+                // Test 6: mcpSerendipityV3Start starts a serendipity
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                const serStartV3 = server.mcpSerendipityV3Start('mysterious_valley');
+                v167Assert(serStartV3.success === true, 'serendipityV3.start returns success');
+                v167Assert(serStartV3.serendipityId === 'mysterious_valley', 'serendipityV3.start returns correct id');
+                v167Assert(serStartV3.name !== undefined, 'serendipityV3.start returns name');
+                v167Assert(serStartV3.duration !== undefined, 'serendipityV3.start returns duration');
+
+                // Test 7: mcpSerendipityV3Start prevents duplicate
+                const serStartV3_2 = server.mcpSerendipityV3Start('ancient_tomb');
+                v167Assert(serStartV3_2.error !== undefined, 'serendipityV3.start prevents duplicate when active');
+
+                // Test 8: mcpSerendipityV3Start validates serendipityId
+                const serStartV3Err = server.mcpSerendipityV3Start('invalid_id');
+                v167Assert(serStartV3Err.error !== undefined, 'serendipityV3.start returns error for invalid id');
+
+                // Test 9: mcpSerendipityV3Start validates requirements
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                window.gameState.level = 1;
+                window.gameState.realm = 0;
+                const serStartV3_3 = server.mcpSerendipityV3Start('immortal_cliff');
+                v167Assert(serStartV3_3.error !== undefined, 'serendipityV3.start validates realm requirements');
+
+                // Test 10: mcpSerendipityV3Complete completes serendipity
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 5;
+                window.gameState.realm = 2;
+                server._initSerendipityStateV3();
+                server.mcpSerendipityV3Start('mysterious_valley');
+                const serCompV3 = server.mcpSerendipityV3Complete('mysterious_valley');
+                v167Assert(serCompV3.success === true, 'serendipityV3.complete returns success');
+                v167Assert(serCompV3.rewards !== undefined, 'serendipityV3.complete returns rewards');
+                v167Assert(serCompV3.serendipityId === 'mysterious_valley', 'serendipityV3.complete returns correct id');
+
+                // Test 11: mcpSerendipityV3Complete validates active serendipity
+                const serCompV3Err = server.mcpSerendipityV3Complete('ancient_tomb');
+                v167Assert(serCompV3Err.error !== undefined, 'serendipityV3.complete validates active serendipity');
+
+                // Test 12: mcpSerendipityV3Complete adds to history
+                v167Assert(window.gameState.serendipityV3.history.length >= 1, 'serendipityV3.complete adds to history');
+
+                // Test 13: mcpEventV3List returns correct structure
+                const evtListV3 = server.mcpEventV3List();
+                v167Assert(evtListV3.success === true, 'eventV3.list returns success');
+                v167Assert(Array.isArray(evtListV3.events), 'eventV3.list returns events array');
+                v167Assert(evtListV3.events.length === 3, 'eventV3.list returns 3 events');
+                v167Assert(evtListV3.activeCount !== undefined, 'eventV3.list has activeCount');
+
+                // Test 14: mcpEventV3List includes event details
+                const evt = evtListV3.events[0];
+                v167Assert(evt.id !== undefined, 'eventV3.list event has id');
+                v167Assert(evt.name !== undefined, 'eventV3.list event has name');
+                v167Assert(evt.startTime !== undefined, 'eventV3.list event has startTime');
+                v167Assert(evt.endTime !== undefined, 'eventV3.list event has endTime');
+                v167Assert(evt.participants !== undefined, 'eventV3.list event has participants');
+                v167Assert(evt.maxParticipants !== undefined, 'eventV3.list event has maxParticipants');
+
+                // Test 15: mcpEventV3Join joins an event
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.participated = [];
+                const evtJoinV3 = server.mcpEventV3Join('spirit_awakening');
+                v167Assert(evtJoinV3.success === true, 'eventV3.join returns success');
+                v167Assert(evtJoinV3.eventId === 'spirit_awakening', 'eventV3.join returns correct id');
+                v167Assert(evtJoinV3.participants !== undefined, 'eventV3.join returns participants');
+
+                // Test 16: mcpEventV3Join prevents duplicate
+                const evtJoinV3_2 = server.mcpEventV3Join('spirit_awakening');
+                v167Assert(evtJoinV3_2.error !== undefined, 'eventV3.join prevents duplicate participation');
+
+                // Test 17: mcpEventV3Join validates eventId
+                const evtJoinV3Err = server.mcpEventV3Join('invalid_event');
+                v167Assert(evtJoinV3Err.error !== undefined, 'eventV3.join returns error for invalid event');
+
+                // Test 18: mcpEventV3Join checks max participants
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.events[0].participants = window.gameState.eventV3.events[0].maxParticipants;
+                const evtJoinV3_3 = server.mcpEventV3Join('spirit_awakening');
+                v167Assert(evtJoinV3_3.error !== undefined, 'eventV3.join checks max participants');
+
+                // Test 19: mcpEventV3Reward claims reward
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.participated = [];
+                window.gameState.eventV3.rewardsClaimed = [];
+                server.mcpEventV3Join('spirit_awakening');
+                const evtRewardV3 = server.mcpEventV3Reward('spirit_awakening');
+                v167Assert(evtRewardV3.success === true, 'eventV3.reward returns success');
+                v167Assert(evtRewardV3.eventId === 'spirit_awakening', 'eventV3.reward returns correct id');
+                v167Assert(evtRewardV3.rewards !== undefined, 'eventV3.reward returns rewards');
+
+                // Test 20: mcpEventV3Reward prevents duplicate claim
+                const evtRewardV3_2 = server.mcpEventV3Reward('spirit_awakening');
+                v167Assert(evtRewardV3_2.error !== undefined, 'eventV3.reward prevents duplicate claim');
+
+                // Test 21: mcpEventV3Reward validates participation
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.participated = [];
+                window.gameState.eventV3.rewardsClaimed = [];
+                const evtRewardV3_3 = server.mcpEventV3Reward('battle_royal');
+                v167Assert(evtRewardV3_3.error !== undefined, 'eventV3.reward validates participation');
+
+                // Test 22: serendipityV3 requirements filtering - level too low
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 2;
+                window.gameState.realm = 0;
+                server._initSerendipityStateV3();
+                const serListV3_3 = server.mcpSerendipityV3List();
+                const availableImmortal = serListV3_3.serendipities.filter(s => s.id === 'immortal_cliff' && s.status === 'available');
+                v167Assert(availableImmortal.length === 0, 'serendipityV3.filters by minLevel requirement');
+
+                // Test 23: serendipityV3 requirements filtering - realm too low
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 10;
+                window.gameState.realm = 1;
+                server._initSerendipityStateV3();
+                const serListV3_4 = server.mcpSerendipityV3List();
+                const availableDragon = serListV3_4.serendipities.filter(s => s.id === 'dragon_lake' && s.status === 'available');
+                v167Assert(availableDragon.length === 0, 'serendipityV3.filters by minRealm requirement');
+
+                // Test 24: serendipityV3 can start when requirements met
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 5;
+                window.gameState.realm = 2;
+                server._initSerendipityStateV3();
+                const serStartV3_4 = server.mcpSerendipityV3Start('dragon_lake');
+                v167Assert(serStartV3_4.success === true, 'serendipityV3.start works when requirements met');
+
+                // Test 25: eventV3 status calculation
+                const evtListV3_2 = server.mcpEventV3List();
+                const activeEvents = evtListV3_2.events.filter(e => e.status === 'active');
+                v167Assert(activeEvents.length >= 1, 'eventV3.list correctly calculates active status');
+
+                // Test 26: serendipityV3 state persists
+                v167Assert(window.gameState.serendipityV3 !== null, 'serendipityV3 state is persisted');
+                v167Assert(window.gameState.serendipityV3.serendipities !== undefined, 'serendipityV3 has serendipities array');
+
+                // Test 27: eventV3 state persists
+                v167Assert(window.gameState.eventV3 !== null, 'eventV3 state is persisted');
+                v167Assert(window.gameState.eventV3.events !== undefined, 'eventV3 has events array');
+
+                // Test 28: mcpSerendipityV3List returns correct message
+                const serListV3_5 = server.mcpSerendipityV3List();
+                v167Assert(typeof serListV3_5.message === 'string', 'serendipityV3.list returns message');
+                v167Assert(serListV3_5.message.includes('奇遇'), 'serendipityV3.list message mentions serendipity');
+
+                // Test 29: mcpEventV3List returns correct message
+                const evtListV3_3 = server.mcpEventV3List();
+                v167Assert(typeof evtListV3_3.message === 'string', 'eventV3.list returns message');
+                v167Assert(evtListV3_3.message.includes('事件'), 'eventV3.list message mentions event');
+
+                // Test 30: serendipityV3 history tracks completed
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 1;
+                window.gameState.realm = 0;
+                server._initSerendipityStateV3();
+                server.mcpSerendipityV3Start('mysterious_valley');
+                server.mcpSerendipityV3Complete('mysterious_valley');
+                v167Assert(window.gameState.serendipityV3.history.length >= 1, 'serendipityV3.history tracks completed');
+
+                // Test 31: serendipityV3 active is cleared after complete
+                v167Assert(window.gameState.serendipityV3.active === null, 'serendipityV3.active cleared after complete');
+
+                // Test 32: eventV3 participated tracks joining
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.participated = [];
+                server.mcpEventV3Join('treasure_festival');
+                v167Assert(window.gameState.eventV3.participated.includes('treasure_festival'), 'eventV3.participated tracks joins');
+
+                // Test 33: serendipityV3 status transitions correctly
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                const mysteriousSer = window.gameState.serendipityV3.serendipities.find(s => s.id === 'mysterious_valley');
+                v167Assert(mysteriousSer.status === 'available', 'serendipityV3 starts as available');
+                server.mcpSerendipityV3Start('mysterious_valley');
+                v167Assert(mysteriousSer.status === 'in_progress', 'serendipityV3 becomes in_progress after start');
+                server.mcpSerendipityV3Complete('mysterious_valley');
+                v167Assert(mysteriousSer.status === 'completed', 'serendipityV3 becomes completed after complete');
+
+                // Test 34: eventV3 participants increments
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                const initialParticipants = window.gameState.eventV3.events[0].participants;
+                window.gameState.eventV3.participated = [];
+                server.mcpEventV3Join('spirit_awakening');
+                v167Assert(window.gameState.eventV3.events[0].participants === initialParticipants + 1, 'eventV3.participants increments');
+
+                // Test 35: mcpSerendipityV3Start returns startTime
+                window.gameState.serendipityV3 = null;
+                window.gameState.level = 1;
+                window.gameState.realm = 0;
+                server._initSerendipityStateV3();
+                const serStartV3_5 = server.mcpSerendipityV3Start('mysterious_valley');
+                v167Assert(serStartV3_5.startTime !== undefined, 'serendipityV3.start returns startTime');
+
+                // Test 36: mcpEventV3Join validates event time
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                const now = Date.now();
+                window.gameState.eventV3.events[0].endTime = now - 1000;
+                const evtJoinV3_4 = server.mcpEventV3Join('spirit_awakening');
+                v167Assert(evtJoinV3_4.error !== undefined, 'eventV3.join validates event time');
+
+                // Test 37: mcpSerendipityV3List shows correct progress
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                server.mcpSerendipityV3Start('mysterious_valley');
+                const serListV3_6 = server.mcpSerendipityV3List();
+                const inProgressSer = serListV3_6.serendipities.find(s => s.id === 'mysterious_valley');
+                v167Assert(inProgressSer.progress === 0, 'serendipityV3.list shows progress 0 for in_progress');
+
+                // Test 38: mcpSerendipityV3Complete shows progress 100
+                server.mcpSerendipityV3Complete('mysterious_valley');
+                const serListV3_7 = server.mcpSerendipityV3List();
+                const completedSer = serListV3_7.serendipities.find(s => s.id === 'mysterious_valley');
+                v167Assert(completedSer.progress === 100, 'serendipityV3.list shows progress 100 for completed');
+
+                // Test 39: eventV3 rewardsClaimed tracks claims
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                window.gameState.eventV3.participated = ['spirit_awakening'];
+                server.mcpEventV3Reward('spirit_awakening');
+                v167Assert(window.gameState.eventV3.rewardsClaimed.includes('spirit_awakening'), 'eventV3.rewardsClaimed tracks claims');
+
+                // Test 40: mcpSerendipityV3Start validates no serendipityId
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                const serStartV3Err2 = server.mcpSerendipityV3Start(null);
+                v167Assert(serStartV3Err2.error !== undefined, 'serendipityV3.start validates no serendipityId');
+
+                // Test 41: mcpEventV3Join validates no eventId
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                const evtJoinV3Err2 = server.mcpEventV3Join(null);
+                v167Assert(evtJoinV3Err2.error !== undefined, 'eventV3.join validates no eventId');
+
+                // Test 42: mcpSerendipityV3Complete validates no serendipityId
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                const serCompV3Err2 = server.mcpSerendipityV3Complete(null);
+                v167Assert(serCompV3Err2.error !== undefined, 'serendipityV3.complete validates no serendipityId');
+
+                // Test 43: mcpEventV3Reward validates no eventId
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                const evtRewardV3Err2 = server.mcpEventV3Reward(null);
+                v167Assert(evtRewardV3Err2.error !== undefined, 'eventV3.reward validates no eventId');
+
+                // Test 44: serendipityV3.rewards has correct structure
+                window.gameState.serendipityV3 = null;
+                server._initSerendipityStateV3();
+                const serRewards = window.gameState.serendipityV3.serendipities[0].rewards;
+                v167Assert(serRewards.type !== undefined, 'serendipityV3.rewards has type');
+                v167Assert(serRewards.amount !== undefined || serRewards.name !== undefined, 'serendipityV3.rewards has amount or name');
+
+                // Test 45: eventV3.rewards has correct structure
+                window.gameState.eventV3 = null;
+                server._initEventStateV3();
+                const evtRewards = window.gameState.eventV3.events[0].rewards;
+                v167Assert(evtRewards.type !== undefined, 'eventV3.rewards has type');
+                v167Assert(evtRewards.amount !== undefined || evtRewards.name !== undefined || evtRewards.items !== undefined, 'eventV3.rewards has amount/name/items');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V167 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V167', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v167Results = runV167Tests();
 
         const v150Results = runV150Tests();
