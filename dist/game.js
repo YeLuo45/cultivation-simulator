@@ -4939,6 +4939,74 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // --- MCP_TOOLS_GM: GM工具系统 (P-20260528-085) ---
+        const MCP_TOOLS_GM = {
+            'gm.toggle': {
+                name: 'gm.toggle',
+                description: '开启/关闭GM模式 (GM工具系统-开关)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        enabled: { type: 'boolean', description: '是否启用GM模式' }
+                    },
+                    required: ['enabled']
+                }
+            },
+            'gm.addSpirit': {
+                name: 'gm.addSpirit',
+                description: '添加灵石 (GM工具系统-灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '灵石数量' }
+                    },
+                    required: ['amount']
+                }
+            },
+            'gm.setRealm': {
+                name: 'gm.setRealm',
+                description: '设置境界 (GM工具系统-境界)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        realmId: { type: 'number', description: '境界ID (1-8)' }
+                    },
+                    required: ['realmId']
+                }
+            },
+            'gm.addItem': {
+                name: 'gm.addItem',
+                description: '添加物品到背包 (GM工具系统-物品)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        itemType: { type: 'string', description: '物品类型 (spiritStone/pill/technique/equipment/material)' },
+                        quantity: { type: 'number', description: '数量', default: 1 }
+                    },
+                    required: ['itemType']
+                }
+            },
+            'gm.unlockAchievement': {
+                name: 'gm.unlockAchievement',
+                description: '解锁成就 (GM工具系统-成就)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        achievementId: { type: 'string', description: '成就ID' }
+                    },
+                    required: ['achievementId']
+                }
+            },
+            'gm.reset': {
+                name: 'gm.reset',
+                description: '重置玩家数据 (GM工具系统-重置)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
         // --- MCP_TOOLS_V113: 仙界商城+兑换系统 ---
         const MCP_TOOLS_V113 = {
             'mall.browse': {
@@ -5301,6 +5369,10 @@ const ACHIEVEMENT_ID_MAP = {
                 }
                 // V113: Register 仙界商城+兑换系统 tools
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V113)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // GM: Register GM工具系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_GM)) {
                     this.toolRegistry.set(name, tool);
                 }
                 // V114: Register 仙界任务+成就系统 tools
@@ -6707,6 +6779,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'arena.reward':
                             result = this.mcpArenaReward();
+                            break;
+                        // GM: GM工具系统
+                        case 'gm.toggle':
+                            result = this.mcpGmToggle(args.enabled);
+                            break;
+                        case 'gm.addSpirit':
+                            result = this.mcpGmAddSpirit(args.amount);
+                            break;
+                        case 'gm.setRealm':
+                            result = this.mcpGmSetRealm(args.realmId);
+                            break;
+                        case 'gm.addItem':
+                            result = this.mcpGmAddItem(args.itemType, args.quantity);
+                            break;
+                        case 'gm.unlockAchievement':
+                            result = this.mcpGmUnlockAchievement(args.achievementId);
+                            break;
+                        case 'gm.reset':
+                            result = this.mcpGmReset();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -18811,6 +18902,180 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // GM: GM工具系统 - 状态初始化
+            _initGmState() {
+                const gs = window.gameState;
+                if (!gs) return null;
+                if (!gs.gm) {
+                    gs.gm = { enabled: false };
+                }
+                return gs.gm;
+            }
+
+            // GM: mcpGmToggle - 开启/关闭GM模式
+            mcpGmToggle(enabled) {
+                try {
+                    const gmState = this._initGmState();
+                    if (!gmState) return { error: 'Game state not initialized' };
+                    gmState.enabled = enabled === true;
+                    return {
+                        success: true,
+                        enabled: gmState.enabled,
+                        message: gmState.enabled ? 'GM模式已开启' : 'GM模式已关闭'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // GM: mcpGmAddSpirit - 添加灵石
+            mcpGmAddSpirit(amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gmState = this._initGmState();
+                    if (!gmState.enabled) return { error: 'GM模式未开启，请先调用 gm.toggle 开启' };
+                    if (typeof amount !== 'number' || amount <= 0) {
+                        return { error: '无效的灵石数量' };
+                    }
+                    gs.spiritStones = (gs.spiritStones || 0) + amount;
+                    return {
+                        success: true,
+                        added: amount,
+                        total: gs.spiritStones,
+                        message: `已添加 ${amount} 灵石`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // GM: mcpGmSetRealm - 设置境界
+            mcpGmSetRealm(realmId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gmState = this._initGmState();
+                    if (!gmState.enabled) return { error: 'GM模式未开启，请先调用 gm.toggle 开启' };
+                    const realms = this._getRealmList();
+                    if (realmId < 1 || realmId > realms.length) {
+                        return { error: `无效的境界ID，范围: 1-${realms.length}` };
+                    }
+                    gs.realm = realmId;
+                    gs.realmName = realms[realmId - 1] || '未知境界';
+                    return {
+                        success: true,
+                        realmId: realmId,
+                        realmName: gs.realmName,
+                        message: `已设置境界为 ${gs.realmName}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // GM: mcpGmAddItem - 添加物品到背包
+            mcpGmAddItem(itemType, quantity = 1) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gmState = this._initGmState();
+                    if (!gmState.enabled) return { error: 'GM模式未开启，请先调用 gm.toggle 开启' };
+                    if (!itemType) return { error: '物品类型不能为空' };
+                    const qty = Math.max(1, Math.floor(quantity) || 1);
+                    
+                    // 初始化背包
+                    if (!gs.inventory) gs.inventory = [];
+                    
+                    // 根据物品类型生成物品
+                    const itemTemplates = {
+                        'spiritStone': { name: '灵石', type: 'currency', description: '修仙界通用货币', value: 1 },
+                        'pill': { name: '筑基丹', type: 'pill', quality: 'R', description: '辅助筑基的丹药', effect: 'realm_boost' },
+                        'technique': { name: '青云诀', type: 'technique', quality: 'SR', description: '基础修炼功法', level: 1 },
+                        'equipment': { name: '精铁剑', type: 'equipment', quality: 'R', slot: 'weapon', level: 1 },
+                        'material': { name: '灵草', type: 'material', quality: 'N', description: '炼丹材料' }
+                    };
+                    
+                    const template = itemTemplates[itemType] || itemTemplates['material'];
+                    const item = {
+                        id: `gm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        name: template.name,
+                        type: template.type,
+                        quality: template.quality || 'N',
+                        description: template.description,
+                        quantity: qty
+                    };
+                    
+                    gs.inventory.push(item);
+                    return {
+                        success: true,
+                        item: item,
+                        totalItems: gs.inventory.length,
+                        message: `已添加 ${qty} 个 ${template.name} 到背包`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // GM: mcpGmUnlockAchievement - 解锁成就
+            mcpGmUnlockAchievement(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gmState = this._initGmState();
+                    if (!gmState.enabled) return { error: 'GM模式未开启，请先调用 gm.toggle 开启' };
+                    if (!achievementId) return { error: '成就ID不能为空' };
+                    
+                    // 初始化成就系统
+                    if (!gs.achievements) gs.achievements = {};
+                    if (!gs.achievements[achievementId]) {
+                        gs.achievements[achievementId] = { unlocked: false, claimed: false };
+                    }
+                    gs.achievements[achievementId].unlocked = true;
+                    gs.achievements[achievementId].claimed = false;
+                    gs.achievements[achievementId].unlockedAt = Date.now();
+                    
+                    return {
+                        success: true,
+                        achievementId: achievementId,
+                        message: `已解锁成就: ${achievementId}`
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // GM: mcpGmReset - 重置玩家数据
+            mcpGmReset() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const gmState = this._initGmState();
+                    if (!gmState.enabled) return { error: 'GM模式未开启，请先调用 gm.toggle 开启' };
+                    
+                    // 保存GM状态
+                    const wasEnabled = gmState.enabled;
+                    
+                    // 重置游戏状态到初始值
+                    const initialState = {
+                        realm: 1,
+                        stage: 0,
+                        exp: 0,
+                        spiritStones: 0,
+                        spiritualEnergy: 100,
+                        inventory: [],
+                        achievements: {},
+                        sect: null,
+                        techniques: [],
+                        pets: [],
+                        equipment: {},
+                        currentDay: 1,
+                        totalCultivationTime: 0
+                    };
+                    
+                    // 合并初始状态但保留GM状态
+                    Object.assign(gs, initialState);
+                    gs.gm = { enabled: wasEnabled };
+                    
+                    return {
+                        success: true,
+                        message: '玩家数据已重置（GM模式保持开启）',
+                        resetFields: Object.keys(initialState)
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -20267,6 +20532,17 @@ const ACHIEVEMENT_ID_MAP = {
         window.openSerendipityPanel = openSerendipityPanel;
         window.toggleSerendipityNodeDetails = toggleSerendipityNodeDetails;
         window.executeSerendipityFromPanel = executeSerendipityFromPanel;
+
+        // GM mode toggle & callTool exposed to window for HTML onclick
+        window.toggleGmMode = function(enabled) {
+            window.callTool('gm.toggle', {enabled: enabled});
+            document.getElementById('gmPanel').style.display = enabled ? 'block' : 'none';
+        };
+        window.callTool = function(toolName, args) {
+            if (window.game && window.game.callTool) {
+                window.game.callTool(toolName, args || {});
+            }
+        };
 
         // ===== Direction C: Offline Persistence Layer =====
         // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
@@ -32755,6 +33031,266 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V138', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v138Results = runV138Tests();
+
+        // ===== GM Tools Tests (P-20260528-085) =====
+        function runGMTests() {
+            const results = [];
+            function gmAssert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                realm: 1,
+                stage: 0,
+                spiritStones: 0,
+                spiritualEnergy: 100,
+                inventory: [],
+                achievements: {},
+                exp: 0
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: gm.toggle enables GM mode
+            const toggleOn = server.mcpGmToggle(true);
+            gmAssert(toggleOn.success === true, 'gm.toggle enables GM mode');
+            gmAssert(toggleOn.enabled === true, 'gm.toggle returns enabled=true');
+            gmAssert(toggleOn.message === 'GM模式已开启', 'gm.toggle returns correct message');
+
+            // Test 2: gm.toggle disables GM mode
+            const toggleOff = server.mcpGmToggle(false);
+            gmAssert(toggleOff.success === true, 'gm.toggle disables GM mode');
+            gmAssert(toggleOff.enabled === false, 'gm.toggle returns enabled=false');
+            gmAssert(toggleOff.message === 'GM模式已关闭', 'gm.toggle returns correct disable message');
+
+            // Test 3: gm.addSpirit fails when GM is off
+            server.mcpGmToggle(false);
+            const addSpiritOff = server.mcpGmAddSpirit(1000);
+            gmAssert(addSpiritOff.error && addSpiritOff.error.includes('GM模式未开启'), 'gm.addSpirit fails when GM is off');
+
+            // Test 4: gm.addSpirit adds spirit stones when GM is on
+            server.mcpGmToggle(true);
+            mockGameState.spiritStones = 0;
+            const addSpirit1 = server.mcpGmAddSpirit(5000);
+            gmAssert(addSpirit1.success === true, 'gm.addSpirit succeeds when GM on');
+            gmAssert(addSpirit1.added === 5000, 'gm.addSpirit returns correct amount');
+            gmAssert(addSpirit1.total === 5000, 'gm.addSpirit updates total');
+            gmAssert(mockGameState.spiritStones === 5000, 'gm.addSpirit actually adds stones');
+
+            // Test 5: gm.addSpirit accumulates
+            const addSpirit2 = server.mcpGmAddSpirit(3000);
+            gmAssert(addSpirit2.total === 8000, 'gm.addSpirit accumulates correctly');
+
+            // Test 6: gm.addSpirit rejects invalid amount
+            const addSpiritBad = server.mcpGmAddSpirit(-100);
+            gmAssert(addSpiritBad.error && addSpiritBad.error.includes('无效的灵石数量'), 'gm.addSpirit rejects negative amount');
+
+            // Test 7: gm.setRealm fails when GM is off
+            server.mcpGmToggle(false);
+            const setRealmOff = server.mcpGmSetRealm(3);
+            gmAssert(setRealmOff.error && setRealmOff.error.includes('GM模式未开启'), 'gm.setRealm fails when GM is off');
+
+            // Test 8: gm.setRealm sets valid realm
+            server.mcpGmToggle(true);
+            const setRealm1 = server.mcpGmSetRealm(3);
+            gmAssert(setRealm1.success === true, 'gm.setRealm succeeds');
+            gmAssert(setRealm1.realmId === 3, 'gm.setRealm returns correct realmId');
+            gmAssert(setRealm1.realmName === '金丹期', 'gm.setRealm returns correct name');
+
+            // Test 9: gm.setRealm rejects invalid realm
+            const setRealmBad = server.mcpGmSetRealm(99);
+            gmAssert(setRealmBad.error && setRealmBad.error.includes('无效的境界ID'), 'gm.setRealm rejects invalid realm ID');
+
+            // Test 10: gm.setRealm rejects realm 0
+            const setRealmZero = server.mcpGmSetRealm(0);
+            gmAssert(setRealmZero.error && setRealmZero.error.includes('无效的境界ID'), 'gm.setRealm rejects realm 0');
+
+            // Test 11: gm.addItem fails when GM is off
+            server.mcpGmToggle(false);
+            const addItemOff = server.mcpGmAddItem('pill', 5);
+            gmAssert(addItemOff.error && addItemOff.error.includes('GM模式未开启'), 'gm.addItem fails when GM is off');
+
+            // Test 12: gm.addItem adds spiritStone item
+            server.mcpGmToggle(true);
+            mockGameState.inventory = [];
+            const addItem1 = server.mcpGmAddItem('spiritStone', 10);
+            gmAssert(addItem1.success === true, 'gm.addItem succeeds');
+            gmAssert(addItem1.item.name === '灵石', 'gm.addItem creates spiritStone item');
+            gmAssert(addItem1.item.type === 'currency', 'gm.addItem sets correct type');
+            gmAssert(addItem1.totalItems === 1, 'gm.addItem updates inventory count');
+
+            // Test 13: gm.addItem adds pill item
+            const addItem2 = server.mcpGmAddItem('pill', 3);
+            gmAssert(addItem2.success === true, 'gm.addItem pill succeeds');
+            gmAssert(addItem2.item.name === '筑基丹', 'gm.addItem creates pill item');
+            gmAssert(addItem2.item.quality === 'R', 'gm.addItem pill has R quality');
+
+            // Test 14: gm.addItem adds technique item
+            const addItem3 = server.mcpGmAddItem('technique', 1);
+            gmAssert(addItem3.success === true, 'gm.addItem technique succeeds');
+            gmAssert(addItem3.item.name === '青云诀', 'gm.addItem creates technique item');
+            gmAssert(addItem3.item.quality === 'SR', 'gm.addItem technique has SR quality');
+
+            // Test 15: gm.addItem adds equipment item
+            const addItem4 = server.mcpGmAddItem('equipment', 1);
+            gmAssert(addItem4.success === true, 'gm.addItem equipment succeeds');
+            gmAssert(addItem4.item.name === '精铁剑', 'gm.addItem creates equipment item');
+            gmAssert(addItem4.item.type === 'equipment', 'gm.addItem equipment has correct type');
+
+            // Test 16: gm.addItem defaults quantity to 1
+            const addItem5 = server.mcpGmAddItem('material');
+            gmAssert(addItem5.success === true, 'gm.addItem without quantity succeeds');
+            gmAssert(addItem5.item.quantity === 1, 'gm.addItem defaults quantity to 1');
+
+            // Test 17: gm.unlockAchievement fails when GM is off
+            server.mcpGmToggle(false);
+            const unlockOff = server.mcpGmUnlockAchievement('test_ach_1');
+            gmAssert(unlockOff.error && unlockOff.error.includes('GM模式未开启'), 'gm.unlockAchievement fails when GM is off');
+
+            // Test 18: gm.unlockAchievement unlocks achievement
+            server.mcpGmToggle(true);
+            mockGameState.achievements = {};
+            const unlock1 = server.mcpGmUnlockAchievement('first_realm');
+            gmAssert(unlock1.success === true, 'gm.unlockAchievement succeeds');
+            gmAssert(unlock1.achievementId === 'first_realm', 'gm.unlockAchievement returns correct ID');
+            gmAssert(mockGameState.achievements['first_realm'].unlocked === true, 'gm.unlockAchievement actually unlocks');
+
+            // Test 19: gm.unlockAchievement sets claimed=false
+            gmAssert(mockGameState.achievements['first_realm'].claimed === false, 'gm.unlockAchievement sets claimed=false');
+
+            // Test 20: gm.unlockAchievement rejects empty ID
+            const unlockBad = server.mcpGmUnlockAchievement('');
+            gmAssert(unlockBad.error && unlockBad.error.includes('成就ID不能为空'), 'gm.unlockAchievement rejects empty ID');
+
+            // Test 21: gm.reset fails when GM is off
+            server.mcpGmToggle(false);
+            const resetOff = server.mcpGmReset();
+            gmAssert(resetOff.error && resetOff.error.includes('GM模式未开启'), 'gm.reset fails when GM is off');
+
+            // Test 22: gm.reset resets player data
+            server.mcpGmToggle(true);
+            mockGameState.spiritStones = 99999;
+            mockGameState.realm = 8;
+            mockGameState.exp = 1000000;
+            mockGameState.inventory = [{ id: 'item1', name: '测试物品' }];
+            const reset1 = server.mcpGmReset();
+            gmAssert(reset1.success === true, 'gm.reset succeeds');
+            gmAssert(mockGameState.realm === 1, 'gm.reset resets realm to 1');
+            gmAssert(mockGameState.spiritStones === 0, 'gm.reset resets spiritStones to 0');
+            gmAssert(mockGameState.exp === 0, 'gm.reset resets exp to 0');
+            gmAssert(mockGameState.inventory.length === 0, 'gm.reset clears inventory');
+
+            // Test 23: gm.reset keeps GM mode enabled
+            gmAssert(mockGameState.gm.enabled === true, 'gm.reset keeps GM mode enabled');
+
+            // Test 24: _initGmState initializes gm state
+            const freshServer = new CultivationMCPServer();
+            delete mockGameState.gm;
+            const initResult = freshServer._initGmState();
+            gmAssert(initResult !== null, '_initGmState returns gm state');
+            gmAssert(initResult.enabled === false, '_initGmState defaults enabled to false');
+
+            // Test 25: gm.toggle works with undefined input (treated as false)
+            mockGameState.gm = { enabled: true };
+            const toggleUndefined = server.mcpGmToggle(undefined);
+            gmAssert(toggleUndefined.enabled === false, 'gm.toggle with undefined disables GM');
+
+            // Test 26: gm.addSpirit works with decimal
+            server.mcpGmToggle(true);
+            mockGameState.spiritStones = 0;
+            const addSpiritDec = server.mcpGmAddSpirit(100.5);
+            gmAssert(addSpiritDec.success === true, 'gm.addSpirit accepts decimal');
+
+            // Test 27: gm.addItem unknown type defaults to material
+            mockGameState.inventory = [];
+            const addItemUnknown = server.mcpGmAddItem('unknown_type');
+            gmAssert(addItemUnknown.success === true, 'gm.addItem unknown type succeeds');
+            gmAssert(addItemUnknown.item.name === '灵草', 'gm.addItem unknown type defaults to material');
+
+            // Test 28: gm.setRealm sets realmName correctly for realm 1
+            mockGameState.realm = 1;
+            const setRealm2 = server.mcpGmSetRealm(1);
+            gmAssert(setRealm2.realmId === 1, 'gm.setRealm sets realm 1');
+            gmAssert(setRealm2.realmName === '炼气期', 'gm.setRealm returns correct name for realm 1');
+
+            // Test 29: gm.setRealm sets realmName for realm 5
+            const setRealm5 = server.mcpGmSetRealm(5);
+            gmAssert(setRealm5.realmName === '化神期', 'gm.setRealm returns correct name for realm 5');
+
+            // Test 30: gm.unlockAchievement sets unlockedAt timestamp
+            mockGameState.achievements = {};
+            const unlock2 = server.mcpGmUnlockAchievement('test_timed');
+            gmAssert(unlock2.success === true, 'gm.unlockAchievement succeeds');
+            gmAssert(typeof mockGameState.achievements['test_timed'].unlockedAt === 'number', 'gm.unlockAchievement sets unlockedAt');
+
+            // Test 31: gm.reset preserves GM enabled after reset
+            mockGameState.gm = { enabled: true };
+            mockGameState.spiritStones = 500;
+            server.mcpGmReset();
+            gmAssert(mockGameState.gm.enabled === true, 'gm.reset preserves gm.enabled=true');
+
+            // Test 32: gm.reset with gm.enabled=false
+            mockGameState.gm = { enabled: false };
+            mockGameState.spiritStones = 500;
+            server.mcpGmReset();
+            gmAssert(mockGameState.gm.enabled === false, 'gm.reset preserves gm.enabled=false');
+
+            // Test 33: gm.addItem creates unique IDs
+            mockGameState.inventory = [];
+            const item1 = server.mcpGmAddItem('pill');
+            const item2 = server.mcpGmAddItem('pill');
+            gmAssert(item1.item.id !== item2.item.id, 'gm.addItem generates unique IDs');
+
+            // Test 34: Tools registered in toolRegistry
+            const toolsRegistered = server.toolRegistry.has('gm.toggle') &&
+                                   server.toolRegistry.has('gm.addSpirit') &&
+                                   server.toolRegistry.has('gm.setRealm') &&
+                                   server.toolRegistry.has('gm.addItem') &&
+                                   server.toolRegistry.has('gm.unlockAchievement') &&
+                                   server.toolRegistry.has('gm.reset');
+            gmAssert(toolsRegistered === true, 'All GM tools registered in toolRegistry');
+
+            // Test 35: callTool dispatches gm.toggle correctly
+            const callToggle = server.callTool('gm.toggle', { enabled: true });
+            const toggleResult = JSON.parse(callToggle.content[0].text);
+            gmAssert(toggleResult.success === true, 'callTool gm.toggle works');
+
+            // Test 36: callTool dispatches gm.addSpirit correctly
+            mockGameState.spiritStones = 0;
+            const callSpirit = server.callTool('gm.addSpirit', { amount: 2500 });
+            const spiritResult = JSON.parse(callSpirit.content[0].text);
+            gmAssert(spiritResult.success === true, 'callTool gm.addSpirit works');
+            gmAssert(spiritResult.total === 2500, 'callTool gm.addSpirit returns correct total');
+
+            // Test 37: gm.addSpirit handles string number
+            const addSpiritStr = server.mcpGmAddSpirit('500');
+            gmAssert(addSpiritStr.success === true, 'gm.addSpirit handles string number');
+
+            // Test 38: gm.setRealm handles string realmId
+            const setRealmStr = server.mcpGmSetRealm('4');
+            gmAssert(setRealmStr.success === true, 'gm.setRealm handles string realmId');
+
+            // Test 39: gm.addItem quantity is floored
+            mockGameState.inventory = [];
+            const addItemFloor = server.mcpGmAddItem('pill', 3.7);
+            gmAssert(addItemFloor.item.quantity === 3, 'gm.addItem floors quantity to 3');
+
+            // Test 40: gm.reset returns resetFields
+            mockGameState.gm = { enabled: true };
+            const resetResult = server.mcpGmReset();
+            gmAssert(Array.isArray(resetResult.resetFields), 'gm.reset returns resetFields array');
+            gmAssert(resetResult.resetFields.includes('realm'), 'gm.reset includes realm in resetFields');
+            gmAssert(resetResult.resetFields.includes('spiritStones'), 'gm.reset includes spiritStones in resetFields');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('GM Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'GM', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const gmResults = runGMTests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {

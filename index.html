@@ -4190,6 +4190,16 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div class="feature-toggle" style="background:#2a1a1a;border:1px solid #c00;border-radius:8px;padding:12px;margin-top:12px;">
+                            <div class="feature-info">
+                                <div class="feature-name" style="color:#ff6b6b;">🔧 GM模式</div>
+                                <div class="feature-desc">开发者模式：可添加灵石、设置境界、添加物品等</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="gmToggle" onchange="window.toggleGmMode(this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
                     <!-- 关于 -->
                     <div id="settingsAbout" class="settings-section">
@@ -4306,6 +4316,53 @@
             </div>
             <button class="close-btn" onclick="closeSettings()">关闭</button>
         </div>
+    </div>
+
+    <div id="gmPanel" style="display:none;position:fixed;top:60px;right:20px;width:280px;background:linear-gradient(135deg,#1a0a0a 0%,#2d1a1a 100%);border:2px solid #c00;border-radius:12px;padding:16px;z-index:1001;box-shadow:0 8px 32px rgba(200,0,0,0.3);">
+        <h4 style="color:#ff6b6b;margin:0 0 12px 0;font-size:14px;">🔧 GM控制面板</h4>
+        <div style="margin-bottom:10px;">
+            <label style="color:#aaa;font-size:12px;">灵石</label>
+            <div style="display:flex;gap:6px;">
+                <input type="number" id="gmSpiritInput" placeholder="数量" style="flex:1;padding:6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
+                <button onclick="window.callTool('gm.addSpirit',{amount:parseInt(document.getElementById('gmSpiritInput').value)||0})" style="padding:6px 10px;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">+</button>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="color:#aaa;font-size:12px;">境界</label>
+            <div style="display:flex;gap:6px;">
+                <select id="gmRealmSelect" style="flex:1;padding:6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
+                    <option value="1">炼气期</option>
+                    <option value="2">筑基期</option>
+                    <option value="3">金丹期</option>
+                    <option value="4">元婴期</option>
+                    <option value="5">化神期</option>
+                    <option value="6">炼虚期</option>
+                    <option value="7">合体期</option>
+                    <option value="8">大乘期</option>
+                    <option value="9">渡劫期</option>
+                    <option value="10">地仙境</option>
+                    <option value="11">天仙境</option>
+                    <option value="12">金仙境</option>
+                </select>
+                <button onclick="window.callTool('gm.setRealm',{realmId:parseInt(document.getElementById('gmRealmSelect').value)})" style="padding:6px 10px;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">设</button>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="color:#aaa;font-size:12px;">物品</label>
+            <div style="display:flex;gap:6px;">
+                <input type="text" id="gmItemInput" placeholder="类型" style="flex:1;padding:6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
+                <input type="number" id="gmItemQty" placeholder="数量" value="1" style="width:60px;padding:6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
+                <button onclick="window.callTool('gm.addItem',{itemType:document.getElementById('gmItemInput').value,quantity:parseInt(document.getElementById('gmItemQty').value)||1})" style="padding:6px 10px;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">+</button>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="color:#aaa;font-size:12px;">成就ID</label>
+            <div style="display:flex;gap:6px;">
+                <input type="text" id="gmAchInput" placeholder="成就ID" style="flex:1;padding:6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:13px;">
+                <button onclick="window.callTool('gm.unlockAchievement',{achievementId:document.getElementById('gmAchInput').value})" style="padding:6px 10px;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">解</button>
+            </div>
+        </div>
+        <button onclick="if(confirm('确定重置所有数据？'))window.callTool('gm.reset',{})" style="width:100%;padding:8px;background:#333;color:#ff6b6b;border:1px solid #c00;border-radius:6px;cursor:pointer;font-size:13px;">🔄 重置数据</button>
     </div>
 
     <script src="./game.js"></script>
