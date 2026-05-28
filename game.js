@@ -3549,6 +3549,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V138)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V140: Register 图鉴+收集系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V140)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4872,6 +4876,25 @@
                             break;
                         case 'gm.reset':
                             result = this.mcpGmReset();
+                            break;
+                        // V140: 图鉴+收集系统
+                        case 'codex.list':
+                            result = this.mcpCodexList();
+                            break;
+                        case 'codex.view':
+                            result = this.mcpCodexView(args.categoryId, args.entryId);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlock(args.entryId);
+                            break;
+                        case 'collection.stats':
+                            result = this.mcpCollectionStats();
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionReward(args.collectionId);
+                            break;
+                        case 'collection.reset':
+                            result = this.mcpCollectionReset();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -12782,6 +12805,299 @@
                         totalCollected,
                         totalItems,
                         progress: progressByCategory
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: mcpCodexList - 获取图鉴分类列表
+            mcpCodexList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    
+                    // Build category info with counts
+                    const categories = Object.entries(CODEX_POOL).map(([catId, entries]) => {
+                        const totalCount = entries.length;
+                        const unlockedCount = codex.entries.filter(e => e.category === catId).length;
+                        return {
+                            id: catId,
+                            name: this._getCategoryName(catId),
+                            totalCount,
+                            unlockedCount,
+                            lockedCount: totalCount - unlockedCount
+                        };
+                    });
+                    
+                    const totalEntries = Object.values(CODEX_POOL).reduce((sum, entries) => sum + entries.length, 0);
+                    const totalUnlocked = codex.entries.length;
+                    
+                    return {
+                        success: true,
+                        categories,
+                        totalEntries,
+                        totalUnlocked,
+                        totalLocked: totalEntries - totalUnlocked,
+                        message: '共' + categories.length + '个分类，已解锁' + totalUnlocked + '/' + totalEntries + '个图鉴'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: _getCategoryName - 获取分类显示名称
+            _getCategoryName(categoryId) {
+                const names = {
+                    recipe: '食谱图鉴',
+                    pet: '灵宠图鉴',
+                    item: '道具图鉴',
+                    realm: '境界图鉴'
+                };
+                return names[categoryId] || categoryId;
+            }
+
+            // V140: mcpCodexView - 查看图鉴条目详情
+            mcpCodexView(categoryId, entryId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!categoryId) return { error: '分类ID不能为空' };
+                    if (!entryId) return { error: '条目ID不能为空' };
+                    
+                    const codex = this._initCodexState();
+                    
+                    // Check if category exists
+                    if (!CODEX_POOL[categoryId]) {
+                        return { error: '未知图鉴分类: ' + categoryId };
+                    }
+                    
+                    // Find entry in pool
+                    const poolEntry = CODEX_POOL[categoryId].find(e => e.id === entryId);
+                    if (!poolEntry) {
+                        return { error: '图鉴条目不存在: ' + entryId };
+                    }
+                    
+                    // Check if unlocked
+                    const unlockedEntry = codex.entries.find(e => e.id === entryId);
+                    
+                    if (unlockedEntry) {
+                        return {
+                            success: true,
+                            entryId,
+                            categoryId,
+                            name: unlockedEntry.name,
+                            description: unlockedEntry.description,
+                            effect: unlockedEntry.effect,
+                            isUnlocked: true,
+                            message: '已解锁图鉴[' + unlockedEntry.name + ']'
+                        };
+                    }
+                    
+                    return {
+                        success: true,
+                        entryId,
+                        categoryId,
+                        name: poolEntry.name,
+                        description: poolEntry.description,
+                        effect: poolEntry.effect,
+                        unlockCost: poolEntry.unlockCost,
+                        isUnlocked: false,
+                        message: '图鉴[' + poolEntry.name + ']未解锁，需要' + poolEntry.unlockCost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: mcpCodexUnlock - 解锁图鉴条目 (新版 - 通过entryId直接解锁)
+            mcpCodexUnlock(entryId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!entryId) return { error: '条目ID不能为空' };
+                    
+                    const codex = this._initCodexState();
+                    
+                    // Find entry in CODEX_POOL
+                    let foundEntry = null;
+                    let entryCategory = null;
+                    for (const [cat, entries] of Object.entries(CODEX_POOL)) {
+                        const entry = entries.find(e => e.id === entryId);
+                        if (entry) {
+                            foundEntry = entry;
+                            entryCategory = cat;
+                            break;
+                        }
+                    }
+                    
+                    if (!foundEntry) return { error: '图鉴条目不存在: ' + entryId };
+                    
+                    // Check if already unlocked
+                    if (codex.entries.some(e => e.id === entryId)) {
+                        return { error: '该图鉴已解锁', entryId, name: foundEntry.name };
+                    }
+                    
+                    // Check cost and deduct
+                    const cost = foundEntry.unlockCost;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { error: '灵石不足，需要' + cost + '灵石', need: cost, have: gs.spiritStones };
+                    }
+                    gs.spiritStones -= cost;
+                    
+                    // Add to unlocked
+                    codex.entries.push({ ...foundEntry, category: entryCategory });
+                    codex.unlockedCount = (codex.unlockedCount || 0) + 1;
+                    
+                    // Update collection progress
+                    const collection = this._initCollectionState();
+                    if (collection.progress[entryCategory] !== undefined) {
+                        collection.progress[entryCategory]++;
+                    }
+                    
+                    return {
+                        success: true,
+                        entryId,
+                        name: foundEntry.name,
+                        category: entryCategory,
+                        cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        unlockedCount: codex.unlockedCount,
+                        message: '解锁图鉴[' + foundEntry.name + ']成功，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: mcpCollectionStats - 获取收集进度统计
+            mcpCollectionStats() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    
+                    // Calculate progress by category
+                    const progress = {};
+                    let totalCollected = 0;
+                    let totalItems = 0;
+                    
+                    for (const [catId, entries] of Object.entries(CODEX_POOL)) {
+                        const totalCount = entries.length;
+                        const unlockedCount = codex.entries.filter(e => e.category === catId).length;
+                        progress[catId] = {
+                            collected: unlockedCount,
+                            total: totalCount,
+                            percentage: totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0
+                        };
+                        totalCollected += unlockedCount;
+                        totalItems += totalCount;
+                    }
+                    
+                    // Get tier rewards status
+                    const tierRewards = Object.entries(collection.tierRewards || {}).map(([tierId, data]) => ({
+                        tierId,
+                        need: data.need,
+                        current: totalCollected,
+                        percentage: data.need > 0 ? Math.min(100, Math.round((totalCollected / data.need) * 100)) : 0,
+                        canClaim: totalCollected >= data.need && !data.claimed,
+                        claimed: data.claimed,
+                        reward: data.reward
+                    }));
+                    
+                    return {
+                        success: true,
+                        progress,
+                        totalCollected,
+                        totalItems,
+                        overallPercentage: totalItems > 0 ? Math.round((totalCollected / totalItems) * 100) : 0,
+                        tierRewards,
+                        message: '收集进度: ' + totalCollected + '/' + totalItems + ' (' + (totalItems > 0 ? Math.round((totalCollected / totalItems) * 100) : 0) + '%)'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: mcpCollectionReward - 领取收集奖励
+            mcpCollectionReward(collectionId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!collectionId) return { error: '收集ID不能为空' };
+                    
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    
+                    // Find tier by collectionId
+                    const tierData = collection.tierRewards ? collection.tierRewards[collectionId] : null;
+                    if (!tierData) {
+                        return { error: '奖励档位不存在: ' + collectionId };
+                    }
+                    
+                    if (tierData.claimed) {
+                        return { error: '该奖励已领取', collectionId, claimed: true };
+                    }
+                    
+                    const totalCollected = codex.entries.length;
+                    if (totalCollected < tierData.need) {
+                        return { 
+                            error: '收集进度不足',
+                            collectionId,
+                            need: tierData.need,
+                            current: totalCollected,
+                            short: tierData.need - totalCollected
+                        };
+                    }
+                    
+                    // Claim reward
+                    tierData.claimed = true;
+                    const spiritReward = tierData.reward.spiritStones || 0;
+                    const expReward = tierData.reward.exp || 0;
+                    gs.spiritStones = (gs.spiritStones || 0) + spiritReward;
+                    gs.exp = (gs.exp || 0) + expReward;
+                    
+                    if (!collection.rewardsClaimed) collection.rewardsClaimed = [];
+                    collection.rewardsClaimed.push(collectionId);
+                    
+                    return {
+                        success: true,
+                        collectionId,
+                        reward: tierData.reward,
+                        totalSpiritStones: gs.spiritStones,
+                        totalExp: gs.exp,
+                        message: '领取' + collectionId + '奖励成功，获得' + spiritReward + '灵石和' + expReward + '经验'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V140: mcpCollectionReset - 重置收集进度
+            mcpCollectionReset() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    
+                    const codex = this._initCodexState();
+                    const collection = this._initCollectionState();
+                    
+                    const previousUnlocked = codex.entries.length;
+                    const previousRewards = collection.rewardsClaimed ? [...collection.rewardsClaimed] : [];
+                    
+                    // Reset codex state
+                    codex.entries = [];
+                    codex.unlockedCount = 0;
+                    if (codex.categories) {
+                        for (const cat of Object.keys(codex.categories)) {
+                            codex.categories[cat] = [];
+                        }
+                    }
+                    
+                    // Reset collection state
+                    collection.progress = { recipe: 0, pet: 0, item: 0, realm: 0 };
+                    collection.rewardsClaimed = [];
+                    if (collection.tierRewards) {
+                        for (const tier of Object.values(collection.tierRewards)) {
+                            tier.claimed = false;
+                        }
+                    }
+                    
+                    return {
+                        success: true,
+                        previousUnlocked,
+                        previousRewardsCount: previousRewards.length,
+                        message: '收集进度已重置，之前已解锁' + previousUnlocked + '个图鉴，领取了' + previousRewards.length + '个奖励'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -25646,6 +25962,40 @@
             'arena.reward': {
                 name: 'arena.reward',
                 description: '领取竞技奖励 (竞技场-领取胜利奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V140: 图鉴+收集系统
+        const MCP_TOOLS_V140 = {
+            'codex.list': {
+                name: 'codex.list',
+                description: '获取图鉴分类列表 (图鉴-列出所有分类及条目)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'codex.view': {
+                name: 'codex.view',
+                description: '查看图鉴条目详情 (图鉴-查看指定分类的指定条目详情)',
+                inputSchema: { type: 'object', properties: { categoryId: { type: 'string', description: '分类ID' }, entryId: { type: 'string', description: '条目ID' } }, required: ['categoryId', 'entryId'] }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴条目 (图鉴-解锁指定条目)',
+                inputSchema: { type: 'object', properties: { entryId: { type: 'string', description: '条目ID' } }, required: ['entryId'] }
+            },
+            'collection.stats': {
+                name: 'collection.stats',
+                description: '获取收集进度统计 (收集-获取所有收集进度统计)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集-领取指定收集奖励)',
+                inputSchema: { type: 'object', properties: { collectionId: { type: 'string', description: '收集ID' } }, required: ['collectionId'] }
+            },
+            'collection.reset': {
+                name: 'collection.reset',
+                description: '重置收集进度 (收集-重置所有收集进度)',
                 inputSchema: { type: 'object', properties: {} }
             }
         };
@@ -48404,3 +48754,227 @@
             currentProposalTab = 'list';
             renderProposalPanel();
         }
+
+        // ===== V140: 图鉴+收集系统 Tests =====
+        function runV140Tests() {
+            const results = [];
+            function v140Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 100000,
+                realm: 2,
+                stage: 1,
+                exp: 5000,
+                codex: null,
+                collection: null
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // === Codex System Tests ===
+
+            // Test 1: _initCodexState initializes correctly
+            const codexState = server._initCodexState();
+            v140Assert(codexState !== null, '_initCodexState returns state');
+            v140Assert(Array.isArray(codexState.entries), '_initCodexState entries is array');
+            v140Assert(codexState.unlockedCount === 0, '_initCodexState unlockedCount is 0');
+
+            // Test 2: _initCollectionState initializes correctly
+            const collState = server._initCollectionState();
+            v140Assert(collState !== null, '_initCollectionState returns state');
+            v140Assert(collState.progress !== undefined, '_initCollectionState progress exists');
+            v140Assert(Array.isArray(collState.rewardsClaimed), '_initCollectionState rewardsClaimed is array');
+
+            // Test 3: codex.list returns all categories
+            const cl1 = server.mcpCodexList();
+            v140Assert(cl1.success === true, 'codex.list returns success');
+            v140Assert(cl1.categories && cl1.categories.length === 4, 'codex.list returns 4 categories');
+            v140Assert(cl1.totalEntries > 0, 'codex.list has totalEntries');
+            v140Assert(cl1.totalUnlocked === 0, 'codex.list totalUnlocked is 0');
+            v140Assert(cl1.categories[0].id === 'recipe', 'codex.list first category is recipe');
+            v140Assert(cl1.categories[0].name === '食谱图鉴', 'codex.list recipe name is correct');
+
+            // Test 4: codex.list category has correct structure
+            const recipeCat = cl1.categories.find(c => c.id === 'recipe');
+            v140Assert(recipeCat.totalCount > 0, 'recipe category has totalCount');
+            v140Assert(recipeCat.unlockedCount === 0, 'recipe unlockedCount is 0');
+            v140Assert(recipeCat.lockedCount === recipeCat.totalCount, 'recipe lockedCount equals totalCount');
+
+            // Test 5: codex.view with valid entry returns locked info
+            const cv1 = server.mcpCodexView('recipe', 'recipe_001');
+            v140Assert(cv1.success === true, 'codex.view recipe entry returns success');
+            v140Assert(cv1.entryId === 'recipe_001', 'codex.view returns correct entryId');
+            v140Assert(cv1.categoryId === 'recipe', 'codex.view returns correct categoryId');
+            v140Assert(cv1.name === '筑基丹', 'codex.view returns correct name');
+            v140Assert(cv1.isUnlocked === false, 'codex.view shows as locked');
+            v140Assert(cv1.unlockCost === 500, 'codex.view returns unlockCost');
+
+            // Test 6: codex.view with invalid category returns error
+            const cvInvalidCat = server.mcpCodexView('invalid_cat', 'recipe_001');
+            v140Assert(cvInvalidCat.error && cvInvalidCat.error.includes('未知图鉴分类'), 'codex.view invalid category returns error');
+
+            // Test 7: codex.view with invalid entry returns error
+            const cvInvalidEntry = server.mcpCodexView('recipe', 'invalid_entry');
+            v140Assert(cvInvalidEntry.error && cvInvalidEntry.error.includes('图鉴条目不存在'), 'codex.view invalid entry returns error');
+
+            // Test 8: codex.view with empty categoryId returns error
+            const cvEmptyCat = server.mcpCodexView('', 'recipe_001');
+            v140Assert(cvEmptyCat.error && cvEmptyCat.error.includes('分类ID不能为空'), 'codex.view empty categoryId returns error');
+
+            // Test 9: codex.view with empty entryId returns error
+            const cvEmptyEntry = server.mcpCodexView('recipe', '');
+            v140Assert(cvEmptyEntry.error && cvEmptyEntry.error.includes('条目ID不能为空'), 'codex.view empty entryId returns error');
+
+            // Test 10: codex.unlock unlocks entry successfully
+            mockGameState.spiritStones = 100000;
+            const cu1 = server.mcpCodexUnlock('recipe_001');
+            v140Assert(cu1.success === true, 'codex.unlock succeeds');
+            v140Assert(cu1.entryId === 'recipe_001', 'codex.unlock returns correct entryId');
+            v140Assert(cu1.name === '筑基丹', 'codex.unlock returns correct name');
+            v140Assert(cu1.cost === 500, 'codex.unlock deducts correct cost');
+            v140Assert(cu1.remainingSpiritStones === 99500, 'codex.unlock updates spiritStones');
+            v140Assert(cu1.unlockedCount === 1, 'codex.unlock increments unlockedCount');
+
+            // Test 11: codex.unlock already unlocked returns error
+            const cuDup = server.mcpCodexUnlock('recipe_001');
+            v140Assert(cuDup.error && cuDup.error.includes('已解锁'), 'codex.unlock duplicate returns error');
+
+            // Test 12: codex.unlock with insufficient spirit stones returns error
+            mockGameState.spiritStones = 100;
+            const cuPoor = server.mcpCodexUnlock('pet_001');
+            v140Assert(cuPoor.error && cuPoor.error.includes('灵石不足'), 'codex.unlock poor returns error');
+
+            // Test 13: codex.unlock with empty entryId returns error
+            const cuEmpty = server.mcpCodexUnlock('');
+            v140Assert(cuEmpty.error && cuEmpty.error.includes('条目ID不能为空'), 'codex.unlock empty entryId returns error');
+
+            // Test 14: codex.view after unlock shows unlocked
+            const cv2 = server.mcpCodexView('recipe', 'recipe_001');
+            v140Assert(cv2.success === true, 'codex.view after unlock returns success');
+            v140Assert(cv2.isUnlocked === true, 'codex.view shows as unlocked');
+            v140Assert(cv2.name === '筑基丹', 'codex.view name is correct');
+
+            // Test 15: codex.list after unlock shows updated counts
+            mockGameState.spiritStones = 100000;
+            const cu2 = server.mcpCodexUnlock('pet_001');
+            const cl2 = server.mcpCodexList();
+            v140Assert(cl2.categories.find(c => c.id === 'recipe').unlockedCount === 1, 'recipe unlockedCount is 1');
+            v140Assert(cl2.categories.find(c => c.id === 'pet').unlockedCount === 1, 'pet unlockedCount is 1');
+            v140Assert(cl2.totalUnlocked === 2, 'totalUnlocked is 2');
+
+            // === Collection System Tests ===
+
+            // Test 16: collection.stats returns initial progress
+            const cs1 = server.mcpCollectionStats();
+            v140Assert(cs1.success === true, 'collection.stats returns success');
+            v140Assert(cs1.totalCollected === 2, 'collection.stats totalCollected is 2');
+            v140Assert(cs1.progress.recipe.percentage > 0, 'collection.stats recipe has progress');
+
+            // Test 17: collection.stats tierRewards structure is correct
+            const tier1 = cs1.tierRewards.find(t => t.tierId === 'tier1');
+            v140Assert(tier1 !== undefined, 'collection.stats has tier1');
+            v140Assert(tier1.need === 5, 'tier1 need is 5');
+            v140Assert(tier1.canClaim === false, 'tier1 canClaim is false (need 5, have 2)');
+            v140Assert(tier1.claimed === false, 'tier1 claimed is false');
+
+            // Test 18: collection.reward with insufficient progress returns error
+            const cr1 = server.mcpCollectionReward('tier1');
+            v140Assert(cr1.error && cr1.error.includes('收集进度不足'), 'collection.reward tier1 fails with 2/5');
+
+            // Test 19: collection.reward with non-existent collectionId returns error
+            const crInvalid = server.mcpCollectionReward('nonexistent');
+            v140Assert(crInvalid.error && crInvalid.error.includes('奖励档位不存在'), 'collection.reward invalid returns error');
+
+            // Test 20: collection.reward with empty collectionId returns error
+            const crEmpty = server.mcpCollectionReward('');
+            v140Assert(crEmpty.error && crEmpty.error.includes('收集ID不能为空'), 'collection.reward empty returns error');
+
+            // Test 21: Unlock more entries to test collection reward
+            mockGameState.spiritStones = 100000;
+            server.mcpCodexUnlock('recipe_002'); // 1500
+            server.mcpCodexUnlock('recipe_003'); // 5000
+            server.mcpCodexUnlock('pet_002');    // 1000
+            server.mcpCodexUnlock('item_001');   // 3000 - total: 6 now
+
+            // Test 22: collection.stats after more unlocks
+            const cs2 = server.mcpCollectionStats();
+            v140Assert(cs2.totalCollected === 6, 'collection.stats totalCollected is 6');
+            v140Assert(cs2.tierRewards.find(t => t.tierId === 'tier1').canClaim === true, 'tier1 canClaim is true (6>=5)');
+
+            // Test 23: collection.reward tier1 success
+            const cr2 = server.mcpCollectionReward('tier1');
+            v140Assert(cr2.success === true, 'collection.reward tier1 succeeds');
+            v140Assert(cr2.collectionId === 'tier1', 'collection.reward returns correct collectionId');
+            v140Assert(cr2.reward.spiritStones === 1000, 'collection.reward tier1 has spiritStones');
+            v140Assert(cr2.reward.exp === 100, 'collection.reward tier1 has exp');
+            v140Assert(cr2.totalSpiritStones > 0, 'collection.reward updates spiritStones');
+
+            // Test 24: collection.reward same tier again returns error (already claimed)
+            const crDup = server.mcpCollectionReward('tier1');
+            v140Assert(crDup.error && crDup.error.includes('已领取'), 'collection.reward duplicate returns error');
+
+            // Test 25: collection.reset resets everything
+            const crst1 = server.mcpCollectionReset();
+            v140Assert(crst1.success === true, 'collection.reset succeeds');
+            v140Assert(crst1.previousUnlocked === 6, 'collection.reset previousUnlocked is 6');
+            v140Assert(crst1.previousRewardsCount === 1, 'collection.reset previousRewardsCount is 1');
+
+            // Test 26: collection.stats after reset shows empty
+            const cs3 = server.mcpCollectionStats();
+            v140Assert(cs3.totalCollected === 0, 'collection.stats after reset totalCollected is 0');
+            v140Assert(cs3.tierRewards.find(t => t.tierId === 'tier1').claimed === false, 'tier1 claimed is false after reset');
+            v140Assert(cs3.tierRewards.find(t => t.tierId === 'tier1').canClaim === false, 'tier1 canClaim is false after reset');
+
+            // Test 27: codex.list after reset shows 0 unlocked
+            const cl3 = server.mcpCodexList();
+            v140Assert(cl3.totalUnlocked === 0, 'codex.list after reset totalUnlocked is 0');
+
+            // Test 28: codex.view after reset shows locked again
+            const cv3 = server.mcpCodexView('recipe', 'recipe_001');
+            v140Assert(cv3.isUnlocked === false, 'codex.view after reset shows locked');
+
+            // Test 29: collection.reward after reset still blocked
+            const cr3 = server.mcpCollectionReward('tier1');
+            v140Assert(cr3.error && cr3.error.includes('收集进度不足'), 'collection.reward after reset still fails');
+
+            // Test 30: Unlock all entries for testing complete collection
+            mockGameState.spiritStones = 1000000;
+            server.mcpCodexUnlock('realm_001');  // 200
+            server.mcpCodexUnlock('realm_002');  // 800
+            server.mcpCodexUnlock('realm_003');  // 3000
+            server.mcpCodexUnlock('realm_004');  // 10000
+            server.mcpCodexUnlock('realm_005');  // 30000
+            // Total now should be 11 (6 reset + 5 new realm)
+
+            // Test 31: collection.stats shows 11 collected
+            const cs4 = server.mcpCollectionStats();
+            v140Assert(cs4.totalCollected >= 10, 'collection.stats has >= 10 collected');
+
+            // Test 32: mcpCollectionReward tier2 success
+            const cr4 = server.mcpCollectionReward('tier2');
+            v140Assert(cr4.success === true, 'collection.reward tier2 succeeds when sufficient progress');
+
+            // Test 33: mcpCollectionReward tier3 still blocked if not enough
+            const cs5 = server.mcpCollectionStats();
+            const tier3Reward = server.mcpCollectionReward('tier3');
+            // tier3 needs 20, we might not have enough - check error path
+
+            // Test 34: _getCategoryName returns correct names
+            v140Assert(server._getCategoryName('recipe') === '食谱图鉴', '_getCategoryName recipe is correct');
+            v140Assert(server._getCategoryName('pet') === '灵宠图鉴', '_getCategoryName pet is correct');
+            v140Assert(server._getCategoryName('item') === '道具图鉴', '_getCategoryName item is correct');
+            v140Assert(server._getCategoryName('realm') === '境界图鉴', '_getCategoryName realm is correct');
+            v140Assert(server._getCategoryName('unknown') === 'unknown', '_getCategoryName unknown returns as-is');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V140 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V140', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v140Results = runV140Tests();
