@@ -5399,6 +5399,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V137)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V138: Register 排行榜+竞技系统 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V138)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6685,6 +6689,24 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'badge.unequip':
                             result = this.mcpBadgeUnequip();
+                            break;
+                        case 'rank.list':
+                            result = this.mcpRankList();
+                            break;
+                        case 'rank.query':
+                            result = this.mcpRankQuery(args.rankType);
+                            break;
+                        case 'rank.reward':
+                            result = this.mcpRankReward(args.rankType);
+                            break;
+                        case 'arena.match':
+                            result = this.mcpArenaMatch();
+                            break;
+                        case 'arena.fight':
+                            result = this.mcpArenaFight();
+                            break;
+                        case 'arena.reward':
+                            result = this.mcpArenaReward();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -18486,6 +18508,309 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V138: _initRankState - 初始化排行榜状态
+            _initRankState() {
+                const gs = window.gameState;
+                if (!gs.rank) {
+                    gs.rank = {
+                        leaderboards: {
+                            realm: { // 境界排行榜
+                                entries: [],
+                                updatedAt: null
+                            },
+                            wealth: { // 财富排行榜
+                                entries: [],
+                                updatedAt: null
+                            },
+                            badge: { // 徽章排行榜
+                                entries: [],
+                                updatedAt: null
+                            }
+                        },
+                        rewardsClaimed: {
+                            realm: false,
+                            wealth: false,
+                            badge: false
+                        }
+                    };
+                }
+                return gs.rank;
+            }
+
+            // V138: _initArenaState - 初始化竞技场状态
+            _initArenaState() {
+                const gs = window.gameState;
+                if (!gs.arena) {
+                    gs.arena = {
+                        status: 'idle', // idle|matching|matched|fighting|finished
+                        opponent: null,
+                        matchTime: null,
+                        fightResult: null,
+                        rewardClaimed: false
+                    };
+                }
+                return gs.arena;
+            }
+
+            // V138: _generateMockLeaderboard - 生成模拟排行榜数据
+            _generateMockLeaderboard(rankType, playerRealm) {
+                const mockNames = ['天剑子', '青云子', '玄清子', '玉清子', '紫霄子', '太虚子', '神农药师', '苍穹子', '星河子', '幽冥子'];
+                const entries = [];
+                for (let i = 0; i < 10; i++) {
+                    let score, name;
+                    switch(rankType) {
+                        case 'realm':
+                            score = 5 - i; // 境界等级 0-5
+                            name = mockNames[i];
+                            break;
+                        case 'wealth':
+                            score = (10 - i) * 10000; // 灵石数量
+                            name = mockNames[i];
+                            break;
+                        case 'badge':
+                            score = 5 - i; // 徽章分数
+                            name = mockNames[i];
+                            break;
+                        default:
+                            score = 0;
+                            name = 'Unknown';
+                    }
+                    entries.push({ rank: i + 1, name, score });
+                }
+                return entries;
+            }
+
+            // V138: mcpRankList - 获取排行榜列表
+            mcpRankList() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankState = this._initRankState();
+                    // 生成或更新各榜数据
+                    const playerRealm = gs.realm || 0;
+                    const playerWealth = gs.spiritStones || 0;
+                    const playerBadgeScore = (gs.badge && gs.badge.equippedBadges) ? gs.badge.equippedBadges.length * 10 : 0;
+                    
+                    // 更新各榜
+                    const realmBoard = rankState.leaderboards.realm;
+                    const wealthBoard = rankState.leaderboards.wealth;
+                    const badgeBoard = rankState.leaderboards.badge;
+                    
+                    // 生成mock数据
+                    realmBoard.entries = this._generateMockLeaderboard('realm', playerRealm);
+                    realmBoard.updatedAt = Date.now();
+                    
+                    wealthBoard.entries = this._generateMockLeaderboard('wealth', playerWealth);
+                    wealthBoard.updatedAt = Date.now();
+                    
+                    badgeBoard.entries = this._generateMockLeaderboard('badge', playerBadgeScore);
+                    badgeBoard.updatedAt = Date.now();
+                    
+                    return {
+                        success: true,
+                        leaderboards: {
+                            realm: { name: '境界榜', entries: realmBoard.entries },
+                            wealth: { name: '财富榜', entries: wealthBoard.entries },
+                            badge: { name: '徽章榜', entries: badgeBoard.entries }
+                        },
+                        message: '获取排行榜列表成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V138: mcpRankQuery - 查询排名
+            mcpRankQuery(rankType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['realm', 'wealth', 'badge'].includes(rankType)) {
+                        return { error: '无效的排行榜类型: ' + rankType };
+                    }
+                    const rankState = this._initRankState();
+                    let playerScore, boardName;
+                    switch(rankType) {
+                        case 'realm':
+                            playerScore = gs.realm || 0;
+                            boardName = '境界榜';
+                            break;
+                        case 'wealth':
+                            playerScore = gs.spiritStones || 0;
+                            boardName = '财富榜';
+                            break;
+                        case 'badge':
+                            playerScore = (gs.badge && gs.badge.equippedBadges) ? gs.badge.equippedBadges.length * 10 : 0;
+                            boardName = '徽章榜';
+                            break;
+                    }
+                    // 计算排名(简单模拟)
+                    let rank = 0;
+                    const entries = rankState.leaderboards[rankType].entries || [];
+                    if (entries.length > 0) {
+                        for (let i = 0; i < entries.length; i++) {
+                            if (entries[i].score >= playerScore) {
+                                rank = entries[i].rank;
+                                break;
+                            }
+                        }
+                        if (rank === 0) rank = entries.length + 1;
+                    } else {
+                        rank = 1;
+                    }
+                    return {
+                        success: true,
+                        rankType,
+                        boardName,
+                        playerRank: rank,
+                        playerScore,
+                        message: '查询排名成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V138: mcpRankReward - 领取排名奖励
+            mcpRankReward(rankType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!['realm', 'wealth', 'badge'].includes(rankType)) {
+                        return { error: '无效的排行榜类型: ' + rankType };
+                    }
+                    const rankState = this._initRankState();
+                    if (rankState.rewardsClaimed[rankType]) {
+                        return { error: '排名奖励已领取' };
+                    }
+                    // 根据排名给予奖励(默认第10名奖励)
+                    const rewards = {
+                        realm: { spiritStones: 500, exp: 200 },
+                        wealth: { spiritStones: 1000, exp: 100 },
+                        badge: { spiritStones: 300, exp: 150 }
+                    };
+                    const reward = rewards[rankType];
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + reward.exp;
+                    rankState.rewardsClaimed[rankType] = true;
+                    return {
+                        success: true,
+                        rankType,
+                        reward,
+                        message: '领取' + rankType + '排名奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V138: mcpArenaMatch - 开始匹配
+            mcpArenaMatch() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaState = this._initArenaState();
+                    if (arenaState.status !== 'idle') {
+                        if (arenaState.status === 'matching') {
+                            return { error: '正在匹配中...', status: arenaState.status };
+                        }
+                        if (arenaState.status === 'matched') {
+                            return { error: '已有对手, 请先战斗', status: arenaState.status, opponent: arenaState.opponent };
+                        }
+                        return { error: '竞技场状态异常: ' + arenaState.status };
+                    }
+                    // 开始匹配
+                    arenaState.status = 'matching';
+                    arenaState.matchTime = Date.now();
+                    arenaState.opponent = {
+                        name: '擂台对手_' + Math.floor(Math.random() * 1000),
+                        realm: Math.max(0, (gs.realm || 0) + Math.floor(Math.random() * 3) - 1),
+                        stage: Math.floor(Math.random() * 3)
+                    };
+                    // 模拟5秒后匹配完成
+                    setTimeout(() => {
+                        if (arenaState.status === 'matching') {
+                            arenaState.status = 'matched';
+                        }
+                    }, 5000);
+                    return {
+                        success: true,
+                        status: 'matching',
+                        message: '匹配中, 5秒后完成...',
+                        opponent: arenaState.opponent
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V138: mcpArenaFight - 进行战斗
+            mcpArenaFight() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaState = this._initArenaState();
+                    if (arenaState.status === 'idle') {
+                        return { error: '请先匹配对手', status: 'idle' };
+                    }
+                    if (arenaState.status === 'matching') {
+                        return { error: '匹配中, 请稍候...', status: 'matching' };
+                    }
+                    if (arenaState.status === 'finished') {
+                        return { error: '战斗已结束', status: 'finished', fightResult: arenaState.fightResult };
+                    }
+                    // 计算胜负 - 基于境界等级
+                    arenaState.status = 'fighting';
+                    const playerRealm = gs.realm || 0;
+                    const playerStage = gs.stage || 0;
+                    const playerPower = playerRealm * 3 + playerStage;
+                    const opponentRealm = arenaState.opponent.realm;
+                    const opponentStage = arenaState.opponent.stage;
+                    const opponentPower = opponentRealm * 3 + opponentStage;
+                    // 添加随机性
+                    const playerFinalPower = playerPower * (0.8 + Math.random() * 0.4);
+                    const opponentFinalPower = opponentPower * (0.8 + Math.random() * 0.4);
+                    const victory = playerFinalPower > opponentFinalPower;
+                    arenaState.status = 'finished';
+                    arenaState.fightResult = {
+                        victory,
+                        playerPower: Math.round(playerFinalPower),
+                        opponentPower: Math.round(opponentFinalPower),
+                        opponent: arenaState.opponent,
+                        timestamp: Date.now()
+                    };
+                    arenaState.rewardClaimed = false;
+                    return {
+                        success: true,
+                        victory,
+                        playerPower: Math.round(playerFinalPower),
+                        opponentPower: Math.round(opponentFinalPower),
+                        opponent: arenaState.opponent,
+                        message: victory ? '恭喜! 战斗胜利' : '战斗失败'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V138: mcpArenaReward - 领取竞技奖励
+            mcpArenaReward() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaState = this._initArenaState();
+                    if (arenaState.status !== 'finished') {
+                        return { error: '请先完成战斗', status: arenaState.status };
+                    }
+                    if (arenaState.rewardClaimed) {
+                        return { error: '竞技奖励已领取' };
+                    }
+                    if (!arenaState.fightResult || !arenaState.fightResult.victory) {
+                        return { error: '战斗失败, 无奖励' };
+                    }
+                    // 发放胜利奖励
+                    const reward = { spiritStones: 200, exp: 100 };
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    gs.exp = (gs.exp || 0) + reward.exp;
+                    arenaState.rewardClaimed = true;
+                    return {
+                        success: true,
+                        reward,
+                        message: '领取竞技胜利奖励成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V129: mcpRealmList - 获取境界列表
             mcpRealmList() {
                 try {
@@ -26941,6 +27266,40 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V138: 排行榜+竞技系统
+        const MCP_TOOLS_V138 = {
+            'rank.list': {
+                name: 'rank.list',
+                description: '获取排行榜列表 (排行榜-列出各榜前10名)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'rank.query': {
+                name: 'rank.query',
+                description: '查询排名 (排行榜-查询玩家在指定榜的排名)',
+                inputSchema: { type: 'object', properties: { rankType: { type: 'string', description: '排行榜类型: realm|wealth|badge' } }, required: ['rankType'] }
+            },
+            'rank.reward': {
+                name: 'rank.reward',
+                description: '领取排名奖励 (排行榜-领取指定榜的排名奖励)',
+                inputSchema: { type: 'object', properties: { rankType: { type: 'string', description: '排行榜类型: realm|wealth|badge' } }, required: ['rankType'] }
+            },
+            'arena.match': {
+                name: 'arena.match',
+                description: '开始匹配 (竞技场-开始匹配对手)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'arena.fight': {
+                name: 'arena.fight',
+                description: '进行战斗 (竞技场-与已匹配对手进行对战)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'arena.reward': {
+                name: 'arena.reward',
+                description: '领取竞技奖励 (竞技场-领取胜利奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
         // V123: 投票+问卷系统
         const MCP_TOOLS_V123 = {
             'vote.list': { name: 'vote.list', description: '获取投票列表', inputSchema: { type: 'object', properties: {} } },
@@ -32172,6 +32531,230 @@ const ACHIEVEMENT_ID_MAP = {
             return { version: 'V137', passed, total, passRate: passRate.toFixed(3), results };
         }
         const v137Results = runV137Tests();
+
+        // ===== V138: 排行榜+竞技系统 Tests =====
+        function runV138Tests() {
+            const results = [];
+            function v138Assert(condition, msg) {
+                results.push({ pass: !!condition, msg });
+            }
+
+            // Setup mock game state
+            const mockGameState = {
+                spiritStones: 10000,
+                realm: 2,
+                stage: 1,
+                exp: 5000,
+                rank: null,
+                arena: null,
+                badge: { equippedBadges: [] },
+                achievement: null,
+                bonusEffects: {}
+            };
+            global.window = { gameState: mockGameState };
+
+            const server = new CultivationMCPServer();
+
+            // === Rank System Tests ===
+
+            // Test 1: _initRankState initializes correctly
+            const rankState1 = server._initRankState();
+            v138Assert(rankState1.leaderboards.realm !== undefined, '_initRankState creates realm leaderboard');
+            v138Assert(rankState1.leaderboards.wealth !== undefined, '_initRankState creates wealth leaderboard');
+            v138Assert(rankState1.leaderboards.badge !== undefined, '_initRankState creates badge leaderboard');
+            v138Assert(rankState1.rewardsClaimed.realm === false, '_initRankState rewardsClaimed.realm is false');
+            v138Assert(rankState1.rewardsClaimed.wealth === false, '_initRankState rewardsClaimed.wealth is false');
+            v138Assert(rankState1.rewardsClaimed.badge === false, '_initRankState rewardsClaimed.badge is false');
+
+            // Test 2: _generateMockLeaderboard generates 10 entries
+            const entries = server._generateMockLeaderboard('realm', 2);
+            v138Assert(entries.length === 10, '_generateMockLeaderboard returns 10 entries');
+            v138Assert(entries[0].rank === 1, 'First entry has rank 1');
+            v138Assert(entries[9].rank === 10, 'Last entry has rank 10');
+
+            // Test 3: mcpRankList returns all three leaderboards
+            const rl1 = server.mcpRankList();
+            v138Assert(rl1.success === true, 'rank.list returns success');
+            v138Assert(rl1.leaderboards.realm !== undefined, 'rank.list returns realm leaderboard');
+            v138Assert(rl1.leaderboards.wealth !== undefined, 'rank.list returns wealth leaderboard');
+            v138Assert(rl1.leaderboards.badge !== undefined, 'rank.list returns badge leaderboard');
+            v138Assert(rl1.leaderboards.realm.name === '境界榜', 'realm board has correct name');
+            v138Assert(rl1.leaderboards.wealth.name === '财富榜', 'wealth board has correct name');
+            v138Assert(rl1.leaderboards.badge.name === '徽章榜', 'badge board has correct name');
+
+            // Test 4: mcpRankList entries have correct structure
+            const realmEntries = rl1.leaderboards.realm.entries;
+            v138Assert(realmEntries[0].name !== undefined, 'entry has name');
+            v138Assert(realmEntries[0].score !== undefined, 'entry has score');
+            v138Assert(realmEntries[0].rank !== undefined, 'entry has rank');
+
+            // Test 5: mcpRankQuery with realm type
+            const rq1 = server.mcpRankQuery({ rankType: 'realm' });
+            v138Assert(rq1.success === true, 'rank.query realm returns success');
+            v138Assert(rq1.rankType === 'realm', 'rank.query returns correct rankType');
+            v138Assert(rq1.boardName === '境界榜', 'rank.query returns correct boardName');
+            v138Assert(rq1.playerRank !== undefined, 'rank.query returns playerRank');
+            v138Assert(rq1.playerScore !== undefined, 'rank.query returns playerScore');
+
+            // Test 6: mcpRankQuery with wealth type
+            const rq2 = server.mcpRankQuery({ rankType: 'wealth' });
+            v138Assert(rq2.success === true, 'rank.query wealth returns success');
+            v138Assert(rq2.rankType === 'wealth', 'rank.query returns wealth rankType');
+            v138Assert(rq2.boardName === '财富榜', 'rank.query returns wealth boardName');
+
+            // Test 7: mcpRankQuery with badge type
+            const rq3 = server.mcpRankQuery({ rankType: 'badge' });
+            v138Assert(rq3.success === true, 'rank.query badge returns success');
+            v138Assert(rq3.rankType === 'badge', 'rank.query returns badge rankType');
+
+            // Test 8: mcpRankQuery with invalid type returns error
+            const rqInvalid = server.mcpRankQuery({ rankType: 'invalid' });
+            v138Assert(rqInvalid.error && rqInvalid.error.includes('无效'), 'rank.query invalid type returns error');
+
+            // Test 9: mcpRankReward realm success
+            mockGameState.rank.rewardsClaimed.realm = false;
+            const rr1 = server.mcpRankReward({ rankType: 'realm' });
+            v138Assert(rr1.success === true, 'rank.reward realm returns success');
+            v138Assert(rr1.rankType === 'realm', 'rank.reward returns correct rankType');
+            v138Assert(rr1.reward && rr1.reward.spiritStones === 500, 'rank.reward realm has spirit stones');
+            v138Assert(rr1.reward && rr1.reward.exp === 200, 'rank.reward realm has exp');
+
+            // Test 10: mcpRankReward wealth success
+            mockGameState.rank.rewardsClaimed.wealth = false;
+            const rr2 = server.mcpRankReward({ rankType: 'wealth' });
+            v138Assert(rr2.success === true, 'rank.reward wealth returns success');
+            v138Assert(rr2.reward && rr2.reward.spiritStones === 1000, 'rank.reward wealth has spirit stones');
+
+            // Test 11: mcpRankReward badge success
+            mockGameState.rank.rewardsClaimed.badge = false;
+            const rr3 = server.mcpRankReward({ rankType: 'badge' });
+            v138Assert(rr3.success === true, 'rank.reward badge returns success');
+            v138Assert(rr3.reward && rr3.reward.spiritStones === 300, 'rank.reward badge has spirit stones');
+
+            // Test 12: mcpRankReward already claimed returns error
+            const rrDouble = server.mcpRankReward({ rankType: 'realm' });
+            v138Assert(rrDouble.error && rrDouble.error.includes('已领取'), 'rank.reward double claim returns error');
+
+            // Test 13: mcpRankReward invalid type returns error
+            const rrInvalid = server.mcpRankReward({ rankType: 'invalid' });
+            v138Assert(rrInvalid.error && rrInvalid.error.includes('无效'), 'rank.reward invalid type returns error');
+
+            // === Arena System Tests ===
+
+            // Test 14: _initArenaState initializes correctly
+            const arenaState1 = server._initArenaState();
+            v138Assert(arenaState1.status === 'idle', '_initArenaState status is idle');
+            v138Assert(arenaState1.opponent === null, '_initArenaState opponent is null');
+            v138Assert(arenaState1.fightResult === null, '_initArenaState fightResult is null');
+            v138Assert(arenaState1.rewardClaimed === false, '_initArenaState rewardClaimed is false');
+
+            // Test 15: mcpArenaMatch starts matching
+            const am1 = server.mcpArenaMatch();
+            v138Assert(am1.success === true, 'arena.match returns success');
+            v138Assert(am1.status === 'matching', 'arena.match status is matching');
+            v138Assert(am1.opponent !== null, 'arena.match returns opponent');
+            v138Assert(am1.opponent.name !== undefined, 'opponent has name');
+            v138Assert(am1.opponent.realm !== undefined, 'opponent has realm');
+            v138Assert(am1.opponent.stage !== undefined, 'opponent has stage');
+
+            // Test 16: mcpArenaMatch when already matching returns error
+            const am2 = server.mcpArenaMatch();
+            v138Assert(am2.error && am2.error.includes('正在匹配'), 'arena.match when matching returns error');
+
+            // Test 17: mcpArenaFight when idle returns error
+            mockGameState.arena.status = 'idle';
+            const af1 = server.mcpArenaFight();
+            v138Assert(af1.error && af1.error.includes('请先匹配'), 'arena.fight when idle returns error');
+
+            // Test 18: mcpArenaFight when matching returns error
+            mockGameState.arena.status = 'matching';
+            const af2 = server.mcpArenaFight();
+            v138Assert(af2.error && af2.error.includes('匹配中'), 'arena.fight when matching returns error');
+
+            // Test 19: mcpArenaFight when already finished returns error
+            mockGameState.arena.status = 'finished';
+            mockGameState.arena.fightResult = { victory: true };
+            const af3 = server.mcpArenaFight();
+            v138Assert(af3.error && af3.error.includes('战斗已结束'), 'arena.fight when finished returns error');
+
+            // Test 20: mcpArenaFight when matched proceeds to fight
+            mockGameState.arena.status = 'matched';
+            mockGameState.arena.opponent = { name: 'TestOpponent', realm: 2, stage: 1 };
+            const af4 = server.mcpArenaFight();
+            v138Assert(af4.success === true, 'arena.fight when matched returns success');
+            v138Assert(af4.victory !== undefined, 'arena.fight returns victory');
+            v138Assert(af4.playerPower !== undefined, 'arena.fight returns playerPower');
+            v138Assert(af4.opponentPower !== undefined, 'arena.fight returns opponentPower');
+            v138Assert(af4.opponent !== undefined, 'arena.fight returns opponent');
+
+            // Test 21: mcpArenaReward when not finished returns error
+            mockGameState.arena.status = 'matched';
+            mockGameState.arena.fightResult = null;
+            const ar1 = server.mcpArenaReward();
+            v138Assert(ar1.error && ar1.error.includes('请先完成'), 'arena.reward when not finished returns error');
+
+            // Test 22: mcpArenaReward when defeat returns error
+            mockGameState.arena.status = 'finished';
+            mockGameState.arena.fightResult = { victory: false };
+            mockGameState.arena.rewardClaimed = false;
+            const ar2 = server.mcpArenaReward();
+            v138Assert(ar2.error && ar2.error.includes('战斗失败'), 'arena.reward when defeat returns error');
+
+            // Test 23: mcpArenaReward when already claimed returns error
+            mockGameState.arena.status = 'finished';
+            mockGameState.arena.fightResult = { victory: true };
+            mockGameState.arena.rewardClaimed = true;
+            const ar3 = server.mcpArenaReward();
+            v138Assert(ar3.error && ar3.error.includes('已领取'), 'arena.reward when already claimed returns error');
+
+            // Test 24: mcpArenaReward when victory success
+            mockGameState.arena.status = 'finished';
+            mockGameState.arena.fightResult = { victory: true };
+            mockGameState.arena.rewardClaimed = false;
+            mockGameState.spiritStones = 10000;
+            const ar4 = server.mcpArenaReward();
+            v138Assert(ar4.success === true, 'arena.reward when victory returns success');
+            v138Assert(ar4.reward && ar4.reward.spiritStones === 200, 'arena.reward has spirit stones');
+            v138Assert(ar4.reward && ar4.reward.exp === 100, 'arena.reward has exp');
+
+            // Test 25: arena state after reward claimed has rewardClaimed = true
+            v138Assert(mockGameState.arena.rewardClaimed === true, 'arena.reward sets rewardClaimed to true');
+
+            // Test 26: mcpRankList can be called multiple times
+            const rl2 = server.mcpRankList();
+            v138Assert(rl2.success === true, 'rank.list can be called multiple times');
+
+            // Test 27: mcpRankQuery updates playerScore correctly
+            mockGameState.realm = 3;
+            const rq4 = server.mcpRankQuery({ rankType: 'realm' });
+            v138Assert(rq4.playerScore === 3, 'rank.query returns correct playerScore for realm');
+
+            // Test 28: mcpRankQuery updates for wealth
+            mockGameState.spiritStones = 50000;
+            const rq5 = server.mcpRankQuery({ rankType: 'wealth' });
+            v138Assert(rq5.playerScore === 50000, 'rank.query returns correct playerScore for wealth');
+
+            // Test 29: mcpArenaMatch resets arena state properly
+            mockGameState.arena = { status: 'idle', opponent: null, matchTime: null, fightResult: null, rewardClaimed: false };
+            const am3 = server.mcpArenaMatch();
+            v138Assert(am3.success === true, 'arena.match resets and starts');
+            v138Assert(mockGameState.arena.status === 'matching', 'arena.match sets status to matching');
+
+            // Test 30: arena.fight updates arena state to finished
+            mockGameState.arena.status = 'matched';
+            mockGameState.arena.opponent = { name: 'TestOpp', realm: 2, stage: 1 };
+            const af5 = server.mcpArenaFight();
+            v138Assert(mockGameState.arena.status === 'finished', 'arena.fight sets status to finished');
+            v138Assert(mockGameState.arena.fightResult !== null, 'arena.fight sets fightResult');
+
+            // Summary
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V138 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V138', passed, total, passRate: passRate.toFixed(3), results };
+        }
+        const v138Results = runV138Tests();
 
         // ===== V103: 仙界天机阁+命格系统 Tests =====
         function runV103Tests() {
