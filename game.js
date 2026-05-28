@@ -5599,6 +5599,14 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V170)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V171: Register 宠物探险+派遣系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V171)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V172: Register 图鉴+收集系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V172)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7425,6 +7433,44 @@ const ACHIEVEMENT_ID_MAP = {
                         case 'friend.accept':
                             // V170: 红包+社交系统v3 - delegate to V3 methods
                             result = this._callRedpacketFriendV3(name, args);
+                            break;
+                        // V171: 宠物探险+派遣系统v4
+                        case 'pet.list':
+                            result = this.mcpPetListV4();
+                            break;
+                        case 'pet.equip':
+                            result = this.mcpPetEquipV4(args.petId);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolveV4(args.petId);
+                            break;
+                        case 'explore.list':
+                            result = this.mcpExploreListV4();
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStartV4(args.exploreId);
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreCompleteV4(args.exploreId);
+                            break;
+                        // V172: 图鉴+收集系统v4
+                        case 'codex.list':
+                            result = this.mcpCodexListV4();
+                            break;
+                        case 'codex.view':
+                            result = this.mcpCodexViewV4(args.codexId);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlockV4(args.codexId);
+                            break;
+                        case 'collection.stats':
+                            result = this.mcpCollectionStatsV4();
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionRewardV4(args.collectionId);
+                            break;
+                        case 'collection.reset':
+                            result = this.mcpCollectionResetV4();
                             break;
                         // V160: 红包+社交系统v2
                         case 'redpacket.list':
@@ -16975,6 +17021,393 @@ const ACHIEVEMENT_ID_MAP = {
                     };
                 }
                 return gs.redpacketV3;
+            }
+
+            // V171: _initPetStateV4 - 初始化宠物系统v4状态
+            _initPetStateV4() {
+                const gs = window.gameState;
+                if (!gs.petV4) {
+                    gs.petV4 = {
+                        pets: [],
+                        maxPets: 5,
+                        equippedPetId: null
+                    };
+                }
+                return gs.petV4;
+            }
+
+            // V171: _initExploreStateV4 - 初始化探险系统v4状态
+            _initExploreStateV4() {
+                const gs = window.gameState;
+                if (!gs.exploreV4) {
+                    gs.exploreV4 = {
+                        explorations: [],
+                        history: []
+                    };
+                }
+                return gs.exploreV4;
+            }
+
+            // V171: mcpPetListV4 - 获取宠物列表v4
+            mcpPetListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petV4 = this._initPetStateV4();
+                    return {
+                        success: true,
+                        pets: petV4.pets,
+                        total: petV4.pets.length,
+                        maxPets: petV4.maxPets,
+                        equippedPetId: petV4.equippedPetId
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpPetEquipV4 - 装备宠物v4
+            mcpPetEquipV4(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV4 = this._initPetStateV4();
+                    const pet = petV4.pets.find(p => p.id === petId);
+                    if (!pet) return { error: '宠物不存在: ' + petId };
+                    petV4.equippedPetId = petId;
+                    return { success: true, petId, message: '已装备 ' + pet.name };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpPetEvolveV4 - 宠物进化v4
+            mcpPetEvolveV4(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV4 = this._initPetStateV4();
+                    const petIdx = petV4.pets.findIndex(p => p.id === petId);
+                    if (petIdx === -1) return { error: '宠物不存在: ' + petId };
+                    const pet = petV4.pets[petIdx];
+                    // 进化消耗500灵石
+                    const evolveCost = 500;
+                    if ((gs.spiritStones || 0) < evolveCost) return { error: '灵石不足，进化需要 ' + evolveCost + ' 灵石' };
+                    gs.spiritStones -= evolveCost;
+                    // 进化提升属性
+                    pet.level = (pet.level || 1) + 1;
+                    pet.evolveStage = (pet.evolveStage || 1) + 1;
+                    petV4.pets[petIdx] = pet;
+                    return { success: true, petId, name: pet.name, newLevel: pet.level, newEvolveStage: pet.evolveStage, message: pet.name + ' 进化成功！等级提升至 ' + pet.level };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreListV4 - 获取探险列表v4
+            mcpExploreListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreV4 = this._initExploreStateV4();
+                    return {
+                        success: true,
+                        explorations: exploreV4.explorations,
+                        total: exploreV4.explorations.length,
+                        history: exploreV4.history
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreStartV4 - 开始探险v4
+            mcpExploreStartV4(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV4 = this._initExploreStateV4();
+                    const existing = exploreV4.explorations.find(e => e.id === exploreId);
+                    if (existing && existing.status === 'active') return { error: '探险进行中: ' + exploreId };
+                    const explore = {
+                        id: exploreId,
+                        name: '探险_' + exploreId,
+                        status: 'active',
+                        startTime: Date.now(),
+                        endTime: Date.now() + 300000 // 5分钟
+                    };
+                    exploreV4.explorations.push(explore);
+                    return { success: true, exploreId, message: '探险开始: ' + exploreId };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V171: mcpExploreCompleteV4 - 完成探险v4
+            mcpExploreCompleteV4(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV4 = this._initExploreStateV4();
+                    const idx = exploreV4.explorations.findIndex(e => e.id === exploreId);
+                    if (idx === -1) return { error: '探险不存在: ' + exploreId };
+                    const explore = exploreV4.explorations[idx];
+                    if (explore.status !== 'active') return { error: '探险未进行中: ' + exploreId };
+                    // 完成探险，发放奖励
+                    const reward = { spiritStones: 100, items: ['灵草x2'] };
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    explore.status = 'completed';
+                    explore.endTime = Date.now();
+                    exploreV4.history.push({ ...explore, reward });
+                    exploreV4.explorations.splice(idx, 1);
+                    return { success: true, exploreId, reward, message: '探险完成！获得 ' + reward.spiritStones + ' 灵石和 ' + reward.items.join(',') };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: _initCodexStateV4 - 初始化图鉴系统v4状态
+            _initCodexStateV4() {
+                const gs = window.gameState;
+                if (!gs.codexV4) {
+                    gs.codexV4 = {
+                        categories: [
+                            {
+                                id: 'realm', name: '境界图鉴', entries: [
+                                    { id: 'codex_realm_1', name: '凡人', description: '无灵气修为的凡人', unlocked: false, reward: { spiritStones: 10 } },
+                                    { id: 'codex_realm_2', name: '炼气期', description: '初入修炼，感应灵气', unlocked: false, reward: { spiritStones: 50 } },
+                                    { id: 'codex_realm_3', name: '筑基期', description: '丹田凝聚，可筑道基', unlocked: false, reward: { spiritStones: 100 } },
+                                    { id: 'codex_realm_4', name: '金丹期', description: '金丹凝实，道基初成', unlocked: false, reward: { spiritStones: 200 } },
+                                    { id: 'codex_realm_5', name: '元婴期', description: '元婴出窍，神魂可脱', unlocked: false, reward: { spiritStones: 500 } }
+                                ]
+                            },
+                            {
+                                id: 'item', name: '物品图鉴', entries: [
+                                    { id: 'codex_item_1', name: '灵石', description: '修仙界通用货币', unlocked: false, reward: { spiritStones: 5 } },
+                                    { id: 'codex_item_2', name: '灵草', description: '炼制丹药的材料', unlocked: false, reward: { spiritStones: 10 } },
+                                    { id: 'codex_item_3', name: '筑基丹', description: '辅助筑基的丹药', unlocked: false, reward: { spiritStones: 50 } }
+                                ]
+                            },
+                            {
+                                id: 'beast', name: '妖兽图鉴', entries: [
+                                    { id: 'codex_beast_1', name: '灰兔', description: '温顺的小妖兽', unlocked: false, reward: { spiritStones: 20 } },
+                                    { id: 'codex_beast_2', name: '野狼', description: '群居妖兽', unlocked: false, reward: { spiritStones: 30 } },
+                                    { id: 'codex_beast_3', name: '妖狐', description: '狡诈的妖兽', unlocked: false, reward: { spiritStones: 40 } }
+                                ]
+                            }
+                        ],
+                        progress: { total: 11, unlocked: 0 }
+                    };
+                }
+                return gs.codexV4;
+            }
+
+            // V172: _initCollectionStateV4 - 初始化收集系统v4状态
+            _initCollectionStateV4() {
+                const gs = window.gameState;
+                if (!gs.collectionV4) {
+                    gs.collectionV4 = {
+                        collections: [
+                            {
+                                id: 'col_realm', name: '境界收集', description: '收集所有境界图鉴', items: [
+                                    { id: 'citem_realm_1', name: '凡人', collected: false },
+                                    { id: 'citem_realm_2', name: '炼气期', collected: false },
+                                    { id: 'citem_realm_3', name: '筑基期', collected: false },
+                                    { id: 'citem_realm_4', name: '金丹期', collected: false },
+                                    { id: 'citem_realm_5', name: '元婴期', collected: false }
+                                ], completed: false, reward: { spiritStones: 500 }
+                            },
+                            {
+                                id: 'col_item', name: '物品收集', description: '收集所有物品图鉴', items: [
+                                    { id: 'citem_item_1', name: '灵石', collected: false },
+                                    { id: 'citem_item_2', name: '灵草', collected: false },
+                                    { id: 'citem_item_3', name: '筑基丹', collected: false }
+                                ], completed: false, reward: { spiritStones: 200 }
+                            },
+                            {
+                                id: 'col_beast', name: '妖兽收集', description: '收集所有妖兽图鉴', items: [
+                                    { id: 'citem_beast_1', name: '灰兔', collected: false },
+                                    { id: 'citem_beast_2', name: '野狼', collected: false },
+                                    { id: 'citem_beast_3', name: '妖狐', collected: false }
+                                ], completed: false, reward: { spiritStones: 300 }
+                            }
+                        ],
+                        rewardsClaimed: []
+                    };
+                }
+                return gs.collectionV4;
+            }
+
+            // V172: mcpCodexListV4 - 获取图鉴列表v4
+            mcpCodexListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const codexV4 = this._initCodexStateV4();
+                    // 计算解锁进度
+                    let unlocked = 0;
+                    for (const cat of codexV4.categories) {
+                        for (const entry of cat.entries) {
+                            if (entry.unlocked) unlocked++;
+                        }
+                    }
+                    codexV4.progress.unlocked = unlocked;
+                    return {
+                        success: true,
+                        categories: codexV4.categories,
+                        progress: codexV4.progress
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: mcpCodexViewV4 - 查看图鉴详情v4
+            mcpCodexViewV4(codexId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!codexId) return { error: '请指定图鉴ID' };
+                    const codexV4 = this._initCodexStateV4();
+                    // 查找图鉴条目
+                    for (const cat of codexV4.categories) {
+                        const entry = cat.entries.find(e => e.id === codexId);
+                        if (entry) {
+                            return {
+                                success: true,
+                                codexId: entry.id,
+                                name: entry.name,
+                                description: entry.description,
+                                category: cat.name,
+                                unlocked: entry.unlocked,
+                                reward: entry.reward
+                            };
+                        }
+                    }
+                    return { error: '图鉴不存在: ' + codexId };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: mcpCodexUnlockV4 - 解锁图鉴条目v4
+            mcpCodexUnlockV4(codexId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!codexId) return { error: '请指定图鉴ID' };
+                    const codexV4 = this._initCodexStateV4();
+                    // 查找图鉴条目
+                    for (const cat of codexV4.categories) {
+                        const entry = cat.entries.find(e => e.id === codexId);
+                        if (entry) {
+                            if (entry.unlocked) return { error: '图鉴已解锁: ' + codexId };
+                            // 解锁消耗100灵石
+                            const unlockCost = 100;
+                            if ((gs.spiritStones || 0) < unlockCost) {
+                                return { error: '灵石不足，解锁需要 ' + unlockCost + ' 灵石' };
+                            }
+                            gs.spiritStones -= unlockCost;
+                            entry.unlocked = true;
+                            // 同步到收集系统
+                            const collectionV4 = this._initCollectionStateV4();
+                            for (const col of collectionV4.collections) {
+                                const citem = col.items.find(i => i.name === entry.name);
+                                if (citem) citem.collected = true;
+                            }
+                            // 检查收集是否完成
+                            for (const col of collectionV4.collections) {
+                                const allCollected = col.items.every(i => i.collected);
+                                if (allCollected) col.completed = true;
+                            }
+                            return {
+                                success: true,
+                                codexId: entry.id,
+                                name: entry.name,
+                                message: entry.name + ' 解锁成功！消耗 ' + unlockCost + ' 灵石'
+                            };
+                        }
+                    }
+                    return { error: '图鉴不存在: ' + codexId };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: mcpCollectionStatsV4 - 获取收集统计v4
+            mcpCollectionStatsV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const collectionV4 = this._initCollectionStateV4();
+                    const codexV4 = this._initCodexStateV4();
+                    // 同步收集状态
+                    for (const col of collectionV4.collections) {
+                        const allCollected = col.items.every(i => i.collected);
+                        col.completed = allCollected;
+                    }
+                    const totalItems = collectionV4.collections.reduce((sum, col) => sum + col.items.length, 0);
+                    const collectedItems = collectionV4.collections.reduce((sum, col) => sum + col.items.filter(i => i.collected).length, 0);
+                    return {
+                        success: true,
+                        collections: collectionV4.collections,
+                        totalItems,
+                        collectedItems,
+                        completedCount: collectionV4.collections.filter(c => c.completed).length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: mcpCollectionRewardV4 - 领取收集奖励v4
+            mcpCollectionRewardV4(collectionId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!collectionId) return { error: '请指定收集ID' };
+                    const collectionV4 = this._initCollectionStateV4();
+                    const col = collectionV4.collections.find(c => c.id === collectionId);
+                    if (!col) return { error: '收集不存在: ' + collectionId };
+                    if (!col.completed) return { error: '收集未完成: ' + collectionId };
+                    if (collectionV4.rewardsClaimed.includes(collectionId)) {
+                        return { error: '奖励已领取: ' + collectionId };
+                    }
+                    // 发放奖励
+                    if (col.reward.spiritStones) {
+                        gs.spiritStones = (gs.spiritStones || 0) + col.reward.spiritStones;
+                    }
+                    collectionV4.rewardsClaimed.push(collectionId);
+                    return {
+                        success: true,
+                        collectionId: col.id,
+                        name: col.name,
+                        reward: col.reward,
+                        message: col.name + ' 奖励已领取！获得 ' + col.reward.spiritStones + ' 灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V172: mcpCollectionResetV4 - 重置收集进度v4
+            mcpCollectionResetV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    // 重置消耗道具: 重置符x1
+                    const resetItem = 'reset_scroll';
+                    const resetCost = 1;
+                    if (!gs.inventory) gs.inventory = [];
+                    const itemIdx = gs.inventory.findIndex(i => i.id === resetItem);
+                    if (itemIdx === -1) {
+                        return { error: '缺少重置道具，需要: 重置符x1' };
+                    }
+                    gs.inventory.splice(itemIdx, 1);
+                    // 重置收集状态
+                    const collectionV4 = this._initCollectionStateV4();
+                    for (const col of collectionV4.collections) {
+                        for (const item of col.items) {
+                            item.collected = false;
+                        }
+                        col.completed = false;
+                    }
+                    collectionV4.rewardsClaimed = [];
+                    // 重置图鉴解锁状态
+                    const codexV4 = this._initCodexStateV4();
+                    for (const cat of codexV4.categories) {
+                        for (const entry of cat.entries) {
+                            entry.unlocked = false;
+                        }
+                    }
+                    codexV4.progress.unlocked = 0;
+                    return {
+                        success: true,
+                        message: '收集进度已重置，消耗 重置符x1'
+                    };
+                } catch (e) { return { error: e.message }; }
             }
 
             // V170: _initFriendStateV3 - 初始化好友系统v3状态
@@ -36199,6 +36632,116 @@ const ACHIEVEMENT_ID_MAP = {
                     },
                     required: ['applyId']
                 }
+            }
+        };
+
+        // V171: 宠物探险+派遣系统v4 (P-20260529-048)
+        const MCP_TOOLS_V171 = {
+            'pet.list': {
+                name: 'pet.list',
+                description: '获取宠物列表 (宠物系统v4-获取所有宠物列表及装备状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.equip': {
+                name: 'pet.equip',
+                description: '装备宠物 (宠物系统v4-装备指定宠物获得属性加成)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: '宠物进化 (宠物系统v4-进化宠物提升属性，消耗道具和灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取探险列表 (探险系统v4-获取所有探险区域及状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始探险 (探险系统v4-开始指定探险，需宠物支援)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'explore.complete': {
+                name: 'explore.complete',
+                description: '完成探险 (探险系统v4-完成探险获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            }
+        };
+
+        // V172: 图鉴+收集系统v4 (P-20260529-051)
+        const MCP_TOOLS_V172 = {
+            'codex.list': {
+                name: 'codex.list',
+                description: '获取图鉴列表 (图鉴系统v4-获取所有图鉴类别和条目)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'codex.view': {
+                name: 'codex.view',
+                description: '查看图鉴详情 (图鉴系统v4-查看指定图鉴条目详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴条目 (图鉴系统v4-解锁图鉴条目，消耗灵石或完成成就)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'collection.stats': {
+                name: 'collection.stats',
+                description: '获取收集统计数据 (收集系统v4-获取所有收集项及完成度)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集系统v4-领取完成收集的奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        collectionId: { type: 'string', description: '收集ID' }
+                    },
+                    required: ['collectionId']
+                }
+            },
+            'collection.reset': {
+                name: 'collection.reset',
+                description: '重置收集进度 (收集系统v4-重置收集进度，需消耗道具)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -65452,6 +65995,474 @@ const v152Results = runV152Tests();
         const v170Results = runV170Tests();
 
         const v150Results = runV150Tests();
+
+        // ===== V171 Tests (P-20260529-048) =====
+        function runV171Tests() {
+            const results = [];
+            function v171Assert(condition, testName) {
+                results.push({ pass: condition === true, test: testName });
+                if (condition !== true) console.warn('FAIL:', testName);
+            }
+
+            // Setup game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                realm: '筑基',
+                level: 10
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V171 definition exists and has 6 tools
+            v171Assert(typeof MCP_TOOLS_V171 === 'object', 'MCP_TOOLS_V171 is defined');
+            v171Assert(Object.keys(MCP_TOOLS_V171).length === 6, 'MCP_TOOLS_V171 has 6 tools');
+
+            // Test 2: pet.list tool exists
+            v171Assert('pet.list' in MCP_TOOLS_V171, 'pet.list tool exists');
+
+            // Test 3: pet.equip tool exists
+            v171Assert('pet.equip' in MCP_TOOLS_V171, 'pet.equip tool exists');
+
+            // Test 4: pet.evolve tool exists
+            v171Assert('pet.evolve' in MCP_TOOLS_V171, 'pet.evolve tool exists');
+
+            // Test 5: explore.list tool exists
+            v171Assert('explore.list' in MCP_TOOLS_V171, 'explore.list tool exists');
+
+            // Test 6: explore.start tool exists
+            v171Assert('explore.start' in MCP_TOOLS_V171, 'explore.start tool exists');
+
+            // Test 7: explore.complete tool exists
+            v171Assert('explore.complete' in MCP_TOOLS_V171, 'explore.complete tool exists');
+
+            // Test 8: _initPetStateV4 creates state
+            server._initPetStateV4();
+            v171Assert(window.gameState.petV4 !== undefined, '_initPetStateV4 creates petV4');
+            v171Assert(Array.isArray(window.gameState.petV4.pets), 'petV4.pets is array');
+
+            // Test 9: _initExploreStateV4 creates state
+            server._initExploreStateV4();
+            v171Assert(window.gameState.exploreV4 !== undefined, '_initExploreStateV4 creates exploreV4');
+            v171Assert(Array.isArray(window.gameState.exploreV4.explorations), 'exploreV4.explorations is array');
+            v171Assert(Array.isArray(window.gameState.exploreV4.history), 'exploreV4.history is array');
+
+            // Test 10: mcpPetListV4 returns success
+            const petList = server.mcpPetListV4();
+            v171Assert(petList.success === true, 'mcpPetListV4 returns success');
+            v171Assert(Array.isArray(petList.pets), 'mcpPetListV4 returns pets array');
+
+            // Test 11: mcpPetListV4 returns maxPets and equippedPetId
+            v171Assert(petList.maxPets === 5, 'mcpPetListV4 returns maxPets=5');
+            v171Assert(petList.equippedPetId === null, 'mcpPetListV4 returns equippedPetId=null initially');
+
+            // Test 12: mcpPetEquipV4 fails without petId
+            const equipNoId = server.mcpPetEquipV4(null);
+            v171Assert(equipNoId.error !== undefined, 'mcpPetEquipV4 fails without petId');
+
+            // Test 13: mcpPetEquipV4 fails for non-existent pet
+            const equipBad = server.mcpPetEquipV4('pet_non_exist');
+            v171Assert(equipBad.error !== undefined, 'mcpPetEquipV4 fails for non-existent pet');
+
+            // Test 14: mcpPetEvolveV4 fails without petId
+            const evolveNoId = server.mcpPetEvolveV4(null);
+            v171Assert(evolveNoId.error !== undefined, 'mcpPetEvolveV4 fails without petId');
+
+            // Test 15: mcpPetEvolveV4 fails for non-existent pet
+            const evolveBad = server.mcpPetEvolveV4('pet_non_exist');
+            v171Assert(evolveBad.error !== undefined, 'mcpPetEvolveV4 fails for non-existent pet');
+
+            // Test 16: mcpPetEvolveV4 fails with insufficient stones
+            window.gameState.petV4 = null;
+            window.gameState.spiritStones = 100;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_test', name: '测试宠物', level: 1, evolveStage: 1 });
+            const evolvePoor = server.mcpPetEvolveV4('pet_test');
+            v171Assert(evolvePoor.error !== undefined, 'mcpPetEvolveV4 fails with insufficient stones');
+
+            // Test 17: mcpPetEvolveV4 succeeds with sufficient stones
+            window.gameState.spiritStones = 1000;
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_evolve', name: '进化宠物', level: 1, evolveStage: 1 });
+            const evolveResult = server.mcpPetEvolveV4('pet_evolve');
+            v171Assert(evolveResult.success === true, 'mcpPetEvolveV4 succeeds');
+
+            // Test 18: mcpPetEvolveV4 deducts spirit stones
+            v171Assert(window.gameState.spiritStones === 500, 'mcpPetEvolveV4 deducts 500 stones');
+
+            // Test 19: mcpPetEvolveV4 increases level and evolveStage
+            v171Assert(evolveResult.newLevel === 2, 'mcpPetEvolveV4 increases level to 2');
+            v171Assert(evolveResult.newEvolveStage === 2, 'mcpPetEvolveV4 increases evolveStage to 2');
+
+            // Test 20: mcpExploreListV4 returns success
+            const exploreList = server.mcpExploreListV4();
+            v171Assert(exploreList.success === true, 'mcpExploreListV4 returns success');
+            v171Assert(Array.isArray(exploreList.explorations), 'mcpExploreListV4 returns explorations array');
+
+            // Test 21: mcpExploreStartV4 fails without exploreId
+            const startNoId = server.mcpExploreStartV4(null);
+            v171Assert(startNoId.error !== undefined, 'mcpExploreStartV4 fails without exploreId');
+
+            // Test 22: mcpExploreStartV4 succeeds with valid exploreId
+            const startResult = server.mcpExploreStartV4('explore_001');
+            v171Assert(startResult.success === true, 'mcpExploreStartV4 succeeds');
+
+            // Test 23: mcpExploreStartV4 adds to explorations
+            v171Assert(window.gameState.exploreV4.explorations.length === 1, 'mcpExploreStartV4 adds to explorations');
+
+            // Test 24: mcpExploreStartV4 fails when already active
+            const startDup = server.mcpExploreStartV4('explore_001');
+            v171Assert(startDup.error !== undefined, 'mcpExploreStartV4 fails when already active');
+
+            // Test 25: mcpExploreCompleteV4 fails without exploreId
+            const completeNoId = server.mcpExploreCompleteV4(null);
+            v171Assert(completeNoId.error !== undefined, 'mcpExploreCompleteV4 fails without exploreId');
+
+            // Test 26: mcpExploreCompleteV4 fails for non-existent explore
+            const completeBad = server.mcpExploreCompleteV4('explore_non_exist');
+            v171Assert(completeBad.error !== undefined, 'mcpExploreCompleteV4 fails for non-existent explore');
+
+            // Test 27: mcpExploreCompleteV4 succeeds for active explore
+            const completeResult = server.mcpExploreCompleteV4('explore_001');
+            v171Assert(completeResult.success === true, 'mcpExploreCompleteV4 succeeds');
+
+            // Test 28: mcpExploreCompleteV4 adds to history
+            v171Assert(window.gameState.exploreV4.history.length === 1, 'mcpExploreCompleteV4 adds to history');
+
+            // Test 29: mcpExploreCompleteV4 removes from explorations
+            v171Assert(window.gameState.exploreV4.explorations.length === 0, 'mcpExploreCompleteV4 removes from explorations');
+
+            // Test 30: mcpExploreCompleteV4 adds reward to spirit stones
+            v171Assert(window.gameState.spiritStones > 500, 'mcpExploreCompleteV4 adds spirit stones reward');
+
+            // Test 31: mcpPetEquipV4 succeeds for existing pet
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'pet_equip', name: '装备宠物' });
+            const equipResult = server.mcpPetEquipV4('pet_equip');
+            v171Assert(equipResult.success === true, 'mcpPetEquipV4 succeeds');
+
+            // Test 32: mcpPetEquipV4 sets equippedPetId
+            v171Assert(window.gameState.petV4.equippedPetId === 'pet_equip', 'mcpPetEquipV4 sets equippedPetId');
+
+            // Test 33: mcpPetListV4 returns equippedPetId after equip
+            const listAfterEquip = server.mcpPetListV4();
+            v171Assert(listAfterEquip.equippedPetId === 'pet_equip', 'mcpPetListV4 returns equippedPetId');
+
+            // Test 34: explore.list shows history
+            window.gameState.exploreV4 = null;
+            server._initExploreStateV4();
+            server.mcpExploreStartV4('explore_hist');
+            server.mcpExploreCompleteV4('explore_hist');
+            const histList = server.mcpExploreListV4();
+            v171Assert(histList.history.length === 1, 'explore.list shows history');
+
+            // Test 35: mcpExploreCompleteV4 fails when not active
+            server.mcpExploreStartV4('explore_inactive');
+            server.mcpExploreCompleteV4('explore_inactive');
+            const completeInactive = server.mcpExploreCompleteV4('explore_inactive');
+            v171Assert(completeInactive.error !== undefined, 'mcpExploreCompleteV4 fails when not active');
+
+            // Test 36: petV4.maxPets is 5
+            v171Assert(window.gameState.petV4.maxPets === 5, 'petV4.maxPets is 5');
+
+            // Test 37: _initPetStateV4 is idempotent
+            const petV4First = server._initPetStateV4();
+            const petV4Second = server._initPetStateV4();
+            v171Assert(petV4First === petV4Second, '_initPetStateV4 is idempotent');
+
+            // Test 38: _initExploreStateV4 is idempotent
+            const exploreV4First = server._initExploreStateV4();
+            const exploreV4Second = server._initExploreStateV4();
+            v171Assert(exploreV4First === exploreV4Second, '_initExploreStateV4 is idempotent');
+
+            // Test 39: mcpPetListV4 returns correct total
+            window.gameState.petV4 = null;
+            server._initPetStateV4();
+            window.gameState.petV4.pets.push({ id: 'p1', name: '宠物1' }, { id: 'p2', name: '宠物2' });
+            const listWithPets = server.mcpPetListV4();
+            v171Assert(listWithPets.total === 2, 'mcpPetListV4 returns correct total');
+
+            // Test 40: mcpExploreStartV4 sets correct status
+            server._initExploreStateV4();
+            server.mcpExploreStartV4('explore_status');
+            const activeExplore = window.gameState.exploreV4.explorations[0];
+            v171Assert(activeExplore.status === 'active', 'mcpExploreStartV4 sets status=active');
+
+            // Test 41: mcpExploreCompleteV4 sets correct status in history
+            server.mcpExploreCompleteV4('explore_status');
+            const histEntry = window.gameState.exploreV4.history[0];
+            v171Assert(histEntry.status === 'completed', 'mcpExploreCompleteV4 sets history status=completed');
+
+            // Test 42: mcpExploreCompleteV4 includes reward in history
+            v171Assert(histEntry.reward !== undefined, 'mcpExploreCompleteV4 includes reward in history');
+
+            // Test 43: pet.evolve tool registered in toolRegistry
+            const hasPetEvolve = server.toolRegistry.has('pet.evolve');
+            v171Assert(hasPetEvolve === true, 'pet.evolve registered in toolRegistry');
+
+            // Test 44: explore.complete tool registered in toolRegistry
+            const hasExploreComplete = server.toolRegistry.has('explore.complete');
+            v171Assert(hasExploreComplete === true, 'explore.complete registered in toolRegistry');
+
+            // Test 45: callTool dispatch for pet.list V171
+            const dispatched = server.callTool('pet.list', {});
+            const parsedResult = JSON.parse(dispatched.content[0].text);
+            v171Assert(parsedResult.success === true, 'callTool dispatches pet.list successfully');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V171 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V171', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v171Results = runV171Tests();
+
+        // V172: 图鉴+收集系统v4 Tests (P-20260529-051)
+        function runV172Tests() {
+            const results = [];
+            function v172Assert(condition, message) {
+                results.push({ message, pass: !!condition });
+                if (!condition) console.warn('V172 FAILED:', message);
+            }
+
+            // Setup game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                realm: '筑基',
+                level: 10,
+                inventory: [{ id: 'reset_scroll', name: '重置符', count: 5 }]
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V172 definition exists and has 6 tools
+            v172Assert(typeof MCP_TOOLS_V172 === 'object', 'MCP_TOOLS_V172 is defined');
+            v172Assert(Object.keys(MCP_TOOLS_V172).length === 6, 'MCP_TOOLS_V172 has 6 tools');
+
+            // Test 2: codex.list tool exists
+            v172Assert('codex.list' in MCP_TOOLS_V172, 'codex.list tool exists');
+
+            // Test 3: codex.view tool exists
+            v172Assert('codex.view' in MCP_TOOLS_V172, 'codex.view tool exists');
+
+            // Test 4: codex.unlock tool exists
+            v172Assert('codex.unlock' in MCP_TOOLS_V172, 'codex.unlock tool exists');
+
+            // Test 5: collection.stats tool exists
+            v172Assert('collection.stats' in MCP_TOOLS_V172, 'collection.stats tool exists');
+
+            // Test 6: collection.reward tool exists
+            v172Assert('collection.reward' in MCP_TOOLS_V172, 'collection.reward tool exists');
+
+            // Test 7: collection.reset tool exists
+            v172Assert('collection.reset' in MCP_TOOLS_V172, 'collection.reset tool exists');
+
+            // Test 8: _initCodexStateV4 creates state
+            server._initCodexStateV4();
+            v172Assert(window.gameState.codexV4 !== undefined, '_initCodexStateV4 creates codexV4');
+            v172Assert(Array.isArray(window.gameState.codexV4.categories), 'codexV4.categories is array');
+
+            // Test 9: _initCollectionStateV4 creates state
+            server._initCollectionStateV4();
+            v172Assert(window.gameState.collectionV4 !== undefined, '_initCollectionStateV4 creates collectionV4');
+            v172Assert(Array.isArray(window.gameState.collectionV4.collections), 'collectionV4.collections is array');
+            v172Assert(Array.isArray(window.gameState.collectionV4.rewardsClaimed), 'collectionV4.rewardsClaimed is array');
+
+            // Test 10: mcpCodexListV4 returns success
+            const codexList = server.mcpCodexListV4();
+            v172Assert(codexList.success === true, 'mcpCodexListV4 returns success');
+            v172Assert(Array.isArray(codexList.categories), 'mcpCodexListV4 returns categories array');
+            v172Assert(codexList.categories.length === 3, 'mcpCodexListV4 returns 3 categories');
+
+            // Test 11: mcpCodexViewV4 fails without codexId
+            const viewNoId = server.mcpCodexViewV4(null);
+            v172Assert(viewNoId.error !== undefined, 'mcpCodexViewV4 fails without codexId');
+
+            // Test 12: mcpCodexViewV4 succeeds for valid codexId
+            const viewResult = server.mcpCodexViewV4('codex_realm_1');
+            v172Assert(viewResult.success === true, 'mcpCodexViewV4 succeeds');
+            v172Assert(viewResult.name === '凡人', 'mcpCodexViewV4 returns correct name');
+            v172Assert(viewResult.unlocked === false, 'mcpCodexViewV4 returns unlocked=false initially');
+
+            // Test 13: mcpCodexViewV4 fails for non-existent codex
+            const viewBad = server.mcpCodexViewV4('codex_non_exist');
+            v172Assert(viewBad.error !== undefined, 'mcpCodexViewV4 fails for non-existent codexId');
+
+            // Test 14: mcpCodexUnlockV4 fails without codexId
+            const unlockNoId = server.mcpCodexUnlockV4(null);
+            v172Assert(unlockNoId.error !== undefined, 'mcpCodexUnlockV4 fails without codexId');
+
+            // Test 15: mcpCodexUnlockV4 succeeds for valid codexId
+            window.gameState.spiritStones = 10000;
+            window.gameState.codexV4 = null;
+            server._initCodexStateV4();
+            const unlockResult = server.mcpCodexUnlockV4('codex_realm_2');
+            v172Assert(unlockResult.success === true, 'mcpCodexUnlockV4 succeeds');
+
+            // Test 16: mcpCodexUnlockV4 deducts spirit stones
+            v172Assert(window.gameState.spiritStones === 9900, 'mcpCodexUnlockV4 deducts 100 stones');
+
+            // Test 17: mcpCodexUnlockV4 updates entry unlocked status
+            const viewAfterUnlock = server.mcpCodexViewV4('codex_realm_2');
+            v172Assert(viewAfterUnlock.unlocked === true, 'mcpCodexUnlockV4 updates entry unlocked=true');
+
+            // Test 18: mcpCodexUnlockV4 fails for already unlocked codex
+            const unlockDup = server.mcpCodexUnlockV4('codex_realm_2');
+            v172Assert(unlockDup.error !== undefined, 'mcpCodexUnlockV4 fails for already unlocked');
+
+            // Test 19: mcpCodexUnlockV4 fails with insufficient stones
+            window.gameState.spiritStones = 50;
+            window.gameState.codexV4 = null;
+            server._initCodexStateV4();
+            const unlockPoor = server.mcpCodexUnlockV4('codex_realm_3');
+            v172Assert(unlockPoor.error !== undefined, 'mcpCodexUnlockV4 fails with insufficient stones');
+
+            // Test 20: mcpCollectionStatsV4 returns success
+            const collStats = server.mcpCollectionStatsV4();
+            v172Assert(collStats.success === true, 'mcpCollectionStatsV4 returns success');
+            v172Assert(Array.isArray(collStats.collections), 'mcpCollectionStatsV4 returns collections array');
+
+            // Test 21: mcpCollectionStatsV4 returns totalItems and collectedItems
+            v172Assert(typeof collStats.totalItems === 'number', 'mcpCollectionStatsV4 returns totalItems');
+            v172Assert(typeof collStats.collectedItems === 'number', 'mcpCollectionStatsV4 returns collectedItems');
+            v172Assert(typeof collStats.completedCount === 'number', 'mcpCollectionStatsV4 returns completedCount');
+
+            // Test 22: mcpCollectionRewardV4 fails without collectionId
+            const rewardNoId = server.mcpCollectionRewardV4(null);
+            v172Assert(rewardNoId.error !== undefined, 'mcpCollectionRewardV4 fails without collectionId');
+
+            // Test 23: mcpCollectionRewardV4 fails for non-existent collection
+            const rewardBad = server.mcpCollectionRewardV4('col_non_exist');
+            v172Assert(rewardBad.error !== undefined, 'mcpCollectionRewardV4 fails for non-existent collection');
+
+            // Test 24: mcpCollectionRewardV4 fails for incomplete collection
+            const rewardIncomplete = server.mcpCollectionRewardV4('col_realm');
+            v172Assert(rewardIncomplete.error !== undefined, 'mcpCollectionRewardV4 fails for incomplete collection');
+
+            // Test 25: unlocking all items in collection marks it completed
+            window.gameState.codexV4 = null;
+            server._initCodexStateV4();
+            window.gameState.spiritStones = 10000;
+            // Unlock all realm items: 凡人(100), 炼气期(100), 筑基期(100), 金丹期(100), 元婴期(100)
+            server.mcpCodexUnlockV4('codex_realm_1');
+            server.mcpCodexUnlockV4('codex_realm_2');
+            server.mcpCodexUnlockV4('codex_realm_3');
+            server.mcpCodexUnlockV4('codex_realm_4');
+            server.mcpCodexUnlockV4('codex_realm_5');
+            const collAfterUnlock = server.mcpCollectionStatsV4();
+            v172Assert(collAfterUnlock.completedCount >= 1, 'mcpCollectionRewardV4 collection marked completed after all items unlocked');
+
+            // Test 26: mcpCollectionRewardV4 succeeds for completed collection
+            const rewardResult = server.mcpCollectionRewardV4('col_realm');
+            v172Assert(rewardResult.success === true, 'mcpCollectionRewardV4 succeeds for completed collection');
+
+            // Test 27: mcpCollectionRewardV4 deducts reward stones
+            v172Assert(window.gameState.spiritStones > 9500, 'mcpCollectionRewardV4 adds spirit stones reward');
+
+            // Test 28: mcpCollectionRewardV4 fails for already claimed reward
+            const rewardDup = server.mcpCollectionRewardV4('col_realm');
+            v172Assert(rewardDup.error !== undefined, 'mcpCollectionRewardV4 fails for already claimed reward');
+
+            // Test 29: mcpCollectionResetV4 fails without reset scroll
+            window.gameState.inventory = [];
+            const resetNoItem = server.mcpCollectionResetV4();
+            v172Assert(resetNoItem.error !== undefined, 'mcpCollectionResetV4 fails without reset scroll');
+
+            // Test 30: mcpCollectionResetV4 succeeds with reset scroll
+            window.gameState.inventory = [{ id: 'reset_scroll', name: '重置符', count: 1 }];
+            const resetResult = server.mcpCollectionResetV4();
+            v172Assert(resetResult.success === true, 'mcpCollectionResetV4 succeeds');
+
+            // Test 31: mcpCollectionResetV4 deducts reset scroll
+            v172Assert(window.gameState.inventory.find(i => i.id === 'reset_scroll').count === 0, 'mcpCollectionResetV4 deducts reset scroll');
+
+            // Test 32: mcpCollectionResetV4 resets collection items
+            const collAfterReset = server.mcpCollectionStatsV4();
+            v172Assert(collAfterReset.collectedItems === 0, 'mcpCollectionResetV4 resets collected items');
+
+            // Test 33: mcpCollectionResetV4 resets codex entries
+            const viewAfterReset = server.mcpCodexViewV4('codex_realm_1');
+            v172Assert(viewAfterReset.unlocked === false, 'mcpCollectionResetV4 resets codex entries');
+
+            // Test 34: codex.list returns correct progress
+            window.gameState.codexV4 = null;
+            server._initCodexStateV4();
+            const codexListInit = server.mcpCodexListV4();
+            v172Assert(codexListInit.progress.total === 11, 'codex.list returns correct total');
+            v172Assert(codexListInit.progress.unlocked === 0, 'codex.list returns unlocked=0 initially');
+
+            // Test 35: mcpCodexUnlockV4 syncs to collection
+            window.gameState.codexV4 = null;
+            server._initCodexStateV4();
+            window.gameState.spiritStones = 10000;
+            server.mcpCodexUnlockV4('codex_item_1');
+            const collAfterSync = server.mcpCollectionStatsV4();
+            v172Assert(collAfterSync.collectedItems > 0, 'mcpCodexUnlockV4 syncs to collection');
+
+            // Test 36: _initCodexStateV4 is idempotent
+            const codexV4First = server._initCodexStateV4();
+            const codexV4Second = server._initCodexStateV4();
+            v172Assert(codexV4First === codexV4Second, '_initCodexStateV4 is idempotent');
+
+            // Test 37: _initCollectionStateV4 is idempotent
+            const collV4First = server._initCollectionStateV4();
+            const collV4Second = server._initCollectionStateV4();
+            v172Assert(collV4First === collV4Second, '_initCollectionStateV4 is idempotent');
+
+            // Test 38: codex.list shows all 3 categories with correct names
+            const codexListDetail = server.mcpCodexListV4();
+            const catNames = codexListDetail.categories.map(c => c.name);
+            v172Assert(catNames.includes('境界图鉴'), 'codex.list includes 境界图鉴');
+            v172Assert(catNames.includes('物品图鉴'), 'codex.list includes 物品图鉴');
+            v172Assert(catNames.includes('妖兽图鉴'), 'codex.list includes 妖兽图鉴');
+
+            // Test 39: codex.unlock tool registered in toolRegistry
+            const hasCodexUnlock = server.toolRegistry.has('codex.unlock');
+            v172Assert(hasCodexUnlock === true, 'codex.unlock registered in toolRegistry');
+
+            // Test 40: collection.reset tool registered in toolRegistry
+            const hasCollectionReset = server.toolRegistry.has('collection.reset');
+            v172Assert(hasCollectionReset === true, 'collection.reset registered in toolRegistry');
+
+            // Test 41: callTool dispatch for codex.list V172
+            const dispatchedCodex = server.callTool('codex.list', {});
+            const parsedCodexResult = JSON.parse(dispatchedCodex.content[0].text);
+            v172Assert(parsedCodexResult.success === true, 'callTool dispatches codex.list successfully');
+
+            // Test 42: callTool dispatch for collection.stats V172
+            const dispatchedColl = server.callTool('collection.stats', {});
+            const parsedCollResult = JSON.parse(dispatchedColl.content[0].text);
+            v172Assert(parsedCollResult.success === true, 'callTool dispatches collection.stats successfully');
+
+            // Test 43: codex.view returns category name
+            const viewWithCategory = server.mcpCodexViewV4('codex_beast_1');
+            v172Assert(viewWithCategory.category === '妖兽图鉴', 'codex.view returns correct category');
+
+            // Test 44: codex.view returns reward info
+            const viewWithReward = server.mcpCodexViewV4('codex_realm_3');
+            v172Assert(viewWithReward.reward !== undefined, 'codex.view returns reward info');
+            v172Assert(viewWithReward.reward.spiritStones === 100, 'codex.view returns correct reward amount');
+
+            // Test 45: collection.stats returns correct collection structure
+            const collDetail = server.mcpCollectionStatsV4();
+            const realmCol = collDetail.collections.find(c => c.id === 'col_realm');
+            v172Assert(realmCol.items.length === 5, 'collection.stats returns correct realm collection item count');
+            v172Assert(realmCol.reward.spiritStones === 500, 'collection.stats returns correct realm collection reward');
+
+            const passed = results.filter(r => r.pass).length;
+            const total = results.length;
+            const passRate = passed / total;
+            console.log('V172 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+            return { version: 'V172', passed, total, passRate: passRate.toFixed(3), results };
+        }
+
+        const v172Results = runV172Tests();
 
 
         // ===== closeAchievements =====
