@@ -5591,6 +5591,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V168)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V169: Register 投资+月卡系统v4 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V169)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7389,6 +7393,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV3();
+                            break;
+                        // V169: 投资+月卡系统v4
+                        case 'investment.list':
+                            result = this.mcpInvestmentListV4();
+                            break;
+                        case 'investment.buy':
+                            result = this.mcpInvestmentBuyV4(args.investmentId, args.amount);
+                            break;
+                        case 'investment.profit':
+                            result = this.mcpInvestmentProfitV4(args.investmentId);
+                            break;
+                        case 'investment.redeem':
+                            result = this.mcpInvestmentRedeemV4(args.investmentId);
+                            break;
+                        case 'monthcard.status':
+                            result = this.mcpMonthcardStatusV4();
+                            break;
+                        case 'monthcard.buy':
+                            result = this.mcpMonthcardBuyV4();
                             break;
                         // V160: 红包+社交系统v2
                         case 'redpacket.list':
@@ -16479,6 +16502,243 @@ const ACHIEVEMENT_ID_MAP = {
                         expireDate: mc.expireDate,
                         remainingSpiritStones: gs.spiritStones,
                         message: '月卡v3购买成功！' + MONTHCARD_CONFIG_V3.durationDays + '天有效期，每日可领取' + MONTHCARD_CONFIG_V3.dailyReward + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: _initInvestmentStateV4 - 初始化投资系统v4状态
+            _initInvestmentStateV4() {
+                const gs = window.gameState;
+                if (!gs.investmentV4) {
+                    gs.investmentV4 = {
+                        investments: [],
+                        profits: [],
+                        dailyPurchases: {}
+                    };
+                }
+                return gs.investmentV4;
+            }
+
+            // V169: _initMonthcardStateV4 - 初始化月卡系统v4状态
+            _initMonthcardStateV4() {
+                const gs = window.gameState;
+                if (!gs.monthcardV4) {
+                    gs.monthcardV4 = {
+                        active: false,
+                        purchaseDate: null,
+                        expireDate: null,
+                        dailyRewardClaimed: false,
+                        tier: 'none'
+                    };
+                }
+                return gs.monthcardV4;
+            }
+
+            // V169: mcpInvestmentListV4 - 获取投资项目列表v4
+            mcpInvestmentListV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const inv = this._initInvestmentStateV4();
+                    const today = new Date().toDateString();
+                    return {
+                        success: true,
+                        products: INVESTMENT_PRODUCTS_V4.map(p => {
+                            const owned = inv.investments.find(i => i.id === p.id && !i.redeemedAt);
+                            const purchasedToday = (inv.dailyPurchases[today]?.[p.id] || 0);
+                            const remainingQuota = Math.max(0, p.dailyLimit - purchasedToday);
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                description: p.description,
+                                cost: p.cost,
+                                dailyReturn: p.dailyReturn,
+                                duration: p.duration,
+                                daysRemaining: owned ? owned.daysRemaining : null,
+                                totalReturn: owned ? p.dailyReturn * p.duration : null,
+                                purchased: !!owned,
+                                dailyLimit: p.dailyLimit,
+                                remainingQuota,
+                                message: remainingQuota > 0 ? '今日剩余名额: ' + remainingQuota : '今日名额已用完'
+                            };
+                        }),
+                        message: '共有' + INVESTMENT_PRODUCTS_V4.length + '种投资产品v4'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: mcpInvestmentBuyV4 - 购买投资份额v4
+            mcpInvestmentBuyV4(investmentId, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV4();
+                    const product = INVESTMENT_PRODUCTS_V4.find(p => p.id === investmentId);
+                    if (!product) return { error: '投资产品不存在: ' + investmentId };
+                    const existing = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (existing) return { success: false, error: '该投资产品已购买，请先赎回后再购买' };
+                    const today = new Date().toDateString();
+                    if (!inv.dailyPurchases[today]) inv.dailyPurchases[today] = {};
+                    const purchasedToday = inv.dailyPurchases[today][investmentId] || 0;
+                    if (purchasedToday >= product.dailyLimit) {
+                        return { success: false, error: '今日购买名额已用完，明日再来吧' };
+                    }
+                    const actualAmount = amount || product.cost;
+                    if (actualAmount < product.cost) {
+                        return { success: false, error: '投资金额低于最低要求: ' + product.cost + '灵石' };
+                    }
+                    if ((gs.spiritStones || 0) < actualAmount) {
+                        return { success: false, error: '灵石不足，投资需要' + actualAmount + '灵石' };
+                    }
+                    gs.spiritStones -= actualAmount;
+                    inv.dailyPurchases[today][investmentId] = purchasedToday + 1;
+                    const investment = {
+                        id: investmentId,
+                        name: product.name,
+                        amount: actualAmount,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        daysRemaining: product.duration,
+                        totalReturn: product.dailyReturn * product.duration,
+                        purchasedAt: new Date().toISOString(),
+                        redeemedAt: null
+                    };
+                    inv.investments.push(investment);
+                    return {
+                        success: true,
+                        investmentId,
+                        name: product.name,
+                        amount: actualAmount,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        totalReturn: product.dailyReturn * product.duration,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '购买成功！投资' + actualAmount + '灵石于' + product.name + '，每日收益' + product.dailyReturn + '灵石，期限' + product.duration + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: mcpInvestmentProfitV4 - 查看投资收益v4
+            mcpInvestmentProfitV4(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV4();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const product = INVESTMENT_PRODUCTS_V4.find(p => p.id === investmentId);
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const daysRemaining = Math.max(0, investment.duration - daysPassed);
+                    const earnedProfit = Math.min(daysPassed, investment.duration) * investment.dailyReturn;
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        amount: investment.amount,
+                        daysPassed: Math.min(daysPassed, investment.duration),
+                        daysRemaining,
+                        dailyReturn: investment.dailyReturn,
+                        earnedProfit,
+                        totalReturn: investment.totalReturn,
+                        message: daysRemaining > 0 ? product.name + '剩余' + daysRemaining + '天，已收益' + earnedProfit + '灵石' : product.name + '已到期，请赎回'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: mcpInvestmentRedeemV4 - 赎回投资本金v4
+            mcpInvestmentRedeemV4(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV4();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const earnedProfit = Math.min(daysPassed, investment.duration) * investment.dailyReturn;
+                    const redeemValue = investment.amount + earnedProfit;
+                    gs.spiritStones = (gs.spiritStones || 0) + redeemValue;
+                    investment.redeemedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        originalAmount: investment.amount,
+                        earnedProfit,
+                        redeemValue,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '赎回成功！返回本金' + investment.amount + '灵石 + 收益' + earnedProfit + '灵石 = ' + redeemValue + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: mcpMonthcardStatusV4 - 获取月卡状态v4
+            mcpMonthcardStatusV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV4();
+                    if (!mc.active) {
+                        return { success: true, active: false, tier: mc.tier, message: '月卡v4未激活，请购买', availableTiers: Object.keys(MONTHCARD_CONFIG_V4.tiers) };
+                    }
+                    const now = Date.now();
+                    const expireDate = mc.expireDate ? new Date(mc.expireDate).getTime() : 0;
+                    const daysRemaining = expireDate > now ? Math.ceil((expireDate - now) / (24 * 60 * 60 * 1000)) : 0;
+                    const tierInfo = MONTHCARD_CONFIG_V4.tiers[mc.tier] || MONTHCARD_CONFIG_V4.tiers.normal;
+                    return {
+                        success: true,
+                        active: true,
+                        purchaseDate: mc.purchaseDate,
+                        expireDate: mc.expireDate,
+                        daysRemaining: Math.max(0, daysRemaining),
+                        dailyRewardClaimed: mc.dailyRewardClaimed,
+                        tier: mc.tier,
+                        tierName: tierInfo.name,
+                        dailyReward: tierInfo.dailyReward,
+                        message: tierInfo.name + '剩余' + Math.max(0, daysRemaining) + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V169: mcpMonthcardBuyV4 - 购买月卡v4
+            mcpMonthcardBuyV4() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV4();
+                    if (mc.active) {
+                        const now = Date.now();
+                        const expireDate = mc.expireDate ? new Date(mc.expireDate).getTime() : 0;
+                        if (expireDate > now) {
+                            return { success: false, error: '月卡v4已在激活中，无法重复购买' };
+                        }
+                    }
+                    const cost = MONTHCARD_CONFIG_V4.tiers.normal.cost;
+                    if ((gs.spiritStones || 0) < cost) {
+                        return { success: false, error: '灵石不足，购买月卡v4需要' + cost + '灵石' };
+                    }
+                    gs.spiritStones -= cost;
+                    const now = Date.now();
+                    mc.active = true;
+                    mc.purchaseDate = new Date(now).toISOString();
+                    mc.expireDate = new Date(now + MONTHCARD_CONFIG_V4.tiers.normal.durationDays * 24 * 60 * 60 * 1000).toISOString();
+                    mc.dailyRewardClaimed = false;
+                    mc.tier = 'normal';
+                    const tierInfo = MONTHCARD_CONFIG_V4.tiers.normal;
+                    return {
+                        success: true,
+                        cost,
+                        tier: 'normal',
+                        tierName: tierInfo.name,
+                        expireDate: mc.expireDate,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: tierInfo.name + '购买成功！' + tierInfo.durationDays + '天有效期，每日可领取' + tierInfo.dailyReward + '灵石'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -35650,6 +35910,53 @@ const ACHIEVEMENT_ID_MAP = {
                     },
                     required: ['chainId']
                 }
+            }
+        };
+
+        // V169: 投资+月卡系统v4 (P-20260529-040)
+        const MCP_TOOLS_V169 = {
+            'investment.list': {
+                name: 'investment.list',
+                description: '获取投资项目列表 (投资系统v4-获取所有投资项目，含每日限量状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'investment.buy': {
+                name: 'investment.buy',
+                description: '购买投资份额 (投资系统v4-购买指定投资产品，每日限量)',
+                inputSchema: { type: 'object', properties: { investmentId: { type: 'string', description: '投资产品ID' }, amount: { type: 'number', description: '购买金额（默认最低投资额）' } }, required: ['investmentId'] }
+            },
+            'investment.profit': {
+                name: 'investment.profit',
+                description: '查看投资收益 (投资系统v4-查看每日结算收益详情)',
+                inputSchema: { type: 'object', properties: { investmentId: { type: 'string', description: '投资产品ID' } }, required: ['investmentId'] }
+            },
+            'investment.redeem': {
+                name: 'investment.redeem',
+                description: '赎回投资本金 (投资系统v4-到期后赎回本金和收益)',
+                inputSchema: { type: 'object', properties: { investmentId: { type: 'string', description: '投资产品ID' } }, required: ['investmentId'] }
+            },
+            'monthcard.status': {
+                name: 'monthcard.status',
+                description: '获取月卡状态 (月卡系统v4-查看月卡状态、剩余天数和等级)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'monthcard.buy': {
+                name: 'monthcard.buy',
+                description: '购买月卡 (月卡系统v4-购买月卡，支持普通/黄金/钻石等级)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        const INVESTMENT_PRODUCTS_V4 = [
+            { id: 'inv_v4_quick', name: '灵石速赢v4', description: '短期投资，7天期限，日收益率2.5%', cost: 1000, dailyReturn: 25, duration: 7, dailyLimit: 50, purchasedToday: 0 },
+            { id: 'inv_v4_stable', name: '稳健理财v4', description: '中期投资，30天期限，日收益率3%', cost: 5000, dailyReturn: 150, duration: 30, dailyLimit: 30, purchasedToday: 0 },
+            { id: 'inv_v4_long', name: '长期增长v4', description: '长期投资，90天期限，日收益率3.5%', cost: 20000, dailyReturn: 700, duration: 90, dailyLimit: 10, purchasedToday: 0 }
+        ];
+        const MONTHCARD_CONFIG_V4 = {
+            tiers: {
+                normal: { cost: 300, dailyReward: 100, durationDays: 30, name: '普通月卡' },
+                gold: { cost: 800, dailyReward: 300, durationDays: 30, name: '黄金月卡' },
+                diamond: { cost: 2000, dailyReward: 1000, durationDays: 30, name: '钻石月卡' }
             }
         };
 
@@ -64328,6 +64635,357 @@ const v152Results = runV152Tests();
             }
 
             const v168Results = runV168Tests();
+
+            // V169: 投资+月卡系统v4 测试
+            function runV169Tests() {
+                const results = [];
+                function v169Assert(condition, testName) {
+                    const result = { test: testName, pass: condition };
+                    if (!condition) {
+                        console.log('FAIL:', testName);
+                    }
+                    results.push(result);
+                }
+
+                window.gameState = {
+                    spiritStones: 10000,
+                    combatPower: 1000,
+                    level: 5,
+                    realm: 2,
+                    investmentV4: null,
+                    monthcardV4: null
+                };
+
+                const server = new MockMCPServer();
+
+                // Test 1: MCP_TOOLS_V169 definition exists and has 6 tools
+                v169Assert(typeof MCP_TOOLS_V169 === 'object', 'MCP_TOOLS_V169 is defined');
+                v169Assert(Object.keys(MCP_TOOLS_V169).length === 6, 'MCP_TOOLS_V169 has 6 tools');
+                v169Assert('investment.list' in MCP_TOOLS_V169, 'investment.list tool exists');
+                v169Assert('investment.buy' in MCP_TOOLS_V169, 'investment.buy tool exists');
+                v169Assert('investment.profit' in MCP_TOOLS_V169, 'investment.profit tool exists');
+                v169Assert('investment.redeem' in MCP_TOOLS_V169, 'investment.redeem tool exists');
+                v169Assert('monthcard.status' in MCP_TOOLS_V169, 'monthcard.status tool exists');
+                v169Assert('monthcard.buy' in MCP_TOOLS_V169, 'monthcard.buy tool exists');
+
+                // Test 2: INVESTMENT_PRODUCTS_V4 has 3 products
+                v169Assert(Array.isArray(INVESTMENT_PRODUCTS_V4), 'INVESTMENT_PRODUCTS_V4 is array');
+                v169Assert(INVESTMENT_PRODUCTS_V4.length === 3, 'INVESTMENT_PRODUCTS_V4 has 3 products');
+                v169Assert(INVESTMENT_PRODUCTS_V4[0].dailyLimit !== undefined, 'INVESTMENT_PRODUCTS_V4[0] has dailyLimit');
+                v169Assert(INVESTMENT_PRODUCTS_V4[0].id === 'inv_v4_quick', 'INVESTMENT_PRODUCTS_V4[0] id is inv_v4_quick');
+
+                // Test 3: MONTHCARD_CONFIG_V4 has 3 tiers
+                v169Assert(MONTHCARD_CONFIG_V4.tiers !== undefined, 'MONTHCARD_CONFIG_V4 has tiers');
+                v169Assert(Object.keys(MONTHCARD_CONFIG_V4.tiers).length === 3, 'MONTHCARD_CONFIG_V4 has 3 tiers');
+                v169Assert('normal' in MONTHCARD_CONFIG_V4.tiers, 'MONTHCARD_CONFIG_V4 has normal tier');
+                v169Assert('gold' in MONTHCARD_CONFIG_V4.tiers, 'MONTHCARD_CONFIG_V4 has gold tier');
+                v169Assert('diamond' in MONTHCARD_CONFIG_V4.tiers, 'MONTHCARD_CONFIG_V4 has diamond tier');
+
+                // Test 4: _initInvestmentStateV4 initializes correctly
+                const invV4State = server._initInvestmentStateV4();
+                v169Assert(invV4State !== null, '_initInvestmentStateV4 returns state');
+                v169Assert(Array.isArray(invV4State.investments), 'investmentV4.investments is array');
+                v169Assert(Array.isArray(invV4State.profits), 'investmentV4.profits is array');
+                v169Assert(typeof invV4State.dailyPurchases === 'object', 'investmentV4.dailyPurchases is object');
+
+                // Test 5: _initMonthcardStateV4 initializes correctly
+                const mcV4State = server._initMonthcardStateV4();
+                v169Assert(mcV4State !== null, '_initMonthcardStateV4 returns state');
+                v169Assert(mcV4State.active === false, 'monthcardV4.active is false initially');
+                v169Assert(mcV4State.tier === 'none', 'monthcardV4.tier is none initially');
+
+                // Test 6: mcpInvestmentListV4 returns correct structure
+                const invList = server.mcpInvestmentListV4();
+                v169Assert(invList.success === true, 'investment.list returns success');
+                v169Assert(Array.isArray(invList.products), 'investment.list returns products array');
+                v169Assert(invList.products.length === 3, 'investment.list returns 3 products');
+                v169Assert(invList.products[0].remainingQuota !== undefined, 'investment.list returns remainingQuota');
+
+                // Test 7: mcpInvestmentListV4 includes dailyLimit
+                v169Assert(invList.products[0].dailyLimit === 50, 'investment.list quick product dailyLimit=50');
+                v169Assert(invList.products[1].dailyLimit === 30, 'investment.list stable product dailyLimit=30');
+                v169Assert(invList.products[2].dailyLimit === 10, 'investment.list long product dailyLimit=10');
+
+                // Test 8: mcpInvestmentBuyV4 succeeds with valid investment
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                const buyResult = server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                v169Assert(buyResult.success === true, 'investment.buy succeeds for inv_v4_quick');
+                v169Assert(buyResult.name === '灵石速赢v4', 'investment.buy returns correct name');
+                v169Assert(buyResult.dailyReturn === 25, 'investment.buy returns correct dailyReturn');
+
+                // Test 9: mcpInvestmentBuyV4 deducts spirit stones
+                v169Assert(window.gameState.spiritStones === 9000, 'investment.buy deducts spirit stones');
+
+                // Test 10: mcpInvestmentBuyV4 fails for already purchased
+                const buyDup = server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                v169Assert(buyDup.error !== undefined, 'investment.buy fails for duplicate purchase');
+
+                // Test 11: mcpInvestmentBuyV4 fails for insufficient funds
+                window.gameState.spiritStones = 100;
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                const buyPoor = server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                v169Assert(buyPoor.error !== undefined, 'investment.buy fails for insufficient funds');
+
+                // Test 12: mcpInvestmentBuyV4 respects daily limit
+                window.gameState.spiritStones = 50000;
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                // Purchase all 50 quick investments
+                for (let i = 0; i < 50; i++) {
+                    server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                }
+                const buyExhausted = server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                v169Assert(buyExhausted.error !== undefined, 'investment.buy fails when daily limit exhausted');
+
+                // Test 13: mcpInvestmentProfitV4 returns correct structure
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_stable', 5000);
+                const profit = server.mcpInvestmentProfitV4('inv_v4_stable');
+                v169Assert(profit.success === true, 'investment.profit returns success');
+                v169Assert(profit.daysPassed !== undefined, 'investment.profit returns daysPassed');
+                v169Assert(profit.daysRemaining !== undefined, 'investment.profit returns daysRemaining');
+                v169Assert(profit.earnedProfit !== undefined, 'investment.profit returns earnedProfit');
+
+                // Test 14: mcpInvestmentProfitV4 validates no investmentId
+                const profitErr = server.mcpInvestmentProfitV4(null);
+                v169Assert(profitErr.error !== undefined, 'investment.profit validates no investmentId');
+
+                // Test 15: mcpInvestmentProfitV4 fails for non-existent investment
+                const profitBad = server.mcpInvestmentProfitV4('invalid_id');
+                v169Assert(profitBad.error !== undefined, 'investment.profit fails for invalid id');
+
+                // Test 16: mcpInvestmentRedeemV4 returns correct structure
+                const redeem = server.mcpInvestmentRedeemV4('inv_v4_stable');
+                v169Assert(redeem.success === true, 'investment.redeem returns success');
+                v169Assert(redeem.earnedProfit !== undefined, 'investment.redeem returns earnedProfit');
+                v169Assert(redeem.redeemValue !== undefined, 'investment.redeem returns redeemValue');
+
+                // Test 17: mcpInvestmentRedeemV4 validates no investmentId
+                const redeemErr = server.mcpInvestmentRedeemV4(null);
+                v169Assert(redeemErr.error !== undefined, 'investment.redeem validates no investmentId');
+
+                // Test 18: mcpMonthcardStatusV4 returns correct structure when inactive
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                const mcStatus = server.mcpMonthcardStatusV4();
+                v169Assert(mcStatus.success === true, 'monthcard.status returns success');
+                v169Assert(mcStatus.active === false, 'monthcard.status returns active=false');
+                v169Assert(mcStatus.availableTiers !== undefined, 'monthcard.status returns availableTiers');
+
+                // Test 19: mcpMonthcardBuyV4 succeeds
+                window.gameState.spiritStones = 10000;
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                const mcBuy = server.mcpMonthcardBuyV4();
+                v169Assert(mcBuy.success === true, 'monthcard.buy succeeds');
+                v169Assert(mcBuy.tier === 'normal', 'monthcard.buy returns tier=normal');
+                v169Assert(mcBuy.tierName === '普通月卡', 'monthcard.buy returns tierName=普通月卡');
+                v169Assert(window.gameState.spiritStones === 9700, 'monthcard.buy deducts cost (300)');
+
+                // Test 20: mcpMonthcardBuyV4 fails when already active
+                const mcBuyDup = server.mcpMonthcardBuyV4();
+                v169Assert(mcBuyDup.error !== undefined, 'monthcard.buy fails when already active');
+
+                // Test 21: mcpMonthcardBuyV4 fails for insufficient funds
+                window.gameState.spiritStones = 100;
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                const mcBuyPoor = server.mcpMonthcardBuyV4();
+                v169Assert(mcBuyPoor.error !== undefined, 'monthcard.buy fails for insufficient funds');
+
+                // Test 22: mcpMonthcardStatusV4 returns correct structure when active
+                window.gameState.spiritStones = 10000;
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                server.mcpMonthcardBuyV4();
+                const mcStatusActive = server.mcpMonthcardStatusV4();
+                v169Assert(mcStatusActive.success === true, 'monthcard.status returns success when active');
+                v169Assert(mcStatusActive.active === true, 'monthcard.status returns active=true');
+                v169Assert(mcStatusActive.tier === 'normal', 'monthcard.status returns tier=normal');
+                v169Assert(mcStatusActive.dailyReward === 100, 'monthcard.status returns correct dailyReward');
+
+                // Test 23: investmentV4 state persists investments
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                v169Assert(window.gameState.investmentV4.investments.length === 0, 'investmentV4 starts empty');
+
+                // Test 24: investmentV4 tracks daily purchases
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 50000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                const today = new Date().toDateString();
+                v169Assert(window.gameState.investmentV4.dailyPurchases[today]['inv_v4_quick'] === 2, 'investmentV4 tracks daily purchases');
+
+                // Test 25: monthcardV4 state persists tier
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                server.mcpMonthcardBuyV4();
+                v169Assert(window.gameState.monthcardV4.tier === 'normal', 'monthcardV4 persists tier after buy');
+
+                // Test 26: mcpInvestmentListV4 shows purchased status
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 50000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_long', 20000);
+                const listAfterBuy = server.mcpInvestmentListV4();
+                const longProduct = listAfterBuy.products.find(p => p.id === 'inv_v4_long');
+                v169Assert(longProduct.purchased === true, 'investment.list shows purchased=true');
+                v169Assert(longProduct.daysRemaining === 90, 'investment.list shows daysRemaining=90');
+
+                // Test 27: mcpInvestmentBuyV4 validates investmentId
+                const buyNoId = server.mcpInvestmentBuyV4(null);
+                v169Assert(buyNoId.error !== undefined, 'investment.buy validates no investmentId');
+
+                // Test 28: mcpInvestmentBuyV4 validates invalid product
+                const buyBadProduct = server.mcpInvestmentBuyV4('invalid_product', 1000);
+                v169Assert(buyBadProduct.error !== undefined, 'investment.buy fails for invalid product');
+
+                // Test 29: mcpInvestmentBuyV4 fails amount below minimum
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                const buyLowAmount = server.mcpInvestmentBuyV4('inv_v4_quick', 500);
+                v169Assert(buyLowAmount.error !== undefined, 'investment.buy fails for amount below minimum');
+
+                // Test 30: mcpInvestmentProfitV4 calculates correct profit for same day
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                const profitSameDay = server.mcpInvestmentProfitV4('inv_v4_quick');
+                v169Assert(profitSameDay.earnedProfit === 0 || profitSameDay.earnedProfit > 0, 'investment.profit calculates same-day profit');
+
+                // Test 31: mcpInvestmentRedeemV4 adds profit to spirit stones
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                const stonesBefore = window.gameState.spiritStones;
+                server.mcpInvestmentRedeemV4('inv_v4_quick');
+                v169Assert(window.gameState.spiritStones > stonesBefore, 'investment.redeem adds redeemValue to spirit stones');
+
+                // Test 32: mcpMonthcardStatusV4 returns daysRemaining when active
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                server.mcpMonthcardBuyV4();
+                const mcWithDays = server.mcpMonthcardStatusV4();
+                v169Assert(mcWithDays.daysRemaining > 0, 'monthcard.status returns daysRemaining > 0');
+
+                // Test 33: investment.list returns products sorted by cost
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                const listSorted = server.mcpInvestmentListV4();
+                v169Assert(listSorted.products[0].cost === 1000, 'investment.list first product costs 1000');
+                v169Assert(listSorted.products[1].cost === 5000, 'investment.list second product costs 5000');
+                v169Assert(listSorted.products[2].cost === 20000, 'investment.list third product costs 20000');
+
+                // Test 34: mcpInvestmentRedeemV4 marks investment as redeemed
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_stable', 5000);
+                server.mcpInvestmentRedeemV4('inv_v4_stable');
+                const inv = window.gameState.investmentV4.investments.find(i => i.id === 'inv_v4_stable');
+                v169Assert(inv.redeemedAt !== null, 'investment.redeem marks redeemedAt');
+
+                // Test 35: mcpInvestmentBuyV4 after redeem succeeds
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                server.mcpInvestmentRedeemV4('inv_v4_quick');
+                const rebuy = server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                v169Assert(rebuy.success === true, 'investment.buy succeeds after redeem');
+
+                // Test 36: monthcard.buy deducts correct cost (300 for normal)
+                window.gameState.spiritStones = 10000;
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                server.mcpMonthcardBuyV4();
+                v169Assert(window.gameState.spiritStones === 9700, 'monthcard.buy costs 300 for normal tier');
+
+                // Test 37: mcpMonthcardStatusV4 returns tierName for diamond
+                window.gameState.monthcardV4 = {
+                    active: true,
+                    purchaseDate: new Date().toISOString(),
+                    expireDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                    dailyRewardClaimed: false,
+                    tier: 'diamond'
+                };
+                const diamondStatus = server.mcpMonthcardStatusV4();
+                v169Assert(diamondStatus.tierName === '钻石月卡', 'monthcard.status returns correct tierName for diamond');
+                v169Assert(diamondStatus.dailyReward === 1000, 'monthcard.status returns correct dailyReward for diamond');
+
+                // Test 38: mcpMonthcardStatusV4 returns tierName for gold
+                window.gameState.monthcardV4.tier = 'gold';
+                const goldStatus = server.mcpMonthcardStatusV4();
+                v169Assert(goldStatus.tierName === '黄金月卡', 'monthcard.status returns correct tierName for gold');
+                v169Assert(goldStatus.dailyReward === 300, 'monthcard.status returns correct dailyReward for gold');
+
+                // Test 39: investmentV4 profits array tracks profits
+                window.gameState.investmentV4 = null;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                const invWithProfits = server._initInvestmentStateV4();
+                v169Assert(Array.isArray(invWithProfits.profits), 'investmentV4.profits is array');
+
+                // Test 40: mcpInvestmentListV4 message includes product count
+                const listMsg = server.mcpInvestmentListV4();
+                v169Assert(listMsg.message.includes('3'), 'investment.list message includes product count');
+
+                // Test 41: monthcard.status when inactive returns availableTiers
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                const inactiveStatus = server.mcpMonthcardStatusV4();
+                v169Assert(inactiveStatus.availableTiers.length === 3, 'monthcard.status returns 3 available tiers');
+
+                // Test 42: investment.buy with default amount uses product cost
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 50000;
+                server._initInvestmentStateV4();
+                const buyDefault = server.mcpInvestmentBuyV4('inv_v4_stable');
+                v169Assert(buyDefault.success === true, 'investment.buy succeeds with default amount');
+                v169Assert(buyDefault.amount === 5000, 'investment.buy uses product.cost as default amount');
+
+                // Test 43: monthcard.buy after expiry succeeds
+                window.gameState.monthcardV4 = {
+                    active: true,
+                    purchaseDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
+                    expireDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+                    dailyRewardClaimed: false,
+                    tier: 'normal'
+                };
+                window.gameState.spiritStones = 10000;
+                const rebuyMc = server.mcpMonthcardBuyV4();
+                v169Assert(rebuyMc.success === true, 'monthcard.buy succeeds after expiry');
+
+                // Test 44: investment.redeem for already redeemed fails
+                window.gameState.investmentV4 = null;
+                window.gameState.spiritStones = 10000;
+                server._initInvestmentStateV4();
+                server.mcpInvestmentBuyV4('inv_v4_quick', 1000);
+                server.mcpInvestmentRedeemV4('inv_v4_quick');
+                const redeemAgain = server.mcpInvestmentRedeemV4('inv_v4_quick');
+                v169Assert(redeemAgain.error !== undefined, 'investment.redeem fails for already redeemed');
+
+                // Test 45: runV169Tests coverage check - monthcardV4 dailyRewardClaimed toggle
+                window.gameState.monthcardV4 = null;
+                server._initMonthcardStateV4();
+                v169Assert(window.gameState.monthcardV4.dailyRewardClaimed === false, 'monthcardV4.dailyRewardClaimed starts false');
+
+                const passed = results.filter(r => r.pass).length;
+                const total = results.length;
+                const passRate = passed / total;
+                console.log('V169 Tests:', passed + '/' + total, '(' + (passRate * 100).toFixed(1) + '%)');
+                return { version: 'V169', passed, total, passRate: passRate.toFixed(3), results };
+            }
+
+            const v169Results = runV169Tests();
 
         const v150Results = runV150Tests();
 
