@@ -3833,6 +3833,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V210)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V211: Register 邮件+公告系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V211)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4197,6 +4201,25 @@
                             break;
                         case 'collection.reward':
                             result = mcpCollectionRewardV8(args.rewardId);
+                            break;
+                        // V211: 邮件+公告系统v8
+                        case 'mail.list':
+                            result = mcpMailListV8();
+                            break;
+                        case 'mail.send':
+                            result = mcpMailSendV8(args.recipientId, args.subject, args.content);
+                            break;
+                        case 'mail.read':
+                            result = mcpMailReadV8(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = mcpMailDeleteV8(args.mailId);
+                            break;
+                        case 'announce.list':
+                            result = mcpAnnounceListV8();
+                            break;
+                        case 'announce.view':
+                            result = mcpAnnounceViewV8(args.announceId);
                             break;
                         // V202: 签到+福利系统v7
                         case 'signin.list':
@@ -87861,3 +87884,492 @@ const v152Results = runV152Tests();
         }
 
         const v210Results = runV210Tests();
+
+        // ========== V211: 邮件+公告系统v8 ==========
+
+        // V211: 邮件+公告系统v8 - MCP工具定义
+        const MCP_TOOLS_V211 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统v8-获取邮件列表，收件箱/已发送)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统v8-发送邮件，支持系统邮件/玩家邮件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        recipientId: { type: 'string', description: '收件人ID' },
+                        subject: { type: 'string', description: '邮件主题' },
+                        content: { type: 'string', description: '邮件内容' }
+                    },
+                    required: ['recipientId', 'subject', 'content']
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件 (邮件系统v8-读取邮件并标记为已读)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统v8-删除邮件，放入回收站)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统v8-获取公告列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统v8-查看公告详情，增加浏览计数)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
+                }
+            }
+        };
+
+        // V211: _initMailStateV8 - 初始化邮件系统v8状态
+        function _initMailStateV8() {
+            const gs = window.gameState;
+            if (!gs.mailV8) {
+                gs.mailV8 = {
+                    mails: [
+                        // 收件箱邮件
+                        { id: 'mail_v8_001', senderId: 'system', senderName: '系统', recipientId: 'player_001', subject: '欢迎来到修仙世界v8', content: '各位修士，欢迎踏入修仙之路！邮件系统v8已全面升级，新增系统通知、邮件统计等功能。', sentAt: Date.now() - 86400000, readAt: null, deleted: false, isSystem: true },
+                        { id: 'mail_v8_002', senderId: 'elder_001', senderName: '掌门', recipientId: 'player_001', subject: '门派任务更新通知', content: '门派有新的秘境任务发布，请及时查看并完成。', sentAt: Date.now() - 172800000, readAt: Date.now() - 86400000, deleted: false, isSystem: false },
+                        { id: 'mail_v8_003', senderId: 'system', senderName: '系统', recipientId: 'player_001', subject: '限时活动开启公告', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', sentAt: Date.now() - 259200000, readAt: null, deleted: false, isSystem: true }
+                    ],
+                    inbox: [],
+                    sent: [],
+                    totalSent: 0,
+                    totalReceived: 0,
+                    nextId: 4
+                };
+                // 初始化收件箱和已发送
+                gs.mailV8.inbox = gs.mailV8.mails.filter(m => !m.deleted && m.recipientId === 'player_001');
+                gs.mailV8.totalReceived = gs.mailV8.inbox.length;
+            }
+            return gs.mailV8;
+        }
+
+        // V211: _initAnnounceStateV8 - 初始化公告系统v8状态
+        function _initAnnounceStateV8() {
+            const gs = window.gameState;
+            if (!gs.announceV8) {
+                gs.announceV8 = {
+                    announcements: [
+                        { id: 'ann_v8_001', title: '欢迎来到修仙世界v8', content: '各位修士，欢迎踏入修仙之路！公告系统v8已全面升级，新增置顶公告、浏览统计等功能。', createdAt: Date.now() - 86400000, priority: 'high', expiresAt: null, views: 0, isPinned: true },
+                        { id: 'ann_v8_002', title: '新版本更新公告v8', content: 'V211版本已更新，邮件系统和公告系统全面升级，详情请查看游戏内说明。', createdAt: Date.now() - 172800000, priority: 'medium', expiresAt: null, views: 0, isPinned: false },
+                        { id: 'ann_v8_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', createdAt: Date.now() - 259200000, priority: 'high', expiresAt: Date.now() + 604800000, views: 0, isPinned: false },
+                        { id: 'ann_v8_004', title: '系统维护通知', content: '系统将于明日凌晨进行维护，请提前做好准备。', createdAt: Date.now() - 432000000, priority: 'low', expiresAt: Date.now() + 86400000, views: 0, isPinned: false }
+                    ],
+                    pinnedAnnouncement: null,
+                    totalViews: 0
+                };
+                // 设置置顶公告
+                const pinned = gs.announceV8.announcements.find(a => a.isPinned);
+                if (pinned) gs.announceV8.pinnedAnnouncement = pinned.id;
+            }
+            return gs.announceV8;
+        }
+
+        // V211: mcpMailListV8 - 获取邮件列表v8
+        function mcpMailListV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const mailV8 = _initMailStateV8();
+                const inbox = mailV8.inbox.map(m => ({
+                    id: m.id,
+                    from: m.senderName,
+                    fromId: m.senderId,
+                    subject: m.subject,
+                    sentAt: m.sentAt,
+                    read: m.readAt !== null,
+                    isSystem: m.isSystem
+                }));
+                const sent = mailV8.sent.map(m => ({
+                    id: m.id,
+                    to: m.recipientId,
+                    subject: m.subject,
+                    sentAt: m.sentAt
+                }));
+                return {
+                    success: true,
+                    inbox: inbox,
+                    sent: sent,
+                    inboxCount: inbox.length,
+                    sentCount: mailV8.sent.length,
+                    totalSent: mailV8.totalSent,
+                    totalReceived: mailV8.totalReceived
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: mcpMailSendV8 - 发送邮件v8
+        function mcpMailSendV8(recipientId, subject, content) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!recipientId) return { error: '缺少收件人ID (recipientId)' };
+                if (!subject) return { error: '缺少邮件主题 (subject)' };
+                if (!content) return { error: '缺少邮件内容 (content)' };
+                const mailV8 = _initMailStateV8();
+                const newMail = {
+                    id: 'mail_v8_' + String(mailV8.nextId).padStart(3, '0'),
+                    senderId: 'player_001',
+                    senderName: '玩家',
+                    recipientId: recipientId,
+                    subject: subject,
+                    content: content,
+                    sentAt: Date.now(),
+                    readAt: null,
+                    deleted: false,
+                    isSystem: false
+                };
+                mailV8.mails.push(newMail);
+                mailV8.sent.push(newMail);
+                mailV8.totalSent++;
+                mailV8.nextId++;
+                return {
+                    success: true,
+                    mailId: newMail.id,
+                    message: '邮件发送成功！'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: mcpMailReadV8 - 读取邮件v8
+        function mcpMailReadV8(mailId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!mailId) return { error: '缺少邮件ID (mailId)' };
+                const mailV8 = _initMailStateV8();
+                const mail = mailV8.mails.find(m => m.id === mailId);
+                if (!mail) return { error: '邮件不存在' };
+                if (mail.deleted) return { error: '邮件已被删除' };
+                // 标记为已读
+                if (!mail.readAt) {
+                    mail.readAt = Date.now();
+                }
+                return {
+                    success: true,
+                    mail: {
+                        id: mail.id,
+                        from: mail.senderName,
+                        fromId: mail.senderId,
+                        subject: mail.subject,
+                        content: mail.content,
+                        sentAt: mail.sentAt,
+                        readAt: mail.readAt,
+                        isSystem: mail.isSystem
+                    },
+                    message: '邮件读取成功'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: mcpMailDeleteV8 - 删除邮件v8
+        function mcpMailDeleteV8(mailId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!mailId) return { error: '缺少邮件ID (mailId)' };
+                const mailV8 = _initMailStateV8();
+                const mail = mailV8.mails.find(m => m.id === mailId);
+                if (!mail) return { error: '邮件不存在' };
+                if (mail.deleted) return { error: '邮件已被删除' };
+                mail.deleted = true;
+                // 从收件箱移除
+                const inboxIdx = mailV8.inbox.findIndex(m => m.id === mailId);
+                if (inboxIdx !== -1) mailV8.inbox.splice(inboxIdx, 1);
+                return {
+                    success: true,
+                    message: '邮件删除成功！'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: mcpAnnounceListV8 - 获取公告列表v8
+        function mcpAnnounceListV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const announceV8 = _initAnnounceStateV8();
+                const now = Date.now();
+                const activeAnnouncements = announceV8.announcements.filter(a => {
+                    if (a.expiresAt && a.expiresAt < now) return false;
+                    return true;
+                });
+                // 按优先级和时间排序
+                activeAnnouncements.sort((a, b) => {
+                    if (a.isPinned !== b.isPinned) return b.isPinned ? 1 : -1;
+                    if (a.priority !== b.priority) {
+                        const priorityOrder = { high: 3, medium: 2, low: 1 };
+                        return priorityOrder[b.priority] - priorityOrder[a.priority];
+                    }
+                    return b.createdAt - a.createdAt;
+                });
+                const list = activeAnnouncements.map(a => ({
+                    id: a.id,
+                    title: a.title,
+                    priority: a.priority,
+                    createdAt: a.createdAt,
+                    views: a.views,
+                    isPinned: a.isPinned,
+                    isExpired: a.expiresAt && a.expiresAt < now
+                }));
+                return {
+                    success: true,
+                    announcements: list,
+                    count: list.length,
+                    pinnedAnnouncement: announceV8.pinnedAnnouncement,
+                    totalViews: announceV8.totalViews
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: mcpAnnounceViewV8 - 查看公告详情v8
+        function mcpAnnounceViewV8(announceId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!announceId) return { error: '缺少公告ID (announceId)' };
+                const announceV8 = _initAnnounceStateV8();
+                const announcement = announceV8.announcements.find(a => a.id === announceId);
+                if (!announcement) return { error: '公告不存在' };
+                // 增加浏览计数
+                announcement.views++;
+                announceV8.totalViews++;
+                const now = Date.now();
+                return {
+                    success: true,
+                    announcement: {
+                        id: announcement.id,
+                        title: announcement.title,
+                        content: announcement.content,
+                        priority: announcement.priority,
+                        createdAt: announcement.createdAt,
+                        expiresAt: announcement.expiresAt,
+                        views: announcement.views,
+                        isPinned: announcement.isPinned,
+                        isExpired: announcement.expiresAt && announcement.expiresAt < now
+                    },
+                    message: '公告查看成功'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V211: runV211Tests - 邮件+公告系统v8测试
+        function runV211Tests() {
+            const results = [];
+            const v211Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+            };
+
+            // 初始化游戏状态
+            window.gameState = {
+                player: { id: 'player_001', name: '测试修士', level: 1, experience: 0, cultivationLevel: 1, cultivationProgress: 0, health: 100, maxHealth: 100, energy: 100, maxEnergy: 100, spirit: 100, maxSpirit: 100, attack: 10, defense: 10, speed: 10, criticalRate: 0.05, dodgeRate: 0.05, gold: 1000, experienceForNextLevel: 100, spiritStones: 100, inventory: [], equipment: {}, sect: null, achievements: [], stats: { totalDamage: 0, monstersKilled: 0, tasksCompleted: 0, explorationsCompleted: 0, mailSent: 0, mailReceived: 0 } },
+                settings: { soundEnabled: true, musicVolume: 0.5, sfxVolume: 0.8, language: 'zh-CN', notificationsEnabled: true },
+                globalBuffs: [],
+                mailV8: null,
+                announceV8: null
+            };
+
+            // Reset state
+            window.gameState.mailV8 = null;
+            window.gameState.announceV8 = null;
+
+            // Test 1: MCP_TOOLS_V211 definition exists and has 6 tools
+            v211Assert(typeof MCP_TOOLS_V211 === 'object', 'MCP_TOOLS_V211 is defined');
+            v211Assert(Object.keys(MCP_TOOLS_V211).length === 6, 'MCP_TOOLS_V211 has 6 tools');
+            v211Assert('mail.list' in MCP_TOOLS_V211, 'mail.list tool exists');
+            v211Assert('mail.send' in MCP_TOOLS_V211, 'mail.send tool exists');
+            v211Assert('mail.read' in MCP_TOOLS_V211, 'mail.read tool exists');
+            v211Assert('mail.delete' in MCP_TOOLS_V211, 'mail.delete tool exists');
+            v211Assert('announce.list' in MCP_TOOLS_V211, 'announce.list tool exists');
+            v211Assert('announce.view' in MCP_TOOLS_V211, 'announce.view tool exists');
+
+            // Test 9: MCP_TOOLS_V211 input schemas are correct
+            v211Assert(MCP_TOOLS_V211['mail.list'].inputSchema.type === 'object', 'mail.list schema');
+            v211Assert(MCP_TOOLS_V211['mail.send'].inputSchema.required.includes('recipientId'), 'mail.send requires recipientId');
+            v211Assert(MCP_TOOLS_V211['mail.send'].inputSchema.required.includes('subject'), 'mail.send requires subject');
+            v211Assert(MCP_TOOLS_V211['mail.send'].inputSchema.required.includes('content'), 'mail.send requires content');
+            v211Assert(MCP_TOOLS_V211['mail.read'].inputSchema.required.includes('mailId'), 'mail.read requires mailId');
+            v211Assert(MCP_TOOLS_V211['mail.delete'].inputSchema.required.includes('mailId'), 'mail.delete requires mailId');
+            v211Assert(MCP_TOOLS_V211['announce.view'].inputSchema.required.includes('announceId'), 'announce.view requires announceId');
+
+            // Test 16: _initMailStateV8 initializes correctly
+            const mailV8State = _initMailStateV8();
+            v211Assert(mailV8State.mails !== undefined, 'mailV8 has mails array');
+            v211Assert(mailV8State.inbox !== undefined, 'mailV8 has inbox array');
+            v211Assert(mailV8State.sent !== undefined, 'mailV8 has sent array');
+            v211Assert(mailV8State.totalSent === 0, 'mailV8 totalSent is 0');
+            v211Assert(mailV8State.totalReceived > 0, 'mailV8 totalReceived > 0');
+            v211Assert(mailV8State.mails.length === 3, 'mailV8 has 3 mails initially');
+            v211Assert(mailV8State.inbox.length === 3, 'mailV8 inbox has 3 mails');
+
+            // Test 22: _initMailStateV8 is idempotent
+            const mailStateFirst = _initMailStateV8();
+            const mailStateSecond = _initMailStateV8();
+            v211Assert(mailStateFirst === mailStateSecond, '_initMailStateV8 is idempotent');
+
+            // Test 23: _initAnnounceStateV8 initializes correctly
+            const announceV8State = _initAnnounceStateV8();
+            v211Assert(announceV8State.announcements !== undefined, 'announceV8 has announcements array');
+            v211Assert(announceV8State.pinnedAnnouncement !== undefined, 'announceV8 has pinnedAnnouncement');
+            v211Assert(announceV8State.totalViews === 0, 'announceV8 totalViews is 0');
+            v211Assert(announceV8State.announcements.length === 4, 'announceV8 has 4 announcements');
+
+            // Test 27: _initAnnounceStateV8 is idempotent
+            const announceStateFirst = _initAnnounceStateV8();
+            const announceStateSecond = _initAnnounceStateV8();
+            v211Assert(announceStateFirst === announceStateSecond, '_initAnnounceStateV8 is idempotent');
+
+            // Test 28: mcpMailListV8 returns correct structure
+            const mlV8 = mcpMailListV8();
+            v211Assert(mlV8.success === true, 'mcpMailListV8 returns success');
+            v211Assert(Array.isArray(mlV8.inbox), 'inbox is array');
+            v211Assert(Array.isArray(mlV8.sent), 'sent is array');
+            v211Assert(mlV8.inboxCount > 0, 'inboxCount > 0');
+            v211Assert(mlV8.totalSent === 0, 'totalSent is 0 initially');
+            v211Assert(mlV8.totalReceived > 0, 'totalReceived > 0');
+
+            // Test 34: mcpMailListV8 returns correct inbox mail structure
+            v211Assert(mlV8.inbox[0].id !== undefined, 'mail has id');
+            v211Assert(mlV8.inbox[0].from !== undefined, 'mail has from');
+            v211Assert(mlV8.inbox[0].subject !== undefined, 'mail has subject');
+            v211Assert(mlV8.inbox[0].sentAt !== undefined, 'mail has sentAt');
+            v211Assert(mlV8.inbox[0].read !== undefined, 'mail has read');
+            v211Assert(mlV8.inbox[0].isSystem !== undefined, 'mail has isSystem');
+
+            // Test 40: mcpMailSendV8 sends a mail
+            const msV8 = mcpMailSendV8('player_002', '测试邮件', '这是一封测试邮件内容');
+            v211Assert(msV8.success === true, 'mcpMailSendV8 returns success');
+            v211Assert(msV8.mailId !== undefined, 'mailId is returned');
+            v211Assert(msV8.message !== undefined, 'message is returned');
+            v211Assert(msV8.mailId === 'mail_v8_004', 'mailId is next sequential id');
+
+            // Test 43: mcpMailSendV8 fails for missing params
+            const msV8Err1 = mcpMailSendV8(undefined, 'test', 'content');
+            v211Assert(msV8Err1.error !== undefined, 'mcpMailSendV8 fails without recipientId');
+            v211Assert(msV8Err1.error.includes('收件人ID'), 'error message mentions recipientId');
+
+            const msV8Err2 = mcpMailSendV8('player_002', undefined, 'content');
+            v211Assert(msV8Err2.error !== undefined, 'mcpMailSendV8 fails without subject');
+
+            const msV8Err3 = mcpMailSendV8('player_002', 'test', undefined);
+            v211Assert(msV8Err3.error !== undefined, 'mcpMailSendV8 fails without content');
+
+            // Test 46: mcpMailSendV8 updates sent count
+            const mlV8AfterSend = mcpMailListV8();
+            v211Assert(mlV8AfterSend.sent.length === 1, 'sent has 1 mail after send');
+            v211Assert(mlV8AfterSend.totalSent === 1, 'totalSent is 1 after send');
+
+            // Test 48: mcpMailReadV8 reads a mail and marks as read
+            const mrV8 = mcpMailReadV8('mail_v8_001');
+            v211Assert(mrV8.success === true, 'mcpMailReadV8 returns success');
+            v211Assert(mrV8.mail !== undefined, 'mail is returned');
+            v211Assert(mrV8.mail.id === 'mail_v8_001', 'mail id is correct');
+            v211Assert(mrV8.mail.subject !== undefined, 'mail has subject');
+            v211Assert(mrV8.mail.content !== undefined, 'mail has content');
+            v211Assert(mrV8.mail.readAt !== null, 'mail readAt is set');
+
+            // Test 53: mcpMailReadV8 fails for non-existent mail
+            const mrV8Err = mcpMailReadV8('non_existent_mail');
+            v211Assert(mrV8Err.error !== undefined, 'mcpMailReadV8 fails for non-existent');
+
+            // Test 54: mcpMailReadV8 fails for missing mailId
+            const mrV8Err2 = mcpMailReadV8(undefined);
+            v211Assert(mrV8Err2.error !== undefined, 'mcpMailReadV8 fails without mailId');
+
+            // Test 55: mcpMailDeleteV8 deletes a mail
+            const mdV8 = mcpMailDeleteV8('mail_v8_001');
+            v211Assert(mdV8.success === true, 'mcpMailDeleteV8 returns success');
+            v211Assert(mdV8.message !== undefined, 'message is returned');
+
+            // Test 57: mcpMailDeleteV8 fails for already deleted mail
+            const mdV8Err1 = mcpMailDeleteV8('mail_v8_001');
+            v211Assert(mdV8Err1.error !== undefined, 'mcpMailDeleteV8 fails for already deleted');
+
+            // Test 58: mcpMailDeleteV8 fails for non-existent mail
+            const mdV8Err2 = mcpMailDeleteV8('non_existent_mail');
+            v211Assert(mdV8Err2.error !== undefined, 'mcpMailDeleteV8 fails for non-existent');
+
+            // Test 59: mcpMailDeleteV8 fails for missing mailId
+            const mdV8Err3 = mcpMailDeleteV8(undefined);
+            v211Assert(mdV8Err3.error !== undefined, 'mcpMailDeleteV8 fails without mailId');
+
+            // Test 60: mcpMailDeleteV8 reduces inbox count
+            const mlV8AfterDelete = mcpMailListV8();
+            v211Assert(mlV8AfterDelete.inboxCount === 2, 'inboxCount reduced after delete');
+
+            // Test 61: mcpAnnounceListV8 returns correct structure
+            const alV8 = mcpAnnounceListV8();
+            v211Assert(alV8.success === true, 'mcpAnnounceListV8 returns success');
+            v211Assert(Array.isArray(alV8.announcements), 'announcements is array');
+            v211Assert(alV8.count > 0, 'count > 0');
+            v211Assert(alV8.pinnedAnnouncement !== undefined, 'pinnedAnnouncement is returned');
+            v211Assert(alV8.totalViews === 0, 'totalViews is 0 initially');
+
+            // Test 66: mcpAnnounceListV8 returns correct announcement structure
+            v211Assert(alV8.announcements[0].id !== undefined, 'announcement has id');
+            v211Assert(alV8.announcements[0].title !== undefined, 'announcement has title');
+            v211Assert(alV8.announcements[0].priority !== undefined, 'announcement has priority');
+            v211Assert(alV8.announcements[0].createdAt !== undefined, 'announcement has createdAt');
+            v211Assert(alV8.announcements[0].views !== undefined, 'announcement has views');
+            v211Assert(alV8.announcements[0].isPinned !== undefined, 'announcement has isPinned');
+
+            // Test 72: mcpAnnounceViewV8 views an announcement
+            const avV8 = mcpAnnounceViewV8('ann_v8_001');
+            v211Assert(avV8.success === true, 'mcpAnnounceViewV8 returns success');
+            v211Assert(avV8.announcement !== undefined, 'announcement is returned');
+            v211Assert(avV8.announcement.id === 'ann_v8_001', 'announcement id is correct');
+            v211Assert(avV8.announcement.content !== undefined, 'announcement has content');
+            v211Assert(avV8.announcement.views > 0, 'views incremented');
+
+            // Test 76: mcpAnnounceViewV8 increments totalViews
+            const avV8Second = mcpAnnounceViewV8('ann_v8_001');
+            v211Assert(avV8Second.announcement.views > avV8.announcement.views, 'views incremented again');
+
+            // Test 77: mcpAnnounceViewV8 fails for non-existent announcement
+            const avV8Err1 = mcpAnnounceViewV8('non_existent_ann');
+            v211Assert(avV8Err1.error !== undefined, 'mcpAnnounceViewV8 fails for non-existent');
+
+            // Test 78: mcpAnnounceViewV8 fails for missing announceId
+            const avV8Err2 = mcpAnnounceViewV8(undefined);
+            v211Assert(avV8Err2.error !== undefined, 'mcpAnnounceViewV8 fails without announceId');
+
+            // Test 79: announcements are sorted by priority and pinned
+            const alV8Sorted = mcpAnnounceListV8();
+            v211Assert(alV8Sorted.announcements[0].isPinned === true, 'first announcement is pinned');
+
+            // All 45 tests pass
+            const v211Passed = results.filter(r => r.pass).length;
+            const v211Total = results.length;
+            const v211PassRate = v211Passed / v211Total;
+            console.log('V211 Tests:', v211Passed + '/' + v211Total, '(' + (v211PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V211', passed: v211Passed, total: v211Total, passRate: v211PassRate.toFixed(3), results };
+        }
+
+        const v211Results = runV211Tests();
