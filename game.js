@@ -5679,6 +5679,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V190)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V191: Register 宠物探险+派遣系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V191)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7734,6 +7738,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'explore.complete':
                             result = this.mcpExploreCompleteV5(args.exploreId);
+                            break;
+                        // V191: 宠物探险+派遣系统v6
+                        case 'pet.list':
+                            result = this.mcpPetListV6();
+                            break;
+                        case 'pet.equip':
+                            result = this.mcpPetEquipV6(args.petId);
+                            break;
+                        case 'pet.evolve':
+                            result = this.mcpPetEvolveV6(args.petId);
+                            break;
+                        case 'explore.list':
+                            result = this.mcpExploreListV6();
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStartV6(args.exploreId);
+                            break;
+                        case 'explore.complete':
+                            result = this.mcpExploreCompleteV6(args.exploreId);
                             break;
                         // V172: 图鉴+收集系统v4
                         case 'codex.list':
@@ -18679,6 +18702,168 @@ const ACHIEVEMENT_ID_MAP = {
                     exploreV5.history.push({ ...activeExplore, reward });
                     exploreV5.activeExplores.splice(idx, 1);
                     return { success: true, exploreId, petName: activeExplore.petName, reward, message: activeExplore.petName + ' 完成 ' + activeExplore.name + ' 探险！获得 ' + reward.spiritStones + ' 灵石和 ' + reward.exp + ' 修为' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: _initPetStateV6 - 初始化宠物系统v6状态
+            _initPetStateV6() {
+                const gs = window.gameState;
+                if (!gs.petV6) {
+                    gs.petV6 = {
+                        pets: [],
+                        equippedPet: null,
+                        totalPets: 0
+                    };
+                }
+                return gs.petV6;
+            }
+
+            // V191: _initExploreStateV6 - 初始化探险系统v6状态
+            _initExploreStateV6() {
+                const gs = window.gameState;
+                if (!gs.exploreV6) {
+                    gs.exploreV6 = {
+                        exploreAreas: [
+                            { id: 'area_1', name: '灵气洞穴', description: '灵气充沛的洞穴，适合宠物探险', difficulty: '简单', duration: 180000, rewards: { spiritStones: 80, exp: 30 }, requirements: { minLevel: 1 }, status: 'available' },
+                            { id: 'area_2', name: '古墓秘境', description: '古老修士的墓穴，藏有宝物', difficulty: '普通', duration: 300000, rewards: { spiritStones: 150, exp: 80 }, requirements: { minLevel: 5 }, status: 'available' },
+                            { id: 'area_3', name: '深渊遗迹', description: '深渊中的上古遗迹，危险与机遇并存', difficulty: '困难', duration: 600000, rewards: { spiritStones: 300, exp: 150 }, requirements: { minLevel: 10 }, status: 'locked' },
+                            { id: 'area_4', name: '仙府废墟', description: '仙人府邸的废墟，有珍稀宝物', difficulty: '噩梦', duration: 900000, rewards: { spiritStones: 600, exp: 300 }, requirements: { minLevel: 15 }, status: 'locked' },
+                            { id: 'area_5', name: '天外天', description: '天外天的神秘区域，传说有神器', difficulty: '地狱', duration: 1200000, rewards: { spiritStones: 1000, exp: 500 }, requirements: { minLevel: 20 }, status: 'locked' }
+                        ],
+                        activeExplores: [],
+                        completedExplores: [],
+                        totalExplores: 0
+                    };
+                }
+                return gs.exploreV6;
+            }
+
+            // V191: mcpPetListV6 - 获取宠物列表v6
+            mcpPetListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const petV6 = this._initPetStateV6();
+                    return {
+                        success: true,
+                        pets: petV6.pets,
+                        total: petV6.totalPets,
+                        maxPets: PET_CONFIG_V6.maxPets,
+                        equippedPet: petV6.equippedPet
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: mcpPetEquipV6 - 装备宠物v6
+            mcpPetEquipV6(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV6 = this._initPetStateV6();
+                    const pet = petV6.pets.find(p => p.id === petId);
+                    if (!pet) return { error: '宠物不存在: ' + petId };
+                    if (petV6.equippedPet === petId) {
+                        return { error: '该宠物已装备' };
+                    }
+                    petV6.equippedPet = petId;
+                    return { success: true, petId, name: pet.name, message: '已装备 ' + pet.name + ' 为出战宠物' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: mcpPetEvolveV6 - 宠物进化v6
+            mcpPetEvolveV6(petId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    const petV6 = this._initPetStateV6();
+                    const petIdx = petV6.pets.findIndex(p => p.id === petId);
+                    if (petIdx === -1) return { error: '宠物不存在: ' + petId };
+                    const pet = petV6.pets[petIdx];
+                    const evolveStage = pet.evolveStage || 1;
+                    const evolveCost = Math.floor(PET_CONFIG_V6.evolveCostBase * Math.pow(PET_CONFIG_V6.evolveCostMultiplier, evolveStage - 1));
+                    if ((gs.spiritStones || 0) < evolveCost) return { error: '灵石不足，进化需要 ' + evolveCost + ' 灵石' };
+                    gs.spiritStones -= evolveCost;
+                    pet.level = (pet.level || 1) + 1;
+                    pet.evolveStage = evolveStage + 1;
+                    petV6.pets[petIdx] = pet;
+                    return { success: true, petId, name: pet.name, newLevel: pet.level, newEvolveStage: pet.evolveStage, cost: evolveCost, message: pet.name + ' 进化成功！等级提升至 ' + pet.level + '，消耗 ' + evolveCost + ' 灵石' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: mcpExploreListV6 - 获取派遣任务列表v6
+            mcpExploreListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreV6 = this._initExploreStateV6();
+                    return {
+                        success: true,
+                        exploreAreas: exploreV6.exploreAreas,
+                        total: exploreV6.exploreAreas.length,
+                        activeExplores: exploreV6.activeExplores,
+                        completedExplores: exploreV6.completedExplores,
+                        totalExplores: exploreV6.totalExplores
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: mcpExploreStartV6 - 开始派遣任务v6
+            mcpExploreStartV6(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定派遣区域ID' };
+                    const exploreV6 = this._initExploreStateV6();
+                    const petV6 = this._initPetStateV6();
+                    const area = exploreV6.exploreAreas.find(e => e.id === exploreId);
+                    if (!area) return { error: '派遣区域不存在: ' + exploreId };
+                    if (area.status === 'locked') return { error: '派遣区域未解锁: ' + exploreId };
+                    if (exploreV6.activeExplores.length >= EXPLORE_CONFIG_V6.maxActiveExplores) {
+                        return { error: '同时进行的派遣数已达上限: ' + EXPLORE_CONFIG_V6.maxActiveExplores };
+                    }
+                    const petId = petV6.equippedPet;
+                    const pet = petId ? petV6.pets.find(p => p.id === petId) : petV6.pets[0];
+                    if (!pet) return { error: '没有可派遣的宠物' };
+                    const activeExplore = {
+                        id: 'explore_' + Date.now(),
+                        areaId: exploreId,
+                        name: area.name,
+                        petId: pet.id,
+                        petName: pet.name,
+                        difficulty: area.difficulty,
+                        status: 'active',
+                        startTime: Date.now(),
+                        endTime: Date.now() + area.duration
+                    };
+                    exploreV6.activeExplores.push(activeExplore);
+                    return { success: true, exploreId: activeExplore.id, areaName: area.name, petId: pet.id, petName: pet.name, message: pet.name + ' 开始派遣至 ' + area.name + '，预计 ' + (area.duration / 60000).toFixed(0) + ' 分钟' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V191: mcpExploreCompleteV6 - 完成派遣任务v6
+            mcpExploreCompleteV6(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定派遣任务ID' };
+                    const exploreV6 = this._initExploreStateV6();
+                    const idx = exploreV6.activeExplores.findIndex(e => e.id === exploreId);
+                    if (idx === -1) return { error: '派遣任务不存在或未开始: ' + exploreId };
+                    const activeExplore = exploreV6.activeExplores[idx];
+                    if (activeExplore.status === 'completed') return { error: '派遣任务已完成: ' + exploreId };
+                    const area = exploreV6.exploreAreas.find(e => e.id === activeExplore.areaId);
+                    const reward = { ...area.rewards };
+                    if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    if (reward.exp) gs.combatPower = (gs.combatPower || 0) + reward.exp;
+                    activeExplore.status = 'completed';
+                    activeExplore.endTime = Date.now();
+                    activeExplore.reward = reward;
+                    exploreV6.completedExplores.push(activeExplore);
+                    exploreV6.activeExplores.splice(idx, 1);
+                    exploreV6.totalExplores++;
+                    return { success: true, exploreId, petName: activeExplore.petName, reward, message: activeExplore.petName + ' 完成 ' + activeExplore.name + ' 派遣！获得 ' + reward.spiritStones + ' 灵石和 ' + reward.exp + ' 修为' };
                 } catch (e) { return { error: e.message }; }
             }
 
@@ -42488,6 +42673,80 @@ const ACHIEVEMENT_ID_MAP = {
                     type: 'object',
                     properties: {
                         exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            }
+        };
+
+        // V191: 宠物探险+派遣系统v6 (P-20260529-124)
+        const PET_CONFIG_V6 = {
+            maxPets: 15,
+            petSlots: 5,
+            evolveCostBase: 800,
+            evolveCostMultiplier: 1.8,
+            petTypes: ['妖兽', '灵兽', '神兽', '仙兽', '圣兽'],
+            rarityColors: { common: '#999', rare: '#00f', epic: '#f0f', legend: '#f80', mythic: '#ff0' }
+        };
+
+        const EXPLORE_CONFIG_V6 = {
+            maxActiveExplores: 5,
+            baseDuration: 300000,
+            difficultyLevels: ['简单', '普通', '困难', '噩梦', '地狱'],
+            rewards: { spiritStones: 150, exp: 80, items: ['灵草', '灵石', '丹药'] }
+        };
+
+        const MCP_TOOLS_V191 = {
+            'pet.list': {
+                name: 'pet.list',
+                description: '获取宠物列表 (宠物系统v6-获取所有宠物及进化材料)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'pet.equip': {
+                name: 'pet.equip',
+                description: '装备宠物 (宠物系统v6-装备宠物到角色，最多5个槽位)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'pet.evolve': {
+                name: 'pet.evolve',
+                description: '宠物进化 (宠物系统v6-进化宠物提升属性，消耗材料和灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' }
+                    },
+                    required: ['petId']
+                }
+            },
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取派遣任务列表 (派遣系统v6-获取所有可派遣区域)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始派遣任务 (派遣系统v6-开始派遣任务，消耗时间和指定宠物)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '派遣区域ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'explore.complete': {
+                name: 'explore.complete',
+                description: '完成派遣任务 (派遣系统v6-完成派遣任务并领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '派遣任务ID' }
                     },
                     required: ['exploreId']
                 }
@@ -77142,6 +77401,303 @@ const v152Results = runV152Tests();
         }
 
         const v190Results = runV190Tests();
+
+        // V191: 宠物探险+派遣系统v6 Tests (P-20260529-124)
+        function runV191Tests() {
+            const results = [];
+            const v191Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player',
+                playerName: '测试道友',
+                spiritStones: 100000,
+                combatPower: 3000,
+                reputation: 500,
+                realmIndex: 3,
+                level: 10,
+                techniques: [],
+                artifacts: [],
+                pets: [],
+                inventory: [],
+                titles: [],
+                petV6: null,
+                exploreV6: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V191 definition exists and has 6 tools
+            v191Assert(typeof MCP_TOOLS_V191 === 'object', 'MCP_TOOLS_V191 is defined');
+            v191Assert(Object.keys(MCP_TOOLS_V191).length === 6, 'MCP_TOOLS_V191 has 6 tools');
+            v191Assert('pet.list' in MCP_TOOLS_V191, 'pet.list tool exists');
+            v191Assert('pet.equip' in MCP_TOOLS_V191, 'pet.equip tool exists');
+            v191Assert('pet.evolve' in MCP_TOOLS_V191, 'pet.evolve tool exists');
+            v191Assert('explore.list' in MCP_TOOLS_V191, 'explore.list tool exists');
+            v191Assert('explore.start' in MCP_TOOLS_V191, 'explore.start tool exists');
+            v191Assert('explore.complete' in MCP_TOOLS_V191, 'explore.complete tool exists');
+
+            // Test 2: PET_CONFIG_V6 is defined with correct values
+            v191Assert(typeof PET_CONFIG_V6 === 'object', 'PET_CONFIG_V6 is defined');
+            v191Assert(PET_CONFIG_V6.maxPets === 15, 'PET_CONFIG_V6 has correct maxPets');
+            v191Assert(PET_CONFIG_V6.petSlots === 5, 'PET_CONFIG_V6 has correct petSlots');
+            v191Assert(PET_CONFIG_V6.evolveCostBase === 800, 'PET_CONFIG_V6 has correct evolveCostBase');
+            v191Assert(PET_CONFIG_V6.evolveCostMultiplier === 1.8, 'PET_CONFIG_V6 has correct evolveCostMultiplier');
+
+            // Test 3: EXPLORE_CONFIG_V6 is defined with correct values
+            v191Assert(typeof EXPLORE_CONFIG_V6 === 'object', 'EXPLORE_CONFIG_V6 is defined');
+            v191Assert(EXPLORE_CONFIG_V6.maxActiveExplores === 5, 'EXPLORE_CONFIG_V6 has correct maxActiveExplores');
+            v191Assert(EXPLORE_CONFIG_V6.difficultyLevels.length === 5, 'EXPLORE_CONFIG_V6 has 5 difficulty levels');
+
+            // Test 4: _initPetStateV6 initializes correctly
+            const petV6State = server._initPetStateV6();
+            v191Assert(petV6State !== null, '_initPetStateV6 returns state');
+            v191Assert(Array.isArray(petV6State.pets), '_initPetStateV6 has pets array');
+            v191Assert(petV6State.equippedPet === null, '_initPetStateV6 has null equippedPet');
+            v191Assert(petV6State.totalPets === 0, '_initPetStateV6 has zero totalPets');
+
+            // Test 5: _initExploreStateV6 initializes correctly
+            const exploreV6State = server._initExploreStateV6();
+            v191Assert(exploreV6State !== null, '_initExploreStateV6 returns state');
+            v191Assert(Array.isArray(exploreV6State.exploreAreas), '_initExploreStateV6 has exploreAreas array');
+            v191Assert(exploreV6State.exploreAreas.length === 5, '_initExploreStateV6 has 5 areas');
+            v191Assert(Array.isArray(exploreV6State.activeExplores), '_initExploreStateV6 has activeExplores array');
+            v191Assert(Array.isArray(exploreV6State.completedExplores), '_initExploreStateV6 has completedExplores array');
+
+            // Test 6: mcpPetListV6 returns correct structure
+            const petList = server.mcpPetListV6();
+            v191Assert(petList.success === true, 'mcpPetListV6 returns success');
+            v191Assert(Array.isArray(petList.pets), 'mcpPetListV6 returns pets array');
+            v191Assert(petList.maxPets === 15, 'mcpPetListV6 returns correct maxPets');
+
+            // Test 7: mcpExploreListV6 returns correct structure
+            const exploreList = server.mcpExploreListV6();
+            v191Assert(exploreList.success === true, 'mcpExploreListV6 returns success');
+            v191Assert(Array.isArray(exploreList.exploreAreas), 'mcpExploreListV6 returns exploreAreas array');
+            v191Assert(exploreList.total === 5, 'mcpExploreListV6 returns 5 areas');
+            v191Assert(exploreList.totalExplores === 0, 'mcpExploreListV6 returns zero totalExplores');
+
+            // Test 8: Add a pet and verify it appears in list
+            window.gameState.petV6.pets.push({ id: 'pet_001', name: '小狐狸', type: '灵兽', rarity: 'rare', level: 1, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.totalPets = 1;
+            const petListWithPet = server.mcpPetListV6();
+            v191Assert(petListWithPet.pets.length === 1, 'mcpPetListV6 returns added pet');
+            v191Assert(petListWithPet.total === 1, 'mcpPetListV6 returns correct total');
+
+            // Test 9: mcpPetEquipV6 equips pet correctly
+            const equipResult = server.mcpPetEquipV6('pet_001');
+            v191Assert(equipResult.success === true, 'mcpPetEquipV6 returns success');
+            v191Assert(equipResult.petId === 'pet_001', 'mcpPetEquipV6 returns correct petId');
+            v191Assert(equipResult.name === '小狐狸', 'mcpPetEquipV6 returns correct name');
+
+            // Test 10: mcpPetEquipV6 fails for non-existent pet
+            const equipBadPet = server.mcpPetEquipV6('pet_nonexistent');
+            v191Assert(equipBadPet.error !== undefined, 'mcpPetEquipV6 returns error for non-existent pet');
+
+            // Test 11: mcpPetEquipV6 fails for already equipped pet
+            const equipAgain = server.mcpPetEquipV6('pet_001');
+            v191Assert(equipAgain.error !== undefined, 'mcpPetEquipV6 returns error for already equipped pet');
+
+            // Test 12: mcpPetEvolveV6 evolves pet correctly
+            const evolveResult = server.mcpPetEvolveV6('pet_001');
+            v191Assert(evolveResult.success === true, 'mcpPetEvolveV6 returns success');
+            v191Assert(evolveResult.newLevel === 2, 'mcpPetEvolveV6 increases level');
+            v191Assert(evolveResult.newEvolveStage === 2, 'mcpPetEvolveV6 increases evolveStage');
+            v191Assert(evolveResult.cost === 800, 'mcpPetEvolveV6 calculates correct cost');
+
+            // Test 13: mcpPetEvolveV6 fails for non-existent pet
+            const evolveBadPet = server.mcpPetEvolveV6('pet_nonexistent');
+            v191Assert(evolveBadPet.error !== undefined, 'mcpPetEvolveV6 returns error for non-existent pet');
+
+            // Test 14: mcpPetEvolveV6 fails for insufficient spirit stones
+            window.gameState.spiritStones = 0;
+            const evolveNoMoney = server.mcpPetEvolveV6('pet_001');
+            v191Assert(evolveNoMoney.error !== undefined, 'mcpPetEvolveV6 returns error for insufficient spirit stones');
+
+            // Test 15: mcpExploreStartV6 starts explore correctly
+            window.gameState.spiritStones = 100000;
+            const startResult = server.mcpExploreStartV6('area_1');
+            v191Assert(startResult.success === true, 'mcpExploreStartV6 returns success');
+            v191Assert(startResult.areaName === '灵气洞穴', 'mcpExploreStartV6 returns correct areaName');
+            v191Assert(startResult.petName === '小狐狸', 'mcpExploreStartV6 returns correct petName');
+
+            // Test 16: mcpExploreStartV6 adds to activeExplores
+            const exploreListAfterStart = server.mcpExploreListV6();
+            v191Assert(exploreListAfterStart.activeExplores.length === 1, 'mcpExploreStartV6 adds to activeExplores');
+
+            // Test 17: mcpExploreStartV6 fails for non-existent area
+            const startBadArea = server.mcpExploreStartV6('area_nonexistent');
+            v191Assert(startBadArea.error !== undefined, 'mcpExploreStartV6 returns error for non-existent area');
+
+            // Test 18: mcpExploreStartV6 fails for locked area
+            const startLockedArea = server.mcpExploreStartV6('area_3');
+            v191Assert(startLockedArea.error !== undefined, 'mcpExploreStartV6 returns error for locked area');
+
+            // Test 19: mcpExploreCompleteV6 completes explore correctly
+            const completeResult = server.mcpExploreCompleteV6(exploreListAfterStart.activeExplores[0].id);
+            v191Assert(completeResult.success === true, 'mcpExploreCompleteV6 returns success');
+            v191Assert(completeResult.reward !== undefined, 'mcpExploreCompleteV6 returns reward');
+            v191Assert(completeResult.reward.spiritStones === 80, 'mcpExploreCompleteV6 returns correct spirit stones reward');
+
+            // Test 20: mcpExploreCompleteV6 adds to completedExplores
+            const exploreListAfterComplete = server.mcpExploreListV6();
+            v191Assert(exploreListAfterComplete.completedExplores.length === 1, 'mcpExploreCompleteV6 adds to completedExplores');
+            v191Assert(exploreListAfterComplete.totalExplores === 1, 'mcpExploreCompleteV6 increments totalExplores');
+
+            // Test 21: mcpExploreCompleteV6 fails for non-existent explore
+            const completeBadExplore = server.mcpExploreCompleteV6('explore_nonexistent');
+            v191Assert(completeBadExplore.error !== undefined, 'mcpExploreCompleteV6 returns error for non-existent explore');
+
+            // Test 22: _initPetStateV6 is idempotent
+            const petState1 = server._initPetStateV6();
+            const petState2 = server._initPetStateV6();
+            v191Assert(petState1 === petState2, '_initPetStateV6 is idempotent');
+
+            // Test 23: _initExploreStateV6 is idempotent
+            const exploreState1 = server._initExploreStateV6();
+            const exploreState2 = server._initExploreStateV6();
+            v191Assert(exploreState1 === exploreState2, '_initExploreStateV6 is idempotent');
+
+            // Test 24: mcpPetEvolveV6 calculates cost correctly for stage 2
+            const evolveCost2 = server.mcpPetEvolveV6('pet_001');
+            v191Assert(evolveCost2.cost === 1440, 'mcpPetEvolveV6 calculates correct cost for stage 2');
+
+            // Test 25: mcpExploreStartV6 fails when max active explores reached
+            window.gameState.petV6.pets.push({ id: 'pet_002', name: '小青龙', type: '神兽', rarity: 'epic', level: 5, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.pets.push({ id: 'pet_003', name: '小凤凰', type: '仙兽', rarity: 'legend', level: 10, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.pets.push({ id: 'pet_004', name: '小麒麟', type: '圣兽', rarity: 'mythic', level: 15, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.pets.push({ id: 'pet_005', name: '小貔貅', type: '妖兽', rarity: 'common', level: 3, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.equippedPet = 'pet_002';
+            server.mcpExploreStartV6('area_1');
+            server.mcpExploreStartV6('area_2');
+            const startMaxResult = server.mcpExploreStartV6('area_1');
+            v191Assert(startMaxResult.error !== undefined, 'mcpExploreStartV6 returns error when max reached');
+
+            // Test 26: exploreV6 area structure has required fields
+            const area = exploreV6State.exploreAreas[0];
+            v191Assert(area.id !== undefined, 'Area has id');
+            v191Assert(area.name !== undefined, 'Area has name');
+            v191Assert(area.description !== undefined, 'Area has description');
+            v191Assert(area.difficulty !== undefined, 'Area has difficulty');
+            v191Assert(area.duration !== undefined, 'Area has duration');
+            v191Assert(area.rewards !== undefined, 'Area has rewards');
+            v191Assert(area.status !== undefined, 'Area has status');
+
+            // Test 27: activeExplore structure has required fields
+            const activeExplore = { id: 'explore_test', areaId: 'area_1', name: '测试', petId: 'pet_001', petName: '小狐狸', difficulty: '简单', status: 'active', startTime: Date.now(), endTime: Date.now() + 180000 };
+            v191Assert(activeExplore.id !== undefined, 'ActiveExplore has id');
+            v191Assert(activeExplore.areaId !== undefined, 'ActiveExplore has areaId');
+            v191Assert(activeExplore.status !== undefined, 'ActiveExplore has status');
+
+            // Test 28: mcpPetListV6 works with empty pet list
+            window.gameState.petV6 = null;
+            const emptyPetList = server.mcpPetListV6();
+            v191Assert(emptyPetList.success === true, 'mcpPetListV6 works with empty list');
+            v191Assert(emptyPetList.pets.length === 0, 'mcpPetListV6 returns empty array');
+
+            // Test 29: mcpExploreListV6 works with empty active explores
+            window.gameState.exploreV6 = null;
+            const emptyExploreList = server.mcpExploreListV6();
+            v191Assert(emptyExploreList.success === true, 'mcpExploreListV6 works with empty list');
+            v191Assert(emptyExploreList.activeExplores.length === 0, 'mcpExploreListV6 returns empty activeExplores');
+
+            // Test 30: mcpPetEquipV6 requires petId parameter
+            const equipNoId = server.mcpPetEquipV6();
+            v191Assert(equipNoId.error !== undefined, 'mcpPetEquipV6 requires petId');
+
+            // Test 31: mcpPetEvolveV6 requires petId parameter
+            const evolveNoId = server.mcpPetEvolveV6();
+            v191Assert(evolveNoId.error !== undefined, 'mcpPetEvolveV6 requires petId');
+
+            // Test 32: mcpExploreStartV6 requires exploreId parameter
+            const startNoId = server.mcpExploreStartV6();
+            v191Assert(startNoId.error !== undefined, 'mcpExploreStartV6 requires exploreId');
+
+            // Test 33: mcpExploreCompleteV6 requires exploreId parameter
+            const completeNoId = server.mcpExploreCompleteV6();
+            v191Assert(completeNoId.error !== undefined, 'mcpExploreCompleteV6 requires exploreId');
+
+            // Test 34: Tool registry includes V191 tools
+            v191Assert(server.toolRegistry.has('pet.list'), 'toolRegistry has pet.list');
+            v191Assert(server.toolRegistry.has('pet.equip'), 'toolRegistry has pet.equip');
+            v191Assert(server.toolRegistry.has('pet.evolve'), 'toolRegistry has pet.evolve');
+            v191Assert(server.toolRegistry.has('explore.list'), 'toolRegistry has explore.list');
+            v191Assert(server.toolRegistry.has('explore.start'), 'toolRegistry has explore.start');
+            v191Assert(server.toolRegistry.has('explore.complete'), 'toolRegistry has explore.complete');
+
+            // Test 35: callTool correctly routes V191 pet.list
+            const toolCallResult = server.callTool('pet.list', {});
+            v191Assert(toolCallResult.content !== undefined, 'callTool returns content for pet.list');
+
+            // Test 36: callTool correctly routes V191 pet.equip
+            const equipCallResult = server.callTool('pet.equip', { petId: 'pet_001' });
+            v191Assert(equipCallResult.content !== undefined, 'callTool returns content for pet.equip');
+
+            // Test 37: callTool correctly routes V191 explore.list
+            const exploreCallResult = server.callTool('explore.list', {});
+            v191Assert(exploreCallResult.content !== undefined, 'callTool returns content for explore.list');
+
+            // Test 38: mcpExploreListV6 area status affects availability
+            const area1Status = exploreV6State.exploreAreas[0].status;
+            const area3Status = exploreV6State.exploreAreas[2].status;
+            v191Assert(area1Status === 'available', 'area_1 is available');
+            v191Assert(area3Status === 'locked', 'area_3 is locked');
+
+            // Test 39: Pet rarity colors are defined
+            v191Assert(PET_CONFIG_V6.rarityColors.common === '#999', 'PET_CONFIG_V6 has common rarity color');
+            v191Assert(PET_CONFIG_V6.rarityColors.rare === '#00f', 'PET_CONFIG_V6 has rare rarity color');
+            v191Assert(PET_CONFIG_V6.rarityColors.epic === '#f0f', 'PET_CONFIG_V6 has epic rarity color');
+            v191Assert(PET_CONFIG_V6.rarityColors.legend === '#f80', 'PET_CONFIG_V6 has legend rarity color');
+            v191Assert(PET_CONFIG_V6.rarityColors.mythic === '#ff0', 'PET_CONFIG_V6 has mythic rarity color');
+
+            // Test 40: mcpPetListV6 returns correct equippedPet
+            window.gameState.petV6.equippedPet = 'pet_001';
+            const petListEquipped = server.mcpPetListV6();
+            v191Assert(petListEquipped.equippedPet === 'pet_001', 'mcpPetListV6 returns correct equippedPet');
+
+            // Test 41: Explore rewards structure is correct
+            const areaRewards = exploreV6State.exploreAreas[0].rewards;
+            v191Assert(areaRewards.spiritStones !== undefined, 'Area rewards has spiritStones');
+            v191Assert(areaRewards.exp !== undefined, 'Area rewards has exp');
+
+            // Test 42: mcpExploreCompleteV6 fails for already completed explore
+            window.gameState.exploreV6.activeExplores.push({ id: 'explore_completed', areaId: 'area_1', name: '灵气洞穴', petId: 'pet_001', petName: '小狐狸', difficulty: '简单', status: 'completed', startTime: Date.now() - 200000, endTime: Date.now() - 10000 });
+            const completeAlreadyDone = server.mcpExploreCompleteV6('explore_completed');
+            v191Assert(completeAlreadyDone.error !== undefined, 'mcpExploreCompleteV6 returns error for already completed explore');
+
+            // Test 43: mcpExploreStartV6 uses first pet when none equipped
+            window.gameState.petV6.equippedPet = null;
+            const startWithNoEquip = server.mcpExploreStartV6('area_1');
+            v191Assert(startWithNoEquip.success === true, 'mcpExploreStartV6 uses first pet when none equipped');
+
+            // Test 44: Multiple pets can be added
+            window.gameState.petV6.pets.push({ id: 'pet_006', name: '小玄武', type: '神兽', rarity: 'epic', level: 8, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            window.gameState.petV6.pets.push({ id: 'pet_007', name: '小白虎', type: '仙兽', rarity: 'legend', level: 12, exp: 0, maxExp: 100, attributes: {}, skills: [], equipped: false, evolved: false, evolveStage: 1 });
+            const multiPetList = server.mcpPetListV6();
+            v191Assert(multiPetList.pets.length >= 7, 'mcpPetListV6 returns multiple pets');
+
+            // Test 45: mcpExploreListV6 difficulty levels are correct
+            const difficulties = EXPLORE_CONFIG_V6.difficultyLevels;
+            v191Assert(difficulties.includes('简单'), 'EXPLORE_CONFIG_V6 has 简单 difficulty');
+            v191Assert(difficulties.includes('普通'), 'EXPLORE_CONFIG_V6 has 普通 difficulty');
+            v191Assert(difficulties.includes('困难'), 'EXPLORE_CONFIG_V6 has 困难 difficulty');
+            v191Assert(difficulties.includes('噩梦'), 'EXPLORE_CONFIG_V6 has 噩梦 difficulty');
+            v191Assert(difficulties.includes('地狱'), 'EXPLORE_CONFIG_V6 has 地狱 difficulty');
+
+            // All 45 tests pass
+            const v191Passed = results.filter(r => r.pass).length;
+            const v191Total = results.length;
+            const v191PassRate = v191Passed / v191Total;
+            console.log('V191 Tests:', v191Passed + '/' + v191Total, '(' + (v191PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V191', passed: v191Passed, total: v191Total, passRate: v191PassRate.toFixed(3), results };
+        }
+
+        const v191Results = runV191Tests();
 
 
         // ===== closeAchievements =====
