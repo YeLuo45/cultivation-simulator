@@ -3725,6 +3725,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V183)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V184: Register 签到+福利系统v5 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V184)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5799,6 +5803,25 @@
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV4(args.badgeId);
+                            break;
+                        // V184: 签到+福利系统v5
+                        case 'signin.list':
+                            result = this.mcpSigninListV5();
+                            break;
+                        case 'signin.checkin':
+                            result = this.mcpSigninCheckinV5();
+                            break;
+                        case 'signin.reward':
+                            result = this.mcpSigninRewardV5(args.rewardType);
+                            break;
+                        case 'signin.makeup':
+                            result = this.mcpSigninMakeupV5(args.date);
+                            break;
+                        case 'welfare.list':
+                            result = this.mcpWelfareListV5();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaimV5(args.welfareId);
                             break;
                         // V160: 红包+社交系统v2
                         case 'redpacket.list':
@@ -19257,6 +19280,244 @@
                         success: true,
                         welfareId: welfareId,
                         reward: welfare.reward,
+                        message: '领取成功！获得' + welfare.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: _initSigninStateV5 - 初始化签到系统状态v5
+            _initSigninStateV5() {
+                const gs = window.gameState;
+                if (!gs.signinV5) {
+                    gs.signinV5 = {
+                        records: {},
+                        currentStreak: 0,
+                        longestStreak: 0,
+                        totalSigned: 0,
+                        rewardThresholds: [
+                            { days: 3, reward: '灵石x300', type: 'bronze', claimed: false },
+                            { days: 7, reward: '灵石x700', type: 'silver', claimed: false },
+                            { days: 30, reward: '灵石x3000', type: 'gold', claimed: false }
+                        ],
+                        lastSignDate: null,
+                        makeupEnabled: true,
+                        makeupCost: 50
+                    };
+                }
+                return gs.signinV5;
+            }
+
+            // V184: _initWelfareStateV5 - 初始化福利系统状态v5
+            _initWelfareStateV5() {
+                const gs = window.gameState;
+                if (!gs.welfareV5) {
+                    gs.welfareV5 = {
+                        welfareItems: [
+                            { id: 'welfare_v5_daily', name: '每日登录礼包', description: '每日登录游戏即可领取', type: 'daily', cost: 0, reward: '灵石x50', stock: null, claimed: false, claimLimit: 1, lastClaimDate: null },
+                            { id: 'welfare_v5_recharge', name: '充值返利', description: '单次充值满200灵石', type: 'recharge', cost: 0, reward: '灵石x40', stock: null, claimed: false, claimLimit: 1, lastClaimDate: null },
+                            { id: 'welfare_v5_vip', name: 'VIP周卡', description: 'VIP用户专属周卡', type: 'vip', cost: 500, reward: '每日灵石x100', stock: null, claimed: false, claimLimit: 1, lastClaimDate: null },
+                            { id: 'welfare_v5_level', name: '等级礼包', description: '每提升10级可领取', type: 'level', cost: 0, reward: '灵气x500', stock: null, claimed: false, claimLimit: 99, lastClaimDate: null },
+                            { id: 'welfare_v5_share', name: '分享礼包', description: '分享游戏给好友', type: 'share', cost: 0, reward: '灵石x30', stock: 100, claimed: false, claimLimit: 1, lastClaimDate: null },
+                            { id: 'welfare_v5_invite', name: '邀请礼包', description: '成功邀请好友', type: 'invite', cost: 0, reward: '灵石x200', stock: 50, claimed: false, claimLimit: 5, lastClaimDate: null }
+                        ],
+                        dailyResets: {},
+                        totalClaimed: 0
+                    };
+                }
+                return gs.welfareV5;
+            }
+
+            // V184: mcpSigninListV5 - 获取签到列表v5
+            mcpSigninListV5() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV5 = this._initSigninStateV5();
+                    const now = new Date();
+                    const today = now.toISOString().split('T')[0];
+                    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                    const monthRecords = {};
+                    for (const [date, record] of Object.entries(signinV5.records)) {
+                        if (date >= firstDayOfMonth) {
+                            monthRecords[date] = record;
+                        }
+                    }
+                    return {
+                        success: true,
+                        todaySigned: signinV5.records[today]?.signed || false,
+                        currentStreak: signinV5.currentStreak,
+                        longestStreak: signinV5.longestStreak,
+                        totalSigned: signinV5.totalSigned,
+                        monthRecords: monthRecords,
+                        rewardThresholds: signinV5.rewardThresholds,
+                        makeupEnabled: signinV5.makeupEnabled,
+                        message: '本月签到' + Object.keys(monthRecords).length + '天，当前连续' + signinV5.currentStreak + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: mcpSigninCheckinV5 - 执行签到v5
+            mcpSigninCheckinV5() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV5 = this._initSigninStateV5();
+                    const today = new Date().toISOString().split('T')[0];
+                    if (signinV5.records[today]?.signed) {
+                        return { error: '今日已签到，请勿重复签到' };
+                    }
+                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                    if (signinV5.records[yesterday]?.signed) {
+                        signinV5.currentStreak++;
+                    } else {
+                        signinV5.currentStreak = 1;
+                    }
+                    if (signinV5.currentStreak > signinV5.longestStreak) {
+                        signinV5.longestStreak = signinV5.currentStreak;
+                    }
+                    if (!signinV5.records[today]) {
+                        signinV5.records[today] = { signed: false, rewardClaimed: false, makeup: false };
+                    }
+                    signinV5.records[today].signed = true;
+                    signinV5.totalSigned++;
+                    signinV5.lastSignDate = today;
+                    return {
+                        success: true,
+                        date: today,
+                        currentStreak: signinV5.currentStreak,
+                        longestStreak: signinV5.longestStreak,
+                        totalSigned: signinV5.totalSigned,
+                        message: '签到成功！已连续签到' + signinV5.currentStreak + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: mcpSigninRewardV5 - 领取签到奖励v5
+            mcpSigninRewardV5(rewardType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rewardType) return { error: '请指定奖励类型 (bronze/silver/gold)' };
+                    const signinV5 = this._initSigninStateV5();
+                    const threshold = signinV5.rewardThresholds.find(r => r.type === rewardType);
+                    if (!threshold) return { error: '奖励类型不存在: ' + rewardType };
+                    if (threshold.claimed) return { error: '该奖励已领取' };
+                    if (signinV5.currentStreak < threshold.days) {
+                        return { error: '连续签到天数不足，需要连续签到' + threshold.days + '天，当前连续' + signinV5.currentStreak + '天' };
+                    }
+                    threshold.claimed = true;
+                    const rewardMap = {
+                        bronze: { spiritStones: 300 },
+                        silver: { spiritStones: 700 },
+                        gold: { spiritStones: 3000 }
+                    };
+                    const reward = rewardMap[rewardType] || { spiritStones: 100 };
+                    gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                    return {
+                        success: true,
+                        rewardType: rewardType,
+                        reward: threshold.reward,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + threshold.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: mcpSigninMakeupV5 - 补签v5
+            mcpSigninMakeupV5(date) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!date) return { error: '请指定补签日期 (YYYY-MM-DD)' };
+                    const signinV5 = this._initSigninStateV5();
+                    if (!signinV5.makeupEnabled) return { error: '补签功能已关闭' };
+                    const today = new Date().toISOString().split('T')[0];
+                    if (date >= today) return { error: '只能补签今天的日期' };
+                    if (signinV5.records[date]?.signed) return { error: '该日期已签到，无需补签' };
+                    const cost = signinV5.makeupCost;
+                    if (gs.spiritStones < cost) return { error: '灵石不足，补签需要' + cost + '灵石' };
+                    gs.spiritStones -= cost;
+                    if (!signinV5.records[date]) {
+                        signinV5.records[date] = { signed: false, rewardClaimed: false, makeup: false };
+                    }
+                    signinV5.records[date].signed = true;
+                    signinV5.records[date].makeup = true;
+                    signinV5.totalSigned++;
+                    return {
+                        success: true,
+                        date: date,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '补签成功！消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: mcpWelfareListV5 - 获取福利列表v5
+            mcpWelfareListV5() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfareV5 = this._initWelfareStateV5();
+                    const now = new Date();
+                    const today = now.toISOString().split('T')[0];
+                    const claimable = welfareV5.welfareItems.filter(w => {
+                        if (w.claimed) return false;
+                        if (w.claimLimit <= 0) return false;
+                        if (w.stock !== null && w.stock <= 0) return false;
+                        if (w.lastClaimDate === today && w.claimLimit === 1) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        welfareItems: welfareV5.welfareItems.map(w => ({
+                            id: w.id,
+                            name: w.name,
+                            description: w.description,
+                            type: w.type,
+                            cost: w.cost,
+                            reward: w.reward,
+                            stock: w.stock,
+                            claimed: w.claimed,
+                            claimLimit: w.claimLimit
+                        })),
+                        claimableCount: claimable.length,
+                        totalClaimed: welfareV5.totalClaimed,
+                        message: '共有' + welfareV5.welfareItems.length + '项福利，其中' + claimable.length + '项可领取'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V184: mcpWelfareClaimV5 - 领取福利v5
+            mcpWelfareClaimV5(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '请指定福利ID' };
+                    const welfareV5 = this._initWelfareStateV5();
+                    const welfare = welfareV5.welfareItems.find(w => w.id === welfareId);
+                    if (!welfare) return { error: '福利不存在: ' + welfareId };
+                    if (welfare.claimed) return { error: '该福利已领取' };
+                    if (welfare.stock !== null && welfare.stock <= 0) return { error: '库存不足' };
+                    if (welfare.cost > 0 && (gs.spiritStones || 0) < welfare.cost) {
+                        return { error: '灵石不足，需要' + welfare.cost + '灵石' };
+                    }
+                    if (welfare.cost > 0) {
+                        gs.spiritStones -= welfare.cost;
+                    }
+                    if (welfare.stock !== null) {
+                        welfare.stock--;
+                    }
+                    welfare.claimed = true;
+                    welfareV5.totalClaimed++;
+                    const now = new Date();
+                    welfare.lastClaimDate = now.toISOString().split('T')[0];
+                    return {
+                        success: true,
+                        welfareId: welfareId,
+                        cost: welfare.cost,
+                        reward: welfare.reward,
+                        remainingSpiritStones: gs.spiritStones,
                         message: '领取成功！获得' + welfare.reward
                     };
                 } catch (e) { return { error: e.message }; }
@@ -37690,6 +37951,58 @@
             'welfare.claim': {
                 name: 'welfare.claim',
                 description: '领取福利 (福利系统v4-领取福利，消耗积分或完成成就)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID' }
+                    },
+                    required: ['welfareId']
+                }
+            }
+        };
+
+        // V184: 签到+福利系统v5 (P-20260529-099)
+        const MCP_TOOLS_V184 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到列表 (签到系统v5-获取本月签到状态和奖励阈值信息)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '执行签到 (签到系统v5-执行签到，自动累加连续签到天数)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.reward': {
+                name: 'signin.reward',
+                description: '领取签到奖励 (签到系统v5-按连续天数阈值领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rewardType: { type: 'string', description: '奖励类型 (bronze/silver/gold)' }
+                    },
+                    required: ['rewardType']
+                }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签 (签到系统v5-补签指定日期，消耗灵石，需开启补签功能)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        date: { type: 'string', description: '补签日期 YYYY-MM-DD' }
+                    },
+                    required: ['date']
+                }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统v5-获取可领取福利列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利 (福利系统v5-领取福利，消耗灵石或免费，扣除库存)',
                 inputSchema: {
                     type: 'object',
                     properties: {
