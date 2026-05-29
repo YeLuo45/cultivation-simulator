@@ -5743,6 +5743,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V206)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V207: Register 投资+月卡系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V207)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5993,6 +5997,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV7(args.monthcardType);
+                            break;
+                        // V207: 投资+月卡系统v8 (override V199)
+                        case 'investment.list':
+                            result = this.mcpInvestmentListV8();
+                            break;
+                        case 'investment.buy':
+                            result = this.mcpInvestmentBuyV8(args.investmentId);
+                            break;
+                        case 'investment.profit':
+                            result = this.mcpInvestmentProfitV8(args.investmentId);
+                            break;
+                        case 'investment.redeem':
+                            result = this.mcpInvestmentRedeemV8(args.investmentId);
+                            break;
+                        case 'monthcard.status':
+                            result = this.mcpMonthcardStatusV8();
+                            break;
+                        case 'monthcard.buy':
+                            result = this.mcpMonthcardBuyV8();
                             break;
                         // V200: 红包+社交系统v6
                         case 'redpack.list':
@@ -18424,6 +18447,242 @@ const ACHIEVEMENT_ID_MAP = {
                         benefitMultiplier: tierInfo.benefitMultiplier,
                         remainingSpiritStones: gs.spiritStones,
                         message: tierInfo.name + '购买成功！' + tierInfo.durationDays + '天有效期，每日可领取' + tierInfo.dailyReward + '灵石，权益倍数' + tierInfo.benefitMultiplier
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: _initInvestmentStateV8 - 初始化投资系统v8状态
+            _initInvestmentStateV8() {
+                const gs = window.gameState;
+                if (!gs.investmentV8) {
+                    gs.investmentV8 = {
+                        investments: [],
+                        totalInvestment: 0,
+                        profitClaimed: 0
+                    };
+                }
+                return gs.investmentV8;
+            }
+
+            // V207: _initMonthcardStateV8 - 初始化月卡系统v8状态
+            _initMonthcardStateV8() {
+                const gs = window.gameState;
+                if (!gs.monthcardV8) {
+                    gs.monthcardV8 = {
+                        hasMonthcard: false,
+                        purchaseDate: null,
+                        expireDate: null,
+                        dailyBonus: 100,
+                        claimedDays: [],
+                        totalClaimed: 0
+                    };
+                }
+                return gs.monthcardV8;
+            }
+
+            // V207: mcpInvestmentListV8 - 获取投资项目列表v8
+            mcpInvestmentListV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const inv = this._initInvestmentStateV8();
+                    const categories = ['spiritStones', 'technique', 'artifact'];
+                    const result = {};
+                    for (const cat of categories) {
+                        const products = INVESTMENT_PRODUCTS_V8.filter(p => p.category === cat);
+                        result[cat] = products.map(p => {
+                            const owned = inv.investments.find(i => i.id === p.id && !i.redeemedAt);
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                description: p.description,
+                                cost: p.cost,
+                                dailyReturn: p.dailyReturn,
+                                duration: p.duration,
+                                dailyLimit: p.dailyLimit,
+                                category: p.category,
+                                purchased: !!owned
+                            };
+                        });
+                    }
+                    return {
+                        success: true,
+                        categories,
+                        products: result,
+                        totalInvestment: inv.totalInvestment,
+                        profitClaimed: inv.profitClaimed,
+                        message: '共有' + INVESTMENT_PRODUCTS_V8.length + '种投资产品v8，分' + categories.length + '类'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentBuyV8 - 购买投资v8
+            mcpInvestmentBuyV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { error: '投资产品不存在: ' + investmentId };
+                    const existing = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (existing) return { success: false, error: '该投资产品已购买，请先赎回后再购买' };
+                    if ((gs.spiritStones || 0) < product.cost) {
+                        return { success: false, error: '灵石不足，投资需要' + product.cost + '灵石' };
+                    }
+                    gs.spiritStones -= product.cost;
+                    const investment = {
+                        id: investmentId,
+                        name: product.name,
+                        cost: product.cost,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        category: product.category,
+                        purchasedAt: new Date().toISOString(),
+                        lastClaimedAt: null,
+                        redeemedAt: null,
+                        returnsClaimed: []
+                    };
+                    inv.investments.push(investment);
+                    inv.totalInvestment += product.cost;
+                    return {
+                        success: true,
+                        investmentId,
+                        name: product.name,
+                        category: product.category,
+                        cost: product.cost,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '购买成功！投资' + product.cost + '灵石于' + product.name + '，每日收益' + product.dailyReturn + '灵石，期限' + product.duration + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentProfitV8 - 领取投资收益v8
+            mcpInvestmentProfitV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { success: false, error: '投资产品不存在' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const lastClaimed = investment.lastClaimedAt ? new Date(investment.lastClaimedAt).getTime() : purchasedAt;
+                    const daysSinceLastClaim = Math.floor((now - lastClaimed) / (24 * 60 * 60 * 1000));
+                    if (daysSinceLastClaim < 1) {
+                        return { success: false, error: '今日已领取过收益，明日再来吧' };
+                    }
+                    const earnedProfit = Math.min(daysSinceLastClaim, investment.duration) * investment.dailyReturn;
+                    gs.spiritStones = (gs.spiritStones || 0) + earnedProfit;
+                    inv.profitClaimed += earnedProfit;
+                    investment.lastClaimedAt = new Date().toISOString();
+                    investment.returnsClaimed.push({ date: new Date().toISOString(), amount: earnedProfit });
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        daysClaimed: daysSinceLastClaim,
+                        earnedProfit,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + earnedProfit + '灵石收益'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentRedeemV8 - 赎回投资v8
+            mcpInvestmentRedeemV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { success: false, error: '投资产品不存在' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const earnedProfit = Math.min(daysPassed, investment.duration) * investment.dailyReturn;
+                    // 提前赎回惩罚：扣除20%收益
+                    const penalty = daysPassed < investment.duration ? Math.floor(earnedProfit * 0.2) : 0;
+                    const redeemValue = investment.cost + earnedProfit - penalty;
+                    gs.spiritStones = (gs.spiritStones || 0) + redeemValue;
+                    investment.redeemedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        originalAmount: investment.cost,
+                        earnedProfit,
+                        penalty,
+                        redeemValue,
+                        totalSpiritStones: gs.spiritStones,
+                        message: penalty > 0 ? '提前赎回！扣除惩罚' + penalty + '灵石，实际返回' + redeemValue + '灵石' : '赎回成功！返回本金' + investment.cost + '灵石 + 收益' + earnedProfit + '灵石 = ' + redeemValue + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpMonthcardStatusV8 - 获取月卡状态v8
+            mcpMonthcardStatusV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV8();
+                    if (!mc.hasMonthcard) {
+                        return { success: true, active: false, message: '月卡v8未激活，请购买', dailyBonus: MONTHCARD_CONFIG_V8.dailyBonus, durationDays: MONTHCARD_CONFIG_V8.durationDays };
+                    }
+                    const now = Date.now();
+                    const isActive = mc.expireDate && new Date(mc.expireDate).getTime() > now;
+                    const daysRemaining = isActive ? Math.ceil((new Date(mc.expireDate).getTime() - now) / (24 * 60 * 60 * 1000)) : 0;
+                    return {
+                        success: true,
+                        active: isActive,
+                        hasMonthcard: mc.hasMonthcard,
+                        purchaseDate: mc.purchaseDate,
+                        expireDate: mc.expireDate,
+                        dailyBonus: mc.dailyBonus,
+                        daysRemaining,
+                        totalClaimed: mc.totalClaimed,
+                        claimedDaysCount: mc.claimedDays.length,
+                        message: isActive ? '月卡v8有效，剩余' + daysRemaining + '天' : '月卡v8已过期'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpMonthcardBuyV8 - 购买月卡v8
+            mcpMonthcardBuyV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV8();
+                    if (mc.hasMonthcard && mc.expireDate && new Date(mc.expireDate).getTime() > Date.now()) {
+                        return { success: false, error: '月卡v8已激活，无需重复购买' };
+                    }
+                    if ((gs.spiritStones || 0) < MONTHCARD_CONFIG_V8.cost) {
+                        return { success: false, error: '灵石不足，购买月卡需要' + MONTHCARD_CONFIG_V8.cost + '灵石' };
+                    }
+                    gs.spiritStones -= MONTHCARD_CONFIG_V8.cost;
+                    const now = Date.now();
+                    mc.hasMonthcard = true;
+                    mc.purchaseDate = new Date(now).toISOString();
+                    mc.expireDate = new Date(now + MONTHCARD_CONFIG_V8.durationDays * 24 * 60 * 60 * 1000).toISOString();
+                    mc.dailyBonus = MONTHCARD_CONFIG_V8.dailyBonus;
+                    mc.claimedDays = [];
+                    mc.totalClaimed = 0;
+                    return {
+                        success: true,
+                        cost: MONTHCARD_CONFIG_V8.cost,
+                        dailyBonus: MONTHCARD_CONFIG_V8.dailyBonus,
+                        expireDate: mc.expireDate,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '月卡v8购买成功！' + MONTHCARD_CONFIG_V8.durationDays + '天有效期，每日可领取' + MONTHCARD_CONFIG_V8.dailyBonus + '灵石'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -47600,6 +47859,74 @@ const ACHIEVEMENT_ID_MAP = {
                         monthcardType: { type: 'string', description: '月卡类型：monthly/quarterly/annual' }
                     }
                 }
+            }
+        };
+
+        // V207: 投资+月卡系统v8 (P-20260530-035)
+        const INVESTMENT_PRODUCTS_V8 = [
+            { id: 'inv_v8_spirit_quick', name: '灵石速赢v8', category: 'spiritStones', description: '短期投资，7天期限，日收益率2.5%', cost: 1000, dailyReturn: 25, duration: 7, dailyLimit: 50, totalShares: 100, soldShares: 0, investors: [] },
+            { id: 'inv_v8_spirit_stable', name: '稳健理财v8', category: 'spiritStones', description: '中期投资，30天期限，日收益率3%', cost: 5000, dailyReturn: 150, duration: 30, dailyLimit: 30, totalShares: 50, soldShares: 0, investors: [] },
+            { id: 'inv_v8_spirit_long', name: '长期增长v8', category: 'spiritStones', description: '长期投资，90天期限，日收益率3.5%', cost: 20000, dailyReturn: 700, duration: 90, dailyLimit: 10, totalShares: 20, soldShares: 0, investors: [] },
+            { id: 'inv_v8_technique', name: '功法传承v8', category: 'technique', description: '功法投资，60天期限，日收益率3.2%', cost: 10000, dailyReturn: 320, duration: 60, dailyLimit: 20, totalShares: 30, soldShares: 0, investors: [] },
+            { id: 'inv_v8_artifact', name: '法宝增值v8', category: 'artifact', description: '法宝投资，120天期限，日收益率4%', cost: 50000, dailyReturn: 2000, duration: 120, dailyLimit: 5, totalShares: 10, soldShares: 0, investors: [] }
+        ];
+        const MONTHCARD_CONFIG_V8 = {
+            cost: 300,
+            dailyBonus: 100,
+            durationDays: 30,
+            name: '修仙月卡',
+            description: '每日可领取100灵石，30天有效期'
+        };
+
+        // V207: 投资+月卡系统v8 MCP工具定义 (override V199)
+        const MCP_TOOLS_V207 = {
+            'investment.list': {
+                name: 'investment.list',
+                description: '获取投资项目列表 (投资系统v8-获取所有可投资项目)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'investment.buy': {
+                name: 'investment.buy',
+                description: '购买投资项目 (投资系统v8-购买投资，消耗灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.profit': {
+                name: 'investment.profit',
+                description: '领取投资收益 (投资系统v8-领取每日投资收益)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.redeem': {
+                name: 'investment.redeem',
+                description: '赎回投资 (投资系统v8-赎回投资，返回本金+收益)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'monthcard.status': {
+                name: 'monthcard.status',
+                description: '获取月卡状态 (月卡系统v8-获取月卡状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'monthcard.buy': {
+                name: 'monthcard.buy',
+                description: '购买月卡 (月卡系统v8-购买30天月卡，每日100灵石)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
