@@ -5683,6 +5683,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V191)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V192: Register 图鉴+收集系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V192)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7757,6 +7761,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'explore.complete':
                             result = this.mcpExploreCompleteV6(args.exploreId);
+                            break;
+                        // V192: 图鉴+收集系统v6
+                        case 'codex.list':
+                            result = this.mcpCodexListV6(args.type, args.rarity, args.page);
+                            break;
+                        case 'codex.view':
+                            result = this.mcpCodexViewV6(args.codexId);
+                            break;
+                        case 'codex.unlock':
+                            result = this.mcpCodexUnlockV6(args.codexId);
+                            break;
+                        case 'collection.stats':
+                            result = this.mcpCollectionStatsV6();
+                            break;
+                        case 'collection.reward':
+                            result = this.mcpCollectionRewardV6(args.collectionId);
+                            break;
+                        case 'collection.reset':
+                            result = this.mcpCollectionResetV6(args.collectionType);
                             break;
                         // V172: 图鉴+收集系统v4
                         case 'codex.list':
@@ -42801,6 +42824,70 @@ const ACHIEVEMENT_ID_MAP = {
             'collection.reset': {
                 name: 'collection.reset',
                 description: '重置收集进度 (收集系统v5-重置收集进度，可用于周期性重置的收集活动)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        collectionType: { type: 'string', description: '收集类型 (可选，默认重置所有)' }
+                    }
+                }
+            }
+        };
+
+        // V192: 图鉴+收集系统v6
+        const MCP_TOOLS_V192 = {
+            'codex.list': {
+                name: 'codex.list',
+                description: '获取图鉴列表 (图鉴系统v6-获取所有图鉴条目，支持类型/稀有度筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '图鉴类型筛选 (可选)' },
+                        rarity: { type: 'string', description: '稀有度筛选: common|rare|epic|legend (可选)' },
+                        page: { type: 'number', description: '页码 (默认1)' }
+                    }
+                }
+            },
+            'codex.view': {
+                name: 'codex.view',
+                description: '查看图鉴详情 (图鉴系统v6-查看指定图鉴条目的完整信息)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'codex.unlock': {
+                name: 'codex.unlock',
+                description: '解锁图鉴 (图鉴系统v6-解锁图鉴条目，消耗灵石或达成条件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        codexId: { type: 'string', description: '图鉴ID' }
+                    },
+                    required: ['codexId']
+                }
+            },
+            'collection.stats': {
+                name: 'collection.stats',
+                description: '获取收集统计 (收集系统v6-获取收集统计和已领取奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'collection.reward': {
+                name: 'collection.reward',
+                description: '领取收集奖励 (收集系统v6-达到指定完成度领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        collectionId: { type: 'string', description: '收集奖励ID' }
+                    },
+                    required: ['collectionId']
+                }
+            },
+            'collection.reset': {
+                name: 'collection.reset',
+                description: '重置收集进度 (收集系统v6-重置收集进度，返还部分资源)',
                 inputSchema: {
                     type: 'object',
                     properties: {
