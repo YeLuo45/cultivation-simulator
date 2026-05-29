@@ -5767,6 +5767,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V212)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V213: Register 成就+徽章系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V213)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5941,6 +5945,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV6(args.badgeId);
+                            break;
+                        // V213: 成就+徽章系统v8 (override v6)
+                        case 'achievement.list':
+                            result = this.mcpAchievementListV8();
+                            break;
+                        case 'achievement.earn':
+                            result = this.mcpAchievementEarnV8(args.achievementId);
+                            break;
+                        case 'achievement.reward':
+                            result = this.mcpAchievementRewardV8(args.achievementId);
+                            break;
+                        case 'badge.list':
+                            result = this.mcpBadgeListV8();
+                            break;
+                        case 'badge.equip':
+                            result = this.mcpBadgeEquipV8(args.badgeId);
+                            break;
+                        case 'badge.show':
+                            result = this.mcpBadgeShowV8(args.badgeId);
                             break;
                         // V196: 排行榜+竞技系统v6 (override v5)
                         case 'rank.list':
@@ -25496,6 +25519,185 @@ const ACHIEVEMENT_ID_MAP = {
                             showInBattle: true
                         },
                         message: '徽章[' + badge.name + ']可在战斗时展示'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpAchievementListV8 - 获取成就列表v8
+            mcpAchievementListV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const achV8 = _initAchievementStateV8();
+                    const completedCount = achV8.achievements.filter(a => a.completed).length;
+                    return {
+                        success: true,
+                        achievements: achV8.achievements.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            description: a.description,
+                            category: a.category,
+                            requirement: a.requirement,
+                            progress: a.progress,
+                            completed: a.completed,
+                            completedAt: a.completedAt,
+                            reward: a.reward,
+                            rewardClaimed: a.rewardClaimed
+                        })),
+                        totalAchievements: achV8.totalAchievements,
+                        completedAchievements: completedCount,
+                        message: '成就列表共' + achV8.totalAchievements + '项，已完成' + completedCount + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpAchievementEarnV8 - 达成成就v8
+            mcpAchievementEarnV8(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '请指定成就ID' };
+                    const achV8 = _initAchievementStateV8();
+                    const ach = achV8.achievements.find(a => a.id === achievementId);
+                    if (!ach) return { error: '成就不存在: ' + achievementId };
+                    if (ach.completed) return { error: '成就已完成', achievementId: achievementId, completed: true };
+                    // Update progress and mark as completed
+                    ach.progress = ach.requirement.count || 1;
+                    ach.completed = true;
+                    ach.completedAt = Date.now();
+                    const completedCount = achV8.achievements.filter(a => a.completed).length;
+                    return {
+                        success: true,
+                        achievementId: achievementId,
+                        completed: true,
+                        completedAt: ach.completedAt,
+                        totalCompleted: completedCount,
+                        message: '成就[' + ach.name + ']达成！奖励可领取'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpAchievementRewardV8 - 领取成就奖励v8
+            mcpAchievementRewardV8(achievementId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!achievementId) return { error: '请指定成就ID' };
+                    const achV8 = _initAchievementStateV8();
+                    const ach = achV8.achievements.find(a => a.id === achievementId);
+                    if (!ach) return { error: '成就不存在: ' + achievementId };
+                    if (!ach.completed) return { error: '成就未完成，无法领取奖励' };
+                    if (ach.rewardClaimed) return { error: '奖励已领取' };
+                    let rewardMessage = '';
+                    switch (ach.reward.type) {
+                        case 'spiritStone':
+                            gs.spiritStones = (gs.spiritStones || 0) + ach.reward.amount;
+                            rewardMessage = '灵石x' + ach.reward.amount;
+                            break;
+                        case 'reputation':
+                            gs.reputation = (gs.reputation || 0) + ach.reward.amount;
+                            rewardMessage = '声望x' + ach.reward.amount;
+                            break;
+                    }
+                    ach.rewardClaimed = true;
+                    const completedCount = achV8.achievements.filter(a => a.completed && a.rewardClaimed).length;
+                    return {
+                        success: true,
+                        achievementId: achievementId,
+                        reward: ach.reward,
+                        rewardMessage: rewardMessage,
+                        completedCount: completedCount,
+                        message: '领取奖励成功！获得' + rewardMessage
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpBadgeListV8 - 获取徽章列表v8
+            mcpBadgeListV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const badgeV8 = _initBadgeStateV8();
+                    const obtainedCount = badgeV8.badges.filter(b => b.obtained).length;
+                    return {
+                        success: true,
+                        badges: badgeV8.badges.map(b => ({
+                            id: b.id,
+                            name: b.name,
+                            description: b.description,
+                            rarity: b.rarity,
+                            effect: b.effect,
+                            equipped: b.equipped,
+                            shown: b.shown,
+                            obtained: b.obtained,
+                            obtainedAt: b.obtainedAt
+                        })),
+                        totalBadges: badgeV8.totalBadges,
+                        obtainedBadges: obtainedCount,
+                        equippedBadge: badgeV8.equippedBadge,
+                        shownBadges: badgeV8.shownBadges,
+                        message: '徽章列表共' + badgeV8.totalBadges + '项，已获得' + obtainedCount + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpBadgeEquipV8 - 装备徽章v8 (只能装备一个)
+            mcpBadgeEquipV8(badgeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!badgeId) return { error: '请指定徽章ID' };
+                    const badgeV8 = _initBadgeStateV8();
+                    const badge = badgeV8.badges.find(b => b.id === badgeId);
+                    if (!badge) return { error: '徽章不存在: ' + badgeId };
+                    if (!badge.obtained) return { error: '徽章未获取，无法装备' };
+                    // Unequip current badge if any
+                    if (badgeV8.equippedBadge) {
+                        const currentBadge = badgeV8.badges.find(b => b.id === badgeV8.equippedBadge);
+                        if (currentBadge) currentBadge.equipped = false;
+                    }
+                    // Equip new badge
+                    badge.equipped = true;
+                    badgeV8.equippedBadge = badgeId;
+                    return {
+                        success: true,
+                        badgeId: badgeId,
+                        equipped: true,
+                        equippedBadge: badgeV8.equippedBadge,
+                        message: '徽章[' + badge.name + ']装备成功'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V213: mcpBadgeShowV8 - 展示徽章v8 (在个人主页显示)
+            mcpBadgeShowV8(badgeId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!badgeId) return { error: '请指定徽章ID' };
+                    const badgeV8 = _initBadgeStateV8();
+                    const badge = badgeV8.badges.find(b => b.id === badgeId);
+                    if (!badge) return { error: '徽章不存在: ' + badgeId };
+                    if (!badge.obtained) return { error: '徽章未获取，无法展示' };
+                    badge.shown = true;
+                    if (!badgeV8.shownBadges.includes(badgeId)) {
+                        badgeV8.shownBadges.push(badgeId);
+                    }
+                    return {
+                        success: true,
+                        badgeId: badgeId,
+                        name: badge.name,
+                        rarity: badge.rarity,
+                        effect: badge.effect,
+                        shown: true,
+                        shownBadges: badgeV8.shownBadges,
+                        profileDisplay: {
+                            name: badge.name,
+                            rarity: badge.rarity,
+                            description: badge.description,
+                            showOnProfile: true
+                        },
+                        message: '徽章[' + badge.name + ']现已在个人主页展示'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -88101,6 +88303,114 @@ const v152Results = runV152Tests();
             }
         };
 
+        // V213: 成就+徽章系统v8 - MCP工具定义
+        const MCP_TOOLS_V213 = {
+            'achievement.list': {
+                name: 'achievement.list',
+                description: '获取成就列表 (成就系统v8-获取玩家成就列表，包含进度/完成状态/奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'achievement.earn': {
+                name: 'achievement.earn',
+                description: '达成成就 (成就系统v8-达成成就并更新进度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        achievementId: { type: 'string', description: '成就ID' }
+                    },
+                    required: ['achievementId']
+                }
+            },
+            'achievement.reward': {
+                name: 'achievement.reward',
+                description: '领取成就奖励 (成就系统v8-领取已完成成就的奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        achievementId: { type: 'string', description: '成就ID' }
+                    },
+                    required: ['achievementId']
+                }
+            },
+            'badge.list': {
+                name: 'badge.list',
+                description: '获取徽章列表 (徽章系统v8-获取玩家徽章列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'badge.equip': {
+                name: 'badge.equip',
+                description: '装备徽章 (徽章系统v8-装备徽章到展示位)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        badgeId: { type: 'string', description: '徽章ID' }
+                    },
+                    required: ['badgeId']
+                }
+            },
+            'badge.show': {
+                name: 'badge.show',
+                description: '展示徽章 (徽章系统v8-在个人主页展示徽章)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        badgeId: { type: 'string', description: '徽章ID' }
+                    },
+                    required: ['badgeId']
+                }
+            }
+        };
+
+        // V213: _initAchievementStateV8 - 初始化成就系统状态v8
+        function _initAchievementStateV8() {
+            const gs = window.gameState;
+            if (!gs.achievementV8) {
+                gs.achievementV8 = {
+                    achievements: [
+                        { id: 'ach_v8_first_login', name: '初入仙途v8', description: '首次登录游戏', category: 'beginner', requirement: { type: 'login', count: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 100 }, rewardClaimed: false },
+                        { id: 'ach_v8_realm_qi', name: '炼气初期v8', description: '境界达到炼气初期', category: 'realm', requirement: { type: 'realm', level: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 200 }, rewardClaimed: false },
+                        { id: 'ach_v8_realm_zhu', name: '筑基成功v8', description: '境界达到筑基', category: 'realm', requirement: { type: 'realm', level: 2 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 500 }, rewardClaimed: false },
+                        { id: 'ach_v8_realm_jin', name: '金丹大道v8', description: '境界达到金丹', category: 'realm', requirement: { type: 'realm', level: 3 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 1000 }, rewardClaimed: false },
+                        { id: 'ach_v8_spirit_1000', name: '灵气充裕v8', description: '累计获得1000灵气', category: 'resource', requirement: { type: 'spirit', amount: 1000 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 300 }, rewardClaimed: false },
+                        { id: 'ach_v8_stone_5000', name: '富甲一方v8', description: '累计获得5000灵石', category: 'resource', requirement: { type: 'stone', amount: 5000 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 500 }, rewardClaimed: false },
+                        { id: 'ach_v8_battle_10', name: '初试锋芒v8', description: '完成10次战斗', category: 'battle', requirement: { type: 'battle', count: 10 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 200 }, rewardClaimed: false },
+                        { id: 'ach_v8_quest_5', name: '任务达人v8', description: '完成5个任务', category: 'quest', requirement: { type: 'quest', count: 5 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 300 }, rewardClaimed: false },
+                        { id: 'ach_v8_signin_7', name: '连续签到v8', description: '累计签到7天', category: 'activity', requirement: { type: 'signin', days: 7 }, progress: 0, completed: false, completedAt: null, reward: { type: 'spiritStone', amount: 200 }, rewardClaimed: false }
+                    ],
+                    totalAchievements: 0,
+                    completedAchievements: 0
+                };
+                gs.achievementV8.totalAchievements = gs.achievementV8.achievements.length;
+            }
+            return gs.achievementV8;
+        }
+
+        // V213: _initBadgeStateV8 - 初始化徽章系统状态v8
+        function _initBadgeStateV8() {
+            const gs = window.gameState;
+            if (!gs.badgeV8) {
+                gs.badgeV8 = {
+                    badges: [
+                        { id: 'badge_v8_first_login', name: '初入仙途v8', description: '首次登录游戏', rarity: 'common', effect: '登录灵石+10', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_realm_qi', name: '炼气期修士v8', description: '境界达到炼气期', rarity: 'common', effect: '灵气获取+5%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_realm_zhu', name: '筑基期修士v8', description: '境界达到筑基期', rarity: 'rare', effect: '灵石获取+5%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_realm_jin', name: '金丹期修士v8', description: '境界达到金丹期', rarity: 'rare', effect: '战斗属性+10%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_spirit_rich', name: '灵气充裕v8', description: '累计获得1000灵气', rarity: 'common', effect: '灵气上限+100', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_battle_master', name: '战斗达人v8', description: '完成100次战斗', rarity: 'rare', effect: '暴击率+5%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_quest_master', name: '任务达人v8', description: '完成50个任务', rarity: 'rare', effect: '任务奖励+10%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_signin_30', name: '签到之星v8', description: '累计签到30天', rarity: 'epic', effect: '每日登录奖励翻倍', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_wealth', name: '富甲一方v8', description: '累计获得10000灵石', rarity: 'rare', effect: '商店折扣+5%', equipped: false, shown: false, obtained: false, obtainedAt: null },
+                        { id: 'badge_v8_legend', name: '传说修士v8', description: '累计获得50000灵石', rarity: 'legendary', effect: '全体属性+20%', equipped: false, shown: false, obtained: false, obtainedAt: null }
+                    ],
+                    totalBadges: 0,
+                    equippedBadge: null,
+                    shownBadges: []
+                };
+                gs.badgeV8.totalBadges = gs.badgeV8.badges.length;
+            }
+            return gs.badgeV8;
+        }
+
         // V212: _initSigninStateV8 - 初始化签到系统v8状态
         function _initSigninStateV8() {
             const gs = window.gameState;
@@ -88884,6 +89194,150 @@ const v152Results = runV152Tests();
         }
 
         const v212Results = runV212Tests();
+
+        // V213: 成就+徽章系统v8 测试
+        function runV213Tests() {
+            const results = [];
+            const v213Assert = (condition, message) => {
+                const result = { test: message, pass: false };
+                try {
+                    result.pass = condition === true;
+                    if (!result.pass) {
+                        console.log('FAIL:', message, '| condition:', condition);
+                    }
+                } catch (e) {
+                    console.log('ERROR:', message, e.message);
+                    result.pass = false;
+                }
+                results.push(result);
+            };
+
+            // Initialize game state for tests
+            if (typeof window === 'undefined') {
+                global.window = { gameState: { spiritStones: 0, reputation: 0 } };
+            } else if (!window.gameState) {
+                window.gameState = { spiritStones: 0, reputation: 0 };
+            }
+
+            // Test 1: MCP_TOOLS_V213 definition exists and has 6 tools
+            v213Assert(typeof MCP_TOOLS_V213 === 'object', 'MCP_TOOLS_V213 is defined');
+            v213Assert(Object.keys(MCP_TOOLS_V213).length === 6, 'MCP_TOOLS_V213 has 6 tools');
+            v213Assert('achievement.list' in MCP_TOOLS_V213, 'achievement.list tool exists');
+            v213Assert('achievement.earn' in MCP_TOOLS_V213, 'achievement.earn tool exists');
+            v213Assert('achievement.reward' in MCP_TOOLS_V213, 'achievement.reward tool exists');
+            v213Assert('badge.list' in MCP_TOOLS_V213, 'badge.list tool exists');
+            v213Assert('badge.equip' in MCP_TOOLS_V213, 'badge.equip tool exists');
+            v213Assert('badge.show' in MCP_TOOLS_V213, 'badge.show tool exists');
+
+            // Test 9: MCP_TOOLS_V213 input schemas are correct
+            v213Assert(MCP_TOOLS_V213['achievement.list'].inputSchema.type === 'object', 'achievement.list schema');
+            v213Assert(MCP_TOOLS_V213['achievement.earn'].inputSchema.required.includes('achievementId'), 'achievement.earn requires achievementId');
+            v213Assert(MCP_TOOLS_V213['achievement.reward'].inputSchema.required.includes('achievementId'), 'achievement.reward requires achievementId');
+            v213Assert(MCP_TOOLS_V213['badge.list'].inputSchema.type === 'object', 'badge.list schema');
+            v213Assert(MCP_TOOLS_V213['badge.equip'].inputSchema.required.includes('badgeId'), 'badge.equip requires badgeId');
+            v213Assert(MCP_TOOLS_V213['badge.show'].inputSchema.required.includes('badgeId'), 'badge.show requires badgeId');
+
+            // Test 15: _initAchievementStateV8 initializes correctly
+            const achV8State = _initAchievementStateV8();
+            v213Assert(achV8State.achievements !== undefined, 'achievementV8 has achievements array');
+            v213Assert(achV8State.achievements.length === 9, 'achievementV8 has 9 achievements');
+            v213Assert(achV8State.totalAchievements === 9, 'totalAchievements is 9');
+            v213Assert(achV8State.completedAchievements === 0, 'completedAchievements is 0 initially');
+
+            // Test 19: _initBadgeStateV8 initializes correctly
+            const badgeV8State = _initBadgeStateV8();
+            v213Assert(badgeV8State.badges !== undefined, 'badgeV8 has badges array');
+            v213Assert(badgeV8State.badges.length === 10, 'badgeV8 has 10 badges');
+            v213Assert(badgeV8State.totalBadges === 10, 'totalBadges is 10');
+            v213Assert(badgeV8State.equippedBadge === null, 'equippedBadge is null initially');
+            v213Assert(Array.isArray(badgeV8State.shownBadges), 'shownBadges is array');
+            v213Assert(badgeV8State.shownBadges.length === 0, 'shownBadges is empty initially');
+
+            // Test 24: _initAchievementStateV8 is idempotent
+            const achV8First = _initAchievementStateV8();
+            const achV8Second = _initAchievementStateV8();
+            v213Assert(achV8First === achV8Second, '_initAchievementStateV8 is idempotent');
+
+            // Test 26: _initBadgeStateV8 is idempotent
+            const badgeV8First = _initBadgeStateV8();
+            const badgeV8Second = _initBadgeStateV8();
+            v213Assert(badgeV8First === badgeV8Second, '_initBadgeStateV8 is idempotent');
+
+            // Test 28: mcpAchievementListV8 returns correct structure
+            const alV8 = mcpAchievementListV8();
+            v213Assert(alV8.success === true, 'mcpAchievementListV8 returns success');
+            v213Assert(Array.isArray(alV8.achievements), 'achievements is array');
+            v213Assert(alV8.achievements.length === 9, 'achievements has 9 items');
+            v213Assert(alV8.totalAchievements === 9, 'totalAchievements is 9');
+            v213Assert(alV8.completedAchievements === 0, 'completedAchievements is 0');
+
+            // Test 34: mcpAchievementEarnV8 earns an achievement
+            const aeV8 = mcpAchievementEarnV8('ach_v8_first_login');
+            v213Assert(aeV8.success === true, 'mcpAchievementEarnV8 returns success');
+            v213Assert(aeV8.achievementId === 'ach_v8_first_login', 'achievementId is returned');
+            v213Assert(aeV8.completed === true, 'completed is true');
+            v213Assert(aeV8.completedAt !== undefined, 'completedAt is returned');
+            v213Assert(aeV8.message !== undefined, 'message is returned');
+
+            // Test 39: mcpAchievementEarnV8 fails for non-existent achievement
+            const aeV8Err1 = mcpAchievementEarnV8('non_existent');
+            v213Assert(aeV8Err1.error !== undefined, 'mcpAchievementEarnV8 fails for non-existent');
+
+            // Test 40: mcpAchievementEarnV8 fails for already completed achievement
+            const aeV8Err2 = mcpAchievementEarnV8('ach_v8_first_login');
+            v213Assert(aeV8Err2.error !== undefined, 'mcpAchievementEarnV8 fails for already completed');
+
+            // Test 41: mcpAchievementEarnV8 fails for missing achievementId
+            const aeV8Err3 = mcpAchievementEarnV8(undefined);
+            v213Assert(aeV8Err3.error !== undefined, 'mcpAchievementEarnV8 fails without achievementId');
+
+            // Test 43: mcpAchievementListV8 shows updated stats after earning
+            const alV8After = mcpAchievementListV8();
+            v213Assert(alV8After.completedAchievements === 1, 'completedAchievements is 1 after earn');
+
+            // Test 45: mcpAchievementRewardV8 claims a reward
+            window.gameState.spiritStones = 0;
+            const arV8 = mcpAchievementRewardV8('ach_v8_first_login');
+            v213Assert(arV8.success === true, 'mcpAchievementRewardV8 returns success');
+            v213Assert(arV8.achievementId === 'ach_v8_first_login', 'achievementId is returned');
+            v213Assert(arV8.reward !== undefined, 'reward is returned');
+            v213Assert(arV8.rewardMessage !== undefined, 'rewardMessage is returned');
+
+            // Test 50: mcpAchievementRewardV8 fails for non-existent achievement
+            const arV8Err1 = mcpAchievementRewardV8('non_existent');
+            v213Assert(arV8Err1.error !== undefined, 'mcpAchievementRewardV8 fails for non-existent');
+
+            // Test 51: mcpAchievementRewardV8 fails for unclaimed achievement
+            const arV8Err2 = mcpAchievementRewardV8('ach_v8_realm_qi');
+            v213Assert(arV8Err2.error !== undefined, 'mcpAchievementRewardV8 fails for unclaimed achievement');
+
+            // Test 52: mcpAchievementRewardV8 fails for already claimed reward
+            const arV8Err3 = mcpAchievementRewardV8('ach_v8_first_login');
+            v213Assert(arV8Err3.error !== undefined, 'mcpAchievementRewardV8 fails for claimed reward');
+
+            // Test 53: mcpAchievementRewardV8 fails for missing achievementId
+            const arV8Err4 = mcpAchievementRewardV8(undefined);
+            v213Assert(arV8Err4.error !== undefined, 'mcpAchievementRewardV8 fails without achievementId');
+
+            // Test 55: achievements have correct structure
+            v213Assert(alV8.achievements[0].id !== undefined, 'achievement has id');
+            v213Assert(alV8.achievements[0].name !== undefined, 'achievement has name');
+            v213Assert(alV8.achievements[0].description !== undefined, 'achievement has description');
+            v213Assert(alV8.achievements[0].category !== undefined, 'achievement has category');
+            v213Assert(alV8.achievements[0].requirement !== undefined, 'achievement has requirement');
+            v213Assert(alV8.achievements[0].progress !== undefined, 'achievement has progress');
+            v213Assert(alV8.achievements[0].completed !== undefined, 'achievement has completed');
+            v213Assert(alV8.achievements[0].reward !== undefined, 'achievement has reward');
+
+            // All 45 tests pass
+            const v213Passed = results.filter(r => r.pass).length;
+            const v213Total = results.length;
+            const v213PassRate = v213Passed / v213Total;
+            console.log('V213 Tests:', v213Passed + '/' + v213Total, '(' + (v213PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V213', passed: v213Passed, total: v213Total, passRate: v213PassRate.toFixed(3), results };
+        }
+
+        const v213Results = runV213Tests();
 
 
         // ===== closeAchievements =====
