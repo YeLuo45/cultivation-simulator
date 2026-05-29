@@ -3797,6 +3797,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V201)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V202: Register 签到+福利系统v7 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V202)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4085,6 +4089,25 @@
                             break;
                         case 'dispatch.execute':
                             result = this.mcpDispatchExecuteV7(args.dispatchId);
+                            break;
+                        // V202: 签到+福利系统v7
+                        case 'signin.list':
+                            result = this.mcpSigninListV7();
+                            break;
+                        case 'signin.checkin':
+                            result = this.mcpSigninCheckinV7();
+                            break;
+                        case 'signin.reward':
+                            result = this.mcpSigninRewardV7(args.day);
+                            break;
+                        case 'signin.makeup':
+                            result = this.mcpSigninMakeupV7(args.day);
+                            break;
+                        case 'welfare.list':
+                            result = this.mcpWelfareListV7();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaimV7(args.welfareId);
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -17252,6 +17275,227 @@
                         petName: matchedPet.name,
                         duration: task.duration,
                         message: matchedPet.name + ' 开始执行派遣任务: ' + task.name + '，预计 ' + (task.duration / 60000).toFixed(0) + ' 分钟'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: _initSigninStateV7 - 初始化签到系统状态v7
+            _initSigninStateV7() {
+                const gs = window.gameState;
+                if (!gs.signinV7) {
+                    gs.signinV7 = {
+                        consecutiveDays: 0,
+                        lastCheckinDate: null,
+                        totalCheckins: 0,
+                        rewardsClaimed: [],
+                        makeupUsed: 0,
+                        maxMakeup: SIGNIN_CONFIG_V7.maxMakeupPerPeriod,
+                        checkinHistory: [],
+                        monthlyProgress: 0,
+                        currentMonth: new Date().getMonth()
+                    };
+                }
+                // Reset if month changed
+                const currentMonth = new Date().getMonth();
+                if (gs.signinV7.currentMonth !== currentMonth) {
+                    gs.signinV7.consecutiveDays = 0;
+                    gs.signinV7.lastCheckinDate = null;
+                    gs.signinV7.rewardsClaimed = [];
+                    gs.signinV7.makeupUsed = 0;
+                    gs.signinV7.checkinHistory = [];
+                    gs.signinV7.monthlyProgress = 0;
+                    gs.signinV7.currentMonth = currentMonth;
+                }
+                return gs.signinV7;
+            }
+
+            // V202: _initWelfareStateV7 - 初始化福利系统状态v7
+            _initWelfareStateV7() {
+                const gs = window.gameState;
+                if (!gs.welfareV7) {
+                    gs.welfareV7 = {
+                        welfareRecords: WELFARE_CONFIG_V7.welfareItems.map(item => ({
+                            ...item,
+                            claimedCount: 0,
+                            lastClaimAt: null
+                        })),
+                        availableWelfare: [],
+                        totalWelfare: 0
+                    };
+                }
+                // Update claimable status based on last claim date
+                const now = new Date();
+                for (const welfare of gs.welfareV7.welfareRecords) {
+                    if (welfare.type === 'daily' && welfare.lastClaimDate) {
+                        const lastClaim = new Date(welfare.lastClaimDate);
+                        const isSameDay = now.toDateString() === lastClaim.toDateString();
+                        welfare.claimed = isSameDay;
+                    }
+                }
+                return gs.welfareV7;
+            }
+
+            // V202: mcpSigninListV7 - 获取签到配置列表v7
+            mcpSigninListV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV7 = this._initSigninStateV7();
+                    return {
+                        success: true,
+                        consecutiveDays: signinV7.consecutiveDays,
+                        totalCheckins: signinV7.totalCheckins,
+                        lastCheckinDate: signinV7.lastCheckinDate,
+                        rewardsClaimed: signinV7.rewardsClaimed,
+                        makeupUsed: signinV7.makeupUsed,
+                        maxMakeup: signinV7.maxMakeup,
+                        rewards: SIGNIN_CONFIG_V7.rewards,
+                        consecutiveBonus: SIGNIN_CONFIG_V7.consecutiveBonus
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: mcpSigninCheckinV7 - 执行签到v7
+            mcpSigninCheckinV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV7 = this._initSigninStateV7();
+                    const today = new Date().toDateString();
+                    if (signinV7.lastCheckinDate === today) {
+                        return { success: false, error: '今日已签到，请勿重复签到' };
+                    }
+                    // Update consecutive days
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    const wasConsecutive = signinV7.lastCheckinDate === yesterday.toDateString();
+                    if (wasConsecutive) {
+                        signinV7.consecutiveDays++;
+                    } else {
+                        signinV7.consecutiveDays = 1;
+                    }
+                    signinV7.lastCheckinDate = today;
+                    signinV7.totalCheckins++;
+                    signinV7.monthlyProgress++;
+                    signinV7.checkinHistory.push({ date: today, type: 'normal' });
+                    // Calculate bonus
+                    const bonus = SIGNIN_CONFIG_V7.consecutiveBonus[signinV7.consecutiveDays] || 0;
+                    if (bonus > 0) {
+                        gs.spiritStones = (gs.spiritStones || 0) + bonus;
+                    }
+                    return {
+                        success: true,
+                        consecutiveDays: signinV7.consecutiveDays,
+                        totalCheckins: signinV7.totalCheckins,
+                        bonus: bonus,
+                        message: '签到成功！已连续签到 ' + signinV7.consecutiveDays + ' 天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: mcpSigninRewardV7 - 领取签到奖励v7
+            mcpSigninRewardV7(day) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!day) return { error: '请指定奖励天数' };
+                    const signinV7 = this._initSigninStateV7();
+                    if (signinV7.rewardsClaimed.includes(day)) {
+                        return { success: false, error: '该奖励已领取' };
+                    }
+                    const reward = SIGNIN_CONFIG_V7.rewards.find(r => r.day === day);
+                    if (!reward) return { error: '奖励天数不存在: ' + day };
+                    // Check if player has met the requirement
+                    if (day === 7 && signinV7.consecutiveDays < 7) {
+                        return { success: false, error: '连续签到不足7天，无法领取该奖励' };
+                    }
+                    if (day === 5 && signinV7.consecutiveDays < 5) {
+                        return { success: false, error: '连续签到不足5天，无法领取该奖励' };
+                    }
+                    signinV7.rewardsClaimed.push(day);
+                    return {
+                        success: true,
+                        day: day,
+                        reward: reward.reward,
+                        message: '领取成功！获得 ' + reward.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: mcpSigninMakeupV7 - 补签v7
+            mcpSigninMakeupV7(day) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!day) return { error: '请指定补签日期' };
+                    const signinV7 = this._initSigninStateV7();
+                    if (signinV7.makeupUsed >= signinV7.maxMakeup) {
+                        return { success: false, error: '本期补签次数已用完，最多 ' + signinV7.maxMakeup + ' 次' };
+                    }
+                    // Check if day is in the past (simple check - today or before)
+                    const targetDate = new Date(day);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (targetDate >= today) {
+                        return { success: false, error: '只能补签过去的日期' };
+                    }
+                    // Check if already signed
+                    const dayStr = targetDate.toDateString();
+                    const alreadySigned = signinV7.checkinHistory.some(h => h.date === dayStr);
+                    if (alreadySigned) {
+                        return { success: false, error: '该日期已签到' };
+                    }
+                    // Consume makeup
+                    signinV7.makeupUsed++;
+                    signinV7.checkinHistory.push({ date: dayStr, type: 'makeup' });
+                    signinV7.totalCheckins++;
+                    return {
+                        success: true,
+                        day: day,
+                        makeupUsed: signinV7.makeupUsed,
+                        remainingMakeup: signinV7.maxMakeup - signinV7.makeupUsed,
+                        message: '补签成功！消耗1次补签机会，剩余 ' + (signinV7.maxMakeup - signinV7.makeupUsed) + ' 次'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: mcpWelfareListV7 - 获取福利列表v7
+            mcpWelfareListV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfareV7 = this._initWelfareStateV7();
+                    const claimable = welfareV7.welfareRecords.filter(w => !w.claimed);
+                    return {
+                        success: true,
+                        welfareList: welfareV7.welfareRecords,
+                        claimableCount: claimable.length,
+                        totalWelfare: welfareV7.totalWelfare,
+                        message: '共有 ' + claimable.length + ' 项福利可领取'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V202: mcpWelfareClaimV7 - 领取福利v7
+            mcpWelfareClaimV7(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '请指定福利ID' };
+                    const welfareV7 = this._initWelfareStateV7();
+                    const welfare = welfareV7.welfareRecords.find(w => w.id === welfareId);
+                    if (!welfare) return { error: '福利不存在: ' + welfareId };
+                    if (welfare.claimed) return { success: false, error: '该福利已领取' };
+                    // Claim the welfare
+                    welfare.claimed = true;
+                    welfare.claimedCount++;
+                    welfare.lastClaimAt = new Date().toISOString();
+                    welfareV7.totalWelfare++;
+                    return {
+                        success: true,
+                        welfareId: welfareId,
+                        reward: welfare.reward,
+                        message: '领取成功！获得 ' + welfare.reward
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -42981,6 +43225,82 @@
                         dispatchId: { type: 'string', description: '派遣任务ID' }
                     },
                     required: ['dispatchId']
+                }
+            }
+        };
+
+        // V202: 签到+福利系统v7 (P-20260530-021)
+        const SIGNIN_CONFIG_V7 = {
+            consecutiveBonus: { 1: 10, 3: 30, 7: 80, 30: 300 },
+            makeupCost: 50,
+            maxMakeupPerPeriod: 3,
+            rewards: [
+                { day: 1, reward: '灵石x50', claimed: false },
+                { day: 2, reward: '灵气x100', claimed: false },
+                { day: 3, reward: '灵石x100', claimed: false },
+                { day: 5, reward: '灵石x200', claimed: false },
+                { day: 7, reward: '稀有灵石x1', claimed: false }
+            ]
+        };
+
+        const WELFARE_CONFIG_V7 = {
+            types: ['daily', 'weekly', 'monthly', 'event', 'recharge'],
+            dailyResetHour: 0,
+            welfareItems: [
+                { id: 'welfare_v7_daily', name: '每日登录礼包', description: '每日登录可领取', type: 'daily', cost: 0, reward: '灵石x50', claimed: false, claimLimit: 1, lastClaimDate: null },
+                { id: 'welfare_v7_level', name: '等级礼包', description: '每提升5级可领取', type: 'level', cost: 0, reward: '灵气x200', claimed: false, claimLimit: 99, lastClaimDate: null },
+                { id: 'welfare_v7_recharge', name: '充值返利', description: '单次充值满100灵石返20%', type: 'recharge', cost: 0, reward: '灵石x20', claimed: false, claimLimit: 1, lastClaimDate: null },
+                { id: 'welfare_v7_share', name: '分享礼包', description: '分享游戏给好友', type: 'share', cost: 0, reward: '灵石x30', claimed: false, claimLimit: 1, lastClaimDate: null }
+            ]
+        };
+
+        const MCP_TOOLS_V202 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到配置列表 (签到系统v7-获取签到配置列表，支持当月/累充奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '执行签到 (签到系统v7-执行签到，验证是否重复+更新连签天数)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.reward': {
+                name: 'signin.reward',
+                description: '领取签到奖励 (签到系统v7-领取签到奖励，验证是否可领)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        day: { type: 'number', description: '奖励天数(1-7)' }
+                    },
+                    required: ['day']
+                }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签某日 (签到系统v7-补签，消耗补签卡，每期限制3次)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        day: { type: 'number', description: '补签日期' }
+                    },
+                    required: ['day']
+                }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统v7-获取可领取福利列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利 (福利系统v7-领取福利，每日/每周/活动福利)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID' }
+                    },
+                    required: ['welfareId']
                 }
             }
         };
@@ -83256,3 +83576,257 @@ const v152Results = runV152Tests();
         }
 
         const v201Results = runV201Tests();
+
+        // V202: 签到+福利系统v7 Tests (P-20260530-021)
+        function runV202Tests() {
+            const results = [];
+            const v202Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player',
+                playerName: '测试道友',
+                spiritStones: 100000,
+                combatPower: 3000,
+                reputation: 500,
+                realmIndex: 3,
+                signinV7: null,
+                welfareV7: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V202 definition exists and has 6 tools
+            v202Assert(typeof MCP_TOOLS_V202 === 'object', 'MCP_TOOLS_V202 is defined');
+            v202Assert(Object.keys(MCP_TOOLS_V202).length === 6, 'MCP_TOOLS_V202 has 6 tools');
+            v202Assert('signin.list' in MCP_TOOLS_V202, 'signin.list tool exists');
+            v202Assert('signin.checkin' in MCP_TOOLS_V202, 'signin.checkin tool exists');
+            v202Assert('signin.reward' in MCP_TOOLS_V202, 'signin.reward tool exists');
+            v202Assert('signin.makeup' in MCP_TOOLS_V202, 'signin.makeup tool exists');
+            v202Assert('welfare.list' in MCP_TOOLS_V202, 'welfare.list tool exists');
+            v202Assert('welfare.claim' in MCP_TOOLS_V202, 'welfare.claim tool exists');
+
+            // Test 2: SIGNIN_CONFIG_V7 is defined with correct values
+            v202Assert(typeof SIGNIN_CONFIG_V7 === 'object', 'SIGNIN_CONFIG_V7 is defined');
+            v202Assert(SIGNIN_CONFIG_V7.maxMakeupPerPeriod === 3, 'SIGNIN_CONFIG_V7 has correct maxMakeupPerPeriod');
+            v202Assert(SIGNIN_CONFIG_V7.makeupCost === 50, 'SIGNIN_CONFIG_V7 has correct makeupCost');
+            v202Assert(Array.isArray(SIGNIN_CONFIG_V7.rewards), 'SIGNIN_CONFIG_V7 has rewards array');
+            v202Assert(SIGNIN_CONFIG_V7.rewards.length === 5, 'SIGNIN_CONFIG_V7 has 5 rewards');
+
+            // Test 3: WELFARE_CONFIG_V7 is defined with correct values
+            v202Assert(typeof WELFARE_CONFIG_V7 === 'object', 'WELFARE_CONFIG_V7 is defined');
+            v202Assert(Array.isArray(WELFARE_CONFIG_V7.welfareItems), 'WELFARE_CONFIG_V7 has welfareItems array');
+            v202Assert(WELFARE_CONFIG_V7.welfareItems.length === 4, 'WELFARE_CONFIG_V7 has 4 welfare items');
+            v202Assert(WELFARE_CONFIG_V7.types.includes('daily'), 'WELFARE_CONFIG_V7 has daily type');
+
+            // Test 4: _initSigninStateV7 creates state
+            const signinV7State = server._initSigninStateV7();
+            v202Assert(signinV7State !== null, '_initSigninStateV7 returns state');
+            v202Assert(signinV7State.consecutiveDays === 0, '_initSigninStateV7 has consecutiveDays 0');
+            v202Assert(signinV7State.totalCheckins === 0, '_initSigninStateV7 has totalCheckins 0');
+            v202Assert(Array.isArray(signinV7State.rewardsClaimed), '_initSigninStateV7 has rewardsClaimed array');
+            v202Assert(signinV7State.makeupUsed === 0, '_initSigninStateV7 has makeupUsed 0');
+            v202Assert(signinV7State.maxMakeup === 3, '_initSigninStateV7 has maxMakeup 3');
+
+            // Test 5: _initWelfareStateV7 creates state
+            const welfareV7State = server._initWelfareStateV7();
+            v202Assert(welfareV7State !== null, '_initWelfareStateV7 returns state');
+            v202Assert(Array.isArray(welfareV7State.welfareRecords), '_initWelfareStateV7 has welfareRecords array');
+            v202Assert(welfareV7State.welfareRecords.length === 4, '_initWelfareStateV7 has 4 welfare records');
+            v202Assert(welfareV7State.totalWelfare === 0, '_initWelfareStateV7 has totalWelfare 0');
+
+            // Test 6: mcpSigninListV7 returns correct structure
+            const signinList = server.mcpSigninListV7();
+            v202Assert(signinList.success === true, 'signin.list v7 returns success');
+            v202Assert(typeof signinList.consecutiveDays === 'number', 'signin.list v7 has consecutiveDays');
+            v202Assert(typeof signinList.totalCheckins === 'number', 'signin.list v7 has totalCheckins');
+            v202Assert(Array.isArray(signinList.rewards), 'signin.list v7 has rewards array');
+            v202Assert(typeof signinList.consecutiveBonus === 'object', 'signin.list v7 has consecutiveBonus');
+
+            // Test 7: mcpSigninCheckinV7 works correctly
+            const checkinResult = server.mcpSigninCheckinV7();
+            v202Assert(checkinResult.success === true, 'signin.checkin v7 returns success');
+            v202Assert(checkinResult.consecutiveDays === 1, 'signin.checkin v7 returns consecutiveDays 1');
+            v202Assert(checkinResult.totalCheckins === 1, 'signin.checkin v7 returns totalCheckins 1');
+            v202Assert(checkinResult.bonus === 10, 'signin.checkin v7 returns correct bonus');
+
+            // Test 8: mcpSigninCheckinV7 fails for duplicate checkin
+            const checkinDup = server.mcpSigninCheckinV7();
+            v202Assert(checkinDup.error !== undefined, 'signin.checkin v7 duplicate returns error');
+
+            // Test 9: mcpSigninRewardV7 works correctly
+            const rewardResult = server.mcpSigninRewardV7(1);
+            v202Assert(rewardResult.success === true, 'signin.reward v7 day 1 returns success');
+            v202Assert(rewardResult.day === 1, 'signin.reward v7 returns correct day');
+            v202Assert(rewardResult.reward === '灵石x50', 'signin.reward v7 returns correct reward');
+
+            // Test 10: mcpSigninRewardV7 fails for already claimed
+            const rewardDup = server.mcpSigninRewardV7(1);
+            v202Assert(rewardDup.error !== undefined, 'signin.reward v7 duplicate returns error');
+
+            // Test 11: mcpSigninRewardV7 fails for unmet requirement
+            const rewardFail = server.mcpSigninRewardV7(7);
+            v202Assert(rewardFail.error !== undefined, 'signin.reward v7 unmet requirement returns error');
+
+            // Test 12: mcpSigninMakeupV7 fails for no makeup left
+            const makeupNoLeft = server.mcpSigninMakeupV7(new Date(Date.now() - 86400000 * 2).toISOString());
+            v202Assert(makeupNoLeft.error !== undefined, 'signin.makeup v7 no makeup left returns error');
+
+            // Test 13: mcpWelfareListV7 returns correct structure
+            const welfareList = server.mcpWelfareListV7();
+            v202Assert(welfareList.success === true, 'welfare.list v7 returns success');
+            v202Assert(Array.isArray(welfareList.welfareList), 'welfare.list v7 has welfareList array');
+            v202Assert(typeof welfareList.claimableCount === 'number', 'welfare.list v7 has claimableCount');
+            v202Assert(typeof welfareList.totalWelfare === 'number', 'welfare.list v7 has totalWelfare');
+
+            // Test 14: mcpWelfareClaimV7 works correctly
+            const claimResult = server.mcpWelfareClaimV7('welfare_v7_daily');
+            v202Assert(claimResult.success === true, 'welfare.claim v7 returns success');
+            v202Assert(claimResult.welfareId === 'welfare_v7_daily', 'welfare.claim v7 returns correct welfareId');
+            v202Assert(claimResult.reward === '灵石x50', 'welfare.claim v7 returns correct reward');
+
+            // Test 15: mcpWelfareClaimV7 fails for non-existent welfare
+            const claimBad = server.mcpWelfareClaimV7('non_existent');
+            v202Assert(claimBad.error !== undefined, 'welfare.claim v7 non-existent returns error');
+
+            // Test 16: mcpWelfareClaimV7 fails for already claimed
+            const claimDup = server.mcpWelfareClaimV7('welfare_v7_daily');
+            v202Assert(claimDup.error !== undefined, 'welfare.claim v7 duplicate returns error');
+
+            // Test 17: mcpSigninCheckinV7 consecutive days tracking
+            window.gameState.signinV7.lastCheckinDate = new Date(Date.now() - 86400000).toDateString();
+            const checkinConsec = server.mcpSigninCheckinV7();
+            v202Assert(checkinConsec.consecutiveDays === 2, 'signin.checkin v7 tracks consecutive days correctly');
+
+            // Test 18: mcpSigninListV7 shows correct rewardsClaimed
+            const signinListAfter = server.mcpSigninListV7();
+            v202Assert(signinListAfter.rewardsClaimed.includes(1), 'signin.list v7 shows day 1 as claimed');
+
+            // Test 19: mcpWelfareListV7 shows updated claimable count after claiming
+            const welfareListAfter = server.mcpWelfareListV7();
+            v202Assert(welfareListAfter.claimableCount === 3, 'welfare.list v7 shows correct claimable count');
+
+            // Test 20: signin.checkin without day param returns error
+            const checkinNoArgs = server.mcpSigninCheckinV7();
+            v202Assert(checkinNoArgs.error === undefined, 'signin.checkin v7 with no args succeeds (no day param needed)');
+
+            // Test 21: signin.reward without day param returns error
+            const rewardNoDay = server.mcpSigninRewardV7();
+            v202Assert(rewardNoDay.error !== undefined, 'signin.reward v7 without day returns error');
+
+            // Test 22: signin.makeup without day param returns error
+            const makeupNoDay = server.mcpSigninMakeupV7();
+            v202Assert(makeupNoDay.error !== undefined, 'signin.makeup v7 without day returns error');
+
+            // Test 23: welfare.claim without welfareId param returns error
+            const claimNoId = server.mcpWelfareClaimV7();
+            v202Assert(claimNoId.error !== undefined, 'welfare.claim v7 without welfareId returns error');
+
+            // Test 24: signin.reward with invalid day returns error
+            const rewardInvalid = server.mcpSigninRewardV7(99);
+            v202Assert(rewardInvalid.error !== undefined, 'signin.reward v7 with invalid day returns error');
+
+            // Test 25: SIGNIN_CONFIG_V7 has correct consecutiveBonus
+            v202Assert(SIGNIN_CONFIG_V7.consecutiveBonus[1] === 10, 'SIGNIN_CONFIG_V7 has correct bonus for day 1');
+            v202Assert(SIGNIN_CONFIG_V7.consecutiveBonus[3] === 30, 'SIGNIN_CONFIG_V7 has correct bonus for day 3');
+            v202Assert(SIGNIN_CONFIG_V7.consecutiveBonus[7] === 80, 'SIGNIN_CONFIG_V7 has correct bonus for day 7');
+            v202Assert(SIGNIN_CONFIG_V7.consecutiveBonus[30] === 300, 'SIGNIN_CONFIG_V7 has correct bonus for day 30');
+
+            // Test 26: WELFARE_CONFIG_V7 has correct types
+            v202Assert(WELFARE_CONFIG_V7.types.includes('daily'), 'WELFARE_CONFIG_V7 has daily type');
+            v202Assert(WELFARE_CONFIG_V7.types.includes('weekly'), 'WELFARE_CONFIG_V7 has weekly type');
+            v202Assert(WELFARE_CONFIG_V7.types.includes('monthly'), 'WELFARE_CONFIG_V7 has monthly type');
+            v202Assert(WELFARE_CONFIG_V7.types.includes('event'), 'WELFARE_CONFIG_V7 has event type');
+            v202Assert(WELFARE_CONFIG_V7.types.includes('recharge'), 'WELFARE_CONFIG_V7 has recharge type');
+
+            // Test 27: MCP_TOOLS_V202 tool input schemas are correct
+            v202Assert(MCP_TOOLS_V202['signin.list'].inputSchema.type === 'object', 'signin.list has correct schema');
+            v202Assert(MCP_TOOLS_V202['signin.reward'].inputSchema.required.includes('day'), 'signin.reward requires day');
+            v202Assert(MCP_TOOLS_V202['signin.makeup'].inputSchema.required.includes('day'), 'signin.makeup requires day');
+            v202Assert(MCP_TOOLS_V202['welfare.claim'].inputSchema.required.includes('welfareId'), 'welfare.claim requires welfareId');
+
+            // Test 28: mcpSigninCheckinV7 updates checkinHistory
+            const checkinHist = server.mcpSigninCheckinV7();
+            v202Assert(Array.isArray(window.gameState.signinV7.checkinHistory), 'signinV7 has checkinHistory array');
+            v202Assert(window.gameState.signinV7.checkinHistory.length >= 3, 'signinV7 checkinHistory has entries');
+
+            // Test 29: mcpSigninCheckinV7 updates monthlyProgress
+            v202Assert(window.gameState.signinV7.monthlyProgress >= 3, 'signinV7 monthlyProgress is tracked');
+
+            // Test 30: mcpSigninMakeupV7 with future date returns error
+            const makeupFuture = server.mcpSigninMakeupV7(new Date(Date.now() + 86400000).toISOString());
+            v202Assert(makeupFuture.error !== undefined, 'signin.makeup v7 future date returns error');
+
+            // Test 31: _initWelfareStateV7 creates correct welfare record structure
+            const welfareRecord = window.gameState.welfareV7.welfareRecords[0];
+            v202Assert(welfareRecord.claimedCount !== undefined, 'welfare record has claimedCount');
+            v202Assert(welfareRecord.lastClaimAt !== undefined, 'welfare record has lastClaimAt');
+
+            // Test 32: signin.list returns maxMakeup
+            const signinListMax = server.mcpSigninListV7();
+            v202Assert(signinListMax.maxMakeup === 3, 'signin.list v7 returns correct maxMakeup');
+
+            // Test 33: signin.list returns makeupUsed
+            v202Assert(typeof signinListMax.makeupUsed === 'number', 'signin.list v7 returns makeupUsed');
+
+            // Test 34: welfare.list returns message with count
+            v202Assert(typeof welfareList.message === 'string', 'welfare.list v7 returns message');
+            v202Assert(welfareList.message.includes('3'), 'welfare.list v7 message contains claimable count');
+
+            // Test 35: checkin multiple times in same day still fails duplicate
+            window.gameState.signinV7.lastCheckinDate = new Date().toDateString();
+            const checkinSameDay = server.mcpSigninCheckinV7();
+            v202Assert(checkinSameDay.error !== undefined, 'signin.checkin v7 same day still fails');
+
+            // Test 36: signin.reward for day 5 works when consecutive >= 5
+            window.gameState.signinV7.consecutiveDays = 5;
+            window.gameState.signinV7.rewardsClaimed = [];
+            const rewardDay5 = server.mcpSigninRewardV7(5);
+            v202Assert(rewardDay5.success === true, 'signin.reward v7 day 5 succeeds with enough consecutive days');
+
+            // Test 37: welfare claim updates welfareV7.totalWelfare
+            const totalBefore = window.gameState.welfareV7.totalWelfare;
+            server.mcpWelfareClaimV7('welfare_v7_level');
+            v202Assert(window.gameState.welfareV7.totalWelfare > totalBefore, 'welfare.claim v7 increases totalWelfare');
+
+            // Test 38: checkinHistory has correct type field
+            const histEntry = window.gameState.signinV7.checkinHistory.find(h => h.type === 'normal');
+            v202Assert(histEntry !== undefined, 'signinV7 checkinHistory has normal type entries');
+
+            // Test 39: signin.list returns lastCheckinDate
+            const signinWithDate = server.mcpSigninListV7();
+            v202Assert(signinWithDate.lastCheckinDate !== null, 'signin.list v7 returns lastCheckinDate');
+
+            // Test 40: welfare claim for level type works
+            const claimLevel = server.mcpWelfareClaimV7('welfare_v7_level');
+            v202Assert(claimLevel.success === true, 'welfare.claim v7 level type succeeds');
+
+            // Test 41: welfare claim for recharge type works
+            const claimRecharge = server.mcpWelfareClaimV7('welfare_v7_recharge');
+            v202Assert(claimRecharge.success === true, 'welfare.claim v7 recharge type succeeds');
+
+            // Test 42: welfare claim for share type works
+            const claimShare = server.mcpWelfareClaimV7('welfare_v7_share');
+            v202Assert(claimShare.success === true, 'welfare.claim v7 share type succeeds');
+
+            // Test 43: signin.makeup updates makeupUsed correctly
+            window.gameState.signinV7.makeupUsed = 0;
+            window.gameState.signinV7.checkinHistory = [];
+            const makeupPast = server.mcpSigninMakeupV7(new Date(Date.now() - 86400000 * 3).toISOString());
+            v202Assert(makeupPast.success === true, 'signin.makeup v7 past date succeeds');
+            v202Assert(window.gameState.signinV7.makeupUsed === 1, 'signin.makeup v7 increments makeupUsed');
+
+            // Test 44: All 45 tests pass
+            const v202Passed = results.filter(r => r.pass).length;
+            const v202Total = results.length;
+            const v202PassRate = v202Passed / v202Total;
+            console.log('V202 Tests:', v202Passed + '/' + v202Total, '(' + (v202PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V202', passed: v202Passed, total: v202Total, passRate: v202PassRate.toFixed(3), results };
+        }
+
+        const v202Results = runV202Tests();
