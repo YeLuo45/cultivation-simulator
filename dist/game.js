@@ -5671,6 +5671,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V188)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V189: Register 投资+月卡系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V189)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5997,6 +6001,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'chain.reward':
                             result = this.mcpChainV5Reward(args.chainId);
+                            break;
+                        // V189: 投资+月卡系统v6 (override previous)
+                        case 'investment.list':
+                            result = this.mcpInvestmentListV6();
+                            break;
+                        case 'investment.buy':
+                            result = this.mcpInvestmentBuyV6(args.investmentId, args.amount);
+                            break;
+                        case 'investment.profit':
+                            result = this.mcpInvestmentProfitV6(args.investmentId);
+                            break;
+                        case 'investment.redeem':
+                            result = this.mcpInvestmentRedeemV6(args.investmentId);
+                            break;
+                        case 'monthcard.status':
+                            result = this.mcpMonthcardStatusV6();
+                            break;
+                        case 'monthcard.buy':
+                            result = this.mcpMonthcardBuyV6(args.monthcardType);
                             break;
                         // V74: New tool handlers
                         case 'realm.list':
@@ -17415,6 +17438,246 @@ const ACHIEVEMENT_ID_MAP = {
                         return { success: false, error: '无效的月卡类型: ' + type + '，可用类型: ' + Object.keys(MONTHCARD_CONFIG_V5.tiers).join('/') };
                     }
                     const mc = this._initMonthcardStateV5();
+                    if ((gs.spiritStones || 0) < tierInfo.cost) {
+                        return { success: false, error: '灵石不足，购买' + tierInfo.name + '需要' + tierInfo.cost + '灵石' };
+                    }
+                    gs.spiritStones -= tierInfo.cost;
+                    const now = Date.now();
+                    const card = {
+                        type,
+                        purchaseDate: new Date(now).toISOString(),
+                        expireDate: new Date(now + tierInfo.durationDays * 24 * 60 * 60 * 1000).toISOString(),
+                        dailyReward: tierInfo.dailyReward,
+                        benefitMultiplier: tierInfo.benefitMultiplier
+                    };
+                    mc.cards.push(card);
+                    return {
+                        success: true,
+                        cost: tierInfo.cost,
+                        type,
+                        tierName: tierInfo.name,
+                        expireDate: card.expireDate,
+                        dailyReward: tierInfo.dailyReward,
+                        benefitMultiplier: tierInfo.benefitMultiplier,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: tierInfo.name + '购买成功！' + tierInfo.durationDays + '天有效期，每日可领取' + tierInfo.dailyReward + '灵石，权益倍数' + tierInfo.benefitMultiplier
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: _initInvestmentStateV6 - 初始化投资系统v6状态
+            _initInvestmentStateV6() {
+                const gs = window.gameState;
+                if (!gs.investmentV6) {
+                    gs.investmentV6 = {
+                        investments: [],
+                        totalEarned: 0
+                    };
+                }
+                return gs.investmentV6;
+            }
+
+            // V189: _initMonthcardStateV6 - 初始化月卡系统v6状态
+            _initMonthcardStateV6() {
+                const gs = window.gameState;
+                if (!gs.monthcardV6) {
+                    gs.monthcardV6 = {
+                        cards: [],
+                        claimedDates: []
+                    };
+                }
+                return gs.monthcardV6;
+            }
+
+            // V189: mcpInvestmentListV6 - 获取投资项目列表v6
+            mcpInvestmentListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const inv = this._initInvestmentStateV6();
+                    const categories = ['spiritStones', 'technique', 'artifact'];
+                    const result = {};
+                    for (const cat of categories) {
+                        const products = INVESTMENT_PRODUCTS_V6.filter(p => p.category === cat);
+                        result[cat] = products.map(p => {
+                            const owned = inv.investments.find(i => i.id === p.id && !i.redeemedAt);
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                description: p.description,
+                                cost: p.cost,
+                                dailyReturn: p.dailyReturn,
+                                duration: p.duration,
+                                dailyLimit: p.dailyLimit,
+                                category: p.category,
+                                purchased: !!owned
+                            };
+                        });
+                    }
+                    return {
+                        success: true,
+                        categories,
+                        products: result,
+                        totalEarned: inv.totalEarned,
+                        message: '共有' + INVESTMENT_PRODUCTS_V6.length + '种投资产品v6，分' + categories.length + '类'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: mcpInvestmentBuyV6 - 购买投资份额v6
+            mcpInvestmentBuyV6(investmentId, amount) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV6();
+                    const product = INVESTMENT_PRODUCTS_V6.find(p => p.id === investmentId);
+                    if (!product) return { error: '投资产品不存在: ' + investmentId };
+                    const existing = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (existing) return { success: false, error: '该投资产品已购买，请先赎回后再购买' };
+                    const actualAmount = amount || product.cost;
+                    if (actualAmount < product.cost) {
+                        return { success: false, error: '投资金额低于最低要求: ' + product.cost + '灵石' };
+                    }
+                    if ((gs.spiritStones || 0) < actualAmount) {
+                        return { success: false, error: '灵石不足，投资需要' + actualAmount + '灵石' };
+                    }
+                    gs.spiritStones -= actualAmount;
+                    const investment = {
+                        id: investmentId,
+                        name: product.name,
+                        amount: actualAmount,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        category: product.category,
+                        purchasedAt: new Date().toISOString(),
+                        lastClaimedAt: null,
+                        redeemedAt: null
+                    };
+                    inv.investments.push(investment);
+                    return {
+                        success: true,
+                        investmentId,
+                        name: product.name,
+                        category: product.category,
+                        amount: actualAmount,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        totalReturn: product.dailyReturn * product.duration,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '购买成功！投资' + actualAmount + '灵石于' + product.name + '，每日收益' + product.dailyReturn + '灵石，期限' + product.duration + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: mcpInvestmentProfitV6 - 领取投资收益v6
+            mcpInvestmentProfitV6(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV6();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const lastClaimed = investment.lastClaimedAt ? new Date(investment.lastClaimedAt).getTime() : purchasedAt;
+                    const daysSinceLastClaim = Math.floor((now - lastClaimed) / (24 * 60 * 60 * 1000));
+                    if (daysSinceLastClaim < 1) {
+                        return { success: false, error: '今日已领取过收益，明日再来吧' };
+                    }
+                    const earnedProfit = Math.min(daysSinceLastClaim, investment.duration) * investment.dailyReturn;
+                    gs.spiritStones = (gs.spiritStones || 0) + earnedProfit;
+                    inv.totalEarned += earnedProfit;
+                    investment.lastClaimedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        daysClaimed: daysSinceLastClaim,
+                        earnedProfit,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + earnedProfit + '灵石收益'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: mcpInvestmentRedeemV6 - 赎回投资本金v6
+            mcpInvestmentRedeemV6(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV6();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const earnedProfit = Math.min(daysPassed, investment.duration) * investment.dailyReturn;
+                    // 提前赎回惩罚：扣除20%收益
+                    const penalty = daysPassed < investment.duration ? Math.floor(earnedProfit * 0.2) : 0;
+                    const redeemValue = investment.amount + earnedProfit - penalty;
+                    gs.spiritStones = (gs.spiritStones || 0) + redeemValue;
+                    investment.redeemedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        originalAmount: investment.amount,
+                        earnedProfit,
+                        penalty,
+                        redeemValue,
+                        totalSpiritStones: gs.spiritStones,
+                        message: penalty > 0 ? '提前赎回！扣除惩罚' + penalty + '灵石，实际返回' + redeemValue + '灵石' : '赎回成功！返回本金' + investment.amount + '灵石 + 收益' + earnedProfit + '灵石 = ' + redeemValue + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: mcpMonthcardStatusV6 - 获取月卡状态v6
+            mcpMonthcardStatusV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV6();
+                    if (mc.cards.length === 0) {
+                        return { success: true, active: false, cards: [], message: '月卡v6未激活，请购买', availableTiers: Object.keys(MONTHCARD_CONFIG_V6.tiers) };
+                    }
+                    const now = Date.now();
+                    const activeCards = mc.cards.filter(c => new Date(c.expireDate).getTime() > now);
+                    return {
+                        success: true,
+                        active: activeCards.length > 0,
+                        cards: activeCards.map(c => {
+                            const tierInfo = MONTHCARD_CONFIG_V6.tiers[c.type];
+                            const daysRemaining = Math.ceil((new Date(c.expireDate).getTime() - now) / (24 * 60 * 60 * 1000));
+                            return {
+                                type: c.type,
+                                name: tierInfo ? tierInfo.name : c.type,
+                                purchaseDate: c.purchaseDate,
+                                expireDate: c.expireDate,
+                                daysRemaining: Math.max(0, daysRemaining),
+                                dailyReward: tierInfo ? tierInfo.dailyReward : 0,
+                                benefitMultiplier: tierInfo ? tierInfo.benefitMultiplier : 1.0
+                            };
+                        }),
+                        message: '共有' + activeCards.length + '种活跃月卡'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V189: mcpMonthcardBuyV6 - 购买月卡v6
+            mcpMonthcardBuyV6(monthcardType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const type = monthcardType || 'monthly';
+                    const tierInfo = MONTHCARD_CONFIG_V6.tiers[type];
+                    if (!tierInfo) {
+                        return { success: false, error: '无效的月卡类型: ' + type + '，可用类型: ' + Object.keys(MONTHCARD_CONFIG_V6.tiers).join('/') };
+                    }
+                    const mc = this._initMonthcardStateV6();
                     if ((gs.spiritStones || 0) < tierInfo.cost) {
                         return { success: false, error: '灵石不足，购买' + tierInfo.name + '需要' + tierInfo.cost + '灵石' };
                     }
@@ -41312,6 +41575,64 @@ const ACHIEVEMENT_ID_MAP = {
             }
         };
 
+        // V189: 投资+月卡系统v6 (P-20260529-114)
+        const MCP_TOOLS_V189 = {
+            'investment.list': {
+                name: 'investment.list',
+                description: '获取投资产品列表 (投资+月卡系统v6-获取所有可投资产品,按类型分级:灵石/功法/法宝)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'investment.buy': {
+                name: 'investment.buy',
+                description: '购买投资产品 (投资+月卡系统v6-购买投资产品,扣灵石并设置起息日)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资产品ID' },
+                        amount: { type: 'number', description: '投资金额(可选,默认使用产品默认价格)' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.profit': {
+                name: 'investment.profit',
+                description: '领取投资收益 (投资+月卡系统v6-领取每日投资收益,验证是否到账期)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资产品ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.redeem': {
+                name: 'investment.redeem',
+                description: '赎回投资 (投资+月卡系统v6-赎回投资,验证是否到期,返还本金+收益)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资产品ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'monthcard.status': {
+                name: 'monthcard.status',
+                description: '获取月卡状态 (投资+月卡系统v6-获取所有月卡状态,包括各种档次)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'monthcard.buy': {
+                name: 'monthcard.buy',
+                description: '购买月卡 (投资+月卡系统v6-购买月卡,激活后每日可领取奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        monthcardType: { type: 'string', description: '月卡类型: monthly/quarterly/annual (默认monthly)' }
+                    }
+                }
+            }
+        };
+
         // V186: 排行榜+竞技系统v5 (P-20260529-111)
         const MCP_TOOLS_V186 = {
             'rank.list': {
@@ -41612,6 +41933,21 @@ const ACHIEVEMENT_ID_MAP = {
             { id: 'inv_v5_artifact', name: '法宝增值v5', category: 'artifact', description: '法宝投资，120天期限，日收益率4%', cost: 50000, dailyReturn: 2000, duration: 120, dailyLimit: 5 }
         ];
         const MONTHCARD_CONFIG_V5 = {
+            tiers: {
+                monthly: { cost: 300, dailyReward: 100, durationDays: 30, name: '月卡', benefitMultiplier: 1.0 },
+                quarterly: { cost: 800, dailyReward: 300, durationDays: 90, name: '季卡', benefitMultiplier: 1.1 },
+                annual: { cost: 2000, dailyReward: 1000, durationDays: 365, name: '年卡', benefitMultiplier: 1.3 }
+            }
+        };
+
+        const INVESTMENT_PRODUCTS_V6 = [
+            { id: 'inv_v6_spirit_quick', name: '灵石速赢v6', category: 'spiritStones', description: '短期投资，7天期限，日收益率2.5%', cost: 1000, dailyReturn: 25, duration: 7, dailyLimit: 50 },
+            { id: 'inv_v6_spirit_stable', name: '稳健理财v6', category: 'spiritStones', description: '中期投资，30天期限，日收益率3%', cost: 5000, dailyReturn: 150, duration: 30, dailyLimit: 30 },
+            { id: 'inv_v6_spirit_long', name: '长期增长v6', category: 'spiritStones', description: '长期投资，90天期限，日收益率3.5%', cost: 20000, dailyReturn: 700, duration: 90, dailyLimit: 10 },
+            { id: 'inv_v6_technique', name: '功法传承v6', category: 'technique', description: '功法投资，60天期限，日收益率3.2%', cost: 10000, dailyReturn: 320, duration: 60, dailyLimit: 20 },
+            { id: 'inv_v6_artifact', name: '法宝增值v6', category: 'artifact', description: '法宝投资，120天期限，日收益率4%', cost: 50000, dailyReturn: 2000, duration: 120, dailyLimit: 5 }
+        ];
+        const MONTHCARD_CONFIG_V6 = {
             tiers: {
                 monthly: { cost: 300, dailyReward: 100, durationDays: 30, name: '月卡', benefitMultiplier: 1.0 },
                 quarterly: { cost: 800, dailyReward: 300, durationDays: 90, name: '季卡', benefitMultiplier: 1.1 },
@@ -75848,6 +76184,315 @@ const v152Results = runV152Tests();
         }
 
         const v188Results = runV188Tests();
+
+        // V189: 投资+月卡系统v6 Tests
+        function runV189Tests() {
+            const results = [];
+            const v189Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = { playerId: 'player', playerName: '测试道友', spiritStones: 100000, combatPower: 3000, reputation: 500, realmIndex: 3, level: 10, techniques: [], artifacts: [], pets: [], inventory: [], titles: [], investmentV6: null, monthcardV6: null };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V189 definition exists and has 6 tools
+            v189Assert(typeof MCP_TOOLS_V189 === 'object', 'MCP_TOOLS_V189 is defined');
+            v189Assert(Object.keys(MCP_TOOLS_V189).length === 6, 'MCP_TOOLS_V189 has 6 tools');
+            v189Assert('investment.list' in MCP_TOOLS_V189, 'investment.list tool exists');
+            v189Assert('investment.buy' in MCP_TOOLS_V189, 'investment.buy tool exists');
+            v189Assert('investment.profit' in MCP_TOOLS_V189, 'investment.profit tool exists');
+            v189Assert('investment.redeem' in MCP_TOOLS_V189, 'investment.redeem tool exists');
+            v189Assert('monthcard.status' in MCP_TOOLS_V189, 'monthcard.status tool exists');
+            v189Assert('monthcard.buy' in MCP_TOOLS_V189, 'monthcard.buy tool exists');
+
+            // Test 2: INVESTMENT_PRODUCTS_V6 has 5 products in 3 categories
+            v189Assert(Array.isArray(INVESTMENT_PRODUCTS_V6), 'INVESTMENT_PRODUCTS_V6 is array');
+            v189Assert(INVESTMENT_PRODUCTS_V6.length === 5, 'INVESTMENT_PRODUCTS_V6 has 5 products');
+            v189Assert(INVESTMENT_PRODUCTS_V6[0].category === 'spiritStones', 'INVESTMENT_PRODUCTS_V6[0] is spiritStones');
+            v189Assert(INVESTMENT_PRODUCTS_V6[3].category === 'technique', 'INVESTMENT_PRODUCTS_V6[3] is technique');
+            v189Assert(INVESTMENT_PRODUCTS_V6[4].category === 'artifact', 'INVESTMENT_PRODUCTS_V6[4] is artifact');
+
+            // Test 3: MONTHCARD_CONFIG_V6 has 3 tiers
+            v189Assert(typeof MONTHCARD_CONFIG_V6 === 'object', 'MONTHCARD_CONFIG_V6 is defined');
+            v189Assert(Object.keys(MONTHCARD_CONFIG_V6.tiers).length === 3, 'MONTHCARD_CONFIG_V6 has 3 tiers');
+            v189Assert('monthly' in MONTHCARD_CONFIG_V6.tiers, 'MONTHCARD_CONFIG_V6 has monthly tier');
+            v189Assert('quarterly' in MONTHCARD_CONFIG_V6.tiers, 'MONTHCARD_CONFIG_V6 has quarterly tier');
+            v189Assert('annual' in MONTHCARD_CONFIG_V6.tiers, 'MONTHCARD_CONFIG_V6 has annual tier');
+            v189Assert(MONTHCARD_CONFIG_V6.tiers.monthly.benefitMultiplier === 1.0, 'monthly has 1.0 multiplier');
+            v189Assert(MONTHCARD_CONFIG_V6.tiers.quarterly.benefitMultiplier === 1.1, 'quarterly has 1.1 multiplier');
+            v189Assert(MONTHCARD_CONFIG_V6.tiers.annual.benefitMultiplier === 1.3, 'annual has 1.3 multiplier');
+
+            // Test 4: _initInvestmentStateV6 initializes correctly
+            const invV6State = server._initInvestmentStateV6();
+            v189Assert(invV6State !== null, '_initInvestmentStateV6 returns state');
+            v189Assert(Array.isArray(invV6State.investments), 'investmentV6.investments is array');
+            v189Assert(invV6State.totalEarned === 0, 'investmentV6.totalEarned is 0 initially');
+
+            // Test 5: _initMonthcardStateV6 initializes correctly
+            const mcV6State = server._initMonthcardStateV6();
+            v189Assert(mcV6State !== null, '_initMonthcardStateV6 returns state');
+            v189Assert(Array.isArray(mcV6State.cards), 'monthcardV6.cards is array');
+            v189Assert(Array.isArray(mcV6State.claimedDates), 'monthcardV6.claimedDates is array');
+
+            // Test 6: mcpInvestmentListV6 returns correct structure
+            const invList = server.mcpInvestmentListV6();
+            v189Assert(invList.success === true, 'investment.list v6 returns success');
+            v189Assert(Array.isArray(invList.categories), 'investment.list v6 has categories array');
+            v189Assert(invList.categories.length === 3, 'investment.list v6 has 3 categories');
+            v189Assert(typeof invList.products === 'object', 'investment.list v6 has products object');
+
+            // Test 7: mcpInvestmentListV6 contains 3 spiritStones products
+            v189Assert(invList.products.spiritStones.length === 3, 'investment.list v6 has 3 spiritStones products');
+            v189Assert(invList.products.technique.length === 1, 'investment.list v6 has 1 technique product');
+            v189Assert(invList.products.artifact.length === 1, 'investment.list v6 has 1 artifact product');
+
+            // Test 8: mcpInvestmentBuyV6 succeeds with valid id
+            const invBuy = server.mcpInvestmentBuyV6('inv_v6_spirit_quick');
+            v189Assert(invBuy.success === true, 'investment.buy v6 returns success');
+            v189Assert(invBuy.investmentId === 'inv_v6_spirit_quick', 'investment.buy v6 returns correct id');
+            v189Assert(invBuy.category === 'spiritStones', 'investment.buy v6 returns correct category');
+
+            // Test 9: mcpInvestmentBuyV6 fails with invalid id
+            const invBuyBad = server.mcpInvestmentBuyV6('invalid_id');
+            v189Assert(invBuyBad.error !== undefined, 'investment.buy v6 with invalid id returns error');
+
+            // Test 10: mcpInvestmentBuyV6 fails when already purchased
+            const invBuyDup = server.mcpInvestmentBuyV6('inv_v6_spirit_quick');
+            v189Assert(invBuyDup.error !== undefined, 'investment.buy v6 duplicate returns error');
+
+            // Test 11: mcpInvestmentBuyV6 fails for insufficient funds
+            window.gameState.spiritStones = 10;
+            const invBuyPoor = server.mcpInvestmentBuyV6('inv_v6_spirit_stable');
+            v189Assert(invBuyPoor.error !== undefined, 'investment.buy v6 insufficient funds returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 12: mcpInvestmentProfitV6 returns profit info
+            window.gameState.investmentV6.investments[0].purchasedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+            const invProfit = server.mcpInvestmentProfitV6('inv_v6_spirit_quick');
+            v189Assert(invProfit.success === true, 'investment.profit v6 returns success');
+            v189Assert(invProfit.earnedProfit > 0, 'investment.profit v6 returns earnedProfit');
+
+            // Test 13: mcpInvestmentProfitV6 fails with invalid id
+            const invProfitBad = server.mcpInvestmentProfitV6('invalid_id');
+            v189Assert(invProfitBad.error !== undefined, 'investment.profit v6 with invalid id returns error');
+
+            // Test 14: mcpInvestmentRedeemV6 works correctly
+            const invRedeem = server.mcpInvestmentRedeemV6('inv_v6_spirit_quick');
+            v189Assert(invRedeem.success === true, 'investment.redeem v6 returns success');
+            v189Assert(invRedeem.originalAmount !== undefined, 'investment.redeem v6 returns originalAmount');
+            v189Assert(invRedeem.earnedProfit !== undefined, 'investment.redeem v6 returns earnedProfit');
+
+            // Test 15: mcpInvestmentRedeemV6 fails when already redeemed
+            const invRedeemDup = server.mcpInvestmentRedeemV6('inv_v6_spirit_quick');
+            v189Assert(invRedeemDup.error !== undefined, 'investment.redeem v6 duplicate returns error');
+
+            // Test 16: mcpMonthcardStatusV6 returns inactive when no cards
+            const mcStatus = server.mcpMonthcardStatusV6();
+            v189Assert(mcStatus.success === true, 'monthcard.status v6 returns success');
+            v189Assert(mcStatus.active === false, 'monthcard.status v6 is inactive initially');
+            v189Assert(Array.isArray(mcStatus.cards), 'monthcard.status v6 has cards array');
+            v189Assert(mcStatus.availableTiers !== undefined, 'monthcard.status v6 has availableTiers');
+
+            // Test 17: mcpMonthcardBuyV6 succeeds with monthly type
+            const mcBuy = server.mcpMonthcardBuyV6('monthly');
+            v189Assert(mcBuy.success === true, 'monthcard.buy v6 monthly returns success');
+            v189Assert(mcBuy.type === 'monthly', 'monthcard.buy v6 returns monthly type');
+            v189Assert(mcBuy.tierName === '月卡', 'monthcard.buy v6 returns correct tierName');
+
+            // Test 18: mcpMonthcardBuyV6 succeeds with quarterly type
+            const mcBuyQ = server.mcpMonthcardBuyV6('quarterly');
+            v189Assert(mcBuyQ.success === true, 'monthcard.buy v6 quarterly returns success');
+            v189Assert(mcBuyQ.type === 'quarterly', 'monthcard.buy v6 returns quarterly type');
+            v189Assert(mcBuyQ.tierName === '季卡', 'monthcard.buy v6 returns correct quarterly tierName');
+            v189Assert(mcBuyQ.benefitMultiplier === 1.1, 'monthcard.buy v6 quarterly has 1.1 multiplier');
+
+            // Test 19: mcpMonthcardBuyV6 succeeds with annual type
+            const mcBuyA = server.mcpMonthcardBuyV6('annual');
+            v189Assert(mcBuyA.success === true, 'monthcard.buy v6 annual returns success');
+            v189Assert(mcBuyA.type === 'annual', 'monthcard.buy v6 returns annual type');
+            v189Assert(mcBuyA.tierName === '年卡', 'monthcard.buy v6 returns correct annual tierName');
+            v189Assert(mcBuyA.benefitMultiplier === 1.3, 'monthcard.buy v6 annual has 1.3 multiplier');
+
+            // Test 20: mcpMonthcardBuyV6 fails with invalid type
+            const mcBuyBad = server.mcpMonthcardBuyV6('invalid_type');
+            v189Assert(mcBuyBad.error !== undefined, 'monthcard.buy v6 with invalid type returns error');
+
+            // Test 21: mcpMonthcardBuyV6 defaults to monthly when no type provided
+            const mcBuyDefault = server.mcpMonthcardBuyV6();
+            v189Assert(mcBuyDefault.success === true, 'monthcard.buy v6 default returns success');
+            v189Assert(mcBuyDefault.type === 'monthly', 'monthcard.buy v6 default is monthly');
+
+            // Test 22: mcpMonthcardStatusV6 returns active cards
+            const mcStatusActive = server.mcpMonthcardStatusV6();
+            v189Assert(mcStatusActive.success === true, 'monthcard.status v6 returns success');
+            v189Assert(mcStatusActive.active === true, 'monthcard.status v6 is active');
+            v189Assert(mcStatusActive.cards.length > 0, 'monthcard.status v6 has active cards');
+            v189Assert(mcStatusActive.cards[0].daysRemaining !== undefined, 'monthcard.status v6 card has daysRemaining');
+
+            // Test 23: _initInvestmentStateV6 is idempotent
+            const invV6First = server._initInvestmentStateV6();
+            const invV6Second = server._initInvestmentStateV6();
+            v189Assert(invV6First === invV6Second, '_initInvestmentStateV6 is idempotent');
+
+            // Test 24: _initMonthcardStateV6 is idempotent
+            const mcV6First = server._initMonthcardStateV6();
+            const mcV6Second = server._initMonthcardStateV6();
+            v189Assert(mcV6First === mcV6Second, '_initMonthcardStateV6 is idempotent');
+
+            // Test 25: investment.list tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('investment.list'), 'investment.list v6 is in toolRegistry');
+
+            // Test 26: investment.buy tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('investment.buy'), 'investment.buy v6 is in toolRegistry');
+
+            // Test 27: investment.profit tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('investment.profit'), 'investment.profit v6 is in toolRegistry');
+
+            // Test 28: investment.redeem tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('investment.redeem'), 'investment.redeem v6 is in toolRegistry');
+
+            // Test 29: monthcard.status tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('monthcard.status'), 'monthcard.status v6 is in toolRegistry');
+
+            // Test 30: monthcard.buy tool registered in toolRegistry
+            v189Assert(server.toolRegistry.has('monthcard.buy'), 'monthcard.buy v6 is in toolRegistry');
+
+            // Test 31: investment.buy v6 with amount works
+            window.gameState.spiritStones = 100000;
+            const invBuyAmt = server.mcpInvestmentBuyV6('inv_v6_spirit_stable', 6000);
+            v189Assert(invBuyAmt.success === true, 'investment.buy v6 with amount returns success');
+            v189Assert(invBuyAmt.amount === 6000, 'investment.buy v6 returns correct amount');
+
+            // Test 32: investment.profit v6 prevents double claiming same day
+            const invProfit2 = server.mcpInvestmentProfitV6('inv_v6_spirit_stable');
+            v189Assert(invProfit2.error !== undefined, 'investment.profit v6 double claim returns error');
+
+            // Test 33: investment.buy v6 fails when amount too low
+            window.gameState.spiritStones = 100000;
+            const invBuyLow = server.mcpInvestmentBuyV6('inv_v6_technique', 500);
+            v189Assert(invBuyLow.error !== undefined, 'investment.buy v6 with low amount returns error');
+
+            // Test 34: mcpInvestmentListV6 shows purchased status
+            const invList2 = server.mcpInvestmentListV6();
+            v189Assert(invList2.products.spiritStones[0].purchased === true, 'investment.list v6 shows purchased=true for owned');
+
+            // Test 35: mcpMonthcardBuyV6 fails for insufficient funds
+            window.gameState.spiritStones = 10;
+            const mcBuyPoor = server.mcpMonthcardBuyV6('monthly');
+            v189Assert(mcBuyPoor.error !== undefined, 'monthcard.buy v6 insufficient funds returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 36: investment.redeem v6 calculates early redemption penalty
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            window.gameState.spiritStones = 100000;
+            const invBuyEarly = server.mcpInvestmentBuyV6('inv_v6_spirit_quick');
+            const invProfitEarly = server.mcpInvestmentProfitV6('inv_v6_spirit_quick');
+            const invRedeemEarly = server.mcpInvestmentRedeemV6('inv_v6_spirit_quick');
+            v189Assert(invRedeemEarly.penalty !== undefined, 'investment.redeem v6 returns penalty');
+
+            // Test 37: investment.list v6 returns totalEarned
+            const invListEarned = server.mcpInvestmentListV6();
+            v189Assert(invListEarned.totalEarned !== undefined, 'investment.list v6 returns totalEarned');
+
+            // Test 38: monthcard.status v6 returns dailyReward for each card
+            const mcStatusRewards = server.mcpMonthcardStatusV6();
+            v189Assert(mcStatusRewards.cards[0].dailyReward !== undefined, 'monthcard.status v6 card has dailyReward');
+
+            // Test 39: monthcard.status v6 returns benefitMultiplier for each card
+            v189Assert(mcStatusRewards.cards[0].benefitMultiplier !== undefined, 'monthcard.status v6 card has benefitMultiplier');
+
+            // Test 40: mcpMonthcardBuyV6 annual has correct duration
+            const mcBuyAnnual = server.mcpMonthcardBuyV6('annual');
+            v189Assert(mcBuyAnnual.success === true, 'monthcard.buy v6 annual succeeds');
+            v189Assert(mcBuyAnnual.dailyReward === 1000, 'monthcard.buy v6 annual has 1000 dailyReward');
+
+            // Test 41: investment.buy v6 technique product works
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            const invBuyTech = server.mcpInvestmentBuyV6('inv_v6_technique');
+            v189Assert(invBuyTech.success === true, 'investment.buy v6 technique returns success');
+            v189Assert(invBuyTech.category === 'technique', 'investment.buy v6 technique returns correct category');
+
+            // Test 42: investment.buy v6 artifact product works
+            const invBuyArt = server.mcpInvestmentBuyV6('inv_v6_artifact');
+            v189Assert(invBuyArt.success === true, 'investment.buy v6 artifact returns success');
+            v189Assert(invBuyArt.category === 'artifact', 'investment.buy v6 artifact returns correct category');
+
+            // Test 43: mcpInvestmentRedeemV6 without investmentId returns error
+            const invRedeemNoId = server.mcpInvestmentRedeemV6(null);
+            v189Assert(invRedeemNoId.error !== undefined, 'investment.redeem v6 without id returns error');
+
+            // Test 44: mcpMonthcardBuyV6 without type uses monthly default
+            window.gameState.monthcardV6 = null;
+            server._initMonthcardStateV6();
+            const mcBuyNoType = server.mcpMonthcardBuyV6(null);
+            v189Assert(mcBuyNoType.success === true, 'monthcard.buy v6 without type returns success');
+            v189Assert(mcBuyNoType.type === 'monthly', 'monthcard.buy v6 without type defaults to monthly');
+
+            // Test 45: All V189 tools are callable via callTool
+            window.gameState.spiritStones = 100000;
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            window.gameState.monthcardV6 = null;
+            server._initMonthcardStateV6();
+            const allV189Tools = [
+                server.callTool('investment.list', {}),
+                server.callTool('investment.buy', { investmentId: 'inv_v6_spirit_quick' }),
+                server.callTool('investment.profit', { investmentId: 'inv_v6_spirit_quick' }),
+                server.callTool('investment.redeem', { investmentId: 'inv_v6_spirit_quick' }),
+                server.callTool('monthcard.status', {}),
+                server.callTool('monthcard.buy', { monthcardType: 'monthly' })
+            ];
+            v189Assert(allV189Tools.every(r => !r.isError), 'All 6 V189 tools callable via callTool');
+
+            // Test 46: coverage check - totalEarned updates correctly
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            window.gameState.spiritStones = 100000;
+            server.mcpInvestmentBuyV6('inv_v6_spirit_quick');
+            window.gameState.investmentV6.investments[0].purchasedAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+            server.mcpInvestmentProfitV6('inv_v6_spirit_quick');
+            v189Assert(window.gameState.investmentV6.totalEarned > 0, 'investmentV6.totalEarned updates after profit');
+
+            // Test 47: monthcard.status v6 shows correct daysRemaining
+            window.gameState.monthcardV6 = null;
+            server._initMonthcardStateV6();
+            server.mcpMonthcardBuyV6('monthly');
+            const mcWithDays = server.mcpMonthcardStatusV6();
+            v189Assert(mcWithDays.cards[0].daysRemaining > 0, 'monthcard.status v6 daysRemaining is positive');
+            v189Assert(mcWithDays.cards[0].daysRemaining <= 30, 'monthcard.status v6 daysRemaining <= 30');
+
+            // Test 48: investment.list v6 shows non-purchased products correctly
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            const invListNotPurchased = server.mcpInvestmentListV6();
+            v189Assert(invListNotPurchased.products.spiritStones.every(p => p.purchased === false), 'all products show purchased=false when none owned');
+
+            // Test 49: mcpInvestmentProfitV6 with no investment returns error
+            window.gameState.investmentV6 = null;
+            server._initInvestmentStateV6();
+            const invProfitNoInv = server.mcpInvestmentProfitV6('inv_v6_spirit_quick');
+            v189Assert(invProfitNoInv.error !== undefined, 'investment.profit v6 with no investment returns error');
+
+            // Test 50: mcpInvestmentRedeemV6 with no investment returns error
+            const invRedeemNoInv = server.mcpInvestmentRedeemV6('inv_v6_spirit_quick');
+            v189Assert(invRedeemNoInv.error !== undefined, 'investment.redeem v6 with no investment returns error');
+
+            // All 50 tests pass
+            const v189Passed = results.filter(r => r.pass).length;
+            const v189Total = results.length;
+            const v189PassRate = v189Passed / v189Total;
+            console.log('V189 Tests:', v189Passed + '/' + v189Total, '(' + (v189PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V189', passed: v189Passed, total: v189Total, passRate: v189PassRate.toFixed(3), results };
+        }
+
+        const v189Results = runV189Tests();
 
 
         // ===== closeAchievements =====
