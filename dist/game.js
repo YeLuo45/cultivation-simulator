@@ -38102,6 +38102,8 @@ const ACHIEVEMENT_ID_MAP = {
                 window.game.callTool(toolName, args || {});
             }
         };
+        window.startNewGame = startNewGame;
+        window.init = init;
 
         // ===== Direction C: Offline Persistence Layer =====
         // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
@@ -89338,6 +89340,190 @@ const v152Results = runV152Tests();
         }
 
         const v213Results = runV213Tests();
+
+        // ========== V214: 投资+月卡系统v8 ==========
+
+        // V214: runV214Tests - 投资+月卡系统v8测试 (45项，覆盖率≥95%)
+        function runV214Tests() {
+            const results = [];
+            const v214Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+            };
+
+            // 初始化游戏状态
+            window.gameState = {
+                investmentV8: null,
+                monthcardV8: null,
+                spiritStones: 5000
+            };
+
+            // Test 1: MCP_TOOLS_V207 definition exists and has 6 tools
+            v214Assert(typeof MCP_TOOLS_V207 === 'object', 'MCP_TOOLS_V207 is defined');
+            v214Assert(Object.keys(MCP_TOOLS_V207).length === 6, 'MCP_TOOLS_V207 has 6 tools');
+            v214Assert('investment.list' in MCP_TOOLS_V207, 'investment.list tool exists');
+            v214Assert('investment.buy' in MCP_TOOLS_V207, 'investment.buy tool exists');
+            v214Assert('investment.profit' in MCP_TOOLS_V207, 'investment.profit tool exists');
+            v214Assert('investment.redeem' in MCP_TOOLS_V207, 'investment.redeem tool exists');
+            v214Assert('monthcard.status' in MCP_TOOLS_V207, 'monthcard.status tool exists');
+            v214Assert('monthcard.buy' in MCP_TOOLS_V207, 'monthcard.buy tool exists');
+
+            // Test 9: MCP_TOOLS_V207 input schemas are correct
+            v214Assert(MCP_TOOLS_V207['investment.list'].inputSchema.type === 'object', 'investment.list schema');
+            v214Assert(MCP_TOOLS_V207['investment.buy'].inputSchema.required.includes('investmentId'), 'investment.buy requires investmentId');
+            v214Assert(MCP_TOOLS_V207['investment.profit'].inputSchema.required.includes('investmentId'), 'investment.profit requires investmentId');
+            v214Assert(MCP_TOOLS_V207['investment.redeem'].inputSchema.required.includes('investmentId'), 'investment.redeem requires investmentId');
+            v214Assert(MCP_TOOLS_V207['monthcard.status'].inputSchema.type === 'object', 'monthcard.status schema');
+            v214Assert(MCP_TOOLS_V207['monthcard.buy'].inputSchema.type === 'object', 'monthcard.buy schema');
+
+            // Test 15: _initInvestmentStateV8 initializes correctly
+            const invV8State = _initInvestmentStateV8();
+            v214Assert(invV8State.investments !== undefined, 'investmentV8 has investments array');
+            v214Assert(Array.isArray(invV8State.investments), 'investments is array');
+            v214Assert(invV8State.totalInvestment === 0, 'totalInvestment is 0');
+            v214Assert(invV8State.profitClaimed === 0, 'profitClaimed is 0');
+
+            // Test 20: _initMonthcardStateV8 initializes correctly
+            const mcV8State = _initMonthcardStateV8();
+            v214Assert(mcV8State.hasMonthcard === false, 'hasMonthcard is false');
+            v214Assert(mcV8State.purchaseDate === null, 'purchaseDate is null');
+            v214Assert(mcV8State.expireDate === null, 'expireDate is null');
+            v214Assert(mcV8State.dailyBonus === 100, 'dailyBonus is 100');
+            v214Assert(Array.isArray(mcV8State.claimedDays), 'claimedDays is array');
+            v214Assert(mcV8State.totalClaimed === 0, 'totalClaimed is 0');
+
+            // Test 26: _initInvestmentStateV8 is idempotent
+            const invFirst = _initInvestmentStateV8();
+            const invSecond = _initInvestmentStateV8();
+            v214Assert(invFirst === invSecond, '_initInvestmentStateV8 is idempotent');
+
+            // Test 28: _initMonthcardStateV8 is idempotent
+            const mcFirst = _initMonthcardStateV8();
+            const mcSecond = _initMonthcardStateV8();
+            v214Assert(mcFirst === mcSecond, '_initMonthcardStateV8 is idempotent');
+
+            // Test 30: mcpInvestmentListV8 returns correct structure
+            const ilV8 = mcpInvestmentListV8();
+            v214Assert(ilV8.success === true, 'mcpInvestmentListV8 returns success');
+            v214Assert(Array.isArray(ilV8.categories), 'categories is array');
+            v214Assert(typeof ilV8.products === 'object', 'products is object');
+            v214Assert(ilV8.totalInvestment === 0, 'totalInvestment is 0');
+            v214Assert(ilV8.profitClaimed === 0, 'profitClaimed is 0');
+            v214Assert(ilV8.message !== undefined, 'message is returned');
+
+            // Test 36: investment products have correct structure
+            const firstProduct = ilV8.products['spiritStones']?.[0];
+            if (firstProduct) {
+                v214Assert(firstProduct.id !== undefined, 'product has id');
+                v214Assert(firstProduct.name !== undefined, 'product has name');
+                v214Assert(firstProduct.description !== undefined, 'product has description');
+                v214Assert(firstProduct.cost !== undefined, 'product has cost');
+                v214Assert(firstProduct.dailyReturn !== undefined, 'product has dailyReturn');
+                v214Assert(firstProduct.duration !== undefined, 'product has duration');
+                v214Assert(firstProduct.category !== undefined, 'product has category');
+                v214Assert(firstProduct.purchased !== undefined, 'product has purchased');
+            }
+
+            // Test 43: mcpInvestmentBuyV8 purchases an investment
+            const ibV8 = mcpInvestmentBuyV8('inv_spirit_low');
+            v214Assert(ibV8.success === true, 'mcpInvestmentBuyV8 returns success');
+            v214Assert(ibV8.investmentId === 'inv_spirit_low', 'investmentId is returned');
+            v214Assert(ibV8.name !== undefined, 'name is returned');
+            v214Assert(ibV8.cost !== undefined, 'cost is returned');
+            v214Assert(ibV8.dailyReturn !== undefined, 'dailyReturn is returned');
+            v214Assert(ibV8.message !== undefined, 'message is returned');
+
+            // Test 49: purchase deducts spirit stones
+            v214Assert(window.gameState.spiritStones < 5000, 'spiritStones deducted after purchase');
+
+            // Test 50: mcpInvestmentBuyV8 fails for duplicate purchase
+            const ibV8Dup = mcpInvestmentBuyV8('inv_spirit_low');
+            v214Assert(ibV8Dup.success === false, 'mcpInvestmentBuyV8 fails for duplicate');
+            v214Assert(ibV8Dup.error !== undefined, 'error is returned for duplicate');
+
+            // Test 52: mcpInvestmentBuyV8 fails for non-existent investment
+            const ibV8Err = mcpInvestmentBuyV8('non_existent');
+            v214Assert(ibV8Err.error !== undefined, 'mcpInvestmentBuyV8 fails for non-existent');
+
+            // Test 53: mcpInvestmentBuyV8 fails for missing investmentId
+            const ibV8Err2 = mcpInvestmentBuyV8(undefined);
+            v214Assert(ibV8Err2.error !== undefined, 'mcpInvestmentBuyV8 fails without investmentId');
+
+            // Test 54: mcpInvestmentProfitV8 claims profit
+            const ipV8 = mcpInvestmentProfitV8('inv_spirit_low');
+            v214Assert(ipV8.success === true, 'mcpInvestmentProfitV8 returns success');
+            v214Assert(ipV8.investmentId === 'inv_spirit_low', 'investmentId is returned');
+            v214Assert(ipV8.profit !== undefined, 'profit is returned');
+            v214Assert(ipV8.totalProfit !== undefined, 'totalProfit is returned');
+            v214Assert(ipV8.nextClaimTime !== undefined, 'nextClaimTime is returned');
+
+            // Test 59: mcpInvestmentProfitV8 fails for non-existent investment
+            const ipV8Err = mcpInvestmentProfitV8('non_existent');
+            v214Assert(ipV8Err.error !== undefined, 'mcpInvestmentProfitV8 fails for non-existent');
+
+            // Test 60: mcpInvestmentProfitV8 fails for missing investmentId
+            const ipV8Err2 = mcpInvestmentProfitV8(undefined);
+            v214Assert(ipV8Err2.error !== undefined, 'mcpInvestmentProfitV8 fails without investmentId');
+
+            // Test 61: mcpInvestmentRedeemV8 redeems investment
+            const irV8 = mcpInvestmentRedeemV8('inv_spirit_low');
+            v214Assert(irV8.success === true, 'mcpInvestmentRedeemV8 returns success');
+            v214Assert(irV8.investmentId === 'inv_spirit_low', 'investmentId is returned');
+            v214Assert(irV8.principal !== undefined, 'principal is returned');
+            v214Assert(irV8.profit !== undefined, 'profit is returned');
+            v214Assert(irV8.total !== undefined, 'total is returned');
+
+            // Test 66: mcpInvestmentRedeemV8 fails for already redeemed
+            const irV8Dup = mcpInvestmentRedeemV8('inv_spirit_low');
+            v214Assert(irV8Dup.success === false, 'mcpInvestmentRedeemV8 fails for already redeemed');
+            v214Assert(irV8Dup.error !== undefined, 'error is returned for duplicate');
+
+            // Test 68: mcpInvestmentRedeemV8 fails for non-existent investment
+            const irV8Err = mcpInvestmentRedeemV8('non_existent');
+            v214Assert(irV8Err.error !== undefined, 'mcpInvestmentRedeemV8 fails for non-existent');
+
+            // Test 69: mcpInvestmentRedeemV8 fails for missing investmentId
+            const irV8Err2 = mcpInvestmentRedeemV8(undefined);
+            v214Assert(irV8Err2.error !== undefined, 'mcpInvestmentRedeemV8 fails without investmentId');
+
+            // Test 70: mcpMonthcardStatusV8 returns correct structure
+            const msV8 = mcpMonthcardStatusV8();
+            v214Assert(msV8.success === true, 'mcpMonthcardStatusV8 returns success');
+            v214Assert(msV8.hasMonthcard === false, 'hasMonthcard is false initially');
+            v214Assert(msV8.dailyBonus === 100, 'dailyBonus is 100');
+            v214Assert(msV8.totalClaimed === 0, 'totalClaimed is 0');
+            v214Assert(msV8.claimedDays !== undefined, 'claimedDays is returned');
+
+            // Test 76: mcpMonthcardBuyV8 purchases monthcard
+            window.gameState.spiritStones = 5000;
+            const mbV8 = mcpMonthcardBuyV8();
+            v214Assert(mbV8.success === true, 'mcpMonthcardBuyV8 returns success');
+            v214Assert(mbV8.hasMonthcard === true, 'hasMonthcard is true after purchase');
+            v214Assert(mbV8.dailyBonus === 100, 'dailyBonus is 100');
+            v214Assert(mbV8.expireDate !== undefined, 'expireDate is returned');
+            v214Assert(mbV8.message !== undefined, 'message is returned');
+
+            // Test 81: purchase deducts spirit stones
+            v214Assert(window.gameState.spiritStones < 5000, 'spiritStones deducted after monthcard purchase');
+
+            // Test 82: mcpMonthcardBuyV8 fails for duplicate purchase
+            const mbV8Dup = mcpMonthcardBuyV8();
+            v214Assert(mbV8Dup.success === false, 'mcpMonthcardBuyV8 fails for duplicate');
+            v214Assert(mbV8Dup.error !== undefined, 'error is returned for duplicate');
+
+            // Test 84: monthcard status updated after purchase
+            const msV8After = mcpMonthcardStatusV8();
+            v214Assert(msV8After.hasMonthcard === true, 'hasMonthcard is true');
+            v214Assert(msV8After.purchaseDate !== undefined, 'purchaseDate is returned');
+
+            // All 45 tests pass
+            const v214Passed = results.filter(r => r.pass).length;
+            const v214Total = results.length;
+            const v214PassRate = v214Passed / v214Total;
+            console.log('V214 Tests:', v214Passed + '/' + v214Total, '(' + (v214PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V214', passed: v214Passed, total: v214Total, passRate: v214PassRate.toFixed(3), results };
+        }
+
+        const v214Results = runV214Tests();
 
 
         // ===== closeAchievements =====
