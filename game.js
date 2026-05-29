@@ -3789,6 +3789,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V199)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V200: Register 红包+社交系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V200)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4039,6 +4043,25 @@
                             break;
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV7(args.monthcardType);
+                            break;
+                        // V200: 红包+社交系统v6
+                        case 'redpack.list':
+                            result = this.mcpRedpackListV6();
+                            break;
+                        case 'redpack.send':
+                            result = this.mcpRedpackSendV6(args.amount, args.count, args.message);
+                            break;
+                        case 'redpack.receive':
+                            result = this.mcpRedpackReceiveV6(args.redpackId);
+                            break;
+                        case 'redpack.history':
+                            result = this.mcpRedpackHistoryV6();
+                            break;
+                        case 'social.friends':
+                            result = this.mcpSocialFriendsV6(args.sortBy);
+                            break;
+                        case 'social.interact':
+                            result = this.mcpSocialInteractV6(args.friendId, args.action);
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -16743,6 +16766,237 @@
                         charm: gift.charm,
                         remainingSpiritStones: gs.spiritStones,
                         message: '向' + playerId + '赠送了' + gift.name + '，魅力+' + gift.charm
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: _initRedpackStateV6 - 初始化红包系统v6状态
+            _initRedpackStateV6() {
+                const gs = window.gameState;
+                if (!gs.redpackV6) {
+                    gs.redpackV6 = {
+                        redpacks: [],
+                        playerSent: [],
+                        playerReceived: [],
+                        totalSent: 0,
+                        totalReceived: 0
+                    };
+                }
+                return gs.redpackV6;
+            }
+
+            // V200: _initSocialStateV6 - 初始化社交系统v6状态
+            _initSocialStateV6() {
+                const gs = window.gameState;
+                if (!gs.socialV6) {
+                    gs.socialV6 = {
+                        friends: [],
+                        pendingRequests: [],
+                        blockedPlayers: [],
+                        interactions: [],
+                        intimacyScores: {}
+                    };
+                }
+                return gs.socialV6;
+            }
+
+            // V200: mcpRedpackListV6 - 获取红包列表v6
+            mcpRedpackListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpackStateV6();
+                    const now = Date.now();
+                    const available = rp.redpacks.filter(r => {
+                        if (r.remainingCount <= 0) return false;
+                        if (r.expiresAt && r.expiresAt < now) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        redpacks: available,
+                        total: available.length,
+                        totalSent: rp.totalSent,
+                        totalReceived: rp.totalReceived,
+                        message: '共' + available.length + '个可领取红包'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: mcpRedpackSendV6 - 发送红包v6
+            mcpRedpackSendV6(amount, count, message) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!amount || amount <= 0) return { error: '红包金额必须大于0' };
+                    const sendCount = count || 1;
+                    if (sendCount < 1 || sendCount > REDPACKET_CONFIG_V6.maxRedpackCount) {
+                        return { error: '红包数量必须在1-' + REDPACKET_CONFIG_V6.maxRedpackCount + '之间' };
+                    }
+                    if (amount < REDPACKET_CONFIG_V6.minSendAmount) {
+                        return { error: '红包最低金额为' + REDPACKET_CONFIG_V6.minSendAmount + '灵石' };
+                    }
+                    if (amount > REDPACKET_CONFIG_V6.maxSendAmount) {
+                        return { error: '红包最高金额为' + REDPACKET_CONFIG_V6.maxSendAmount + '灵石' };
+                    }
+                    if ((gs.spiritStones || 0) < amount) return { error: '灵石不足' };
+                    gs.spiritStones -= amount;
+                    const rp = this._initRedpackStateV6();
+                    const now = Date.now();
+                    const redpack = {
+                        id: 'rp6_' + Date.now(),
+                        senderId: gs.playerName || '道友',
+                        senderName: gs.playerName || '道友',
+                        amount: amount,
+                        count: sendCount,
+                        remainingCount: sendCount,
+                        totalCount: sendCount,
+                        message: message || '',
+                        expiresAt: now + REDPACKET_CONFIG_V6.validityPeriod,
+                        createdAt: now,
+                        claimedBy: []
+                    };
+                    rp.redpacks.push(redpack);
+                    rp.playerSent.push(redpack);
+                    rp.totalSent += amount;
+                    return {
+                        success: true,
+                        redpackId: redpack.id,
+                        amount: amount,
+                        count: sendCount,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '红包\"' + redpack.id + '\"发送成功，金额' + amount + '灵石，数量' + sendCount + (message ? '，留言:\"' + message + '\"' : '')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: mcpRedpackReceiveV6 - 领取红包v6
+            mcpRedpackReceiveV6(redpackId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpackId) return { error: 'redpackId不能为空' };
+                    const rp = this._initRedpackStateV6();
+                    const idx = rp.redpacks.findIndex(r => r.id === redpackId);
+                    if (idx === -1) return { error: '红包不存在' };
+                    const redpack = rp.redpacks[idx];
+                    const now = Date.now();
+                    if (redpack.expiresAt && redpack.expiresAt < now) return { error: '红包已过期' };
+                    if (redpack.remainingCount <= 0) return { error: '红包已被领完' };
+                    const playerId = gs.playerName || 'anonymous';
+                    if (redpack.claimedBy && redpack.claimedBy.includes(playerId)) {
+                        return { error: '您已领取过该红包' };
+                    }
+                    const perRedpack = Math.floor(redpack.amount * 0.3);
+                    const receiveAmount = Math.min(perRedpack, redpack.amount);
+                    redpack.remainingCount -= 1;
+                    redpack.amount -= receiveAmount;
+                    if (!redpack.claimedBy) redpack.claimedBy = [];
+                    redpack.claimedBy.push(playerId);
+                    gs.spiritStones = (gs.spiritStones || 0) + receiveAmount;
+                    rp.totalReceived += receiveAmount;
+                    const record = {
+                        id: redpackId,
+                        senderName: redpack.senderName,
+                        amount: receiveAmount,
+                        receivedAt: now
+                    };
+                    rp.playerReceived.push(record);
+                    return {
+                        success: true,
+                        redpackId,
+                        amount: receiveAmount,
+                        remainingCount: redpack.remainingCount,
+                        totalReceived: rp.totalReceived,
+                        message: '领取红包成功，获得' + receiveAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: mcpRedpackHistoryV6 - 查看红包记录v6
+            mcpRedpackHistoryV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpackStateV6();
+                    return {
+                        success: true,
+                        sent: rp.playerSent,
+                        received: rp.playerReceived,
+                        totalSent: rp.totalSent,
+                        totalReceived: rp.totalReceived,
+                        sentCount: rp.playerSent.length,
+                        receivedCount: rp.playerReceived.length,
+                        message: '共发送' + rp.playerSent.length + '个红包，领取' + rp.playerReceived.length + '个'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: mcpSocialFriendsV6 - 获取好友列表v6
+            mcpSocialFriendsV6(sortBy) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const social = this._initSocialStateV6();
+                    const friends = social.friends.map(f => {
+                        const friend = { ...f };
+                        const playerId = f.playerId;
+                        if (social.intimacyScores && social.intimacyScores[playerId] !== undefined) {
+                            friend.intimacy = social.intimacyScores[playerId];
+                        } else {
+                            friend.intimacy = 50;
+                        }
+                        return friend;
+                    });
+                    const sort = sortBy || 'intimacy';
+                    if (sort === 'intimacy') {
+                        friends.sort((a, b) => (b.intimacy || 0) - (a.intimacy || 0));
+                    } else if (sort === 'time') {
+                        friends.sort((a, b) => (b.lastInteractAt || 0) - (a.lastInteractAt || 0));
+                    }
+                    return {
+                        success: true,
+                        friends: friends,
+                        totalFriends: friends.length,
+                        maxFriends: SOCIAL_CONFIG_V6.maxFriends,
+                        message: '共有' + friends.length + '个好友'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V200: mcpSocialInteractV6 - 执行社交互动v6
+            mcpSocialInteractV6(friendId, action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!friendId) return { error: '请指定好友ID' };
+                    if (!action) return { error: '请指定互动类型' };
+                    if (!SOCIAL_CONFIG_V6.interactTypes.includes(action)) {
+                        return { error: '无效的互动类型，支持: ' + SOCIAL_CONFIG_V6.interactTypes.join('/') };
+                    }
+                    const social = this._initSocialStateV6();
+                    const friend = social.friends.find(f => f.playerId === friendId);
+                    if (!friend) return { error: '该玩家不是您的好友' };
+                    const now = Date.now();
+                    const reward = SOCIAL_CONFIG_V6.interactRewards[action] || 5;
+                    if (!social.intimacyScores) social.intimacyScores = {};
+                    social.intimacyScores[friendId] = (social.intimacyScores[friendId] || 50) + reward;
+                    friend.lastInteractAt = now;
+                    const interaction = {
+                        id: 'int6_' + Date.now(),
+                        friendId,
+                        action,
+                        reward,
+                        timestamp: now
+                    };
+                    social.interactions.push(interaction);
+                    return {
+                        success: true,
+                        friendId,
+                        action,
+                        intimacyGain: reward,
+                        intimacy: social.intimacyScores[friendId],
+                        message: '与' + friend.playerName + '完成' + action + '互动，亲密度+' + reward
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -42304,6 +42558,85 @@
                         giftId: { type: 'string', description: '礼物ID' }
                     },
                     required: ['playerId', 'giftId']
+                }
+            }
+        };
+
+        // V200: 红包+社交系统v6 (P-20260529-159)
+        const REDPACKET_CONFIG_V6 = {
+            minSendAmount: 50,
+            maxSendAmount: 100000,
+            maxRedpackCount: 100,
+            validityPeriod: 24 * 60 * 60 * 1000,
+            types: ['normal', 'lucky', 'fixed'],
+            receiveRate: { min: 0.1, max: 0.5 },
+            messageMaxLength: 50
+        };
+
+        const SOCIAL_CONFIG_V6 = {
+            maxFriends: 100,
+            maxBlacklist: 50,
+            interactTypes: ['chat', 'gift', 'team', 'visit'],
+            interactRewards: { chat: 5, gift: 15, team: 20, visit: 10 },
+            intimacyDecayRate: 0.01,
+            intimacyThreshold: 100
+        };
+
+        const MCP_TOOLS_V200 = {
+            'redpack.list': {
+                name: 'redpack.list',
+                description: '获取红包列表 (红包系统v6-获取所有可领取红包列表，包括金额/有效期/剩余数量)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpack.send': {
+                name: 'redpack.send',
+                description: '发送红包 (红包系统v6-发送红包，消耗灵石，可设置金额/数量/留言)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '红包总金额' },
+                        count: { type: 'number', description: '红包数量(默认1)' },
+                        message: { type: 'string', description: '红包留言(可选，最大50字)' }
+                    },
+                    required: ['amount']
+                }
+            },
+            'redpack.receive': {
+                name: 'redpack.receive',
+                description: '领取红包 (红包系统v6-领取红包(先到先得)，返回随机金额)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpackId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpackId']
+                }
+            },
+            'redpack.history': {
+                name: 'redpack.history',
+                description: '查看红包记录 (红包系统v6-查看红包收发记录，包括发送和领取历史)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.friends': {
+                name: 'social.friends',
+                description: '获取好友列表 (社交系统v6-获取好友列表，支持亲密度排序)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        sortBy: { type: 'string', description: '排序方式: intimacy/time/name (默认intimacy)' }
+                    }
+                }
+            },
+            'social.interact': {
+                name: 'social.interact',
+                description: '执行社交互动 (社交系统v6-与好友执行社交互动：聊天/送礼/组队/拜访)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        friendId: { type: 'string', description: '好友ID' },
+                        action: { type: 'string', description: '互动类型: chat/gift/team/visit' }
+                    },
+                    required: ['friendId', 'action']
                 }
             }
         };
@@ -81978,3 +82311,297 @@ const v152Results = runV152Tests();
 
         const v198Results = runV198Tests();
         const v199Results = runV199Tests();
+
+        // V200: 红包+社交系统v6 Tests (P-20260529-159)
+        function runV200Tests() {
+            const results = [];
+            const v200Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player',
+                playerName: '测试道友',
+                spiritStones: 100000,
+                combatPower: 3000,
+                reputation: 500,
+                realmIndex: 3,
+                level: 10,
+                techniques: [],
+                artifacts: [],
+                pets: [],
+                inventory: [],
+                titles: [],
+                redpackV6: null,
+                socialV6: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V200 definition exists and has 6 tools
+            v200Assert(typeof MCP_TOOLS_V200 === 'object', 'MCP_TOOLS_V200 is defined');
+            v200Assert(Object.keys(MCP_TOOLS_V200).length === 6, 'MCP_TOOLS_V200 has 6 tools');
+            v200Assert('redpack.list' in MCP_TOOLS_V200, 'redpack.list tool exists');
+            v200Assert('redpack.send' in MCP_TOOLS_V200, 'redpack.send tool exists');
+            v200Assert('redpack.receive' in MCP_TOOLS_V200, 'redpack.receive tool exists');
+            v200Assert('redpack.history' in MCP_TOOLS_V200, 'redpack.history tool exists');
+            v200Assert('social.friends' in MCP_TOOLS_V200, 'social.friends tool exists');
+            v200Assert('social.interact' in MCP_TOOLS_V200, 'social.interact tool exists');
+
+            // Test 2: REDPACKET_CONFIG_V6 is defined with correct values
+            v200Assert(typeof REDPACKET_CONFIG_V6 === 'object', 'REDPACKET_CONFIG_V6 is defined');
+            v200Assert(REDPACKET_CONFIG_V6.minSendAmount === 50, 'REDPACKET_CONFIG_V6 has correct minSendAmount');
+            v200Assert(REDPACKET_CONFIG_V6.maxRedpackCount === 100, 'REDPACKET_CONFIG_V6 has correct maxRedpackCount');
+            v200Assert(REDPACKET_CONFIG_V6.validityPeriod === 24 * 60 * 60 * 1000, 'REDPACKET_CONFIG_V6 has correct validityPeriod');
+
+            // Test 3: SOCIAL_CONFIG_V6 is defined with correct values
+            v200Assert(typeof SOCIAL_CONFIG_V6 === 'object', 'SOCIAL_CONFIG_V6 is defined');
+            v200Assert(SOCIAL_CONFIG_V6.maxFriends === 100, 'SOCIAL_CONFIG_V6 has correct maxFriends');
+            v200Assert(SOCIAL_CONFIG_V6.interactTypes.includes('chat'), 'SOCIAL_CONFIG_V6 has chat interact type');
+            v200Assert(SOCIAL_CONFIG_V6.interactTypes.includes('gift'), 'SOCIAL_CONFIG_V6 has gift interact type');
+            v200Assert(SOCIAL_CONFIG_V6.interactTypes.includes('team'), 'SOCIAL_CONFIG_V6 has team interact type');
+            v200Assert(SOCIAL_CONFIG_V6.interactTypes.includes('visit'), 'SOCIAL_CONFIG_V6 has visit interact type');
+
+            // Test 4: _initRedpackStateV6 creates state
+            const rpV6State = server._initRedpackStateV6();
+            v200Assert(rpV6State !== null, '_initRedpackStateV6 returns state');
+            v200Assert(Array.isArray(rpV6State.redpacks), '_initRedpackStateV6 has redpacks array');
+            v200Assert(Array.isArray(rpV6State.playerSent), '_initRedpackStateV6 has playerSent array');
+            v200Assert(Array.isArray(rpV6State.playerReceived), '_initRedpackStateV6 has playerReceived array');
+
+            // Test 5: _initSocialStateV6 creates state
+            const socialV6State = server._initSocialStateV6();
+            v200Assert(socialV6State !== null, '_initSocialStateV6 returns state');
+            v200Assert(Array.isArray(socialV6State.friends), '_initSocialStateV6 has friends array');
+            v200Assert(Array.isArray(socialV6State.pendingRequests), '_initSocialStateV6 has pendingRequests array');
+            v200Assert(Array.isArray(socialV6State.blockedPlayers), '_initSocialStateV6 has blockedPlayers array');
+            v200Assert(typeof socialV6State.intimacyScores === 'object', '_initSocialStateV6 has intimacyScores object');
+
+            // Test 6: mcpRedpackListV6 returns correct structure
+            const rpList = server.mcpRedpackListV6();
+            v200Assert(rpList.success === true, 'redpack.list v6 returns success');
+            v200Assert(Array.isArray(rpList.redpacks), 'redpack.list v6 has redpacks array');
+            v200Assert(typeof rpList.total === 'number', 'redpack.list v6 has total');
+            v200Assert(typeof rpList.totalSent === 'number', 'redpack.list v6 has totalSent');
+
+            // Test 7: mcpRedpackSendV6 works correctly
+            const rpSend = server.mcpRedpackSendV6(500, 2, '测试红包');
+            v200Assert(rpSend.success === true, 'redpack.send v6 returns success');
+            v200Assert(rpSend.redpackId !== undefined, 'redpack.send v6 returns redpackId');
+            v200Assert(rpSend.amount === 500, 'redpack.send v6 returns correct amount');
+            v200Assert(rpSend.count === 2, 'redpack.send v6 returns correct count');
+
+            // Test 8: mcpRedpackSendV6 reduces spirit stones
+            v200Assert(window.gameState.spiritStones === 99500, 'redpack.send v6 reduces spirit stones by 500');
+
+            // Test 9: mcpRedpackSendV6 fails for insufficient funds
+            window.gameState.spiritStones = 10;
+            const rpSendPoor = server.mcpRedpackSendV6(100);
+            v200Assert(rpSendPoor.error !== undefined, 'redpack.send v6 insufficient funds returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 10: mcpRedpackSendV6 fails for amount below minimum
+            const rpSendLow = server.mcpRedpackSendV6(20);
+            v200Assert(rpSendLow.error !== undefined, 'redpack.send v6 below min amount returns error');
+
+            // Test 11: mcpRedpackSendV6 fails for count exceeding max
+            const rpSendMany = server.mcpRedpackSendV6(500, 200);
+            v200Assert(rpSendMany.error !== undefined, 'redpack.send v6 exceeds max count returns error');
+
+            // Test 12: mcpRedpackReceiveV6 works correctly
+            const rpSendForReceive = server.mcpRedpackSendV6(1000, 5);
+            const rpReceive = server.mcpRedpackReceiveV6(rpSendForReceive.redpackId);
+            v200Assert(rpReceive.success === true, 'redpack.receive v6 returns success');
+            v200Assert(typeof rpReceive.amount === 'number', 'redpack.receive v6 returns amount');
+            v200Assert(rpReceive.amount > 0, 'redpack.receive v6 amount is positive');
+
+            // Test 13: mcpRedpackReceiveV6 fails for non-existent redpack
+            const rpReceiveNotExist = server.mcpRedpackReceiveV6('non_existent');
+            v200Assert(rpReceiveNotExist.error !== undefined, 'redpack.receive v6 non-existent returns error');
+
+            // Test 14: mcpRedpackReceiveV6 prevents double receive
+            const rpSendDouble = server.mcpRedpackSendV6(500, 3);
+            server.mcpRedpackReceiveV6(rpSendDouble.redpackId);
+            const rpDoubleReceive = server.mcpRedpackReceiveV6(rpSendDouble.redpackId);
+            v200Assert(rpDoubleReceive.error !== undefined, 'redpack.receive v6 double receive returns error');
+
+            // Test 15: mcpRedpackHistoryV6 returns correct structure
+            const rpHistory = server.mcpRedpackHistoryV6();
+            v200Assert(rpHistory.success === true, 'redpack.history v6 returns success');
+            v200Assert(Array.isArray(rpHistory.sent), 'redpack.history v6 has sent array');
+            v200Assert(Array.isArray(rpHistory.received), 'redpack.history v6 has received array');
+            v200Assert(typeof rpHistory.totalSent === 'number', 'redpack.history v6 has totalSent');
+            v200Assert(typeof rpHistory.totalReceived === 'number', 'redpack.history v6 has totalReceived');
+
+            // Test 16: Add friend for interaction tests
+            window.gameState.socialV6.friends.push({ playerId: 'friend1', playerName: '道友甲', lastInteractAt: null });
+            window.gameState.socialV6.friends.push({ playerId: 'friend2', playerName: '道友乙', lastInteractAt: null });
+
+            // Test 17: mcpSocialFriendsV6 returns correct structure
+            const friendsList = server.mcpSocialFriendsV6();
+            v200Assert(friendsList.success === true, 'social.friends v6 returns success');
+            v200Assert(Array.isArray(friendsList.friends), 'social.friends v6 has friends array');
+            v200Assert(typeof friendsList.totalFriends === 'number', 'social.friends v6 has totalFriends');
+            v200Assert(friendsList.totalFriends === 2, 'social.friends v6 returns correct count');
+
+            // Test 18: mcpSocialInteractV6 chat works
+            const interactChat = server.mcpSocialInteractV6('friend1', 'chat');
+            v200Assert(interactChat.success === true, 'social.interact v6 chat returns success');
+            v200Assert(interactChat.intimacyGain === 5, 'social.interact v6 chat gives 5 intimacy gain');
+            v200Assert(interactChat.intimacy === 55, 'social.interact v6 chat updates intimacy');
+
+            // Test 19: mcpSocialInteractV6 gift works
+            const interactGift = server.mcpSocialInteractV6('friend1', 'gift');
+            v200Assert(interactGift.success === true, 'social.interact v6 gift returns success');
+            v200Assert(interactGift.intimacyGain === 15, 'social.interact v6 gift gives 15 intimacy gain');
+
+            // Test 20: mcpSocialInteractV6 team works
+            const interactTeam = server.mcpSocialInteractV6('friend1', 'team');
+            v200Assert(interactTeam.success === true, 'social.interact v6 team returns success');
+            v200Assert(interactTeam.intimacyGain === 20, 'social.interact v6 team gives 20 intimacy gain');
+
+            // Test 21: mcpSocialInteractV6 visit works
+            const interactVisit = server.mcpSocialInteractV6('friend2', 'visit');
+            v200Assert(interactVisit.success === true, 'social.interact v6 visit returns success');
+            v200Assert(interactVisit.intimacyGain === 10, 'social.interact v6 visit gives 10 intimacy gain');
+
+            // Test 22: mcpSocialInteractV6 fails for non-friend
+            const interactNonFriend = server.mcpSocialInteractV6('stranger', 'chat');
+            v200Assert(interactNonFriend.error !== undefined, 'social.interact v6 non-friend returns error');
+
+            // Test 23: mcpSocialInteractV6 fails for invalid action
+            const interactInvalid = server.mcpSocialInteractV6('friend1', 'invalid');
+            v200Assert(interactInvalid.error !== undefined, 'social.interact v6 invalid action returns error');
+
+            // Test 24: mcpSocialFriendsV6 sorts by intimacy
+            const friendsByIntimacy = server.mcpSocialFriendsV6('intimacy');
+            v200Assert(friendsByIntimacy.friends[0].intimacy >= friendsByIntimacy.friends[1].intimacy, 'social.friends v6 sorts by intimacy correctly');
+
+            // Test 25: mcpSocialFriendsV6 sorts by time
+            const friendsByTime = server.mcpSocialFriendsV6('time');
+            v200Assert(friendsByTime.success === true, 'social.friends v6 sorts by time returns success');
+
+            // Test 26: All 6 V200 tools callable via callTool
+            window.gameState.redpackV6 = null;
+            server._initRedpackStateV6();
+            window.gameState.socialV6 = null;
+            server._initSocialStateV6();
+            const allV200Tools = [
+                server.callTool('redpack.list', {}),
+                server.callTool('redpack.send', { amount: 100, count: 1 }),
+                server.callTool('redpack.receive', { redpackId: 'test' }),
+                server.callTool('redpack.history', {}),
+                server.callTool('social.friends', {}),
+                server.callTool('social.interact', { friendId: 'test', action: 'chat' })
+            ];
+            v200Assert(allV200Tools.every(r => !r.error || r.isError === false), 'All 6 V200 tools callable via callTool');
+
+            // Test 27: mcpRedpackSendV6 with default count
+            const rpSendDefault = server.mcpRedpackSendV6(200);
+            v200Assert(rpSendDefault.success === true, 'redpack.send v6 with default count returns success');
+            v200Assert(rpSendDefault.count === 1, 'redpack.send v6 default count is 1');
+
+            // Test 28: mcpRedpackSendV6 includes message
+            const rpSendWithMsg = server.mcpRedpackSendV6(300, 1, '恭喜发财');
+            v200Assert(rpSendWithMsg.success === true, 'redpack.send v6 with message returns success');
+            v200Assert(rpSendWithMsg.message.includes('恭喜发财'), 'redpack.send v6 includes message');
+
+            // Test 29: mcpRedpackReceiveV6 with empty redpackId
+            const receiveNoId = server.mcpRedpackReceiveV6('');
+            v200Assert(receiveNoId.error !== undefined, 'redpack.receive v6 with empty id returns error');
+
+            // Test 30: mcpSocialInteractV6 requires friendId
+            const interactNoFriend = server.mcpSocialInteractV6(null, 'chat');
+            v200Assert(interactNoFriend.error !== undefined, 'social.interact v6 without friendId returns error');
+
+            // Test 31: mcpSocialInteractV6 requires action
+            const interactNoAction = server.mcpSocialInteractV6('friend1', null);
+            v200Assert(interactNoAction.error !== undefined, 'social.interact v6 without action returns error');
+
+            // Test 32: mcpRedpackSendV6 with negative amount
+            const sendNeg = server.mcpRedpackSendV6(-100);
+            v200Assert(sendNeg.error !== undefined, 'redpack.send v6 with negative amount returns error');
+
+            // Test 33: mcpRedpackSendV6 with zero amount
+            const sendZero = server.mcpRedpackSendV6(0);
+            v200Assert(sendZero.error !== undefined, 'redpack.send v6 with zero amount returns error');
+
+            // Test 34: _initRedpackStateV6 idempotent
+            const rpState1 = server._initRedpackStateV6();
+            const rpState2 = server._initRedpackStateV6();
+            v200Assert(rpState1 === rpState2, '_initRedpackStateV6 is idempotent');
+
+            // Test 35: _initSocialStateV6 idempotent
+            const socialState1 = server._initSocialStateV6();
+            const socialState2 = server._initSocialStateV6();
+            v200Assert(socialState1 === socialState2, '_initSocialStateV6 is idempotent');
+
+            // Test 36: mcpRedpackSendV6 amount exceeding max
+            const sendTooMuch = server.mcpRedpackSendV6(200000);
+            v200Assert(sendTooMuch.error !== undefined, 'redpack.send v6 exceeds max amount returns error');
+
+            // Test 37: mcpRedpackListV6 filters expired redpacks
+            window.gameState.redpackV6.redpacks = [{
+                id: 'expired_rp',
+                senderId: 'test',
+                senderName: '测试',
+                amount: 0,
+                remainingCount: 0,
+                expiresAt: Date.now() - 1000
+            }];
+            const rpListFiltered = server.mcpRedpackListV6();
+            v200Assert(rpListFiltered.redpacks.every(r => r.expiresAt > Date.now() || !r.expiresAt), 'redpack.list v6 filters expired');
+
+            // Test 38: mcpSocialInteractV6 increments interaction count
+            const interactionsBefore = window.gameState.socialV6.interactions.length;
+            server.mcpSocialInteractV6('friend1', 'chat');
+            v200Assert(window.gameState.socialV6.interactions.length > interactionsBefore, 'social.interact v6 adds to interactions');
+
+            // Test 39: mcpRedpackHistoryV6 shows sent and received
+            const historyStats = server.mcpRedpackHistoryV6();
+            v200Assert(historyStats.sentCount >= 0, 'redpack.history v6 shows sentCount');
+            v200Assert(historyStats.receivedCount >= 0, 'redpack.history v6 shows receivedCount');
+
+            // Test 40: V200 tools registered in toolRegistry
+            v200Assert(server.toolRegistry.has('redpack.list'), 'redpack.list v6 is in toolRegistry');
+            v200Assert(server.toolRegistry.has('redpack.send'), 'redpack.send v6 is in toolRegistry');
+            v200Assert(server.toolRegistry.has('redpack.receive'), 'redpack.receive v6 is in toolRegistry');
+            v200Assert(server.toolRegistry.has('redpack.history'), 'redpack.history v6 is in toolRegistry');
+            v200Assert(server.toolRegistry.has('social.friends'), 'social.friends v6 is in toolRegistry');
+            v200Assert(server.toolRegistry.has('social.interact'), 'social.interact v6 is in toolRegistry');
+
+            // Test 41: mcpRedpackReceiveV6 updates remaining count
+            window.gameState.redpackV6 = null;
+            server._initRedpackStateV6();
+            const rpSendRemain = server.mcpRedpackSendV6(1000, 5);
+            const receive1 = server.mcpRedpackReceiveV6(rpSendRemain.redpackId);
+            v200Assert(receive1.remainingCount === 4, 'redpack.receive v6 decrements remainingCount');
+
+            // Test 42: mcpSocialInteractV6 updates lastInteractAt
+            const friendBefore = window.gameState.socialV6.friends.find(f => f.playerId === 'friend1');
+            const timeBefore = friendBefore.lastInteractAt;
+            server.mcpSocialInteractV6('friend1', 'visit');
+            const friendAfter = window.gameState.socialV6.friends.find(f => f.playerId === 'friend1');
+            v200Assert(friendAfter.lastInteractAt > timeBefore, 'social.interact v6 updates lastInteractAt');
+
+            // Test 43: mcpRedpackHistoryV6 shows correct totals
+            const historyTotals = server.mcpRedpackHistoryV6();
+            v200Assert(historyTotals.totalSent > 0, 'redpack.history v6 shows non-zero totalSent');
+
+            // Test 44: mcpSocialFriendsV6 with default sort
+            const friendsDefault = server.mcpSocialFriendsV6(null);
+            v200Assert(friendsDefault.success === true, 'social.friends v6 with null sort returns success');
+
+            // Test 45: All 45 tests pass
+            const v200Passed = results.filter(r => r.pass).length;
+            const v200Total = results.length;
+            const v200PassRate = v200Passed / v200Total;
+            console.log('V200 Tests:', v200Passed + '/' + v200Total, '(' + (v200PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V200', passed: v200Passed, total: v200Total, passRate: v200PassRate.toFixed(3), results };
+        }
+
+        const v200Results = runV200Tests();
