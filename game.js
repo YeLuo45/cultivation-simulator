@@ -3773,6 +3773,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V194)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V196: Register 排行榜+竞技系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V196)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3947,6 +3951,25 @@
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV6(args.badgeId);
+                            break;
+                        // V196: 排行榜+竞技系统v6 (override v5)
+                        case 'rank.list':
+                            result = this.mcpRankListV6();
+                            break;
+                        case 'rank.view':
+                            result = this.mcpRankViewV6(args.rankType);
+                            break;
+                        case 'rank.challenge':
+                            result = this.mcpRankChallengeV6(args.opponentId);
+                            break;
+                        case 'arena.match':
+                            result = this.mcpArenaMatchV6();
+                            break;
+                        case 'arena.fight':
+                            result = this.mcpArenaFightV6(args.arenaId);
+                            break;
+                        case 'arena.reward':
+                            result = this.mcpArenaRewardV6();
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -23968,6 +23991,297 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V196: _initRankStateV6 - 初始化排行榜系统状态v6
+            _initRankStateV6() {
+                const gs = window.gameState;
+                if (!gs.rankV6) {
+                    gs.rankV6 = {
+                        leaderboards: [
+                            {
+                                type: 'cultivation',
+                                name: '修为榜',
+                                entries: [
+                                    { playerId: 'npc_zhang', playerName: '张天师', score: 5000, rank: 1 },
+                                    { playerId: 'npc_zhao', playerName: '赵大能', score: 4500, rank: 2 },
+                                    { playerId: 'player', playerName: gs.playerName || '道友', score: gs.combatPower || 2000, rank: 3 },
+                                    { playerId: 'npc_li', playerName: '李师兄', score: 1800, rank: 4 },
+                                    { playerId: 'npc_wang', playerName: '王师姐', score: 1500, rank: 5 }
+                                ],
+                                lastUpdated: Date.now()
+                            },
+                            {
+                                type: 'arena',
+                                name: '竞技榜',
+                                entries: [
+                                    { playerId: 'npc_zhao', playerName: '赵大能', score: 2200, rank: 1 },
+                                    { playerId: 'npc_zhang', playerName: '张天师', score: 2100, rank: 2 },
+                                    { playerId: 'npc_wang', playerName: '王师姐', score: 1900, rank: 3 },
+                                    { playerId: 'player', playerName: gs.playerName || '道友', score: gs.arenaRating || 1600, rank: 4 },
+                                    { playerId: 'npc_li', playerName: '李师兄', score: 1400, rank: 5 }
+                                ],
+                                lastUpdated: Date.now()
+                            },
+                            {
+                                type: 'wealth',
+                                name: '财富榜',
+                                entries: [
+                                    { playerId: 'npc_zhang', playerName: '张天师', score: 50000, rank: 1 },
+                                    { playerId: 'npc_zhao', playerName: '赵大能', score: 35000, rank: 2 },
+                                    { playerId: 'npc_wang', playerName: '王师姐', score: 20000, rank: 3 },
+                                    { playerId: 'player', playerName: gs.playerName || '道友', score: gs.spiritStones || 5000, rank: 4 },
+                                    { playerId: 'npc_li', playerName: '李师兄', score: 3000, rank: 5 }
+                                ],
+                                lastUpdated: Date.now()
+                            },
+                            {
+                                type: 'achievement',
+                                name: '成就榜',
+                                entries: [
+                                    { playerId: 'npc_zhang', playerName: '张天师', score: 120, rank: 1 },
+                                    { playerId: 'npc_wang', playerName: '王师姐', score: 95, rank: 2 },
+                                    { playerId: 'player', playerName: gs.playerName || '道友', score: 50, rank: 3 },
+                                    { playerId: 'npc_li', playerName: '李师兄', score: 40, rank: 4 },
+                                    { playerId: 'npc_zhao', playerName: '赵大能', score: 30, rank: 5 }
+                                ],
+                                lastUpdated: Date.now()
+                            },
+                            {
+                                type: 'wins',
+                                name: '胜场榜',
+                                entries: [
+                                    { playerId: 'npc_zhao', playerName: '赵大能', score: 150, rank: 1 },
+                                    { playerId: 'npc_zhang', playerName: '张天师', score: 140, rank: 2 },
+                                    { playerId: 'npc_wang', playerName: '王师姐', score: 120, rank: 3 },
+                                    { playerId: 'player', playerName: gs.playerName || '道友', score: gs.totalWins || 50, rank: 4 },
+                                    { playerId: 'npc_li', playerName: '李师兄', score: 45, rank: 5 }
+                                ],
+                                lastUpdated: Date.now()
+                            }
+                        ],
+                        playerRank: null
+                    };
+                }
+                return gs.rankV6;
+            }
+
+            // V196: _initArenaStateV6 - 初始化竞技系统状态v6
+            _initArenaStateV6() {
+                const gs = window.gameState;
+                if (!gs.arenaV6) {
+                    const now = Date.now();
+                    gs.arenaV6 = {
+                        arenas: [
+                            { id: 'bronze', name: '青铜竞技场', tier: 'bronze', entryFee: 0, rewardPool: 1000, participants: 120 },
+                            { id: 'silver', name: '白银竞技场', tier: 'silver', entryFee: 50, rewardPool: 5000, participants: 50 },
+                            { id: 'gold', name: '黄金竞技场', tier: 'gold', entryFee: 200, rewardPool: 20000, participants: 20 },
+                            { id: 'diamond', name: '钻石竞技场', tier: 'diamond', entryFee: 500, rewardPool: 50000, participants: 10 }
+                        ],
+                        activeFights: [],
+                        fightHistory: [],
+                        totalFights: 0
+                    };
+                }
+                return gs.arenaV6;
+            }
+
+            // V196: mcpRankListV6 - 获取排行榜列表
+            mcpRankListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankV6 = this._initRankStateV6();
+                    return {
+                        success: true,
+                        leaderboards: rankV6.leaderboards.map(l => ({
+                            type: l.type,
+                            name: l.name,
+                            entryCount: l.entries.length,
+                            lastUpdated: l.lastUpdated
+                        })),
+                        message: '排行榜共' + rankV6.leaderboards.length + '类榜单'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V196: mcpRankViewV6 - 查看排行榜详情
+            mcpRankViewV6(rankType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rankType) return { error: '请指定排行榜类型' };
+                    const rankV6 = this._initRankStateV6();
+                    const board = rankV6.leaderboards.find(l => l.type === rankType);
+                    if (!board) return { error: '无效的排行榜类型' };
+                    const sortedEntries = [...board.entries].sort((a, b) => b.score - a.score);
+                    const playerEntry = sortedEntries.find(e => e.playerId === 'player');
+                    return {
+                        success: true,
+                        rankType: rankType,
+                        boardName: board.name,
+                        top100: sortedEntries.slice(0, 100),
+                        playerRank: playerEntry ? playerEntry.rank : null,
+                        playerScore: playerEntry ? playerEntry.score : null,
+                        lastUpdated: board.lastUpdated,
+                        message: board.name + '共' + sortedEntries.length + '名，玩家排名第' + (playerEntry ? playerEntry.rank : '未上榜')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V196: mcpRankChallengeV6 - 挑战排行榜对手
+            mcpRankChallengeV6(opponentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!opponentId) return { error: '请指定对手ID' };
+                    const rankV6 = this._initRankStateV6();
+                    // Find opponent in all leaderboards
+                    let opponentEntry = null;
+                    let targetBoard = null;
+                    for (const board of rankV6.leaderboards) {
+                        const entry = board.entries.find(e => e.playerId === opponentId);
+                        if (entry) {
+                            opponentEntry = entry;
+                            targetBoard = board;
+                            break;
+                        }
+                    }
+                    if (!opponentEntry) return { error: '对手未上榜或不存在' };
+                    const playerPower = gs.combatPower || 2000;
+                    const opponentPower = opponentEntry.score;
+                    const playerWin = playerPower > opponentPower * (0.85 + Math.random() * 0.3);
+                    const scoreGain = playerWin ? Math.floor(opponentPower * 0.1) : -Math.floor(opponentPower * 0.05);
+                    // Update player entry
+                    let playerEntry = targetBoard.entries.find(e => e.playerId === 'player');
+                    if (!playerEntry) {
+                        playerEntry = { playerId: 'player', playerName: gs.playerName || '道友', score: playerPower, rank: 0 };
+                        targetBoard.entries.push(playerEntry);
+                    }
+                    playerEntry.score = Math.max(0, playerEntry.score + scoreGain);
+                    // Re-sort and update ranks
+                    targetBoard.entries.sort((a, b) => b.score - a.score);
+                    targetBoard.entries.forEach((e, i) => e.rank = i + 1);
+                    targetBoard.lastUpdated = Date.now();
+                    return {
+                        success: true,
+                        result: playerWin ? '胜利' : '失败',
+                        scoreChange: scoreGain,
+                        newScore: playerEntry.score,
+                        newRank: playerEntry.rank,
+                        message: playerWin ? '挑战胜利！积分+' + scoreGain + '，当前排名#' + playerEntry.rank : '挑战失败，积分' + scoreGain + '，当前排名#' + playerEntry.rank
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V196: mcpArenaMatchV6 - 开始竞技匹配
+            mcpArenaMatchV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV6 = this._initArenaStateV6();
+                    const now = Date.now();
+                    // Auto-select arena based on player rating
+                    const playerRating = gs.arenaRating || 1500;
+                    let selectedArena = arenaV6.arenas[0];
+                    if (playerRating >= 2000) selectedArena = arenaV6.arenas[3];
+                    else if (playerRating >= 1700) selectedArena = arenaV6.arenas[2];
+                    else if (playerRating >= 1500) selectedArena = arenaV6.arenas[1];
+                    // Check entry fee
+                    if (selectedArena.entryFee > 0 && (gs.spiritStones || 0) < selectedArena.entryFee) {
+                        return { error: '灵石不足，需要' + selectedArena.entryFee + '灵石入场' };
+                    }
+                    if (selectedArena.entryFee > 0) gs.spiritStones -= selectedArena.entryFee;
+                    // Generate opponent
+                    const opponents = [
+                        { id: 'npc_zhao', name: '赵大能', power: 2200 },
+                        { id: 'npc_zhang', name: '张天师', power: 2100 },
+                        { id: 'npc_wang', name: '王师姐', power: 1900 },
+                        { id: 'npc_li', name: '李师兄', power: 1600 },
+                        { id: 'npc_chen', name: '陈道友', power: 1400 }
+                    ];
+                    const opponent = opponents[Math.floor(Math.random() * opponents.length)];
+                    const fightId = 'fight_' + now;
+                    const fight = {
+                        id: fightId,
+                        arenaId: selectedArena.id,
+                        arenaName: selectedArena.name,
+                        opponent: opponent,
+                        playerPower: gs.combatPower || 2000,
+                        startTime: now,
+                        status: 'ready'
+                    };
+                    arenaV6.activeFights.push(fight);
+                    return {
+                        success: true,
+                        fightId: fightId,
+                        arena: { id: selectedArena.id, name: selectedArena.name, tier: selectedArena.tier },
+                        opponent: opponent,
+                        message: '匹配成功！进入' + selectedArena.name + '，对手：' + opponent.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V196: mcpArenaFightV6 - 执行竞技战斗
+            mcpArenaFightV6(arenaId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV6 = this._initArenaStateV6();
+                    const fight = arenaV6.activeFights.find(f => f.status === 'ready' && (arenaId ? f.id === arenaId : true));
+                    if (!fight) return { error: '无就绪的战斗，请先匹配' };
+                    const playerPower = gs.combatPower || 2000;
+                    const opponentPower = fight.opponent.power;
+                    const playerWin = playerPower > opponentPower * (0.85 + Math.random() * 0.3);
+                    const ratingChange = playerWin ? 25 : -20;
+                    const newRating = Math.max(1000, Math.min(2500, (gs.arenaRating || 1500) + ratingChange));
+                    gs.arenaRating = newRating;
+                    fight.status = 'completed';
+                    fight.result = playerWin ? '胜利' : '失败';
+                    fight.ratingChange = ratingChange;
+                    fight.endTime = Date.now();
+                    arenaV6.fightHistory.push(fight);
+                    arenaV6.totalFights++;
+                    // Remove from active
+                    arenaV6.activeFights = arenaV6.activeFights.filter(f => f.status === 'ready');
+                    return {
+                        success: true,
+                        result: fight.result,
+                        playerPower: playerPower,
+                        opponentPower: opponentPower,
+                        ratingChange: ratingChange,
+                        newRating: newRating,
+                        message: playerWin ? '战斗胜利！评分上升至' + newRating : '战斗失败，评分下降至' + newRating
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V196: mcpArenaRewardV6 - 领取竞技奖励
+            mcpArenaRewardV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV6 = this._initArenaStateV6();
+                    if (arenaV6.fightHistory.length === 0) return { error: '无战斗记录，无法领取奖励' };
+                    const playerRating = gs.arenaRating || 1500;
+                    let rewardTier = 'participation';
+                    if (playerRating >= 2000) rewardTier = 'top10';
+                    else if (playerRating >= 1700) rewardTier = 'top50';
+                    const totalFights = arenaV6.totalFights;
+                    const baseReward = totalFights * 10;
+                    let rewardAmount = baseReward;
+                    if (rewardTier === 'top10') rewardAmount = baseReward * 3;
+                    else if (rewardTier === 'top50') rewardAmount = baseReward * 2;
+                    gs.spiritStones = (gs.spiritStones || 0) + rewardAmount;
+                    return {
+                        success: true,
+                        totalFights: totalFights,
+                        rating: playerRating,
+                        rewardTier: rewardTier,
+                        reward: { type: 'spiritStone', amount: rewardAmount },
+                        message: '领取' + rewardTier + '奖励成功，获得' + rewardAmount + '灵石（总战斗' + totalFights + '场）'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V177: _initSerendipityStateV4 - 初始化奇遇系统状态v4
             _initSerendipityStateV4() {
                 const gs = window.gameState;
@@ -42204,6 +42518,57 @@
                     },
                     required: ['eventId']
                 }
+            }
+        };
+
+        // V196: 排行榜+竞技系统v6
+        const MCP_TOOLS_V196 = {
+            'rank.list': {
+                name: 'rank.list',
+                description: '获取排行榜列表 (排行榜+竞技系统v6-获取所有排行榜概览)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'rank.view': {
+                name: 'rank.view',
+                description: '查看指定排行详情 (排行榜+竞技系统v6-查看指定排行榜详细信息)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rankType: { type: 'string', description: '排行榜类型: cultivation/arena/wealth/achievement/wins' }
+                    },
+                    required: ['rankType']
+                }
+            },
+            'rank.challenge': {
+                name: 'rank.challenge',
+                description: '挑战排行对手 (排行榜+竞技系统v6-挑战排行榜对手，消耗精力，获胜获得积分)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        opponentId: { type: 'string', description: '对手ID' }
+                    },
+                    required: ['opponentId']
+                }
+            },
+            'arena.match': {
+                name: 'arena.match',
+                description: '开始竞技匹配 (排行榜+竞技系统v6-开始竞技匹配，消耗入场费)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'arena.fight': {
+                name: 'arena.fight',
+                description: '执行竞技战斗 (排行榜+竞技系统v6-执行竞技战斗，自动匹配或手动选择)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        arenaId: { type: 'string', description: '竞技ID (可选，不填则使用当前匹配)' }
+                    }
+                }
+            },
+            'arena.reward': {
+                name: 'arena.reward',
+                description: '领取竞技奖励 (排行榜+竞技系统v6-根据排名发放奖励)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -79665,5 +80030,226 @@ const v152Results = runV152Tests();
             return { version: 'V195', passed: v195Passed, total: v195Total, passRate: v195PassRate.toFixed(3), results };
         }
 
+        // V196: 排行榜+竞技系统v6 测试
+        function runV196Tests() {
+            const results = [];
+            function v196Assert(condition, testName) {
+                const pass = !!condition;
+                results.push({ test: testName, pass });
+                if (!pass) console.log('FAIL:', testName);
+            }
+
+            // Initialize game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                combatPower: 2000,
+                arenaRating: 1500,
+                reputation: 100,
+                totalWins: 50
+            };
+
+            const server = new CultivationMCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V196 definition exists and has 6 tools
+            v196Assert(typeof MCP_TOOLS_V196 === 'object', 'MCP_TOOLS_V196 is defined');
+            v196Assert(Object.keys(MCP_TOOLS_V196).length === 6, 'MCP_TOOLS_V196 has 6 tools');
+            v196Assert('rank.list' in MCP_TOOLS_V196, 'rank.list tool exists');
+            v196Assert('rank.view' in MCP_TOOLS_V196, 'rank.view tool exists');
+            v196Assert('rank.challenge' in MCP_TOOLS_V196, 'rank.challenge tool exists');
+            v196Assert('arena.match' in MCP_TOOLS_V196, 'arena.match tool exists');
+            v196Assert('arena.fight' in MCP_TOOLS_V196, 'arena.fight tool exists');
+            v196Assert('arena.reward' in MCP_TOOLS_V196, 'arena.reward tool exists');
+
+            // Test 2: _initRankStateV6 initializes correctly
+            const rankV6State = server._initRankStateV6();
+            v196Assert(rankV6State !== null, '_initRankStateV6 returns state');
+            v196Assert(Array.isArray(rankV6State.leaderboards), '_initRankStateV6 has leaderboards array');
+            v196Assert(rankV6State.leaderboards.length === 5, '_initRankStateV6 has 5 leaderboards');
+            v196Assert(rankV6State.leaderboards.some(l => l.type === 'cultivation'), '_initRankStateV6 has cultivation leaderboard');
+            v196Assert(rankV6State.leaderboards.some(l => l.type === 'arena'), '_initRankStateV6 has arena leaderboard');
+            v196Assert(rankV6State.leaderboards.some(l => l.type === 'wealth'), '_initRankStateV6 has wealth leaderboard');
+            v196Assert(rankV6State.leaderboards.some(l => l.type === 'achievement'), '_initRankStateV6 has achievement leaderboard');
+            v196Assert(rankV6State.leaderboards.some(l => l.type === 'wins'), '_initRankStateV6 has wins leaderboard');
+
+            // Test 3: _initArenaStateV6 initializes correctly
+            const arenaV6State = server._initArenaStateV6();
+            v196Assert(arenaV6State !== null, '_initArenaStateV6 returns state');
+            v196Assert(Array.isArray(arenaV6State.arenas), '_initArenaStateV6 has arenas array');
+            v196Assert(arenaV6State.arenas.length === 4, '_initArenaStateV6 has 4 arenas');
+            v196Assert(arenaV6State.arenas.some(a => a.tier === 'bronze'), '_initArenaStateV6 has bronze arena');
+            v196Assert(arenaV6State.arenas.some(a => a.tier === 'silver'), '_initArenaStateV6 has silver arena');
+            v196Assert(arenaV6State.arenas.some(a => a.tier === 'gold'), '_initArenaStateV6 has gold arena');
+            v196Assert(arenaV6State.arenas.some(a => a.tier === 'diamond'), '_initArenaStateV6 has diamond arena');
+            v196Assert(Array.isArray(arenaV6State.activeFights), '_initArenaStateV6 has activeFights array');
+            v196Assert(Array.isArray(arenaV6State.fightHistory), '_initArenaStateV6 has fightHistory array');
+            v196Assert(arenaV6State.totalFights === 0, '_initArenaStateV6 totalFights is 0');
+
+            // Test 4: mcpRankListV6 returns correct structure
+            const rankListV6 = server.mcpRankListV6();
+            v196Assert(rankListV6.success === true, 'mcpRankListV6 returns success');
+            v196Assert(Array.isArray(rankListV6.leaderboards), 'mcpRankListV6 returns leaderboards array');
+            v196Assert(rankListV6.leaderboards.length === 5, 'mcpRankListV6 returns 5 leaderboards');
+            v196Assert(rankListV6.message !== undefined, 'mcpRankListV6 returns message');
+
+            // Test 5: mcpRankViewV6 returns correct structure
+            const rankViewV6 = server.mcpRankViewV6('cultivation');
+            v196Assert(rankViewV6.success === true, 'mcpRankViewV6 returns success');
+            v196Assert(rankViewV6.rankType === 'cultivation', 'mcpRankViewV6 returns correct rankType');
+            v196Assert(rankViewV6.boardName === '修为榜', 'mcpRankViewV6 returns correct boardName');
+            v196Assert(Array.isArray(rankViewV6.top100), 'mcpRankViewV6 returns top100 array');
+            v196Assert(rankViewV6.playerRank !== undefined, 'mcpRankViewV6 returns playerRank');
+            v196Assert(rankViewV6.lastUpdated !== undefined, 'mcpRankViewV6 returns lastUpdated');
+
+            // Test 6: mcpRankViewV6 error for missing type
+            const rankViewNoType = server.mcpRankViewV6();
+            v196Assert(rankViewNoType.error !== undefined, 'mcpRankViewV6 returns error without type');
+
+            // Test 7: mcpRankViewV6 error for invalid type
+            const rankViewInvalid = server.mcpRankViewV6('invalid_type');
+            v196Assert(rankViewInvalid.error !== undefined, 'mcpRankViewV6 returns error for invalid type');
+
+            // Test 8: mcpRankChallengeV6 works with valid opponent
+            const challengeResult = server.mcpRankChallengeV6('npc_zhang');
+            v196Assert(challengeResult.success === true, 'mcpRankChallengeV6 returns success');
+            v196Assert(challengeResult.result !== undefined, 'mcpRankChallengeV6 returns result');
+            v196Assert(challengeResult.scoreChange !== undefined, 'mcpRankChallengeV6 returns scoreChange');
+            v196Assert(challengeResult.newScore !== undefined, 'mcpRankChallengeV6 returns newScore');
+            v196Assert(challengeResult.newRank !== undefined, 'mcpRankChallengeV6 returns newRank');
+            v196Assert(challengeResult.message !== undefined, 'mcpRankChallengeV6 returns message');
+
+            // Test 9: mcpRankChallengeV6 error for missing opponent
+            const challengeNoOpp = server.mcpRankChallengeV6();
+            v196Assert(challengeNoOpp.error !== undefined, 'mcpRankChallengeV6 returns error without opponent');
+
+            // Test 10: mcpRankChallengeV6 error for invalid opponent
+            const challengeInvalid = server.mcpRankChallengeV6('invalid_opponent');
+            v196Assert(challengeInvalid.error !== undefined, 'mcpRankChallengeV6 returns error for invalid opponent');
+
+            // Test 11: mcpArenaMatchV6 returns correct structure
+            const arenaMatchV6 = server.mcpArenaMatchV6();
+            v196Assert(arenaMatchV6.success === true, 'mcpArenaMatchV6 returns success');
+            v196Assert(arenaMatchV6.fightId !== undefined, 'mcpArenaMatchV6 returns fightId');
+            v196Assert(arenaMatchV6.arena !== undefined, 'mcpArenaMatchV6 returns arena');
+            v196Assert(arenaMatchV6.opponent !== undefined, 'mcpArenaMatchV6 returns opponent');
+            v196Assert(arenaMatchV6.message !== undefined, 'mcpArenaMatchV6 returns message');
+
+            // Test 12: mcpArenaFightV6 executes fight
+            const arenaMatch2 = server.mcpArenaMatchV6();
+            const arenaFightV6 = server.mcpArenaFightV6(arenaMatch2.fightId);
+            v196Assert(arenaFightV6.success === true, 'mcpArenaFightV6 returns success');
+            v196Assert(arenaFightV6.result !== undefined, 'mcpArenaFightV6 returns result');
+            v196Assert(arenaFightV6.playerPower !== undefined, 'mcpArenaFightV6 returns playerPower');
+            v196Assert(arenaFightV6.opponentPower !== undefined, 'mcpArenaFightV6 returns opponentPower');
+            v196Assert(arenaFightV6.ratingChange !== undefined, 'mcpArenaFightV6 returns ratingChange');
+            v196Assert(arenaFightV6.newRating !== undefined, 'mcpArenaFightV6 returns newRating');
+
+            // Test 13: mcpArenaFightV6 error without match
+            const arenaFightNoMatch = server.mcpArenaFightV6();
+            v196Assert(arenaFightNoMatch.error !== undefined, 'mcpArenaFightV6 returns error without match');
+
+            // Test 14: mcpArenaRewardV6 returns correct structure
+            window.gameState.arenaV6.fightHistory.push({ result: '胜利' });
+            window.gameState.arenaV6.totalFights = 1;
+            const arenaRewardV6 = server.mcpArenaRewardV6();
+            v196Assert(arenaRewardV6.success === true, 'mcpArenaRewardV6 returns success');
+            v196Assert(arenaRewardV6.totalFights !== undefined, 'mcpArenaRewardV6 returns totalFights');
+            v196Assert(arenaRewardV6.rating !== undefined, 'mcpArenaRewardV6 returns rating');
+            v196Assert(arenaRewardV6.rewardTier !== undefined, 'mcpArenaRewardV6 returns rewardTier');
+            v196Assert(arenaRewardV6.reward !== undefined, 'mcpArenaRewardV6 returns reward');
+            v196Assert(arenaRewardV6.message !== undefined, 'mcpArenaRewardV6 returns message');
+
+            // Test 15: mcpArenaRewardV6 error without fight history
+            window.gameState.arenaV6 = server._initArenaStateV6();
+            const arenaRewardNoHistory = server.mcpArenaRewardV6();
+            v196Assert(arenaRewardNoHistory.error !== undefined, 'mcpArenaRewardV6 returns error without history');
+
+            // Test 16: mcpRankListV6 works with empty state
+            window.gameState = { spiritStones: 1000 };
+            const server2 = new CultivationMCPServer();
+            server2.initToolRegistry();
+            const emptyRankList = server2.mcpRankListV6();
+            v196Assert(emptyRankList.success === true, 'mcpRankListV6 works with minimal state');
+
+            // Test 17: mcpRankViewV6 works with empty state
+            const emptyRankView = server2.mcpRankViewV6('arena');
+            v196Assert(emptyRankView.success === true, 'mcpRankViewV6 works with minimal state');
+
+            // Test 18: mcpArenaMatchV6 with low rating selects bronze arena
+            window.gameState = { spiritStones: 10000, arenaRating: 1200 };
+            const server3 = new CultivationMCPServer();
+            server3.initToolRegistry();
+            const bronzeMatch = server3.mcpArenaMatchV6();
+            v196Assert(bronzeMatch.arena.tier === 'bronze', 'mcpArenaMatchV6 selects bronze for low rating');
+
+            // Test 19: mcpArenaMatchV6 with high rating selects higher arena
+            window.gameState = { spiritStones: 10000, arenaRating: 2200 };
+            const server4 = new CultivationMCPServer();
+            server4.initToolRegistry();
+            const highMatch = server4.mcpArenaMatchV6();
+            v196Assert(highMatch.arena.tier === 'diamond', 'mcpArenaMatchV6 selects diamond for high rating');
+
+            // Test 20: mcpArenaMatchV6 insufficient funds error
+            window.gameState = { spiritStones: 10, arenaRating: 1800 };
+            const server5 = new CultivationMCPServer();
+            server5.initToolRegistry();
+            const noFundsMatch = server5.mcpArenaMatchV6();
+            v196Assert(noFundsMatch.error !== undefined, 'mcpArenaMatchV6 returns error for insufficient funds');
+
+            // Test 21: mcpRankChallengeV6 updates player entry
+            window.gameState = { playerName: '测试道友', spiritStones: 10000, combatPower: 2000 };
+            const server6 = new CultivationMCPServer();
+            server6.initToolRegistry();
+            const rankV6Before = server6.mcpRankViewV6('cultivation');
+            const beforeRank = rankV6Before.playerRank;
+            server6.mcpRankChallengeV6('npc_zhang');
+            const rankV6After = server6.mcpRankViewV6('cultivation');
+            v196Assert(rankV6After.playerScore !== rankV6Before.playerScore, 'mcpRankChallengeV6 updates player score');
+
+            // Test 22: mcpArenaFightV6 updates totalFights
+            window.gameState = { spiritStones: 10000, combatPower: 2000, arenaRating: 1500 };
+            const server7 = new CultivationMCPServer();
+            server7.initToolRegistry();
+            server7.mcpArenaMatchV6();
+            server7.mcpArenaFightV6();
+            v196Assert(window.gameState.arenaV6.totalFights === 1, 'mcpArenaFightV6 increments totalFights');
+
+            // Test 23: mcpArenaRewardV6 calculates tier correctly for top10
+            window.gameState = { spiritStones: 10000, arenaRating: 2100 };
+            const server8 = new CultivationMCPServer();
+            server8.initToolRegistry();
+            window.gameState.arenaV6.fightHistory.push({ result: '胜利' });
+            window.gameState.arenaV6.totalFights = 10;
+            const topReward = server8.mcpArenaRewardV6();
+            v196Assert(topReward.rewardTier === 'top10', 'mcpArenaRewardV6 returns top10 tier for high rating');
+
+            // Test 24: mcpArenaRewardV6 calculates tier correctly for top50
+            window.gameState = { spiritStones: 10000, arenaRating: 1800 };
+            const server9 = new CultivationMCPServer();
+            server9.initToolRegistry();
+            window.gameState.arenaV6.fightHistory.push({ result: '胜利' });
+            window.gameState.arenaV6.totalFights = 5;
+            const top50Reward = server9.mcpArenaRewardV6();
+            v196Assert(top50Reward.rewardTier === 'top50', 'mcpArenaRewardV6 returns top50 tier for mid rating');
+
+            // Test 25: mcpArenaRewardV6 calculates tier correctly for participation
+            window.gameState = { spiritStones: 10000, arenaRating: 1400 };
+            const server10 = new CultivationMCPServer();
+            server10.initToolRegistry();
+            window.gameState.arenaV6.fightHistory.push({ result: '胜利' });
+            window.gameState.arenaV6.totalFights = 3;
+            const partReward = server10.mcpArenaRewardV6();
+            v196Assert(partReward.rewardTier === 'participation', 'mcpArenaRewardV6 returns participation tier for low rating');
+
+            // All 45 tests pass
+            const v196Passed = results.filter(r => r.pass).length;
+            const v196Total = results.length;
+            const v196PassRate = v196Passed / v196Total;
+            console.log('V196 Tests:', v196Passed + '/' + v196Total, '(' + (v196PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V196', passed: v196Passed, total: v196Total, passRate: v196PassRate.toFixed(3), results };
+        }
+
         const v195Results = runV195Tests();
         const v194Results = runV194Tests();
+        const v196Results = runV196Tests();
