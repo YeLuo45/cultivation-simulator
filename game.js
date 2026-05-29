@@ -36176,6 +36176,8 @@
                 window.game.callTool(toolName, args || {});
             }
         };
+        window.startNewGame = startNewGame;
+        window.init = init;
 
         // ===== Direction C: Offline Persistence Layer =====
         // Thunderbolt dual-path sync (SharedWorker + Main-thread) + PowerSync
