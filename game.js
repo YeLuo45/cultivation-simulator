@@ -3809,6 +3809,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V204)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V205: Register 奇遇+事件系统v7 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V205)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4116,6 +4120,25 @@
                             break;
                         case 'welfare.claim':
                             result = this.mcpWelfareClaimV7(args.welfareId);
+                            break;
+                        // V205: 奇遇+事件系统v7
+                        case 'encounter.list':
+                            result = this.mcpEncounterListV7(args.type, args.rarity);
+                            break;
+                        case 'encounter.trigger':
+                            result = this.mcpEncounterTriggerV7(args.encounterId);
+                            break;
+                        case 'encounter.complete':
+                            result = this.mcpEncounterCompleteV7(args.encounterId);
+                            break;
+                        case 'event.list':
+                            result = this.mcpEventListV7();
+                            break;
+                        case 'event.select':
+                            result = this.mcpEventSelectV7(args.eventId, args.optionId);
+                            break;
+                        case 'event.resolve':
+                            result = this.mcpEventResolveV7(args.eventId);
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -26375,6 +26398,204 @@
                             gs.materials = gs.materials || {};
                             gs.materials.herbs = (gs.materials.herbs || 0) + reward.herbs;
                         }
+                    }
+                    return {
+                        success: true,
+                        eventId: event.id,
+                        name: event.name,
+                        choice: selectedChoice.text,
+                        outcome: selectedChoice.outcome,
+                        reward: reward,
+                        message: '结算事件: ' + event.name + ', 结果: ' + selectedChoice.outcome
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: _initEncounterStateV7 - 初始化奇遇系统状态v7
+            _initEncounterStateV7() {
+                const gs = window.gameState;
+                if (!gs.encounterV7) {
+                    gs.encounterV7 = {
+                        encounters: [
+                            { id: 'ancient_cave', name: '古洞探险', description: '在深山中发现一处神秘古洞', type: 'adventure', rarity: 'rare', requirement: { minRealm: 1 }, duration: 3600000, status: 'available', progress: 0, rewards: { spiritStones: 500, experience: 200 } },
+                            { id: 'spirit_beast', name: '灵兽之缘', description: '偶遇一只受伤的神奇灵兽', type: 'npc', rarity: 'epic', requirement: { minRealm: 2 }, duration: 7200000, status: 'available', progress: 0, rewards: { pet: '灵兽幼崽', spiritStones: 300 } },
+                            { id: 'lost_treasure', name: '失落宝藏', description: '传说中藏有珍贵宝物的遗迹', type: 'treasure', rarity: 'rare', requirement: { minRealm: 1 }, duration: 5400000, status: 'available', progress: 0, rewards: { artifact: '古宝', spiritStones: 800 } },
+                            { id: 'cultivation_epiphany', name: '修炼顿悟', description: '突然领悟修炼真谛', type: 'cultivation', rarity: 'legendary', requirement: { minRealm: 3 }, duration: 10800000, status: 'available', progress: 0, rewards: { realmProgress: 1, spiritStones: 1000 } },
+                            { id: 'elder_encounter', name: '前辈遗泽', description: '遇到陨落的修士传承', type: 'npc', rarity: 'epic', requirement: { minRealm: 2 }, duration: 9000000, status: 'available', progress: 0, rewards: { technique: '前辈心得', spiritStones: 400 } },
+                            { id: 'miracle_medicine', name: '奇药现世', description: '发现一株罕见的灵药', type: 'treasure', rarity: 'rare', requirement: { minRealm: 1 }, duration: 1800000, status: 'available', progress: 0, rewards: { herbs: 5, spiritStones: 200 } },
+                            { id: 'hidden_realm', name: '秘境界开', description: '发现一个隐藏的小世界', type: 'adventure', rarity: 'legendary', requirement: { minRealm: 4 }, duration: 14400000, status: 'available', progress: 0, rewards: { spiritStones: 2000, rareItem: '秘境令牌' } }
+                        ],
+                        availableEncounters: [],
+                        totalEncounters: 0,
+                        cooldown: null
+                    };
+                }
+                return gs.encounterV7;
+            }
+
+            // V205: _initEventStateV7 - 初始化事件系统状态v7
+            _initEventStateV7() {
+                const gs = window.gameState;
+                if (!gs.eventV7) {
+                    gs.eventV7 = {
+                        events: [
+                            { id: 'celestial_phenomenon', name: '天象异变', description: '天现异象，必有大事发生', type: 'cultivation', choices: [{ id: 'observe', text: '静心观察', outcome: 'insight', reward: { spirit: 100 } }, { id: 'absorb', text: '尝试吸收', outcome: 'risk', reward: { spirit: 300, penalty: '可能的反噬' } }, { id: 'ignore', text: '不予理会', outcome: 'none', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'stranger_request', name: '陌生人请求', description: '一位蒙面修士请求协助', type: 'npc', choices: [{ id: 'accept', text: '欣然接受', outcome: 'gain', reward: { reputation: 50, spiritStones: 500 } }, { id: 'negotiate', text: '讨价还价', outcome: 'compromise', reward: { spiritStones: 200 } }, { id: 'refuse', text: '断然拒绝', outcome: 'safe', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'artifact_apperception', name: '法器感悟', description: '手中的法器突然发出光芒', type: 'cultivation', choices: [{ id: 'meditate', text: '冥想感悟', outcome: 'breakthrough', reward: { artifactBonus: 0.2 } }, { id: 'enhance', text: '尝试强化', outcome: 'enhance', reward: { artifactLevel: 1 } }, { id: 'store', text: '收入储物袋', outcome: 'safe', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'auction_opportunity', name: '拍卖会', description: '偶然发现一场地下拍卖会', type: 'treasure', choices: [{ id: 'bid_high', text: '高价竞拍', outcome: 'luxury', reward: { rareItem: '拍卖品' } }, { id: 'bid_low', text: '谨慎竞拍', outcome: 'normal', reward: { herbs: 3 } }, { id: 'observe_only', text: '只旁观', outcome: 'info', reward: { marketInfo: true } }], selectedChoice: null, resolved: false }
+                        ],
+                        activeEvent: null,
+                        eventHistory: []
+                    };
+                }
+                return gs.eventV7;
+            }
+
+            // V205: mcpEncounterListV7 - 获取奇遇列表
+            mcpEncounterListV7(type, rarity) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV7 = this._initEncounterStateV7();
+                    let filtered = [...encounterV7.encounters];
+                    if (type) filtered = filtered.filter(e => e.type === type);
+                    if (rarity) filtered = filtered.filter(e => e.rarity === rarity);
+                    return {
+                        success: true,
+                        total: filtered.length,
+                        totalEncounters: encounterV7.totalEncounters,
+                        cooldown: encounterV7.cooldown,
+                        encounters: filtered
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: mcpEncounterTriggerV7 - 触发奇遇事件
+            mcpEncounterTriggerV7(encounterId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV7 = this._initEncounterStateV7();
+                    if (encounterV7.cooldown && Date.now() < encounterV7.cooldown) {
+                        return { error: '奇遇冷却中: ' + Math.ceil((encounterV7.cooldown - Date.now()) / 1000) + '秒' };
+                    }
+                    if (encounterV7.activeEncounter) return { error: '已有进行中的奇遇: ' + encounterV7.activeEncounter.id };
+                    const encounter = encounterV7.encounters.find(e => e.id === encounterId);
+                    if (!encounter) return { error: '奇遇不存在: ' + encounterId };
+                    if (encounter.status !== 'available') return { error: '奇遇不可用: ' + encounterId };
+                    encounter.status = 'active';
+                    encounterV7.totalEncounters++;
+                    encounterV7.activeEncounter = encounter;
+                    encounterV7.cooldown = Date.now() + 60000;
+                    return {
+                        success: true,
+                        encounterId: encounter.id,
+                        name: encounter.name,
+                        duration: encounter.duration,
+                        message: '触发奇遇: ' + encounter.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: mcpEncounterCompleteV7 - 完成奇遇获得奖励
+            mcpEncounterCompleteV7(encounterId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV7 = this._initEncounterStateV7();
+                    const active = encounterV7.activeEncounter;
+                    if (!active) return { error: '没有进行中的奇遇' };
+                    if (active.id !== encounterId) return { error: '奇遇ID不匹配: ' + encounterId };
+                    const encounter = encounterV7.encounters.find(e => e.id === encounterId);
+                    if (!encounter) return { error: '奇遇不存在: ' + encounterId };
+                    encounter.status = 'completed';
+                    encounterV7.activeEncounter = null;
+                    const reward = encounter.rewards;
+                    if (reward) {
+                        if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                        if (reward.experience) gs.cultivationProgress = (gs.cultivationProgress || 0) + reward.experience;
+                        if (reward.realmProgress) gs.realmProgress = (gs.realmProgress || 0) + reward.realmProgress;
+                        if (reward.reputation) gs.reputation = (gs.reputation || 0) + reward.reputation;
+                        if (reward.herbs) { gs.materials = gs.materials || {}; gs.materials.herbs = (gs.materials.herbs || 0) + reward.herbs; }
+                    }
+                    return {
+                        success: true,
+                        encounterId: encounter.id,
+                        name: encounter.name,
+                        reward: reward,
+                        message: '完成奇遇: ' + encounter.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: mcpEventListV7 - 获取事件列表
+            mcpEventListV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV7 = this._initEventStateV7();
+                    return {
+                        success: true,
+                        total: eventV7.events.length,
+                        activeEvent: eventV7.activeEvent,
+                        events: eventV7.events.map(e => ({
+                            id: e.id,
+                            name: e.name,
+                            description: e.description,
+                            type: e.type,
+                            choices: e.choices.map(c => ({ id: c.id, text: c.text })),
+                            resolved: e.resolved
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: mcpEventSelectV7 - 选择事件选项
+            mcpEventSelectV7(eventId, optionId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV7 = this._initEventStateV7();
+                    if (eventV7.activeEvent) return { error: '已有进行中的事件: ' + eventV7.activeEvent.id };
+                    const event = eventV7.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    const option = event.choices.find(c => c.id === optionId);
+                    if (!option) return { error: '无效的选项: ' + optionId };
+                    event.selectedChoice = optionId;
+                    eventV7.activeEvent = event;
+                    return {
+                        success: true,
+                        eventId: event.id,
+                        name: event.name,
+                        selectedOption: { id: option.id, text: option.text },
+                        outcome: option.outcome,
+                        message: '选择: ' + option.text + ', 等待结算...'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V205: mcpEventResolveV7 - 事件结果结算
+            mcpEventResolveV7(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV7 = this._initEventStateV7();
+                    const active = eventV7.activeEvent;
+                    if (!active) return { error: '没有进行中的事件' };
+                    if (active.id !== eventId) return { error: '事件ID不匹配: ' + eventId };
+                    const event = eventV7.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    const selectedChoice = event.choices.find(c => c.id === event.selectedChoice);
+                    if (!selectedChoice) return { error: '未选择选项' };
+                    event.resolved = true;
+                    eventV7.activeEvent = null;
+                    eventV7.eventHistory.push({ eventId: event.id, choice: selectedChoice.id, outcome: selectedChoice.outcome, timestamp: Date.now() });
+                    const reward = selectedChoice.reward;
+                    if (reward) {
+                        if (reward.spirit) gs.spirit = (gs.spirit || 0) + reward.spirit;
+                        if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                        if (reward.reputation) gs.reputation = (gs.reputation || 0) + reward.reputation;
+                        if (reward.herbs) { gs.materials = gs.materials || {}; gs.materials.herbs = (gs.materials.herbs || 0) + reward.herbs; }
                     }
                     return {
                         success: true,
@@ -84502,6 +84723,71 @@ const v152Results = runV152Tests();
             }
         };
 
+        // V205: 奇遇+事件系统v7 MCP工具定义 (P-20260530-033)
+        const MCP_TOOLS_V205 = {
+            'encounter.list': {
+                name: 'encounter.list',
+                description: '获取奇遇列表 (奇遇+事件系统v7-获取所有奇遇，支持类型/稀有度筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '奇遇类型: adventure/treasure/cultivation/npc (可选)' },
+                        rarity: { type: 'string', description: '稀有度: common/rare/epic/legendary (可选)' }
+                    }
+                }
+            },
+            'encounter.trigger': {
+                name: 'encounter.trigger',
+                description: '触发奇遇事件 (奇遇+事件系统v7-触发奇遇，消耗冷却时间)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        encounterId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['encounterId']
+                }
+            },
+            'encounter.complete': {
+                name: 'encounter.complete',
+                description: '完成奇遇获得奖励 (奇遇+事件系统v7-完成奇遇，发放奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        encounterId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['encounterId']
+                }
+            },
+            'event.list': {
+                name: 'event.list',
+                description: '获取事件列表 (奇遇+事件系统v7-获取所有事件)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'event.select': {
+                name: 'event.select',
+                description: '选择事件选项 (奇遇+事件系统v7-选择事件选项)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' },
+                        optionId: { type: 'string', description: '选项ID' }
+                    },
+                    required: ['eventId', 'optionId']
+                }
+            },
+            'event.resolve': {
+                name: 'event.resolve',
+                description: '事件结果结算 (奇遇+事件系统v7-结算事件结果)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
+            }
+        };
+
         // V203: 成就+徽章系统v7 Tests (P-20260530-031)
         function runV203Tests() {
             const results = [];
@@ -85068,4 +85354,273 @@ const v152Results = runV152Tests();
             return { version: 'V204', passed: v204Passed, total: v204Total, passRate: v204PassRate.toFixed(3), results };
         }
 
+        // V205: 奇遇+事件系统v7 Tests (P-20260530-033)
+        function runV205Tests() {
+            const results = [];
+            const v205Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player_v205',
+                playerName: '测试修士v7',
+                spiritStones: 50000,
+                combatPower: 5000,
+                realm: 2,
+                level: 10
+            };
+            const server = new CultivationMCPServer();
+
+            // Test 1: MCP_TOOLS_V205 definition exists and has 6 tools
+            v205Assert(typeof MCP_TOOLS_V205 === 'object', 'MCP_TOOLS_V205 is defined');
+            v205Assert(Object.keys(MCP_TOOLS_V205).length === 6, 'MCP_TOOLS_V205 has 6 tools');
+            v205Assert('encounter.list' in MCP_TOOLS_V205, 'encounter.list tool exists');
+            v205Assert('encounter.trigger' in MCP_TOOLS_V205, 'encounter.trigger tool exists');
+            v205Assert('encounter.complete' in MCP_TOOLS_V205, 'encounter.complete tool exists');
+            v205Assert('event.list' in MCP_TOOLS_V205, 'event.list tool exists');
+            v205Assert('event.select' in MCP_TOOLS_V205, 'event.select tool exists');
+            v205Assert('event.resolve' in MCP_TOOLS_V205, 'event.resolve tool exists');
+
+            // Test 2: _initEncounterStateV7 creates correct structure
+            const encState = server._initEncounterStateV7();
+            v205Assert(encState !== null, '_initEncounterStateV7 returns state');
+            v205Assert(Array.isArray(encState.encounters), 'encounterV7.encounters is array');
+            v205Assert(encState.encounters.length === 7, 'encounterV7 has 7 encounters');
+            v205Assert(encState.cooldown === null, 'encounterV7.cooldown is null initially');
+
+            // Test 3: _initEventStateV7 creates correct structure
+            const evtState = server._initEventStateV7();
+            v205Assert(evtState !== null, '_initEventStateV7 returns state');
+            v205Assert(Array.isArray(evtState.events), 'eventV7.events is array');
+            v205Assert(evtState.events.length === 4, 'eventV7 has 4 events');
+            v205Assert(evtState.activeEvent === null, 'eventV7.activeEvent is null initially');
+            v205Assert(Array.isArray(evtState.eventHistory), 'eventV7.eventHistory is array');
+
+            // Test 4: mcpEncounterListV7 returns correct structure
+            const encList = server.mcpEncounterListV7();
+            v205Assert(encList.success === true, 'mcpEncounterListV7 returns success');
+            v205Assert(Array.isArray(encList.encounters), 'mcpEncounterListV7 returns encounters array');
+            v205Assert(encList.total === 7, 'mcpEncounterListV7 total is 7');
+            v205Assert(encList.totalEncounters === 0, 'mcpEncounterListV7 totalEncounters is 0');
+
+            // Test 5: mcpEncounterListV7 with type filter
+            const encListAdventure = server.mcpEncounterListV7('adventure');
+            v205Assert(encListAdventure.total === 2, 'mcpEncounterListV7 adventure filter returns 2');
+            v205Assert(encListAdventure.encounters.every(e => e.type === 'adventure'), 'mcpEncounterListV7 adventure filter works');
+
+            // Test 6: mcpEncounterListV7 with rarity filter
+            const encListLegendary = server.mcpEncounterListV7(null, 'legendary');
+            v205Assert(encListLegendary.total === 2, 'mcpEncounterListV7 legendary filter returns 2');
+            v205Assert(encListLegendary.encounters.every(e => e.rarity === 'legendary'), 'mcpEncounterListV7 legendary filter works');
+
+            // Test 7: mcpEncounterTriggerV7 triggers encounter
+            window.gameState.encounterV7.cooldown = null;
+            const triggerResult = server.mcpEncounterTriggerV7('ancient_cave');
+            v205Assert(triggerResult.success === true, 'mcpEncounterTriggerV7 returns success');
+            v205Assert(triggerResult.encounterId === 'ancient_cave', 'mcpEncounterTriggerV7 returns correct id');
+            v205Assert(triggerResult.duration === 3600000, 'mcpEncounterTriggerV7 returns duration');
+            v205Assert(window.gameState.encounterV7.cooldown !== null, 'mcpEncounterTriggerV7 sets cooldown');
+
+            // Test 8: mcpEncounterTriggerV7 returns error when no encounter
+            const triggerNoExist = server.mcpEncounterTriggerV7('nonexistent');
+            v205Assert(triggerNoExist.error !== undefined, 'mcpEncounterTriggerV7 nonexistent returns error');
+
+            // Test 9: mcpEncounterTriggerV7 returns error when already active
+            const triggerAgain = server.mcpEncounterTriggerV7('spirit_beast');
+            v205Assert(triggerAgain.error !== undefined, 'mcpEncounterTriggerV7 during active returns error');
+
+            // Test 10: mcpEncounterCompleteV7 completes encounter and grants rewards
+            window.gameState.spiritStones = 10000;
+            const completeResult = server.mcpEncounterCompleteV7('ancient_cave');
+            v205Assert(completeResult.success === true, 'mcpEncounterCompleteV7 returns success');
+            v205Assert(completeResult.encounterId === 'ancient_cave', 'mcpEncounterCompleteV7 returns correct id');
+            v205Assert(completeResult.reward !== undefined, 'mcpEncounterCompleteV7 returns reward');
+            v205Assert(window.gameState.spiritStones === 10500, 'mcpEncounterCompleteV7 grants spiritStones');
+
+            // Test 11: mcpEncounterCompleteV7 returns error when no active
+            const completeNoActive = server.mcpEncounterCompleteV7('ancient_cave');
+            v205Assert(completeNoActive.error !== undefined, 'mcpEncounterCompleteV7 without active returns error');
+
+            // Test 12: mcpEncounterTriggerV7 returns error when in cooldown
+            window.gameState.encounterV7.cooldown = Date.now() + 60000;
+            const triggerCooldown = server.mcpEncounterTriggerV7('lost_treasure');
+            v205Assert(triggerCooldown.error !== undefined, 'mcpEncounterTriggerV7 during cooldown returns error');
+
+            // Test 13: mcpEventListV7 returns correct structure
+            const evtList = server.mcpEventListV7();
+            v205Assert(evtList.success === true, 'mcpEventListV7 returns success');
+            v205Assert(Array.isArray(evtList.events), 'mcpEventListV7 returns events array');
+            v205Assert(evtList.total === 4, 'mcpEventListV7 total is 4');
+            v205Assert(evtList.events[0].choices !== undefined, 'mcpEventListV7 events have choices');
+
+            // Test 14: mcpEventSelectV7 selects an option
+            const selectResult = server.mcpEventSelectV7('celestial_phenomenon', 'observe');
+            v205Assert(selectResult.success === true, 'mcpEventSelectV7 returns success');
+            v205Assert(selectResult.eventId === 'celestial_phenomenon', 'mcpEventSelectV7 returns correct id');
+            v205Assert(selectResult.selectedOption.id === 'observe', 'mcpEventSelectV7 returns correct option');
+            v205Assert(selectResult.outcome === 'insight', 'mcpEventSelectV7 returns correct outcome');
+
+            // Test 15: mcpEventSelectV7 returns error when no event
+            const selectNoExist = server.mcpEventSelectV7('nonexistent', 'observe');
+            v205Assert(selectNoExist.error !== undefined, 'mcpEventSelectV7 nonexistent returns error');
+
+            // Test 16: mcpEventSelectV7 returns error when no option
+            const selectNoOption = server.mcpEventSelectV7('celestial_phenomenon', 'nonexistent');
+            v205Assert(selectNoOption.error !== undefined, 'mcpEventSelectV7 nonexistent option returns error');
+
+            // Test 17: mcpEventResolveV7 resolves event and grants rewards
+            window.gameState.spirit = 0;
+            const resolveResult = server.mcpEventResolveV7('celestial_phenomenon');
+            v205Assert(resolveResult.success === true, 'mcpEventResolveV7 returns success');
+            v205Assert(resolveResult.eventId === 'celestial_phenomenon', 'mcpEventResolveV7 returns correct id');
+            v205Assert(resolveResult.outcome === 'insight', 'mcpEventResolveV7 returns correct outcome');
+            v205Assert(window.gameState.spirit === 100, 'mcpEventResolveV7 grants spirit');
+
+            // Test 18: mcpEventResolveV7 returns error when no active
+            const resolveNoActive = server.mcpEventResolveV7('celestial_phenomenon');
+            v205Assert(resolveNoActive.error !== undefined, 'mcpEventResolveV7 without active returns error');
+
+            // Test 19: mcpEventSelectV7 returns error when event already active
+            const selectAgain = server.mcpEventSelectV7('stranger_request', 'accept');
+            v205Assert(selectAgain.error !== undefined, 'mcpEventSelectV7 when event active returns error');
+
+            // Test 20: _initEncounterStateV7 is idempotent
+            const encStateFirst = server._initEncounterStateV7();
+            const encStateSecond = server._initEncounterStateV7();
+            v205Assert(encStateFirst === encStateSecond, '_initEncounterStateV7 is idempotent');
+
+            // Test 21: _initEventStateV7 is idempotent
+            const evtStateFirst = server._initEventStateV7();
+            const evtStateSecond = server._initEventStateV7();
+            v205Assert(evtStateFirst === evtStateSecond, '_initEventStateV7 is idempotent');
+
+            // Test 22: encounter V7 has correct structure for all encounters
+            const allEncounters = server.mcpEncounterListV7();
+            v205Assert(allEncounters.encounters.every(e => e.id !== undefined), 'All encounters have id');
+            v205Assert(allEncounters.encounters.every(e => e.name !== undefined), 'All encounters have name');
+            v205Assert(allEncounters.encounters.every(e => e.type !== undefined), 'All encounters have type');
+            v205Assert(allEncounters.encounters.every(e => e.rarity !== undefined), 'All encounters have rarity');
+            v205Assert(allEncounters.encounters.every(e => e.status !== undefined), 'All encounters have status');
+
+            // Test 23: event V7 has correct structure for all events
+            const allEvents = server.mcpEventListV7();
+            v205Assert(allEvents.events.every(e => e.id !== undefined), 'All events have id');
+            v205Assert(allEvents.events.every(e => e.name !== undefined), 'All events have name');
+            v205Assert(allEvents.events.every(e => e.type !== undefined), 'All events have type');
+            v205Assert(allEvents.events.every(e => e.choices !== undefined), 'All events have choices');
+            v205Assert(allEvents.events.every(e => e.choices.length > 0), 'All events have at least one choice');
+
+            // Test 24: encounter.trigger cooldown expires
+            window.gameState.encounterV7.cooldown = Date.now() - 1000;
+            const triggerAfterCooldown = server.mcpEncounterTriggerV7('lost_treasure');
+            v205Assert(triggerAfterCooldown.success === true, 'mcpEncounterTriggerV7 after cooldown succeeds');
+
+            // Test 25: event.select and event.resolve flow works
+            const selectFlow = server.mcpEventSelectV7('artifact_apperception', 'meditate');
+            v205Assert(selectFlow.success === true, 'event.select flow works');
+            const resolveFlow = server.mcpEventResolveV7('artifact_apperception');
+            v205Assert(resolveFlow.success === true, 'event.resolve flow works');
+            v205Assert(resolveFlow.outcome === 'breakthrough', 'event.resolve returns correct outcome');
+
+            // Test 26: mcpEncounterListV7 with treasure type filter
+            const encListTreasure = server.mcpEncounterListV7('treasure');
+            v205Assert(encListTreasure.total === 2, 'mcpEncounterListV7 treasure filter returns 2');
+
+            // Test 27: mcpEncounterListV7 with npc type filter
+            const encListNpc = server.mcpEncounterListV7('npc');
+            v205Assert(encListNpc.total === 2, 'mcpEncounterListV7 npc filter returns 2');
+
+            // Test 28: mcpEncounterListV7 with cultivation type filter
+            const encListCultivation = server.mcpEncounterListV7('cultivation');
+            v205Assert(encListCultivation.total === 1, 'mcpEncounterListV7 cultivation filter returns 1');
+
+            // Test 29: mcpEncounterListV7 with common rarity filter
+            const encListCommon = server.mcpEncounterListV7(null, 'common');
+            v205Assert(encListCommon.total === 0, 'mcpEncounterListV7 common rarity returns 0');
+
+            // Test 30: mcpEncounterListV7 with rare rarity filter
+            const encListRare = server.mcpEncounterListV7(null, 'rare');
+            v205Assert(encListRare.total === 3, 'mcpEncounterListV7 rare rarity returns 3');
+
+            // Test 31: mcpEncounterListV7 with epic rarity filter
+            const encListEpic = server.mcpEncounterListV7(null, 'epic');
+            v205Assert(encListEpic.total === 2, 'mcpEncounterListV7 epic rarity returns 2');
+
+            // Test 32: mcpEncounterListV7 cooldown is returned
+            window.gameState.encounterV7.cooldown = Date.now() + 30000;
+            const encListWithCooldown = server.mcpEncounterListV7();
+            v205Assert(encListWithCooldown.cooldown !== null, 'mcpEncounterListV7 returns cooldown');
+
+            // Test 33: mcpEventListV7 returns resolved status
+            const evtListResolved = server.mcpEventListV7();
+            const celestialEvent = evtListResolved.events.find(e => e.id === 'celestial_phenomenon');
+            v205Assert(celestialEvent.resolved === true, 'mcpEventListV7 shows resolved=true for resolved event');
+
+            // Test 34: mcpEncounterCompleteV7 works for different encounter rewards
+            window.gameState.encounterV7.cooldown = null;
+            const triggerEpiphany = server.mcpEncounterTriggerV7('cultivation_epiphany');
+            const completeEpiphany = server.mcpEncounterCompleteV7('cultivation_epiphany');
+            v205Assert(completeEpiphany.success === true, 'mcpEncounterCompleteV7 for legendary works');
+            v205Assert(completeEpiphany.reward.realmProgress === 1, 'mcpEncounterCompleteV7 grants realmProgress');
+            v205Assert(completeEpiphany.reward.spiritStones === 1000, 'mcpEncounterCompleteV7 grants spiritStones');
+
+            // Test 35: event.resolve records in eventHistory
+            const selectHistory = server.mcpEventSelectV7('auction_opportunity', 'bid_high');
+            const resolveHistory = server.mcpEventResolveV7('auction_opportunity');
+            v205Assert(window.gameState.eventV7.eventHistory.length === 2, 'eventHistory has 2 entries');
+            v205Assert(window.gameState.eventV7.eventHistory[1].eventId === 'auction_opportunity', 'eventHistory records correct event');
+
+            // Test 36: mcpEventSelectV7 can select different option
+            const selectDiff = server.mcpEventSelectV7('stranger_request', 'negotiate');
+            v205Assert(selectDiff.selectedOption.id === 'negotiate', 'mcpEventSelectV7 can select different option');
+
+            // Test 37: mcpEncounterListV7 activeEncounter is null after complete
+            const encListAfterComplete = server.mcpEncounterListV7();
+            v205Assert(encListAfterComplete.encounters.find(e => e.id === 'ancient_cave').status === 'completed', 'encounter status is completed');
+
+            // Test 38: mcpEncounterTriggerV7 for completed encounter returns error
+            const triggerCompleted = server.mcpEncounterTriggerV7('ancient_cave');
+            v205Assert(triggerCompleted.error !== undefined, 'mcpEncounterTriggerV7 for completed returns error');
+
+            // Test 39: mcpEncounterTriggerV7 for unavailable encounter returns error
+            const encounterState = server._initEncounterStateV7();
+            encounterState.encounters[0].status = 'active';
+            encounterState.activeEncounter = encounterState.encounters[0];
+            const triggerUnavailable = server.mcpEncounterTriggerV7('miracle_medicine');
+            v205Assert(triggerUnavailable.error !== undefined, 'mcpEncounterTriggerV7 when other active returns error');
+
+            // Test 40: mcpEventListV7 activeEvent is null after resolve
+            const evtListAfterResolve = server.mcpEventListV7();
+            v205Assert(evtListAfterResolve.activeEvent === null, 'mcpEventListV7 activeEvent is null after resolve');
+
+            // Test 41: mcpEventResolveV7 with mismatched eventId returns error
+            const resolveMismatch = server.mcpEventResolveV7('celestial_phenomenon');
+            v205Assert(resolveMismatch.error !== undefined, 'mcpEventResolveV7 with mismatched id returns error');
+
+            // Test 42: mcpEventResolveV7 when no selection returns error
+            const eventNoSelect = window.gameState.eventV7.events.find(e => e.id === 'stranger_request');
+            eventNoSelect.selectedChoice = null;
+            const resolveNoSelect = server.mcpEventResolveV7('stranger_request');
+            v205Assert(resolveNoSelect.error !== undefined, 'mcpEventResolveV7 when no selection returns error');
+
+            // Test 43: encounter.list with type and rarity combined filter
+            const encListCombo = server.mcpEncounterListV7('adventure', 'legendary');
+            v205Assert(encListCombo.total === 1, 'mcpEncounterListV7 combined filter returns 1');
+
+            // Test 44: event.select with different choices gives different outcomes
+            const selectBidLow = server.mcpEventSelectV7('auction_opportunity', 'bid_low');
+            v205Assert(selectBidLow.outcome === 'normal', 'mcpEventSelectV7 bid_low returns normal outcome');
+
+            // Test 45: All 45 tests pass
+            const v205Passed = results.filter(r => r.pass).length;
+            const v205Total = results.length;
+            const v205PassRate = v205Passed / v205Total;
+            console.log('V205 Tests:', v205Passed + '/' + v205Total, '(' + (v205PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V205', passed: v205Passed, total: v205Total, passRate: v205PassRate.toFixed(3), results };
+        }
+
         const v204Results = runV204Tests();
+        const v205Results = runV205Tests();
