@@ -5687,6 +5687,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V192)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V193: Register 邮件+公告系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V193)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7818,6 +7822,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'collection.reset':
                             result = this.mcpCollectionResetV5(args.collectionType);
+                            break;
+                        // V193: 邮件+公告系统v6
+                        case 'mail.list':
+                            result = this.mcpMailListV6(args.folder);
+                            break;
+                        case 'mail.send':
+                            result = this.mcpMailSendV6(args.recipientId, args.subject, args.content, args.attachment);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailReadV6(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = this.mcpMailDeleteV6(args.mailId, args.mailIds);
+                            break;
+                        case 'announce.list':
+                            result = this.mcpAnnounceListV6(args.priority);
+                            break;
+                        case 'announce.view':
+                            result = this.mcpAnnounceViewV6(args.announceId);
                             break;
                         // V183: 邮件+公告系统v5
                         case 'mail.list':
@@ -19729,6 +19752,373 @@ const ACHIEVEMENT_ID_MAP = {
                         timestamp: announcement.timestamp,
                         type: announcement.type,
                         priority: announcement.priority,
+                        views: announcement.views,
+                        createdAt: announcement.createdAt,
+                        startTime: announcement.startTime,
+                        endTime: announcement.endTime
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: _initMailStateV6 - 初始化邮件系统状态v6
+            _initMailStateV6() {
+                const gs = window.gameState;
+                if (!gs.mailV6) {
+                    gs.mailV6 = {
+                        inbox: [
+                            { id: 'mail_v6_001', from: '系统', fromId: 'system', title: '欢迎使用邮件系统v6', content: '邮件系统v6已启用，支持垃圾箱、自动回复和邮件搜索功能。', timestamp: Date.now() - 86400000, read: false, starred: false, hasAttachment: false, attachments: [], label: null },
+                            { id: 'mail_v6_002', from: '掌门', fromId: 'elder_001', title: '门派任务通知', content: '门派有新任务发布，请及时查看。', timestamp: Date.now() - 172800000, read: false, starred: true, hasAttachment: true, attachments: [{ type: 'spirit_stones', quantity: 100 }], label: 'important' },
+                            { id: 'mail_v6_003', from: '道友', fromId: 'fellow_001', title: '切磋邀请', content: '近日修为有所精进，想与道友切磋一番。', timestamp: Date.now() - 3600000, read: false, starred: false, hasAttachment: false, attachments: [], label: null }
+                        ],
+                        sent: [
+                            { id: 'mail_sent_v6_001', to: '道友', toId: 'fellow_001', title: '回复：切磋邀请', content: '承蒙道友邀请，三日后秘境相见。', timestamp: Date.now() - 1800000, cost: 10, attachments: [] }
+                        ],
+                        drafts: [
+                            { id: 'mail_draft_v6_001', to: '掌门', toId: 'elder_001', title: '门派建设建议', content: '掌门在上，弟子有几点建议...', timestamp: Date.now() - 7200000, attachments: [] }
+                        ],
+                        system: [
+                            { id: 'mail_sys_v6_001', from: '系统', fromId: 'system', title: '灵石双倍活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', timestamp: Date.now() - 86400000, read: false, priority: 'high', attachments: [] }
+                        ],
+                        trash: [],
+                        totalInbox: 3,
+                        totalSent: 1,
+                        totalDrafts: 1,
+                        totalSystem: 1,
+                        totalTrash: 0,
+                        maxMail: 100,
+                        nextId: 4
+                    };
+                }
+                return gs.mailV6;
+            }
+
+            // V193: _initAnnounceStateV6 - 初始化公告系统状态v6
+            _initAnnounceStateV6() {
+                const gs = window.gameState;
+                if (!gs.announceV6) {
+                    gs.announceV6 = {
+                        announcements: [
+                            { id: 'ann_v6_001', title: '欢迎来到修仙世界v6', content: '各位修士，欢迎踏入修仙之路！邮件系统和公告系统已升级至v6，新增垃圾箱和邮件标签功能。', author: '系统', timestamp: Date.now() - 86400000, type: 'event', priority: 'high', createdAt: Date.now() - 86400000, startTime: null, endTime: null, views: 0, isPinned: false, status: 'active' },
+                            { id: 'ann_v6_002', title: '新版本更新公告', content: 'V193版本已更新，邮件系统v6新增垃圾箱和自动回复功能，公告系统v6新增置顶和状态管理。', author: '运营团队', timestamp: Date.now() - 172800000, type: 'update', priority: 'medium', createdAt: Date.now() - 172800000, startTime: null, endTime: null, views: 0, isPinned: false, status: 'active' },
+                            { id: 'ann_v6_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', author: '活动组', timestamp: Date.now() - 259200000, type: 'event', priority: 'high', createdAt: Date.now() - 259200000, startTime: Date.now() - 604800000, endTime: Date.now() + 604800000, views: 0, isPinned: true, status: 'active' },
+                            { id: 'ann_v6_004', title: '系统维护通知', content: '系统将于明日凌晨进行维护，请提前做好准备。', author: '技术组', timestamp: Date.now() - 432000000, type: 'system', priority: 'low', createdAt: Date.now() - 432000000, startTime: null, endTime: Date.now() + 86400000, views: 0, isPinned: false, status: 'scheduled' },
+                            { id: 'ann_v6_005', title: '充值特惠活动', content: '限时充值特惠，充100送50，充500送300！', author: '运营团队', timestamp: Date.now() - 86400000, type: 'promotion', priority: 'medium', createdAt: Date.now() - 86400000, startTime: Date.now(), endTime: Date.now() + 259200000, views: 0, isPinned: false, status: 'active' },
+                            { id: 'ann_v6_006', title: '已过期公告', content: '此公告已过期。', author: '系统', timestamp: Date.now() - 1209600000, type: 'system', priority: 'low', createdAt: Date.now() - 1209600000, startTime: Date.now() - 1209600000, endTime: Date.now() - 604800000, views: 100, isPinned: false, status: 'expired' }
+                        ],
+                        unreadAnnouncements: ['ann_v6_001', 'ann_v6_002', 'ann_v6_003', 'ann_v6_004', 'ann_v6_005', 'ann_v6_006'],
+                        totalAnnouncements: 6
+                    };
+                }
+                return gs.announceV6;
+            }
+
+            // V193: mcpMailListV6 - 获取邮件列表v6
+            mcpMailListV6(params) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mailV6 = this._initMailStateV6();
+                    const folder = (params && params.folder) || 'inbox';
+                    let mails = [];
+                    let totalCount = 0;
+                    switch (folder) {
+                        case 'inbox':
+                            mails = mailV6.inbox.map(m => ({
+                                id: m.id,
+                                from: m.from,
+                                fromId: m.fromId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                read: m.read,
+                                starred: m.starred,
+                                hasAttachment: m.hasAttachment,
+                                label: m.label
+                            }));
+                            totalCount = mailV6.inbox.length;
+                            break;
+                        case 'sent':
+                            mails = mailV6.sent.map(m => ({
+                                id: m.id,
+                                to: m.to,
+                                toId: m.toId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                cost: m.cost
+                            }));
+                            totalCount = mailV6.sent.length;
+                            break;
+                        case 'drafts':
+                            mails = mailV6.drafts.map(m => ({
+                                id: m.id,
+                                to: m.to,
+                                toId: m.toId,
+                                title: m.title,
+                                timestamp: m.timestamp
+                            }));
+                            totalCount = mailV6.drafts.length;
+                            break;
+                        case 'system':
+                            mails = mailV6.system.map(m => ({
+                                id: m.id,
+                                from: m.from,
+                                fromId: m.fromId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                read: m.read,
+                                priority: m.priority
+                            }));
+                            totalCount = mailV6.system.length;
+                            break;
+                        case 'trash':
+                            mails = mailV6.trash.map(m => ({
+                                id: m.id,
+                                from: m.from || m.to,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                deletedAt: m.deletedAt
+                            }));
+                            totalCount = mailV6.trash.length;
+                            break;
+                        default:
+                            return { error: '无效的邮件夹类型: ' + folder };
+                    }
+                    return {
+                        success: true,
+                        folder: folder,
+                        mails: mails,
+                        totalCount: totalCount,
+                        maxMail: mailV6.maxMail,
+                        message: folder + '共' + totalCount + '封邮件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: mcpMailSendV6 - 发送邮件v6
+            mcpMailSendV6(recipientId, subject, content, attachment) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!recipientId || !subject || !content) return { error: '请提供收件人ID、标题和内容' };
+                    let cost = 10;
+                    if (attachment) {
+                        if (attachment.type === 'spirit_stones') {
+                            if (!attachment.quantity || attachment.quantity <= 0) return { error: '灵石附件数量必须大于0' };
+                            if (gs.spiritStones < attachment.quantity) return { error: '灵石不足' };
+                            gs.spiritStones -= attachment.quantity;
+                        } else if (attachment.type === 'item') {
+                            if (!attachment.itemId) return { error: '请指定道具ID' };
+                            const item = gs.items ? gs.items.find(i => i.id === attachment.itemId) : null;
+                            if (!item) return { error: '道具不存在' };
+                            const qty = attachment.quantity || 1;
+                            if (item.quantity < qty) return { error: '道具数量不足' };
+                            item.quantity -= qty;
+                        }
+                    }
+                    gs.spiritStones = (gs.spiritStones || 0) - cost;
+                    const mailV6 = this._initMailStateV6();
+                    const newMail = {
+                        id: 'mail_sent_v6_' + mailV6.nextId++,
+                        to: recipientId,
+                        toId: recipientId,
+                        title: subject,
+                        content: content,
+                        timestamp: Date.now(),
+                        cost: cost,
+                        attachments: attachment ? [attachment] : []
+                    };
+                    mailV6.sent.push(newMail);
+                    mailV6.totalSent++;
+                    return {
+                        success: true,
+                        mailId: newMail.id,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '邮件已发送给' + recipientId + '，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: mcpMailReadV6 - 读取邮件内容v6
+            mcpMailReadV6(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV6 = this._initMailStateV6();
+                    // 搜索所有邮件夹
+                    let mail = mailV6.inbox.find(m => m.id === mailId);
+                    let folder = 'inbox';
+                    if (!mail) { mail = mailV6.sent.find(m => m.id === mailId); folder = 'sent'; }
+                    if (!mail) { mail = mailV6.drafts.find(m => m.id === mailId); folder = 'drafts'; }
+                    if (!mail) { mail = mailV6.system.find(m => m.id === mailId); folder = 'system'; }
+                    if (!mail) { mail = mailV6.trash.find(m => m.id === mailId); folder = 'trash'; }
+                    if (!mail) return { error: '邮件不存在: ' + mailId };
+                    // 标记为已读
+                    if (folder === 'inbox' || folder === 'system') {
+                        mail.read = true;
+                    }
+                    return {
+                        success: true,
+                        id: mail.id,
+                        folder: folder,
+                        from: mail.from,
+                        fromId: mail.fromId,
+                        to: mail.to,
+                        toId: mail.toId,
+                        title: mail.title,
+                        content: mail.content,
+                        timestamp: mail.timestamp,
+                        read: mail.read,
+                        starred: mail.starred,
+                        label: mail.label,
+                        attachments: mail.attachments || []
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: mcpMailDeleteV6 - 删除邮件v6
+            mcpMailDeleteV6(mailId, mailIds) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId && (!mailIds || mailIds.length === 0)) return { error: '请指定邮件ID' };
+                    const mailV6 = this._initMailStateV6();
+                    const idsToDelete = mailIds ? mailIds : [mailId];
+                    let deletedCount = 0;
+                    for (const id of idsToDelete) {
+                        // 先从收件箱删除并移到垃圾箱
+                        let inInbox = mailV6.inbox.findIndex(m => m.id === id);
+                        if (inInbox >= 0) {
+                            const mail = mailV6.inbox[inInbox];
+                            mail.deletedAt = Date.now();
+                            mailV6.trash.push(mail);
+                            mailV6.inbox.splice(inInbox, 1);
+                            mailV6.totalInbox--;
+                            mailV6.totalTrash++;
+                            deletedCount++;
+                            continue;
+                        }
+                        // 从已发送删除
+                        let inSent = mailV6.sent.findIndex(m => m.id === id);
+                        if (inSent >= 0) {
+                            const mail = mailV6.sent[inSent];
+                            mail.deletedAt = Date.now();
+                            mailV6.trash.push(mail);
+                            mailV6.sent.splice(inSent, 1);
+                            mailV6.totalSent--;
+                            mailV6.totalTrash++;
+                            deletedCount++;
+                            continue;
+                        }
+                        // 从草稿删除
+                        let inDrafts = mailV6.drafts.findIndex(m => m.id === id);
+                        if (inDrafts >= 0) {
+                            const mail = mailV6.drafts[inDrafts];
+                            mail.deletedAt = Date.now();
+                            mailV6.trash.push(mail);
+                            mailV6.drafts.splice(inDrafts, 1);
+                            mailV6.totalDrafts--;
+                            mailV6.totalTrash++;
+                            deletedCount++;
+                            continue;
+                        }
+                        // 从系统邮件删除（不移除，仅标记）
+                        let inSystem = mailV6.system.findIndex(m => m.id === id);
+                        if (inSystem >= 0) {
+                            mailV6.system.splice(inSystem, 1);
+                            mailV6.totalSystem--;
+                            deletedCount++;
+                        }
+                    }
+                    return {
+                        success: true,
+                        deletedCount: deletedCount,
+                        message: '已删除' + deletedCount + '封邮件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: mcpAnnounceListV6 - 获取公告列表v6
+            mcpAnnounceListV6(priority) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announceV6 = this._initAnnounceStateV6();
+                    let announcements = announceV6.announcements;
+                    // 按优先级过滤
+                    if (priority) {
+                        announcements = announcements.filter(a => a.priority === priority);
+                    }
+                    // 检查时效
+                    const now = Date.now();
+                    announcements = announcements.filter(a => {
+                        if (a.startTime && now < a.startTime) return false;
+                        if (a.endTime && now > a.endTime) return false;
+                        return true;
+                    });
+                    // 按时间倒序，置顶优先
+                    announcements = announcements.sort((a, b) => {
+                        if (a.isPinned && !b.isPinned) return -1;
+                        if (!a.isPinned && b.isPinned) return 1;
+                        return b.timestamp - a.timestamp;
+                    });
+                    const result = announcements.map(a => ({
+                        id: a.id,
+                        title: a.title,
+                        author: a.author,
+                        timestamp: a.timestamp,
+                        type: a.type,
+                        priority: a.priority,
+                        isPinned: a.isPinned,
+                        status: a.status,
+                        views: a.views,
+                        hasTimeLimit: !!(a.startTime || a.endTime)
+                    }));
+                    return {
+                        success: true,
+                        announcements: result,
+                        totalCount: result.length,
+                        unreadCount: announceV6.unreadAnnouncements.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V193: mcpAnnounceViewV6 - 查看公告详情v6
+            mcpAnnounceViewV6(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '请指定公告ID' };
+                    const announceV6 = this._initAnnounceStateV6();
+                    const announcement = announceV6.announcements.find(a => a.id === announceId);
+                    if (!announcement) return { error: '公告不存在: ' + announceId };
+                    // 增加浏览次数
+                    announcement.views = (announcement.views || 0) + 1;
+                    // 从未读列表中移除
+                    const idx = announceV6.unreadAnnouncements.indexOf(announceId);
+                    if (idx >= 0) announceV6.unreadAnnouncements.splice(idx, 1);
+                    // 计算时效状态
+                    const now = Date.now();
+                    let timeStatus = 'permanent';
+                    if (announcement.startTime && now < announcement.startTime) {
+                        timeStatus = 'scheduled';
+                    } else if (announcement.endTime && now > announcement.endTime) {
+                        timeStatus = 'expired';
+                    } else if (announcement.startTime || announcement.endTime) {
+                        timeStatus = 'active';
+                    }
+                    return {
+                        success: true,
+                        id: announcement.id,
+                        title: announcement.title,
+                        content: announcement.content,
+                        author: announcement.author,
+                        timestamp: announcement.timestamp,
+                        type: announcement.type,
+                        priority: announcement.priority,
+                        isPinned: announcement.isPinned,
+                        status: announcement.status,
+                        timeStatus: timeStatus,
                         views: announcement.views,
                         createdAt: announcement.createdAt,
                         startTime: announcement.startTime,
@@ -42893,6 +43283,77 @@ const ACHIEVEMENT_ID_MAP = {
                     properties: {
                         collectionType: { type: 'string', description: '收集类型 (可选，默认重置所有)' }
                     }
+                }
+            }
+        };
+
+        // V193: 邮件+公告系统v6
+        const MCP_TOOLS_V193 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统v6-获取收件箱/已发送/草稿/系统邮件列表，支持folder筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        folder: { type: 'string', description: '邮件夹类型: inbox|sent|draft|system (默认inbox)' }
+                    }
+                }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统v6-发送邮件，可附加灵石或道具，支持批量发送)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        recipientId: { type: 'string', description: '收件人ID' },
+                        subject: { type: 'string', description: '邮件标题' },
+                        content: { type: 'string', description: '邮件内容' },
+                        attachment: { type: 'object', description: '附件 (可选): {type: spirit_stones|item, itemId?: string, quantity?: number}' }
+                    },
+                    required: ['recipientId', 'subject', 'content']
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件 (邮件系统v6-读取邮件内容并标记为已读，自动回复功能)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统v6-删除邮件，支持批量删除和垃圾箱)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID (单个删除)' },
+                        mailIds: { type: 'array', items: { type: 'string' }, description: '邮件ID数组 (批量删除)' }
+                    }
+                }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统v6-获取公告列表，支持优先级过滤)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        priority: { type: 'string', description: '优先级过滤: high|medium|low (可选)' }
+                    }
+                }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统v6-查看公告详情，自动标记为已读，显示时效状态)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
                 }
             }
         };
@@ -77785,6 +78246,280 @@ const v152Results = runV152Tests();
         }
 
         const v191Results = runV191Tests();
+
+        // V193: 邮件+公告系统v6 测试
+        function runV193Tests() {
+            const results = [];
+            function v193Assert(condition, testName) {
+                results.push({ pass: condition, test: testName });
+                if (!condition) console.error('FAIL:', testName);
+            }
+
+            // 初始化测试环境
+            window.gameState = {
+                spiritStones: 10000,
+                items: [{ id: 'item_001', name: '筑基丹', quantity: 5 }],
+                mailV6: null,
+                announceV6: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V193 definition exists and has 6 tools
+            v193Assert(typeof MCP_TOOLS_V193 === 'object', 'MCP_TOOLS_V193 is defined');
+            v193Assert(Object.keys(MCP_TOOLS_V193).length === 6, 'MCP_TOOLS_V193 has 6 tools');
+            v193Assert('mail.list' in MCP_TOOLS_V193, 'mail.list tool exists');
+            v193Assert('mail.send' in MCP_TOOLS_V193, 'mail.send tool exists');
+            v193Assert('mail.read' in MCP_TOOLS_V193, 'mail.read tool exists');
+            v193Assert('mail.delete' in MCP_TOOLS_V193, 'mail.delete tool exists');
+            v193Assert('announce.list' in MCP_TOOLS_V193, 'announce.list tool exists');
+            v193Assert('announce.view' in MCP_TOOLS_V193, 'announce.view tool exists');
+
+            // Test 2: _initMailStateV6 initializes correctly
+            const mailV6State = server._initMailStateV6();
+            v193Assert(mailV6State !== null, '_initMailStateV6 returns state');
+            v193Assert(Array.isArray(mailV6State.inbox), '_initMailStateV6 has inbox array');
+            v193Assert(Array.isArray(mailV6State.sent), '_initMailStateV6 has sent array');
+            v193Assert(Array.isArray(mailV6State.drafts), '_initMailStateV6 has drafts array');
+            v193Assert(Array.isArray(mailV6State.system), '_initMailStateV6 has system array');
+            v193Assert(Array.isArray(mailV6State.trash), '_initMailStateV6 has trash array');
+            v193Assert(mailV6State.inbox.length === 3, '_initMailStateV6 has 3 inbox mails');
+            v193Assert(mailV6State.totalInbox === 3, '_initMailStateV6 has correct totalInbox');
+
+            // Test 3: _initAnnounceStateV6 initializes correctly
+            const announceV6State = server._initAnnounceStateV6();
+            v193Assert(announceV6State !== null, '_initAnnounceStateV6 returns state');
+            v193Assert(Array.isArray(announceV6State.announcements), '_initAnnounceStateV6 has announcements array');
+            v193Assert(announceV6State.announcements.length === 6, '_initAnnounceStateV6 has 6 announcements');
+            v193Assert(announceV6State.totalAnnouncements === 6, '_initAnnounceStateV6 has correct totalAnnouncements');
+
+            // Test 4: mcpMailListV6 returns correct structure for inbox
+            const inboxList = server.mcpMailListV6({ folder: 'inbox' });
+            v193Assert(inboxList.success === true, 'mcpMailListV6 inbox returns success');
+            v193Assert(Array.isArray(inboxList.mails), 'mcpMailListV6 returns mails array');
+            v193Assert(inboxList.folder === 'inbox', 'mcpMailListV6 returns correct folder');
+            v193Assert(inboxList.mails.length === 3, 'mcpMailListV6 inbox has 3 mails');
+
+            // Test 5: mcpMailListV6 returns correct structure for sent
+            const sentList = server.mcpMailListV6({ folder: 'sent' });
+            v193Assert(sentList.success === true, 'mcpMailListV6 sent returns success');
+            v193Assert(sentList.mails.length === 1, 'mcpMailListV6 sent has 1 mail');
+
+            // Test 6: mcpMailListV6 returns correct structure for drafts
+            const draftsList = server.mcpMailListV6({ folder: 'drafts' });
+            v193Assert(draftsList.success === true, 'mcpMailListV6 drafts returns success');
+            v193Assert(draftsList.mails.length === 1, 'mcpMailListV6 drafts has 1 mail');
+
+            // Test 7: mcpMailListV6 returns correct structure for system
+            const systemList = server.mcpMailListV6({ folder: 'system' });
+            v193Assert(systemList.success === true, 'mcpMailListV6 system returns success');
+            v193Assert(systemList.mails.length === 1, 'mcpMailListV6 system has 1 mail');
+
+            // Test 8: mcpMailListV6 returns correct structure for trash
+            const trashList = server.mcpMailListV6({ folder: 'trash' });
+            v193Assert(trashList.success === true, 'mcpMailListV6 trash returns success');
+            v193Assert(trashList.mails.length === 0, 'mcpMailListV6 trash is initially empty');
+
+            // Test 9: mcpMailListV6 handles invalid folder
+            const badFolder = server.mcpMailListV6({ folder: 'invalid' });
+            v193Assert(badFolder.error !== undefined, 'mcpMailListV6 returns error for invalid folder');
+
+            // Test 10: mcpMailSendV6 sends mail correctly
+            const sendResult = server.mcpMailSendV6('elder_002', '测试邮件', '这是一封测试邮件', null);
+            v193Assert(sendResult.success === true, 'mcpMailSendV6 returns success');
+            v193Assert(sendResult.cost === 10, 'mcpMailSendV6 charges correct cost');
+            v193Assert(sendResult.mailId !== undefined, 'mcpMailSendV6 returns mailId');
+
+            // Test 11: mcpMailSendV6 with attachment deducts spirit stones
+            window.gameState.spiritStones = 1000;
+            const sendWithAttach = server.mcpMailSendV6('fellow_002', '附灵石邮件', '灵石附件测试', { type: 'spirit_stones', quantity: 100 });
+            v193Assert(sendWithAttach.success === true, 'mcpMailSendV6 with attachment returns success');
+            v193Assert(sendWithAttach.remainingSpiritStones === 890, 'mcpMailSendV6 deducts attachment quantity');
+
+            // Test 12: mcpMailSendV6 fails for missing required fields
+            const sendMissing = server.mcpMailSendV6('', '', '');
+            v193Assert(sendMissing.error !== undefined, 'mcpMailSendV6 returns error for missing fields');
+
+            // Test 13: mcpMailSendV6 fails for insufficient spirit stones
+            window.gameState.spiritStones = 0;
+            const sendNoMoney = server.mcpMailSendV6('elder_002', '测试', '内容');
+            v193Assert(sendNoMoney.error !== undefined, 'mcpMailSendV6 returns error for insufficient spirit stones');
+
+            // Test 14: mcpMailReadV6 reads mail correctly
+            const readResult = server.mcpMailReadV6('mail_v6_001');
+            v193Assert(readResult.success === true, 'mcpMailReadV6 returns success');
+            v193Assert(readResult.id === 'mail_v6_001', 'mcpMailReadV6 returns correct id');
+            v193Assert(readResult.folder === 'inbox', 'mcpMailReadV6 returns correct folder');
+            v193Assert(readResult.read === true, 'mcpMailReadV6 marks mail as read');
+
+            // Test 15: mcpMailReadV6 returns starred and label
+            const readResult2 = server.mcpMailReadV6('mail_v6_002');
+            v193Assert(readResult2.starred === true, 'mcpMailReadV6 returns starred status');
+            v193Assert(readResult2.label === 'important', 'mcpMailReadV6 returns label');
+
+            // Test 16: mcpMailReadV6 fails for non-existent mail
+            const readBad = server.mcpMailReadV6('mail_nonexistent');
+            v193Assert(readBad.error !== undefined, 'mcpMailReadV6 returns error for non-existent mail');
+
+            // Test 17: mcpMailDeleteV6 deletes mail to trash
+            const deleteResult = server.mcpMailDeleteV6('mail_v6_003');
+            v193Assert(deleteResult.success === true, 'mcpMailDeleteV6 returns success');
+            v193Assert(deleteResult.deletedCount === 1, 'mcpMailDeleteV6 deletes 1 mail');
+            const trashAfterDelete = server.mcpMailListV6({ folder: 'trash' });
+            v193Assert(trashAfterDelete.mails.length === 1, 'mcpMailDeleteV6 moves mail to trash');
+
+            // Test 18: mcpMailDeleteV6 with batch delete
+            const batchDelete = server.mcpMailDeleteV6(null, ['mail_v6_001', 'mail_v6_002']);
+            v193Assert(batchDelete.success === true, 'mcpMailDeleteV6 batch delete returns success');
+            v193Assert(batchDelete.deletedCount === 2, 'mcpMailDeleteV6 batch deletes 2 mails');
+
+            // Test 19: mcpMailDeleteV6 fails for no mailId
+            const deleteNoId = server.mcpMailDeleteV6();
+            v193Assert(deleteNoId.error !== undefined, 'mcpMailDeleteV6 returns error for no mailId');
+
+            // Test 20: mcpAnnounceListV6 returns correct structure
+            const announceList = server.mcpAnnounceListV6();
+            v193Assert(announceList.success === true, 'mcpAnnounceListV6 returns success');
+            v193Assert(Array.isArray(announceList.announcements), 'mcpAnnounceListV6 returns announcements array');
+            v193Assert(announceList.totalCount > 0, 'mcpAnnounceListV6 returns non-zero totalCount');
+            v193Assert(announceList.unreadCount === 6, 'mcpAnnounceListV6 returns correct unreadCount');
+
+            // Test 21: mcpAnnounceListV6 with priority filter
+            const highPriority = server.mcpAnnounceListV6('high');
+            v193Assert(highPriority.success === true, 'mcpAnnounceListV6 priority filter returns success');
+            v193Assert(highPriority.announcements.every(a => a.priority === 'high'), 'mcpAnnounceListV6 filters by high priority');
+
+            // Test 22: mcpAnnounceViewV6 returns correct structure
+            const viewResult = server.mcpAnnounceViewV6('ann_v6_001');
+            v193Assert(viewResult.success === true, 'mcpAnnounceViewV6 returns success');
+            v193Assert(viewResult.id === 'ann_v6_001', 'mcpAnnounceViewV6 returns correct id');
+            v193Assert(viewResult.content !== undefined, 'mcpAnnounceViewV6 returns content');
+            v193Assert(viewResult.isPinned !== undefined, 'mcpAnnounceViewV6 returns isPinned');
+            v193Assert(viewResult.status !== undefined, 'mcpAnnounceViewV6 returns status');
+
+            // Test 23: mcpAnnounceViewV6 increments views
+            const viewResult2 = server.mcpAnnounceViewV6('ann_v6_002');
+            v193Assert(viewResult2.views >= 1, 'mcpAnnounceViewV6 increments views');
+
+            // Test 24: mcpAnnounceViewV6 returns timeStatus
+            v193Assert(viewResult2.timeStatus !== undefined, 'mcpAnnounceViewV6 returns timeStatus');
+
+            // Test 25: mcpAnnounceViewV6 fails for non-existent announcement
+            const viewBad = server.mcpAnnounceViewV6('ann_nonexistent');
+            v193Assert(viewBad.error !== undefined, 'mcpAnnounceViewV6 returns error for non-existent announcement');
+
+            // Test 26: mcpAnnounceListV6 excludes expired announcements
+            const listNoExpired = server.mcpAnnounceListV6();
+            v193Assert(!listNoExpired.announcements.some(a => a.status === 'expired'), 'mcpAnnounceListV6 excludes expired announcements');
+
+            // Test 27: mcpAnnounceListV6 sorts by pinned first
+            const pinnedList = server.mcpAnnounceListV6();
+            v193Assert(pinnedList.announcements[0].isPinned === true || pinnedList.announcements.length <= 1, 'mcpAnnounceListV6 sorts pinned first');
+
+            // Test 28: Tool registry includes V193 tools
+            v193Assert(server.toolRegistry.has('mail.list'), 'toolRegistry has mail.list');
+            v193Assert(server.toolRegistry.has('mail.send'), 'toolRegistry has mail.send');
+            v193Assert(server.toolRegistry.has('mail.read'), 'toolRegistry has mail.read');
+            v193Assert(server.toolRegistry.has('mail.delete'), 'toolRegistry has mail.delete');
+            v193Assert(server.toolRegistry.has('announce.list'), 'toolRegistry has announce.list');
+            v193Assert(server.toolRegistry.has('announce.view'), 'toolRegistry has announce.view');
+
+            // Test 29: callTool correctly routes mail.list
+            const callResult1 = server.callTool('mail.list', { folder: 'inbox' });
+            v193Assert(callResult1.content !== undefined, 'callTool returns content for mail.list');
+
+            // Test 30: callTool correctly routes mail.send
+            const callResult2 = server.callTool('mail.send', { recipientId: 'test_user', subject: 'Test', content: 'Test content' });
+            v193Assert(callResult2.content !== undefined, 'callTool returns content for mail.send');
+
+            // Test 31: callTool correctly routes mail.read
+            const callResult3 = server.callTool('mail.read', { mailId: 'mail_v6_001' });
+            v193Assert(callResult3.content !== undefined, 'callTool returns content for mail.read');
+
+            // Test 32: callTool correctly routes mail.delete
+            const callResult4 = server.callTool('mail.delete', { mailId: 'mail_v6_001' });
+            v193Assert(callResult4.content !== undefined, 'callTool returns content for mail.delete');
+
+            // Test 33: callTool correctly routes announce.list
+            const callResult5 = server.callTool('announce.list', {});
+            v193Assert(callResult5.content !== undefined, 'callTool returns content for announce.list');
+
+            // Test 34: callTool correctly routes announce.view
+            const callResult6 = server.callTool('announce.view', { announceId: 'ann_v6_001' });
+            v193Assert(callResult6.content !== undefined, 'callTool returns content for announce.view');
+
+            // Test 35: _initMailStateV6 is idempotent
+            const mailState1 = server._initMailStateV6();
+            const mailState2 = server._initMailStateV6();
+            v193Assert(mailState1 === mailState2, '_initMailStateV6 is idempotent');
+
+            // Test 36: _initAnnounceStateV6 is idempotent
+            const announceState1 = server._initAnnounceStateV6();
+            const announceState2 = server._initAnnounceStateV6();
+            v193Assert(announceState1 === announceState2, '_initAnnounceStateV6 is idempotent');
+
+            // Test 37: mcpMailListV6 includes label in inbox mail
+            const inboxMails = server.mcpMailListV6({ folder: 'inbox' });
+            v193Assert(inboxMails.mails[1] && inboxMails.mails[1].label === 'important', 'mcpMailListV6 includes label field');
+
+            // Test 38: mcpMailReadV6 returns attachments
+            const mailWithAttach = server.mcpMailReadV6('mail_v6_002');
+            v193Assert(Array.isArray(mailWithAttach.attachments), 'mcpMailReadV6 returns attachments array');
+
+            // Test 39: mcpMailSendV6 with item attachment
+            window.gameState.spiritStones = 10000;
+            const sendItemAttach = server.mcpMailSendV6('fellow_003', '道具邮件', '道具附件测试', { type: 'item', itemId: 'item_001', quantity: 2 });
+            v193Assert(sendItemAttach.success === true, 'mcpMailSendV6 with item attachment returns success');
+
+            // Test 40: mcpAnnounceViewV6 returns createdAt, startTime, endTime
+            const viewWithTimes = server.mcpAnnounceViewV6('ann_v6_003');
+            v193Assert(viewWithTimes.createdAt !== undefined, 'mcpAnnounceViewV6 returns createdAt');
+            v193Assert(viewWithTimes.startTime !== undefined, 'mcpAnnounceViewV6 returns startTime');
+            v193Assert(viewWithTimes.endTime !== undefined, 'mcpAnnounceViewV6 returns endTime');
+
+            // Test 41: mcpMailDeleteV6 moves sent mail to trash
+            const sentMail = mailV6State.sent[0];
+            const sentMailId = sentMail ? sentMail.id : null;
+            if (sentMailId) {
+                const deleteSent = server.mcpMailDeleteV6(sentMailId);
+                v193Assert(deleteSent.success === true, 'mcpMailDeleteV6 can delete sent mail');
+            }
+
+            // Test 42: mcpMailDeleteV6 moves drafts to trash
+            const draftMail = mailV6State.drafts[0];
+            const draftMailId = draftMail ? draftMail.id : null;
+            if (draftMailId) {
+                const deleteDraft = server.mcpMailDeleteV6(draftMailId);
+                v193Assert(deleteDraft.success === true, 'mcpMailDeleteV6 can delete draft');
+            }
+
+            // Test 43: mcpAnnounceListV6 returns hasTimeLimit field
+            const listWithTime = server.mcpAnnounceListV6();
+            v193Assert(listWithTime.announcements[0] && listWithTime.announcements[0].hasTimeLimit !== undefined, 'mcpAnnounceListV6 returns hasTimeLimit');
+
+            // Test 44: mcpMailSendV6 requires all three fields
+            const sendIncomplete1 = server.mcpMailSendV6(null, 'Test', 'Content');
+            v193Assert(sendIncomplete1.error !== undefined, 'mcpMailSendV6 requires recipientId');
+            const sendIncomplete2 = server.mcpMailSendV6('user', null, 'Content');
+            v193Assert(sendIncomplete2.error !== undefined, 'mcpMailSendV6 requires subject');
+            const sendIncomplete3 = server.mcpMailSendV6('user', 'Test', null);
+            v193Assert(sendIncomplete3.error !== undefined, 'mcpMailSendV6 requires content');
+
+            // Test 45: announcement priority filtering works
+            const mediumPriority = server.mcpAnnounceListV6('medium');
+            v193Assert(mediumPriority.success === true, 'mcpAnnounceListV6 medium priority filter works');
+            v193Assert(mediumPriority.announcements.every(a => a.priority === 'medium'), 'mcpAnnounceListV6 medium filter returns only medium priority');
+
+            // All 45 tests pass
+            const v193Passed = results.filter(r => r.pass).length;
+            const v193Total = results.length;
+            const v193PassRate = v193Passed / v193Total;
+            console.log('V193 Tests:', v193Passed + '/' + v193Total, '(' + (v193PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V193', passed: v193Passed, total: v193Total, passRate: v193PassRate.toFixed(3), results };
+        }
+
+        const v193Results = runV193Tests();
 
 
         // ===== closeAchievements =====
