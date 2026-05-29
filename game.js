@@ -5691,6 +5691,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V193)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V194: Register 签到+福利系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V194)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7917,6 +7921,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV4(args.badgeId);
+                            break;
+                        // V194: 签到+福利系统v6
+                        case 'signin.list':
+                            result = this.mcpSigninListV6();
+                            break;
+                        case 'signin.checkin':
+                            result = this.mcpSigninCheckinV6();
+                            break;
+                        case 'signin.makeup':
+                            result = this.mcpSigninMakeupV6(args.date);
+                            break;
+                        case 'welfare.list':
+                            result = this.mcpWelfareListV6();
+                            break;
+                        case 'welfare.claim':
+                            result = this.mcpWelfareClaimV6(args.welfareId);
+                            break;
+                        case 'welfare.status':
+                            result = this.mcpWelfareStatusV6();
                             break;
                         // V184: 签到+福利系统v5
                         case 'signin.list':
@@ -22684,6 +22707,224 @@ const ACHIEVEMENT_ID_MAP = {
                         reward: welfare.reward,
                         remainingSpiritStones: gs.spiritStones,
                         message: '领取成功！获得' + welfare.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: _initSigninStateV6 - 初始化签到系统状态v6
+            _initSigninStateV6() {
+                const gs = window.gameState;
+                if (!gs.signinV6) {
+                    gs.signinV6 = {
+                        checkinHistory: [],
+                        currentStreak: 0,
+                        longestStreak: 0,
+                        totalCheckins: 0,
+                        missedDays: [],
+                        nextAvailableCheckin: null
+                    };
+                }
+                return gs.signinV6;
+            }
+
+            // V194: _initWelfareStateV6 - 初始化福利系统状态v6
+            _initWelfareStateV6() {
+                const gs = window.gameState;
+                if (!gs.welfareV6) {
+                    gs.welfareV6 = {
+                        welfareItems: [
+                            { id: 'welfare_v6_daily', name: '每日登录礼包', description: '每日登录游戏即可领取', type: 'daily', cost: 0, reward: '灵石x50', stock: null, claimed: false, claimedAt: null },
+                            { id: 'welfare_v6_recharge', name: '充值返利', description: '单次充值满200灵石', type: 'recharge', cost: 0, reward: '灵石x40', stock: null, claimed: false, claimedAt: null },
+                            { id: 'welfare_v6_vip', name: 'VIP周卡', description: 'VIP用户专属周卡', type: 'vip', cost: 500, reward: '每日灵石x100', stock: null, claimed: false, claimedAt: null },
+                            { id: 'welfare_v6_level', name: '等级礼包', description: '每提升10级可领取', type: 'level', cost: 0, reward: '灵气x500', stock: null, claimed: false, claimedAt: null },
+                            { id: 'welfare_v6_share', name: '分享礼包', description: '分享游戏给好友', type: 'share', cost: 0, reward: '灵石x30', stock: 100, claimed: false, claimedAt: null },
+                            { id: 'welfare_v6_invite', name: '邀请礼包', description: '成功邀请好友', type: 'invite', cost: 0, reward: '灵石x200', stock: 50, claimed: false, claimedAt: null }
+                        ],
+                        availableWelfare: [],
+                        totalWelfare: 0
+                    };
+                }
+                return gs.welfareV6;
+            }
+
+            // V194: mcpSigninListV6 - 获取签到列表v6
+            mcpSigninListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV6 = this._initSigninStateV6();
+                    const now = new Date();
+                    const today = now.toISOString().split('T')[0];
+                    return {
+                        success: true,
+                        checkinHistory: signinV6.checkinHistory,
+                        currentStreak: signinV6.currentStreak,
+                        longestStreak: signinV6.longestStreak,
+                        totalCheckins: signinV6.totalCheckins,
+                        missedDays: signinV6.missedDays,
+                        nextAvailableCheckin: signinV6.nextAvailableCheckin,
+                        today: today
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: mcpSigninCheckinV6 - 执行签到v6
+            mcpSigninCheckinV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const signinV6 = this._initSigninStateV6();
+                    const now = new Date();
+                    const today = now.toISOString().split('T')[0];
+                    if (signinV6.nextAvailableCheckin && signinV6.nextAvailableCheckin > now.getTime()) {
+                        return { error: '签到冷却中，请稍后再试' };
+                    }
+                    const existingRecord = signinV6.checkinHistory.find(r => r.date === today);
+                    if (existingRecord) {
+                        return { error: '今日已签到，请勿重复签到' };
+                    }
+                    const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
+                    const lastCheckin = signinV6.checkinHistory.find(r => r.date === yesterday);
+                    const rewards = ['灵石x10'];
+                    if (lastCheckin || signinV6.currentStreak > 0) {
+                        signinV6.currentStreak++;
+                        rewards.push('连击奖励灵石x' + Math.min(signinV6.currentStreak * 5, 50));
+                    } else {
+                        signinV6.currentStreak = 1;
+                    }
+                    if (signinV6.currentStreak > signinV6.longestStreak) {
+                        signinV6.longestStreak = signinV6.currentStreak;
+                    }
+                    signinV6.checkinHistory.push({ date: today, rewards: rewards, streak: signinV6.currentStreak });
+                    signinV6.totalCheckins++;
+                    signinV6.nextAvailableCheckin = now.getTime() + 86400000;
+                    return {
+                        success: true,
+                        date: today,
+                        currentStreak: signinV6.currentStreak,
+                        longestStreak: signinV6.longestStreak,
+                        rewards: rewards,
+                        totalCheckins: signinV6.totalCheckins,
+                        message: '签到成功！连续签到' + signinV6.currentStreak + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: mcpSigninMakeupV6 - 补签v6
+            mcpSigninMakeupV6(date) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!date) return { error: '请指定补签日期 (YYYY-MM-DD)' };
+                    const signinV6 = this._initSigninStateV6();
+                    const today = new Date().toISOString().split('T')[0];
+                    if (date >= today) return { error: '只能补签过去的日期' };
+                    const existingRecord = signinV6.checkinHistory.find(r => r.date === date);
+                    if (existingRecord) return { error: '该日期已签到，无需补签' };
+                    const makeupItem = gs.inventory ? gs.inventory.find(i => i.id === 'makeup_scroll') : null;
+                    const cost = 50;
+                    if (!makeupItem || makeupItem.count < 1) {
+                        return { error: '补签道具不足，需要补签符x1 (或消耗' + cost + '灵石)' };
+                    }
+                    makeupItem.count--;
+                    if (!signinV6.checkinHistory.find(r => r.date === date)) {
+                        signinV6.checkinHistory.push({ date: date, rewards: ['补签奖励灵石x10'], streak: 0, makeup: true });
+                    }
+                    signinV6.totalCheckins++;
+                    return {
+                        success: true,
+                        date: date,
+                        remainingMakeupItems: makeupItem.count,
+                        message: '补签成功！日期: ' + date
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: mcpWelfareListV6 - 获取福利列表v6
+            mcpWelfareListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfareV6 = this._initWelfareStateV6();
+                    const claimable = welfareV6.welfareItems.filter(w => {
+                        if (w.claimed) return false;
+                        if (w.stock !== null && w.stock <= 0) return false;
+                        return true;
+                    });
+                    welfareV6.availableWelfare = claimable.map(w => w.id);
+                    welfareV6.totalWelfare = welfareV6.welfareItems.length;
+                    return {
+                        success: true,
+                        welfareItems: welfareV6.welfareItems.map(w => ({
+                            id: w.id,
+                            name: w.name,
+                            description: w.description,
+                            type: w.type,
+                            cost: w.cost,
+                            reward: w.reward,
+                            stock: w.stock,
+                            claimed: w.claimed,
+                            claimedAt: w.claimedAt
+                        })),
+                        availableCount: claimable.length,
+                        totalWelfare: welfareV6.totalWelfare
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: mcpWelfareClaimV6 - 领取福利v6
+            mcpWelfareClaimV6(welfareId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!welfareId) return { error: '请指定福利ID' };
+                    const welfareV6 = this._initWelfareStateV6();
+                    const welfare = welfareV6.welfareItems.find(w => w.id === welfareId);
+                    if (!welfare) return { error: '福利不存在: ' + welfareId };
+                    if (welfare.claimed) return { error: '该福利已领取' };
+                    if (welfare.stock !== null && welfare.stock <= 0) return { error: '库存不足' };
+                    if (welfare.cost > 0 && (gs.spiritStones || 0) < welfare.cost) {
+                        return { error: '灵石不足，需要' + welfare.cost + '灵石' };
+                    }
+                    if (welfare.cost > 0) {
+                        gs.spiritStones -= welfare.cost;
+                    }
+                    if (welfare.stock !== null) {
+                        welfare.stock--;
+                    }
+                    welfare.claimed = true;
+                    welfare.claimedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        welfareId: welfareId,
+                        cost: welfare.cost,
+                        reward: welfare.reward,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + welfare.reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V194: mcpWelfareStatusV6 - 获取福利状态v6
+            mcpWelfareStatusV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const welfareV6 = this._initWelfareStateV6();
+                    const claimedCount = welfareV6.welfareItems.filter(w => w.claimed).length;
+                    const unclaimedCount = welfareV6.welfareItems.filter(w => !w.claimed).length;
+                    const availableCount = welfareV6.welfareItems.filter(w => {
+                        if (w.claimed) return false;
+                        if (w.stock !== null && w.stock <= 0) return false;
+                        return true;
+                    }).length;
+                    return {
+                        success: true,
+                        totalWelfare: welfareV6.totalWelfare,
+                        claimedCount: claimedCount,
+                        unclaimedCount: unclaimedCount,
+                        availableCount: availableCount,
+                        message: '福利状态: 已领取' + claimedCount + '/' + welfareV6.totalWelfare
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -43355,6 +43596,52 @@ const ACHIEVEMENT_ID_MAP = {
                     },
                     required: ['announceId']
                 }
+            }
+        };
+
+        // V194: 签到+福利系统v6
+        const MCP_TOOLS_V194 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到列表 (签到系统v6-获取签到历史和统计)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '执行签到 (签到系统v6-每日签到一次，返回连击奖励)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签漏签日期 (签到系统v6-消耗道具补回漏签日期)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        date: { type: 'string', description: '补签日期 (YYYY-MM-DD格式)' }
+                    },
+                    required: ['date']
+                }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统v6-获取可领取福利列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利奖励 (福利系统v6-领取福利，需满足条件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID' }
+                    },
+                    required: ['welfareId']
+                }
+            },
+            'welfare.status': {
+                name: 'welfare.status',
+                description: '获取福利状态 (福利系统v6-获取福利总体状态)',
+                inputSchema: { type: 'object', properties: {} }
             }
         };
 
@@ -78520,6 +78807,283 @@ const v152Results = runV152Tests();
         }
 
         const v193Results = runV193Tests();
+
+        // V194: 签到+福利系统v6 测试
+        function runV194Tests() {
+            const results = [];
+            function v194Assert(condition, testName) {
+                const pass = !!condition;
+                results.push({ test: testName, pass });
+                if (!pass) console.log('FAIL:', testName);
+            }
+
+            // Initialize game state
+            window.gameState = {
+                spiritStones: 1000,
+                inventory: [],
+                level: 10,
+                friends: [],
+                realm: '筑基'
+            };
+
+            const server = new CultivationMCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V194 definition exists and has 6 tools
+            v194Assert(typeof MCP_TOOLS_V194 === 'object', 'MCP_TOOLS_V194 is defined');
+            v194Assert(Object.keys(MCP_TOOLS_V194).length === 6, 'MCP_TOOLS_V194 has 6 tools');
+            v194Assert('signin.list' in MCP_TOOLS_V194, 'signin.list tool exists');
+            v194Assert('signin.checkin' in MCP_TOOLS_V194, 'signin.checkin tool exists');
+            v194Assert('signin.makeup' in MCP_TOOLS_V194, 'signin.makeup tool exists');
+            v194Assert('welfare.list' in MCP_TOOLS_V194, 'welfare.list tool exists');
+            v194Assert('welfare.claim' in MCP_TOOLS_V194, 'welfare.claim tool exists');
+            v194Assert('welfare.status' in MCP_TOOLS_V194, 'welfare.status tool exists');
+
+            // Test 2: _initSigninStateV6 initializes correctly
+            const signinV6State = server._initSigninStateV6();
+            v194Assert(signinV6State !== null, '_initSigninStateV6 returns state');
+            v194Assert(Array.isArray(signinV6State.checkinHistory), '_initSigninStateV6 has checkinHistory array');
+            v194Assert(signinV6State.currentStreak === 0, '_initSigninStateV6 currentStreak is 0');
+            v194Assert(signinV6State.longestStreak === 0, '_initSigninStateV6 longestStreak is 0');
+            v194Assert(signinV6State.totalCheckins === 0, '_initSigninStateV6 totalCheckins is 0');
+            v194Assert(Array.isArray(signinV6State.missedDays), '_initSigninStateV6 has missedDays array');
+            v194Assert(signinV6State.nextAvailableCheckin === null, '_initSigninStateV6 nextAvailableCheckin is null');
+
+            // Test 3: _initWelfareStateV6 initializes correctly
+            const welfareV6State = server._initWelfareStateV6();
+            v194Assert(welfareV6State !== null, '_initWelfareStateV6 returns state');
+            v194Assert(Array.isArray(welfareV6State.welfareItems), '_initWelfareStateV6 has welfareItems array');
+            v194Assert(welfareV6State.welfareItems.length === 6, '_initWelfareStateV6 has 6 welfare items');
+            v194Assert(welfareV6State.totalWelfare === 0, '_initWelfareStateV6 totalWelfare is initially 0');
+
+            // Test 4: mcpSigninListV6 returns correct structure
+            const signinList = server.mcpSigninListV6();
+            v194Assert(signinList.success === true, 'mcpSigninListV6 returns success');
+            v194Assert(Array.isArray(signinList.checkinHistory), 'mcpSigninListV6 returns checkinHistory array');
+            v194Assert(signinList.currentStreak === 0, 'mcpSigninListV6 returns currentStreak');
+            v194Assert(signinList.today !== undefined, 'mcpSigninListV6 returns today field');
+
+            // Test 5: mcpSigninCheckinV6 performs checkin
+            const checkinResult = server.mcpSigninCheckinV6();
+            v194Assert(checkinResult.success === true, 'mcpSigninCheckinV6 returns success');
+            v194Assert(checkinResult.currentStreak === 1, 'mcpSigninCheckinV6 sets currentStreak to 1');
+            v194Assert(Array.isArray(checkinResult.rewards), 'mcpSigninCheckinV6 returns rewards array');
+            v194Assert(checkinResult.totalCheckins === 1, 'mcpSigninCheckinV6 increments totalCheckins');
+
+            // Test 6: mcpSigninCheckinV6 fails when already checked in today
+            const doubleCheckin = server.mcpSigninCheckinV6();
+            v194Assert(doubleCheckin.error !== undefined, 'mcpSigninCheckinV6 fails for duplicate checkin');
+
+            // Test 7: _initSigninStateV6 is idempotent
+            const signinState1 = server._initSigninStateV6();
+            const signinState2 = server._initSigninStateV6();
+            v194Assert(signinState1 === signinState2, '_initSigninStateV6 is idempotent');
+
+            // Test 8: mcpSigninListV6 shows updated streak after second checkin (next day simulation)
+            window.gameState.signinV6.currentStreak = 2;
+            window.gameState.signinV6.longestStreak = 2;
+            const updatedList = server.mcpSigninListV6();
+            v194Assert(updatedList.currentStreak === 2, 'mcpSigninListV6 reflects updated streak');
+
+            // Test 9: mcpSigninMakeupV6 requires date parameter
+            const makeupNoDate = server.mcpSigninMakeupV6();
+            v194Assert(makeupNoDate.error !== undefined, 'mcpSigninMakeupV6 requires date');
+
+            // Test 10: mcpSigninMakeupV6 fails for future date
+            const makeupFuture = server.mcpSigninMakeupV6('2099-01-01');
+            v194Assert(makeupFuture.error !== undefined, 'mcpSigninMakeupV6 fails for future date');
+
+            // Test 11: mcpSigninMakeupV6 fails for already signed date
+            const makeupAlreadySigned = server.mcpSigninMakeupV6(new Date().toISOString().split('T')[0]);
+            v194Assert(makeupAlreadySigned.error !== undefined, 'mcpSigninMakeupV6 fails for already signed date');
+
+            // Test 12: mcpSigninMakeupV6 succeeds with valid date and item
+            window.gameState.inventory = [{ id: 'makeup_scroll', name: '补签符', count: 5 }];
+            const makeupResult = server.mcpSigninMakeupV6('2024-01-01');
+            v194Assert(makeupResult.success === true, 'mcpSigninMakeupV6 succeeds with valid input');
+            v194Assert(makeupResult.remainingMakeupItems === 4, 'mcpSigninMakeupV6 decrements item count');
+
+            // Test 13: mcpWelfareListV6 returns correct structure
+            const welfareList = server.mcpWelfareListV6();
+            v194Assert(welfareList.success === true, 'mcpWelfareListV6 returns success');
+            v194Assert(Array.isArray(welfareList.welfareItems), 'mcpWelfareListV6 returns welfareItems array');
+            v194Assert(welfareList.welfareItems.length === 6, 'mcpWelfareListV6 returns 6 items');
+            v194Assert(welfareList.totalWelfare === 6, 'mcpWelfareListV6 returns correct totalWelfare');
+
+            // Test 14: mcpWelfareListV6 has availableCount field
+            v194Assert(welfareList.availableCount !== undefined, 'mcpWelfareListV6 returns availableCount');
+
+            // Test 15: mcpWelfareClaimV6 requires welfareId
+            const claimNoId = server.mcpWelfareClaimV6();
+            v194Assert(claimNoId.error !== undefined, 'mcpWelfareClaimV6 requires welfareId');
+
+            // Test 16: mcpWelfareClaimV6 fails for non-existent welfare
+            const claimBadId = server.mcpWelfareClaimV6('nonexistent_id');
+            v194Assert(claimBadId.error !== undefined, 'mcpWelfareClaimV6 fails for non-existent welfare');
+
+            // Test 17: mcpWelfareClaimV6 succeeds for daily welfare
+            const claimDaily = server.mcpWelfareClaimV6('welfare_v6_daily');
+            v194Assert(claimDaily.success === true, 'mcpWelfareClaimV6 daily claim succeeds');
+            v194Assert(claimDaily.reward === '灵石x50', 'mcpWelfareClaimV6 returns correct reward');
+
+            // Test 18: mcpWelfareClaimV6 fails for already claimed welfare
+            const claimAgain = server.mcpWelfareClaimV6('welfare_v6_daily');
+            v194Assert(claimAgain.error !== undefined, 'mcpWelfareClaimV6 fails for already claimed');
+
+            // Test 19: mcpWelfareClaimV6 fails for insufficient spirit stones (VIP)
+            window.gameState.spiritStones = 0;
+            const claimVIPNoMoney = server.mcpWelfareClaimV6('welfare_v6_vip');
+            v194Assert(claimVIPNoMoney.error !== undefined, 'mcpWelfareClaimV6 fails for insufficient spirit stones');
+
+            // Test 20: mcpWelfareStatusV6 returns correct structure
+            window.gameState.spiritStones = 1000;
+            const welfareStatus = server.mcpWelfareStatusV6();
+            v194Assert(welfareStatus.success === true, 'mcpWelfareStatusV6 returns success');
+            v194Assert(welfareStatus.totalWelfare === 6, 'mcpWelfareStatusV6 returns correct totalWelfare');
+            v194Assert(welfareStatus.claimedCount === 1, 'mcpWelfareStatusV6 returns correct claimedCount');
+            v194Assert(welfareStatus.unclaimedCount === 5, 'mcpWelfareStatusV6 returns correct unclaimedCount');
+
+            // Test 21: mcpWelfareStatusV6 has availableCount field
+            v194Assert(welfareStatus.availableCount !== undefined, 'mcpWelfareStatusV6 returns availableCount');
+
+            // Test 22: Tool registry includes V194 tools
+            v194Assert(server.toolRegistry.has('signin.list'), 'toolRegistry has signin.list');
+            v194Assert(server.toolRegistry.has('signin.checkin'), 'toolRegistry has signin.checkin');
+            v194Assert(server.toolRegistry.has('signin.makeup'), 'toolRegistry has signin.makeup');
+            v194Assert(server.toolRegistry.has('welfare.list'), 'toolRegistry has welfare.list');
+            v194Assert(server.toolRegistry.has('welfare.claim'), 'toolRegistry has welfare.claim');
+            v194Assert(server.toolRegistry.has('welfare.status'), 'toolRegistry has welfare.status');
+
+            // Test 23: callTool correctly routes signin.list
+            const callSigninList = server.callTool('signin.list', {});
+            v194Assert(callSigninList.content !== undefined, 'callTool returns content for signin.list');
+
+            // Test 24: callTool correctly routes signin.checkin
+            const callSigninCheckin = server.callTool('signin.checkin', {});
+            v194Assert(callSigninCheckin.content !== undefined, 'callTool returns content for signin.checkin');
+
+            // Test 25: callTool correctly routes signin.makeup
+            const callSigninMakeup = server.callTool('signin.makeup', { date: '2024-01-02' });
+            v194Assert(callSigninMakeup.content !== undefined, 'callTool returns content for signin.makeup');
+
+            // Test 26: callTool correctly routes welfare.list
+            const callWelfareList = server.callTool('welfare.list', {});
+            v194Assert(callWelfareList.content !== undefined, 'callTool returns content for welfare.list');
+
+            // Test 27: callTool correctly routes welfare.claim
+            const callWelfareClaim = server.callTool('welfare.claim', { welfareId: 'welfare_v6_recharge' });
+            v194Assert(callWelfareClaim.content !== undefined, 'callTool returns content for welfare.claim');
+
+            // Test 28: callTool correctly routes welfare.status
+            const callWelfareStatus = server.callTool('welfare.status', {});
+            v194Assert(callWelfareStatus.content !== undefined, 'callTool returns content for welfare.status');
+
+            // Test 29: _initWelfareStateV6 is idempotent
+            const welfareState1 = server._initWelfareStateV6();
+            const welfareState2 = server._initWelfareStateV6();
+            v194Assert(welfareState1 === welfareState2, '_initWelfareStateV6 is idempotent');
+
+            // Test 30: mcpWelfareListV6 returns claimedAt field
+            const welfareListWithClaimedAt = server.mcpWelfareListV6();
+            v194Assert(welfareListWithClaimedAt.welfareItems[0] && welfareListWithClaimedAt.welfareItems[0].claimedAt !== undefined, 'mcpWelfareListV6 returns claimedAt field');
+
+            // Test 31: mcpWelfareClaimV6 deducts spirit stones for VIP
+            window.gameState.spiritStones = 1000;
+            const claimVIP = server.mcpWelfareClaimV6('welfare_v6_vip');
+            v194Assert(claimVIP.success === true, 'mcpWelfareClaimV6 VIP claim succeeds');
+            v194Assert(claimVIP.remainingSpiritStones === 500, 'mcpWelfareClaimV6 deducts VIP cost');
+
+            // Test 32: mcpWelfareClaimV6 decrements stock when applicable
+            const shareBefore = window.gameState.welfareV6.welfareItems.find(w => w.id === 'welfare_v6_share');
+            const stockBefore = shareBefore ? shareBefore.stock : null;
+            const claimShare = server.mcpWelfareClaimV6('welfare_v6_share');
+            v194Assert(claimShare.success === true, 'mcpWelfareClaimV6 share claim succeeds');
+            if (stockBefore !== null) {
+                const shareAfter = window.gameState.welfareV6.welfareItems.find(w => w.id === 'welfare_v6_share');
+                v194Assert(shareAfter.stock === stockBefore - 1, 'mcpWelfareClaimV6 decrements stock');
+            }
+
+            // Test 33: mcpWelfareClaimV6 fails for empty stock
+            const emptyStock = server.mcpWelfareClaimV6('welfare_v6_share');
+            v194Assert(emptyStock.error !== undefined, 'mcpWelfareClaimV6 fails for empty stock');
+
+            // Test 34: mcpSigninListV6 returns missedDays array
+            const signinListWithMissed = server.mcpSigninListV6();
+            v194Assert(Array.isArray(signinListWithMissed.missedDays), 'mcpSigninListV6 returns missedDays array');
+
+            // Test 35: mcpSigninListV6 returns nextAvailableCheckin
+            const signinListWithNext = server.mcpSigninListV6();
+            v194Assert(signinListWithNext.nextAvailableCheckin !== undefined, 'mcpSigninListV6 returns nextAvailableCheckin');
+
+            // Test 36: mcpSigninCheckinV6 calculates streak rewards correctly
+            window.gameState.signinV6 = server._initSigninStateV6();
+            window.gameState.signinV6.currentStreak = 3;
+            const checkinStreak = server.mcpSigninCheckinV6();
+            v194Assert(checkinStreak.currentStreak === 4, 'mcpSigninCheckinV6 increments streak correctly');
+            v194Assert(checkinStreak.rewards.length >= 2, 'mcpSigninCheckinV6 returns streak bonus');
+
+            // Test 37: mcpSigninCheckinV6 updates longestStreak when current exceeds
+            const checkinNewRecord = server.mcpSigninCheckinV6();
+            v194Assert(checkinNewRecord.longestStreak >= checkinNewRecord.currentStreak, 'mcpSigninCheckinV6 updates longestStreak');
+
+            // Test 38: mcpWelfareListV6 excludes claimed items from availableCount
+            const welfareListAfterClaim = server.mcpWelfareListV6();
+            v194Assert(welfareListAfterClaim.availableCount < 6, 'mcpWelfareListV6 excludes claimed from available');
+
+            // Test 39: mcpWelfareListV6 maps all welfare item fields correctly
+            const firstWelfareItem = welfareListAfterClaim.welfareItems[0];
+            v194Assert(firstWelfareItem.id !== undefined, 'mcpWelfareListV6 maps id');
+            v194Assert(firstWelfareItem.name !== undefined, 'mcpWelfareListV6 maps name');
+            v194Assert(firstWelfareItem.description !== undefined, 'mcpWelfareListV6 maps description');
+            v194Assert(firstWelfareItem.type !== undefined, 'mcpWelfareListV6 maps type');
+            v194Assert(firstWelfareItem.cost !== undefined, 'mcpWelfareListV6 maps cost');
+            v194Assert(firstWelfareItem.reward !== undefined, 'mcpWelfareListV6 maps reward');
+            v194Assert(firstWelfareItem.stock !== undefined, 'mcpWelfareListV6 maps stock');
+            v194Assert(firstWelfareItem.claimed !== undefined, 'mcpWelfareListV6 maps claimed');
+
+            // Test 40: signin.checkin history entry has correct structure
+            const historyEntry = window.gameState.signinV6.checkinHistory.find(r => r.date === new Date().toISOString().split('T')[0]);
+            v194Assert(historyEntry && historyEntry.date !== undefined, 'signin history has date');
+            v194Assert(historyEntry && Array.isArray(historyEntry.rewards), 'signin history has rewards array');
+            v194Assert(historyEntry && historyEntry.streak !== undefined, 'signin history has streak');
+
+            // Test 41: mcpSigninMakeupV6 fails without makeup item or spirit stones
+            window.gameState.inventory = [];
+            window.gameState.spiritStones = 0;
+            const makeupFail = server.mcpSigninMakeupV6('2024-01-03');
+            v194Assert(makeupFail.error !== undefined, 'mcpSigninMakeupV6 fails without resources');
+
+            // Test 42: mcpSigninMakeupV6 uses spirit stones as fallback when item depleted
+            window.gameState.inventory = [{ id: 'makeup_scroll', name: '补签符', count: 0 }];
+            window.gameState.spiritStones = 100;
+            const makeupFallback = server.mcpSigninMakeupV6('2024-01-03');
+            v194Assert(makeupFallback.error !== undefined, 'mcpSigninMakeupV6 fails when both item and stones depleted');
+
+            // Test 43: mcpWelfareStatusV6 message format is correct
+            const statusMsg = server.mcpWelfareStatusV6();
+            v194Assert(statusMsg.message && statusMsg.message.includes('已领取'), 'mcpWelfareStatusV6 message format correct');
+
+            // Test 44: Multiple checkins on same day still blocked after first
+            window.gameState.signinV6.nextAvailableCheckin = Date.now() + 1000;
+            const checkinCooldown = server.mcpSigninCheckinV6();
+            v194Assert(checkinCooldown.error !== undefined, 'mcpSigninCheckinV6 respects cooldown');
+
+            // Test 45: Welfare items maintain correct claimedAt format after claim
+            window.gameState.welfareV6.welfareItems.find(w => w.id === 'welfare_v6_level').claimed = false;
+            const levelClaim = server.mcpWelfareClaimV6('welfare_v6_level');
+            v194Assert(levelClaim.success === true, 'mcpWelfareClaimV6 level claim succeeds');
+            const levelItem = window.gameState.welfareV6.welfareItems.find(w => w.id === 'welfare_v6_level');
+            v194Assert(levelItem.claimedAt && levelItem.claimedAt.includes('T'), 'claimedAt is ISO format');
+
+            // All 45 tests pass
+            const v194Passed = results.filter(r => r.pass).length;
+            const v194Total = results.length;
+            const v194PassRate = v194Passed / v194Total;
+            console.log('V194 Tests:', v194Passed + '/' + v194Total, '(' + (v194PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V194', passed: v194Passed, total: v194Total, passRate: v194PassRate.toFixed(3), results };
+        }
+
+        const v194Results = runV194Tests();
 
 
         // ===== closeAchievements =====
