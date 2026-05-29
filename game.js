@@ -3737,6 +3737,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V186)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V187: Register 奇遇+事件系统v5 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V187)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3968,6 +3972,25 @@
                             break;
                         case 'eventV3.reward':
                             result = this.mcpEventV3Reward(args.eventId);
+                            break;
+                        // V187: 奇遇+事件系统v5 (override v4)
+                        case 'serendipity.list':
+                            result = this.mcpSerendipityV5List(args.type, args.difficulty);
+                            break;
+                        case 'serendipity.start':
+                            result = this.mcpSerendipityV5Start(args.serendipityId);
+                            break;
+                        case 'serendipity.complete':
+                            result = this.mcpSerendipityV5Complete(args.serendipityId, args.choiceId);
+                            break;
+                        case 'event.list':
+                            result = this.mcpEventV5List();
+                            break;
+                        case 'event.join':
+                            result = this.mcpEventV5Join(args.eventId);
+                            break;
+                        case 'event.reward':
+                            result = this.mcpEventV5Reward(args.eventId);
                             break;
                         // V177: 奇遇+事件系统v4
                         case 'serendipity.list':
@@ -22229,6 +22252,247 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V187: _initSerendipityStateV5 - 初始化奇遇系统状态v5
+            _initSerendipityStateV5() {
+                const gs = window.gameState;
+                if (!gs.serendipityV5) {
+                    gs.serendipityV5 = {
+                        serendipities: [
+                            {
+                                id: 'mystic_cave_v5', name: '神秘洞窟', description: '传闻洞窟藏有上古机缘', type: 'exploration', difficulty: 'easy', duration: 3600000,
+                                requirements: { minRealm: 0, minLevel: 1 },
+                                progress: 0, status: 'available',
+                                choices: [
+                                    { id: 'explore_deep', text: '深入探索', effect: 'danger', reward: { type: 'spiritStone', amount: 1200 } },
+                                    { id: 'safe_path', text: '安全路径', effect: 'safe', reward: { type: 'spiritStone', amount: 600 } }
+                                ]
+                            },
+                            {
+                                id: 'ancient_temple_v5', name: '古老神殿', description: '神殿中沉睡强大存在', type: 'combat', difficulty: 'medium', duration: 7200000,
+                                requirements: { minRealm: 1, minLevel: 3 },
+                                progress: 0, status: 'available',
+                                choices: [
+                                    { id: 'challenge_guardian', text: '挑战守护者', effect: 'combat', reward: { type: 'artifact', name: '神殿令牌' } },
+                                    { id: 'stealth_approach', text: '潜行获取', effect: 'stealth', reward: { type: 'spiritStone', amount: 800 } }
+                                ]
+                            },
+                            {
+                                id: 'dragon_shrine_v5', name: '龙族圣地', description: '龙族圣地藏有惊天机缘', type: 'combat', difficulty: 'hard', duration: 10800000,
+                                requirements: { minRealm: 2, minLevel: 5 },
+                                progress: 0, status: 'available',
+                                choices: [
+                                    { id: 'fight_dragon', text: '与龙搏斗', effect: 'extreme', reward: { type: 'pet', name: '龙蛋' } },
+                                    { id: 'dragon_gift', text: '接受馈赠', effect: 'peaceful', reward: { type: 'technique', name: '龙息诀' } }
+                                ]
+                            },
+                            {
+                                id: 'immortal_valley_v5', name: '飞升福地', description: '传说中的飞升之地', type: 'cultivation', difficulty: 'legendary', duration: 14400000,
+                                requirements: { minRealm: 3, minLevel: 8 },
+                                progress: 0, status: 'available',
+                                choices: [
+                                    { id: 'immerse_cultivation', text: '沉浸修炼', effect: 'cultivation', reward: { type: 'realm', name: '化神丹' } },
+                                    { id: 'seek_elder', text: '求见前辈', effect: 'wisdom', reward: { type: 'technique', name: '飞升诀' } }
+                                ]
+                            }
+                        ],
+                        currentSerendipity: null,
+                        completed: [],
+                        totalCompleted: 0
+                    };
+                }
+                return gs.serendipityV5;
+            }
+
+            // V187: _initEventStateV5 - 初始化事件系统状态v5
+            _initEventStateV5() {
+                const gs = window.gameState;
+                if (!gs.eventV5) {
+                    const now = Date.now();
+                    gs.eventV5 = {
+                        events: [
+                            {
+                                id: 'cultivation_peak_v5', name: '修炼巅峰赛', description: '全服修炼效率大比拼', type: 'competition',
+                                startTime: now - 86400000 * 3, endTime: now + 86400000 * 7,
+                                requirements: { minRealm: 0 },
+                                rewards: { participation: { type: 'spiritStone', amount: 500 }, ranking: { 1: { type: 'spiritStone', amount: 5000 }, 2: { type: 'spiritStone', amount: 3000 }, 3: { type: 'spiritStone', amount: 2000 } } },
+                                participants: [], status: 'active', entryFee: 100
+                            },
+                            {
+                                id: 'battle_royale_v5', name: '诸神黄昏', description: '跨服竞技盛会', type: 'combat',
+                                startTime: now - 86400000 * 5, endTime: now + 86400000 * 12,
+                                requirements: { minRealm: 1 },
+                                rewards: { participation: { type: 'title', name: '战神' }, ranking: { 1: { type: 'artifact', name: '战神之冠' }, 2: { type: 'artifact', name: '战神护腕' }, 3: { type: 'artifact', name: '战神护腿' } } },
+                                participants: [], status: 'active', entryFee: 200
+                            },
+                            {
+                                id: 'treasure_hunt_v5', name: '寻宝盛典', description: '稀有宝藏等你来探', type: 'exploration',
+                                startTime: now - 86400000 * 1, endTime: now + 86400000 * 4,
+                                requirements: { minRealm: 0 },
+                                rewards: { participation: { type: 'items', items: ['低级灵石袋'] }, ranking: { 1: { type: 'items', items: ['神兵图纸', '灵草礼包'] } } },
+                                participants: [], status: 'active', entryFee: 0
+                            }
+                        ],
+                        activeEvent: null,
+                        eventHistory: [],
+                        totalParticipated: 0
+                    };
+                }
+                return gs.eventV5;
+            }
+
+            // V187: mcpSerendipityV5List - 获取奇遇列表(按类型/难度筛选)
+            mcpSerendipityV5List(type, difficulty) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const serV5 = this._initSerendipityStateV5();
+                    let serendipities = serV5.serendipities;
+                    if (type) serendipities = serendipities.filter(s => s.type === type);
+                    if (difficulty) serendipities = serendipities.filter(s => s.difficulty === difficulty);
+                    return {
+                        success: true,
+                        serendipities: serendipities.map(s => ({
+                            id: s.id, name: s.name, description: s.description, type: s.type,
+                            difficulty: s.difficulty, duration: s.duration, requirements: s.requirements,
+                            progress: s.progress, status: s.status, choices: s.choices
+                        })),
+                        totalCount: serendipities.length,
+                        message: '奇遇列表共' + serendipities.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V187: mcpSerendipityV5Start - 开始奇遇(进入多选择事件流程)
+            mcpSerendipityV5Start(serendipityId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!serendipityId) return { error: '请指定奇遇ID' };
+                    const serV5 = this._initSerendipityStateV5();
+                    const ser = serV5.serendipities.find(s => s.id === serendipityId);
+                    if (!ser) return { error: '奇遇不存在' };
+                    if (ser.status !== 'available') return { error: '奇遇不可用' };
+                    const req = ser.requirements || {};
+                    if ((req.minRealm || 0) > (gs.realmIndex || 0)) return { error: '境界不足，无法触发此奇遇' };
+                    if ((req.minLevel || 0) > (gs.level || 1)) return { error: '等级不足，无法触发此奇遇' };
+                    ser.status = 'in_progress';
+                    ser.startTime = Date.now();
+                    serV5.currentSerendipity = { id: ser.id, name: ser.name, choices: ser.choices };
+                    return {
+                        success: true,
+                        serendipityId: ser.id,
+                        name: ser.name,
+                        type: ser.type,
+                        difficulty: ser.difficulty,
+                        choices: ser.choices,
+                        message: '开始奇遇"' + ser.name + '"，请选择分支'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V187: mcpSerendipityV5Complete - 完成奇遇(根据选择的分支获得奖励)
+            mcpSerendipityV5Complete(serendipityId, choiceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!serendipityId) return { error: '请指定奇遇ID' };
+                    if (!choiceId) return { error: '请选择分支' };
+                    const serV5 = this._initSerendipityStateV5();
+                    const ser = serV5.serendipities.find(s => s.id === serendipityId);
+                    if (!ser) return { error: '奇遇不存在' };
+                    if (ser.status !== 'in_progress') return { error: '奇遇不在进行中状态' };
+                    const choice = (ser.choices || []).find(c => c.id === choiceId);
+                    if (!choice) return { error: '无效的分支选择' };
+                    const reward = choice.reward;
+                    if (reward.type === 'spiritStone') gs.spiritStones = (gs.spiritStones || 0) + (reward.amount || 0);
+                    else if (reward.type === 'technique') { gs.techniques = gs.techniques || []; gs.techniques.push(reward.name); }
+                    else if (reward.type === 'artifact') { gs.artifacts = gs.artifacts || []; gs.artifacts.push(reward.name); }
+                    else if (reward.type === 'pet') { gs.pets = gs.pets || []; gs.pets.push(reward.name); }
+                    else if (reward.type === 'realm') { gs.inventory = gs.inventory || []; gs.inventory.push(reward.name); }
+                    else if (reward.type === 'title') { gs.titles = gs.titles || []; gs.titles.push(reward.name); }
+                    ser.status = 'completed';
+                    ser.progress = 100;
+                    serV5.completed.push({ id: ser.id, name: ser.name, choiceId: choiceId, rewards: reward, completedAt: Date.now() });
+                    serV5.totalCompleted++;
+                    serV5.currentSerendipity = null;
+                    return { success: true, serendipityId: ser.id, choiceId: choiceId, rewards: reward, message: '奇遇"' + ser.name + '"完成，选择"' + choice.text + '"，获得奖励' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V187: mcpEventV5List - 获取事件列表
+            mcpEventV5List() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const evtV5 = this._initEventStateV5();
+                    const now = Date.now();
+                    const activeEvents = evtV5.events.filter(e => now >= e.startTime && now <= e.endTime);
+                    return {
+                        success: true,
+                        events: evtV5.events.map(e => ({
+                            id: e.id, name: e.name, description: e.description, type: e.type,
+                            startTime: e.startTime, endTime: e.endTime,
+                            participants: e.participants.length, status: (now >= e.startTime && now <= e.endTime) ? 'active' : 'inactive',
+                            entryFee: e.entryFee, rewards: e.rewards
+                        })),
+                        activeCount: activeEvents.length,
+                        message: '事件列表共' + evtV5.events.length + '项，进行中' + activeEvents.length + '项'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V187: mcpEventV5Join - 参与事件
+            mcpEventV5Join(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtV5 = this._initEventStateV5();
+                    const evt = evtV5.events.find(e => e.id === eventId);
+                    if (!evt) return { error: '事件不存在' };
+                    const now = Date.now();
+                    if (now < evt.startTime || now > evt.endTime) return { error: '事件不在进行中' };
+                    const req = evt.requirements || {};
+                    if ((req.minRealm || 0) > (gs.realmIndex || 0)) return { error: '境界不足，无法参与此事件' };
+                    if (evt.participants.includes(gs.playerId || 'player')) return { error: '已经参与过此事件' };
+                    if ((evt.entryFee || 0) > (gs.spiritStones || 0)) return { error: '灵石不足，无法参与' };
+                    if (evt.entryFee > 0) gs.spiritStones -= evt.entryFee;
+                    evt.participants.push(gs.playerId || 'player');
+                    evtV5.totalParticipated++;
+                    evtV5.activeEvent = { id: evt.id, name: evt.name, joinedAt: now };
+                    return { success: true, eventId: evt.id, name: evt.name, participants: evt.participants.length, message: '成功参与事件"' + evt.name + '"' };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V187: mcpEventV5Reward - 领取事件奖励
+            mcpEventV5Reward(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!eventId) return { error: '请指定事件ID' };
+                    const evtV5 = this._initEventStateV5();
+                    const evt = evtV5.events.find(e => e.id === eventId);
+                    if (!evt) return { error: '事件不存在' };
+                    if (!evt.participants.includes(gs.playerId || 'player')) return { error: '未参与此事件，无法领取奖励' };
+                    const claimKey = eventId + '_' + (gs.playerId || 'player');
+                    if (evtV5.eventHistory.includes(claimKey)) return { error: '奖励已领取' };
+                    const playerRank = evt.participants.indexOf(gs.playerId || 'player') + 1;
+                    let reward = null;
+                    if (playerRank <= 3 && evt.rewards.ranking && evt.rewards.ranking[playerRank]) {
+                        reward = evt.rewards.ranking[playerRank];
+                    } else if (evt.rewards.participation) {
+                        reward = evt.rewards.participation;
+                    }
+                    if (!reward) return { error: '无奖励可领取' };
+                    if (reward.type === 'spiritStone') gs.spiritStones = (gs.spiritStones || 0) + (reward.amount || 0);
+                    else if (reward.type === 'title') { gs.titles = gs.titles || []; gs.titles.push(reward.name); }
+                    else if (reward.type === 'artifact') { gs.artifacts = gs.artifacts || []; gs.artifacts.push(reward.name); }
+                    else if (reward.type === 'items') { gs.inventory = gs.inventory || []; (reward.items || []).forEach(item => gs.inventory.push(item)); }
+                    evtV5.eventHistory.push(claimKey);
+                    return { success: true, eventId: evt.id, rank: playerRank, rewards: reward, message: '领取事件"' + evt.name + '"奖励，排名#' + playerRank };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V156: _initRankStateV2 - 初始化排行榜系统状态v2
             _initRankStateV2() {
                 const gs = window.gameState;
@@ -38718,6 +38982,71 @@
                         badgeId: { type: 'string', description: '徽章ID' }
                     },
                     required: ['badgeId']
+                }
+            }
+        };
+
+        // V187: 奇遇+事件系统v5 (P-20260529-112)
+        const MCP_TOOLS_V187 = {
+            'serendipity.list': {
+                name: 'serendipity.list',
+                description: '获取奇遇列表 (奇遇+事件系统v5-获取所有可用奇遇按类型/难度筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '奇遇类型筛选: exploration/combat/cultivation/legendary' },
+                        difficulty: { type: 'string', description: '难度筛选: easy/medium/hard/legendary' }
+                    }
+                }
+            },
+            'serendipity.start': {
+                name: 'serendipity.start',
+                description: '开始奇遇 (奇遇+事件系统v5-开始奇遇进入多选择事件流程)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['serendipityId']
+                }
+            },
+            'serendipity.complete': {
+                name: 'serendipity.complete',
+                description: '完成奇遇 (奇遇+事件系统v5-根据选择的分支获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        serendipityId: { type: 'string', description: '奇遇ID' },
+                        choiceId: { type: 'string', description: '选择的分支ID' }
+                    },
+                    required: ['serendipityId', 'choiceId']
+                }
+            },
+            'event.list': {
+                name: 'event.list',
+                description: '获取事件列表 (奇遇+事件系统v5-获取当前可用事件列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'event.join': {
+                name: 'event.join',
+                description: '参与事件 (奇遇+事件系统v5-参与事件消耗报名费或免费)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
+            },
+            'event.reward': {
+                name: 'event.reward',
+                description: '领取事件奖励 (奇遇+事件系统v5-根据名次获得奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
                 }
             }
         };
@@ -74569,5 +74898,295 @@ const v152Results = runV152Tests();
         }
 
         const v186Results = runV186Tests();
+
+        // V187: 奇遇+事件系统v5 Tests
+        function runV187Tests() {
+            const results = [];
+            function v187Assert(condition, testName) {
+                results.push({ pass: condition === true, test: testName });
+                if (condition !== true) console.warn('V187 FAIL:', testName);
+            }
+
+            window.gameState = {
+                playerId: 'player',
+                playerName: '测试道友',
+                spiritStones: 10000,
+                combatPower: 2000,
+                reputation: 200,
+                realm: '筑基',
+                realmIndex: 1,
+                level: 5,
+                techniques: [],
+                artifacts: [],
+                pets: [],
+                inventory: [],
+                titles: []
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V187 definition exists and has 6 tools
+            v187Assert(typeof MCP_TOOLS_V187 === 'object', 'MCP_TOOLS_V187 is defined');
+            v187Assert(Object.keys(MCP_TOOLS_V187).length === 6, 'MCP_TOOLS_V187 has 6 tools');
+
+            // Test 2: serendipity.list tool exists
+            v187Assert('serendipity.list' in MCP_TOOLS_V187, 'serendipity.list tool exists');
+
+            // Test 3: serendipity.start tool exists
+            v187Assert('serendipity.start' in MCP_TOOLS_V187, 'serendipity.start tool exists');
+
+            // Test 4: serendipity.complete tool exists
+            v187Assert('serendipity.complete' in MCP_TOOLS_V187, 'serendipity.complete tool exists');
+
+            // Test 5: event.list tool exists
+            v187Assert('event.list' in MCP_TOOLS_V187, 'event.list tool exists');
+
+            // Test 6: event.join tool exists
+            v187Assert('event.join' in MCP_TOOLS_V187, 'event.join tool exists');
+
+            // Test 7: event.reward tool exists
+            v187Assert('event.reward' in MCP_TOOLS_V187, 'event.reward tool exists');
+
+            // Test 8: _initSerendipityStateV5 creates state
+            server._initSerendipityStateV5();
+            v187Assert(window.gameState.serendipityV5 !== undefined, '_initSerendipityStateV5 creates serendipityV5');
+            v187Assert(Array.isArray(window.gameState.serendipityV5.serendipities), 'serendipityV5.serendipities is array');
+            v187Assert(window.gameState.serendipityV5.serendipities.length === 4, 'serendipityV5 has 4 serendipities');
+
+            // Test 9: _initEventStateV5 creates state
+            server._initEventStateV5();
+            v187Assert(window.gameState.eventV5 !== undefined, '_initEventStateV5 creates eventV5');
+            v187Assert(Array.isArray(window.gameState.eventV5.events), 'eventV5.events is array');
+            v187Assert(window.gameState.eventV5.events.length === 3, 'eventV5 has 3 events');
+
+            // Test 10: mcpSerendipityV5List returns success
+            const serList = server.mcpSerendipityV5List();
+            v187Assert(serList.success === true, 'serendipity.list v5 returns success');
+            v187Assert(Array.isArray(serList.serendipities), 'serendipity.list v5 returns serendipities array');
+            v187Assert(serList.serendipities.length === 4, 'serendipity.list v5 returns 4 serendipities');
+
+            // Test 11: mcpSerendipityV5List with type filter works
+            const serListType = server.mcpSerendipityV5List('combat');
+            v187Assert(serListType.success === true, 'serendipity.list v5 with type filter returns success');
+            v187Assert(serListType.serendipities.every(s => s.type === 'combat'), 'serendipity.list v5 type filter works');
+
+            // Test 12: mcpSerendipityV5List with difficulty filter works
+            const serListDiff = server.mcpSerendipityV5List(null, 'easy');
+            v187Assert(serListDiff.success === true, 'serendipity.list v5 with difficulty filter returns success');
+            v187Assert(serListDiff.serendipities.every(s => s.difficulty === 'easy'), 'serendipity.list v5 difficulty filter works');
+
+            // Test 13: mcpSerendipityV5Start starts a serendipity
+            const serStart = server.mcpSerendipityV5Start('mystic_cave_v5');
+            v187Assert(serStart.success === true, 'serendipity.start v5 returns success');
+            v187Assert(Array.isArray(serStart.choices), 'serendipity.start v5 returns choices');
+            v187Assert(serStart.choices.length === 2, 'serendipity.start v5 returns 2 choices');
+
+            // Test 14: mcpSerendipityV5Start with invalid id returns error
+            const serStartInv = server.mcpSerendipityV5Start('invalid_id');
+            v187Assert(serStartInv.error !== undefined, 'serendipity.start v5 with invalid id returns error');
+
+            // Test 15: mcpSerendipityV5Start with realm requirement returns error
+            window.gameState.realmIndex = 0;
+            const serStartReq = server.mcpSerendipityV5Start('ancient_temple_v5');
+            v187Assert(serStartReq.error !== undefined, 'serendipity.start v5 fails realm requirement');
+
+            // Test 16: mcpSerendipityV5Complete completes serendipity with choice
+            window.gameState.realmIndex = 1;
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('mystic_cave_v5');
+            const serComp = server.mcpSerendipityV5Complete('mystic_cave_v5', 'explore_deep');
+            v187Assert(serComp.success === true, 'serendipity.complete v5 returns success');
+            v187Assert(serComp.rewards !== undefined, 'serendipity.complete v5 returns rewards');
+            v187Assert(serComp.rewards.type === 'spiritStone', 'serendipity.complete v5 returns correct reward type');
+
+            // Test 17: mcpSerendipityV5Complete with invalid choice returns error
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('mystic_cave_v5');
+            const serCompInv = server.mcpSerendipityV5Complete('mystic_cave_v5', 'invalid_choice');
+            v187Assert(serCompInv.error !== undefined, 'serendipity.complete v5 with invalid choice returns error');
+
+            // Test 18: mcpSerendipityV5Complete without starting returns error
+            server._initSerendipityStateV5();
+            const serCompNoStart = server.mcpSerendipityV5Complete('mystic_cave_v5', 'explore_deep');
+            v187Assert(serCompNoStart.error !== undefined, 'serendipity.complete v5 without start returns error');
+
+            // Test 19: mcpEventV5List returns success
+            const evtList = server.mcpEventV5List();
+            v187Assert(evtList.success === true, 'event.list v5 returns success');
+            v187Assert(Array.isArray(evtList.events), 'event.list v5 returns events array');
+            v187Assert(evtList.events.length === 3, 'event.list v5 returns 3 events');
+
+            // Test 20: mcpEventV5List shows correct active count
+            v187Assert(evtList.activeCount === 3, 'event.list v5 shows 3 active events');
+
+            // Test 21: mcpEventV5Join joins an event
+            server._initEventStateV5();
+            const evtJoin = server.mcpEventV5Join('cultivation_peak_v5');
+            v187Assert(evtJoin.success === true, 'event.join v5 returns success');
+            v187Assert(evtJoin.participants === 1, 'event.join v5 increments participants');
+
+            // Test 22: mcpEventV5Join with invalid id returns error
+            const evtJoinInv = server.mcpEventV5Join('invalid_event');
+            v187Assert(evtJoinInv.error !== undefined, 'event.join v5 with invalid id returns error');
+
+            // Test 23: mcpEventV5Join with no stones returns error
+            window.gameState.spiritStones = 0;
+            server._initEventStateV5();
+            const evtJoinNoStone = server.mcpEventV5Join('cultivation_peak_v5');
+            v187Assert(evtJoinNoStone.error !== undefined, 'event.join v5 with no stones returns error');
+
+            // Test 24: mcpEventV5Join with free event works without stones
+            window.gameState.spiritStones = 0;
+            server._initEventStateV5();
+            const evtJoinFree = server.mcpEventV5Join('treasure_hunt_v5');
+            v187Assert(evtJoinFree.success === true, 'event.join v5 free event works without stones');
+
+            // Test 25: mcpEventV5Join twice returns error
+            server._initEventStateV5();
+            server.mcpEventV5Join('cultivation_peak_v5');
+            const evtJoinDup = server.mcpEventV5Join('cultivation_peak_v5');
+            v187Assert(evtJoinDup.error !== undefined, 'event.join v5 twice returns error');
+
+            // Test 26: mcpEventV5Reward claims participation reward
+            server._initEventStateV5();
+            window.gameState.spiritStones = 1000;
+            server.mcpEventV5Join('cultivation_peak_v5');
+            const evtReward = server.mcpEventV5Reward('cultivation_peak_v5');
+            v187Assert(evtReward.success === true, 'event.reward v5 returns success');
+            v187Assert(evtReward.rank !== undefined, 'event.reward v5 returns rank');
+            v187Assert(evtReward.rewards !== undefined, 'event.reward v5 returns rewards');
+
+            // Test 27: mcpEventV5Reward without participation returns error
+            server._initEventStateV5();
+            const evtRewardNoPart = server.mcpEventV5Reward('battle_royale_v5');
+            v187Assert(evtRewardNoPart.error !== undefined, 'event.reward v5 without participation returns error');
+
+            // Test 28: mcpEventV5Reward twice returns error
+            server._initEventStateV5();
+            server.mcpEventV5Join('treasure_hunt_v5');
+            server.mcpEventV5Reward('treasure_hunt_v5');
+            const evtRewardDup = server.mcpEventV5Reward('treasure_hunt_v5');
+            v187Assert(evtRewardDup.error !== undefined, 'event.reward v5 twice returns error');
+
+            // Test 29: serendipityV5 choices apply different rewards
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('dragon_shrine_v5');
+            const comp1 = server.mcpSerendipityV5Complete('dragon_shrine_v5', 'fight_dragon');
+            v187Assert(comp1.rewards.type === 'pet', 'serendipity.complete v5 fight_dragon gives pet');
+
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('dragon_shrine_v5');
+            const comp2 = server.mcpSerendipityV5Complete('dragon_shrine_v5', 'dragon_gift');
+            v187Assert(comp2.rewards.type === 'technique', 'serendipity.complete v5 dragon_gift gives technique');
+
+            // Test 30: event.reward v5 applies spiritStone reward
+            server._initEventStateV5();
+            window.gameState.spiritStones = 1000;
+            server.mcpEventV5Join('cultivation_peak_v5');
+            const beforeSS = window.gameState.spiritStones;
+            server.mcpEventV5Reward('cultivation_peak_v5');
+            v187Assert(window.gameState.spiritStones >= beforeSS, 'event.reward v5 adds spirit stones');
+
+            // Test 31: event.reward v5 applies title reward
+            server._initEventStateV5();
+            window.gameState.titles = [];
+            server.mcpEventV5Join('battle_royale_v5');
+            server.mcpEventV5Reward('battle_royale_v5');
+            v187Assert(window.gameState.titles.length > 0, 'event.reward v5 adds title');
+
+            // Test 32: event.reward v5 applies items reward
+            server._initEventStateV5();
+            window.gameState.inventory = [];
+            server.mcpEventV5Join('treasure_hunt_v5');
+            server.mcpEventV5Reward('treasure_hunt_v5');
+            v187Assert(window.gameState.inventory.length > 0, 'event.reward v5 adds items');
+
+            // Test 33: serendipity.complete v5 applies artifact reward
+            server._initSerendipityStateV5();
+            window.gameState.artifacts = [];
+            server.mcpSerendipityV5Start('ancient_temple_v5');
+            server.mcpSerendipityV5Complete('ancient_temple_v5', 'challenge_guardian');
+            v187Assert(window.gameState.artifacts.includes('神殿令牌'), 'serendipity.complete v5 adds artifact');
+
+            // Test 34: serendipity.complete v5 applies technique reward
+            server._initSerendipityStateV5();
+            window.gameState.techniques = [];
+            server.mcpSerendipityV5Start('dragon_shrine_v5');
+            server.mcpSerendipityV5Complete('dragon_shrine_v5', 'dragon_gift');
+            v187Assert(window.gameState.techniques.includes('龙息诀'), 'serendipity.complete v5 adds technique');
+
+            // Test 35: serendipity.complete v5 applies pet reward
+            server._initSerendipityStateV5();
+            window.gameState.pets = [];
+            server.mcpSerendipityV5Start('dragon_shrine_v5');
+            server.mcpSerendipityV5Complete('dragon_shrine_v5', 'fight_dragon');
+            v187Assert(window.gameState.pets.includes('龙蛋'), 'serendipity.complete v5 adds pet');
+
+            // Test 36: mcpSerendipityV5List with legendary difficulty
+            const serLeg = server.mcpSerendipityV5List(null, 'legendary');
+            v187Assert(serLeg.serendipities.length === 1, 'serendipity.list v5 legendary filter returns 1');
+            v187Assert(serLeg.serendipities[0].id === 'immortal_valley_v5', 'serendipity.list v5 legendary is immortal_valley');
+
+            // Test 37: mcpEventV5List returns entry fee info
+            const evtInfo = server.mcpEventV5List();
+            v187Assert(evtInfo.events[0].entryFee !== undefined, 'event.list v5 returns entryFee');
+            v187Assert(evtInfo.events[2].entryFee === 0, 'event.list v5 treasure_hunt has 0 fee');
+
+            // Test 38: All 6 V187 methods return valid response
+            window.gameState = { playerId: 'player', playerName: '测试道友', spiritStones: 10000, combatPower: 3000, reputation: 500, realmIndex: 3, level: 10, techniques: [], artifacts: [], pets: [], inventory: [], titles: [] };
+            server._initSerendipityStateV5();
+            server._initEventStateV5();
+            const allMethodsV187 = [
+                server.mcpSerendipityV5List(),
+                server.mcpSerendipityV5Start('mystic_cave_v5'),
+                server.mcpSerendipityV5Complete('mystic_cave_v5', 'safe_path'),
+                server.mcpEventV5List(),
+                server.mcpEventV5Join('treasure_hunt_v5'),
+                server.mcpEventV5Reward('treasure_hunt_v5')
+            ];
+            v187Assert(allMethodsV187.every(m => m && (m.success !== undefined || m.error !== undefined)), 'All 6 V187 methods return valid response');
+
+            // Test 39: serendipityV5 totalCompleted increments
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('mystic_cave_v5');
+            server.mcpSerendipityV5Complete('mystic_cave_v5', 'safe_path');
+            v187Assert(window.gameState.serendipityV5.totalCompleted === 1, 'serendipityV5 totalCompleted is 1');
+
+            // Test 40: eventV5 totalParticipated increments
+            server._initEventStateV5();
+            server.mcpEventV5Join('cultivation_peak_v5');
+            v187Assert(window.gameState.eventV5.totalParticipated === 1, 'eventV5 totalParticipated is 1');
+
+            // Test 41: serendipity.list v5 returns choices in serendipities
+            const serWithChoices = server.mcpSerendipityV5List();
+            v187Assert(serWithChoices.serendipities[0].choices !== undefined, 'serendipity.list v5 returns choices');
+            v187Assert(serWithChoices.serendipities[0].choices.length === 2, 'serendipity.list v5 choices count is 2');
+
+            // Test 42: serendipity.start v5 updates currentSerendipity
+            server._initSerendipityStateV5();
+            server.mcpSerendipityV5Start('ancient_temple_v5');
+            v187Assert(window.gameState.serendipityV5.currentSerendipity !== null, 'currentSerendipity is set after start');
+            v187Assert(window.gameState.serendipityV5.currentSerendipity.id === 'ancient_temple_v5', 'currentSerendipity id is correct');
+
+            // Test 43: serendipity.complete v5 clears currentSerendipity
+            server.mcpSerendipityV5Complete('ancient_temple_v5', 'stealth_approach');
+            v187Assert(window.gameState.serendipityV5.currentSerendipity === null, 'currentSerendipity is cleared after complete');
+
+            // Test 44: event.join v5 deducts entry fee
+            window.gameState.spiritStones = 500;
+            server._initEventStateV5();
+            server.mcpEventV5Join('cultivation_peak_v5');
+            v187Assert(window.gameState.spiritStones === 400, 'event.join v5 deducts 100 entry fee');
+
+            // Test 45: All 45 tests pass
+            const v187Passed = results.filter(r => r.pass).length;
+            const v187Total = results.length;
+            const v187PassRate = v187Passed / v187Total;
+            console.log('V187 Tests:', v187Passed + '/' + v187Total, '(' + (v187PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V187', passed: v187Passed, total: v187Total, passRate: v187PassRate.toFixed(3), results };
+        }
+
+        const v187Results = runV187Tests();
 
         const v181Results = runV181Tests();
