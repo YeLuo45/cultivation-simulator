@@ -5719,6 +5719,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V200)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V201: Register 宠物探险+派遣系统v7 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V201)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5988,6 +5992,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'social.interact':
                             result = this.mcpSocialInteractV6(args.friendId, args.action);
+                            break;
+                        // V201: 宠物探险+派遣系统v7
+                        case 'explore.list':
+                            result = this.mcpExploreListV7(args.status);
+                            break;
+                        case 'explore.start':
+                            result = this.mcpExploreStartV7(args.petId, args.location);
+                            break;
+                        case 'explore.settle':
+                            result = this.mcpExploreSettleV7(args.exploreId);
+                            break;
+                        case 'explore.speedup':
+                            result = this.mcpExploreSpeedupV7(args.exploreId);
+                            break;
+                        case 'dispatch.list':
+                            result = this.mcpDispatchListV7();
+                            break;
+                        case 'dispatch.execute':
+                            result = this.mcpDispatchExecuteV7(args.dispatchId);
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -18923,6 +18946,238 @@ const ACHIEVEMENT_ID_MAP = {
                         intimacyGain: reward,
                         intimacy: social.intimacyScores[friendId],
                         message: '与' + friend.playerName + '完成' + action + '互动，亲密度+' + reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: _initExploreStateV7 - 初始化探险系统v7状态
+            _initExploreStateV7() {
+                const gs = window.gameState;
+                if (!gs.exploreV7) {
+                    gs.exploreV7 = {
+                        explorations: [],
+                        activeExplorations: [],
+                        totalExplorations: 0,
+                        locations: EXPLORE_CONFIG_V7.locations.map(loc => ({
+                            ...loc,
+                            status: loc.rarity === 'common' ? 'available' : 'locked'
+                        }))
+                    };
+                }
+                return gs.exploreV7;
+            }
+
+            // V201: _initDispatchStateV7 - 初始化派遣系统v7状态
+            _initDispatchStateV7() {
+                const gs = window.gameState;
+                if (!gs.dispatchV7) {
+                    gs.dispatchV7 = {
+                        tasks: [],
+                        availableTasks: DISPATCH_CONFIG_V7.tasks.map(t => ({ ...t, status: 'available' })),
+                        totalTasks: 0
+                    };
+                }
+                return gs.dispatchV7;
+            }
+
+            // V201: mcpExploreListV7 - 获取探险列表v7
+            mcpExploreListV7(status) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const exploreV7 = this._initExploreStateV7();
+                    let explorations = exploreV7.explorations;
+                    if (status === 'active') {
+                        explorations = explorations.filter(e => e.status === 'active');
+                    } else if (status === 'completed') {
+                        explorations = explorations.filter(e => e.status === 'completed');
+                    }
+                    return {
+                        success: true,
+                        explorations,
+                        locations: exploreV7.locations,
+                        total: explorations.length,
+                        activeCount: exploreV7.activeExplorations.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: mcpExploreStartV7 - 开始探险v7
+            mcpExploreStartV7(petId, location) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!petId) return { error: '请指定宠物ID' };
+                    if (!location) return { error: '请指定地点ID' };
+                    const exploreV7 = this._initExploreStateV7();
+                    const petV7 = this._initPetStateV6();
+                    const pet = petV7.pets.find(p => p.id === petId);
+                    if (!pet) return { error: '宠物不存在: ' + petId };
+                    const loc = exploreV7.locations.find(l => l.id === location);
+                    if (!loc) return { error: '地点不存在: ' + location };
+                    if (loc.status === 'locked') return { error: '地点未解锁: ' + loc.name };
+                    if (exploreV7.activeExplorations.length >= EXPLORE_CONFIG_V7.maxActiveExplorations) {
+                        return { error: '同时进行的探险数已达上限: ' + EXPLORE_CONFIG_V7.maxActiveExplorations };
+                    }
+                    const now = Date.now();
+                    const exploration = {
+                        id: 'exp_' + Date.now(),
+                        petId,
+                        petName: pet.name,
+                        location,
+                        locationName: loc.name,
+                        startTime: now,
+                        duration: loc.duration,
+                        endTime: now + loc.duration,
+                        status: 'active',
+                        discoveries: [],
+                        rewards: null
+                    };
+                    exploreV7.explorations.push(exploration);
+                    exploreV7.activeExplorations.push(exploration.id);
+                    exploreV7.totalExplorations++;
+                    return {
+                        success: true,
+                        exploreId: exploration.id,
+                        locationName: loc.name,
+                        petName: pet.name,
+                        duration: loc.duration,
+                        message: pet.name + ' 开始探索 ' + loc.name + '，预计 ' + (loc.duration / 60000).toFixed(0) + ' 分钟'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: mcpExploreSettleV7 - 探险结算v7
+            mcpExploreSettleV7(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV7 = this._initExploreStateV7();
+                    const exploration = exploreV7.explorations.find(e => e.id === exploreId);
+                    if (!exploration) return { error: '探险不存在: ' + exploreId };
+                    if (exploration.status === 'completed') return { error: '探险已完成，请勿重复结算' };
+                    const now = Date.now();
+                    if (now < exploration.endTime) return { error: '探险尚未完成，还需 ' + Math.ceil((exploration.endTime - now) / 60000) + ' 分钟' };
+                    const loc = exploreV7.locations.find(l => l.id === exploration.location);
+                    const discoveries = loc ? loc.possibleDiscoveries : [];
+                    const rewardCount = Math.floor(Math.random() * 3) + 1;
+                    const selectedDiscoveries = discoveries.sort(() => 0.5 - Math.random()).slice(0, rewardCount);
+                    const spiritStoneReward = Math.floor(Math.random() * 100) + 50;
+                    const expReward = Math.floor(Math.random() * 50) + 20;
+                    exploration.discoveries = selectedDiscoveries;
+                    exploration.rewards = {
+                        spiritStones: spiritStoneReward,
+                        exp: expReward,
+                        items: selectedDiscoveries
+                    };
+                    exploration.status = 'completed';
+                    gs.spiritStones = (gs.spiritStones || 0) + spiritStoneReward;
+                    gs.level = gs.level || 1;
+                    gs.exp = (gs.exp || 0) + expReward;
+                    const activeIdx = exploreV7.activeExplorations.indexOf(exploreId);
+                    if (activeIdx > -1) exploreV7.activeExplorations.splice(activeIdx, 1);
+                    return {
+                        success: true,
+                        exploreId,
+                        discoveries: selectedDiscoveries,
+                        rewards: exploration.rewards,
+                        message: exploration.petName + ' 完成探险，发现: ' + selectedDiscoveries.join('/') + '，获得 ' + spiritStoneReward + ' 灵石和 ' + expReward + ' 经验'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: mcpExploreSpeedupV7 - 加速探险v7
+            mcpExploreSpeedupV7(exploreId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!exploreId) return { error: '请指定探险ID' };
+                    const exploreV7 = this._initExploreStateV7();
+                    const exploration = exploreV7.explorations.find(e => e.id === exploreId);
+                    if (!exploration) return { error: '探险不存在: ' + exploreId };
+                    if (exploration.status === 'completed') return { error: '探险已完成，无需加速' };
+                    const now = Date.now();
+                    const remainingTime = exploration.endTime - now;
+                    if (remainingTime <= 0) return { error: '探险已完成' };
+                    const remainingMinutes = Math.ceil(remainingTime / 60000);
+                    const cost = remainingMinutes * EXPLORE_CONFIG_V7.speedupCostPerMinute;
+                    if ((gs.spiritStones || 0) < cost) return { error: '灵石不足，加速需要 ' + cost + ' 灵石' };
+                    gs.spiritStones -= cost;
+                    exploration.endTime = now;
+                    const activeIdx = exploreV7.activeExplorations.indexOf(exploreId);
+                    if (activeIdx > -1) exploreV7.activeExplorations.splice(activeIdx, 1);
+                    return {
+                        success: true,
+                        exploreId,
+                        cost,
+                        message: '消耗 ' + cost + ' 灵石加速探险完成'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: mcpDispatchListV7 - 获取派遣任务列表v7
+            mcpDispatchListV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const dispatchV7 = this._initDispatchStateV7();
+                    return {
+                        success: true,
+                        tasks: dispatchV7.tasks,
+                        availableTasks: dispatchV7.availableTasks,
+                        total: dispatchV7.availableTasks.length,
+                        activeCount: dispatchV7.tasks.filter(t => t.status === 'active').length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V201: mcpDispatchExecuteV7 - 执行派遣任务v7
+            mcpDispatchExecuteV7(dispatchId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!dispatchId) return { error: '请指定派遣任务ID' };
+                    const dispatchV7 = this._initDispatchStateV7();
+                    const petV7 = this._initPetStateV6();
+                    const task = dispatchV7.availableTasks.find(t => t.id === dispatchId);
+                    if (!task) return { error: '派遣任务不存在: ' + dispatchId };
+                    if (task.status !== 'available') return { error: '任务不可用: ' + task.name };
+                    const activeTasks = dispatchV7.tasks.filter(t => t.status === 'active');
+                    if (activeTasks.length >= DISPATCH_CONFIG_V7.maxActiveTasks) {
+                        return { error: '同时进行的派遣任务已达上限: ' + DISPATCH_CONFIG_V7.maxActiveTasks };
+                    }
+                    let matchedPet = null;
+                    for (const pet of petV7.pets) {
+                        const petLevel = pet.level || 1;
+                        if (petLevel >= task.requiredPetLevel) {
+                            matchedPet = pet;
+                            break;
+                        }
+                    }
+                    if (!matchedPet) return { error: '没有符合条件的宠物（需要等级 >= ' + task.requiredPetLevel + '）' };
+                    const now = Date.now();
+                    const dispatchTask = {
+                        id: 'dis_' + Date.now(),
+                        taskId: task.id,
+                        name: task.name,
+                        petId: matchedPet.id,
+                        petName: matchedPet.name,
+                        startTime: now,
+                        duration: task.duration,
+                        endTime: now + task.duration,
+                        status: 'active',
+                        reward: task.reward
+                    };
+                    dispatchV7.tasks.push(dispatchTask);
+                    dispatchV7.totalTasks++;
+                    return {
+                        success: true,
+                        dispatchId: dispatchTask.id,
+                        taskName: task.name,
+                        petName: matchedPet.name,
+                        duration: task.duration,
+                        message: matchedPet.name + ' 开始执行派遣任务: ' + task.name + '，预计 ' + (task.duration / 60000).toFixed(0) + ' 分钟'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -44563,6 +44818,95 @@ const ACHIEVEMENT_ID_MAP = {
                         action: { type: 'string', description: '互动类型: chat/gift/team/visit' }
                     },
                     required: ['friendId', 'action']
+                }
+            }
+        };
+
+        // V201: 宠物探险+派遣系统v7 (P-20260529-179)
+        const EXPLORE_CONFIG_V7 = {
+            maxActiveExplorations: 5,
+            baseDuration: 300000,
+            speedupCostPerMinute: 10,
+            locations: [
+                { id: 'loc_1', name: '灵气洞穴', rarity: 'common', possibleDiscoveries: ['灵草', '灵石', '灵气珠'], duration: 180000 },
+                { id: 'loc_2', name: '古墓秘境', rarity: 'rare', possibleDiscoveries: ['古玉', '灵石', '功法残卷'], duration: 300000 },
+                { id: 'loc_3', name: '深渊遗迹', rarity: 'epic', possibleDiscoveries: ['神器碎片', '上古灵石', '秘术'], duration: 600000 },
+                { id: 'loc_4', name: '仙府废墟', rarity: 'legend', possibleDiscoveries: ['仙丹', '仙器', '天书'], duration: 900000 },
+                { id: 'loc_5', name: '天外天', rarity: 'mythic', possibleDiscoveries: ['天道碎片', '混沌灵', '神兵'], duration: 1200000 }
+            ]
+        };
+
+        const DISPATCH_CONFIG_V7 = {
+            maxActiveTasks: 3,
+            autoMatchPet: true,
+            tasks: [
+                { id: 'task_1', name: '采集灵石', description: '前往矿区采集灵石', requiredPetLevel: 1, reward: { spiritStones: 50, exp: 20 }, duration: 120000 },
+                { id: 'task_2', name: '守护药园', description: '守护宗门药园免受妖兽侵袭', requiredPetLevel: 3, reward: { spiritStones: 100, exp: 50, items: ['灵草'] }, duration: 240000 },
+                { id: 'task_3', name: '探索秘境', description: '协助探索未知秘境', requiredPetLevel: 5, reward: { spiritStones: 200, exp: 100, items: ['灵石'] }, duration: 360000 },
+                { id: 'task_4', name: '护送商队', description: '护送商队穿越危险区域', requiredPetLevel: 8, reward: { spiritStones: 350, exp: 150, items: ['灵石', '丹药'] }, duration: 480000 },
+                { id: 'task_5', name: '狩猎妖兽', description: '清除区域内的强大妖兽', requiredPetLevel: 10, reward: { spiritStones: 500, exp: 250, items: ['妖兽内丹'] }, duration: 600000 }
+            ]
+        };
+
+        const MCP_TOOLS_V201 = {
+            'explore.list': {
+                name: 'explore.list',
+                description: '获取探险列表 (宠物探险v7-获取所有探险列表，支持状态筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        status: { type: 'string', description: '筛选状态: active/completed/全部 (默认全部)' }
+                    }
+                }
+            },
+            'explore.start': {
+                name: 'explore.start',
+                description: '开始探险 (宠物探险v7-选择宠物和地点开始探险，自动计算时长)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        petId: { type: 'string', description: '宠物ID' },
+                        location: { type: 'string', description: '地点ID' }
+                    },
+                    required: ['petId', 'location']
+                }
+            },
+            'explore.settle': {
+                name: 'explore.settle',
+                description: '探险结算 (宠物探险v7-结算探险，发放发现物和奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'explore.speedup': {
+                name: 'explore.speedup',
+                description: '加速探险 (宠物探险v7-消耗灵石加速完成探险)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        exploreId: { type: 'string', description: '探险ID' }
+                    },
+                    required: ['exploreId']
+                }
+            },
+            'dispatch.list': {
+                name: 'dispatch.list',
+                description: '获取派遣任务列表 (派遣系统v7-获取所有可执行派遣任务)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'dispatch.execute': {
+                name: 'dispatch.execute',
+                description: '执行派遣任务 (派遣系统v7-自动匹配宠物并执行派遣任务)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        dispatchId: { type: 'string', description: '派遣任务ID' }
+                    },
+                    required: ['dispatchId']
                 }
             }
         };
@@ -82684,6 +83028,313 @@ const v152Results = runV152Tests();
         }
 
         const v200Results = runV200Tests();
+
+        // V201: 宠物探险+派遣系统v7 Tests (P-20260529-179)
+        function runV201Tests() {
+            const results = [];
+            const v201Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player',
+                playerName: '测试道友',
+                spiritStones: 100000,
+                combatPower: 3000,
+                reputation: 500,
+                realmIndex: 3,
+                level: 10,
+                techniques: [],
+                artifacts: [],
+                pets: [
+                    { id: 'pet_1', name: '小灵狐', level: 5, type: '灵兽', rarity: 'rare' },
+                    { id: 'pet_2', name: '玄武幼崽', level: 8, type: '神兽', rarity: 'epic' },
+                    { id: 'pet_3', name: '仙鹤', level: 12, type: '仙兽', rarity: 'legend' }
+                ],
+                inventory: [],
+                titles: [],
+                exploreV7: null,
+                dispatchV7: null,
+                petV6: null
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V201 definition exists and has 6 tools
+            v201Assert(typeof MCP_TOOLS_V201 === 'object', 'MCP_TOOLS_V201 is defined');
+            v201Assert(Object.keys(MCP_TOOLS_V201).length === 6, 'MCP_TOOLS_V201 has 6 tools');
+            v201Assert('explore.list' in MCP_TOOLS_V201, 'explore.list tool exists');
+            v201Assert('explore.start' in MCP_TOOLS_V201, 'explore.start tool exists');
+            v201Assert('explore.settle' in MCP_TOOLS_V201, 'explore.settle tool exists');
+            v201Assert('explore.speedup' in MCP_TOOLS_V201, 'explore.speedup tool exists');
+            v201Assert('dispatch.list' in MCP_TOOLS_V201, 'dispatch.list tool exists');
+            v201Assert('dispatch.execute' in MCP_TOOLS_V201, 'dispatch.execute tool exists');
+
+            // Test 2: EXPLORE_CONFIG_V7 is defined with correct values
+            v201Assert(typeof EXPLORE_CONFIG_V7 === 'object', 'EXPLORE_CONFIG_V7 is defined');
+            v201Assert(EXPLORE_CONFIG_V7.maxActiveExplorations === 5, 'EXPLORE_CONFIG_V7 has correct maxActiveExplorations');
+            v201Assert(Array.isArray(EXPLORE_CONFIG_V7.locations), 'EXPLORE_CONFIG_V7 has locations array');
+            v201Assert(EXPLORE_CONFIG_V7.locations.length === 5, 'EXPLORE_CONFIG_V7 has 5 locations');
+            v201Assert(EXPLORE_CONFIG_V7.speedupCostPerMinute === 10, 'EXPLORE_CONFIG_V7 has correct speedupCostPerMinute');
+
+            // Test 3: DISPATCH_CONFIG_V7 is defined with correct values
+            v201Assert(typeof DISPATCH_CONFIG_V7 === 'object', 'DISPATCH_CONFIG_V7 is defined');
+            v201Assert(DISPATCH_CONFIG_V7.maxActiveTasks === 3, 'DISPATCH_CONFIG_V7 has correct maxActiveTasks');
+            v201Assert(Array.isArray(DISPATCH_CONFIG_V7.tasks), 'DISPATCH_CONFIG_V7 has tasks array');
+            v201Assert(DISPATCH_CONFIG_V7.tasks.length === 5, 'DISPATCH_CONFIG_V7 has 5 tasks');
+            v201Assert(DISPATCH_CONFIG_V7.autoMatchPet === true, 'DISPATCH_CONFIG_V7 has autoMatchPet enabled');
+
+            // Test 4: _initExploreStateV7 creates state
+            const expV7State = server._initExploreStateV7();
+            v201Assert(expV7State !== null, '_initExploreStateV7 returns state');
+            v201Assert(Array.isArray(expV7State.explorations), '_initExploreStateV7 has explorations array');
+            v201Assert(Array.isArray(expV7State.activeExplorations), '_initExploreStateV7 has activeExplorations array');
+            v201Assert(Array.isArray(expV7State.locations), '_initExploreStateV7 has locations array');
+            v201Assert(expV7State.totalExplorations === 0, '_initExploreStateV7 has totalExplorations 0');
+
+            // Test 5: _initDispatchStateV7 creates state
+            const disV7State = server._initDispatchStateV7();
+            v201Assert(disV7State !== null, '_initDispatchStateV7 returns state');
+            v201Assert(Array.isArray(disV7State.tasks), '_initDispatchStateV7 has tasks array');
+            v201Assert(Array.isArray(disV7State.availableTasks), '_initDispatchStateV7 has availableTasks array');
+            v201Assert(disV7State.totalTasks === 0, '_initDispatchStateV7 has totalTasks 0');
+
+            // Test 6: mcpExploreListV7 returns correct structure
+            const expList = server.mcpExploreListV7();
+            v201Assert(expList.success === true, 'explore.list v7 returns success');
+            v201Assert(Array.isArray(expList.explorations), 'explore.list v7 has explorations array');
+            v201Assert(Array.isArray(expList.locations), 'explore.list v7 has locations array');
+            v201Assert(typeof expList.total === 'number', 'explore.list v7 has total');
+            v201Assert(typeof expList.activeCount === 'number', 'explore.list v7 has activeCount');
+
+            // Test 7: mcpExploreListV7 with status filter
+            const expListActive = server.mcpExploreListV7('active');
+            v201Assert(expListActive.success === true, 'explore.list v7 active filter returns success');
+            v201Assert(Array.isArray(expListActive.explorations), 'explore.list v7 active filter has explorations');
+
+            // Test 8: mcpExploreStartV7 works correctly
+            const expStart = server.mcpExploreStartV7('pet_1', 'loc_1');
+            v201Assert(expStart.success === true, 'explore.start v7 returns success');
+            v201Assert(expStart.exploreId !== undefined, 'explore.start v7 returns exploreId');
+            v201Assert(expStart.locationName === '灵气洞穴', 'explore.start v7 returns correct locationName');
+            v201Assert(expStart.petName === '小灵狐', 'explore.start v7 returns correct petName');
+
+            // Test 9: mcpExploreStartV7 fails for non-existent pet
+            const expStartBadPet = server.mcpExploreStartV7('non_existent_pet', 'loc_1');
+            v201Assert(expStartBadPet.error !== undefined, 'explore.start v7 non-existent pet returns error');
+
+            // Test 10: mcpExploreStartV7 fails for non-existent location
+            const expStartBadLoc = server.mcpExploreStartV7('pet_1', 'non_existent_loc');
+            v201Assert(expStartBadLoc.error !== undefined, 'explore.start v7 non-existent location returns error');
+
+            // Test 11: mcpExploreStartV7 fails for locked location
+            const expStartLocked = server.mcpExploreStartV7('pet_1', 'loc_3');
+            v201Assert(expStartLocked.error !== undefined, 'explore.start v7 locked location returns error');
+
+            // Test 12: mcpExploreSettleV7 works correctly (complete exploration first)
+            window.gameState.exploreV7.explorations[0].endTime = Date.now() - 1000;
+            const expSettle = server.mcpExploreSettleV7(window.gameState.exploreV7.explorations[0].id);
+            v201Assert(expSettle.success === true, 'explore.settle v7 returns success');
+            v201Assert(Array.isArray(expSettle.discoveries), 'explore.settle v7 has discoveries array');
+            v201Assert(typeof expSettle.rewards === 'object', 'explore.settle v7 has rewards object');
+
+            // Test 13: mcpExploreSettleV7 fails for non-existent exploration
+            const expSettleBad = server.mcpExploreSettleV7('non_existent_exp');
+            v201Assert(expSettleBad.error !== undefined, 'explore.settle v7 non-existent returns error');
+
+            // Test 14: mcpExploreSettleV7 fails for already completed
+            const expSettleRepeat = server.mcpExploreSettleV7(window.gameState.exploreV7.explorations[0].id);
+            v201Assert(expSettleRepeat.error !== undefined, 'explore.settle v7 already completed returns error');
+
+            // Test 15: mcpExploreSettleV7 fails when not yet complete
+            const expStart2 = server.mcpExploreStartV7('pet_2', 'loc_2');
+            const expSettleEarly = server.mcpExploreSettleV7(expStart2.exploreId);
+            v201Assert(expSettleEarly.error !== undefined, 'explore.settle v7 not yet complete returns error');
+
+            // Test 16: mcpExploreSpeedupV7 works correctly
+            const expStart3 = server.mcpExploreStartV7('pet_3', 'loc_1');
+            const expSpeedup = server.mcpExploreSpeedupV7(expStart3.exploreId);
+            v201Assert(expSpeedup.success === true, 'explore.speedup v7 returns success');
+            v201Assert(typeof expSpeedup.cost === 'number', 'explore.speedup v7 returns cost');
+
+            // Test 17: mcpExploreSpeedupV7 fails for non-existent exploration
+            const expSpeedupBad = server.mcpExploreSpeedupV7('non_existent_exp');
+            v201Assert(expSpeedupBad.error !== undefined, 'explore.speedup v7 non-existent returns error');
+
+            // Test 18: mcpDispatchListV7 returns correct structure
+            const disList = server.mcpDispatchListV7();
+            v201Assert(disList.success === true, 'dispatch.list v7 returns success');
+            v201Assert(Array.isArray(disList.tasks), 'dispatch.list v7 has tasks array');
+            v201Assert(Array.isArray(disList.availableTasks), 'dispatch.list v7 has availableTasks array');
+            v201Assert(typeof disList.total === 'number', 'dispatch.list v7 has total');
+
+            // Test 19: mcpDispatchExecuteV7 works correctly
+            const disExec = server.mcpDispatchExecuteV7('task_1');
+            v201Assert(disExec.success === true, 'dispatch.execute v7 returns success');
+            v201Assert(disExec.dispatchId !== undefined, 'dispatch.execute v7 returns dispatchId');
+            v201Assert(disExec.taskName === '采集灵石', 'dispatch.execute v7 returns correct taskName');
+
+            // Test 20: mcpDispatchExecuteV7 fails for non-existent task
+            const disExecBad = server.mcpDispatchExecuteV7('non_existent_task');
+            v201Assert(disExecBad.error !== undefined, 'dispatch.execute v7 non-existent returns error');
+
+            // Test 21: mcpDispatchExecuteV7 fails when no eligible pet
+            window.gameState.pets = [{ id: 'pet_low', name: '小宠物', level: 1, type: '妖兽', rarity: 'common' }];
+            server._initPetStateV6();
+            const disExecNoPet = server.mcpDispatchExecuteV7('task_4');
+            v201Assert(disExecNoPet.error !== undefined, 'dispatch.execute v7 no eligible pet returns error');
+
+            // Test 22: _initExploreStateV7 idempotent
+            const expState1 = server._initExploreStateV7();
+            const expState2 = server._initExploreStateV7();
+            v201Assert(expState1 === expState2, '_initExploreStateV7 is idempotent');
+
+            // Test 23: _initDispatchStateV7 idempotent
+            const disState1 = server._initDispatchStateV7();
+            const disState2 = server._initDispatchStateV7();
+            v201Assert(disState1 === disState2, '_initDispatchStateV7 is idempotent');
+
+            // Test 24: All 6 V201 tools callable via callTool
+            window.gameState.exploreV7 = null;
+            server._initExploreStateV7();
+            window.gameState.dispatchV7 = null;
+            server._initDispatchStateV7();
+            const allV201Tools = [
+                server.callTool('explore.list', {}),
+                server.callTool('explore.start', { petId: 'pet_1', location: 'loc_1' }),
+                server.callTool('explore.settle', { exploreId: 'test' }),
+                server.callTool('explore.speedup', { exploreId: 'test' }),
+                server.callTool('dispatch.list', {}),
+                server.callTool('dispatch.execute', { dispatchId: 'task_1' })
+            ];
+            v201Assert(allV201Tools.every(r => !r.error || r.isError === false), 'All 6 V201 tools callable via callTool');
+
+            // Test 25: mcpExploreStartV7 requires petId
+            const expStartNoPet = server.mcpExploreStartV7(null, 'loc_1');
+            v201Assert(expStartNoPet.error !== undefined, 'explore.start v7 without petId returns error');
+
+            // Test 26: mcpExploreStartV7 requires location
+            const expStartNoLoc = server.mcpExploreStartV7('pet_1', null);
+            v201Assert(expStartNoLoc.error !== undefined, 'explore.start v7 without location returns error');
+
+            // Test 27: mcpExploreSettleV7 requires exploreId
+            const expSettleNoId = server.mcpExploreSettleV7(null);
+            v201Assert(expSettleNoId.error !== undefined, 'explore.settle v7 without exploreId returns error');
+
+            // Test 28: mcpExploreSpeedupV7 requires exploreId
+            const expSpeedupNoId = server.mcpExploreSpeedupV7(null);
+            v201Assert(expSpeedupNoId.error !== undefined, 'explore.speedup v7 without exploreId returns error');
+
+            // Test 29: mcpDispatchExecuteV7 requires dispatchId
+            const disExecNoId = server.mcpDispatchExecuteV7(null);
+            v201Assert(disExecNoId.error !== undefined, 'dispatch.execute v7 without dispatchId returns error');
+
+            // Test 30: V201 tools registered in toolRegistry
+            v201Assert(server.toolRegistry.has('explore.list'), 'explore.list v7 is in toolRegistry');
+            v201Assert(server.toolRegistry.has('explore.start'), 'explore.start v7 is in toolRegistry');
+            v201Assert(server.toolRegistry.has('explore.settle'), 'explore.settle v7 is in toolRegistry');
+            v201Assert(server.toolRegistry.has('explore.speedup'), 'explore.speedup v7 is in toolRegistry');
+            v201Assert(server.toolRegistry.has('dispatch.list'), 'dispatch.list v7 is in toolRegistry');
+            v201Assert(server.toolRegistry.has('dispatch.execute'), 'dispatch.execute v7 is in toolRegistry');
+
+            // Test 31: mcpExploreStartV7 exceeds max active limit
+            window.gameState.exploreV7.activeExplorations = ['exp_1', 'exp_2', 'exp_3', 'exp_4', 'exp_5'];
+            const expStartMax = server.mcpExploreStartV7('pet_1', 'loc_1');
+            v201Assert(expStartMax.error !== undefined, 'explore.start v7 exceeds max active returns error');
+
+            // Test 32: mcpDispatchExecuteV7 exceeds max active limit
+            window.gameState.dispatchV7.tasks = [
+                { id: 'dis_1', status: 'active' },
+                { id: 'dis_2', status: 'active' },
+                { id: 'dis_3', status: 'active' }
+            ];
+            const disExecMax = server.mcpDispatchExecuteV7('task_1');
+            v201Assert(disExecMax.error !== undefined, 'dispatch.execute v7 exceeds max active returns error');
+
+            // Test 33: mcpExploreSpeedupV7 with insufficient spirit stones
+            window.gameState.spiritStones = 10;
+            window.gameState.exploreV7.activeExplorations = [];
+            const expStart4 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            window.gameState.exploreV7.explorations[window.gameState.exploreV7.explorations.length - 1].endTime = Date.now() + 600000;
+            window.gameState.exploreV7.activeExplorations.push(expStart4.exploreId);
+            const expSpeedupPoor = server.mcpExploreSpeedupV7(expStart4.exploreId);
+            v201Assert(expSpeedupPoor.error !== undefined, 'explore.speedup v7 insufficient spirit stones returns error');
+            window.gameState.spiritStones = 100000;
+
+            // Test 34: mcpExploreListV7 with completed filter
+            const expListCompleted = server.mcpExploreListV7('completed');
+            v201Assert(expListCompleted.success === true, 'explore.list v7 completed filter returns success');
+
+            // Test 35: mcpDispatchListV7 shows correct activeCount
+            const disListCount = server.mcpDispatchListV7();
+            v201Assert(typeof disListCount.activeCount === 'number', 'dispatch.list v7 has activeCount');
+
+            // Test 36: mcpExploreStartV7 increases totalExplorations
+            const beforeCount = window.gameState.exploreV7.totalExplorations;
+            const expStart5 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            v201Assert(window.gameState.exploreV7.totalExplorations > beforeCount, 'explore.start v7 increases totalExplorations');
+
+            // Test 37: mcpDispatchExecuteV7 increases totalTasks
+            const beforeTaskCount = window.gameState.dispatchV7.totalTasks;
+            const disExec2 = server.mcpDispatchExecuteV7('task_2');
+            v201Assert(window.gameState.dispatchV7.totalTasks > beforeTaskCount, 'dispatch.execute v7 increases totalTasks');
+
+            // Test 38: mcpExploreSettleV7 adds rewards to spirit stones
+            const expStart6 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            window.gameState.exploreV7.explorations[window.gameState.exploreV7.explorations.length - 1].endTime = Date.now() - 1000;
+            const spiritBefore = window.gameState.spiritStones;
+            server.mcpExploreSettleV7(expStart6.exploreId);
+            v201Assert(window.gameState.spiritStones > spiritBefore, 'explore.settle v7 adds spirit stones');
+
+            // Test 39: mcpExploreSettleV7 adds rewards to exp
+            const expBefore = window.gameState.exp || 0;
+            const expStart7 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            window.gameState.exploreV7.explorations[window.gameState.exploreV7.explorations.length - 1].endTime = Date.now() - 1000;
+            server.mcpExploreSettleV7(expStart7.exploreId);
+            v201Assert(window.gameState.exp > expBefore, 'explore.settle v7 adds exp');
+
+            // Test 40: mcpExploreSpeedupV7 reduces spirit stones
+            const expStart8 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            window.gameState.exploreV7.explorations[window.gameState.exploreV7.explorations.length - 1].endTime = Date.now() + 600000;
+            window.gameState.exploreV7.activeExplorations.push(expStart8.exploreId);
+            const spiritBeforeSpeedup = window.gameState.spiritStones;
+            server.mcpExploreSpeedupV7(expStart8.exploreId);
+            v201Assert(window.gameState.spiritStones < spiritBeforeSpeedup, 'explore.speedup v7 reduces spirit stones');
+
+            // Test 41: explore.list v7 returns locations with status
+            const expListLoc = server.mcpExploreListV7();
+            v201Assert(expListLoc.locations.every(l => l.status !== undefined), 'explore.list v7 locations have status');
+
+            // Test 42: dispatch.list v7 available tasks have requiredPetLevel
+            const disListTasks = server.mcpDispatchListV7();
+            v201Assert(disListTasks.availableTasks.every(t => t.requiredPetLevel !== undefined), 'dispatch.list v7 tasks have requiredPetLevel');
+
+            // Test 43: mcpExploreStartV7 without pets returns error
+            window.gameState.pets = [];
+            server._initPetStateV6();
+            const expStartNoPets = server.mcpExploreStartV7('pet_x', 'loc_1');
+            v201Assert(expStartNoPets.error !== undefined, 'explore.start v7 without pets returns error');
+            window.gameState.pets = [{ id: 'pet_1', name: '小灵狐', level: 5, type: '灵兽', rarity: 'rare' }];
+
+            // Test 44: mcpExploreSpeedupV7 on already completed exploration
+            const expStart9 = server.mcpExploreStartV7('pet_1', 'loc_1');
+            window.gameState.exploreV7.explorations[window.gameState.exploreV7.explorations.length - 1].status = 'completed';
+            const expSpeedupComplete = server.mcpExploreSpeedupV7(expStart9.exploreId);
+            v201Assert(expSpeedupComplete.error !== undefined, 'explore.speedup v7 on completed returns error');
+
+            // Test 45: All 45 tests pass
+            const v201Passed = results.filter(r => r.pass).length;
+            const v201Total = results.length;
+            const v201PassRate = v201Passed / v201Total;
+            console.log('V201 Tests:', v201Passed + '/' + v201Total, '(' + (v201PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V201', passed: v201Passed, total: v201Total, passRate: v201PassRate.toFixed(3), results };
+        }
+
+        const v201Results = runV201Tests();
 
 
         // ===== closeAchievements =====
