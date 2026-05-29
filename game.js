@@ -3777,6 +3777,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V196)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V197: Register 奇遇+事件系统v6 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V197)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3970,6 +3974,25 @@
                             break;
                         case 'arena.reward':
                             result = this.mcpArenaRewardV6();
+                            break;
+                        // V197: 奇遇+事件系统v6 (override V135)
+                        case 'encounter.list':
+                            result = this.mcpEncounterListV6(args.type, args.rarity);
+                            break;
+                        case 'encounter.trigger':
+                            result = this.mcpEncounterTriggerV6(args.encounterId);
+                            break;
+                        case 'encounter.complete':
+                            result = this.mcpEncounterCompleteV6(args.encounterId);
+                            break;
+                        case 'event.list':
+                            result = this.mcpEventListV6();
+                            break;
+                        case 'event.select':
+                            result = this.mcpEventSelectV6(args.eventId, args.optionId);
+                            break;
+                        case 'event.resolve':
+                            result = this.mcpEventResolveV6(args.eventId);
                             break;
                         // V186: 排行榜+竞技系统v5 (override v4)
                         case 'rank.list':
@@ -24282,6 +24305,206 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V197: _initEncounterStateV6 - 初始化奇遇系统状态v6
+            _initEncounterStateV6() {
+                const gs = window.gameState;
+                if (!gs.encounterV6) {
+                    gs.encounterV6 = {
+                        encounters: [
+                            { id: 'ancient_cave_v6', name: '古洞探险v6', description: '在深山中发现一处神秘古洞', type: 'adventure', rarity: 'rare', requirements: { minRealm: 1 }, triggered: false, completed: false, reward: { spiritStones: 500, experience: 200 } },
+                            { id: 'spirit_beast_v6', name: '灵兽之缘v6', description: '偶遇一只受伤的神奇灵兽', type: 'npc', rarity: 'epic', requirements: { minRealm: 2 }, triggered: false, completed: false, reward: { pet: '灵兽幼崽', spiritStones: 300 } },
+                            { id: 'lost_treasure_v6', name: '失落宝藏v6', description: '传说中藏有珍贵宝物的遗迹', type: 'treasure', rarity: 'rare', requirements: { minRealm: 1 }, triggered: false, completed: false, reward: { artifact: '古宝', spiritStones: 800 } },
+                            { id: 'cultivation_epiphany_v6', name: '修炼顿悟v6', description: '突然领悟修炼真谛', type: 'cultivation', rarity: 'legendary', requirements: { minRealm: 3 }, triggered: false, completed: false, reward: { realmProgress: 1, spiritStones: 1000 } },
+                            { id: 'elder_encounter_v6', name: '前辈遗泽v6', description: '遇到陨落的修士传承', type: 'npc', rarity: 'epic', requirements: { minRealm: 2 }, triggered: false, completed: false, reward: { technique: '前辈心得', spiritStones: 400 } },
+                            { id: 'miracle_medicine_v6', name: '奇药现世v6', description: '发现一株罕见的灵药', type: 'treasure', rarity: 'rare', requirements: { minRealm: 1 }, triggered: false, completed: false, reward: { herbs: 5, spiritStones: 200 } },
+                            { id: 'hidden_realm_v6', name: '秘境界开v6', description: '发现一个隐藏的小世界', type: 'adventure', rarity: 'legendary', requirements: { minRealm: 4 }, triggered: false, completed: false, reward: { spiritStones: 2000, rareItem: '秘境令牌' } }
+                        ],
+                        totalEncounters: 0,
+                        activeEncounter: null
+                    };
+                }
+                return gs.encounterV6;
+            }
+
+            // V197: _initEventStateV6 - 初始化事件系统状态v6
+            _initEventStateV6() {
+                const gs = window.gameState;
+                if (!gs.eventV6) {
+                    const now = Date.now();
+                    gs.eventV6 = {
+                        events: [
+                            { id: 'celestial_phenomenon', name: '天象异变', description: '天现异象，必有大事发生', type: 'cultivation', choices: [{ id: 'observe', text: '静心观察', outcome: 'insight', reward: { spirit: 100 } }, { id: 'absorb', text: '尝试吸收', outcome: 'risk', reward: { spirit: 300, risk: '可能的反噬' } }, { id: 'ignore', text: '不予理会', outcome: 'none', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'stranger_request', name: '陌生人请求', description: '一位蒙面修士请求协助', type: 'npc', choices: [{ id: 'accept', text: '欣然接受', outcome: 'gain', reward: { reputation: 50, spiritStones: 500 } }, { id: 'negotiate', text: '讨价还价', outcome: 'compromise', reward: { spiritStones: 200 } }, { id: 'refuse', text: '断然拒绝', outcome: 'safe', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'artifact_apperception', name: '法器感悟', description: '手中的法器突然发出光芒', type: 'cultivation', choices: [{ id: 'meditate', text: '冥想感悟', outcome: 'breakthrough', reward: { artifactBonus: 0.2 } }, { id: 'enhance', text: '尝试强化', outcome: 'enhance', reward: { artifactLevel: 1 } }, { id: 'store', text: '收入储物袋', outcome: 'safe', reward: null }], selectedChoice: null, resolved: false },
+                            { id: 'auction_opportunity', name: '拍卖会', description: '偶然发现一场地下拍卖会', type: 'treasure', choices: [{ id: 'bid_high', text: '高价竞拍', outcome: 'luxury', reward: { rareItem: '拍卖品' } }, { id: 'bid_low', text: '谨慎竞拍', outcome: 'normal', reward: { herbs: 3 } }, { id: 'observe_only', text: '只旁观的', outcome: 'info', reward: { marketInfo: true } }], selectedChoice: null, resolved: false }
+                        ],
+                        activeEvent: null,
+                        totalEvents: 0
+                    };
+                }
+                return gs.eventV6;
+            }
+
+            // V197: mcpEncounterListV6 - 获取奇遇列表
+            mcpEncounterListV6(type, rarity) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV6 = this._initEncounterStateV6();
+                    let filtered = [...encounterV6.encounters];
+                    if (type) filtered = filtered.filter(e => e.type === type);
+                    if (rarity) filtered = filtered.filter(e => e.rarity === rarity);
+                    return {
+                        success: true,
+                        total: filtered.length,
+                        totalEncounters: encounterV6.totalEncounters,
+                        activeEncounter: encounterV6.activeEncounter,
+                        encounters: filtered
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V197: mcpEncounterTriggerV6 - 触发奇遇事件
+            mcpEncounterTriggerV6(encounterId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV6 = this._initEncounterStateV6();
+                    if (encounterV6.activeEncounter) return { error: '已有进行中的奇遇: ' + encounterV6.activeEncounter.id };
+                    const encounter = encounterV6.encounters.find(e => e.id === encounterId);
+                    if (!encounter) return { error: '奇遇不存在: ' + encounterId };
+                    if (encounter.triggered && !encounter.completed) return { error: '奇遇已在进行中: ' + encounterId };
+                    if (encounter.completed) return { error: '奇遇已完成: ' + encounterId };
+                    encounter.triggered = true;
+                    encounterV6.totalEncounters++;
+                    encounterV6.activeEncounter = encounter;
+                    return {
+                        success: true,
+                        encounterId: encounter.id,
+                        name: encounter.name,
+                        description: encounter.description,
+                        type: encounter.type,
+                        rarity: encounter.rarity,
+                        reward: encounter.reward,
+                        message: '触发奇遇: ' + encounter.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V197: mcpEncounterCompleteV6 - 完成奇遇获得奖励
+            mcpEncounterCompleteV6(encounterId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const encounterV6 = this._initEncounterStateV6();
+                    const active = encounterV6.activeEncounter;
+                    if (!active) return { error: '没有进行中的奇遇' };
+                    if (active.id !== encounterId) return { error: '奇遇ID不匹配: ' + encounterId };
+                    const encounter = encounterV6.encounters.find(e => e.id === encounterId);
+                    if (!encounter) return { error: '奇遇不存在: ' + encounterId };
+                    encounter.completed = true;
+                    encounterV6.activeEncounter = null;
+                    // Apply rewards
+                    const reward = encounter.reward;
+                    if (reward) {
+                        if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                        if (reward.reputation) gs.reputation = (gs.reputation || 0) + reward.reputation;
+                    }
+                    return {
+                        success: true,
+                        encounterId: encounter.id,
+                        name: encounter.name,
+                        reward: reward,
+                        message: '完成奇遇: ' + encounter.name
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V197: mcpEventListV6 - 获取事件列表
+            mcpEventListV6() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV6 = this._initEventStateV6();
+                    return {
+                        success: true,
+                        total: eventV6.events.length,
+                        totalEvents: eventV6.totalEvents,
+                        activeEvent: eventV6.activeEvent,
+                        events: eventV6.events.map(e => ({
+                            id: e.id,
+                            name: e.name,
+                            description: e.description,
+                            type: e.type,
+                            choices: e.choices.map(c => ({ id: c.id, text: c.text })),
+                            resolved: e.resolved
+                        }))
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V197: mcpEventSelectV6 - 选择事件选项
+            mcpEventSelectV6(eventId, optionId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV6 = this._initEventStateV6();
+                    if (eventV6.activeEvent) return { error: '已有进行中的事件: ' + eventV6.activeEvent.id };
+                    const event = eventV6.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    const option = event.choices.find(c => c.id === optionId);
+                    if (!option) return { error: '无效的选项: ' + optionId };
+                    event.selectedChoice = optionId;
+                    eventV6.activeEvent = event;
+                    return {
+                        success: true,
+                        eventId: event.id,
+                        name: event.name,
+                        selectedOption: { id: option.id, text: option.text },
+                        outcome: option.outcome,
+                        message: '选择: ' + option.text + ', 等待结算...'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V197: mcpEventResolveV6 - 事件结果结算
+            mcpEventResolveV6(eventId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const eventV6 = this._initEventStateV6();
+                    const active = eventV6.activeEvent;
+                    if (!active) return { error: '没有进行中的事件' };
+                    if (active.id !== eventId) return { error: '事件ID不匹配: ' + eventId };
+                    const event = eventV6.events.find(e => e.id === eventId);
+                    if (!event) return { error: '事件不存在: ' + eventId };
+                    const selectedChoice = event.choices.find(c => c.id === event.selectedChoice);
+                    if (!selectedChoice) return { error: '未选择选项' };
+                    event.resolved = true;
+                    eventV6.activeEvent = null;
+                    eventV6.totalEvents++;
+                    // Apply reward
+                    const reward = selectedChoice.reward;
+                    if (reward) {
+                        if (reward.spiritStones) gs.spiritStones = (gs.spiritStones || 0) + reward.spiritStones;
+                        if (reward.reputation) gs.reputation = (gs.reputation || 0) + reward.reputation;
+                        if (reward.herbs) {
+                            gs.materials = gs.materials || {};
+                            gs.materials.herbs = (gs.materials.herbs || 0) + reward.herbs;
+                        }
+                    }
+                    return {
+                        success: true,
+                        eventId: event.id,
+                        name: event.name,
+                        choice: selectedChoice.text,
+                        outcome: selectedChoice.outcome,
+                        reward: reward,
+                        message: '结算事件: ' + event.name + ', 结果: ' + selectedChoice.outcome
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V177: _initSerendipityStateV4 - 初始化奇遇系统状态v4
             _initSerendipityStateV4() {
                 const gs = window.gameState;
@@ -42569,6 +42792,71 @@
                 name: 'arena.reward',
                 description: '领取竞技奖励 (排行榜+竞技系统v6-根据排名发放奖励)',
                 inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V197: 奇遇+事件系统v6
+        const MCP_TOOLS_V197 = {
+            'encounter.list': {
+                name: 'encounter.list',
+                description: '获取奇遇列表 (奇遇+事件系统v6-获取所有奇遇，可按类型/稀有度筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '奇遇类型: adventure/treasure/cultivation/npc (可选)' },
+                        rarity: { type: 'string', description: '稀有度: common/rare/epic/legendary (可选)' }
+                    }
+                }
+            },
+            'encounter.trigger': {
+                name: 'encounter.trigger',
+                description: '触发奇遇事件 (奇遇+事件系统v6-触发奇遇事件，消耗精力，触发随机事件)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        encounterId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['encounterId']
+                }
+            },
+            'encounter.complete': {
+                name: 'encounter.complete',
+                description: '完成奇遇获得奖励 (奇遇+事件系统v6-完成奇遇，根据选项发放奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        encounterId: { type: 'string', description: '奇遇ID' }
+                    },
+                    required: ['encounterId']
+                }
+            },
+            'event.list': {
+                name: 'event.list',
+                description: '获取事件列表 (奇遇+事件系统v6-获取所有事件)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'event.select': {
+                name: 'event.select',
+                description: '选择事件选项 (奇遇+事件系统v6-选择事件选项)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' },
+                        optionId: { type: 'string', description: '选项ID' }
+                    },
+                    required: ['eventId', 'optionId']
+                }
+            },
+            'event.resolve': {
+                name: 'event.resolve',
+                description: '事件结果结算 (奇遇+事件系统v6-结算事件结果，发放奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        eventId: { type: 'string', description: '事件ID' }
+                    },
+                    required: ['eventId']
+                }
             }
         };
 
@@ -80250,6 +80538,198 @@ const v152Results = runV152Tests();
             return { version: 'V196', passed: v196Passed, total: v196Total, passRate: v196PassRate.toFixed(3), results };
         }
 
+        // V197: 奇遇+事件系统v6 测试
+        function runV197Tests() {
+            const results = [];
+            function v197Assert(condition, testName) {
+                const pass = !!condition;
+                results.push({ test: testName, pass });
+                if (!pass) console.log('FAIL:', testName);
+            }
+
+            // Initialize game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                combatPower: 2000,
+                reputation: 100
+            };
+
+            const server = new CultivationMCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V197 definition exists and has 6 tools
+            v197Assert(typeof MCP_TOOLS_V197 === 'object', 'MCP_TOOLS_V197 is defined');
+            v197Assert(Object.keys(MCP_TOOLS_V197).length === 6, 'MCP_TOOLS_V197 has 6 tools');
+            v197Assert('encounter.list' in MCP_TOOLS_V197, 'encounter.list tool exists');
+            v197Assert('encounter.trigger' in MCP_TOOLS_V197, 'encounter.trigger tool exists');
+            v197Assert('encounter.complete' in MCP_TOOLS_V197, 'encounter.complete tool exists');
+            v197Assert('event.list' in MCP_TOOLS_V197, 'event.list tool exists');
+            v197Assert('event.select' in MCP_TOOLS_V197, 'event.select tool exists');
+            v197Assert('event.resolve' in MCP_TOOLS_V197, 'event.resolve tool exists');
+
+            // Test 2: _initEncounterStateV6 initializes correctly
+            const encV6State = server._initEncounterStateV6();
+            v197Assert(encV6State !== null, '_initEncounterStateV6 returns state');
+            v197Assert(Array.isArray(encV6State.encounters), '_initEncounterStateV6 has encounters array');
+            v197Assert(encV6State.encounters.length === 7, '_initEncounterStateV6 has 7 encounters');
+            v197Assert(encV6State.totalEncounters === 0, '_initEncounterStateV6 totalEncounters is 0');
+            v197Assert(encV6State.activeEncounter === null, '_initEncounterStateV6 activeEncounter is null');
+            v197Assert(encV6State.encounters.some(e => e.type === 'adventure'), '_initEncounterStateV6 has adventure type');
+            v197Assert(encV6State.encounters.some(e => e.type === 'treasure'), '_initEncounterStateV6 has treasure type');
+            v197Assert(encV6State.encounters.some(e => e.rarity === 'legendary'), '_initEncounterStateV6 has legendary rarity');
+
+            // Test 3: _initEventStateV6 initializes correctly
+            const evtV6State = server._initEventStateV6();
+            v197Assert(evtV6State !== null, '_initEventStateV6 returns state');
+            v197Assert(Array.isArray(evtV6State.events), '_initEventStateV6 has events array');
+            v197Assert(evtV6State.events.length === 4, '_initEventStateV6 has 4 events');
+            v197Assert(evtV6State.activeEvent === null, '_initEventStateV6 activeEvent is null');
+            v197Assert(evtV6State.totalEvents === 0, '_initEventStateV6 totalEvents is 0');
+            v197Assert(evtV6State.events.some(e => e.type === 'cultivation'), '_initEventStateV6 has cultivation type');
+            v197Assert(evtV6State.events.some(e => e.type === 'npc'), '_initEventStateV6 has npc type');
+
+            // Test 4: mcpEncounterListV6 returns correct structure
+            const encList = server.mcpEncounterListV6();
+            v197Assert(encList.success === true, 'mcpEncounterListV6 returns success');
+            v197Assert(Array.isArray(encList.encounters), 'mcpEncounterListV6 returns encounters array');
+            v197Assert(encList.total === 7, 'mcpEncounterListV6 total is 7');
+            v197Assert(encList.totalEncounters === 0, 'mcpEncounterListV6 totalEncounters is 0');
+
+            // Test 5: mcpEncounterListV6 with type filter
+            const encListAdventure = server.mcpEncounterListV6('adventure');
+            v197Assert(encListAdventure.total === 2, 'mcpEncounterListV6 adventure filter returns 2');
+            v197Assert(encListAdventure.encounters.every(e => e.type === 'adventure'), 'mcpEncounterListV6 adventure filter works');
+
+            // Test 6: mcpEncounterListV6 with rarity filter
+            const encListLegendary = server.mcpEncounterListV6(null, 'legendary');
+            v197Assert(encListLegendary.total === 2, 'mcpEncounterListV6 legendary filter returns 2');
+            v197Assert(encListLegendary.encounters.every(e => e.rarity === 'legendary'), 'mcpEncounterListV6 legendary filter works');
+
+            // Test 7: mcpEncounterTriggerV6 triggers encounter successfully
+            const triggerResult = server.mcpEncounterTriggerV6('ancient_cave_v6');
+            v197Assert(triggerResult.success === true, 'mcpEncounterTriggerV6 returns success');
+            v197Assert(triggerResult.encounterId === 'ancient_cave_v6', 'mcpEncounterTriggerV6 returns correct id');
+            v197Assert(triggerResult.name === '古洞探险v6', 'mcpEncounterTriggerV6 returns correct name');
+            v197Assert(triggerResult.reward !== undefined, 'mcpEncounterTriggerV6 returns reward');
+
+            // Test 8: mcpEncounterTriggerV6 error for missing id
+            const triggerNoId = server.mcpEncounterTriggerV6();
+            v197Assert(triggerNoId.error !== undefined, 'mcpEncounterTriggerV6 returns error without id');
+
+            // Test 9: mcpEncounterTriggerV6 error for invalid id
+            const triggerInvalid = server.mcpEncounterTriggerV6('invalid_encounter');
+            v197Assert(triggerInvalid.error !== undefined, 'mcpEncounterTriggerV6 returns error for invalid id');
+
+            // Test 10: mcpEncounterTriggerV6 error when already active
+            const triggerAgain = server.mcpEncounterTriggerV6('spirit_beast_v6');
+            v197Assert(triggerAgain.error !== undefined, 'mcpEncounterTriggerV6 returns error when active');
+
+            // Test 11: mcpEncounterCompleteV6 completes encounter and grants reward
+            window.gameState.spiritStones = 10000;
+            const completeResult = server.mcpEncounterCompleteV6('ancient_cave_v6');
+            v197Assert(completeResult.success === true, 'mcpEncounterCompleteV6 returns success');
+            v197Assert(completeResult.encounterId === 'ancient_cave_v6', 'mcpEncounterCompleteV6 returns correct id');
+            v197Assert(completeResult.reward !== undefined, 'mcpEncounterCompleteV6 returns reward');
+            v197Assert(window.gameState.spiritStones === 10500, 'mcpEncounterCompleteV6 grants spiritStones reward');
+
+            // Test 12: mcpEncounterCompleteV6 error when no active encounter
+            const completeNoActive = server.mcpEncounterCompleteV6('ancient_cave_v6');
+            v197Assert(completeNoActive.error !== undefined, 'mcpEncounterCompleteV6 returns error when no active');
+
+            // Test 13: mcpEncounterCompleteV6 error for id mismatch
+            server.mcpEncounterTriggerV6('spirit_beast_v6');
+            const completeMismatch = server.mcpEncounterCompleteV6('lost_treasure_v6');
+            v197Assert(completeMismatch.error !== undefined, 'mcpEncounterCompleteV6 returns error for id mismatch');
+
+            // Reset for event tests
+            window.gameState.spiritStones = 10000;
+            window.gameState.reputation = 100;
+
+            // Test 14: mcpEventListV6 returns correct structure
+            const evtList = server.mcpEventListV6();
+            v197Assert(evtList.success === true, 'mcpEventListV6 returns success');
+            v197Assert(Array.isArray(evtList.events), 'mcpEventListV6 returns events array');
+            v197Assert(evtList.total === 4, 'mcpEventListV6 total is 4');
+            v197Assert(evtList.events[0].choices !== undefined, 'mcpEventListV6 events have choices');
+
+            // Test 15: mcpEventSelectV6 selects option successfully
+            const selectResult = server.mcpEventSelectV6('celestial_phenomenon', 'observe');
+            v197Assert(selectResult.success === true, 'mcpEventSelectV6 returns success');
+            v197Assert(selectResult.eventId === 'celestial_phenomenon', 'mcpEventSelectV6 returns correct id');
+            v197Assert(selectResult.selectedOption.id === 'observe', 'mcpEventSelectV6 returns correct option');
+            v197Assert(selectResult.outcome === 'insight', 'mcpEventSelectV6 returns correct outcome');
+
+            // Test 16: mcpEventSelectV6 error for missing eventId
+            const selectNoEvent = server.mcpEventSelectV6();
+            v197Assert(selectNoEvent.error !== undefined, 'mcpEventSelectV6 returns error without eventId');
+
+            // Test 17: mcpEventSelectV6 error for invalid eventId
+            const selectInvalidEvent = server.mcpEventSelectV6('invalid_event', 'observe');
+            v197Assert(selectInvalidEvent.error !== undefined, 'mcpEventSelectV6 returns error for invalid event');
+
+            // Test 18: mcpEventSelectV6 error for invalid optionId
+            const selectInvalidOption = server.mcpEventSelectV6('celestial_phenomenon', 'invalid_option');
+            v197Assert(selectInvalidOption.error !== undefined, 'mcpEventSelectV6 returns error for invalid option');
+
+            // Test 19: mcpEventResolveV6 resolves event and grants reward
+            window.gameState.materials = {};
+            const resolveResult = server.mcpEventResolveV6('celestial_phenomenon');
+            v197Assert(resolveResult.success === true, 'mcpEventResolveV6 returns success');
+            v197Assert(resolveResult.eventId === 'celestial_phenomenon', 'mcpEventResolveV6 returns correct id');
+            v197Assert(resolveResult.outcome === 'insight', 'mcpEventResolveV6 returns correct outcome');
+            v197Assert(resolveResult.reward !== undefined, 'mcpEventResolveV6 returns reward');
+
+            // Test 20: mcpEventResolveV6 error when no active event
+            const resolveNoActive = server.mcpEventResolveV6('celestial_phenomenon');
+            v197Assert(resolveNoActive.error !== undefined, 'mcpEventResolveV6 returns error when no active');
+
+            // Test 21: mcpEventResolveV6 error for id mismatch
+            server.mcpEventSelectV6('stranger_request', 'accept');
+            const resolveMismatch = server.mcpEventResolveV6('artifact_apperception');
+            v197Assert(resolveMismatch.error !== undefined, 'mcpEventResolveV6 returns error for id mismatch');
+
+            // Test 22: mcpEventSelectV6 error when event already active
+            server.mcpEventSelectV6('auction_opportunity', 'bid_low');
+            const selectWhenActive = server.mcpEventSelectV6('stranger_request', 'refuse');
+            v197Assert(selectWhenActive.error !== undefined, 'mcpEventSelectV6 returns error when event active');
+
+            // Test 23: Complete another event and verify reward application
+            server.mcpEventResolveV6('auction_opportunity');
+            v197Assert(window.gameState.materials !== undefined, 'mcpEventResolveV6 applies herbs reward');
+
+            // Test 24: Verify event counter increments
+            const evtListAfter = server.mcpEventListV6();
+            v197Assert(evtListAfter.totalEvents === 2, 'mcpEventResolveV6 increments totalEvents');
+
+            // Test 25: Can trigger different encounter after completion
+            window.gameState.spiritStones = 10000;
+            const triggerNew = server.mcpEncounterTriggerV6('cultivation_epiphany_v6');
+            v197Assert(triggerNew.success === true, 'can trigger new encounter after completion');
+
+            // Test 26: Encounter list shows correct triggered state
+            const encListAfterTrigger = server.mcpEncounterListV6();
+            const triggeredEnc = encListAfterTrigger.encounters.find(e => e.id === 'ancient_cave_v6');
+            v197Assert(triggeredEnc.triggered === true, 'encounter list shows triggered state');
+
+            // Test 27: Cannot trigger completed encounter again
+            const triggerCompleted = server.mcpEncounterTriggerV6('ancient_cave_v6');
+            v197Assert(triggerCompleted.error !== undefined, 'cannot trigger completed encounter');
+
+            // Test 28: mcpEventListV6 shows resolved state
+            const evtListResolved = server.mcpEventListV6();
+            const resolvedEvt = evtListResolved.events.find(e => e.id === 'celestial_phenomenon');
+            v197Assert(resolvedEvt.resolved === true, 'event list shows resolved state');
+
+            // All 28 tests
+            const v197Passed = results.filter(r => r.pass).length;
+            const v197Total = results.length;
+            const v197PassRate = v197Passed / v197Total;
+            console.log('V197 Tests:', v197Passed + '/' + v197Total, '(' + (v197PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V197', passed: v197Passed, total: v197Total, passRate: v197PassRate.toFixed(3), results };
+        }
+
         const v195Results = runV195Tests();
         const v194Results = runV194Tests();
         const v196Results = runV196Tests();
+        const v197Results = runV197Tests();
