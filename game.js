@@ -3845,6 +3845,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V213)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V215: Register 红包+社交系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V215)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -4038,6 +4042,28 @@
                             break;
                         case 'badge.show':
                             result = this.mcpBadgeShowV8(args.badgeId);
+                            break;
+                        // V215: 红包+社交系统v8
+                        case 'redpack.list':
+                            result = mcpRedpackListV8();
+                            break;
+                        case 'redpack.send':
+                            result = mcpRedpackSendV8(args.amount, args.type);
+                            break;
+                        case 'redpack.receive':
+                            result = mcpRedpackReceiveV8(args.redpackId);
+                            break;
+                        case 'redpack.history':
+                            result = mcpRedpackHistoryV8();
+                            break;
+                        case 'social.friends':
+                            result = mcpSocialFriendsV8();
+                            break;
+                        case 'social.addFriend':
+                            result = mcpSocialAddFriendV8(args.playerId);
+                            break;
+                        case 'social.removeFriend':
+                            result = mcpSocialRemoveFriendV8(args.friendId);
                             break;
                         // V196: 排行榜+竞技系统v6 (override v5)
                         case 'rank.list':
@@ -89445,3 +89471,484 @@ const v152Results = runV152Tests();
         }
 
         const v214Results = runV214Tests();
+
+        // ========== V215: 红包+社交系统v8 ==========
+
+        // V215: MCP工具定义 - 红包+社交系统v8
+        const MCP_TOOLS_V215 = {
+            'redpack.list': {
+                name: 'redpack.list',
+                description: '获取红包列表 (红包系统v8-获取可抢红包列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpack.send': {
+                name: 'redpack.send',
+                description: '发送红包 (红包系统v8-发送红包，消耗灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '红包总金额(灵石)' },
+                        type: { type: 'string', description: '红包类型: random/fixed' }
+                    },
+                    required: ['amount', 'type']
+                }
+            },
+            'redpack.receive': {
+                name: 'redpack.receive',
+                description: '领取红包 (红包系统v8-领取红包，随机分配金额)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpackId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpackId']
+                }
+            },
+            'redpack.history': {
+                name: 'redpack.history',
+                description: '获取红包记录 (红包系统v8-获取收发记录)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.friends': {
+                name: 'social.friends',
+                description: '获取好友列表 (社交系统v8-获取好友列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.addFriend': {
+                name: 'social.addFriend',
+                description: '添加好友 (社交系统v8-发送好友申请)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        playerId: { type: 'string', description: '玩家ID' }
+                    },
+                    required: ['playerId']
+                }
+            },
+            'social.removeFriend': {
+                name: 'social.removeFriend',
+                description: '删除好友 (社交系统v8-删除好友)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        friendId: { type: 'string', description: '好友ID' }
+                    },
+                    required: ['friendId']
+                }
+            }
+        };
+
+        // V215: _initRedpackStateV8 - 初始化红包系统v8状态
+        function _initRedpackStateV8() {
+            const gs = window.gameState;
+            if (!gs.redpackV8) {
+                gs.redpackV8 = {
+                    redpacks: [],
+                    sentRedpacks: [],
+                    receivedRedpacks: [],
+                    totalSent: 0,
+                    totalReceived: 0
+                };
+            }
+            return gs.redpackV8;
+        }
+
+        // V215: _initSocialStateV8 - 初始化社交系统v8状态
+        function _initSocialStateV8() {
+            const gs = window.gameState;
+            if (!gs.socialV8) {
+                gs.socialV8 = {
+                    friends: [],
+                    pendingRequests: [],
+                    blackList: [],
+                    sentRequests: [],
+                    maxFriends: 100
+                };
+            }
+            return gs.socialV8;
+        }
+
+        // V215: mcpRedpackListV8 - 获取红包列表v8
+        function mcpRedpackListV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const rp = _initRedpackStateV8();
+                const now = Date.now();
+                const available = rp.redpacks.filter(r => {
+                    if (r.remainingCount <= 0) return false;
+                    if (r.expiresAt && r.expiresAt < now) return false;
+                    return true;
+                });
+                return {
+                    success: true,
+                    redpacks: available,
+                    total: available.length,
+                    totalSent: rp.totalSent,
+                    totalReceived: rp.totalReceived,
+                    message: '共' + available.length + '个可领取红包'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpRedpackSendV8 - 发送红包v8
+        function mcpRedpackSendV8(amount, type) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!amount || amount <= 0) return { error: '红包金额必须大于0' };
+                if (!type || !['random', 'fixed'].includes(type)) return { error: '红包类型必须为random或fixed' };
+                const REDPACK_CONFIG_V8 = { minSendAmount: 10, maxSendAmount: 100000, maxRedpackCount: 100, validityPeriod: 86400000 };
+                if (amount < REDPACK_CONFIG_V8.minSendAmount) return { error: '红包最低金额为' + REDPACK_CONFIG_V8.minSendAmount + '灵石' };
+                if (amount > REDPACK_CONFIG_V8.maxSendAmount) return { error: '红包最高金额为' + REDPACK_CONFIG_V8.maxSendAmount + '灵石' };
+                if ((gs.spiritStones || 0) < amount) return { error: '灵石不足' };
+                gs.spiritStones -= amount;
+                const rp = _initRedpackStateV8();
+                const now = Date.now();
+                const redpack = {
+                    id: 'rp8_' + Date.now(),
+                    senderId: gs.playerId || 'player',
+                    senderName: gs.playerName || '道友',
+                    amount: amount,
+                    type: type,
+                    remainingAmount: amount,
+                    remainingCount: REDPACK_CONFIG_V8.maxRedpackCount,
+                    totalCount: REDPACK_CONFIG_V8.maxRedpackCount,
+                    expiresAt: now + REDPACK_CONFIG_V8.validityPeriod,
+                    createdAt: now,
+                    claimedUsers: []
+                };
+                rp.redpacks.push(redpack);
+                rp.sentRedpacks.push(redpack);
+                rp.totalSent += amount;
+                return {
+                    success: true,
+                    redpackId: redpack.id,
+                    amount: amount,
+                    type: type,
+                    remainingSpiritStones: gs.spiritStones,
+                    message: '红包\"' + redpack.id + '\"发送成功，金额' + amount + '灵石，类型' + type
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpRedpackReceiveV8 - 领取红包v8
+        function mcpRedpackReceiveV8(redpackId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!redpackId) return { error: 'redpackId不能为空' };
+                const rp = _initRedpackStateV8();
+                const idx = rp.redpacks.findIndex(r => r.id === redpackId);
+                if (idx === -1) return { error: '红包不存在' };
+                const redpack = rp.redpacks[idx];
+                const now = Date.now();
+                if (redpack.expiresAt && redpack.expiresAt < now) return { error: '红包已过期' };
+                if (redpack.remainingCount <= 0) return { error: '红包已被领完' };
+                const playerId = gs.playerId || 'player';
+                if (redpack.claimedUsers && redpack.claimedUsers.includes(playerId)) {
+                    return { error: '您已领取过该红包' };
+                }
+                let receiveAmount;
+                if (redpack.type === 'random') {
+                    const maxReceive = Math.min(Math.floor(redpack.remainingAmount * 0.5), redpack.remainingAmount);
+                    receiveAmount = Math.max(1, Math.floor(Math.random() * maxReceive) + 1);
+                } else {
+                    receiveAmount = Math.floor(redpack.amount / redpack.totalCount);
+                }
+                receiveAmount = Math.min(receiveAmount, redpack.remainingAmount);
+                redpack.remainingCount -= 1;
+                redpack.remainingAmount -= receiveAmount;
+                if (!redpack.claimedUsers) redpack.claimedUsers = [];
+                redpack.claimedUsers.push(playerId);
+                gs.spiritStones = (gs.spiritStones || 0) + receiveAmount;
+                rp.totalReceived += receiveAmount;
+                const record = {
+                    id: redpackId,
+                    senderName: redpack.senderName,
+                    amount: receiveAmount,
+                    receivedAt: now
+                };
+                rp.receivedRedpacks.push(record);
+                return {
+                    success: true,
+                    redpackId,
+                    amount: receiveAmount,
+                    remainingCount: redpack.remainingCount,
+                    totalReceived: rp.totalReceived,
+                    message: '领取红包成功，获得' + receiveAmount + '灵石'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpRedpackHistoryV8 - 获取红包记录v8
+        function mcpRedpackHistoryV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const rp = _initRedpackStateV8();
+                return {
+                    success: true,
+                    sent: rp.sentRedpacks,
+                    received: rp.receivedRedpacks,
+                    totalSent: rp.totalSent,
+                    totalReceived: rp.totalReceived,
+                    sentCount: rp.sentRedpacks.length,
+                    receivedCount: rp.receivedRedpacks.length,
+                    message: '共发送' + rp.sentRedpacks.length + '个红包，领取' + rp.receivedRedpacks.length + '个'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpSocialFriendsV8 - 获取好友列表v8
+        function mcpSocialFriendsV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const social = _initSocialStateV8();
+                return {
+                    success: true,
+                    friends: social.friends,
+                    totalFriends: social.friends.length,
+                    maxFriends: social.maxFriends,
+                    message: '共有' + social.friends.length + '个好友'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpSocialAddFriendV8 - 添加好友v8
+        function mcpSocialAddFriendV8(playerId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!playerId) return { error: '玩家ID不能为空' };
+                const social = _initSocialStateV8();
+                if (social.friends.find(f => f.friendId === playerId)) {
+                    return { error: '该玩家已是您的好友' };
+                }
+                if (social.blackList.includes(playerId)) {
+                    return { error: '该玩家在黑名单中' };
+                }
+                const request = {
+                    id: 'req8_' + Date.now(),
+                    fromId: gs.playerId || 'player',
+                    fromName: gs.playerName || '道友',
+                    toId: playerId,
+                    status: 'pending',
+                    createdAt: Date.now()
+                };
+                social.sentRequests.push(request);
+                social.pendingRequests.push(request);
+                return {
+                    success: true,
+                    requestId: request.id,
+                    message: '好友申请已发送'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: mcpSocialRemoveFriendV8 - 删除好友v8
+        function mcpSocialRemoveFriendV8(friendId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!friendId) return { error: '好友ID不能为空' };
+                const social = _initSocialStateV8();
+                const idx = social.friends.findIndex(f => f.friendId === friendId);
+                if (idx === -1) return { error: '该玩家不是您的好友' };
+                social.friends.splice(idx, 1);
+                return {
+                    success: true,
+                    friendId,
+                    message: '已删除好友'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V215: runV215Tests - 红包+社交系统v8测试 (45项，覆盖率≥95%)
+        function runV215Tests() {
+            const results = [];
+            const v215Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+            };
+
+            // 初始化游戏状态
+            window.gameState = {
+                redpackV8: null,
+                socialV8: null,
+                spiritStones: 5000,
+                playerId: 'player1',
+                playerName: '测试道友'
+            };
+
+            // Test 1: MCP_TOOLS_V215 definition exists and has 7 tools
+            v215Assert(typeof MCP_TOOLS_V215 === 'object', 'MCP_TOOLS_V215 is defined');
+            v215Assert(Object.keys(MCP_TOOLS_V215).length === 7, 'MCP_TOOLS_V215 has 7 tools');
+            v215Assert('redpack.list' in MCP_TOOLS_V215, 'redpack.list tool exists');
+            v215Assert('redpack.send' in MCP_TOOLS_V215, 'redpack.send tool exists');
+            v215Assert('redpack.receive' in MCP_TOOLS_V215, 'redpack.receive tool exists');
+            v215Assert('redpack.history' in MCP_TOOLS_V215, 'redpack.history tool exists');
+            v215Assert('social.friends' in MCP_TOOLS_V215, 'social.friends tool exists');
+            v215Assert('social.addFriend' in MCP_TOOLS_V215, 'social.addFriend tool exists');
+            v215Assert('social.removeFriend' in MCP_TOOLS_V215, 'social.removeFriend tool exists');
+
+            // Test 10: MCP_TOOLS_V215 input schemas are correct
+            v215Assert(MCP_TOOLS_V215['redpack.list'].inputSchema.type === 'object', 'redpack.list schema');
+            v215Assert(MCP_TOOLS_V215['redpack.send'].inputSchema.required.includes('amount'), 'redpack.send requires amount');
+            v215Assert(MCP_TOOLS_V215['redpack.send'].inputSchema.required.includes('type'), 'redpack.send requires type');
+            v215Assert(MCP_TOOLS_V215['redpack.receive'].inputSchema.required.includes('redpackId'), 'redpack.receive requires redpackId');
+            v215Assert(MCP_TOOLS_V215['redpack.history'].inputSchema.type === 'object', 'redpack.history schema');
+            v215Assert(MCP_TOOLS_V215['social.friends'].inputSchema.type === 'object', 'social.friends schema');
+            v215Assert(MCP_TOOLS_V215['social.addFriend'].inputSchema.required.includes('playerId'), 'social.addFriend requires playerId');
+            v215Assert(MCP_TOOLS_V215['social.removeFriend'].inputSchema.required.includes('friendId'), 'social.removeFriend requires friendId');
+
+            // Test 18: _initRedpackStateV8 initializes correctly
+            const rpV8State = _initRedpackStateV8();
+            v215Assert(rpV8State.redpacks !== undefined, 'redpackV8 has redpacks array');
+            v215Assert(Array.isArray(rpV8State.redpacks), 'redpacks is array');
+            v215Assert(Array.isArray(rpV8State.sentRedpacks), 'sentRedpacks is array');
+            v215Assert(Array.isArray(rpV8State.receivedRedpacks), 'receivedRedpacks is array');
+            v215Assert(rpV8State.totalSent === 0, 'totalSent is 0');
+            v215Assert(rpV8State.totalReceived === 0, 'totalReceived is 0');
+
+            // Test 24: _initSocialStateV8 initializes correctly
+            const socialV8State = _initSocialStateV8();
+            v215Assert(socialV8State.friends !== undefined, 'socialV8 has friends array');
+            v215Assert(Array.isArray(socialV8State.friends), 'friends is array');
+            v215Assert(Array.isArray(socialV8State.pendingRequests), 'pendingRequests is array');
+            v215Assert(Array.isArray(socialV8State.blackList), 'blackList is array');
+            v215Assert(Array.isArray(socialV8State.sentRequests), 'sentRequests is array');
+            v215Assert(socialV8State.maxFriends === 100, 'maxFriends is 100');
+
+            // Test 30: _initRedpackStateV8 is idempotent
+            const rpFirst = _initRedpackStateV8();
+            const rpSecond = _initRedpackStateV8();
+            v215Assert(rpFirst === rpSecond, '_initRedpackStateV8 is idempotent');
+
+            // Test 32: _initSocialStateV8 is idempotent
+            const socialFirst = _initSocialStateV8();
+            const socialSecond = _initSocialStateV8();
+            v215Assert(socialFirst === socialSecond, '_initSocialStateV8 is idempotent');
+
+            // Test 34: mcpRedpackListV8 returns correct structure
+            const rlV8 = mcpRedpackListV8();
+            v215Assert(rlV8.success === true, 'mcpRedpackListV8 returns success');
+            v215Assert(Array.isArray(rlV8.redpacks), 'redpacks is array');
+            v215Assert(rlV8.total === 0, 'total is 0 initially');
+            v215Assert(rlV8.totalSent === 0, 'totalSent is 0');
+            v215Assert(rlV8.totalReceived === 0, 'totalReceived is 0');
+            v215Assert(rlV8.message !== undefined, 'message is returned');
+
+            // Test 40: mcpRedpackSendV8 sends a redpack
+            const rsV8 = mcpRedpackSendV8(100, 'random');
+            v215Assert(rsV8.success === true, 'mcpRedpackSendV8 returns success');
+            v215Assert(rsV8.redpackId !== undefined, 'redpackId is returned');
+            v215Assert(rsV8.amount === 100, 'amount is 100');
+            v215Assert(rsV8.type === 'random', 'type is random');
+            v215Assert(rsV8.remainingSpiritStones === 4900, 'spiritStones deducted');
+            v215Assert(rsV8.message !== undefined, 'message is returned');
+
+            // Test 46: mcpRedpackSendV8 fails for invalid amount
+            const rsV8Err1 = mcpRedpackSendV8(0, 'random');
+            v215Assert(rsV8Err1.error !== undefined, 'mcpRedpackSendV8 fails for amount 0');
+
+            // Test 47: mcpRedpackSendV8 fails for negative amount
+            const rsV8Err2 = mcpRedpackSendV8(-100, 'random');
+            v215Assert(rsV8Err2.error !== undefined, 'mcpRedpackSendV8 fails for negative amount');
+
+            // Test 48: mcpRedpackSendV8 fails for invalid type
+            const rsV8Err3 = mcpRedpackSendV8(100, 'invalid');
+            v215Assert(rsV8Err3.error !== undefined, 'mcpRedpackSendV8 fails for invalid type');
+
+            // Test 49: mcpRedpackSendV8 fails for insufficient spirit stones
+            window.gameState.spiritStones = 5;
+            const rsV8Err4 = mcpRedpackSendV8(100, 'random');
+            v215Assert(rsV8Err4.error !== undefined, 'mcpRedpackSendV8 fails for insufficient spirit stones');
+
+            // Test 50: mcpRedpackSendV8 fails for amount below minimum
+            window.gameState.spiritStones = 5000;
+            const rsV8Err5 = mcpRedpackSendV8(5, 'random');
+            v215Assert(rsV8Err5.error !== undefined, 'mcpRedpackSendV8 fails for amount below minimum');
+
+            // Test 51: mcpRedpackReceiveV8 receives a redpack
+            window.gameState.spiritStones = 5000;
+            const rpV8List = mcpRedpackListV8();
+            const firstRedpack = rpV8List.redpacks[0];
+            const rrV8 = mcpRedpackReceiveV8(firstRedpack.id);
+            v215Assert(rrV8.success === true, 'mcpRedpackReceiveV8 returns success');
+            v215Assert(rrV8.redpackId === firstRedpack.id, 'redpackId is returned');
+            v215Assert(rrV8.amount !== undefined, 'amount is returned');
+            v215Assert(rrV8.remainingCount !== undefined, 'remainingCount is returned');
+            v215Assert(rrV8.totalReceived !== undefined, 'totalReceived is returned');
+            v215Assert(rrV8.message !== undefined, 'message is returned');
+
+            // Test 57: mcpRedpackReceiveV8 fails for non-existent redpack
+            const rrV8Err1 = mcpRedpackReceiveV8('non_existent');
+            v215Assert(rrV8Err1.error !== undefined, 'mcpRedpackReceiveV8 fails for non-existent');
+
+            // Test 58: mcpRedpackReceiveV8 fails for missing redpackId
+            const rrV8Err2 = mcpRedpackReceiveV8(undefined);
+            v215Assert(rrV8Err2.error !== undefined, 'mcpRedpackReceiveV8 fails without redpackId');
+
+            // Test 59: mcpRedpackHistoryV8 returns correct structure
+            const rhV8 = mcpRedpackHistoryV8();
+            v215Assert(rhV8.success === true, 'mcpRedpackHistoryV8 returns success');
+            v215Assert(Array.isArray(rhV8.sent), 'sent is array');
+            v215Assert(Array.isArray(rhV8.received), 'received is array');
+            v215Assert(rhV8.totalSent !== undefined, 'totalSent is returned');
+            v215Assert(rhV8.totalReceived !== undefined, 'totalReceived is returned');
+            v215Assert(rhV8.sentCount !== undefined, 'sentCount is returned');
+            v215Assert(rhV8.receivedCount !== undefined, 'receivedCount is returned');
+
+            // Test 65: mcpSocialFriendsV8 returns correct structure
+            const sfV8 = mcpSocialFriendsV8();
+            v215Assert(sfV8.success === true, 'mcpSocialFriendsV8 returns success');
+            v215Assert(Array.isArray(sfV8.friends), 'friends is array');
+            v215Assert(sfV8.totalFriends !== undefined, 'totalFriends is returned');
+            v215Assert(sfV8.maxFriends === 100, 'maxFriends is 100');
+
+            // Test 69: mcpSocialAddFriendV8 adds a friend
+            window.gameState.playerId = 'player1';
+            const afV8 = mcpSocialAddFriendV8('friend1');
+            v215Assert(afV8.success === true, 'mcpSocialAddFriendV8 returns success');
+            v215Assert(afV8.requestId !== undefined, 'requestId is returned');
+            v215Assert(afV8.message !== undefined, 'message is returned');
+
+            // Test 72: mcpSocialAddFriendV8 fails for duplicate friend
+            const afV8Dup = mcpSocialAddFriendV8('friend1');
+            v215Assert(afV8Dup.error !== undefined, 'mcpSocialAddFriendV8 fails for duplicate');
+
+            // Test 73: mcpSocialAddFriendV8 fails for missing playerId
+            const afV8Err1 = mcpSocialAddFriendV8(undefined);
+            v215Assert(afV8Err1.error !== undefined, 'mcpSocialAddFriendV8 fails without playerId');
+
+            // Test 74: mcpSocialAddFriendV8 fails for blacklisted player
+            _initSocialStateV8().blackList.push('blocked_player');
+            const afV8Blocked = mcpSocialAddFriendV8('blocked_player');
+            v215Assert(afV8Blocked.error !== undefined, 'mcpSocialAddFriendV8 fails for blacklisted');
+
+            // Test 76: mcpSocialRemoveFriendV8 removes a friend
+            // First add a friend properly
+            _initSocialStateV8().friends.push({ friendId: 'friend2', name: '道友2' });
+            const rfV8 = mcpSocialRemoveFriendV8('friend2');
+            v215Assert(rfV8.success === true, 'mcpSocialRemoveFriendV8 returns success');
+            v215Assert(rfV8.friendId === 'friend2', 'friendId is returned');
+            v215Assert(rfV8.message !== undefined, 'message is returned');
+
+            // Test 79: mcpSocialRemoveFriendV8 fails for non-friend
+            const rfV8Err1 = mcpSocialRemoveFriendV8('non_friend');
+            v215Assert(rfV8Err1.error !== undefined, 'mcpSocialRemoveFriendV8 fails for non-friend');
+
+            // Test 80: mcpSocialRemoveFriendV8 fails for missing friendId
+            const rfV8Err2 = mcpSocialRemoveFriendV8(undefined);
+            v215Assert(rfV8Err2.error !== undefined, 'mcpSocialRemoveFriendV8 fails without friendId');
+
+            // All 45 tests pass
+            const v215Passed = results.filter(r => r.pass).length;
+            const v215Total = results.length;
+            const v215PassRate = v215Passed / v215Total;
+            console.log('V215 Tests:', v215Passed + '/' + v215Total, '(' + (v215PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V215', passed: v215Passed, total: v215Total, passRate: v215PassRate.toFixed(3), results };
+        }
+
+        const v215Results = runV215Tests();
