@@ -3805,6 +3805,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V203)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V204: Register 排行榜+竞技系统v7 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V204)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6316,6 +6320,25 @@
                             break;
                         case 'badge.show':
                             result = this.mcpBadgeShowV7(args.badgeId);
+                            break;
+                        // V204: 排行榜+竞技系统v7
+                        case 'ranking.list':
+                            result = this.mcpRankingListV7(args.type);
+                            break;
+                        case 'ranking.detail':
+                            result = this.mcpRankingDetailV7(args.type, args.rank);
+                            break;
+                        case 'ranking.refresh':
+                            result = this.mcpRankingRefreshV7();
+                            break;
+                        case 'arena.status':
+                            result = this.mcpArenaStatusV7();
+                            break;
+                        case 'arena.challenge':
+                            result = this.mcpArenaChallengeV7(args.targetId);
+                            break;
+                        case 'arena.reward':
+                            result = this.mcpArenaRewardV7();
                             break;
                         default:
                             result = { error: `Tool ${name} not yet implemented` };
@@ -22707,6 +22730,258 @@
                             showInBattle: true
                         },
                         message: '徽章[' + badge.name + ']可在战斗时展示'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: _initRankingStateV7 - 初始化排行榜系统状态v7
+            _initRankingStateV7() {
+                const gs = window.gameState;
+                if (!gs.rankingV7) {
+                    gs.rankingV7 = {
+                        rankings: {
+                            power: [],
+                            level: [],
+                            spiritStone: [],
+                            arena: [],
+                            sect: []
+                        },
+                        lastRefresh: null,
+                        refreshCost: 100
+                    };
+                }
+                return gs.rankingV7;
+            }
+
+            // V204: _initArenaStateV7 - 初始化竞技场系统状态v7
+            _initArenaStateV7() {
+                const gs = window.gameState;
+                if (!gs.arenaV7) {
+                    gs.arenaV7 = {
+                        currentRank: 0,
+                        seasonEndAt: null,
+                        challenges: [],
+                        dailyChallenge: 0,
+                        maxDailyChallenge: 10,
+                        rewards: [],
+                        lastChallengeAt: null,
+                        challengeCooldown: 30000
+                    };
+                }
+                return gs.arenaV7;
+            }
+
+            // V204: mcpRankingListV7 - 获取排行榜列表v7
+            mcpRankingListV7(type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankingV7 = this._initRankingStateV7();
+                    const rankingTypes = ['power', 'level', 'spiritStone', 'arena', 'sect'];
+                    if (type && !rankingTypes.includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    if (type) {
+                        const list = rankingV7.rankings[type] || [];
+                        return {
+                            success: true,
+                            type: type,
+                            rankings: list.slice(0, 100),
+                            message: type + '排行榜共' + list.length + '项'
+                        };
+                    }
+                    return {
+                        success: true,
+                        rankings: {
+                            power: rankingV7.rankings.power.slice(0, 100),
+                            level: rankingV7.rankings.level.slice(0, 100),
+                            spiritStone: rankingV7.rankings.spiritStone.slice(0, 100),
+                            arena: rankingV7.rankings.arena.slice(0, 100),
+                            sect: rankingV7.rankings.sect.slice(0, 100)
+                        },
+                        message: '排行榜类型: power/level/spiritStone/arena/sect'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: mcpRankingDetailV7 - 查看排行详情v7
+            mcpRankingDetailV7(type, rank) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!type || rank === undefined) return { error: '请指定排行榜类型和排名' };
+                    const rankingV7 = this._initRankingStateV7();
+                    const rankingTypes = ['power', 'level', 'spiritStone', 'arena', 'sect'];
+                    if (!rankingTypes.includes(type)) {
+                        return { error: '无效的排行榜类型: ' + type };
+                    }
+                    const list = rankingV7.rankings[type] || [];
+                    if (rank < 1 || rank > list.length) {
+                        return { error: '排名无效: ' + rank };
+                    }
+                    const entry = list[rank - 1];
+                    return {
+                        success: true,
+                        type: type,
+                        rank: rank,
+                        player: entry,
+                        message: '第' + rank + '名: ' + (entry ? entry.name : '空位')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: mcpRankingRefreshV7 - 刷新排行数据v7
+            mcpRankingRefreshV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankingV7 = this._initRankingStateV7();
+                    if ((gs.spiritStones || 0) < rankingV7.refreshCost) {
+                        return { error: '灵石不足，需要' + rankingV7.refreshCost + '灵石' };
+                    }
+                    gs.spiritStones -= rankingV7.refreshCost;
+                    const mockPlayers = [
+                        { id: 'player_1', name: '天玄子', power: 50000, level: 50, spiritStone: 100000, arena: 1, sect: '天玄宗' },
+                        { id: 'player_2', name: '紫霄真人', power: 45000, level: 48, spiritStone: 80000, arena: 2, sect: '紫霄宫' },
+                        { id: 'player_3', name: '青冥剑客', power: 40000, level: 45, spiritStone: 60000, arena: 3, sect: '青冥派' },
+                        { id: 'player_4', name: '火凤仙子', power: 35000, level: 43, spiritStone: 50000, arena: 4, sect: '火凤阁' },
+                        { id: 'player_5', name: '玄武真君', power: 30000, level: 40, spiritStone: 40000, arena: 5, sect: '玄武殿' },
+                        { id: 'player_6', name: '白虎战魂', power: 25000, level: 38, spiritStone: 30000, arena: 6, sect: '白虎帮' },
+                        { id: 'player_7', name: '朱雀神焰', power: 20000, level: 35, spiritStone: 20000, arena: 7, sect: '朱雀堂' },
+                        { id: 'player_8', name: '青龙守护', power: 15000, level: 32, spiritStone: 15000, arena: 8, sect: '青龙会' },
+                        { id: 'player_9', name: '麒麟血脉', power: 10000, level: 28, spiritStone: 10000, arena: 9, sect: '麒麟谷' },
+                        { id: 'player_10', name: '鲲鹏展翅', power: 8000, level: 25, spiritStone: 8000, arena: 10, sect: '鲲鹏庄' }
+                    ];
+                    const currentPlayer = {
+                        id: gs.playerId || 'player_v204',
+                        name: gs.playerName || '测试修士v7',
+                        power: gs.combatPower || 5000,
+                        level: gs.level || 10,
+                        spiritStone: gs.spiritStones || 50000,
+                        arena: 0,
+                        sect: gs.sectName || '无'
+                    };
+                    rankingV7.rankings.power = [...mockPlayers, currentPlayer].sort((a, b) => b.power - a.power);
+                    rankingV7.rankings.level = [...mockPlayers, currentPlayer].sort((a, b) => b.level - a.level);
+                    rankingV7.rankings.spiritStone = [...mockPlayers, currentPlayer].sort((a, b) => b.spiritStone - a.spiritStone);
+                    rankingV7.rankings.arena = [...mockPlayers, currentPlayer].sort((a, b) => (a.arena || 999) - (b.arena || 999));
+                    rankingV7.rankings.sect = [...mockPlayers, currentPlayer].sort((a, b) => (a.sect || '').localeCompare(b.sect || ''));
+                    rankingV7.lastRefresh = new Date().toISOString();
+                    return {
+                        success: true,
+                        lastRefresh: rankingV7.lastRefresh,
+                        message: '排行榜刷新成功，消耗' + rankingV7.refreshCost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: mcpArenaStatusV7 - 获取竞技场状态v7
+            mcpArenaStatusV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV7 = this._initArenaStateV7();
+                    const now = Date.now();
+                    const canChallenge = !arenaV7.lastChallengeAt || (now - arenaV7.lastChallengeAt) >= arenaV7.challengeCooldown;
+                    const remainingDaily = arenaV7.maxDailyChallenge - arenaV7.dailyChallenge;
+                    const currentPlayerRank = arenaV7.currentRank || 0;
+                    return {
+                        success: true,
+                        currentRank: currentPlayerRank,
+                        seasonEndAt: arenaV7.seasonEndAt,
+                        dailyChallenge: arenaV7.dailyChallenge,
+                        maxDailyChallenge: arenaV7.maxDailyChallenge,
+                        remainingDaily: remainingDaily,
+                        canChallenge: canChallenge,
+                        challengeCooldown: arenaV7.challengeCooldown,
+                        lastChallengeAt: arenaV7.lastChallengeAt,
+                        rewards: arenaV7.rewards,
+                        message: '竞技场状态: 排名' + currentPlayerRank + '，剩余挑战次数' + remainingDaily
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: mcpArenaChallengeV7 - 执行竞技场挑战v7
+            mcpArenaChallengeV7(targetId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!targetId) return { error: '请指定目标玩家ID' };
+                    const arenaV7 = this._initArenaStateV7();
+                    if (arenaV7.dailyChallenge >= arenaV7.maxDailyChallenge) {
+                        return { error: '今日挑战次数已用完' };
+                    }
+                    const now = Date.now();
+                    if (arenaV7.lastChallengeAt && (now - arenaV7.lastChallengeAt) < arenaV7.challengeCooldown) {
+                        const remaining = arenaV7.challengeCooldown - (now - arenaV7.lastChallengeAt);
+                        return { error: '挑战冷却中，请等待' + Math.ceil(remaining / 1000) + '秒' };
+                    }
+                    const rankingV7 = this._initRankingStateV7();
+                    const arenaList = rankingV7.rankings.arena || [];
+                    const target = arenaList.find(p => p.id === targetId);
+                    const playerPower = gs.combatPower || 5000;
+                    const targetPower = target ? target.power : 5000;
+                    const win = playerPower > targetPower;
+                    const challenge = {
+                        targetId: targetId,
+                        result: win ? 'win' : 'lose',
+                        reward: win ? 50 : -20,
+                        timestamp: new Date().toISOString()
+                    };
+                    arenaV7.challenges.push(challenge);
+                    arenaV7.dailyChallenge++;
+                    arenaV7.lastChallengeAt = now;
+                    if (win) {
+                        gs.spiritStones = (gs.spiritStones || 0) + 50;
+                        arenaV7.currentRank = Math.max(0, arenaV7.currentRank - 1);
+                    } else {
+                        gs.spiritStones = Math.max(0, (gs.spiritStones || 0) - 20);
+                        arenaV7.currentRank = arenaV7.currentRank + 1;
+                    }
+                    return {
+                        success: true,
+                        result: challenge.result,
+                        reward: challenge.reward,
+                        currentRank: arenaV7.currentRank,
+                        message: win ? '挑战胜利！排名上升，获得50灵石' : '挑战失败，排名下降，扣除20灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V204: mcpArenaRewardV7 - 领取竞技场奖励v7
+            mcpArenaRewardV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV7 = this._initArenaStateV7();
+                    const rank = arenaV7.currentRank || 0;
+                    const rewardTiers = [
+                        { minRank: 1, maxRank: 10, type: 'legendary', amount: 5000 },
+                        { minRank: 11, maxRank: 50, type: 'epic', amount: 2000 },
+                        { minRank: 51, maxRank: 100, type: 'rare', amount: 1000 },
+                        { minRank: 101, maxRank: 500, type: 'common', amount: 500 }
+                    ];
+                    const tier = rewardTiers.find(t => rank >= t.minRank && rank <= t.maxRank);
+                    if (!tier) {
+                        return { error: '排名未达到奖励要求' };
+                    }
+                    const existingReward = arenaV7.rewards.find(r => r.seasonEndAt === arenaV7.seasonEndAt);
+                    if (existingReward) {
+                        return { error: '本期奖励已领取' };
+                    }
+                    gs.spiritStones = (gs.spiritStones || 0) + tier.amount;
+                    const reward = {
+                        seasonEndAt: arenaV7.seasonEndAt,
+                        rank: rank,
+                        type: tier.type,
+                        amount: tier.amount,
+                        claimedAt: new Date().toISOString()
+                    };
+                    arenaV7.rewards.push(reward);
+                    return {
+                        success: true,
+                        reward: reward,
+                        message: '领取成功！获得' + tier.amount + '灵石（' + tier.type + '级奖励）'
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -84166,6 +84441,67 @@ const v152Results = runV152Tests();
 
         const v202Results = runV202Tests();
 
+        // V204: 排行榜+竞技系统v7 MCP工具定义 (P-20260530-032)
+        const MCP_TOOLS_V204 = {
+            'ranking.list': {
+                name: 'ranking.list',
+                description: '获取排行榜列表 (排行榜+竞技系统v7-获取排行榜列表，支持类型筛选)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型: power|level|spiritStone|arena|sect' }
+                    }
+                }
+            },
+            'ranking.detail': {
+                name: 'ranking.detail',
+                description: '查看排行详情 (排行榜+竞技系统v7-查看特定玩家详情)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', description: '排行榜类型: power|level|spiritStone|arena|sect' },
+                        rank: { type: 'number', description: '排名位置' }
+                    },
+                    required: ['type', 'rank']
+                }
+            },
+            'ranking.refresh': {
+                name: 'ranking.refresh',
+                description: '刷新排行数据 (排行榜+竞技系统v7-刷新排行，消耗100灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'arena.status': {
+                name: 'arena.status',
+                description: '获取竞技场状态 (排行榜+竞技系统v7-获取竞技场状态)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            },
+            'arena.challenge': {
+                name: 'arena.challenge',
+                description: '执行竞技场挑战 (排行榜+竞技系统v7-执行挑战，有cd，失败扣积分)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetId: { type: 'string', description: '目标玩家ID' }
+                    },
+                    required: ['targetId']
+                }
+            },
+            'arena.reward': {
+                name: 'arena.reward',
+                description: '领取竞技场奖励 (排行榜+竞技系统v7-领取段位奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {}
+                }
+            }
+        };
+
         // V203: 成就+徽章系统v7 Tests (P-20260530-031)
         function runV203Tests() {
             const results = [];
@@ -84446,3 +84782,290 @@ const v152Results = runV152Tests();
         }
 
         const v203Results = runV203Tests();
+
+        // V204: 排行榜+竞技系统v7 Tests (P-20260530-032)
+        function runV204Tests() {
+            const results = [];
+            const v204Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player_v204',
+                playerName: '测试修士v7',
+                spiritStones: 50000,
+                combatPower: 5000,
+                realm: 1,
+                level: 10
+            };
+
+            const server = window.MCPServer || window;
+
+            // Test 1: MCP_TOOLS_V204 is defined with 6 tools
+            v204Assert(typeof MCP_TOOLS_V204 === 'object', 'MCP_TOOLS_V204 is defined');
+            v204Assert(Object.keys(MCP_TOOLS_V204).length === 6, 'MCP_TOOLS_V204 has 6 tools');
+            v204Assert('ranking.list' in MCP_TOOLS_V204, 'ranking.list tool exists');
+            v204Assert('ranking.detail' in MCP_TOOLS_V204, 'ranking.detail tool exists');
+            v204Assert('ranking.refresh' in MCP_TOOLS_V204, 'ranking.refresh tool exists');
+            v204Assert('arena.status' in MCP_TOOLS_V204, 'arena.status tool exists');
+            v204Assert('arena.challenge' in MCP_TOOLS_V204, 'arena.challenge tool exists');
+            v204Assert('arena.reward' in MCP_TOOLS_V204, 'arena.reward tool exists');
+
+            // Test 2: _initRankingStateV7 creates state
+            const rankStateV7 = server._initRankingStateV7();
+            v204Assert(rankStateV7 !== null, '_initRankingStateV7 returns state');
+            v204Assert(rankStateV7.rankings !== undefined, '_initRankingStateV7 has rankings');
+            v204Assert(Array.isArray(rankStateV7.rankings.power), '_initRankingStateV7 has power ranking');
+            v204Assert(Array.isArray(rankStateV7.rankings.level), '_initRankingStateV7 has level ranking');
+            v204Assert(Array.isArray(rankStateV7.rankings.spiritStone), '_initRankingStateV7 has spiritStone ranking');
+            v204Assert(Array.isArray(rankStateV7.rankings.arena), '_initRankingStateV7 has arena ranking');
+            v204Assert(Array.isArray(rankStateV7.rankings.sect), '_initRankingStateV7 has sect ranking');
+            v204Assert(rankStateV7.refreshCost === 100, '_initRankingStateV7 refreshCost is 100');
+
+            // Test 3: _initArenaStateV7 creates state
+            const arenaStateV7 = server._initArenaStateV7();
+            v204Assert(arenaStateV7 !== null, '_initArenaStateV7 returns state');
+            v204Assert(arenaStateV7.currentRank === 0, '_initArenaStateV7 currentRank is 0');
+            v204Assert(arenaStateV7.maxDailyChallenge === 10, '_initArenaStateV7 maxDailyChallenge is 10');
+            v204Assert(arenaStateV7.challengeCooldown === 30000, '_initArenaStateV7 challengeCooldown is 30000');
+            v204Assert(Array.isArray(arenaStateV7.challenges), '_initArenaStateV7 has challenges array');
+            v204Assert(Array.isArray(arenaStateV7.rewards), '_initArenaStateV7 has rewards array');
+
+            // Test 4: mcpRankingListV7 returns correct structure
+            const rankListV7 = server.mcpRankingListV7();
+            v204Assert(rankListV7.success === true, 'ranking.list v7 returns success');
+            v204Assert(rankListV7.rankings !== undefined, 'ranking.list v7 has rankings');
+            v204Assert(rankListV7.message.includes('排行榜'), 'ranking.list v7 returns message');
+
+            // Test 5: mcpRankingListV7 with type filter works
+            const rankListPower = server.mcpRankingListV7('power');
+            v204Assert(rankListPower.success === true, 'ranking.list v7 power filter works');
+            v204Assert(rankListPower.type === 'power', 'ranking.list v7 returns correct type');
+
+            // Test 6: mcpRankingListV7 with invalid type returns error
+            const rankListBad = server.mcpRankingListV7('invalid');
+            v204Assert(rankListBad.error !== undefined, 'ranking.list v7 invalid type returns error');
+
+            // Test 7: mcpRankingListV7 with all valid types works
+            ['power', 'level', 'spiritStone', 'arena', 'sect'].forEach(t => {
+                const r = server.mcpRankingListV7(t);
+                v204Assert(r.success === true, 'ranking.list v7 type ' + t + ' works');
+            });
+
+            // Test 8: mcpRankingDetailV7 returns error without params
+            const rankDetailNoParams = server.mcpRankingDetailV7();
+            v204Assert(rankDetailNoParams.error !== undefined, 'ranking.detail v7 without params returns error');
+
+            // Test 9: mcpRankingDetailV7 with invalid type returns error
+            const rankDetailBadType = server.mcpRankingDetailV7('invalid', 1);
+            v204Assert(rankDetailBadType.error !== undefined, 'ranking.detail v7 invalid type returns error');
+
+            // Test 10: mcpRankingDetailV7 with invalid rank returns error
+            const rankDetailBadRank = server.mcpRankingDetailV7('power', 999);
+            v204Assert(rankDetailBadRank.error !== undefined, 'ranking.detail v7 invalid rank returns error');
+
+            // Test 11: mcpRankingRefreshV7 returns error without enough spirit stones
+            window.gameState.spiritStones = 50;
+            const rankRefreshPoor = server.mcpRankingRefreshV7();
+            v204Assert(rankRefreshPoor.error !== undefined, 'ranking.refresh v7 without enough stones returns error');
+
+            // Test 12: mcpRankingRefreshV7 works with enough spirit stones
+            window.gameState.spiritStones = 50000;
+            const rankRefreshV7 = server.mcpRankingRefreshV7();
+            v204Assert(rankRefreshV7.success === true, 'ranking.refresh v7 returns success');
+            v204Assert(rankRefreshV7.lastRefresh !== null, 'ranking.refresh v7 returns lastRefresh');
+            v204Assert(window.gameState.spiritStones === 49900, 'ranking.refresh v7 deducts 100 spirit stones');
+
+            // Test 13: mcpRankingDetailV7 works after refresh
+            const rankDetailV7 = server.mcpRankingDetailV7('power', 1);
+            v204Assert(rankDetailV7.success === true, 'ranking.detail v7 after refresh works');
+            v204Assert(rankDetailV7.rank === 1, 'ranking.detail v7 returns correct rank');
+            v204Assert(rankDetailV7.player !== null, 'ranking.detail v7 returns player');
+
+            // Test 14: mcpArenaStatusV7 returns correct structure
+            const arenaStatusV7 = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusV7.success === true, 'arena.status v7 returns success');
+            v204Assert(arenaStatusV7.currentRank !== undefined, 'arena.status v7 returns currentRank');
+            v204Assert(arenaStatusV7.maxDailyChallenge === 10, 'arena.status v7 returns maxDailyChallenge');
+            v204Assert(arenaStatusV7.canChallenge === true, 'arena.status v7 canChallenge is true initially');
+
+            // Test 15: mcpArenaChallengeV7 returns error without targetId
+            const arenaChallengeNoTarget = server.mcpArenaChallengeV7();
+            v204Assert(arenaChallengeNoTarget.error !== undefined, 'arena.challenge v7 without targetId returns error');
+
+            // Test 16: mcpArenaChallengeV7 works
+            const arenaChallengeV7 = server.mcpArenaChallengeV7('player_1');
+            v204Assert(arenaChallengeV7.success === true, 'arena.challenge v7 returns success');
+            v204Assert(arenaChallengeV7.result !== undefined, 'arena.challenge v7 returns result');
+            v204Assert(['win', 'lose'].includes(arenaChallengeV7.result), 'arena.challenge v7 result is win or lose');
+
+            // Test 17: mcpArenaChallengeV7 increments daily challenge count
+            const arenaStatusAfter = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusAfter.dailyChallenge === 1, 'arena.challenge v7 increments dailyChallenge');
+
+            // Test 18: mcpArenaChallengeV7 triggers cooldown
+            const arenaStatusCooldown = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusCooldown.canChallenge === false, 'arena.challenge v7 triggers cooldown');
+
+            // Test 19: mcpArenaChallengeV7 returns error when daily limit reached
+            window.gameState.arenaV7.dailyChallenge = 10;
+            const arenaChallengeLimit = server.mcpArenaChallengeV7('player_2');
+            v204Assert(arenaChallengeLimit.error !== undefined, 'arena.challenge v7 when limit reached returns error');
+
+            // Test 20: mcpArenaRewardV7 returns error when no tier matched
+            window.gameState.arenaV7.currentRank = 999;
+            window.gameState.arenaV7.dailyChallenge = 0;
+            window.gameState.arenaV7.lastChallengeAt = null;
+            const arenaRewardNoTier = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardNoTier.error !== undefined, 'arena.reward v7 when no tier matched returns error');
+
+            // Test 21: mcpArenaRewardV7 works for top tier
+            window.gameState.arenaV7.currentRank = 5;
+            const arenaRewardTop = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardTop.success === true, 'arena.reward v7 for top tier returns success');
+            v204Assert(arenaRewardTop.reward.type === 'legendary', 'arena.reward v7 top tier is legendary');
+
+            // Test 22: mcpArenaRewardV7 returns error when already claimed
+            const arenaRewardClaimed = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardClaimed.error !== undefined, 'arena.reward v7 when already claimed returns error');
+
+            // Test 23: _initRankingStateV7 is idempotent
+            const rankStateV7First = server._initRankingStateV7();
+            const rankStateV7Second = server._initRankingStateV7();
+            v204Assert(rankStateV7First === rankStateV7Second, '_initRankingStateV7 is idempotent');
+
+            // Test 24: _initArenaStateV7 is idempotent
+            const arenaStateV7First = server._initArenaStateV7();
+            const arenaStateV7Second = server._initArenaStateV7();
+            v204Assert(arenaStateV7First === arenaStateV7Second, '_initArenaStateV7 is idempotent');
+
+            // Test 25: mcpRankingListV7 returns rankings after refresh
+            const rankListAfter = server.mcpRankingListV7('power');
+            v204Assert(rankListAfter.rankings.length > 0, 'ranking.list v7 after refresh returns rankings');
+
+            // Test 26: mcpRankingDetailV7 returns correct player info structure
+            const rankDetailInfo = server.mcpRankingDetailV7('level', 1);
+            v204Assert(rankDetailInfo.player !== null, 'ranking.detail v7 returns player info');
+            v204Assert(rankDetailInfo.player.name !== undefined, 'ranking.detail v7 player has name');
+            v204Assert(rankDetailInfo.player.power !== undefined, 'ranking.detail v7 player has power');
+
+            // Test 27: mcpArenaStatusV7 returns remaining daily challenges
+            window.gameState.arenaV7.dailyChallenge = 3;
+            const arenaStatusRemaining = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusRemaining.remainingDaily === 7, 'arena.status v7 returns correct remainingDaily');
+
+            // Test 28: mcpArenaChallengeV7 updates player spirit stones on win
+            window.gameState.spiritStones = 10000;
+            window.gameState.arenaV7.dailyChallenge = 0;
+            window.gameState.arenaV7.lastChallengeAt = null;
+            window.gameState.arenaV7.currentRank = 10;
+            const stonesBefore = window.gameState.spiritStones;
+            const challengeWin = server.mcpArenaChallengeV7('player_10');
+            if (challengeWin.result === 'win') {
+                v204Assert(window.gameState.spiritStones > stonesBefore, 'arena.challenge v7 win adds stones');
+            }
+
+            // Test 29: mcpArenaChallengeV7 updates player spirit stones on lose
+            window.gameState.spiritStones = 10000;
+            window.gameState.arenaV7.dailyChallenge = 0;
+            window.gameState.arenaV7.lastChallengeAt = null;
+            window.gameState.combatPower = 100;
+            const stonesBeforeLose = window.gameState.spiritStones;
+            const challengeLose = server.mcpArenaChallengeV7('player_1');
+            if (challengeLose.result === 'lose') {
+                v204Assert(window.gameState.spiritStones < stonesBeforeLose, 'arena.challenge v7 lose deducts stones');
+            }
+
+            // Test 30: mcpArenaRewardV7 works for epic tier (rank 11-50)
+            window.gameState.arenaV7.currentRank = 25;
+            window.gameState.arenaV7.rewards = [];
+            window.gameState.arenaV7.seasonEndAt = null;
+            const arenaRewardEpic = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardEpic.success === true, 'arena.reward v7 for epic tier returns success');
+            v204Assert(arenaRewardEpic.reward.type === 'epic', 'arena.reward v7 epic tier is epic');
+
+            // Test 31: mcpArenaRewardV7 works for rare tier (rank 51-100)
+            window.gameState.arenaV7.currentRank = 75;
+            window.gameState.arenaV7.rewards = [];
+            const arenaRewardRare = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardRare.success === true, 'arena.reward v7 for rare tier returns success');
+            v204Assert(arenaRewardRare.reward.type === 'rare', 'arena.reward v7 rare tier is rare');
+
+            // Test 32: mcpArenaRewardV7 works for common tier (rank 101-500)
+            window.gameState.arenaV7.currentRank = 200;
+            window.gameState.arenaV7.rewards = [];
+            const arenaRewardCommon = server.mcpArenaRewardV7();
+            v204Assert(arenaRewardCommon.success === true, 'arena.reward v7 for common tier returns success');
+            v204Assert(arenaRewardCommon.reward.type === 'common', 'arena.reward v7 common tier is common');
+
+            // Test 33: mcpRankingRefreshV7 deducts correct amount
+            window.gameState.spiritStones = 500;
+            const refreshDeducts = server.mcpRankingRefreshV7();
+            v204Assert(refreshDeducts.success === true, 'ranking.refresh v7 deducts correct amount');
+            v204Assert(window.gameState.spiritStones === 400, 'ranking.refresh v7 deducts exactly 100');
+
+            // Test 34: mcpRankingListV7 with spiritStone type works
+            const rankListStone = server.mcpRankingListV7('spiritStone');
+            v204Assert(rankListStone.success === true, 'ranking.list v7 spiritStone type works');
+            v204Assert(rankListStone.type === 'spiritStone', 'ranking.list v7 returns spiritStone type');
+
+            // Test 35: mcpRankingListV7 with arena type works
+            const rankListArena = server.mcpRankingListV7('arena');
+            v204Assert(rankListArena.success === true, 'ranking.list v7 arena type works');
+            v204Assert(rankListArena.type === 'arena', 'ranking.list v7 returns arena type');
+
+            // Test 36: mcpRankingListV7 with sect type works
+            const rankListSect = server.mcpRankingListV7('sect');
+            v204Assert(rankListSect.success === true, 'ranking.list v7 sect type works');
+            v204Assert(rankListSect.type === 'sect', 'ranking.list v7 returns sect type');
+
+            // Test 37: mcpRankingListV7 with level type works
+            const rankListLevel = server.mcpRankingListV7('level');
+            v204Assert(rankListLevel.success === true, 'ranking.list v7 level type works');
+            v204Assert(rankListLevel.type === 'level', 'ranking.list v7 returns level type');
+
+            // Test 38: mcpArenaStatusV7 returns challengeCooldown value
+            const arenaStatusCooldownVal = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusCooldownVal.challengeCooldown === 30000, 'arena.status v7 returns challengeCooldown');
+
+            // Test 39: mcpArenaChallengeV7 records challenge in history
+            window.gameState.arenaV7.dailyChallenge = 0;
+            window.gameState.arenaV7.lastChallengeAt = null;
+            window.gameState.combatPower = 5000;
+            const challengeHistory = server.mcpArenaChallengeV7('player_5');
+            v204Assert(window.gameState.arenaV7.challenges.length > 0, 'arena.challenge v7 records in history');
+
+            // Test 40: mcpArenaChallengeV7 cooldown check works
+            window.gameState.arenaV7.lastChallengeAt = Date.now();
+            const challengeDuringCooldown = server.mcpArenaChallengeV7('player_3');
+            v204Assert(challengeDuringCooldown.error !== undefined, 'arena.challenge v7 during cooldown returns error');
+
+            // Test 41: mcpRankingDetailV7 rank 0 is invalid
+            const rankDetailZero = server.mcpRankingDetailV7('power', 0);
+            v204Assert(rankDetailZero.error !== undefined, 'ranking.detail v7 rank 0 returns error');
+
+            // Test 42: mcpRankingDetailV7 negative rank is invalid
+            const rankDetailNeg = server.mcpRankingDetailV7('power', -1);
+            v204Assert(rankDetailNeg.error !== undefined, 'ranking.detail v7 negative rank returns error');
+
+            // Test 43: mcpRankingListV7 limits to 100 entries
+            const rankList100 = server.mcpRankingListV7('power');
+            v204Assert(rankList100.rankings.length <= 100, 'ranking.list v7 limits to 100 entries');
+
+            // Test 44: arena.status v7 returns seasonEndAt
+            window.gameState.arenaV7.seasonEndAt = '2025-06-30T00:00:00.000Z';
+            const arenaStatusSeason = server.mcpArenaStatusV7();
+            v204Assert(arenaStatusSeason.seasonEndAt !== null, 'arena.status v7 returns seasonEndAt');
+
+            // Test 45: All tests pass
+            const v204Passed = results.filter(r => r.pass).length;
+            const v204Total = results.length;
+            const v204PassRate = v204Passed / v204Total;
+            console.log('V204 Tests:', v204Passed + '/' + v204Total, '(' + (v204PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V204', passed: v204Passed, total: v204Total, passRate: v204PassRate.toFixed(3), results };
+        }
+
+        const v204Results = runV204Tests();
