@@ -3733,6 +3733,10 @@
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V185)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V186: Register 排行榜+竞技系统v5 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V186)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -3888,6 +3892,25 @@
                             break;
                         case 'badge.equip':
                             result = this.mcpBadgeEquipV3(args.badgeId);
+                            break;
+                        // V186: 排行榜+竞技系统v5 (override v4)
+                        case 'rank.list':
+                            result = this.mcpRankListV5();
+                            break;
+                        case 'rank.view':
+                            result = this.mcpRankViewV5(args.rankType);
+                            break;
+                        case 'rank.challenge':
+                            result = this.mcpRankChallengeV5(args.targetId);
+                            break;
+                        case 'arena.match':
+                            result = this.mcpArenaMatchV5();
+                            break;
+                        case 'arena.fight':
+                            result = this.mcpArenaFightV5(args.opponentId);
+                            break;
+                        case 'arena.reward':
+                            result = this.mcpArenaRewardV5(args.rewardType);
                             break;
                         // V176: 排行榜+竞技系统v4 (override v3)
                         case 'rank.list':
@@ -21651,6 +21674,325 @@
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V186: _initRankStateV5 - 初始化排行榜系统状态v5
+            _initRankStateV5() {
+                const gs = window.gameState;
+                if (!gs.rankV5) {
+                    gs.rankV5 = {
+                        leaderboards: [
+                            {
+                                type: 'cultivation',
+                                name: '修为榜',
+                                entries: [
+                                    { rank: 1, playerId: 'npc_zhang', playerName: '张天师', score: 5000 },
+                                    { rank: 2, playerId: 'npc_zhao', playerName: '赵大能', score: 4500 },
+                                    { rank: 3, playerId: 'player', playerName: gs.playerName || '道友', score: gs.combatPower || 2000 },
+                                    { rank: 4, playerId: 'npc_li', playerName: '李师兄', score: 1800 },
+                                    { rank: 5, playerId: 'npc_wang', playerName: '王师姐', score: 1500 }
+                                ],
+                                refreshTime: Date.now()
+                            },
+                            {
+                                type: 'arena',
+                                name: '竞技榜',
+                                entries: [
+                                    { rank: 1, playerId: 'npc_zhao', playerName: '赵大能', score: 2200 },
+                                    { rank: 2, playerId: 'npc_zhang', playerName: '张天师', score: 2100 },
+                                    { rank: 3, playerId: 'npc_wang', playerName: '王师姐', score: 1900 },
+                                    { rank: 4, playerId: 'player', playerName: gs.playerName || '道友', score: 1600 },
+                                    { rank: 5, playerId: 'npc_li', playerName: '李师兄', score: 1400 }
+                                ],
+                                refreshTime: Date.now()
+                            },
+                            {
+                                type: 'wealth',
+                                name: '财富榜',
+                                entries: [
+                                    { rank: 1, playerId: 'npc_zhang', playerName: '张天师', score: 50000 },
+                                    { rank: 2, playerId: 'npc_zhao', playerName: '赵大能', score: 35000 },
+                                    { rank: 3, playerId: 'npc_wang', playerName: '王师姐', score: 20000 },
+                                    { rank: 4, playerId: 'player', playerName: gs.playerName || '道友', score: gs.spiritStones || 5000 },
+                                    { rank: 5, playerId: 'npc_li', playerName: '李师兄', score: 3000 }
+                                ],
+                                refreshTime: Date.now()
+                            },
+                            {
+                                type: 'social',
+                                name: '社交榜',
+                                entries: [
+                                    { rank: 1, playerId: 'npc_zhang', playerName: '张天师', score: 800 },
+                                    { rank: 2, playerId: 'npc_wang', playerName: '王师姐', score: 650 },
+                                    { rank: 3, playerId: 'player', playerName: gs.playerName || '道友', score: gs.reputation || 200 },
+                                    { rank: 4, playerId: 'npc_li', playerName: '李师兄', score: 150 },
+                                    { rank: 5, playerId: 'npc_zhao', playerName: '赵大能', score: 100 }
+                                ],
+                                refreshTime: Date.now()
+                            }
+                        ],
+                        personalBest: {
+                            cultivation: gs.combatPower || 2000,
+                            arena: 1600,
+                            wealth: gs.spiritStones || 5000,
+                            social: gs.reputation || 200
+                        },
+                        challengeCount: 5,
+                        maxChallenges: 5,
+                        history: []
+                    };
+                }
+                return gs.rankV5;
+            }
+
+            // V186: _initArenaStateV5 - 初始化竞技系统状态v5
+            _initArenaStateV5() {
+                const gs = window.gameState;
+                if (!gs.arenaV5) {
+                    const now = Date.now();
+                    gs.arenaV5 = {
+                        matchStatus: 'idle',
+                        currentOpponent: null,
+                        fightHistory: [],
+                        season: {
+                            id: 'season_1',
+                            startTime: now - 86400000 * 7,
+                            endTime: now + 86400000 * 23,
+                            rewards: {
+                                weekly: { top10: 500, top50: 200, participation: 50 },
+                                monthly: { top10: 2000, top50: 1000, participation: 200 },
+                                season: { top10: 10000, top50: 5000, participation: 1000 }
+                            }
+                        },
+                        dailyMatches: 0,
+                        maxDailyMatches: 5,
+                        freeMatches: 3,
+                        lastMatchReset: now
+                    };
+                }
+                return gs.arenaV5;
+            }
+
+            // V186: mcpRankListV5 - 获取排行榜列表
+            mcpRankListV5() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rankV5 = this._initRankStateV5();
+                    return {
+                        success: true,
+                        leaderboards: rankV5.leaderboards.map(l => ({
+                            type: l.type,
+                            name: l.name,
+                            entryCount: l.entries.length,
+                            refreshTime: l.refreshTime
+                        })),
+                        message: '排行榜共' + rankV5.leaderboards.length + '类榜单'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V186: mcpRankViewV5 - 查看排行榜详情
+            mcpRankViewV5(rankType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rankType) return { error: '请指定排行榜类型' };
+                    const rankV5 = this._initRankStateV5();
+                    const board = rankV5.leaderboards.find(l => l.type === rankType);
+                    if (!board) return { error: '无效的排行榜类型' };
+                    const sortedEntries = [...board.entries].sort((a, b) => b.score - a.score);
+                    const playerEntry = sortedEntries.find(e => e.playerId === 'player');
+                    const playerRank = playerEntry ? playerEntry.rank : null;
+                    return {
+                        success: true,
+                        rankType: rankType,
+                        boardName: board.name,
+                        top100: sortedEntries.slice(0, 100),
+                        playerRank: playerRank,
+                        playerScore: playerEntry ? playerEntry.score : null,
+                        personalBest: rankV5.personalBest[rankType] || null,
+                        refreshTime: board.refreshTime,
+                        message: board.name + '共' + sortedEntries.length + '名，玩家排名第' + (playerRank || '未上榜')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V186: mcpRankChallengeV5 - 挑战排行榜
+            mcpRankChallengeV5(targetId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!targetId) return { error: '请指定目标玩家ID' };
+                    const rankV5 = this._initRankStateV5();
+                    if (rankV5.challengeCount <= 0) return { error: '今日挑战次数已用完' };
+                    const targetEntry = rankV5.leaderboards.find(l => l.entries.some(e => e.playerId === targetId));
+                    if (!targetEntry) return { error: '目标玩家不存在' };
+                    const target = targetEntry.entries.find(e => e.playerId === targetId);
+                    if (!target) return { error: '目标玩家不存在' };
+                    const playerEntry = targetEntry.entries.find(e => e.playerId === 'player');
+                    if (!playerEntry) return { error: '玩家未上榜，无法挑战' };
+                    rankV5.challengeCount--;
+                    const playerPower = gs.combatPower || 2000;
+                    const targetPower = target.score;
+                    const playerWin = playerPower > targetPower * (0.85 + Math.random() * 0.3);
+                    let message = '';
+                    if (playerWin) {
+                        const oldRank = playerEntry.rank;
+                        const newRank = target.rank;
+                        playerEntry.rank = newRank;
+                        target.rank = oldRank;
+                        playerEntry.score = Math.max(playerEntry.score, targetPower + 100);
+                        rankV5.personalBest[targetEntry.type] = Math.max(rankV5.personalBest[targetEntry.type] || 0, playerEntry.score);
+                        message = '挑战胜利！排名上升至第' + newRank + '名';
+                    } else {
+                        playerEntry.score = Math.max(100, playerEntry.score - 50);
+                        message = '挑战失败，排名保持不变';
+                    }
+                    rankV5.history.push({
+                        timestamp: Date.now(),
+                        type: 'challenge',
+                        targetId: targetId,
+                        targetName: target.playerName,
+                        result: playerWin ? '胜利' : '失败'
+                    });
+                    return {
+                        success: true,
+                        result: playerWin ? '胜利' : '失败',
+                        playerRank: playerEntry.rank,
+                        playerScore: playerEntry.score,
+                        remainingChallenges: rankV5.challengeCount,
+                        message: message
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V186: mcpArenaMatchV5 - 开始匹配
+            mcpArenaMatchV5() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV5 = this._initArenaStateV5();
+                    if (arenaV5.matchStatus === 'matching') return { error: '正在匹配中，请稍候' };
+                    if (arenaV5.matchStatus === 'fighting') return { error: '存在进行中的战斗，请先完成战斗' };
+                    const now = Date.now();
+                    if (now - arenaV5.lastMatchReset > 86400000) {
+                        arenaV5.dailyMatches = 0;
+                        arenaV5.freeMatches = 3;
+                        arenaV5.lastMatchReset = now;
+                    }
+                    const useStone = arenaV5.freeMatches <= 0;
+                    if (useStone) {
+                        if ((gs.spiritStones || 0) < 50) return { error: '灵石不足，需要50灵石匹配' };
+                        gs.spiritStones -= 50;
+                    } else {
+                        arenaV5.freeMatches--;
+                    }
+                    arenaV5.dailyMatches++;
+                    const opponents = [
+                        { id: 'npc_zhao', name: '赵大能', power: 2200, rating: 2000 },
+                        { id: 'npc_zhang', name: '张天师', power: 2100, rating: 1900 },
+                        { id: 'npc_wang', name: '王师姐', power: 1900, rating: 1800 },
+                        { id: 'npc_li', name: '李师兄', power: 1600, rating: 1500 },
+                        { id: 'npc_chen', name: '陈道友', power: 1400, rating: 1300 }
+                    ];
+                    const playerRating = gs.arenaV5 ? gs.arenaV5.rating || 1500 : 1500;
+                    const nearby = opponents.filter(o => Math.abs(o.rating - playerRating) < 500);
+                    const opponent = nearby.length > 0 ? nearby[Math.floor(Math.random() * nearby.length)] : opponents[Math.floor(Math.random() * opponents.length)];
+                    arenaV5.matchStatus = 'matching';
+                    arenaV5.currentOpponent = {
+                        id: opponent.id,
+                        name: opponent.name,
+                        power: opponent.power,
+                        matchedAt: now
+                    };
+                    return {
+                        success: true,
+                        status: 'matched',
+                        opponent: { id: opponent.id, name: opponent.name, power: opponent.power },
+                        dailyMatches: arenaV5.dailyMatches,
+                        freeMatchesLeft: arenaV5.freeMatches,
+                        message: '匹配成功！对手：' + opponent.name + '（战力' + opponent.power + '）'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V186: mcpArenaFightV5 - 执行战斗
+            mcpArenaFightV5(opponentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const arenaV5 = this._initArenaStateV5();
+                    if (!arenaV5.currentOpponent) return { error: '无匹配对手，请先匹配' };
+                    if (arenaV5.currentOpponent.id !== opponentId) return { error: '对手ID不匹配' };
+                    const playerPower = gs.combatPower || 2000;
+                    const opponentPower = arenaV5.currentOpponent.power;
+                    const playerWin = playerPower > opponentPower * (0.85 + Math.random() * 0.3);
+                    const ratingChange = playerWin ? 25 : -20;
+                    const newRating = Math.max(1000, Math.min(2500, (gs.arenaRating || 1500) + ratingChange));
+                    if (!gs.arenaV5) gs.arenaV5 = {};
+                    gs.arenaV5.rating = newRating;
+                    const fightResult = {
+                        timestamp: Date.now(),
+                        opponentId: opponentId,
+                        opponentName: arenaV5.currentOpponent.name,
+                        playerPower: playerPower,
+                        opponentPower: opponentPower,
+                        result: playerWin ? '胜利' : '失败',
+                        ratingChange: ratingChange,
+                        newRating: newRating
+                    };
+                    arenaV5.fightHistory.push(fightResult);
+                    if (arenaV5.fightHistory.length > 100) arenaV5.fightHistory.shift();
+                    arenaV5.currentOpponent = null;
+                    arenaV5.matchStatus = 'idle';
+                    return {
+                        success: true,
+                        result: fightResult.result,
+                        playerPower: playerPower,
+                        opponentPower: opponentPower,
+                        ratingChange: ratingChange,
+                        newRating: newRating,
+                        message: playerWin ? '战斗胜利！评分上升至' + newRating : '战斗失败，评分下降至' + newRating
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V186: mcpArenaRewardV5 - 领取竞技奖励
+            mcpArenaRewardV5(rewardType) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!rewardType) return { error: '请指定奖励类型' };
+                    const arenaV5 = this._initArenaStateV5();
+                    const validTypes = ['weekly', 'monthly', 'season'];
+                    if (!validTypes.includes(rewardType)) return { error: '无效的奖励类型' };
+                    if (!arenaV5.season.rewards[rewardType]) return { error: '奖励类型不存在' };
+                    const season = arenaV5.season;
+                    const now = Date.now();
+                    if (rewardType === 'weekly' && (now < season.startTime || now > season.startTime + 86400000 * 7)) {
+                        return { error: '本周奖励尚未开放' };
+                    }
+                    if (rewardType === 'monthly' && (now < season.startTime || now > season.startTime + 86400000 * 30)) {
+                        return { error: '本月奖励尚未开放' };
+                    }
+                    if (rewardType === 'season' && now < season.endTime) {
+                        return { error: '赛季尚未结束' };
+                    }
+                    const playerRating = gs.arenaRating || 1500;
+                    let rewardAmount = 0;
+                    if (playerRating >= 2000) rewardAmount = season.rewards[rewardType].top10;
+                    else if (playerRating >= 1700) rewardAmount = season.rewards[rewardType].top50;
+                    else rewardAmount = season.rewards[rewardType].participation;
+                    gs.spiritStones = (gs.spiritStones || 0) + rewardAmount;
+                    return {
+                        success: true,
+                        rewardType: rewardType,
+                        reward: { type: 'spiritStone', amount: rewardAmount },
+                        rating: playerRating,
+                        message: '领取' + rewardType + '奖励成功，获得' + rewardAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V177: _initSerendipityStateV4 - 初始化奇遇系统状态v4
             _initSerendipityStateV4() {
                 const gs = window.gameState;
@@ -38376,6 +38718,64 @@
                         badgeId: { type: 'string', description: '徽章ID' }
                     },
                     required: ['badgeId']
+                }
+            }
+        };
+
+        // V186: 排行榜+竞技系统v5 (P-20260529-111)
+        const MCP_TOOLS_V186 = {
+            'rank.list': {
+                name: 'rank.list',
+                description: '获取排行榜列表 (排行榜+竞技系统v5-获取所有排行榜类型)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'rank.view': {
+                name: 'rank.view',
+                description: '查看排行榜详情 (排行榜+竞技系统v5-查看指定排行榜详情(top100+玩家排名))',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rankType: { type: 'string', description: '排行榜类型: cultivation/arena/wealth/social' }
+                    },
+                    required: ['rankType']
+                }
+            },
+            'rank.challenge': {
+                name: 'rank.challenge',
+                description: '挑战排行榜 (排行榜+竞技系统v5-挑战排行榜，消耗挑战次数，获胜获得排名上升)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        targetId: { type: 'string', description: '目标玩家ID' }
+                    },
+                    required: ['targetId']
+                }
+            },
+            'arena.match': {
+                name: 'arena.match',
+                description: '开始匹配 (排行榜+竞技系统v5-开始匹配对手进行竞技(消耗灵石或免费次数))',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'arena.fight': {
+                name: 'arena.fight',
+                description: '执行战斗 (排行榜+竞技系统v5-执行战斗(基于属性计算胜负))',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        opponentId: { type: 'string', description: '对手ID' }
+                    },
+                    required: ['opponentId']
+                }
+            },
+            'arena.reward': {
+                name: 'arena.reward',
+                description: '领取竞技奖励 (排行榜+竞技系统v5-领取赛季奖励(按排名领取))',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rewardType: { type: 'string', description: '奖励类型: weekly/monthly/season' }
+                    },
+                    required: ['rewardType']
                 }
             }
         };
@@ -73843,5 +74243,331 @@ const v152Results = runV152Tests();
         }
 
         const v185Results = runV185Tests();
+
+        function runV186Tests() {
+            const results = [];
+            function v186Assert(condition, testName) {
+                results.push({ pass: condition === true, test: testName });
+                if (condition !== true) console.warn('V186 FAIL:', testName);
+            }
+
+            // Setup game state
+            window.gameState = {
+                playerName: '测试道友',
+                spiritStones: 10000,
+                combatPower: 2000,
+                reputation: 200,
+                realm: '筑基',
+                realmIndex: 1,
+                level: 10,
+                arenaRating: 1500
+            };
+
+            const server = new MCPServer();
+            server.initToolRegistry();
+
+            // Test 1: MCP_TOOLS_V186 definition exists and has 6 tools
+            v186Assert(typeof MCP_TOOLS_V186 === 'object', 'MCP_TOOLS_V186 is defined');
+            v186Assert(Object.keys(MCP_TOOLS_V186).length === 6, 'MCP_TOOLS_V186 has 6 tools');
+
+            // Test 2: rank.list tool exists
+            v186Assert('rank.list' in MCP_TOOLS_V186, 'rank.list tool exists');
+
+            // Test 3: rank.view tool exists
+            v186Assert('rank.view' in MCP_TOOLS_V186, 'rank.view tool exists');
+
+            // Test 4: rank.challenge tool exists
+            v186Assert('rank.challenge' in MCP_TOOLS_V186, 'rank.challenge tool exists');
+
+            // Test 5: arena.match tool exists
+            v186Assert('arena.match' in MCP_TOOLS_V186, 'arena.match tool exists');
+
+            // Test 6: arena.fight tool exists
+            v186Assert('arena.fight' in MCP_TOOLS_V186, 'arena.fight tool exists');
+
+            // Test 7: arena.reward tool exists
+            v186Assert('arena.reward' in MCP_TOOLS_V186, 'arena.reward tool exists');
+
+            // Test 8: _initRankStateV5 creates state
+            server._initRankStateV5();
+            v186Assert(window.gameState.rankV5 !== undefined, '_initRankStateV5 creates rankV5');
+            v186Assert(Array.isArray(window.gameState.rankV5.leaderboards), 'rankV5.leaderboards is array');
+            v186Assert(window.gameState.rankV5.leaderboards.length === 4, 'rankV5 has 4 leaderboards');
+            v186Assert(window.gameState.rankV5.challengeCount === 5, 'rankV5 challengeCount is 5');
+            v186Assert(window.gameState.rankV5.maxChallenges === 5, 'rankV5 maxChallenges is 5');
+
+            // Test 9: _initArenaStateV5 creates state
+            server._initArenaStateV5();
+            v186Assert(window.gameState.arenaV5 !== undefined, '_initArenaStateV5 creates arenaV5');
+            v186Assert(window.gameState.arenaV5.matchStatus === 'idle', 'arenaV5 matchStatus is idle');
+            v186Assert(window.gameState.arenaV5.dailyMatches === 0, 'arenaV5 dailyMatches is 0');
+            v186Assert(window.gameState.arenaV5.maxDailyMatches === 5, 'arenaV5 maxDailyMatches is 5');
+            v186Assert(window.gameState.arenaV5.freeMatches === 3, 'arenaV5 freeMatches is 3');
+
+            // Test 10: mcpRankListV5 returns success
+            const rlV5 = server.mcpRankListV5();
+            v186Assert(rlV5.success === true, 'rank.list v5 returns success');
+            v186Assert(Array.isArray(rlV5.leaderboards), 'rank.list v5 leaderboards is array');
+            v186Assert(rlV5.leaderboards.length === 4, 'rank.list v5 has 4 leaderboards');
+
+            // Test 11: mcpRankListV5 returns all 4 leaderboard types
+            v186Assert(rlV5.leaderboards.some(l => l.type === 'cultivation'), 'rank.list v5 has cultivation board');
+            v186Assert(rlV5.leaderboards.some(l => l.type === 'arena'), 'rank.list v5 has arena board');
+            v186Assert(rlV5.leaderboards.some(l => l.type === 'wealth'), 'rank.list v5 has wealth board');
+            v186Assert(rlV5.leaderboards.some(l => l.type === 'social'), 'rank.list v5 has social board');
+
+            // Test 12: mcpRankViewV5 with cultivation returns success
+            const rvV5Cult = server.mcpRankViewV5('cultivation');
+            v186Assert(rvV5Cult.success === true, 'rank.view v5 cultivation returns success');
+            v186Assert(rvV5Cult.rankType === 'cultivation', 'rank.view v5 returns correct rankType');
+            v186Assert(Array.isArray(rvV5Cult.top100), 'rank.view v5 returns top100 array');
+
+            // Test 13: mcpRankViewV5 returns player rank
+            v186Assert(rvV5Cult.playerRank !== undefined, 'rank.view v5 returns playerRank');
+
+            // Test 14: mcpRankViewV5 returns personalBest
+            v186Assert(rvV5Cult.personalBest !== undefined, 'rank.view v5 returns personalBest');
+
+            // Test 15: mcpRankViewV5 with invalid type returns error
+            const rvV5Invalid = server.mcpRankViewV5('invalid');
+            v186Assert(rvV5Invalid.error !== undefined, 'rank.view v5 invalid type returns error');
+
+            // Test 16: mcpRankChallengeV5 with valid target
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            window.gameState.rankV5.challengeCount = 5;
+            const rcV5 = server.mcpRankChallengeV5('npc_zhang');
+            v186Assert(rcV5.success === true, 'rank.challenge v5 returns success');
+            v186Assert(rcV5.result === '胜利' || rcV5.result === '失败', 'rank.challenge v5 returns result');
+            v186Assert(typeof rcV5.remainingChallenges === 'number', 'rank.challenge v5 returns remainingChallenges');
+
+            // Test 17: rank.challenge decrements challenge count
+            const beforeChallenge = window.gameState.rankV5.challengeCount;
+            server.mcpRankChallengeV5('npc_zhao');
+            v186Assert(window.gameState.rankV5.challengeCount === beforeChallenge - 1, 'rank.challenge v5 decrements challengeCount');
+
+            // Test 18: rank.challenge with no remaining challenges returns error
+            window.gameState.rankV5.challengeCount = 0;
+            const rcV5NoChallenge = server.mcpRankChallengeV5('npc_zhang');
+            v186Assert(rcV5NoChallenge.error !== undefined, 'rank.challenge v5 returns error when no challenges left');
+
+            // Test 19: mcpArenaMatchV5 returns success
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            const amV5 = server.mcpArenaMatchV5();
+            v186Assert(amV5.success === true, 'arena.match v5 returns success');
+            v186Assert(amV5.opponent !== undefined, 'arena.match v5 returns opponent');
+            v186Assert(amV5.opponent.id !== undefined, 'arena.match v5 opponent has id');
+            v186Assert(amV5.opponent.name !== undefined, 'arena.match v5 opponent has name');
+
+            // Test 20: arena.match deducts free match count
+            const beforeFree = window.gameState.arenaV5.freeMatches;
+            window.gameState.arenaV5.freeMatches = 3;
+            server.mcpArenaMatchV5();
+            v186Assert(window.gameState.arenaV5.freeMatches === beforeFree - 1, 'arena.match v5 decrements freeMatches');
+
+            // Test 21: arena.match uses spirit stones when no free matches
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaV5.freeMatches = 0;
+            window.gameState.spiritStones = 100;
+            const beforeStones = window.gameState.spiritStones;
+            server.mcpArenaMatchV5();
+            v186Assert(window.gameState.spiritStones === beforeStones - 50, 'arena.match v5 deducts 50 spirit stones');
+
+            // Test 22: arena.match returns error when no spirit stones
+            window.gameState.spiritStones = 0;
+            const amV5NoStone = server.mcpArenaMatchV5();
+            v186Assert(amV5NoStone.error !== undefined, 'arena.match v5 returns error when no stones');
+
+            // Test 23: mcpArenaFightV5 executes fight
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            server.mcpArenaMatchV5();
+            const opponentId = window.gameState.arenaV5.currentOpponent.id;
+            const afV5 = server.mcpArenaFightV5(opponentId);
+            v186Assert(afV5.success === true, 'arena.fight v5 returns success');
+            v186Assert(afV5.result === '胜利' || afV5.result === '失败', 'arena.fight v5 returns result');
+            v186Assert(typeof afV5.newRating === 'number', 'arena.fight v5 returns newRating');
+
+            // Test 24: arena.fight updates rating
+            const ratingBefore = window.gameState.arenaRating || 1500;
+            const afV5Result = server.mcpArenaFightV5(opponentId);
+            v186Assert(window.gameState.arenaRating !== ratingBefore, 'arena.fight v5 updates arenaRating');
+
+            // Test 25: arena.fight clears current opponent
+            server.mcpArenaMatchV5();
+            const oppId = window.gameState.arenaV5.currentOpponent.id;
+            server.mcpArenaFightV5(oppId);
+            v186Assert(window.gameState.arenaV5.currentOpponent === null, 'arena.fight v5 clears currentOpponent');
+
+            // Test 26: arena.fight returns error for wrong opponent id
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            server.mcpArenaMatchV5();
+            const wrongAfV5 = server.mcpArenaFightV5('wrong_opponent');
+            v186Assert(wrongAfV5.error !== undefined, 'arena.fight v5 returns error for wrong opponent');
+
+            // Test 27: mcpArenaRewardV5 with valid weekly reward
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaV5.season.startTime = Date.now() - 86400000 * 3;
+            window.gameState.arenaV5.season.endTime = Date.now() + 86400000 * 27;
+            window.gameState.arenaRating = 1500;
+            const arV5Weekly = server.mcpArenaRewardV5('weekly');
+            v186Assert(arV5Weekly.success === true, 'arena.reward v5 weekly returns success');
+            v186Assert(arV5Weekly.rewardType === 'weekly', 'arena.reward v5 returns correct rewardType');
+
+            // Test 28: mcpArenaRewardV5 with invalid type returns error
+            const arV5Invalid = server.mcpArenaRewardV5('invalid');
+            v186Assert(arV5Invalid.error !== undefined, 'arena.reward v5 invalid type returns error');
+
+            // Test 29: mcpArenaRewardV5 returns correct reward amounts by rating
+            window.gameState.arenaRating = 2100;
+            window.gameState.spiritStones = 0;
+            const arV5Top = server.mcpArenaRewardV5('weekly');
+            v186Assert(arV5Top.reward.amount === 500, 'arena.reward v5 top10 gets 500');
+
+            // Test 30: rank.view v5 arena type returns board info
+            const rvV5Arena = server.mcpRankViewV5('arena');
+            v186Assert(rvV5Arena.success === true, 'rank.view v5 arena returns success');
+            v186Assert(rvV5Arena.boardName === '竞技榜', 'rank.view v5 arena board name is 竞技榜');
+
+            // Test 31: rank.view v5 wealth type returns wealth board
+            const rvV5Wealth = server.mcpRankViewV5('wealth');
+            v186Assert(rvV5Wealth.success === true, 'rank.view v5 wealth returns success');
+            v186Assert(rvV5Wealth.boardName === '财富榜', 'rank.view v5 wealth board name is 财富榜');
+
+            // Test 32: rank.view v5 social type returns social board
+            const rvV5Social = server.mcpRankViewV5('social');
+            v186Assert(rvV5Social.success === true, 'rank.view v5 social returns success');
+            v186Assert(rvV5Social.boardName === '社交榜', 'rank.view v5 social board name is 社交榜');
+
+            // Test 33: rank.challenge v5 adds to history
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            const histLenBefore = window.gameState.rankV5.history.length;
+            server.mcpRankChallengeV5('npc_zhang');
+            v186Assert(window.gameState.rankV5.history.length === histLenBefore + 1, 'rank.challenge v5 adds to history');
+
+            // Test 34: arena.match v5 increments daily matches
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            const dailyBefore = window.gameState.arenaV5.dailyMatches;
+            server.mcpArenaMatchV5();
+            v186Assert(window.gameState.arenaV5.dailyMatches === dailyBefore + 1, 'arena.match v5 increments dailyMatches');
+
+            // Test 35: arena.fight v5 adds to fightHistory
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            server.mcpArenaMatchV5();
+            const opp = window.gameState.arenaV5.currentOpponent.id;
+            const fightHistBefore = window.gameState.arenaV5.fightHistory.length;
+            server.mcpArenaFightV5(opp);
+            v186Assert(window.gameState.arenaV5.fightHistory.length === fightHistBefore + 1, 'arena.fight v5 adds to fightHistory');
+
+            // Test 36: All 6 rank methods return valid response
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            const allRankMethods = [
+                server.mcpRankListV5(),
+                server.mcpRankViewV5('cultivation'),
+                server.mcpRankChallengeV5('npc_zhang'),
+                server.mcpArenaMatchV5(),
+                server.mcpArenaFightV5('npc_chen'),
+                server.mcpArenaRewardV5('weekly')
+            ];
+            v186Assert(allRankMethods.every(m => m && (m.success !== undefined || m.error !== undefined)), 'All 6 V186 methods return valid response');
+
+            // Test 37: arena.reward v5 season reward
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaV5.season.endTime = Date.now() - 1000;
+            window.gameState.arenaRating = 1800;
+            window.gameState.spiritStones = 0;
+            const arV5Season = server.mcpArenaRewardV5('season');
+            v186Assert(arV5Season.success === true, 'arena.reward v5 season returns success');
+
+            // Test 38: rank.challenge v5 updates score on win
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            const playerEntry = window.gameState.rankV5.leaderboards[0].entries.find(e => e.playerId === 'player');
+            const scoreBefore = playerEntry.score;
+            // Force win by setting high combat power
+            window.gameState.combatPower = 10000;
+            server.mcpRankChallengeV5('npc_zhang');
+            v186Assert(playerEntry.score >= scoreBefore, 'rank.challenge v5 updates score on win');
+
+            // Test 39: arena.match v5 daily limit
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaV5.dailyMatches = 5;
+            window.gameState.arenaV5.freeMatches = 0;
+            window.gameState.spiritStones = 1000;
+            const amV5DailyLimit = server.mcpArenaMatchV5();
+            v186Assert(amV5DailyLimit.error !== undefined, 'arena.match v5 respects daily limit');
+
+            // Test 40: rank.list v5 returns refresh time
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            const rlV5Refresh = server.mcpRankListV5();
+            v186Assert(rlV5Refresh.leaderboards[0].refreshTime !== undefined, 'rank.list v5 returns refreshTime');
+
+            // Test 41: arena.reward v5 monthly reward
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaV5.season.startTime = Date.now() - 86400000 * 10;
+            window.gameState.arenaV5.season.endTime = Date.now() + 86400000 * 20;
+            window.gameState.arenaRating = 1200;
+            window.gameState.spiritStones = 0;
+            const arV5Monthly = server.mcpArenaRewardV5('monthly');
+            v186Assert(arV5Monthly.success === true, 'arena.reward v5 monthly returns success');
+
+            // Test 42: rank.challenge v5 handles player not on leaderboard
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            // Remove player from leaderboard
+            window.gameState.rankV5.leaderboards[0].entries = window.gameState.rankV5.leaderboards[0].entries.filter(e => e.playerId !== 'player');
+            const rcV5NotOnBoard = server.mcpRankChallengeV5('npc_zhang');
+            v186Assert(rcV5NotOnBoard.error !== undefined, 'rank.challenge v5 returns error when player not on board');
+
+            // Test 43: arena.fight v5 calculates correct rating change
+            window.gameState.arenaV5 = null;
+            server._initArenaStateV5();
+            window.gameState.arenaRating = 1500;
+            server.mcpArenaMatchV5();
+            const oppId2 = window.gameState.arenaV5.currentOpponent.id;
+            const afV5Rating = server.mcpArenaFightV5(oppId2);
+            const expectedChange = afV5Rating.result === '胜利' ? 25 : -20;
+            v186Assert(afV5Rating.ratingChange === expectedChange, 'arena.fight v5 rating change is correct');
+
+            // Test 44: rank.view v5 top100 is limited to 100
+            window.gameState.rankV5 = null;
+            server._initRankStateV5();
+            const rvV5Top = server.mcpRankViewV5('cultivation');
+            v186Assert(rvV5Top.top100.length <= 100, 'rank.view v5 top100 limited to 100');
+
+            // Test 45: All 6 methods respond correctly with full state
+            window.gameState = { playerName: '测试道友', spiritStones: 100000, combatPower: 3000, reputation: 500, arenaRating: 1800 };
+            server._initRankStateV5();
+            server._initArenaStateV5();
+            const allMethodsFinal = [
+                server.mcpRankListV5(),
+                server.mcpRankViewV5('arena'),
+                server.mcpRankChallengeV5('npc_zhao'),
+                server.mcpArenaMatchV5(),
+                server.mcpArenaFightV5(window.gameState.arenaV5.currentOpponent ? window.gameState.arenaV5.currentOpponent.id : 'npc_chen'),
+                server.mcpArenaRewardV5('season')
+            ];
+            v186Assert(allMethodsFinal.every(m => m && (m.success !== undefined || m.error !== undefined)), 'All 6 V186 methods return valid response with full state');
+
+            const v186Passed = results.filter(r => r.pass).length;
+            const v186Total = results.length;
+            const v186PassRate = v186Passed / v186Total;
+            console.log('V186 Tests:', v186Passed + '/' + v186Total, '(' + (v186PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V186', passed: v186Passed, total: v186Total, passRate: v186PassRate.toFixed(3), results };
+        }
+
+        const v186Results = runV186Tests();
 
         const v181Results = runV181Tests();
