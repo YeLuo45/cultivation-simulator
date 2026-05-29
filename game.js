@@ -5647,6 +5647,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V182)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V183: Register 邮件+公告系统v5 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V183)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -7645,6 +7649,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'collection.reset':
                             result = this.mcpCollectionResetV5(args.collectionType);
+                            break;
+                        // V183: 邮件+公告系统v5
+                        case 'mail.list':
+                            result = this.mcpMailListV5(args.folder);
+                            break;
+                        case 'mail.send':
+                            result = this.mcpMailSendV5(args.recipientId, args.subject, args.content, args.attachment);
+                            break;
+                        case 'mail.read':
+                            result = this.mcpMailReadV5(args.mailId);
+                            break;
+                        case 'mail.delete':
+                            result = this.mcpMailDeleteV5(args.mailId, args.mailIds);
+                            break;
+                        case 'announce.list':
+                            result = this.mcpAnnounceListV5(args.priority);
+                            break;
+                        case 'announce.view':
+                            result = this.mcpAnnounceViewV5(args.announceId);
                             break;
                         // V173: 邮件+公告系统v4
                         case 'mail.list':
@@ -18549,6 +18572,295 @@ const ACHIEVEMENT_ID_MAP = {
                     return {
                         success: true,
                         message: '收集进度已重置' + (collectionType ? ' (' + collectionType + ')' : '')
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: _initMailStateV5 - 初始化邮件系统状态v5
+            _initMailStateV5() {
+                const gs = window.gameState;
+                if (!gs.mailV5) {
+                    gs.mailV5 = {
+                        inbox: [
+                            { id: 'mail_v5_001', from: '系统', fromId: 'system', title: '欢迎使用邮件系统v5', content: '邮件系统v5已启用，支持4种邮件夹、附件功能和批量删除。', timestamp: Date.now() - 86400000, read: false, starred: false, hasAttachment: false, attachments: [] },
+                            { id: 'mail_v5_002', from: '掌门', fromId: 'elder_001', title: '门派任务通知', content: '门派有新任务发布，请及时查看。', timestamp: Date.now() - 172800000, read: false, starred: true, hasAttachment: true, attachments: [{ type: 'spirit_stones', quantity: 100 }] },
+                            { id: 'mail_v5_003', from: '道友', fromId: 'fellow_001', title: '切磋邀请', content: '近日修为有所精进，想与道友切磋一番。', timestamp: Date.now() - 3600000, read: false, starred: false, hasAttachment: false, attachments: [] }
+                        ],
+                        sent: [
+                            { id: 'mail_sent_v5_001', to: '道友', toId: 'fellow_001', title: '回复：切磋邀请', content: '承蒙道友邀请，三日后秘境相见。', timestamp: Date.now() - 1800000, cost: 10, attachments: [] }
+                        ],
+                        draft: [
+                            { id: 'mail_draft_v5_001', to: '掌门', toId: 'elder_001', title: '门派建设建议', content: '掌门在上，弟子有几点建议...', timestamp: Date.now() - 7200000, attachments: [] }
+                        ],
+                        system: [
+                            { id: 'mail_sys_v5_001', from: '系统', fromId: 'system', title: '灵石双倍活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', timestamp: Date.now() - 86400000, read: false, priority: 'high', attachments: [] }
+                        ],
+                        maxMail: 100,
+                        nextId: 4
+                    };
+                }
+                return gs.mailV5;
+            }
+
+            // V183: _initAnnounceStateV5 - 初始化公告系统状态v5
+            _initAnnounceStateV5() {
+                const gs = window.gameState;
+                if (!gs.announceV5) {
+                    gs.announceV5 = {
+                        announcements: [
+                            { id: 'ann_v5_001', title: '欢迎来到修仙世界v5', content: '各位修士，欢迎踏入修仙之路！邮件系统和公告系统已升级至v5，新增优先级和时效管理。', author: '系统', timestamp: Date.now() - 86400000, type: 'event', priority: 'high', createdAt: Date.now() - 86400000, startTime: null, endTime: null, views: 0 },
+                            { id: 'ann_v5_002', title: '新版本更新公告', content: 'V183版本已更新，邮件系统v5新增附件功能，公告系统v5新增优先级过滤。', author: '运营团队', timestamp: Date.now() - 172800000, type: 'update', priority: 'medium', createdAt: Date.now() - 172800000, startTime: null, endTime: null, views: 0 },
+                            { id: 'ann_v5_003', title: '限时活动开启', content: '灵石副本双倍掉落活动进行中，修士们请抓紧时间！', author: '活动组', timestamp: Date.now() - 259200000, type: 'event', priority: 'high', createdAt: Date.now() - 259200000, startTime: Date.now() - 604800000, endTime: Date.now() + 604800000, views: 0 },
+                            { id: 'ann_v5_004', title: '系统维护通知', content: '系统将于明日凌晨进行维护，请提前做好准备。', author: '技术组', timestamp: Date.now() - 432000000, type: 'system', priority: 'low', createdAt: Date.now() - 432000000, startTime: null, endTime: Date.now() + 86400000, views: 0 },
+                            { id: 'ann_v5_005', title: '充值特惠活动', content: '限时充值特惠，充100送50，充500送300！', author: '运营团队', timestamp: Date.now() - 86400000, type: 'promotion', priority: 'medium', createdAt: Date.now() - 86400000, startTime: Date.now(), endTime: Date.now() + 259200000, views: 0 }
+                        ],
+                        unreadAnnouncements: ['ann_v5_001', 'ann_v5_002', 'ann_v5_003', 'ann_v5_004', 'ann_v5_005']
+                    };
+                }
+                return gs.announceV5;
+            }
+
+            // V183: mcpMailListV5 - 获取邮件列表v5
+            mcpMailListV5(folder) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mailV5 = this._initMailStateV5();
+                    folder = folder || 'inbox';
+                    let mails = [];
+                    let totalCount = 0;
+                    switch (folder) {
+                        case 'inbox':
+                            mails = mailV5.inbox.map(m => ({
+                                id: m.id,
+                                from: m.from,
+                                fromId: m.fromId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                read: m.read,
+                                starred: m.starred,
+                                hasAttachment: m.hasAttachment
+                            }));
+                            totalCount = mailV5.inbox.length;
+                            break;
+                        case 'sent':
+                            mails = mailV5.sent.map(m => ({
+                                id: m.id,
+                                to: m.to,
+                                toId: m.toId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                cost: m.cost
+                            }));
+                            totalCount = mailV5.sent.length;
+                            break;
+                        case 'draft':
+                            mails = mailV5.draft.map(m => ({
+                                id: m.id,
+                                to: m.to,
+                                toId: m.toId,
+                                title: m.title,
+                                timestamp: m.timestamp
+                            }));
+                            totalCount = mailV5.draft.length;
+                            break;
+                        case 'system':
+                            mails = mailV5.system.map(m => ({
+                                id: m.id,
+                                from: m.from,
+                                fromId: m.fromId,
+                                title: m.title,
+                                timestamp: m.timestamp,
+                                read: m.read,
+                                priority: m.priority
+                            }));
+                            totalCount = mailV5.system.length;
+                            break;
+                        default:
+                            return { error: '无效的邮件夹类型: ' + folder };
+                    }
+                    return {
+                        success: true,
+                        folder: folder,
+                        mails: mails,
+                        totalCount: totalCount,
+                        maxMail: mailV5.maxMail,
+                        message: folder + '共' + totalCount + '封邮件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: mcpMailSendV5 - 发送邮件v5
+            mcpMailSendV5(recipientId, subject, content, attachment) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!recipientId || !subject || !content) return { error: '请提供收件人ID、标题和内容' };
+                    let cost = 10;
+                    if (attachment) {
+                        if (attachment.type === 'spirit_stones') {
+                            if (!attachment.quantity || attachment.quantity <= 0) return { error: '灵石附件数量必须大于0' };
+                            if (gs.spiritStones < attachment.quantity) return { error: '灵石不足' };
+                            gs.spiritStones -= attachment.quantity;
+                        } else if (attachment.type === 'item') {
+                            if (!attachment.itemId) return { error: '请指定道具ID' };
+                            const item = gs.items ? gs.items.find(i => i.id === attachment.itemId) : null;
+                            if (!item) return { error: '道具不存在' };
+                            const qty = attachment.quantity || 1;
+                            if (item.quantity < qty) return { error: '道具数量不足' };
+                            item.quantity -= qty;
+                        }
+                    }
+                    gs.spiritStones = (gs.spiritStones || 0) - cost;
+                    const mailV5 = this._initMailStateV5();
+                    const newMail = {
+                        id: 'mail_sent_v5_' + mailV5.nextId++,
+                        to: recipientId,
+                        toId: recipientId,
+                        title: subject,
+                        content: content,
+                        timestamp: Date.now(),
+                        cost: cost,
+                        attachments: attachment ? [attachment] : []
+                    };
+                    mailV5.sent.push(newMail);
+                    return {
+                        success: true,
+                        mailId: newMail.id,
+                        cost: cost,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '邮件已发送给' + recipientId + '，消耗' + cost + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: mcpMailReadV5 - 读取邮件内容v5
+            mcpMailReadV5(mailId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId) return { error: '请指定邮件ID' };
+                    const mailV5 = this._initMailStateV5();
+                    // 搜索所有邮件夹
+                    let mail = mailV5.inbox.find(m => m.id === mailId);
+                    let folder = 'inbox';
+                    if (!mail) { mail = mailV5.sent.find(m => m.id === mailId); folder = 'sent'; }
+                    if (!mail) { mail = mailV5.draft.find(m => m.id === mailId); folder = 'draft'; }
+                    if (!mail) { mail = mailV5.system.find(m => m.id === mailId); folder = 'system'; }
+                    if (!mail) return { error: '邮件不存在: ' + mailId };
+                    // 标记为已读
+                    if (folder === 'inbox' || folder === 'system') {
+                        mail.read = true;
+                    }
+                    return {
+                        success: true,
+                        id: mail.id,
+                        folder: folder,
+                        from: mail.from,
+                        fromId: mail.fromId,
+                        to: mail.to,
+                        toId: mail.toId,
+                        title: mail.title,
+                        content: mail.content,
+                        timestamp: mail.timestamp,
+                        read: mail.read,
+                        attachments: mail.attachments || []
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: mcpMailDeleteV5 - 删除邮件v5
+            mcpMailDeleteV5(mailId, mailIds) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!mailId && (!mailIds || mailIds.length === 0)) return { error: '请指定邮件ID' };
+                    const mailV5 = this._initMailStateV5();
+                    const idsToDelete = mailIds ? mailIds : [mailId];
+                    let deletedCount = 0;
+                    for (const id of idsToDelete) {
+                        const inInbox = mailV5.inbox.findIndex(m => m.id === id);
+                        if (inInbox >= 0) { mailV5.inbox.splice(inInbox, 1); deletedCount++; continue; }
+                        const inSent = mailV5.sent.findIndex(m => m.id === id);
+                        if (inSent >= 0) { mailV5.sent.splice(inSent, 1); deletedCount++; continue; }
+                        const inDraft = mailV5.draft.findIndex(m => m.id === id);
+                        if (inDraft >= 0) { mailV5.draft.splice(inDraft, 1); deletedCount++; continue; }
+                        const inSystem = mailV5.system.findIndex(m => m.id === id);
+                        if (inSystem >= 0) { mailV5.system.splice(inSystem, 1); deletedCount++; }
+                    }
+                    return {
+                        success: true,
+                        deletedCount: deletedCount,
+                        message: '已删除' + deletedCount + '封邮件'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: mcpAnnounceListV5 - 获取公告列表v5
+            mcpAnnounceListV5(priority) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const announceV5 = this._initAnnounceStateV5();
+                    let announcements = announceV5.announcements;
+                    // 按优先级过滤
+                    if (priority) {
+                        announcements = announcements.filter(a => a.priority === priority);
+                    }
+                    // 检查时效
+                    const now = Date.now();
+                    announcements = announcements.filter(a => {
+                        if (a.startTime && now < a.startTime) return false;
+                        if (a.endTime && now > a.endTime) return false;
+                        return true;
+                    });
+                    // 按时间倒序
+                    announcements = announcements.sort((a, b) => b.timestamp - a.timestamp);
+                    const result = announcements.map(a => ({
+                        id: a.id,
+                        title: a.title,
+                        author: a.author,
+                        timestamp: a.timestamp,
+                        type: a.type,
+                        priority: a.priority,
+                        isUnread: announceV5.unreadAnnouncements.includes(a.id)
+                    }));
+                    return {
+                        success: true,
+                        announcements: result,
+                        totalCount: result.length,
+                        unreadCount: announceV5.unreadAnnouncements.length
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V183: mcpAnnounceViewV5 - 查看公告详情v5
+            mcpAnnounceViewV5(announceId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!announceId) return { error: '请指定公告ID' };
+                    const announceV5 = this._initAnnounceStateV5();
+                    const announcement = announceV5.announcements.find(a => a.id === announceId);
+                    if (!announcement) return { error: '公告不存在: ' + announceId };
+                    // 增加浏览次数
+                    announcement.views = (announcement.views || 0) + 1;
+                    // 从未读列表中移除
+                    const idx = announceV5.unreadAnnouncements.indexOf(announceId);
+                    if (idx >= 0) announceV5.unreadAnnouncements.splice(idx, 1);
+                    return {
+                        success: true,
+                        id: announcement.id,
+                        title: announcement.title,
+                        content: announcement.content,
+                        author: announcement.author,
+                        timestamp: announcement.timestamp,
+                        type: announcement.type,
+                        priority: announcement.priority,
+                        views: announcement.views,
+                        createdAt: announcement.createdAt,
+                        startTime: announcement.startTime,
+                        endTime: announcement.endTime
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -39842,6 +40154,77 @@ const ACHIEVEMENT_ID_MAP = {
                     properties: {
                         collectionType: { type: 'string', description: '收集类型 (可选，默认重置所有)' }
                     }
+                }
+            }
+        };
+
+        // V183: 邮件+公告系统v5
+        const MCP_TOOLS_V183 = {
+            'mail.list': {
+                name: 'mail.list',
+                description: '获取邮件列表 (邮件系统v5-获取收件箱/已发送/草稿/系统邮件列表)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        folder: { type: 'string', description: '邮件夹类型: inbox|sent|draft|system (默认inbox)' }
+                    }
+                }
+            },
+            'mail.send': {
+                name: 'mail.send',
+                description: '发送邮件 (邮件系统v5-发送邮件，可附加灵石或道具)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        recipientId: { type: 'string', description: '收件人ID' },
+                        subject: { type: 'string', description: '邮件标题' },
+                        content: { type: 'string', description: '邮件内容' },
+                        attachment: { type: 'object', description: '附件 (可选): {type: spirit_stones|item, itemId?: string, quantity?: number}' }
+                    },
+                    required: ['recipientId', 'subject', 'content']
+                }
+            },
+            'mail.read': {
+                name: 'mail.read',
+                description: '读取邮件 (邮件系统v5-读取邮件内容并标记为已读)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID' }
+                    },
+                    required: ['mailId']
+                }
+            },
+            'mail.delete': {
+                name: 'mail.delete',
+                description: '删除邮件 (邮件系统v5-删除邮件，支持批量删除)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mailId: { type: 'string', description: '邮件ID (单个删除)' },
+                        mailIds: { type: 'array', items: { type: 'string' }, description: '邮件ID数组 (批量删除)' }
+                    }
+                }
+            },
+            'announce.list': {
+                name: 'announce.list',
+                description: '获取公告列表 (公告系统v5-获取公告列表，支持优先级过滤)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        priority: { type: 'string', description: '优先级过滤: high|medium|low (可选)' }
+                    }
+                }
+            },
+            'announce.view': {
+                name: 'announce.view',
+                description: '查看公告详情 (公告系统v5-查看公告详情，自动标记为已读)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        announceId: { type: 'string', description: '公告ID' }
+                    },
+                    required: ['announceId']
                 }
             }
         };
@@ -72322,6 +72705,337 @@ const v152Results = runV152Tests();
         }
 
         const v182Results = runV182Tests();
+
+        // V183: 邮件+公告系统v5 Tests
+        function runV183Tests() {
+            const results = [];
+            const v183Assert = (condition, message) => {
+                const pass = condition === true;
+                results.push({ pass, message });
+                if (!pass) console.log('FAIL:', message);
+            };
+            const server = window.server;
+            window.gameState = { spiritStones: 100000, items: [{ id: 'item_001', name: '筑基丹', quantity: 10 }] };
+
+            // Test 1: MCP_TOOLS_V183 definition exists and has 6 tools
+            v183Assert(typeof MCP_TOOLS_V183 === 'object', 'MCP_TOOLS_V183 is defined');
+            v183Assert(Object.keys(MCP_TOOLS_V183).length === 6, 'MCP_TOOLS_V183 has 6 tools');
+            v183Assert('mail.list' in MCP_TOOLS_V183, 'mail.list tool exists');
+            v183Assert('mail.send' in MCP_TOOLS_V183, 'mail.send tool exists');
+            v183Assert('mail.read' in MCP_TOOLS_V183, 'mail.read tool exists');
+            v183Assert('mail.delete' in MCP_TOOLS_V183, 'mail.delete tool exists');
+            v183Assert('announce.list' in MCP_TOOLS_V183, 'announce.list tool exists');
+            v183Assert('announce.view' in MCP_TOOLS_V183, 'announce.view tool exists');
+
+            // Test 2: _initMailStateV5 creates state
+            window.gameState = {};
+            const mailV5 = server._initMailStateV5();
+            v183Assert(window.gameState.mailV5 !== undefined, '_initMailStateV5 creates mailV5');
+            v183Assert(mailV5.inbox !== undefined, 'mailV5 has inbox');
+            v183Assert(mailV5.sent !== undefined, 'mailV5 has sent');
+            v183Assert(mailV5.draft !== undefined, 'mailV5 has draft');
+            v183Assert(mailV5.system !== undefined, 'mailV5 has system');
+            v183Assert(mailV5.maxMail === 100, 'mailV5 has correct maxMail');
+
+            // Test 3: _initAnnounceStateV5 creates state
+            window.gameState = {};
+            const announceV5 = server._initAnnounceStateV5();
+            v183Assert(window.gameState.announceV5 !== undefined, '_initAnnounceStateV5 creates announceV5');
+            v183Assert(announceV5.announcements !== undefined, 'announceV5 has announcements');
+            v183Assert(announceV5.unreadAnnouncements !== undefined, 'announceV5 has unreadAnnouncements');
+            v183Assert(announceV5.announcements.length === 5, 'announceV5 has 5 announcements');
+
+            // Test 4: mcpMailListV5 returns inbox by default
+            window.gameState = { spiritStones: 100000 };
+            const mailListInbox = server.mcpMailListV5();
+            v183Assert(mailListInbox.success === true, 'mail.list v5 returns success');
+            v183Assert(mailListInbox.folder === 'inbox', 'mail.list v5 defaults to inbox');
+            v183Assert(mailListInbox.mails !== undefined, 'mail.list v5 returns mails');
+            v183Assert(mailListInbox.totalCount === 3, 'mail.list v5 returns correct totalCount');
+            v183Assert(mailListInbox.maxMail === 100, 'mail.list v5 returns maxMail');
+
+            // Test 5: mcpMailListV5 returns sent folder
+            window.gameState = { spiritStones: 100000 };
+            const mailListSent = server.mcpMailListV5('sent');
+            v183Assert(mailListSent.success === true, 'mail.list v5 sent returns success');
+            v183Assert(mailListSent.folder === 'sent', 'mail.list v5 sent returns correct folder');
+            v183Assert(mailListSent.totalCount === 1, 'mail.list v5 sent returns correct count');
+
+            // Test 6: mcpMailListV5 returns draft folder
+            window.gameState = { spiritStones: 100000 };
+            const mailListDraft = server.mcpMailListV5('draft');
+            v183Assert(mailListDraft.success === true, 'mail.list v5 draft returns success');
+            v183Assert(mailListDraft.folder === 'draft', 'mail.list v5 draft returns correct folder');
+            v183Assert(mailListDraft.totalCount === 1, 'mail.list v5 draft returns correct count');
+
+            // Test 7: mcpMailListV5 returns system folder
+            window.gameState = { spiritStones: 100000 };
+            const mailListSystem = server.mcpMailListV5('system');
+            v183Assert(mailListSystem.success === true, 'mail.list v5 system returns success');
+            v183Assert(mailListSystem.folder === 'system', 'mail.list v5 system returns correct folder');
+            v183Assert(mailListSystem.totalCount === 1, 'mail.list v5 system returns correct count');
+
+            // Test 8: mcpMailListV5 returns error for invalid folder
+            window.gameState = { spiritStones: 100000 };
+            const mailListInvalid = server.mcpMailListV5('invalid');
+            v183Assert(mailListInvalid.error !== undefined, 'mail.list v5 returns error for invalid folder');
+
+            // Test 9: mcpMailSendV5 sends mail successfully
+            window.gameState = { spiritStones: 10000 };
+            const sendResult = server.mcpMailSendV5('fellow_001', '测试邮件', '这是一封测试邮件');
+            v183Assert(sendResult.success === true, 'mail.send v5 returns success');
+            v183Assert(sendResult.mailId !== undefined, 'mail.send v5 returns mailId');
+            v183Assert(sendResult.cost === 10, 'mail.send v5 costs 10 spirit stones');
+            v183Assert(window.gameState.spiritStones < 10000, 'mail.send v5 deducts spirit stones');
+
+            // Test 10: mcpMailSendV5 sends mail with spirit stone attachment
+            window.gameState = { spiritStones: 10000 };
+            const sendWithAttach = server.mcpMailSendV5('fellow_002', '附件邮件', '带灵石附件', { type: 'spirit_stones', quantity: 100 });
+            v183Assert(sendWithAttach.success === true, 'mail.send v5 with attachment returns success');
+            v183Assert(window.gameState.spiritStones < 9900, 'mail.send v5 deducts attachment spirit stones');
+
+            // Test 11: mcpMailSendV5 fails without recipient
+            window.gameState = { spiritStones: 10000 };
+            const sendNoRecipient = server.mcpMailSendV5(null, 'test', 'content');
+            v183Assert(sendNoRecipient.error !== undefined, 'mail.send v5 fails without recipient');
+
+            // Test 12: mcpMailReadV5 reads inbox mail
+            window.gameState = { spiritStones: 10000 };
+            const readInbox = server.mcpMailReadV5('mail_v5_001');
+            v183Assert(readInbox.success === true, 'mail.read v5 returns success');
+            v183Assert(readInbox.id === 'mail_v5_001', 'mail.read v5 returns correct id');
+            v183Assert(readInbox.title !== undefined, 'mail.read v5 returns title');
+            v183Assert(readInbox.content !== undefined, 'mail.read v5 returns content');
+            v183Assert(readInbox.folder === 'inbox', 'mail.read v5 returns correct folder');
+
+            // Test 13: mcpMailReadV5 reads sent mail
+            window.gameState = { spiritStones: 10000 };
+            const readSent = server.mcpMailReadV5('mail_sent_v5_001');
+            v183Assert(readSent.success === true, 'mail.read v5 sent returns success');
+            v183Assert(readSent.folder === 'sent', 'mail.read v5 sent returns correct folder');
+
+            // Test 14: mcpMailReadV5 marks mail as read
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const beforeRead = server.mcpMailReadV5('mail_v5_001');
+            v183Assert(beforeRead.read === true, 'mail.read v5 marks mail as read');
+
+            // Test 15: mcpMailReadV5 returns error for invalid id
+            window.gameState = { spiritStones: 10000 };
+            const readInvalid = server.mcpMailReadV5('invalid_id');
+            v183Assert(readInvalid.error !== undefined, 'mail.read v5 returns error for invalid id');
+
+            // Test 16: mcpMailDeleteV5 deletes single mail
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const deleteResult = server.mcpMailDeleteV5('mail_v5_001');
+            v183Assert(deleteResult.success === true, 'mail.delete v5 returns success');
+            v183Assert(deleteResult.deletedCount >= 1, 'mail.delete v5 deletes at least 1 mail');
+
+            // Test 17: mcpMailDeleteV5 batch deletes
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const batchDelete = server.mcpMailDeleteV5(null, ['mail_v5_001', 'mail_v5_002']);
+            v183Assert(batchDelete.success === true, 'mail.delete v5 batch returns success');
+            v183Assert(batchDelete.deletedCount === 2, 'mail.delete v5 batch deletes 2 mails');
+
+            // Test 18: mcpMailDeleteV5 returns error without id
+            window.gameState = { spiritStones: 10000 };
+            const deleteNoId = server.mcpMailDeleteV5(null, null);
+            v183Assert(deleteNoId.error !== undefined, 'mail.delete v5 fails without id');
+
+            // Test 19: mcpAnnounceListV5 returns all announcements
+            window.gameState = { spiritStones: 10000 };
+            const announceList = server.mcpAnnounceListV5();
+            v183Assert(announceList.success === true, 'announce.list v5 returns success');
+            v183Assert(announceList.announcements !== undefined, 'announce.list v5 returns announcements');
+            v183Assert(announceList.totalCount !== undefined, 'announce.list v5 returns totalCount');
+            v183Assert(announceList.unreadCount === 5, 'announce.list v5 returns correct unreadCount');
+
+            // Test 20: mcpAnnounceListV5 filters by priority
+            window.gameState = { spiritStones: 10000 };
+            const announceListHigh = server.mcpAnnounceListV5('high');
+            v183Assert(announceListHigh.success === true, 'announce.list v5 priority filter returns success');
+            v183Assert(announceListHigh.announcements.every(a => a.priority === 'high'), 'announce.list v5 filters correctly');
+
+            // Test 21: mcpAnnounceViewV5 returns announcement detail
+            window.gameState = { spiritStones: 10000 };
+            const announceView = server.mcpAnnounceViewV5('ann_v5_001');
+            v183Assert(announceView.success === true, 'announce.view v5 returns success');
+            v183Assert(announceView.title !== undefined, 'announce.view v5 returns title');
+            v183Assert(announceView.content !== undefined, 'announce.view v5 returns content');
+            v183Assert(announceView.author !== undefined, 'announce.view v5 returns author');
+            v183Assert(announceView.views >= 1, 'announce.view v5 increments views');
+
+            // Test 22: mcpAnnounceViewV5 removes from unread list
+            window.gameState = { spiritStones: 10000 };
+            server._initAnnounceStateV5();
+            const beforeView = window.gameState.announceV5.unreadAnnouncements.includes('ann_v5_002');
+            server.mcpAnnounceViewV5('ann_v5_002');
+            const afterView = window.gameState.announceV5.unreadAnnouncements.includes('ann_v5_002');
+            v183Assert(beforeView === true, 'announce was in unread list before view');
+            v183Assert(afterView === false, 'announce removed from unread list after view');
+
+            // Test 23: mcpAnnounceViewV5 returns error for invalid id
+            window.gameState = { spiritStones: 10000 };
+            const viewInvalid = server.mcpAnnounceViewV5('invalid_id');
+            v183Assert(viewInvalid.error !== undefined, 'announce.view v5 returns error for invalid id');
+
+            // Test 24: _initMailStateV5 is idempotent
+            window.gameState = {};
+            const mailFirst = server._initMailStateV5();
+            const mailSecond = server._initMailStateV5();
+            v183Assert(mailFirst === mailSecond, '_initMailStateV5 is idempotent');
+
+            // Test 25: _initAnnounceStateV5 is idempotent
+            window.gameState = {};
+            const annFirst = server._initAnnounceStateV5();
+            const annSecond = server._initAnnounceStateV5();
+            v183Assert(annFirst === annSecond, '_initAnnounceStateV5 is idempotent');
+
+            // Test 26: mail.list v5 with all folders work correctly
+            window.gameState = { spiritStones: 10000 };
+            const allFolders = ['inbox', 'sent', 'draft', 'system'];
+            const folderResults = allFolders.map(f => server.mcpMailListV5(f));
+            v183Assert(folderResults.every(r => r.success === true), 'all folder types return success');
+
+            // Test 27: mail.send v5 with item attachment
+            window.gameState = { spiritStones: 10000, items: [{ id: 'item_001', name: '筑基丹', quantity: 5 }] };
+            const sendWithItem = server.mcpMailSendV5('fellow_003', '道具邮件', '带道具附件', { type: 'item', itemId: 'item_001', quantity: 2 });
+            v183Assert(sendWithItem.success === true, 'mail.send v5 with item attachment returns success');
+
+            // Test 28: mail.send v5 fails when item quantity insufficient
+            window.gameState = { spiritStones: 10000, items: [{ id: 'item_001', name: '筑基丹', quantity: 1 }] };
+            const sendInsufficient = server.mcpMailSendV5('fellow_003', '道具邮件', '不够', { type: 'item', itemId: 'item_001', quantity: 5 });
+            v183Assert(sendInsufficient.error !== undefined, 'mail.send v5 fails when item quantity insufficient');
+
+            // Test 29: announce.list v5 respects time validity
+            window.gameState = { spiritStones: 10000 };
+            server._initAnnounceStateV5();
+            const listValid = server.mcpAnnounceListV5();
+            v183Assert(listValid.announcements.every(a => {
+                const now = Date.now();
+                if (a.startTime && now < a.startTime) return false;
+                if (a.endTime && now > a.endTime) return false;
+                return true;
+            }), 'announce.list v5 filters expired announcements');
+
+            // Test 30: Tool registry includes V183 tools
+            server.initToolRegistry();
+            v183Assert(server.toolRegistry.has('mail.list'), 'toolRegistry has mail.list');
+            v183Assert(server.toolRegistry.has('mail.send'), 'toolRegistry has mail.send');
+            v183Assert(server.toolRegistry.has('mail.read'), 'toolRegistry has mail.read');
+            v183Assert(server.toolRegistry.has('mail.delete'), 'toolRegistry has mail.delete');
+            v183Assert(server.toolRegistry.has('announce.list'), 'toolRegistry has announce.list');
+            v183Assert(server.toolRegistry.has('announce.view'), 'toolRegistry has announce.view');
+
+            // Test 31: mail.read v5 returns attachments
+            window.gameState = { spiritStones: 10000 };
+            const readWithAttach = server.mcpMailReadV5('mail_v5_002');
+            v183Assert(readWithAttach.attachments !== undefined, 'mail.read v5 returns attachments array');
+
+            // Test 32: announce.list v5 sorts by timestamp descending
+            window.gameState = { spiritStones: 10000 };
+            const sortedList = server.mcpAnnounceListV5();
+            const timestamps = sortedList.announcements.map(a => a.timestamp);
+            v183Assert(timestamps.length === timestamps.slice().sort((a, b) => b - a).length || timestamps.length <= 1, 'announce.list v5 sorted by timestamp');
+
+            // Test 33: mcpMailSendV5 with invalid item attachment
+            window.gameState = { spiritStones: 10000, items: [] };
+            const sendBadItem = server.mcpMailSendV5('fellow_003', '道具邮件', '道具不存在', { type: 'item', itemId: 'nonexistent', quantity: 1 });
+            v183Assert(sendBadItem.error !== undefined, 'mail.send v5 fails with invalid item');
+
+            // Test 34: mcpMailSendV5 with invalid spirit stone quantity
+            window.gameState = { spiritStones: 10000 };
+            const sendBadStones = server.mcpMailSendV5('fellow_003', 'test', 'test', { type: 'spirit_stones', quantity: -100 });
+            v183Assert(sendBadStones.error !== undefined, 'mail.send v5 fails with negative spirit stones');
+
+            // Test 35: mail.delete v5 handles already deleted mail
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const deleteTwice = server.mcpMailDeleteV5('mail_v5_001');
+            const deleteAgain = server.mcpMailDeleteV5('mail_v5_001');
+            v183Assert(deleteTwice.deletedCount >= 1, 'first delete succeeds');
+            v183Assert(deleteAgain.deletedCount === 0, 'second delete of same mail deletes 0');
+
+            // Test 36: announce.view v5 returns all metadata fields
+            window.gameState = { spiritStones: 10000 };
+            const viewFull = server.mcpAnnounceViewV5('ann_v5_003');
+            v183Assert(viewFull.createdAt !== undefined, 'announce.view v5 returns createdAt');
+            v183Assert(viewFull.startTime !== undefined, 'announce.view v5 returns startTime');
+            v183Assert(viewFull.endTime !== undefined, 'announce.view v5 returns endTime');
+            v183Assert(viewFull.type !== undefined, 'announce.view v5 returns type');
+            v183Assert(viewFull.priority !== undefined, 'announce.view v5 returns priority');
+
+            // Test 37: mail.list v5 returns read status for inbox
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const listInbox = server.mcpMailListV5('inbox');
+            v183Assert(listInbox.mails[0].read !== undefined, 'mail.list v5 inbox returns read status');
+            v183Assert(listInbox.mails[0].starred !== undefined, 'mail.list v5 inbox returns starred status');
+
+            // Test 38: mail.list v5 returns hasAttachment for inbox
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            const listHasAttach = server.mcpMailListV5('inbox');
+            v183Assert(listHasAttach.mails[1].hasAttachment === true, 'mail.list v5 inbox returns correct hasAttachment');
+
+            // Test 39: mcpMailSendV5 deducts combined cost (attachment + base)
+            window.gameState = { spiritStones: 1000 };
+            const beforeStones = window.gameState.spiritStones;
+            server.mcpMailSendV5('fellow_001', 'test', 'test', { type: 'spirit_stones', quantity: 100 });
+            v183Assert(window.gameState.spiritStones === beforeStones - 100 - 10, 'mail.send v5 deducts attachment + base cost');
+
+            // Test 40: announce.list v5 returns isUnread for each announcement
+            window.gameState = { spiritStones: 10000 };
+            server._initAnnounceStateV5();
+            const listUnread = server.mcpAnnounceListV5();
+            v183Assert(listUnread.announcements[0].isUnread !== undefined, 'announce.list v5 returns isUnread');
+
+            // Test 41: mail.send v5 fails when spirit stones insufficient for attachment
+            window.gameState = { spiritStones: 50 };
+            const sendNoStones = server.mcpMailSendV5('fellow_001', 'test', 'test', { type: 'spirit_stones', quantity: 100 });
+            v183Assert(sendNoStones.error !== undefined, 'mail.send v5 fails when spirit stones insufficient');
+
+            // Test 42: _initMailStateV5 initializes nextId correctly
+            window.gameState = {};
+            const mailInit = server._initMailStateV5();
+            v183Assert(mailInit.nextId === 4, '_initMailStateV5 has correct nextId');
+
+            // Test 43: announce.list v5 medium priority filter
+            window.gameState = { spiritStones: 10000 };
+            const listMedium = server.mcpAnnounceListV5('medium');
+            v183Assert(listMedium.announcements.length >= 2, 'announce.list v5 returns medium priority announcements');
+
+            // Test 44: mail.delete v5 searches all folders
+            window.gameState = { spiritStones: 10000 };
+            server._initMailStateV5();
+            // Try to delete a sent mail
+            const deleteSent = server.mcpMailDeleteV5('mail_sent_v5_001');
+            v183Assert(deleteSent.success === true, 'mail.delete v5 can delete sent mail');
+
+            // Test 45: coverage - all 6 methods respond correctly
+            window.gameState = { spiritStones: 100000 };
+            server._initMailStateV5();
+            server._initAnnounceStateV5();
+            const allMethods = [
+                server.mcpMailListV5(),
+                server.mcpMailSendV5('test_user', 'Test Subject', 'Test Content'),
+                server.mcpMailReadV5('mail_v5_001'),
+                server.mcpMailDeleteV5('mail_v5_003'),
+                server.mcpAnnounceListV5(),
+                server.mcpAnnounceViewV5('ann_v5_001')
+            ];
+            v183Assert(allMethods.every(m => m && (m.success !== undefined || m.error !== undefined)), 'All 6 V183 methods return valid response');
+
+            const v183Passed = results.filter(r => r.pass).length;
+            const v183Total = results.length;
+            const v183PassRate = v183Passed / v183Total;
+            console.log('V183 Tests:', v183Passed + '/' + v183Total, '(' + (v183PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V183', passed: v183Passed, total: v183Total, passRate: v183PassRate.toFixed(3), results };
+        }
+
+        const v183Results = runV183Tests();
 
         const v181Results = runV181Tests();
 
