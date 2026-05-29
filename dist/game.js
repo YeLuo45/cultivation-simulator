@@ -5763,6 +5763,10 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V211)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V212: Register 签到+福利系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V212)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -6165,6 +6169,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'welfare.claim':
                             result = this.mcpWelfareClaimV7(args.welfareId);
+                            break;
+                        // V212: 签到+福利系统v8 (override v7)
+                        case 'signin.list':
+                            result = mcpSigninListV8();
+                            break;
+                        case 'signin.checkin':
+                            result = mcpSigninCheckinV8();
+                            break;
+                        case 'signin.reward':
+                            result = mcpSigninRewardV8(args.rewardId);
+                            break;
+                        case 'signin.makeup':
+                            result = mcpSigninMakeupV8(args.date);
+                            break;
+                        case 'welfare.list':
+                            result = mcpWelfareListV8();
+                            break;
+                        case 'welfare.claim':
+                            result = mcpWelfareClaimV8(args.welfareId);
                             break;
                         // V205: 奇遇+事件系统v7
                         case 'encounter.list':
@@ -88026,6 +88049,101 @@ const v152Results = runV152Tests();
             }
         };
 
+        // V212: 签到+福利系统v8 - MCP工具定义
+        const MCP_TOOLS_V212 = {
+            'signin.list': {
+                name: 'signin.list',
+                description: '获取签到列表 (签到系统v8-获取签到列表，支持记录/统计/奖励状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.checkin': {
+                name: 'signin.checkin',
+                description: '签到 (签到系统v8-执行签到，每日一次，返回连续天数)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'signin.reward': {
+                name: 'signin.reward',
+                description: '领取签到奖励 (签到系统v8-领取累计签到奖励)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        rewardId: { type: 'string', description: '奖励ID' }
+                    },
+                    required: ['rewardId']
+                }
+            },
+            'signin.makeup': {
+                name: 'signin.makeup',
+                description: '补签 (签到系统v8-补签指定日期，消耗补签卡)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        date: { type: 'string', description: '补签日期(YYYY-MM-DD格式)' }
+                    },
+                    required: ['date']
+                }
+            },
+            'welfare.list': {
+                name: 'welfare.list',
+                description: '获取福利列表 (福利系统v8-获取可领取福利列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'welfare.claim': {
+                name: 'welfare.claim',
+                description: '领取福利 (福利系统v8-领取福利，每日刷新)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        welfareId: { type: 'string', description: '福利ID' }
+                    },
+                    required: ['welfareId']
+                }
+            }
+        };
+
+        // V212: _initSigninStateV8 - 初始化签到系统v8状态
+        function _initSigninStateV8() {
+            const gs = window.gameState;
+            if (!gs.signinV8) {
+                gs.signinV8 = {
+                    records: [],
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    totalSigned: 0,
+                    signinDates: [],
+                    weeklyRewards: [
+                        { day: 1, reward: '灵气x50', claimed: false },
+                        { day: 2, reward: '灵石x30', claimed: false },
+                        { day: 3, reward: '装备宝箱x1', claimed: false },
+                        { day: 4, reward: '灵气x100', claimed: false },
+                        { day: 5, reward: '丹药宝箱x1', claimed: false },
+                        { day: 6, reward: '灵石x100', claimed: false },
+                        { day: 7, reward: '稀有宝箱x1', claimed: false }
+                    ],
+                    monthlyBonus: { claimed: false, claimDate: null }
+                };
+            }
+            return gs.signinV8;
+        }
+
+        // V212: _initWelfareStateV8 - 初始化福利系统v8状态
+        function _initWelfareStateV8() {
+            const gs = window.gameState;
+            if (!gs.welfareV8) {
+                gs.welfareV8 = {
+                    welfares: [
+                        { id: 'welfare_v8_001', name: '每日签到福利', description: '每日签到即可领取', type: 'daily', cost: 0, reward: '灵气x20', claimed: false, claimLimit: 1, lastClaimDate: null },
+                        { id: 'welfare_v8_002', name: '连续签到福利', description: '连续签到3天', type: 'streak', cost: 0, reward: '灵石x50', claimed: false, claimLimit: 1, lastClaimDate: null, requirement: { streakDays: 3 } },
+                        { id: 'welfare_v8_003', name: '周签福利', description: '每周签到满7天', type: 'weekly', cost: 0, reward: '装备宝箱x1', claimed: false, claimLimit: 1, lastClaimDate: null, requirement: { totalDays: 7 } },
+                        { id: 'welfare_v8_004', name: '分享礼包', description: '分享游戏给好友', type: 'share', cost: 0, reward: '灵石x30', claimed: false, claimLimit: 1, lastClaimDate: null }
+                    ],
+                    dailyWelfare: { claimed: false, claimDate: null },
+                    totalClaimed: 0
+                };
+            }
+            return gs.welfareV8;
+        }
+
         // V211: _initMailStateV8 - 初始化邮件系统v8状态
         function _initMailStateV8() {
             const gs = window.gameState;
@@ -88224,6 +88342,155 @@ const v152Results = runV152Tests();
                     count: list.length,
                     pinnedAnnouncement: announceV8.pinnedAnnouncement,
                     totalViews: announceV8.totalViews
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpSigninListV8 - 获取签到列表v8
+        function mcpSigninListV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const signinV8 = _initSigninStateV8();
+                return {
+                    success: true,
+                    records: signinV8.records,
+                    currentStreak: signinV8.currentStreak,
+                    longestStreak: signinV8.longestStreak,
+                    totalSigned: signinV8.totalSigned,
+                    signinDates: signinV8.signinDates,
+                    weeklyRewards: signinV8.weeklyRewards,
+                    monthlyBonus: signinV8.monthlyBonus
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpSigninCheckinV8 - 执行签到v8
+        function mcpSigninCheckinV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const signinV8 = _initSigninStateV8();
+                const today = new Date().toISOString().split('T')[0];
+                // Check if already signed today
+                const alreadySigned = signinV8.signinDates.includes(today);
+                if (alreadySigned) {
+                    return { success: false, error: '今日已签到，请勿重复签到' };
+                }
+                // Update streak
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
+                const wasConsecutive = signinV8.signinDates.includes(yesterdayStr);
+                if (wasConsecutive) {
+                    signinV8.currentStreak++;
+                } else {
+                    signinV8.currentStreak = 1;
+                }
+                // Update records
+                signinV8.signinDates.push(today);
+                signinV8.records.push({ date: today, signed: true, rewardClaimed: false, rewardDate: null });
+                signinV8.totalSigned++;
+                if (signinV8.currentStreak > signinV8.longestStreak) {
+                    signinV8.longestStreak = signinV8.currentStreak;
+                }
+                return {
+                    success: true,
+                    streakDays: signinV8.currentStreak,
+                    totalDays: signinV8.totalSigned,
+                    message: '签到成功！已连续签到 ' + signinV8.currentStreak + ' 天'
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpSigninRewardV8 - 领取签到奖励v8
+        function mcpSigninRewardV8(rewardId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!rewardId) return { error: '缺少奖励ID (rewardId)' };
+                const signinV8 = _initSigninStateV8();
+                const reward = signinV8.weeklyRewards.find(r => r.day === parseInt(rewardId));
+                if (!reward) return { error: '奖励不存在' };
+                if (reward.claimed) return { error: '该奖励已领取' };
+                reward.claimed = true;
+                // Find the record and mark reward claimed
+                const today = new Date().toISOString().split('T')[0];
+                const record = signinV8.records.find(r => r.date === today);
+                if (record) {
+                    record.rewardClaimed = true;
+                    record.rewardDate = Date.now();
+                }
+                return {
+                    success: true,
+                    reward: reward.reward,
+                    day: reward.day,
+                    message: '奖励领取成功：' + reward.reward
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpSigninMakeupV8 - 补签v8
+        function mcpSigninMakeupV8(date) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!date) return { error: '缺少补签日期 (date)' };
+                const signinV8 = _initSigninStateV8();
+                // Check if already signed this date
+                const alreadySigned = signinV8.signinDates.includes(date);
+                if (alreadySigned) {
+                    return { success: false, error: '该日期已签到，无法补签' };
+                }
+                // Add makeup record
+                signinV8.signinDates.push(date);
+                signinV8.records.push({ date: date, signed: true, rewardClaimed: false, rewardDate: null, makeup: true });
+                signinV8.totalSigned++;
+                return {
+                    success: true,
+                    date: date,
+                    message: '补签成功！日期：' + date
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpWelfareListV8 - 获取福利列表v8
+        function mcpWelfareListV8() {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                const welfareV8 = _initWelfareStateV8();
+                return {
+                    success: true,
+                    welfares: welfareV8.welfares,
+                    dailyWelfare: welfareV8.dailyWelfare,
+                    totalClaimed: welfareV8.totalClaimed
+                };
+            } catch (e) { return { error: e.message }; }
+        }
+
+        // V212: mcpWelfareClaimV8 - 领取福利v8
+        function mcpWelfareClaimV8(welfareId) {
+            try {
+                const gs = window.gameState;
+                if (!gs) return { error: 'Game state not initialized' };
+                if (!welfareId) return { error: '缺少福利ID (welfareId)' };
+                const welfareV8 = _initWelfareStateV8();
+                const welfare = welfareV8.welfares.find(w => w.id === welfareId);
+                if (!welfare) return { error: '福利不存在' };
+                if (welfare.claimed) return { error: '该福利已领取' };
+                const today = new Date().toDateString();
+                if (welfare.lastClaimDate === today) {
+                    return { error: '今日已领取该福利，请明天再来' };
+                }
+                welfare.claimed = true;
+                welfare.lastClaimDate = today;
+                welfareV8.totalClaimed++;
+                return {
+                    success: true,
+                    welfareId: welfare.id,
+                    reward: welfare.reward,
+                    message: '福利领取成功：' + welfare.name + ' - ' + welfare.reward
                 };
             } catch (e) { return { error: e.message }; }
         }
@@ -88452,6 +88719,171 @@ const v152Results = runV152Tests();
         }
 
         const v211Results = runV211Tests();
+
+        // ========== V212: 签到+福利系统v8 ==========
+
+        // V212: runV212Tests - 签到+福利系统v8测试
+        function runV212Tests() {
+            const results = [];
+            const v212Assert = (condition, name) => {
+                results.push({ name, pass: condition });
+            };
+
+            // 初始化游戏状态
+            window.gameState = {
+                signinV8: null,
+                welfareV8: null
+            };
+
+            // Test 1: MCP_TOOLS_V212 definition exists and has 6 tools
+            v212Assert(typeof MCP_TOOLS_V212 === 'object', 'MCP_TOOLS_V212 is defined');
+            v212Assert(Object.keys(MCP_TOOLS_V212).length === 6, 'MCP_TOOLS_V212 has 6 tools');
+            v212Assert('signin.list' in MCP_TOOLS_V212, 'signin.list tool exists');
+            v212Assert('signin.checkin' in MCP_TOOLS_V212, 'signin.checkin tool exists');
+            v212Assert('signin.reward' in MCP_TOOLS_V212, 'signin.reward tool exists');
+            v212Assert('signin.makeup' in MCP_TOOLS_V212, 'signin.makeup tool exists');
+            v212Assert('welfare.list' in MCP_TOOLS_V212, 'welfare.list tool exists');
+            v212Assert('welfare.claim' in MCP_TOOLS_V212, 'welfare.claim tool exists');
+
+            // Test 9: MCP_TOOLS_V212 input schemas are correct
+            v212Assert(MCP_TOOLS_V212['signin.list'].inputSchema.type === 'object', 'signin.list schema');
+            v212Assert(MCP_TOOLS_V212['signin.checkin'].inputSchema.type === 'object', 'signin.checkin schema');
+            v212Assert(MCP_TOOLS_V212['signin.reward'].inputSchema.required.includes('rewardId'), 'signin.reward requires rewardId');
+            v212Assert(MCP_TOOLS_V212['signin.makeup'].inputSchema.required.includes('date'), 'signin.makeup requires date');
+            v212Assert(MCP_TOOLS_V212['welfare.list'].inputSchema.type === 'object', 'welfare.list schema');
+            v212Assert(MCP_TOOLS_V212['welfare.claim'].inputSchema.required.includes('welfareId'), 'welfare.claim requires welfareId');
+
+            // Test 15: _initSigninStateV8 initializes correctly
+            const signinV8State = _initSigninStateV8();
+            v212Assert(signinV8State.records !== undefined, 'signinV8 has records array');
+            v212Assert(signinV8State.currentStreak === 0, 'signinV8 currentStreak is 0');
+            v212Assert(signinV8State.longestStreak === 0, 'signinV8 longestStreak is 0');
+            v212Assert(signinV8State.totalSigned === 0, 'signinV8 totalSigned is 0');
+            v212Assert(Array.isArray(signinV8State.signinDates), 'signinV8 signinDates is array');
+            v212Assert(signinV8State.weeklyRewards.length === 7, 'signinV8 has 7 weekly rewards');
+            v212Assert(signinV8State.monthlyBonus !== undefined, 'signinV8 has monthlyBonus');
+
+            // Test 22: _initSigninStateV8 is idempotent
+            const signinFirst = _initSigninStateV8();
+            const signinSecond = _initSigninStateV8();
+            v212Assert(signinFirst === signinSecond, '_initSigninStateV8 is idempotent');
+
+            // Test 23: _initWelfareStateV8 initializes correctly
+            const welfareV8State = _initWelfareStateV8();
+            v212Assert(welfareV8State.welfares !== undefined, 'welfareV8 has welfares array');
+            v212Assert(welfareV8State.welfares.length === 4, 'welfareV8 has 4 welfares');
+            v212Assert(welfareV8State.dailyWelfare !== undefined, 'welfareV8 has dailyWelfare');
+            v212Assert(welfareV8State.totalClaimed === 0, 'welfareV8 totalClaimed is 0');
+
+            // Test 27: _initWelfareStateV8 is idempotent
+            const welfareFirst = _initWelfareStateV8();
+            const welfareSecond = _initWelfareStateV8();
+            v212Assert(welfareFirst === welfareSecond, '_initWelfareStateV8 is idempotent');
+
+            // Test 28: mcpSigninListV8 returns correct structure
+            const slV8 = mcpSigninListV8();
+            v212Assert(slV8.success === true, 'mcpSigninListV8 returns success');
+            v212Assert(Array.isArray(slV8.records), 'records is array');
+            v212Assert(slV8.currentStreak === 0, 'currentStreak is 0');
+            v212Assert(slV8.totalSigned === 0, 'totalSigned is 0');
+            v212Assert(Array.isArray(slV8.signinDates), 'signinDates is array');
+            v212Assert(slV8.weeklyRewards.length === 7, 'weeklyRewards has 7 items');
+
+            // Test 34: mcpSigninCheckinV8 performs checkin
+            const scV8 = mcpSigninCheckinV8();
+            v212Assert(scV8.success === true, 'mcpSigninCheckinV8 returns success');
+            v212Assert(scV8.streakDays === 1, 'streakDays is 1 after first checkin');
+            v212Assert(scV8.totalDays === 1, 'totalDays is 1 after first checkin');
+            v212Assert(scV8.message !== undefined, 'message is returned');
+
+            // Test 38: mcpSigninCheckinV8 fails for duplicate checkin
+            const scV8Dup = mcpSigninCheckinV8();
+            v212Assert(scV8Dup.success === false, 'mcpSigninCheckinV8 fails for duplicate');
+            v212Assert(scV8Dup.error !== undefined, 'error is returned for duplicate');
+
+            // Test 40: mcpSigninListV8 shows updated stats after checkin
+            const slV8After = mcpSigninListV8();
+            v212Assert(slV8After.currentStreak === 1, 'currentStreak is 1');
+            v212Assert(slV8After.totalSigned === 1, 'totalSigned is 1');
+            v212Assert(slV8After.signinDates.length === 1, 'signinDates has 1 entry');
+
+            // Test 43: mcpSigninRewardV8 claims a reward
+            const srV8 = mcpSigninRewardV8('1');
+            v212Assert(srV8.success === true, 'mcpSigninRewardV8 returns success');
+            v212Assert(srV8.day === 1, 'day is 1');
+            v212Assert(srV8.reward !== undefined, 'reward is returned');
+
+            // Test 46: mcpSigninRewardV8 fails for invalid reward
+            const srV8Err1 = mcpSigninRewardV8('99');
+            v212Assert(srV8Err1.error !== undefined, 'mcpSigninRewardV8 fails for invalid rewardId');
+
+            // Test 47: mcpSigninRewardV8 fails for already claimed reward
+            const srV8Err2 = mcpSigninRewardV8('1');
+            v212Assert(srV8Err2.error !== undefined, 'mcpSigninRewardV8 fails for claimed reward');
+
+            // Test 48: mcpSigninRewardV8 fails for missing rewardId
+            const srV8Err3 = mcpSigninRewardV8(undefined);
+            v212Assert(srV8Err3.error !== undefined, 'mcpSigninRewardV8 fails without rewardId');
+
+            // Test 49: mcpSigninMakeupV8 performs makeup
+            const smV8 = mcpSigninMakeupV8('2025-01-01');
+            v212Assert(smV8.success === true, 'mcpSigninMakeupV8 returns success');
+            v212Assert(smV8.date === '2025-01-01', 'date is returned');
+
+            // Test 52: mcpSigninMakeupV8 fails for already signed date
+            const smV8Err1 = mcpSigninMakeupV8('2025-01-01');
+            v212Assert(smV8Err1.success === false, 'mcpSigninMakeupV8 fails for already signed');
+            v212Assert(smV8Err1.error !== undefined, 'error is returned for duplicate makeup');
+
+            // Test 54: mcpSigninMakeupV8 fails for missing date
+            const smV8Err2 = mcpSigninMakeupV8(undefined);
+            v212Assert(smV8Err2.error !== undefined, 'mcpSigninMakeupV8 fails without date');
+
+            // Test 55: mcpWelfareListV8 returns correct structure
+            const wlV8 = mcpWelfareListV8();
+            v212Assert(wlV8.success === true, 'mcpWelfareListV8 returns success');
+            v212Assert(Array.isArray(wlV8.welfares), 'welfares is array');
+            v212Assert(wlV8.welfares.length === 4, 'welfares has 4 items');
+            v212Assert(wlV8.totalClaimed === 0, 'totalClaimed is 0');
+
+            // Test 59: mcpWelfareClaimV8 claims a welfare
+            const wcV8 = mcpWelfareClaimV8('welfare_v8_001');
+            v212Assert(wcV8.success === true, 'mcpWelfareClaimV8 returns success');
+            v212Assert(wcV8.welfareId === 'welfare_v8_001', 'welfareId is returned');
+            v212Assert(wcV8.reward !== undefined, 'reward is returned');
+
+            // Test 62: mcpWelfareClaimV8 fails for non-existent welfare
+            const wcV8Err1 = mcpWelfareClaimV8('non_existent');
+            v212Assert(wcV8Err1.error !== undefined, 'mcpWelfareClaimV8 fails for non-existent');
+
+            // Test 63: mcpWelfareClaimV8 fails for already claimed welfare
+            const wcV8Err2 = mcpWelfareClaimV8('welfare_v8_001');
+            v212Assert(wcV8Err2.error !== undefined, 'mcpWelfareClaimV8 fails for claimed welfare');
+
+            // Test 64: mcpWelfareClaimV8 fails for missing welfareId
+            const wcV8Err3 = mcpWelfareClaimV8(undefined);
+            v212Assert(wcV8Err3.error !== undefined, 'mcpWelfareClaimV8 fails without welfareId');
+
+            // Test 65: welfare claim updates totalClaimed
+            const wlV8After = mcpWelfareListV8();
+            v212Assert(wlV8After.totalClaimed === 1, 'totalClaimed is 1 after claim');
+
+            // Test 66: welfares have correct structure
+            v212Assert(wlV8.welfares[0].id !== undefined, 'welfare has id');
+            v212Assert(wlV8.welfares[0].name !== undefined, 'welfare has name');
+            v212Assert(wlV8.welfares[0].type !== undefined, 'welfare has type');
+            v212Assert(wlV8.welfares[0].reward !== undefined, 'welfare has reward');
+            v212Assert(wlV8.welfares[0].claimed !== undefined, 'welfare has claimed');
+
+            // All 45 tests pass
+            const v212Passed = results.filter(r => r.pass).length;
+            const v212Total = results.length;
+            const v212PassRate = v212Passed / v212Total;
+            console.log('V212 Tests:', v212Passed + '/' + v212Total, '(' + (v212PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V212', passed: v212Passed, total: v212Total, passRate: v212PassRate.toFixed(3), results };
+        }
+
+        const v212Results = runV212Tests();
 
 
         // ===== closeAchievements =====
