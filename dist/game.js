@@ -5743,6 +5743,14 @@ const ACHIEVEMENT_ID_MAP = {
                 for (const [name, tool] of Object.entries(MCP_TOOLS_V206)) {
                     this.toolRegistry.set(name, tool);
                 }
+                // V207: Register 投资+月卡系统v8 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V207)) {
+                    this.toolRegistry.set(name, tool);
+                }
+                // V208: Register 红包+社交系统v7 tools
+                for (const [name, tool] of Object.entries(MCP_TOOLS_V208)) {
+                    this.toolRegistry.set(name, tool);
+                }
             }
 
             // 处理外部MCP请求
@@ -5994,6 +6002,25 @@ const ACHIEVEMENT_ID_MAP = {
                         case 'monthcard.buy':
                             result = this.mcpMonthcardBuyV7(args.monthcardType);
                             break;
+                        // V207: 投资+月卡系统v8 (override V199)
+                        case 'investment.list':
+                            result = this.mcpInvestmentListV8();
+                            break;
+                        case 'investment.buy':
+                            result = this.mcpInvestmentBuyV8(args.investmentId);
+                            break;
+                        case 'investment.profit':
+                            result = this.mcpInvestmentProfitV8(args.investmentId);
+                            break;
+                        case 'investment.redeem':
+                            result = this.mcpInvestmentRedeemV8(args.investmentId);
+                            break;
+                        case 'monthcard.status':
+                            result = this.mcpMonthcardStatusV8();
+                            break;
+                        case 'monthcard.buy':
+                            result = this.mcpMonthcardBuyV8();
+                            break;
                         // V200: 红包+社交系统v6
                         case 'redpack.list':
                             result = this.mcpRedpackListV6();
@@ -6012,6 +6039,25 @@ const ACHIEVEMENT_ID_MAP = {
                             break;
                         case 'social.interact':
                             result = this.mcpSocialInteractV6(args.friendId, args.action);
+                            break;
+                        // V208: 红包+社交系统v7
+                        case 'redpack.list':
+                            result = this.mcpRedpackListV7();
+                            break;
+                        case 'redpack.send':
+                            result = this.mcpRedpackSendV7(args.amount, args.type);
+                            break;
+                        case 'redpack.receive':
+                            result = this.mcpRedpackReceiveV7(args.redpackId);
+                            break;
+                        case 'redpack.history':
+                            result = this.mcpRedpackHistoryV7();
+                            break;
+                        case 'social.friends':
+                            result = this.mcpSocialFriendsV7();
+                            break;
+                        case 'social.interact':
+                            result = this.mcpSocialInteractV7(args.friendId, args.action);
                             break;
                         // V201: 宠物探险+派遣系统v7
                         case 'explore.list':
@@ -18428,6 +18474,242 @@ const ACHIEVEMENT_ID_MAP = {
                 } catch (e) { return { error: e.message }; }
             }
 
+            // V207: _initInvestmentStateV8 - 初始化投资系统v8状态
+            _initInvestmentStateV8() {
+                const gs = window.gameState;
+                if (!gs.investmentV8) {
+                    gs.investmentV8 = {
+                        investments: [],
+                        totalInvestment: 0,
+                        profitClaimed: 0
+                    };
+                }
+                return gs.investmentV8;
+            }
+
+            // V207: _initMonthcardStateV8 - 初始化月卡系统v8状态
+            _initMonthcardStateV8() {
+                const gs = window.gameState;
+                if (!gs.monthcardV8) {
+                    gs.monthcardV8 = {
+                        hasMonthcard: false,
+                        purchaseDate: null,
+                        expireDate: null,
+                        dailyBonus: 100,
+                        claimedDays: [],
+                        totalClaimed: 0
+                    };
+                }
+                return gs.monthcardV8;
+            }
+
+            // V207: mcpInvestmentListV8 - 获取投资项目列表v8
+            mcpInvestmentListV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const inv = this._initInvestmentStateV8();
+                    const categories = ['spiritStones', 'technique', 'artifact'];
+                    const result = {};
+                    for (const cat of categories) {
+                        const products = INVESTMENT_PRODUCTS_V8.filter(p => p.category === cat);
+                        result[cat] = products.map(p => {
+                            const owned = inv.investments.find(i => i.id === p.id && !i.redeemedAt);
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                description: p.description,
+                                cost: p.cost,
+                                dailyReturn: p.dailyReturn,
+                                duration: p.duration,
+                                dailyLimit: p.dailyLimit,
+                                category: p.category,
+                                purchased: !!owned
+                            };
+                        });
+                    }
+                    return {
+                        success: true,
+                        categories,
+                        products: result,
+                        totalInvestment: inv.totalInvestment,
+                        profitClaimed: inv.profitClaimed,
+                        message: '共有' + INVESTMENT_PRODUCTS_V8.length + '种投资产品v8，分' + categories.length + '类'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentBuyV8 - 购买投资v8
+            mcpInvestmentBuyV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { error: '投资产品不存在: ' + investmentId };
+                    const existing = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (existing) return { success: false, error: '该投资产品已购买，请先赎回后再购买' };
+                    if ((gs.spiritStones || 0) < product.cost) {
+                        return { success: false, error: '灵石不足，投资需要' + product.cost + '灵石' };
+                    }
+                    gs.spiritStones -= product.cost;
+                    const investment = {
+                        id: investmentId,
+                        name: product.name,
+                        cost: product.cost,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        category: product.category,
+                        purchasedAt: new Date().toISOString(),
+                        lastClaimedAt: null,
+                        redeemedAt: null,
+                        returnsClaimed: []
+                    };
+                    inv.investments.push(investment);
+                    inv.totalInvestment += product.cost;
+                    return {
+                        success: true,
+                        investmentId,
+                        name: product.name,
+                        category: product.category,
+                        cost: product.cost,
+                        dailyReturn: product.dailyReturn,
+                        duration: product.duration,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '购买成功！投资' + product.cost + '灵石于' + product.name + '，每日收益' + product.dailyReturn + '灵石，期限' + product.duration + '天'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentProfitV8 - 领取投资收益v8
+            mcpInvestmentProfitV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { success: false, error: '投资产品不存在' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const lastClaimed = investment.lastClaimedAt ? new Date(investment.lastClaimedAt).getTime() : purchasedAt;
+                    const daysSinceLastClaim = Math.floor((now - lastClaimed) / (24 * 60 * 60 * 1000));
+                    if (daysSinceLastClaim < 1) {
+                        return { success: false, error: '今日已领取过收益，明日再来吧' };
+                    }
+                    const earnedProfit = Math.min(daysSinceLastClaim, investment.duration) * investment.dailyReturn;
+                    gs.spiritStones = (gs.spiritStones || 0) + earnedProfit;
+                    inv.profitClaimed += earnedProfit;
+                    investment.lastClaimedAt = new Date().toISOString();
+                    investment.returnsClaimed.push({ date: new Date().toISOString(), amount: earnedProfit });
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        daysClaimed: daysSinceLastClaim,
+                        earnedProfit,
+                        totalSpiritStones: gs.spiritStones,
+                        message: '领取成功！获得' + earnedProfit + '灵石收益'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpInvestmentRedeemV8 - 赎回投资v8
+            mcpInvestmentRedeemV8(investmentId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!investmentId) return { error: '请指定投资产品ID' };
+                    const inv = this._initInvestmentStateV8();
+                    const investment = inv.investments.find(i => i.id === investmentId && !i.redeemedAt);
+                    if (!investment) return { success: false, error: '未购买该投资产品或已赎回' };
+                    const product = INVESTMENT_PRODUCTS_V8.find(p => p.id === investmentId);
+                    if (!product) return { success: false, error: '投资产品不存在' };
+                    const now = Date.now();
+                    const purchasedAt = new Date(investment.purchasedAt).getTime();
+                    const daysPassed = Math.floor((now - purchasedAt) / (24 * 60 * 60 * 1000));
+                    const earnedProfit = Math.min(daysPassed, investment.duration) * investment.dailyReturn;
+                    // 提前赎回惩罚：扣除20%收益
+                    const penalty = daysPassed < investment.duration ? Math.floor(earnedProfit * 0.2) : 0;
+                    const redeemValue = investment.cost + earnedProfit - penalty;
+                    gs.spiritStones = (gs.spiritStones || 0) + redeemValue;
+                    investment.redeemedAt = new Date().toISOString();
+                    return {
+                        success: true,
+                        investmentId,
+                        name: investment.name,
+                        originalAmount: investment.cost,
+                        earnedProfit,
+                        penalty,
+                        redeemValue,
+                        totalSpiritStones: gs.spiritStones,
+                        message: penalty > 0 ? '提前赎回！扣除惩罚' + penalty + '灵石，实际返回' + redeemValue + '灵石' : '赎回成功！返回本金' + investment.cost + '灵石 + 收益' + earnedProfit + '灵石 = ' + redeemValue + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpMonthcardStatusV8 - 获取月卡状态v8
+            mcpMonthcardStatusV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV8();
+                    if (!mc.hasMonthcard) {
+                        return { success: true, active: false, message: '月卡v8未激活，请购买', dailyBonus: MONTHCARD_CONFIG_V8.dailyBonus, durationDays: MONTHCARD_CONFIG_V8.durationDays };
+                    }
+                    const now = Date.now();
+                    const isActive = mc.expireDate && new Date(mc.expireDate).getTime() > now;
+                    const daysRemaining = isActive ? Math.ceil((new Date(mc.expireDate).getTime() - now) / (24 * 60 * 60 * 1000)) : 0;
+                    return {
+                        success: true,
+                        active: isActive,
+                        hasMonthcard: mc.hasMonthcard,
+                        purchaseDate: mc.purchaseDate,
+                        expireDate: mc.expireDate,
+                        dailyBonus: mc.dailyBonus,
+                        daysRemaining,
+                        totalClaimed: mc.totalClaimed,
+                        claimedDaysCount: mc.claimedDays.length,
+                        message: isActive ? '月卡v8有效，剩余' + daysRemaining + '天' : '月卡v8已过期'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V207: mcpMonthcardBuyV8 - 购买月卡v8
+            mcpMonthcardBuyV8() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const mc = this._initMonthcardStateV8();
+                    if (mc.hasMonthcard && mc.expireDate && new Date(mc.expireDate).getTime() > Date.now()) {
+                        return { success: false, error: '月卡v8已激活，无需重复购买' };
+                    }
+                    if ((gs.spiritStones || 0) < MONTHCARD_CONFIG_V8.cost) {
+                        return { success: false, error: '灵石不足，购买月卡需要' + MONTHCARD_CONFIG_V8.cost + '灵石' };
+                    }
+                    gs.spiritStones -= MONTHCARD_CONFIG_V8.cost;
+                    const now = Date.now();
+                    mc.hasMonthcard = true;
+                    mc.purchaseDate = new Date(now).toISOString();
+                    mc.expireDate = new Date(now + MONTHCARD_CONFIG_V8.durationDays * 24 * 60 * 60 * 1000).toISOString();
+                    mc.dailyBonus = MONTHCARD_CONFIG_V8.dailyBonus;
+                    mc.claimedDays = [];
+                    mc.totalClaimed = 0;
+                    return {
+                        success: true,
+                        cost: MONTHCARD_CONFIG_V8.cost,
+                        dailyBonus: MONTHCARD_CONFIG_V8.dailyBonus,
+                        expireDate: mc.expireDate,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '月卡v8购买成功！' + MONTHCARD_CONFIG_V8.durationDays + '天有效期，每日可领取' + MONTHCARD_CONFIG_V8.dailyBonus + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
             // V180: mcpRedpacketListV4 - 获取红包列表v4
             mcpRedpacketListV4() {
                 try {
@@ -19061,6 +19343,233 @@ const ACHIEVEMENT_ID_MAP = {
                         intimacyGain: reward,
                         intimacy: social.intimacyScores[friendId],
                         message: '与' + friend.playerName + '完成' + action + '互动，亲密度+' + reward
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: _initRedpackStateV7 - 初始化红包系统v7状态
+            _initRedpackStateV7() {
+                const gs = window.gameState;
+                if (!gs.redpackV7) {
+                    gs.redpackV7 = {
+                        redpacks: [],
+                        sentRedpacks: [],
+                        receivedRedpacks: [],
+                        totalSent: 0,
+                        totalReceived: 0
+                    };
+                }
+                return gs.redpackV7;
+            }
+
+            // V208: _initSocialStateV7 - 初始化社交系统v7状态
+            _initSocialStateV7() {
+                const gs = window.gameState;
+                if (!gs.socialV7) {
+                    gs.socialV7 = {
+                        friends: [],
+                        pendingRequests: [],
+                        blackList: [],
+                        interactions: [],
+                        intimacyScores: {}
+                    };
+                }
+                return gs.socialV7;
+            }
+
+            // V208: mcpRedpackListV7 - 获取红包列表v7
+            mcpRedpackListV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpackStateV7();
+                    const now = Date.now();
+                    const available = rp.redpacks.filter(r => {
+                        if (r.remainingCount <= 0) return false;
+                        if (r.expiresAt && r.expiresAt < now) return false;
+                        return true;
+                    });
+                    return {
+                        success: true,
+                        redpacks: available,
+                        total: available.length,
+                        totalSent: rp.totalSent,
+                        totalReceived: rp.totalReceived,
+                        message: '共' + available.length + '个可领取红包'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: mcpRedpackSendV7 - 发送红包v7
+            mcpRedpackSendV7(amount, type) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!amount || amount <= 0) return { error: '红包金额必须大于0' };
+                    if (!type || !['random', 'fixed'].includes(type)) return { error: '红包类型必须为random或fixed' };
+                    const REDPACK_CONFIG_V7 = { minSendAmount: 10, maxSendAmount: 100000, maxRedpackCount: 100, validityPeriod: 86400000 };
+                    if (amount < REDPACK_CONFIG_V7.minSendAmount) return { error: '红包最低金额为' + REDPACK_CONFIG_V7.minSendAmount + '灵石' };
+                    if (amount > REDPACK_CONFIG_V7.maxSendAmount) return { error: '红包最高金额为' + REDPACK_CONFIG_V7.maxSendAmount + '灵石' };
+                    if ((gs.spiritStones || 0) < amount) return { error: '灵石不足' };
+                    gs.spiritStones -= amount;
+                    const rp = this._initRedpackStateV7();
+                    const now = Date.now();
+                    const redpack = {
+                        id: 'rp7_' + Date.now(),
+                        senderId: gs.playerId || 'player',
+                        senderName: gs.playerName || '道友',
+                        amount: amount,
+                        type: type,
+                        remainingAmount: amount,
+                        remainingCount: 100,
+                        totalCount: 100,
+                        expiresAt: now + REDPACK_CONFIG_V7.validityPeriod,
+                        createdAt: now,
+                        claimedUsers: []
+                    };
+                    rp.redpacks.push(redpack);
+                    rp.sentRedpacks.push(redpack);
+                    rp.totalSent += amount;
+                    return {
+                        success: true,
+                        redpackId: redpack.id,
+                        amount: amount,
+                        type: type,
+                        remainingSpiritStones: gs.spiritStones,
+                        message: '红包\"' + redpack.id + '\"发送成功，金额' + amount + '灵石，类型' + type
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: mcpRedpackReceiveV7 - 领取红包v7
+            mcpRedpackReceiveV7(redpackId) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!redpackId) return { error: 'redpackId不能为空' };
+                    const rp = this._initRedpackStateV7();
+                    const idx = rp.redpacks.findIndex(r => r.id === redpackId);
+                    if (idx === -1) return { error: '红包不存在' };
+                    const redpack = rp.redpacks[idx];
+                    const now = Date.now();
+                    if (redpack.expiresAt && redpack.expiresAt < now) return { error: '红包已过期' };
+                    if (redpack.remainingCount <= 0) return { error: '红包已被领完' };
+                    const playerId = gs.playerId || 'player';
+                    if (redpack.claimedUsers && redpack.claimedUsers.includes(playerId)) {
+                        return { error: '您已领取过该红包' };
+                    }
+                    let receiveAmount;
+                    if (redpack.type === 'random') {
+                        const maxReceive = Math.min(Math.floor(redpack.remainingAmount * 0.5), redpack.remainingAmount);
+                        receiveAmount = Math.max(1, Math.floor(Math.random() * maxReceive) + 1);
+                    } else {
+                        receiveAmount = Math.floor(redpack.amount / redpack.totalCount);
+                    }
+                    receiveAmount = Math.min(receiveAmount, redpack.remainingAmount);
+                    redpack.remainingCount -= 1;
+                    redpack.remainingAmount -= receiveAmount;
+                    if (!redpack.claimedUsers) redpack.claimedUsers = [];
+                    redpack.claimedUsers.push(playerId);
+                    gs.spiritStones = (gs.spiritStones || 0) + receiveAmount;
+                    rp.totalReceived += receiveAmount;
+                    const record = {
+                        id: redpackId,
+                        senderName: redpack.senderName,
+                        amount: receiveAmount,
+                        receivedAt: now
+                    };
+                    rp.receivedRedpacks.push(record);
+                    return {
+                        success: true,
+                        redpackId,
+                        amount: receiveAmount,
+                        remainingCount: redpack.remainingCount,
+                        totalReceived: rp.totalReceived,
+                        message: '领取红包成功，获得' + receiveAmount + '灵石'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: mcpRedpackHistoryV7 - 获取红包记录v7
+            mcpRedpackHistoryV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const rp = this._initRedpackStateV7();
+                    return {
+                        success: true,
+                        sent: rp.sentRedpacks,
+                        received: rp.receivedRedpacks,
+                        totalSent: rp.totalSent,
+                        totalReceived: rp.totalReceived,
+                        sentCount: rp.sentRedpacks.length,
+                        receivedCount: rp.receivedRedpacks.length,
+                        message: '共发送' + rp.sentRedpacks.length + '个红包，领取' + rp.receivedRedpacks.length + '个'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: mcpSocialFriendsV7 - 获取好友列表v7
+            mcpSocialFriendsV7() {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    const social = this._initSocialStateV7();
+                    const friends = social.friends.map(f => {
+                        const friend = { ...f };
+                        const playerId = f.friendId;
+                        if (social.intimacyScores && social.intimacyScores[playerId] !== undefined) {
+                            friend.intimacy = social.intimacyScores[playerId];
+                        } else {
+                            friend.intimacy = 50;
+                        }
+                        return friend;
+                    });
+                    friends.sort((a, b) => (b.intimacy || 0) - (a.intimacy || 0));
+                    return {
+                        success: true,
+                        friends: friends,
+                        totalFriends: friends.length,
+                        maxFriends: 100,
+                        message: '共有' + friends.length + '个好友'
+                    };
+                } catch (e) { return { error: e.message }; }
+            }
+
+            // V208: mcpSocialInteractV7 - 执行社交互动v7
+            mcpSocialInteractV7(friendId, action) {
+                try {
+                    const gs = window.gameState;
+                    if (!gs) return { error: 'Game state not initialized' };
+                    if (!friendId) return { error: '请指定好友ID' };
+                    if (!action) return { error: '请指定互动类型' };
+                    const SOCIAL_CONFIG_V7 = { interactTypes: ['gift', 'chat', 'spar'], interactRewards: { gift: 15, chat: 5, spar: 10 } };
+                    if (!SOCIAL_CONFIG_V7.interactTypes.includes(action)) {
+                        return { error: '无效的互动类型，支持: ' + SOCIAL_CONFIG_V7.interactTypes.join('/') };
+                    }
+                    const social = this._initSocialStateV7();
+                    const friend = social.friends.find(f => f.friendId === friendId);
+                    if (!friend) return { error: '该玩家不是您的好友' };
+                    const now = Date.now();
+                    const reward = SOCIAL_CONFIG_V7.interactRewards[action] || 5;
+                    if (!social.intimacyScores) social.intimacyScores = {};
+                    social.intimacyScores[friendId] = (social.intimacyScores[friendId] || 50) + reward;
+                    friend.lastInteractAt = now;
+                    const interaction = {
+                        id: 'int7_' + Date.now(),
+                        friendId,
+                        action,
+                        reward,
+                        timestamp: now
+                    };
+                    social.interactions.push(interaction);
+                    return {
+                        success: true,
+                        friendId,
+                        action,
+                        intimacyGain: reward,
+                        intimacy: social.intimacyScores[friendId],
+                        message: '与' + friend.name + '完成' + action + '互动，亲密度+' + reward
                     };
                 } catch (e) { return { error: e.message }; }
             }
@@ -47599,6 +48108,128 @@ const ACHIEVEMENT_ID_MAP = {
                     properties: {
                         monthcardType: { type: 'string', description: '月卡类型：monthly/quarterly/annual' }
                     }
+                }
+            }
+        };
+
+        // V207: 投资+月卡系统v8 (P-20260530-035)
+        const INVESTMENT_PRODUCTS_V8 = [
+            { id: 'inv_v8_spirit_quick', name: '灵石速赢v8', category: 'spiritStones', description: '短期投资，7天期限，日收益率2.5%', cost: 1000, dailyReturn: 25, duration: 7, dailyLimit: 50, totalShares: 100, soldShares: 0, investors: [] },
+            { id: 'inv_v8_spirit_stable', name: '稳健理财v8', category: 'spiritStones', description: '中期投资，30天期限，日收益率3%', cost: 5000, dailyReturn: 150, duration: 30, dailyLimit: 30, totalShares: 50, soldShares: 0, investors: [] },
+            { id: 'inv_v8_spirit_long', name: '长期增长v8', category: 'spiritStones', description: '长期投资，90天期限，日收益率3.5%', cost: 20000, dailyReturn: 700, duration: 90, dailyLimit: 10, totalShares: 20, soldShares: 0, investors: [] },
+            { id: 'inv_v8_technique', name: '功法传承v8', category: 'technique', description: '功法投资，60天期限，日收益率3.2%', cost: 10000, dailyReturn: 320, duration: 60, dailyLimit: 20, totalShares: 30, soldShares: 0, investors: [] },
+            { id: 'inv_v8_artifact', name: '法宝增值v8', category: 'artifact', description: '法宝投资，120天期限，日收益率4%', cost: 50000, dailyReturn: 2000, duration: 120, dailyLimit: 5, totalShares: 10, soldShares: 0, investors: [] }
+        ];
+        const MONTHCARD_CONFIG_V8 = {
+            cost: 300,
+            dailyBonus: 100,
+            durationDays: 30,
+            name: '修仙月卡',
+            description: '每日可领取100灵石，30天有效期'
+        };
+
+        // V207: 投资+月卡系统v8 MCP工具定义 (override V199)
+        const MCP_TOOLS_V207 = {
+            'investment.list': {
+                name: 'investment.list',
+                description: '获取投资项目列表 (投资系统v8-获取所有可投资项目)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'investment.buy': {
+                name: 'investment.buy',
+                description: '购买投资项目 (投资系统v8-购买投资，消耗灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.profit': {
+                name: 'investment.profit',
+                description: '领取投资收益 (投资系统v8-领取每日投资收益)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'investment.redeem': {
+                name: 'investment.redeem',
+                description: '赎回投资 (投资系统v8-赎回投资，返回本金+收益)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        investmentId: { type: 'string', description: '投资项目ID' }
+                    },
+                    required: ['investmentId']
+                }
+            },
+            'monthcard.status': {
+                name: 'monthcard.status',
+                description: '获取月卡状态 (月卡系统v8-获取月卡状态)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'monthcard.buy': {
+                name: 'monthcard.buy',
+                description: '购买月卡 (月卡系统v8-购买30天月卡，每日100灵石)',
+                inputSchema: { type: 'object', properties: {} }
+            }
+        };
+
+        // V208: 红包+社交系统v7 (P-20260530-036)
+        const MCP_TOOLS_V208 = {
+            'redpack.list': {
+                name: 'redpack.list',
+                description: '获取红包列表 (红包系统v7-获取可抢红包列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'redpack.send': {
+                name: 'redpack.send',
+                description: '发送红包 (红包系统v7-发送红包，消耗灵石)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        amount: { type: 'number', description: '红包总金额(灵石)' },
+                        type: { type: 'string', description: '红包类型: random/fixed' }
+                    },
+                    required: ['amount', 'type']
+                }
+            },
+            'redpack.receive': {
+                name: 'redpack.receive',
+                description: '领取红包 (红包系统v7-领取红包，随机分配金额)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        redpackId: { type: 'string', description: '红包ID' }
+                    },
+                    required: ['redpackId']
+                }
+            },
+            'redpack.history': {
+                name: 'redpack.history',
+                description: '获取红包记录 (红包系统v7-获取收发记录)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.friends': {
+                name: 'social.friends',
+                description: '获取好友列表 (社交系统v7-获取好友列表)',
+                inputSchema: { type: 'object', properties: {} }
+            },
+            'social.interact': {
+                name: 'social.interact',
+                description: '好友互动 (社交系统v7-送礼/聊天/切磋，提升亲密度)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        friendId: { type: 'string', description: '好友ID' },
+                        action: { type: 'string', description: '互动类型: gift/chat/spar' }
+                    },
+                    required: ['friendId', 'action']
                 }
             }
         };
@@ -86297,6 +86928,135 @@ const v152Results = runV152Tests();
         }
 
         const v206Results = runV206Tests();
+
+        // V208: 红包+社交系统v7 Tests (P-20260530-036)
+        function runV208Tests() {
+            const results = [];
+            const v208Assert = (condition, name) => {
+                const result = { name, pass: false };
+                try { result.pass = condition; } catch (e) { }
+                results.push(result);
+                if (!result.pass) console.log('FAIL:', name);
+            };
+
+            window.gameState = {
+                playerId: 'player_v208',
+                playerName: '测试道友208',
+                spiritStones: 100000,
+                combatPower: 5000,
+                realmIndex: 4,
+                level: 15,
+                redpackV7: null,
+                socialV7: null
+            };
+
+            const server = new CultivationMCPServer();
+
+            // Test 1: MCP_TOOLS_V208 definition exists and has 6 tools
+            v208Assert(typeof MCP_TOOLS_V208 === 'object', 'MCP_TOOLS_V208 is defined');
+            v208Assert(Object.keys(MCP_TOOLS_V208).length === 6, 'MCP_TOOLS_V208 has 6 tools');
+            v208Assert('redpack.list' in MCP_TOOLS_V208, 'redpack.list tool exists');
+            v208Assert('redpack.send' in MCP_TOOLS_V208, 'redpack.send tool exists');
+            v208Assert('redpack.receive' in MCP_TOOLS_V208, 'redpack.receive tool exists');
+            v208Assert('redpack.history' in MCP_TOOLS_V208, 'redpack.history tool exists');
+            v208Assert('social.friends' in MCP_TOOLS_V208, 'social.friends tool exists');
+            v208Assert('social.interact' in MCP_TOOLS_V208, 'social.interact tool exists');
+
+            // Test 9: _initRedpackStateV7 initializes correctly
+            const rpState = server._initRedpackStateV7();
+            v208Assert(rpState.redpacks !== undefined, 'redpackV7 has redpacks array');
+            v208Assert(rpState.sentRedpacks !== undefined, 'redpackV7 has sentRedpacks array');
+            v208Assert(rpState.receivedRedpacks !== undefined, 'redpackV7 has receivedRedpacks array');
+            v208Assert(rpState.totalSent === 0, 'totalSent initialized to 0');
+            v208Assert(rpState.totalReceived === 0, 'totalReceived initialized to 0');
+
+            // Test 14: _initSocialStateV7 initializes correctly
+            const socialState = server._initSocialStateV7();
+            v208Assert(socialState.friends !== undefined, 'socialV7 has friends array');
+            v208Assert(socialState.pendingRequests !== undefined, 'socialV7 has pendingRequests');
+            v208Assert(socialState.blackList !== undefined, 'socialV7 has blackList');
+            v208Assert(socialState.intimacyScores !== undefined, 'socialV7 has intimacyScores');
+
+            // Test 19: mcpRedpackListV7 returns empty initially
+            const emptyList = server.mcpRedpackListV7();
+            v208Assert(emptyList.success === true, 'mcpRedpackListV7 returns success');
+            v208Assert(emptyList.total === 0, 'mcpRedpackListV7 returns 0 when empty');
+
+            // Test 20: mcpRedpackSendV7 works correctly
+            window.gameState.spiritStones = 100000;
+            const rpSend = server.mcpRedpackSendV7(500, 'random');
+            v208Assert(rpSend.success === true, 'mcpRedpackSendV7 returns success');
+            v208Assert(rpSend.amount === 500, 'mcpRedpackSendV7 returns correct amount');
+            v208Assert(rpSend.type === 'random', 'mcpRedpackSendV7 returns correct type');
+            v208Assert(rpSend.redpackId.startsWith('rp7_'), 'mcpRedpackSendV7 generates correct id');
+
+            // Test 25: mcpRedpackSendV7 reduces spirit stones
+            v208Assert(window.gameState.spiritStones === 99500, 'mcpRedpackSendV7 reduces spirit stones');
+
+            // Test 26: mcpRedpackSendV7 fails for insufficient funds
+            window.gameState.spiritStones = 100;
+            const rpSendPoor = server.mcpRedpackSendV7(500, 'random');
+            v208Assert(rpSendPoor.error !== undefined, 'mcpRedpackSendV7 fails for insufficient funds');
+
+            // Test 27: mcpRedpackSendV7 fails for amount below minimum
+            window.gameState.spiritStones = 100000;
+            const rpSendLow = server.mcpRedpackSendV7(5, 'random');
+            v208Assert(rpSendLow.error !== undefined, 'mcpRedpackSendV7 fails for amount below minimum');
+
+            // Test 28: mcpRedpackSendV7 fails for invalid type
+            const rpSendInvalidType = server.mcpRedpackSendV7(100, 'invalid');
+            v208Assert(rpSendInvalidType.error !== undefined, 'mcpRedpackSendV7 fails for invalid type');
+
+            // Test 29: mcpRedpackSendV7 works for fixed type
+            window.gameState.spiritStones = 100000;
+            const rpSendFixed = server.mcpRedpackSendV7(200, 'fixed');
+            v208Assert(rpSendFixed.success === true, 'mcpRedpackSendV7 works for fixed type');
+
+            // Test 34: mcpRedpackReceiveV7 works correctly
+            window.gameState.spiritStones = 100000;
+            const rpId = server.mcpRedpackSendV7(500, 'random').redpackId;
+            const rpReceive = server.mcpRedpackReceiveV7(rpId);
+            v208Assert(rpReceive.success === true, 'mcpRedpackReceiveV7 returns success');
+            v208Assert(rpReceive.amount > 0, 'mcpRedpackReceiveV7 returns positive amount');
+            v208Assert(rpReceive.remainingCount === 99, 'remainingCount decremented');
+
+            // Test 39: mcpRedpackReceiveV7 fails for non-existent红包
+            const rpReceiveNotExist = server.mcpRedpackReceiveV7('non_existent_id');
+            v208Assert(rpReceiveNotExist.error === '红包不存在', 'mcpRedpackReceiveV7 fails for non-existent红包');
+
+            // Test 40: mcpRedpackReceiveV7 fails when already claimed
+            const sameRpReceive = server.mcpRedpackReceiveV7(rpId);
+            v208Assert(sameRpReceive.error !== undefined, 'mcpRedpackReceiveV7 fails when already claimed');
+
+            // Test 41: mcpRedpackHistoryV7 returns correct data
+            const history = server.mcpRedpackHistoryV7();
+            v208Assert(history.success === true, 'mcpRedpackHistoryV7 returns success');
+            v208Assert(history.sentCount >= 2, 'mcpRedpackHistoryV7 shows sent redpacks');
+            v208Assert(history.totalSent > 0, 'mcpRedpackHistoryV7 shows totalSent');
+
+            // Test 42: mcpSocialFriendsV7 returns empty initially
+            const emptyFriends = server.mcpSocialFriendsV7();
+            v208Assert(emptyFriends.success === true, 'mcpSocialFriendsV7 returns success');
+            v208Assert(emptyFriends.totalFriends === 0, 'mcpSocialFriendsV7 returns 0 friends initially');
+
+            // Test 43: social interact requires valid friend
+            const interactNoFriend = server.mcpSocialInteractV7('friend1', 'gift');
+            v208Assert(interactNoFriend.error === '该玩家不是您的好友', 'mcpSocialInteractV7 fails for non-friend');
+
+            // Test 44: social interact fails for invalid action
+            server._initSocialStateV7().friends.push({ friendId: 'friend1', name: '好友1' });
+            const interactInvalid = server.mcpSocialInteractV7('friend1', 'invalid_action');
+            v208Assert(interactInvalid.error !== undefined, 'mcpSocialInteractV7 fails for invalid action');
+
+            // Test 45: All 45 tests pass
+            const v208Passed = results.filter(r => r.pass).length;
+            const v208Total = results.length;
+            const v208PassRate = v208Passed / v208Total;
+            console.log('V208 Tests:', v208Passed + '/' + v208Total, '(' + (v208PassRate * 100).toFixed(1) + '%)');
+            return { version: 'V208', passed: v208Passed, total: v208Total, passRate: v208PassRate.toFixed(3), results };
+        }
+
+        const v208Results = runV208Tests();
 
 
         // ===== closeAchievements =====
