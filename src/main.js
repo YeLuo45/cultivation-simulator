@@ -30,6 +30,9 @@ import PetModule from './domains/pet/PetModule.js';
 // 领域模块 (ES Module - named exports)
 import { createRankingService, createArenaService } from './domains/ranking/RankingModule.js';
 import { createSigninService, createWelfareService } from './domains/signin/SigninModule.js';
+import CombatModule from './domains/combat/CombatModule.js';
+import SectModule from './domains/sect/SectModule.js';
+import { reincarnationService } from './domains/reincarnation/services/ReincarnationService.js';
 
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
@@ -299,7 +302,11 @@ function initializeDomainModules() {
     
     // 签到模块 (ES Module)
     domainModules.signin = { createSigninService, createWelfareService };
-    
+
+    // 轮回模块 (ES Module)
+    domainModules.reincarnation = reincarnationService;
+    reincarnationService.init(gameState);
+
     console.log('[Main] 领域模块初始化完成');
 }
 
@@ -473,6 +480,61 @@ function registerDomainMCPTools() {
         description: 'List achievements',
         inputSchema: { type: 'object', properties: {} }
     }, () => ({ achievements: gameState.achievementState?.completedAchievements || [] }));
+
+    // 轮回工具 (Direction M: 悟道境轮回系统)
+    mcpRegistry.registerTool('reincarnation.crystal.create', {
+        name: 'reincarnation.crystal.create',
+        description: 'Create a remembrance crystal from current insights',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                quality: { type: 'string', description: 'Crystal quality (凡品/良品/珍品/上品/极品)' },
+                source: { type: 'string', description: 'Source type (breakthrough/alchemy/serendipity/meditation/combat)' }
+            }
+        }
+    }, (params) => reincarnationService.mcpCrystalCreate(params || {}, gameState));
+
+    mcpRegistry.registerTool('reincarnation.crystal.list', {
+        name: 'reincarnation.crystal.list',
+        description: 'List all remembrance crystals',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => reincarnationService.mcpCrystalList());
+
+    mcpRegistry.registerTool('reincarnation.crystal.apply', {
+        name: 'reincarnation.crystal.apply',
+        description: 'Apply a crystal to restore attributes after reincarnation',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                crystalId: { type: 'string', description: 'ID of the crystal to apply' }
+            },
+            required: ['crystalId']
+        }
+    }, (params) => reincarnationService.mcpCrystalApply(params || {}, gameState));
+
+    mcpRegistry.registerTool('reincarnation.insight.awaken', {
+        name: 'reincarnation.insight.awaken',
+        description: 'Trigger an insight awakening event',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', description: 'Insight type' },
+                desc: { type: 'string', description: 'Insight description' }
+            }
+        }
+    }, (params) => reincarnationService.mcpInsightAwaken(params || {}, gameState));
+
+    mcpRegistry.registerTool('reincarnation.insight.list', {
+        name: 'reincarnation.insight.list',
+        description: 'List all cultivation insights',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => reincarnationService.mcpInsightList());
+
+    mcpRegistry.registerTool('reincarnation.cycle.status', {
+        name: 'reincarnation.cycle.status',
+        description: 'Get reincarnation cycle status and memory layer info',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => reincarnationService.mcpCycleStatus(gameState));
 }
 
 // ===== 持久化系统 =====

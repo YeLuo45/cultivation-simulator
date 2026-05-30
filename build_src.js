@@ -5,13 +5,18 @@ import { build } from 'esbuild';
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 输出路径
 const outfile = path.join(__dirname, 'dist', 'game.js');
 
-// esbuild 打包
+// 版本信息
+const commitHash = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+const buildTime = new Date().toISOString().replace(/[:.]/g, '-');
+const version = `DDD-v1.0.0-${commitHash}-${buildTime}`;
+
 build({
     entryPoints: [path.join(__dirname, 'src', 'main.js')],
     bundle: true,
@@ -23,6 +28,9 @@ build({
     outfile: outfile,
     logLevel: 'info',
     metafile: true,
+    banner: {
+        js: `/* Cultivation Simulator ${version} */`,
+    },
 })
 .then(result => {
     console.log('Build complete!');
@@ -48,6 +56,10 @@ build({
         console.log('Syntax check: PASSED (manual verification)');
     }
     
+    // 追加版本信息到文件末尾（作为全局变量）
+    const versionFooter = `\n;window.__GAME_VERSION__="${version}";\n`;
+    writeFileSync(outfile, readFileSync(outfile) + versionFooter, 'utf8');
+    console.log('Version:', version);
     console.log('Build successful!');
 })
 .catch((err) => {

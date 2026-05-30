@@ -1,3 +1,4 @@
+/* Cultivation Simulator DDD-v1.0.0-d1a1d9a-2026-05-30T14-35-32-987Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2029,7 +2030,7 @@ var CultivationSimulator = (() => {
   // src/main.js
   var main_exports = {};
   __export(main_exports, {
-    CONFIG: () => CONFIG,
+    CONFIG: () => CONFIG2,
     GAME_LOOP_CONFIG: () => GAME_LOOP_CONFIG,
     addLog: () => addLog2,
     advanceDay: () => advanceDay,
@@ -2069,7 +2070,7 @@ var CultivationSimulator = (() => {
   });
 
   // src/config/constants.js
-  var CONFIG = {
+  var CONFIG2 = {
     realms: ["\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347"],
     stages: ["\u521D\u671F", "\u4E2D\u671F", "\u540E\u671F"],
     stageNames: ["\u51E1\u4EBA", "\u4FEE\u58EB", "\u771F\u4EBA", "\u5929\u541B", "\u5927\u80FD"],
@@ -3491,7 +3492,7 @@ var CultivationSimulator = (() => {
       skill: "\u8D85\u8131\uFF1A\u514D\u75AB\u4E00\u5207\u8D1F\u9762\u72B6\u6001\uFF0C\u5BFF\u5143\u8017\u5C3D\u65F6\u81EA\u52A8\u8FDB\u5165\u8F6E\u56DE\u8F6C\u4E16\uFF0C\u4FDD\u7559\u5168\u90E8\u5C5E\u6027\u52A0\u6210"
     }
   };
-  var ENHANCE_CONFIG = {
+  var ENHANCE_CONFIG2 = {
     levels: [
       { cost: 100, bonus: 0.05, desc: "\u5F3A\u5316+1: \u57FA\u7840\u5C5E\u6027+5%" },
       { cost: 500, bonus: 0.1, desc: "\u5F3A\u5316+2: \u57FA\u7840\u5C5E\u6027+10%" },
@@ -4161,7 +4162,7 @@ var CultivationSimulator = (() => {
   function initInventory(gameState3) {
     return inventoryService2.init(gameState3);
   }
-  function addItemToInventory(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
+  function addItemToInventory2(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
     return inventoryService2.addItem(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel);
   }
   function useItem(gameState3, name) {
@@ -4192,7 +4193,7 @@ var CultivationSimulator = (() => {
     EQUIPMENT_TYPES,
     EQUIPMENT_SLOTS,
     HEAVENLY_DAO_SET_BONUSES,
-    ENHANCE_CONFIG,
+    ENHANCE_CONFIG: ENHANCE_CONFIG2,
     // Services
     InventoryService,
     inventoryService: inventoryService2,
@@ -4209,7 +4210,7 @@ var CultivationSimulator = (() => {
     createItem,
     createEquipment,
     initInventory,
-    addItemToInventory,
+    addItemToInventory: addItemToInventory2,
     useItem,
     getInventoryStats,
     doCraft,
@@ -5159,6 +5160,1020 @@ var CultivationSimulator = (() => {
     return new WelfareService(gameStateAccessor);
   }
 
+  // src/domains/combat/entities/CombatState.js
+  var CombatState_exports = {};
+  __export(CombatState_exports, {
+    combatEnergy: () => combatEnergy2,
+    combatState: () => combatState2,
+    createCombatState: () => createCombatState2,
+    resetCombatState: () => resetCombatState2,
+    restoreCombatState: () => restoreCombatState2,
+    serializeCombatState: () => serializeCombatState2,
+    setCombatEnergy: () => setCombatEnergy,
+    setCombatState: () => setCombatState
+  });
+  var combatState2 = {
+    inProgress: false,
+    round: 0,
+    turn: "player",
+    // 'player' | 'opponent'
+    player: {
+      name: "\u4F60",
+      avatar: "\u{1F9D1}\u200D\u{1F393}",
+      realm: 0,
+      realmName: "\u70BC\u6C14\u671F",
+      maxHP: 500,
+      hp: 500,
+      attack: 80,
+      defense: 40,
+      speed: 80,
+      technique: "\u9752\u4E91\u8BC0",
+      techniqueColor: "#00ff88",
+      weapon: null,
+      weaponData: null,
+      armor: null,
+      armorData: null,
+      critRate: 0.1,
+      setBonuses: {},
+      skills: [],
+      accessories: [],
+      counterEnergy: 0,
+      inDefenseStance: false,
+      skillLevels: {}
+    },
+    opponent: null,
+    log: [],
+    effects: {
+      player: {
+        defending: false,
+        attackBoost: 0,
+        defenseBoost: 0,
+        ignoreDefense: false,
+        burning: 0,
+        frozen: 0,
+        defenseBoostObj: 0,
+        critBoostNext: 0,
+        healRate: 0,
+        damageReduction: 0,
+        counterRate: 0,
+        speedReduce: 0,
+        armorBroken: false,
+        fireResist: 0,
+        fireDrain: 0,
+        reflect: 0,
+        maxHpBoost: 0,
+        cleanseStacks: 0,
+        invincible: 0,
+        thunderBonus: 0,
+        doubleHit: 0,
+        pierce: 0,
+        cleave: 0,
+        freezeAura: 0,
+        burnAura: 0,
+        curse: 0
+      },
+      opponent: {
+        defending: false,
+        attackBoost: 0,
+        defenseBoost: 0,
+        burning: 0,
+        frozen: 0,
+        speedReduce: 0,
+        armorBroken: false,
+        curse: 0
+      }
+    }
+  };
+  var combatEnergy2 = 0;
+  function createCombatState2() {
+    return {
+      inProgress: false,
+      round: 0,
+      turn: "player",
+      player: {
+        name: "\u4F60",
+        avatar: "\u{1F9D1}\u200D\u{1F393}",
+        realm: 0,
+        realmName: "\u70BC\u6C14\u671F",
+        maxHP: 500,
+        hp: 500,
+        attack: 80,
+        defense: 40,
+        speed: 80,
+        technique: "\u9752\u4E91\u8BC0",
+        techniqueColor: "#00ff88",
+        weapon: null,
+        weaponData: null,
+        armor: null,
+        armorData: null,
+        critRate: 0.1,
+        setBonuses: {},
+        skills: [],
+        accessories: [],
+        counterEnergy: 0,
+        inDefenseStance: false,
+        skillLevels: {},
+        attackPercent: 1,
+        critBonus: 0,
+        defensePercent: 1,
+        qiRegenBonus: 0
+      },
+      opponent: null,
+      log: [],
+      effects: {
+        player: {
+          defending: false,
+          attackBoost: 0,
+          defenseBoost: 0,
+          ignoreDefense: false,
+          burning: 0,
+          frozen: 0
+        },
+        opponent: {
+          defending: false,
+          attackBoost: 0,
+          defenseBoost: 0,
+          burning: 0,
+          frozen: 0
+        }
+      }
+    };
+  }
+  function serializeCombatState2() {
+    return JSON.parse(JSON.stringify(combatState2));
+  }
+  function restoreCombatState2(saved) {
+    if (saved) {
+      combatState2 = saved;
+    }
+  }
+  function resetCombatState2() {
+    combatState2 = createCombatState2();
+    combatEnergy2 = 0;
+  }
+  function setCombatState(newState) {
+    combatState2 = newState;
+  }
+  function setCombatEnergy(value) {
+    combatEnergy2 = value;
+  }
+
+  // src/domains/combat/services/CombatService.js
+  var { setCombatState: setCombatState2, setCombatEnergy: setCombatEnergy2 } = CombatState_exports;
+
+  // src/domains/combat/CombatModule.js
+  var COMBAT_CONFIG = {
+    ENERGY_PER_ATTACK: 20,
+    COUNTER_ENERGY_COST: 50,
+    COUNTER_ENERGY_THRESHOLD: 100,
+    CRIT_BASE_RATE: 0.1,
+    CRIT_BONUS: 1.5,
+    DEFENSE_REDUCTION: 0.5,
+    TECHNIQUE_BONUS_MULTIPLIER: 1.5,
+    TECHNIQUE_PENALTY_MULTIPLIER: 0.7
+  };
+  var CombatModule_default = {
+    entities: {
+      CombatState: { combatState, combatEnergy, createCombatState, serializeCombatState, restoreCombatState, resetCombatState },
+      Action: { ACTION_TYPES, ACTION_RESULT_TYPES, STATUS_EFFECTS, createCombatLogEntry, createActionRecord, ACTION_METADATA }
+    },
+    services: {
+      CombatService: {
+        initCombat,
+        generateOpponent,
+        startCombatChallenge,
+        executePlayerAttack,
+        executePlayerDefend,
+        executePlayerEscape,
+        executeOpponentTurn,
+        endCombat,
+        addEnergy,
+        getItemCount,
+        selectCombatAction
+      },
+      CombatAIService: {
+        mcpBattleArenaList,
+        mcpBattleArenaJoin,
+        mcpBattleArenaReport,
+        mcpBattleCombatLog,
+        mcpBattleRankRise,
+        mcpBattleRewardClaim,
+        getPlayerRankInfo,
+        updatePlayerRank,
+        getRealmDivision,
+        getDailyChallenges,
+        generateAIOpponents,
+        getRankNameFromRating,
+        getOpponentAvatar,
+        startRankingPVP,
+        calculatePlayerPVPower,
+        calculateOpponentPower,
+        simulatePVPRound,
+        calculateRatingChange
+      }
+    },
+    config: COMBAT_CONFIG
+  };
+
+  // src/domains/sect/SectModule.js
+  var SectModule_default = {
+    entities: {
+      Sect: { createSect, SECT_CONFIG, getSectOverview, getSectResources, calculateSectIncome, getSectBuildings, serializeSect, canUpgradeSect },
+      Disciple: {
+        createDisciple,
+        NPC_ROLES,
+        NPC_PERSONALITIES,
+        NPC_GIFTS,
+        NPC_SKILL_CRYSTALS,
+        NPC_MEMORY_LAYERS,
+        initNpcMemory,
+        getDiscipleInfo,
+        getPersonalityInfo,
+        getNpcRoleIcon,
+        getNpcRoleTitle,
+        recordNpcMemory,
+        checkNpcSkillCrystallization,
+        checkNpcEvolution,
+        npcAutonomousDecision,
+        getNpcMemoryDisplay
+      }
+    },
+    services: {
+      SectService: {
+        createNewSect,
+        addDisciple,
+        recruitDisciple,
+        weightedRandom,
+        trainDisciple,
+        dispatchDiscipleToPalace,
+        recallDiscipleFromPalace,
+        selectDiscipleForDispatch,
+        selectDiscipleForRecall,
+        collectSectResources,
+        buildBuilding,
+        upgradeSect,
+        assignElder,
+        removeElder,
+        disbandSect,
+        processNpcAutonomousLoop,
+        processSectRandomEvent,
+        modifyAffection,
+        getMasterBonus,
+        addItemToInventory
+      }
+    }
+  };
+
+  // src/domains/reincarnation/entities/Reincarnation.js
+  var MEMORY_LAYERS = {
+    L0_META: {
+      name: "L0\u5143\u8BB0\u5FC6",
+      desc: "\u6C38\u4E45\u4FDD\u7559\uFF1A\u609F\u9053\u6B21\u6570/\u8F6E\u56DE\u6B21\u6570",
+      retention: 1,
+      // 100% 保留
+      priority: "critical"
+    },
+    L1_INDEX: {
+      name: "L1\u7D22\u5F15",
+      desc: "\u4FDD\u7559\u6210\u5C31\u89E3\u9501\u72B6\u6001",
+      retention: 1,
+      priority: "high"
+    },
+    L2_GLOBAL: {
+      name: "L2\u5168\u5C40",
+      desc: "\u4FDD\u7559\u4EBA\u7269\u5C5E\u6027\u8D8B\u52BF",
+      retention: 0.8,
+      priority: "medium"
+    },
+    L3_SOP: {
+      name: "L3 SOP",
+      desc: "\u4FDD\u7559\u987F\u609F\u7ED3\u6676\u6280\u80FD (CULTIVATION_INSIGHT)",
+      retention: 0.6,
+      priority: "medium"
+    },
+    L4_SESSION: {
+      name: "L4\u4F1A\u8BDD",
+      desc: "\u91CD\u7F6E",
+      retention: 0,
+      priority: "low"
+    }
+  };
+  var CRYSTAL_QUALITY = {
+    "\u51E1\u54C1": { multiplier: 1, desc: "\u666E\u901A\u54C1\u8D28" },
+    "\u826F\u54C1": { multiplier: 1.5, desc: "\u4F18\u826F\u54C1\u8D28" },
+    "\u73CD\u54C1": { multiplier: 2, desc: "\u4F20\u8BF4\u54C1\u8D28" },
+    "\u4E0A\u54C1": { multiplier: 3, desc: "\u795E\u8BDD\u54C1\u8D28" },
+    "\u6781\u54C1": { multiplier: 5, desc: "\u9006\u5929\u54C1\u8D28" }
+  };
+  var INSIGHT_SOURCES = {
+    "breakthrough": { desc: "\u7A81\u7834\u5883\u754C\u89E6\u53D1", karmaBonus: 50 },
+    "alchemy": { desc: "\u70BC\u5236\u4E39\u836F\u89E6\u53D1", karmaBonus: 30 },
+    "serendipity": { desc: "\u5947\u9047\u89E6\u53D1", karmaBonus: 40 },
+    "meditation": { desc: "\u51A5\u60F3\u89E6\u53D1", karmaBonus: 20 },
+    "combat": { desc: "\u6218\u6597\u987F\u609F", karmaBonus: 25 }
+  };
+  var RemembranceCrystal = class _RemembranceCrystal {
+    constructor(config = {}) {
+      var _a, _b, _c, _d, _e;
+      this.id = config.id || `crystal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.quality = config.quality || "\u51E1\u54C1";
+      this.createdAt = config.createdAt || Date.now();
+      this.source = config.source || "unknown";
+      this.sourceDesc = config.sourceDesc || "";
+      this.preservedAttributes = {
+        cultivationBase: ((_a = config.preservedAttributes) == null ? void 0 : _a.cultivationBase) || 0,
+        karma: ((_b = config.preservedAttributes) == null ? void 0 : _b.karma) || 0,
+        skills: ((_c = config.preservedAttributes) == null ? void 0 : _c.skills) || [],
+        insights: ((_d = config.preservedAttributes) == null ? void 0 : _d.insights) || [],
+        bonuses: ((_e = config.preservedAttributes) == null ? void 0 : _e.bonuses) || []
+      };
+      this.used = config.used || false;
+      this.usedAt = config.usedAt || null;
+      this.appliedTo = config.appliedTo || null;
+    }
+    /**
+     * 获取结晶品质信息
+     */
+    getQualityInfo() {
+      return CRYSTAL_QUALITY[this.quality] || CRYSTAL_QUALITY["\u51E1\u54C1"];
+    }
+    /**
+     * 获取结晶效果倍率
+     */
+    getMultiplier() {
+      return this.getQualityInfo().multiplier;
+    }
+    /**
+     * 应用结晶
+     */
+    apply() {
+      if (this.used) {
+        return { success: false, reason: "\u7ED3\u6676\u5DF2\u88AB\u4F7F\u7528" };
+      }
+      this.used = true;
+      this.usedAt = Date.now();
+      return { success: true, message: "\u7ED3\u6676\u5DF2\u5E94\u7528" };
+    }
+    /**
+     * 序列化
+     */
+    serialize() {
+      return {
+        id: this.id,
+        quality: this.quality,
+        createdAt: this.createdAt,
+        source: this.source,
+        sourceDesc: this.sourceDesc,
+        preservedAttributes: this.preservedAttributes,
+        used: this.used,
+        usedAt: this.usedAt,
+        appliedTo: this.appliedTo
+      };
+    }
+    /**
+     * 从保存数据恢复
+     */
+    static deserialize(data) {
+      return new _RemembranceCrystal(data);
+    }
+  };
+  var CultivationInsight = class _CultivationInsight {
+    constructor(config = {}) {
+      this.id = config.id || `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = config.type || "unknown";
+      this.desc = config.desc || "";
+      this.source = config.source || "unknown";
+      this.awakenedAt = config.awakenedAt || Date.now();
+      this.effect = config.effect || {};
+      this.layer = config.layer || "L3_SOP";
+    }
+    /**
+     * 获取来源描述
+     */
+    getSourceDesc() {
+      var _a;
+      return ((_a = INSIGHT_SOURCES[this.source]) == null ? void 0 : _a.desc) || "\u672A\u77E5\u6765\u6E90";
+    }
+    /**
+     * 序列化
+     */
+    serialize() {
+      return {
+        id: this.id,
+        type: this.type,
+        desc: this.desc,
+        source: this.source,
+        awakenedAt: this.awakenedAt,
+        effect: this.effect,
+        layer: this.layer
+      };
+    }
+    /**
+     * 从保存数据恢复
+     */
+    static deserialize(data) {
+      return new _CultivationInsight(data);
+    }
+  };
+
+  // src/domains/reincarnation/services/ReincarnationService.js
+  var ReincarnationService = class {
+    constructor() {
+      this.reincarnation = null;
+      this.crystals = [];
+      this.insights = [];
+    }
+    /**
+     * 初始化轮回系统
+     */
+    init(gameState3) {
+      if (!gameState3.reincarnation) {
+        gameState3.reincarnation = {
+          times: 0,
+          totalKarma: 0,
+          bonuses: [],
+          karmaGood: 0,
+          karmaBad: 0,
+          pastLives: [],
+          realmAtDeath: 0,
+          ageAtDeath: 0,
+          causeOfDeath: "unknown",
+          retainedSkills: [],
+          retainedItems: [],
+          soulAge: 0,
+          reincarnationBonus: {}
+        };
+      }
+      this.reincarnation = gameState3.reincarnation;
+      return gameState3;
+    }
+    /**
+     * 获取轮回统计
+     */
+    getStats() {
+      var _a, _b;
+      return {
+        times: this.reincarnation.times,
+        totalKarma: this.reincarnation.totalKarma,
+        netKarma: (this.reincarnation.karmaGood || 0) - (this.reincarnation.karmaBad || 0),
+        karmaGood: this.reincarnation.karmaGood || 0,
+        karmaBad: this.reincarnation.karmaBad || 0,
+        soulAge: this.reincarnation.soulAge || 0,
+        bonusesCount: ((_a = this.reincarnation.bonuses) == null ? void 0 : _a.length) || 0,
+        pastLivesCount: ((_b = this.reincarnation.pastLives) == null ? void 0 : _b.length) || 0
+      };
+    }
+    /**
+     * 预览下一次轮回的加成
+     */
+    preview() {
+      const karmaRequired = (this.reincarnation.times || 0) * 100;
+      const nextRealm = (this.reincarnation.times || 0) + 1;
+      return {
+        nextRealm,
+        karmaRequired,
+        potentialBonuses: this.calculatePotentialBonuses()
+      };
+    }
+    /**
+     * 计算潜在加成
+     */
+    calculatePotentialBonuses() {
+      const bonuses = [];
+      const times = this.reincarnation.times || 0;
+      bonuses.push({
+        type: "cultivationSpeed",
+        value: Math.min(0.5, times * 0.05),
+        desc: `\u4FEE\u70BC\u901F\u5EA6+${Math.round(Math.min(50, times * 5))}%`
+      });
+      const netKarma = (this.reincarnation.karmaGood || 0) - (this.reincarnation.karmaBad || 0);
+      if (netKarma > 100) {
+        bonuses.push({ type: "attack", value: 0.1, desc: "\u653B\u51FB+10%" });
+      }
+      if (netKarma > 500) {
+        bonuses.push({ type: "defense", value: 0.1, desc: "\u9632\u5FA1+10%" });
+      }
+      if (netKarma > 1e3) {
+        bonuses.push({ type: "serendipityChance", value: 0.05, desc: "\u5947\u9047+5%" });
+      }
+      if (this.reincarnation.realmAtDeath >= 3) {
+        bonuses.push({ type: "spiritStones", value: 0.2, desc: "\u7075\u77F3+20%" });
+      }
+      return bonuses;
+    }
+    /**
+     * 执行轮回
+     */
+    doReincarnate(gameState3) {
+      const reincarnation = gameState3.reincarnation;
+      const record = {
+        time: Date.now(),
+        times: reincarnation.times,
+        causeOfDeath: reincarnation.causeOfDeath || "unknown",
+        realmAtDeath: gameState3.realm || 0,
+        ageAtDeath: gameState3.age || gameState3.days || 0,
+        karmaBalance: (reincarnation.karmaGood || 0) - (reincarnation.karmaBad || 0),
+        bonusesGained: []
+      };
+      reincarnation.pastLives = reincarnation.pastLives || [];
+      reincarnation.pastLives.push(record);
+      reincarnation.times = (reincarnation.times || 0) + 1;
+      const newBonuses = this.calculateNewBonuses(reincarnation);
+      reincarnation.bonuses = reincarnation.bonuses || [];
+      reincarnation.bonuses.push(...newBonuses);
+      gameState3.realm = 1;
+      gameState3.stage = 1;
+      gameState3.qi = 0;
+      gameState3.maxQi = 100;
+      gameState3.cultivationProgress = 0;
+      gameState3.mindset = 50;
+      const retainedItems = (reincarnation.retainedItems || []).filter(
+        (item) => item && item.type === "treasure" && item.permanent
+      );
+      gameState3.inventory = retainedItems;
+      const reincRecord = {
+        time: Date.now(),
+        bonus: "realm_reset",
+        times: reincarnation.times
+      };
+      reincarnation.bonuses.push(reincRecord);
+      return {
+        success: true,
+        times: reincarnation.times,
+        bonuses: newBonuses,
+        message: `\u8F6E\u56DE\u8F6C\u4E16\u5B8C\u6210\uFF01\u5DF2\u8F6E\u56DE\u6570: ${reincarnation.times}`
+      };
+    }
+    /**
+     * 计算新加成
+     */
+    calculateNewBonuses(reincarnation) {
+      const bonuses = [];
+      const times = reincarnation.times || 0;
+      bonuses.push({
+        type: "cultivationSpeed",
+        value: Math.min(0.5, times * 0.05),
+        desc: `\u4FEE\u70BC\u901F\u5EA6+${Math.round(Math.min(50, times * 5))}%`
+      });
+      const netKarma = (reincarnation.karmaGood || 0) - (reincarnation.karmaBad || 0);
+      if (netKarma > 100) {
+        bonuses.push({ type: "attack", value: 0.1, desc: "\u653B\u51FB+10%" });
+      }
+      if (netKarma > 500) {
+        bonuses.push({ type: "defense", value: 0.1, desc: "\u9632\u5FA1+10%" });
+      }
+      if (netKarma > 1e3) {
+        bonuses.push({ type: "serendipityChance", value: 0.05, desc: "\u5947\u9047+5%" });
+      }
+      if (reincarnation.realmAtDeath >= 3) {
+        bonuses.push({ type: "spiritStones", value: 0.2, desc: "\u7075\u77F3+20%" });
+      }
+      return bonuses;
+    }
+    /**
+     * 记录因果
+     */
+    recordKarma(type, amount) {
+      const reincarnation = this.reincarnation;
+      reincarnation.karmaGood = reincarnation.karmaGood || 0;
+      reincarnation.karmaBad = reincarnation.karmaBad || 0;
+      if (type === "good") {
+        reincarnation.karmaGood += amount;
+      } else if (type === "bad") {
+        reincarnation.karmaBad += amount;
+      }
+      reincarnation.totalKarma = reincarnation.karmaGood - reincarnation.karmaBad;
+      return {
+        success: true,
+        karmaGood: reincarnation.karmaGood,
+        karmaBad: reincarnation.karmaBad,
+        netKarma: reincarnation.totalKarma
+      };
+    }
+    /**
+     * 应用轮回加成到游戏状态
+     */
+    applyBonusesToGameState(gameState3) {
+      const bonuses = this.reincarnation.bonuses || [];
+      for (const bonus of bonuses) {
+        switch (bonus.type) {
+          case "cultivationSpeed":
+            gameState3.activeEffects.cultivate_speed += bonus.value;
+            break;
+          case "attack":
+            gameState3.activeEffects.attack += bonus.value;
+            break;
+          case "defense":
+            gameState3.activeEffects.defense += bonus.value;
+            break;
+          case "spiritStones":
+            gameState3.reincarnationBonus = gameState3.reincarnationBonus || {};
+            gameState3.reincarnationBonus.spiritStones = bonus.value;
+            break;
+          case "serendipityChance":
+            gameState3.activeEffects.serendipity_boost += bonus.value;
+            break;
+        }
+      }
+      return gameState3;
+    }
+    /**
+     * 获取轮回加成描述
+     */
+    getBonusDescriptions() {
+      const bonuses = this.reincarnation.bonuses || [];
+      const descriptions = [];
+      for (const bonus of bonuses) {
+        if (bonus.desc) {
+          descriptions.push(bonus.desc);
+        } else {
+          switch (bonus.type) {
+            case "cultivationSpeed":
+              descriptions.push(`\u4FEE\u70BC\u901F\u5EA6+${Math.round(bonus.value * 100)}%`);
+              break;
+            case "attack":
+              descriptions.push(`\u653B\u51FB+${Math.round(bonus.value * 100)}%`);
+              break;
+            case "defense":
+              descriptions.push(`\u9632\u5FA1+${Math.round(bonus.value * 100)}%`);
+              break;
+            case "spiritStones":
+              descriptions.push(`\u7075\u77F3+${Math.round(bonus.value * 100)}%`);
+              break;
+            case "serendipityChance":
+              descriptions.push(`\u5947\u9047+${Math.round(bonus.value * 100)}%`);
+              break;
+          }
+        }
+      }
+      return descriptions;
+    }
+    /**
+     * 检查轮回条件
+     */
+    canReincarnate(gameState3) {
+      const karmaRequired = this.reincarnation.times * 100;
+      const netKarma = (this.reincarnation.karmaGood || 0) - (this.reincarnation.karmaBad || 0);
+      if (netKarma < karmaRequired) {
+        return {
+          can: false,
+          reason: `\u56E0\u679C\u4E0D\u8DB3\uFF0C\u9700\u8981 ${karmaRequired} \u70B9\uFF0C\u5F53\u524D ${netKarma} \u70B9`
+        };
+      }
+      return { can: true };
+    }
+    /**
+     * 设置死亡原因
+     */
+    setCauseOfDeath(cause) {
+      this.reincarnation.causeOfDeath = cause;
+      return { success: true, cause };
+    }
+    /**
+     * 添加保留技能
+     */
+    addRetainedSkill(skill) {
+      const skills = this.reincarnation.retainedSkills || [];
+      if (!skills.find((s) => s.id === skill.id)) {
+        skills.push(skill);
+      }
+      return { success: true, skillsCount: skills.length };
+    }
+    /**
+     * 添加保留物品
+     */
+    addRetainedItem(item) {
+      const items = this.reincarnation.retainedItems || [];
+      if (item && item.type === "treasure" && item.permanent) {
+        if (!items.find((i) => i.id === item.id)) {
+          items.push(item);
+        }
+      }
+      return { success: true, itemsCount: items.length };
+    }
+    /**
+     * 获取过去生世信息
+     */
+    getPastLives(limit = 10) {
+      const pastLives = this.reincarnation.pastLives || [];
+      return pastLives.slice(-limit).reverse();
+    }
+    /**
+     * MCP: 轮回统计
+     */
+    mcpStats() {
+      return this.getStats();
+    }
+    /**
+     * MCP: 预览轮回
+     */
+    mcpPreview() {
+      return this.preview();
+    }
+    /**
+     * MCP: 执行轮回
+     */
+    mcpReincarnate(gameState3) {
+      return this.doReincarnate(gameState3);
+    }
+    // ===== Direction M: 悟道境轮回系统 6个MCP工具 =====
+    /**
+     * MCP: reincarnation.crystal.create
+     * 将当前顿悟化为记忆结晶
+     * @param {Object} params - { quality?: string, source?: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 创建的结晶信息
+     */
+    mcpCrystalCreate(params = {}, gameState3) {
+      var _a, _b, _c, _d, _e;
+      const quality = (params == null ? void 0 : params.quality) || this.determineCrystalQuality(gameState3);
+      const source = (params == null ? void 0 : params.source) || "serendipity";
+      const preservedAttributes = {
+        cultivationBase: gameState3.realm || 0,
+        karma: (((_a = this.reincarnation) == null ? void 0 : _a.karmaGood) || 0) - (((_b = this.reincarnation) == null ? void 0 : _b.karmaBad) || 0),
+        skills: this.collectRetainableSkills(gameState3),
+        insights: this.insights.slice(-5).map((i) => i.id),
+        // 保留最近5个顿悟
+        bonuses: ((_d = (_c = this.reincarnation) == null ? void 0 : _c.bonuses) == null ? void 0 : _d.slice(-3)) || []
+      };
+      const crystal = new RemembranceCrystal({
+        quality,
+        source,
+        sourceDesc: ((_e = INSIGHT_SOURCES[source]) == null ? void 0 : _e.desc) || "\u672A\u77E5\u6765\u6E90",
+        preservedAttributes
+      });
+      this.crystals.push(crystal);
+      if (!gameState3.reincarnation) {
+        gameState3.reincarnation = {};
+      }
+      if (!gameState3.reincarnation.crystals) {
+        gameState3.reincarnation.crystals = [];
+      }
+      gameState3.reincarnation.crystals.push(crystal.serialize());
+      return {
+        success: true,
+        crystal: crystal.serialize(),
+        message: `\u8BB0\u5FC6\u7ED3\u6676\u300C${quality}\u300D\u521B\u5EFA\u6210\u529F`,
+        qualityInfo: CRYSTAL_QUALITY[quality]
+      };
+    }
+    /**
+     * 确定结晶品质
+     */
+    determineCrystalQuality(gameState3) {
+      var _a, _b;
+      const realm = (gameState3 == null ? void 0 : gameState3.realm) || 0;
+      const netKarma = (((_a = this.reincarnation) == null ? void 0 : _a.karmaGood) || 0) - (((_b = this.reincarnation) == null ? void 0 : _b.karmaBad) || 0);
+      if (realm >= 5 && netKarma >= 1e3) return "\u6781\u54C1";
+      if (realm >= 4 && netKarma >= 600) return "\u4E0A\u54C1";
+      if (realm >= 3 && netKarma >= 300) return "\u73CD\u54C1";
+      if (realm >= 2 && netKarma >= 100) return "\u826F\u54C1";
+      return "\u51E1\u54C1";
+    }
+    /**
+     * 收集可保留的技能
+     */
+    collectRetainableSkills(gameState3) {
+      var _a;
+      const skills = [];
+      if ((_a = gameState3.cultivation) == null ? void 0 : _a.skills) {
+        for (const skill of gameState3.cultivation.skills) {
+          if (skill.permanent || skill.retainable) {
+            skills.push({ id: skill.id, name: skill.name, level: skill.level });
+          }
+        }
+      }
+      return skills;
+    }
+    /**
+     * MCP: reincarnation.crystal.list
+     * 查看拥有的记忆结晶
+     * @returns {Object} 结晶列表
+     */
+    mcpCrystalList() {
+      const available = this.crystals.filter((c) => !c.used);
+      const used = this.crystals.filter((c) => c.used);
+      return {
+        success: true,
+        total: this.crystals.length,
+        available: available.length,
+        used: used.length,
+        crystals: this.crystals.map((c) => ({
+          ...c.serialize(),
+          qualityInfo: CRYSTAL_QUALITY[c.quality]
+        }))
+      };
+    }
+    /**
+     * MCP: reincarnation.crystal.apply
+     * 转世后应用结晶恢复属性
+     * @param {Object} params - { crystalId: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 应用结果
+     */
+    mcpCrystalApply(params = {}, gameState3) {
+      var _a;
+      const crystalId = params == null ? void 0 : params.crystalId;
+      if (!crystalId) {
+        return { success: false, reason: "\u7F3A\u5C11 crystalId \u53C2\u6570" };
+      }
+      const crystal = this.crystals.find((c) => c.id === crystalId);
+      if (!crystal) {
+        return { success: false, reason: "\u7ED3\u6676\u4E0D\u5B58\u5728" };
+      }
+      if (crystal.used) {
+        return { success: false, reason: "\u7ED3\u6676\u5DF2\u88AB\u4F7F\u7528" };
+      }
+      const multiplier = crystal.getMultiplier();
+      const preserved = crystal.preservedAttributes;
+      const result = {
+        success: true,
+        message: `\u7ED3\u6676\u300C${crystal.quality}\u300D\u5E94\u7528\u6210\u529F`,
+        restored: {
+          cultivationBase: preserved.cultivationBase * multiplier,
+          karma: preserved.karma * multiplier,
+          skillsCount: preserved.skills.length,
+          insightsCount: preserved.insights.length,
+          bonusesCount: preserved.bonuses.length
+        }
+      };
+      crystal.apply();
+      crystal.appliedTo = ((_a = this.reincarnation) == null ? void 0 : _a.times) || 0;
+      if (preserved.skills.length > 0 && gameState3.cultivation) {
+        if (!gameState3.cultivation.skills) {
+          gameState3.cultivation.skills = [];
+        }
+        gameState3.cultivation.skills.push(...preserved.skills);
+      }
+      const netKarma = preserved.karma * multiplier;
+      if (netKarma > 0) {
+        this.reincarnation.karmaGood = (this.reincarnation.karmaGood || 0) + netKarma;
+      } else {
+        this.reincarnation.karmaBad = (this.reincarnation.karmaBad || 0) - netKarma;
+      }
+      if (preserved.bonuses.length > 0) {
+        this.reincarnation.bonuses = this.reincarnation.bonuses || [];
+        this.reincarnation.bonuses.push(...preserved.bonuses.map((b) => ({
+          ...b,
+          source: "crystal",
+          sourceId: crystal.id
+        })));
+      }
+      return result;
+    }
+    /**
+     * MCP: reincarnation.insight.awaken
+     * 触发顿悟事件（突破/炼丹/奇遇时）
+     * @param {Object} params - { type: string, desc: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 顿悟信息
+     */
+    mcpInsightAwaken(params = {}, gameState3) {
+      var _a, _b;
+      const type = (params == null ? void 0 : params.type) || "serendipity";
+      const desc = (params == null ? void 0 : params.desc) || ((_a = INSIGHT_SOURCES[type]) == null ? void 0 : _a.desc) || "\u672A\u77E5\u987F\u609F";
+      const insight = new CultivationInsight({
+        type,
+        desc,
+        source: type,
+        effect: this.calculateInsightEffect(type, gameState3)
+      });
+      this.insights.push(insight);
+      if (!gameState3.reincarnation) {
+        gameState3.reincarnation = {};
+      }
+      if (!gameState3.reincarnation.insights) {
+        gameState3.reincarnation.insights = [];
+      }
+      gameState3.reincarnation.insights.push(insight.serialize());
+      const karmaBonus = ((_b = INSIGHT_SOURCES[type]) == null ? void 0 : _b.karmaBonus) || 20;
+      this.recordKarma("good", karmaBonus);
+      return {
+        success: true,
+        insight: insight.serialize(),
+        message: `\u987F\u609F\u300C${desc}\u300D\u89C9\u9192\u6210\u529F`,
+        karmaBonus,
+        layer: insight.layer
+      };
+    }
+    /**
+     * 计算顿悟效果
+     */
+    calculateInsightEffect(type, gameState3) {
+      const effects = {
+        breakthrough: { cultivationSpeed: 0.1, progress: 0.05 },
+        alchemy: { spiritStones: 0.1, quality: 0.1 },
+        serendipity: { serendipityChance: 0.05, karma: 0.05 },
+        meditation: { qiRegen: 0.1, mindset: 0.05 },
+        combat: { attack: 0.05, defense: 0.05 }
+      };
+      return effects[type] || effects.serendipity;
+    }
+    /**
+     * MCP: reincarnation.insight.list
+     * 查看已获得的顿悟
+     * @returns {Object} 顿悟列表
+     */
+    mcpInsightList() {
+      return {
+        success: true,
+        total: this.insights.length,
+        insights: this.insights.map((i) => {
+          var _a;
+          return {
+            ...i.serialize(),
+            sourceDesc: ((_a = INSIGHT_SOURCES[i.source]) == null ? void 0 : _a.desc) || "\u672A\u77E5\u6765\u6E90"
+          };
+        })
+      };
+    }
+    /**
+     * MCP: reincarnation.cycle.status
+     * 查看轮回境界与记忆层状态
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 状态信息
+     */
+    mcpCycleStatus(gameState3) {
+      const stats = this.getStats();
+      const memoryLayers = this.getMemoryLayerStatus(gameState3);
+      return {
+        success: true,
+        stats: {
+          ...stats,
+          crystalsTotal: this.crystals.length,
+          crystalsAvailable: this.crystals.filter((c) => !c.used).length,
+          insightsTotal: this.insights.length
+        },
+        memoryLayers,
+        reincarnationRealm: this.calculateReincarnationRealm(stats.times),
+        memoryRetentionRate: this.calculateMemoryRetention(stats.times)
+      };
+    }
+    /**
+     * 获取记忆层状态
+     */
+    getMemoryLayerStatus(gameState3) {
+      var _a, _b, _c, _d, _e;
+      return {
+        L0_META: {
+          ...MEMORY_LAYERS.L0_META,
+          retained: true,
+          // 永远保留
+          data: {
+            reincarnationTimes: ((_a = this.reincarnation) == null ? void 0 : _a.times) || 0,
+            awakeningTimes: this.insights.filter((i) => i.type === "breakthrough").length
+          }
+        },
+        L1_INDEX: {
+          ...MEMORY_LAYERS.L1_INDEX,
+          retained: true,
+          data: {
+            achievements: ((_c = (_b = gameState3 == null ? void 0 : gameState3.achievementState) == null ? void 0 : _b.completedAchievements) == null ? void 0 : _c.length) || 0,
+            badges: ((_e = (_d = gameState3 == null ? void 0 : gameState3.badgeState) == null ? void 0 : _d.unlockedBadges) == null ? void 0 : _e.length) || 0
+          }
+        },
+        L2_GLOBAL: {
+          ...MEMORY_LAYERS.L2_GLOBAL,
+          retention: MEMORY_LAYERS.L2_GLOBAL.retention,
+          data: {
+            realmTrend: (gameState3 == null ? void 0 : gameState3.realm) || 0,
+            cultivationProgress: (gameState3 == null ? void 0 : gameState3.cultivationProgress) || 0
+          }
+        },
+        L3_SOP: {
+          ...MEMORY_LAYERS.L3_SOP,
+          retention: MEMORY_LAYERS.L3_SOP.retention,
+          data: {
+            insightsCount: this.insights.length,
+            crystalsCount: this.crystals.length
+          }
+        },
+        L4_SESSION: {
+          ...MEMORY_LAYERS.L4_SESSION,
+          retained: false,
+          // 重置
+          data: null
+        }
+      };
+    }
+    /**
+     * 计算轮回境界
+     */
+    calculateReincarnationRealm(times) {
+      const realms = ["\u51E1\u80CE", "\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347", "\u609F\u9053", "\u5927\u4E58", "\u5F7C\u5CB8"];
+      return realms[Math.min(times, realms.length - 1)] || "\u51E1\u80CE";
+    }
+    /**
+     * 计算记忆保留率
+     */
+    calculateMemoryRetention(times) {
+      const baseRetention = 0.5;
+      const retentionPerReincarnation = 0.05;
+      return Math.min(0.95, baseRetention + times * retentionPerReincarnation);
+    }
+  };
+  var reincarnationService = new ReincarnationService();
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -5983,10 +6998,12 @@ var CultivationSimulator = (() => {
     domainModules.inventory.initInventory(gameState2);
     domainModules.pet = PetModule_default;
     domainModules.achievement = createAchievementModule();
-    domainModules.combat = CombatModule;
-    domainModules.sect = SectModule;
+    domainModules.combat = CombatModule_default;
+    domainModules.sect = SectModule_default;
     domainModules.ranking = { createRankingService, createArenaService };
     domainModules.signin = { createSigninService, createWelfareService };
+    domainModules.reincarnation = reincarnationService;
+    reincarnationService.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -6126,6 +7143,54 @@ var CultivationSimulator = (() => {
       var _a;
       return { achievements: ((_a = gameState2.achievementState) == null ? void 0 : _a.completedAchievements) || [] };
     });
+    mcpRegistry.registerTool("reincarnation.crystal.create", {
+      name: "reincarnation.crystal.create",
+      description: "Create a remembrance crystal from current insights",
+      inputSchema: {
+        type: "object",
+        properties: {
+          quality: { type: "string", description: "Crystal quality (\u51E1\u54C1/\u826F\u54C1/\u73CD\u54C1/\u4E0A\u54C1/\u6781\u54C1)" },
+          source: { type: "string", description: "Source type (breakthrough/alchemy/serendipity/meditation/combat)" }
+        }
+      }
+    }, (params) => reincarnationService.mcpCrystalCreate(params || {}, gameState2));
+    mcpRegistry.registerTool("reincarnation.crystal.list", {
+      name: "reincarnation.crystal.list",
+      description: "List all remembrance crystals",
+      inputSchema: { type: "object", properties: {} }
+    }, () => reincarnationService.mcpCrystalList());
+    mcpRegistry.registerTool("reincarnation.crystal.apply", {
+      name: "reincarnation.crystal.apply",
+      description: "Apply a crystal to restore attributes after reincarnation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          crystalId: { type: "string", description: "ID of the crystal to apply" }
+        },
+        required: ["crystalId"]
+      }
+    }, (params) => reincarnationService.mcpCrystalApply(params || {}, gameState2));
+    mcpRegistry.registerTool("reincarnation.insight.awaken", {
+      name: "reincarnation.insight.awaken",
+      description: "Trigger an insight awakening event",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Insight type" },
+          desc: { type: "string", description: "Insight description" }
+        }
+      }
+    }, (params) => reincarnationService.mcpInsightAwaken(params || {}, gameState2));
+    mcpRegistry.registerTool("reincarnation.insight.list", {
+      name: "reincarnation.insight.list",
+      description: "List all cultivation insights",
+      inputSchema: { type: "object", properties: {} }
+    }, () => reincarnationService.mcpInsightList());
+    mcpRegistry.registerTool("reincarnation.cycle.status", {
+      name: "reincarnation.cycle.status",
+      description: "Get reincarnation cycle status and memory layer info",
+      inputSchema: { type: "object", properties: {} }
+    }, () => reincarnationService.mcpCycleStatus(gameState2));
   }
   function doSaveGameWithFeedback() {
     const result = doSaveGame();
@@ -6419,3 +7484,5 @@ var CultivationSimulator = (() => {
   console.log("[Main] main.js \u6A21\u5757\u52A0\u8F7D\u5B8C\u6210");
   return __toCommonJS(main_exports);
 })();
+
+;window.__GAME_VERSION__="DDD-v1.0.0-d1a1d9a-2026-05-30T14-35-32-987Z";

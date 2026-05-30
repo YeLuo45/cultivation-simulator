@@ -288,5 +288,184 @@ const REINCARNATION_QUALITY_BONUSES = {
     '极品': { cultivationSpeed: 0.30, attack: 0.20, defense: 0.20 }
 };
 
+// ===== Direction M: 悟道境轮回系统 =====
+// L0-L4 记忆层定义 (generic-agent 记忆分层)
+const MEMORY_LAYERS = {
+    L0_META: {
+        name: 'L0元记忆',
+        desc: '永久保留：悟道次数/轮回次数',
+        retention: 1.0, // 100% 保留
+        priority: 'critical'
+    },
+    L1_INDEX: {
+        name: 'L1索引',
+        desc: '保留成就解锁状态',
+        retention: 1.0,
+        priority: 'high'
+    },
+    L2_GLOBAL: {
+        name: 'L2全局',
+        desc: '保留人物属性趋势',
+        retention: 0.8,
+        priority: 'medium'
+    },
+    L3_SOP: {
+        name: 'L3 SOP',
+        desc: '保留顿悟结晶技能 (CULTIVATION_INSIGHT)',
+        retention: 0.6,
+        priority: 'medium'
+    },
+    L4_SESSION: {
+        name: 'L4会话',
+        desc: '重置',
+        retention: 0,
+        priority: 'low'
+    }
+};
+
+// REMEMBRANCE_CRYSTAL 品质等级
+const CRYSTAL_QUALITY = {
+    '凡品': { multiplier: 1.0, desc: '普通品质' },
+    '良品': { multiplier: 1.5, desc: '优良品质' },
+    '珍品': { multiplier: 2.0, desc: '传说品质' },
+    '上品': { multiplier: 3.0, desc: '神话品质' },
+    '极品': { multiplier: 5.0, desc: '逆天品质' }
+};
+
+// 顿悟来源类型
+const INSIGHT_SOURCES = {
+    'breakthrough': { desc: '突破境界触发', karmaBonus: 50 },
+    'alchemy': { desc: '炼制丹药触发', karmaBonus: 30 },
+    'serendipity': { desc: '奇遇触发', karmaBonus: 40 },
+    'meditation': { desc: '冥想触发', karmaBonus: 20 },
+    'combat': { desc: '战斗顿悟', karmaBonus: 25 }
+};
+
+// REMEMBRANCE_CRYSTAL 数据结构
+class RemembranceCrystal {
+    constructor(config = {}) {
+        this.id = config.id || `crystal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.quality = config.quality || '凡品';
+        this.createdAt = config.createdAt || Date.now();
+        this.source = config.source || 'unknown'; // 顿悟来源
+        this.sourceDesc = config.sourceDesc || '';
+        
+        // 保留的属性
+        this.preservedAttributes = {
+            cultivationBase: config.preservedAttributes?.cultivationBase || 0,
+            karma: config.preservedAttributes?.karma || 0,
+            skills: config.preservedAttributes?.skills || [],
+            insights: config.preservedAttributes?.insights || [],
+            bonuses: config.preservedAttributes?.bonuses || []
+        };
+        
+        // 结晶状态
+        this.used = config.used || false;
+        this.usedAt = config.usedAt || null;
+        this.appliedTo = config.appliedTo || null; // 应用到的 reincarnation times
+    }
+
+    /**
+     * 获取结晶品质信息
+     */
+    getQualityInfo() {
+        return CRYSTAL_QUALITY[this.quality] || CRYSTAL_QUALITY['凡品'];
+    }
+
+    /**
+     * 获取结晶效果倍率
+     */
+    getMultiplier() {
+        return this.getQualityInfo().multiplier;
+    }
+
+    /**
+     * 应用结晶
+     */
+    apply() {
+        if (this.used) {
+            return { success: false, reason: '结晶已被使用' };
+        }
+        this.used = true;
+        this.usedAt = Date.now();
+        return { success: true, message: '结晶已应用' };
+    }
+
+    /**
+     * 序列化
+     */
+    serialize() {
+        return {
+            id: this.id,
+            quality: this.quality,
+            createdAt: this.createdAt,
+            source: this.source,
+            sourceDesc: this.sourceDesc,
+            preservedAttributes: this.preservedAttributes,
+            used: this.used,
+            usedAt: this.usedAt,
+            appliedTo: this.appliedTo
+        };
+    }
+
+    /**
+     * 从保存数据恢复
+     */
+    static deserialize(data) {
+        return new RemembranceCrystal(data);
+    }
+}
+
+// CULTIVATION_INSIGHT 数据结构
+class CultivationInsight {
+    constructor(config = {}) {
+        this.id = config.id || `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.type = config.type || 'unknown';
+        this.desc = config.desc || '';
+        this.source = config.source || 'unknown';
+        this.awakenedAt = config.awakenedAt || Date.now();
+        this.effect = config.effect || {};
+        this.layer = config.layer || 'L3_SOP'; // 属于 L3 SOP 记忆层
+    }
+
+    /**
+     * 获取来源描述
+     */
+    getSourceDesc() {
+        return INSIGHT_SOURCES[this.source]?.desc || '未知来源';
+    }
+
+    /**
+     * 序列化
+     */
+    serialize() {
+        return {
+            id: this.id,
+            type: this.type,
+            desc: this.desc,
+            source: this.source,
+            awakenedAt: this.awakenedAt,
+            effect: this.effect,
+            layer: this.layer
+        };
+    }
+
+    /**
+     * 从保存数据恢复
+     */
+    static deserialize(data) {
+        return new CultivationInsight(data);
+    }
+}
+
 // 导出
-export { Reincarnation, REINCARNATION_CAUSES, REINCARNATION_QUALITY_BONUSES };
+export { 
+    Reincarnation, 
+    REINCARNATION_CAUSES, 
+    REINCARNATION_QUALITY_BONUSES,
+    MEMORY_LAYERS,
+    CRYSTAL_QUALITY,
+    INSIGHT_SOURCES,
+    RemembranceCrystal,
+    CultivationInsight
+};

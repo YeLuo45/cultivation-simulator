@@ -1,11 +1,22 @@
 /**
  * ReincarnationService - 轮回服务
  * 管理轮回系统的主要逻辑
+ * Direction M: 悟道境轮回系统 (L0-L4记忆分层)
  */
+
+import {
+    MEMORY_LAYERS,
+    CRYSTAL_QUALITY,
+    INSIGHT_SOURCES,
+    RemembranceCrystal,
+    CultivationInsight
+} from '../entities/Reincarnation.js';
 
 class ReincarnationService {
     constructor() {
         this.reincarnation = null;
+        this.crystals = []; // 记忆结晶列表
+        this.insights = []; // 顿悟列表
     }
 
     /**
@@ -355,6 +366,338 @@ class ReincarnationService {
     mcpReincarnate(gameState) {
         return this.doReincarnate(gameState);
     }
+
+    // ===== Direction M: 悟道境轮回系统 6个MCP工具 =====
+
+    /**
+     * MCP: reincarnation.crystal.create
+     * 将当前顿悟化为记忆结晶
+     * @param {Object} params - { quality?: string, source?: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 创建的结晶信息
+     */
+    mcpCrystalCreate(params = {}, gameState) {
+        const quality = params?.quality || this.determineCrystalQuality(gameState);
+        const source = params?.source || 'serendipity';
+        
+        // 收集当前可保留的属性
+        const preservedAttributes = {
+            cultivationBase: gameState.realm || 0,
+            karma: (this.reincarnation?.karmaGood || 0) - (this.reincarnation?.karmaBad || 0),
+            skills: this.collectRetainableSkills(gameState),
+            insights: this.insights.slice(-5).map(i => i.id), // 保留最近5个顿悟
+            bonuses: this.reincarnation?.bonuses?.slice(-3) || []
+        };
+
+        // 创建结晶
+        const crystal = new RemembranceCrystal({
+            quality,
+            source,
+            sourceDesc: INSIGHT_SOURCES[source]?.desc || '未知来源',
+            preservedAttributes
+        });
+
+        this.crystals.push(crystal);
+        
+        // 同步到 gameState
+        if (!gameState.reincarnation) {
+            gameState.reincarnation = {};
+        }
+        if (!gameState.reincarnation.crystals) {
+            gameState.reincarnation.crystals = [];
+        }
+        gameState.reincarnation.crystals.push(crystal.serialize());
+
+        return {
+            success: true,
+            crystal: crystal.serialize(),
+            message: `记忆结晶「${quality}」创建成功`,
+            qualityInfo: CRYSTAL_QUALITY[quality]
+        };
+    }
+
+    /**
+     * 确定结晶品质
+     */
+    determineCrystalQuality(gameState) {
+        const realm = gameState?.realm || 0;
+        const netKarma = (this.reincarnation?.karmaGood || 0) - (this.reincarnation?.karmaBad || 0);
+        
+        if (realm >= 5 && netKarma >= 1000) return '极品';
+        if (realm >= 4 && netKarma >= 600) return '上品';
+        if (realm >= 3 && netKarma >= 300) return '珍品';
+        if (realm >= 2 && netKarma >= 100) return '良品';
+        return '凡品';
+    }
+
+    /**
+     * 收集可保留的技能
+     */
+    collectRetainableSkills(gameState) {
+        const skills = [];
+        if (gameState.cultivation?.skills) {
+            for (const skill of gameState.cultivation.skills) {
+                if (skill.permanent || skill.retainable) {
+                    skills.push({ id: skill.id, name: skill.name, level: skill.level });
+                }
+            }
+        }
+        return skills;
+    }
+
+    /**
+     * MCP: reincarnation.crystal.list
+     * 查看拥有的记忆结晶
+     * @returns {Object} 结晶列表
+     */
+    mcpCrystalList() {
+        const available = this.crystals.filter(c => !c.used);
+        const used = this.crystals.filter(c => c.used);
+        
+        return {
+            success: true,
+            total: this.crystals.length,
+            available: available.length,
+            used: used.length,
+            crystals: this.crystals.map(c => ({
+                ...c.serialize(),
+                qualityInfo: CRYSTAL_QUALITY[c.quality]
+            }))
+        };
+    }
+
+    /**
+     * MCP: reincarnation.crystal.apply
+     * 转世后应用结晶恢复属性
+     * @param {Object} params - { crystalId: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 应用结果
+     */
+    mcpCrystalApply(params = {}, gameState) {
+        const crystalId = params?.crystalId;
+        
+        if (!crystalId) {
+            return { success: false, reason: '缺少 crystalId 参数' };
+        }
+
+        const crystal = this.crystals.find(c => c.id === crystalId);
+        
+        if (!crystal) {
+            return { success: false, reason: '结晶不存在' };
+        }
+
+        if (crystal.used) {
+            return { success: false, reason: '结晶已被使用' };
+        }
+
+        // 应用结晶效果
+        const multiplier = crystal.getMultiplier();
+        const preserved = crystal.preservedAttributes;
+
+        // 恢复属性
+        const result = {
+            success: true,
+            message: `结晶「${crystal.quality}」应用成功`,
+            restored: {
+                cultivationBase: preserved.cultivationBase * multiplier,
+                karma: preserved.karma * multiplier,
+                skillsCount: preserved.skills.length,
+                insightsCount: preserved.insights.length,
+                bonusesCount: preserved.bonuses.length
+            }
+        };
+
+        // 应用到游戏状态
+        crystal.apply();
+        crystal.appliedTo = this.reincarnation?.times || 0;
+
+        // 恢复技能
+        if (preserved.skills.length > 0 && gameState.cultivation) {
+            if (!gameState.cultivation.skills) {
+                gameState.cultivation.skills = [];
+            }
+            gameState.cultivation.skills.push(...preserved.skills);
+        }
+
+        // 恢复因果
+        const netKarma = preserved.karma * multiplier;
+        if (netKarma > 0) {
+            this.reincarnation.karmaGood = (this.reincarnation.karmaGood || 0) + netKarma;
+        } else {
+            this.reincarnation.karmaBad = (this.reincarnation.karmaBad || 0) - netKarma;
+        }
+
+        // 恢复境界加成
+        if (preserved.bonuses.length > 0) {
+            this.reincarnation.bonuses = this.reincarnation.bonuses || [];
+            this.reincarnation.bonuses.push(...preserved.bonuses.map(b => ({
+                ...b,
+                source: 'crystal',
+                sourceId: crystal.id
+            })));
+        }
+
+        return result;
+    }
+
+    /**
+     * MCP: reincarnation.insight.awaken
+     * 触发顿悟事件（突破/炼丹/奇遇时）
+     * @param {Object} params - { type: string, desc: string }
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 顿悟信息
+     */
+    mcpInsightAwaken(params = {}, gameState) {
+        const type = params?.type || 'serendipity';
+        const desc = params?.desc || INSIGHT_SOURCES[type]?.desc || '未知顿悟';
+        
+        // 创建顿悟
+        const insight = new CultivationInsight({
+            type,
+            desc,
+            source: type,
+            effect: this.calculateInsightEffect(type, gameState)
+        });
+
+        this.insights.push(insight);
+
+        // 同步到 gameState
+        if (!gameState.reincarnation) {
+            gameState.reincarnation = {};
+        }
+        if (!gameState.reincarnation.insights) {
+            gameState.reincarnation.insights = [];
+        }
+        gameState.reincarnation.insights.push(insight.serialize());
+
+        // 记录因果
+        const karmaBonus = INSIGHT_SOURCES[type]?.karmaBonus || 20;
+        this.recordKarma('good', karmaBonus);
+
+        return {
+            success: true,
+            insight: insight.serialize(),
+            message: `顿悟「${desc}」觉醒成功`,
+            karmaBonus,
+            layer: insight.layer
+        };
+    }
+
+    /**
+     * 计算顿悟效果
+     */
+    calculateInsightEffect(type, gameState) {
+        const effects = {
+            breakthrough: { cultivationSpeed: 0.1, progress: 0.05 },
+            alchemy: { spiritStones: 0.1, quality: 0.1 },
+            serendipity: { serendipityChance: 0.05, karma: 0.05 },
+            meditation: { qiRegen: 0.1, mindset: 0.05 },
+            combat: { attack: 0.05, defense: 0.05 }
+        };
+        return effects[type] || effects.serendipity;
+    }
+
+    /**
+     * MCP: reincarnation.insight.list
+     * 查看已获得的顿悟
+     * @returns {Object} 顿悟列表
+     */
+    mcpInsightList() {
+        return {
+            success: true,
+            total: this.insights.length,
+            insights: this.insights.map(i => ({
+                ...i.serialize(),
+                sourceDesc: INSIGHT_SOURCES[i.source]?.desc || '未知来源'
+            }))
+        };
+    }
+
+    /**
+     * MCP: reincarnation.cycle.status
+     * 查看轮回境界与记忆层状态
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 状态信息
+     */
+    mcpCycleStatus(gameState) {
+        const stats = this.getStats();
+        const memoryLayers = this.getMemoryLayerStatus(gameState);
+        
+        return {
+            success: true,
+            stats: {
+                ...stats,
+                crystalsTotal: this.crystals.length,
+                crystalsAvailable: this.crystals.filter(c => !c.used).length,
+                insightsTotal: this.insights.length
+            },
+            memoryLayers,
+            reincarnationRealm: this.calculateReincarnationRealm(stats.times),
+            memoryRetentionRate: this.calculateMemoryRetention(stats.times)
+        };
+    }
+
+    /**
+     * 获取记忆层状态
+     */
+    getMemoryLayerStatus(gameState) {
+        return {
+            L0_META: {
+                ...MEMORY_LAYERS.L0_META,
+                retained: true, // 永远保留
+                data: {
+                    reincarnationTimes: this.reincarnation?.times || 0,
+                    awakeningTimes: this.insights.filter(i => i.type === 'breakthrough').length
+                }
+            },
+            L1_INDEX: {
+                ...MEMORY_LAYERS.L1_INDEX,
+                retained: true,
+                data: {
+                    achievements: gameState?.achievementState?.completedAchievements?.length || 0,
+                    badges: gameState?.badgeState?.unlockedBadges?.length || 0
+                }
+            },
+            L2_GLOBAL: {
+                ...MEMORY_LAYERS.L2_GLOBAL,
+                retention: MEMORY_LAYERS.L2_GLOBAL.retention,
+                data: {
+                    realmTrend: gameState?.realm || 0,
+                    cultivationProgress: gameState?.cultivationProgress || 0
+                }
+            },
+            L3_SOP: {
+                ...MEMORY_LAYERS.L3_SOP,
+                retention: MEMORY_LAYERS.L3_SOP.retention,
+                data: {
+                    insightsCount: this.insights.length,
+                    crystalsCount: this.crystals.length
+                }
+            },
+            L4_SESSION: {
+                ...MEMORY_LAYERS.L4_SESSION,
+                retained: false, // 重置
+                data: null
+            }
+        };
+    }
+
+    /**
+     * 计算轮回境界
+     */
+    calculateReincarnationRealm(times) {
+        const realms = ['凡胎', '炼气', '筑基', '金丹', '元婴', '化神', '飞升', '悟道', '大乘', '彼岸'];
+        return realms[Math.min(times, realms.length - 1)] || '凡胎';
+    }
+
+    /**
+     * 计算记忆保留率
+     */
+    calculateMemoryRetention(times) {
+        const baseRetention = 0.5;
+        const retentionPerReincarnation = 0.05;
+        return Math.min(0.95, baseRetention + times * retentionPerReincarnation);
+    }
 }
 
 // 天道轮回配置
@@ -416,5 +759,11 @@ export {
     ReincarnationService, 
     reincarnationService,
     CELESTIAL_REINCARNATION_CONFIG,
-    REINCARNATION_EVENTS
+    REINCARNATION_EVENTS,
+    // Direction M exports
+    MEMORY_LAYERS,
+    CRYSTAL_QUALITY,
+    INSIGHT_SOURCES,
+    RemembranceCrystal,
+    CultivationInsight
 };
