@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-ce97103-2026-05-30T15-23-36-265Z */
+/* Cultivation Simulator DDD-v1.0.0-55627ad-2026-05-30T15-30-22-593Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -7819,6 +7819,447 @@ var CultivationSimulator = (() => {
   };
   var reincarnationService = new ReincarnationService();
 
+  // src/domains/reincarnation/services/ReincarnationBookService.js
+  var ReincarnationBookService = class {
+    constructor() {
+      this.gameState = null;
+      this.karmaRecords = [];
+      this.tiandaoRecords = [];
+      this.blessings = [];
+    }
+    /**
+     * 初始化轮回簿系统
+     */
+    init(gameState3) {
+      var _a;
+      this.gameState = gameState3;
+      gameState3.reincarnationBook = {
+        karmaRecords: [],
+        tiandaoRecords: [],
+        tiandaoMerit: 0,
+        blessings: [],
+        reincarnationHistory: []
+      };
+      if ((_a = gameState3.reincarnation) == null ? void 0 : _a.pastLives) {
+        gameState3.reincarnationBook.reincarnationHistory = gameState3.reincarnation.pastLives;
+      }
+      this.karmaRecords = gameState3.reincarnationBook.karmaRecords;
+      this.tiandaoRecords = gameState3.reincarnationBook.tiandaoRecords;
+      this.blessings = gameState3.reincarnationBook.blessings;
+      return gameState3;
+    }
+    /**
+     * 获取轮回簿统计
+     */
+    getBookStats() {
+      var _a, _b, _c, _d, _e, _f;
+      const book = ((_a = this.gameState) == null ? void 0 : _a.reincarnationBook) || {};
+      const reincarnation = ((_b = this.gameState) == null ? void 0 : _b.reincarnation) || {};
+      return {
+        totalKarmaRecords: ((_c = book.karmaRecords) == null ? void 0 : _c.length) || 0,
+        totalTiandaoRecords: ((_d = book.tiandaoRecords) == null ? void 0 : _d.length) || 0,
+        tiandaoMerit: book.tiandaoMerit || 0,
+        blessingsCount: ((_e = book.blessings) == null ? void 0 : _e.length) || 0,
+        reincarnationTimes: reincarnation.times || 0,
+        netKarma: (reincarnation.karmaGood || 0) - (reincarnation.karmaBad || 0),
+        karmaGood: reincarnation.karmaGood || 0,
+        karmaBad: reincarnation.karmaBad || 0,
+        pastLivesCount: ((_f = reincarnation.pastLives) == null ? void 0 : _f.length) || 0
+      };
+    }
+    // ===== MCP工具实现 =====
+    /**
+     * MCP: reincarnation.book.list
+     * 查看转世历史（轮回簿）
+     */
+    mcpBookList(params = {}) {
+      var _a, _b;
+      const limit = (params == null ? void 0 : params.limit) || 20;
+      const offset = (params == null ? void 0 : params.offset) || 0;
+      const filter = (params == null ? void 0 : params.filter) || "all";
+      const history = ((_b = (_a = this.gameState) == null ? void 0 : _a.reincarnation) == null ? void 0 : _b.pastLives) || [];
+      let filtered = history;
+      if (filter === "good") {
+        filtered = history.filter((h) => (h.karmaBalance || 0) >= 0);
+      } else if (filter === "bad") {
+        filtered = history.filter((h) => (h.karmaBalance || 0) < 0);
+      }
+      const paginated = filtered.slice(offset, offset + limit);
+      return {
+        success: true,
+        total: filtered.length,
+        page: Math.floor(offset / limit) + 1,
+        pageSize: limit,
+        records: paginated.map((record) => ({
+          ...record,
+          realmName: this.getRealmName(record.realmAtDeath),
+          karmaEvaluation: this.evaluateKarma(record.karmaBalance),
+          ageDesc: record.ageAtDeath ? `\u4EAB\u5E74${record.ageAtDeath}\u5C81` : "\u5E74\u9F84\u672A\u77E5"
+        })),
+        message: `\u8F6E\u56DE\u7C3F\u5171 ${filtered.length} \u6761\u8BB0\u5F55`
+      };
+    }
+    /**
+     * MCP: reincarnation.karma.record
+     * 记录因果行为
+     */
+    mcpKarmaRecord(params = {}) {
+      var _a, _b, _c;
+      const { type, action, amount, description } = params;
+      if (!type || !action) {
+        return {
+          success: false,
+          reason: "\u7F3A\u5C11\u5FC5\u8981\u53C2\u6570\uFF1Atype\uFF08\u884C\u4E3A\u7C7B\u578B\uFF09\u548C action\uFF08\u5584\u6076\uFF09"
+        };
+      }
+      const karmaAmount = Math.abs(amount || 1);
+      const isGood = action === "good";
+      const adjustedAmount = isGood ? karmaAmount : -karmaAmount;
+      const record = {
+        id: `karma_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        // 行为类型
+        action,
+        // good/bad
+        amount: adjustedAmount,
+        description: description || this.getDefaultKarmaDesc(type, action),
+        timestamp: Date.now(),
+        day: ((_a = this.gameState) == null ? void 0 : _a.days) || 0
+      };
+      this.karmaRecords.push(record);
+      if ((_b = this.gameState) == null ? void 0 : _b.reincarnationBook) {
+      }
+      const reincarnation = (_c = this.gameState) == null ? void 0 : _c.reincarnation;
+      if (reincarnation) {
+        if (isGood) {
+          reincarnation.karmaGood = (reincarnation.karmaGood || 0) + karmaAmount;
+        } else {
+          reincarnation.karmaBad = (reincarnation.karmaBad || 0) + karmaAmount;
+        }
+      }
+      return {
+        success: true,
+        record,
+        karmaChange: adjustedAmount,
+        currentKarma: {
+          good: (reincarnation == null ? void 0 : reincarnation.karmaGood) || 0,
+          bad: (reincarnation == null ? void 0 : reincarnation.karmaBad) || 0,
+          net: ((reincarnation == null ? void 0 : reincarnation.karmaGood) || 0) - ((reincarnation == null ? void 0 : reincarnation.karmaBad) || 0)
+        },
+        message: `\u56E0\u679C\u8BB0\u5F55\uFF1A${record.description} (${isGood ? "+" : "-"}${karmaAmount})`
+      };
+    }
+    /**
+     * MCP: reincarnation.karma.query
+     * 查询当前因果状态
+     */
+    mcpKarmaQuery(params = {}) {
+      var _a;
+      const reincarnation = ((_a = this.gameState) == null ? void 0 : _a.reincarnation) || {};
+      const karmaGood = reincarnation.karmaGood || 0;
+      const karmaBad = reincarnation.karmaBad || 0;
+      const netKarma = karmaGood - karmaBad;
+      const recentRecords = (this.karmaRecords || []).slice(-10);
+      const evaluation = this.evaluateOverallKarma(netKarma);
+      const karmaLevel = this.getKarmaLevel(netKarma);
+      return {
+        success: true,
+        karma: {
+          good: karmaGood,
+          bad: karmaBad,
+          net: netKarma,
+          level: karmaLevel,
+          evaluation
+        },
+        recentRecords: recentRecords.map((r) => ({
+          type: r.type,
+          action: r.action,
+          amount: r.amount,
+          description: r.description,
+          timestamp: r.timestamp
+        })),
+        impact: {
+          reincarnationBonus: this.calculateKarmaBonus(netKarma),
+          tribulationModifier: this.calculateTribulationModifier(netKarma),
+          serendipityChance: this.calculateSerendipityChance(netKarma)
+        },
+        message: `\u5F53\u524D\u56E0\u679C\uFF1A${evaluation} (${netKarma})`
+      };
+    }
+    /**
+     * MCP: reincarnation.tiandao.record
+     * 记录天道功德
+     */
+    mcpTiandaoRecord(params = {}) {
+      var _a, _b, _c, _d, _e;
+      const { eventType, merit, description } = params;
+      if (!eventType) {
+        return { success: false, reason: "\u7F3A\u5C11 eventType \u53C2\u6570" };
+      }
+      const meritValue = Math.abs(merit || 0);
+      const record = {
+        id: `tiandao_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        eventType,
+        merit: meritValue,
+        description: description || this.getDefaultTiandaoDesc(eventType),
+        timestamp: Date.now(),
+        day: ((_a = this.gameState) == null ? void 0 : _a.days) || 0,
+        realm: ((_b = this.gameState) == null ? void 0 : _b.realm) || 0
+      };
+      this.tiandaoRecords.push(record);
+      if ((_c = this.gameState) == null ? void 0 : _c.reincarnationBook) {
+        this.gameState.reincarnationBook.tiandaoMerit = (this.gameState.reincarnationBook.tiandaoMerit || 0) + meritValue;
+      }
+      return {
+        success: true,
+        record,
+        totalMerit: ((_e = (_d = this.gameState) == null ? void 0 : _d.reincarnationBook) == null ? void 0 : _e.tiandaoMerit) || 0,
+        message: `\u5929\u9053\u8BB0\u5F55\uFF1A${record.description} (+${meritValue}\u529F\u5FB7)`
+      };
+    }
+    /**
+     * MCP: reincarnation.tiandao.bless
+     * 天道赐福（获得奖励）
+     */
+    mcpTiandaoBless(params = {}) {
+      var _a, _b, _c, _d, _e, _f;
+      const { level, reason } = params;
+      const merit = ((_b = (_a = this.gameState) == null ? void 0 : _a.reincarnationBook) == null ? void 0 : _b.tiandaoMerit) || 0;
+      const blessLevel = level || this.determineBlessLevel(merit);
+      const blessConfig = {
+        "SSS": { meritRequired: 1e3, effects: ["\u5929\u9009\u4E4B\u8D44", "\u609F\u6027+50%", "\u4FEE\u70BC\u901F\u5EA6+30%", "\u5947\u9047+20%"] },
+        "SS": { meritRequired: 500, effects: ["\u5929\u547D\u4E4B\u4EBA", "\u609F\u6027+30%", "\u4FEE\u70BC\u901F\u5EA6+20%"] },
+        "S": { meritRequired: 200, effects: ["\u798F\u7F18\u6DF1\u539A", "\u609F\u6027+20%", "\u4FEE\u70BC\u901F\u5EA6+10%"] },
+        "A": { meritRequired: 100, effects: ["\u5409\u661F\u9AD8\u7167", "\u609F\u6027+10%"] },
+        "B": { meritRequired: 50, effects: ["\u5C0F\u6709\u798F\u7F18"] },
+        "C": { meritRequired: 0, effects: ["\u666E\u901A"] }
+      };
+      const config = blessConfig[blessLevel] || blessConfig["C"];
+      if (merit < config.meritRequired) {
+        return {
+          success: false,
+          reason: `\u529F\u5FB7\u4E0D\u8DB3\uFF0C\u9700\u8981 ${config.meritRequired} \u70B9\uFF0C\u5F53\u524D ${merit} \u70B9`,
+          currentMerit: merit,
+          requiredMerit: config.meritRequired
+        };
+      }
+      const blessing = {
+        id: `bless_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        level: blessLevel,
+        effects: config.effects,
+        reason: reason || "\u5929\u9053\u8DEF\u5F84\u4E0A\u7684\u5584\u884C",
+        timestamp: Date.now(),
+        day: ((_c = this.gameState) == null ? void 0 : _c.days) || 0,
+        meritCost: config.meritRequired
+      };
+      this.blessings.push(blessing);
+      if ((_d = this.gameState) == null ? void 0 : _d.reincarnationBook) {
+        this.gameState.reincarnationBook.tiandaoMerit -= config.meritRequired;
+      }
+      this.applyBlessingEffects(blessing);
+      return {
+        success: true,
+        blessing,
+        remainingMerit: ((_f = (_e = this.gameState) == null ? void 0 : _e.reincarnationBook) == null ? void 0 : _f.tiandaoMerit) || 0,
+        message: `\u5929\u9053\u8D50\u798F\u300C${blessLevel}\u7EA7\u300D\uFF1A${config.effects.join("\u3001")}`
+      };
+    }
+    /**
+     * MCP: reincarnation.history.export
+     * 导出轮回历史
+     */
+    mcpHistoryExport(params = {}) {
+      var _a, _b, _c, _d, _e, _f, _g;
+      const format = (params == null ? void 0 : params.format) || "json";
+      const includeDetails = (params == null ? void 0 : params.includeDetails) !== false;
+      const reincarnation = ((_a = this.gameState) == null ? void 0 : _a.reincarnation) || {};
+      const book = ((_b = this.gameState) == null ? void 0 : _b.reincarnationBook) || {};
+      const exportData = {
+        meta: {
+          exportTime: (/* @__PURE__ */ new Date()).toISOString(),
+          gameVersion: ((_c = this.gameState) == null ? void 0 : _c.gameVersion) || "V226",
+          playerName: ((_e = (_d = this.gameState) == null ? void 0 : _d.player) == null ? void 0 : _e.name) || "\u4FEE\u58EB"
+        },
+        summary: {
+          reincarnationTimes: reincarnation.times || 0,
+          totalKarma: (reincarnation.karmaGood || 0) - (reincarnation.karmaBad || 0),
+          karmaGood: reincarnation.karmaGood || 0,
+          karmaBad: reincarnation.karmaBad || 0,
+          tiandaoMerit: book.tiandaoMerit || 0,
+          pastLivesCount: ((_f = reincarnation.pastLives) == null ? void 0 : _f.length) || 0
+        },
+        reincarnationHistory: reincarnation.pastLives || [],
+        karmaRecords: includeDetails ? book.karmaRecords || [] : [],
+        tiandaoRecords: includeDetails ? book.tiandaoRecords || [] : [],
+        blessings: includeDetails ? book.blessings || [] : []
+      };
+      if (format === "json") {
+        return {
+          success: true,
+          data: exportData,
+          dataSize: JSON.stringify(exportData).length,
+          message: `\u8F6E\u56DE\u5386\u53F2\u5BFC\u51FA\u6210\u529F\uFF0C\u5171 ${((_g = reincarnation.pastLives) == null ? void 0 : _g.length) || 0} \u6761\u8F6C\u4E16\u8BB0\u5F55`
+        };
+      } else if (format === "text") {
+        const textReport = this.generateTextReport(exportData);
+        return {
+          success: true,
+          data: textReport,
+          message: "\u6587\u672C\u683C\u5F0F\u8F6E\u56DE\u5386\u53F2"
+        };
+      }
+      return {
+        success: false,
+        reason: `\u4E0D\u652F\u6301\u7684\u683C\u5F0F\uFF1A${format}`
+      };
+    }
+    // ===== 辅助方法 =====
+    /**
+     * 获取境界名称
+     */
+    getRealmName(realm) {
+      const realms = ["\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347"];
+      return realms[realm] || "\u672A\u77E5";
+    }
+    /**
+     * 评估单次因果
+     */
+    evaluateKarma(karmaBalance) {
+      if (karmaBalance >= 500) return "\u5927\u5584";
+      if (karmaBalance >= 100) return "\u5584";
+      if (karmaBalance >= 0) return "\u5E73";
+      if (karmaBalance >= -100) return "\u6076";
+      return "\u5927\u6076";
+    }
+    /**
+     * 评估整体因果
+     */
+    evaluateOverallKarma(netKarma) {
+      if (netKarma >= 1e3) return "\u529F\u5FB7\u5706\u6EE1";
+      if (netKarma >= 500) return "\u529F\u5FB7\u6DF1\u539A";
+      if (netKarma >= 100) return "\u5C0F\u6709\u529F\u5FB7";
+      if (netKarma >= 0) return "\u65E0\u529F\u65E0\u8FC7";
+      if (netKarma >= -100) return "\u6709\u4E9B\u5B7D\u503A";
+      if (netKarma >= -500) return "\u7F6A\u5B7D\u6DF1\u91CD";
+      return "\u6076\u8D2F\u6EE1\u76C8";
+    }
+    /**
+     * 获取因果等级
+     */
+    getKarmaLevel(netKarma) {
+      if (netKarma >= 1e3) return "SS";
+      if (netKarma >= 500) return "S";
+      if (netKarma >= 200) return "A";
+      if (netKarma >= 50) return "B";
+      if (netKarma >= 0) return "C";
+      return "D";
+    }
+    /**
+     * 获取因果行为默认描述
+     */
+    getDefaultKarmaDesc(type, action) {
+      const goodDesc = {
+        "rescue": "\u6551\u52A9\u751F\u7075",
+        "charity": "\u65BD\u820D\u52A9\u4EBA",
+        "honest": "\u8BDA\u5B9E\u5B88\u4FE1",
+        "medicine": "\u884C\u533B\u6551\u4EBA",
+        "protect": "\u4FDD\u62A4\u5F31\u8005"
+      };
+      const badDesc = {
+        "kill": "\u6740\u5BB3\u751F\u7075",
+        "steal": "\u5077\u76D7\u62A2\u52AB",
+        "lie": "\u6B3A\u9A97\u8C0E\u8A00",
+        "harm": "\u4F24\u5BB3\u4ED6\u4EBA",
+        "betray": "\u80CC\u4FE1\u5F03\u4E49"
+      };
+      const desc = action === "good" ? goodDesc : badDesc;
+      return desc[type] || (action === "good" ? "\u5584\u884C" : "\u6076\u884C");
+    }
+    /**
+     * 获取天道事件默认描述
+     */
+    getDefaultTiandaoDesc(eventType) {
+      const tiandaoEvents = {
+        "breakthrough": "\u7A81\u7834\u5883\u754C",
+        "fly": "\u98DE\u5347",
+        "tribulation": "\u6E21\u52AB\u6210\u529F",
+        "merit": "\u79EF\u7D2F\u529F\u5FB7",
+        "serendipity": "\u5947\u9047",
+        "alchemy": "\u70BC\u4E39\u6210\u529F"
+      };
+      return tiandaoEvents[eventType] || "\u5929\u9053\u8FD0\u884C";
+    }
+    /**
+     * 计算因果加成
+     */
+    calculateKarmaBonus(netKarma) {
+      if (netKarma >= 1e3) return { type: "cultivationSpeed", value: 0.3 };
+      if (netKarma >= 500) return { type: "cultivationSpeed", value: 0.2 };
+      if (netKarma >= 100) return { type: "cultivationSpeed", value: 0.1 };
+      return { type: "cultivationSpeed", value: 0 };
+    }
+    /**
+     * 计算天劫难度修正
+     */
+    calculateTribulationModifier(netKarma) {
+      if (netKarma >= 1e3) return -0.3;
+      if (netKarma >= 500) return -0.2;
+      if (netKarma >= 100) return -0.1;
+      if (netKarma < 0) return Math.min(0.5, Math.abs(netKarma) / 1e3);
+      return 0;
+    }
+    /**
+     * 计算奇遇概率
+     */
+    calculateSerendipityChance(netKarma) {
+      if (netKarma >= 500) return 0.1;
+      if (netKarma >= 100) return 0.05;
+      return 0;
+    }
+    /**
+     * 确定赐福等级
+     */
+    determineBlessLevel(merit) {
+      if (merit >= 1e3) return "SSS";
+      if (merit >= 500) return "SS";
+      if (merit >= 200) return "S";
+      if (merit >= 100) return "A";
+      if (merit >= 50) return "B";
+      return "C";
+    }
+    /**
+     * 应用赐福效果
+     */
+    applyBlessingEffects(blessing) {
+      return blessing;
+    }
+    /**
+     * 生成文本报告
+     */
+    generateTextReport(data) {
+      const lines = [
+        "========== \u8F6E\u56DE\u7C3F\u5929\u9053\u8BB0\u5F55 ==========",
+        `\u5BFC\u51FA\u65F6\u95F4\uFF1A${data.meta.exportTime}`,
+        `\u73A9\u5BB6\uFF1A${data.meta.playerName}`,
+        `\u7248\u672C\uFF1A${data.meta.gameVersion}`,
+        "",
+        "---------- \u8F6C\u4E16\u7EDF\u8BA1 ----------",
+        `\u8F6E\u56DE\u6570\uFF1A${data.summary.reincarnationTimes}`,
+        `\u56E0\u679C\u503C\uFF1A${data.summary.totalKarma} (\u5584${data.summary.karmaGood} / \u6076${data.summary.karmaBad})`,
+        `\u5929\u9053\u529F\u5FB7\uFF1A${data.summary.tiandaoMerit}`,
+        "",
+        "---------- \u8F6C\u4E16\u5386\u53F2 ----------"
+      ];
+      for (const life of data.reincarnationHistory || []) {
+        lines.push(`\u7B2C${life.times || "?"}\u4E16\uFF1A\u5883\u754C${this.getRealmName(life.realmAtDeath)}\uFF0C\u56E0\u679C${life.karmaBalance || 0}\uFF0C${life.causeOfDeath || "\u6B7B\u56E0\u4E0D\u660E"}`);
+      }
+      lines.push("");
+      lines.push("================================");
+      return lines.join("\n");
+    }
+  };
+  var reincarnationBookService = new ReincarnationBookService();
+
   // src/domains/cultivation/services/TalentTreeService.js
   init_SpiritRootEntity();
   var TALENT_BRANCHES = ["attack", "defense", "cultivation", "perception"];
@@ -9912,7 +10353,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V225",
+      gameVersion: "V226",
       // 设置
       settings: {
         soundEnabled: true,
@@ -9942,6 +10383,8 @@ var CultivationSimulator = (() => {
     domainModules.signin = { createSigninService, createWelfareService };
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState2);
+    domainModules.reincarnationBook = reincarnationBookService;
+    reincarnationBookService.init(gameState2);
     domainModules.talentTree = new TalentTreeService(gameState2);
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
@@ -10133,6 +10576,72 @@ var CultivationSimulator = (() => {
       description: "Get reincarnation cycle status and memory layer info",
       inputSchema: { type: "object", properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState2));
+    mcpRegistry.registerTool("reincarnation.book.list", {
+      name: "reincarnation.book.list",
+      description: "View reincarnation history (reincarnation book)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Number of records to return", default: 20 },
+          offset: { type: "number", description: "Offset for pagination", default: 0 },
+          filter: { type: "string", enum: ["all", "good", "bad"], description: "Filter by karma", default: "all" }
+        }
+      }
+    }, (params) => reincarnationBookService.mcpBookList(params || {}));
+    mcpRegistry.registerTool("reincarnation.karma.record", {
+      name: "reincarnation.karma.record",
+      description: "Record karma behavior",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Behavior type (rescue/charity/honest/medicine/protect/kill/steal/lie/harm/betray)" },
+          action: { type: "string", enum: ["good", "bad"], description: "Good or bad action" },
+          amount: { type: "number", description: "Karma amount" },
+          description: { type: "string", description: "Custom description" }
+        },
+        required: ["type", "action"]
+      }
+    }, (params) => reincarnationBookService.mcpKarmaRecord(params || {}));
+    mcpRegistry.registerTool("reincarnation.karma.query", {
+      name: "reincarnation.karma.query",
+      description: "Query current karma status",
+      inputSchema: { type: "object", properties: {} }
+    }, () => reincarnationBookService.mcpKarmaQuery());
+    mcpRegistry.registerTool("reincarnation.tiandao.record", {
+      name: "reincarnation.tiandao.record",
+      description: "Record tiandao merit event",
+      inputSchema: {
+        type: "object",
+        properties: {
+          eventType: { type: "string", description: "Event type (breakthrough/fly/tribulation/merit/serendipity/alchemy)" },
+          merit: { type: "number", description: "Merit amount to record" },
+          description: { type: "string", description: "Custom description" }
+        },
+        required: ["eventType"]
+      }
+    }, (params) => reincarnationBookService.mcpTiandaoRecord(params || {}));
+    mcpRegistry.registerTool("reincarnation.tiandao.bless", {
+      name: "reincarnation.tiandao.bless",
+      description: "Receive tiandao blessing (consumes merit)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          level: { type: "string", enum: ["SSS", "SS", "S", "A", "B", "C"], description: "Blessing level" },
+          reason: { type: "string", description: "Reason for blessing" }
+        }
+      }
+    }, (params) => reincarnationBookService.mcpTiandaoBless(params || {}));
+    mcpRegistry.registerTool("reincarnation.history.export", {
+      name: "reincarnation.history.export",
+      description: "Export reincarnation history",
+      inputSchema: {
+        type: "object",
+        properties: {
+          format: { type: "string", enum: ["json", "text"], description: "Export format", default: "json" },
+          includeDetails: { type: "boolean", description: "Include karma and tiandao records", default: true }
+        }
+      }
+    }, (params) => reincarnationBookService.mcpHistoryExport(params || {}));
     const talentTreeHandlers = createTalentTreeMCPHandlers(gameState2);
     mcpRegistry.registerTool("spirit.talent.allocate", {
       name: "spirit.talent.allocate",
@@ -10730,4 +11239,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-ce97103-2026-05-30T15-23-36-265Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-55627ad-2026-05-30T15-30-22-593Z";
