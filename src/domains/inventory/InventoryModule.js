@@ -4,12 +4,12 @@
  */
 
 // Entities
-const { Item, ITEM_TYPES, ITEM_QUALITIES } = require('./entities/Item.js');
-const { Equipment, EQUIPMENT_TYPES, EQUIPMENT_SLOTS, HEAVENLY_DAO_SET_BONUSES, ENHANCE_CONFIG } = require('./entities/Equipment.js');
+import { Item, ITEM_TYPES, ITEM_QUALITIES } from './entities/Item.js';
+import { Equipment, EQUIPMENT_TYPES, EQUIPMENT_SLOTS, HEAVENLY_DAO_SET_BONUSES, ENHANCE_CONFIG } from './entities/Equipment.js';
 
 // Services
-const { InventoryService, inventoryService } = require('./services/InventoryService.js');
-const { CraftService, craftService, ALCHEMY_RECIPES, FORGE_RECIPES, ADVANCED_FORGE_RECIPES, FURNACES, ANVILS, MATERIALS } = require('./services/CraftService.js');
+import { InventoryService, inventoryService } from './services/InventoryService.js';
+import { CraftService, craftService, ALCHEMY_RECIPES, FORGE_RECIPES, ADVANCED_FORGE_RECIPES, FURNACES, ANVILS, MATERIALS } from './services/CraftService.js';
 
 /**
  * 创建物品实例
@@ -83,7 +83,7 @@ function expandInventorySlots(gameState, slots, cost) {
 }
 
 // 导出
-module.exports = {
+export default {
     // Entities
     Item,
     ITEM_TYPES,

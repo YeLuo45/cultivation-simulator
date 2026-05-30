@@ -3,9 +3,9 @@
  * 整合宠物系统的所有功能
  */
 
-const { Pet } = require('./entities/Pet');
-const { PetService } = require('./services/PetService');
-const { PetEvolveService } = require('./services/PetEvolveService');
+import { Pet } from './entities/Pet.js';
+import { PetService } from './services/PetService.js';
+import { PetEvolveService } from './services/PetEvolveService.js';
 
 // 宠物状态初始化
 const PET_STATE_INITIALIZERS = {
@@ -52,7 +52,7 @@ const PET_API_METHODS = [
 ];
 
 // 导出所有宠物模块内容
-module.exports = {
+export default {
     // 实体
     Pet,
     

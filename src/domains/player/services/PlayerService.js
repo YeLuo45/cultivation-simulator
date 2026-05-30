@@ -3,7 +3,7 @@
  * 提供玩家相关操作：addSpiritStones, addQi, getPlayerInfo 等
  */
 
-const { PlayerEntity, REALMS, STAGES } = require('./entities/PlayerEntity');
+const { PlayerEntity, REALMS, STAGES } = require('../entities/PlayerEntity.js');
 
 /**
  * 玩家服务类

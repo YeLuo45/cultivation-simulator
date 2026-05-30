@@ -3,8 +3,8 @@
  * 提供修炼相关操作：meditate, breakthrough, tribulation 等
  */
 
-const { CultivationEntity } = require('./entities/CultivationEntity');
-const { SpiritRootEntity, TIER_BONUSES } = require('./entities/SpiritRootEntity');
+import { CultivationEntity } from '../entities/CultivationEntity.js';
+import { SpiritRootEntity, TIER_BONUSES } from '../entities/SpiritRootEntity.js';
 
 /**
  * 天劫配置
@@ -465,12 +465,4 @@ class CultivationService {
     }
 }
 
-// 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CultivationService, TRIBULATIONS, BLESSING_TYPES };
-} else {
-    // 浏览器环境
-    window.CultivationService = CultivationService;
-    window.TRIBULATIONS = TRIBULATIONS;
-    window.BLESSING_TYPES = BLESSING_TYPES;
-}
+export { CultivationService, TRIBULATIONS, BLESSING_TYPES };

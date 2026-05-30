@@ -161,6 +161,14 @@ function resetCombatState() {
     combatEnergy = 0;
 }
 
+export function setCombatState(newState) {
+    combatState = newState;
+}
+
+export function setCombatEnergy(value) {
+    combatEnergy = value;
+}
+
 export {
     combatState,
     combatEnergy,

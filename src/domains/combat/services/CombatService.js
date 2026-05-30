@@ -3,7 +3,8 @@
  * Core combat operations: initCombat, executePlayerAttack, executePlayerDefend, executeOpponentTurn, endCombat
  */
 
-import { combatState, combatEnergy } from '../entities/CombatState.js';
+import * as combatModule from '../entities/CombatState.js';
+const { setCombatState, setCombatEnergy } = combatModule;
 
 /**
  * Initialize combat with an opponent
@@ -58,9 +59,9 @@ function initCombat(opponent) {
         playerMaxHP = Math.floor(playerMaxHP * (1 + gameState.activeEffects.all_stats));
     }
 
-    combatEnergy = 0;
+    setCombatEnergy(0);
 
-    combatState = {
+    setCombatState({
         inProgress: true,
         round: 0,
         turn: playerSpeed >= opponent.speed ? 'player' : 'opponent',
@@ -94,7 +95,7 @@ function initCombat(opponent) {
             player: { defending: false, attackBoost: 0, defenseBoost: 0, ignoreDefense: false, burning: 0, frozen: 0 },
             opponent: { defending: false, attackBoost: 0, defenseBoost: 0, burning: 0, frozen: 0 }
         }
-    };
+    });
 
     calculateSetBonuses();
     recalculatePlayerStats();
@@ -500,7 +501,7 @@ function endCombat(result) {
  * Add combat energy
  */
 function addEnergy(amount) {
-    combatEnergy += amount;
+    setCombatEnergy(combatModule.combatEnergy + amount);
 }
 
 /**

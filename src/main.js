@@ -20,26 +20,26 @@ import { CONFIG, IDLE_TASKS, IDLE_CONFIG, NPC_ROLE_REGISTRY, PLAN_REVIEW_GATE } 
 
 // 领域模块
 import { createCultivationModule } from './domains/cultivation/CultivationModule.js';
-import { createInventoryModule } from './domains/inventory/InventoryModule.js';
 import { createPlayerModule } from './domains/player/PlayerModule.js';
-import { createPetModule } from './domains/pet/PetModule.js';
 import { createAchievementModule } from './domains/achievement/AchievementModule.js';
 
-// 领域模块 (ES Module)
-import CombatModule from './domains/combat/CombatModule.js';
-import SectModule from './domains/sect/SectModule.js';
-import RankingModule from './domains/ranking/RankingModule.js';
-import SigninModule from './domains/signin/SigninModule.js';
+// 领域模块 (ES Module - default exports)
+import InventoryModule from './domains/inventory/InventoryModule.js';
+import PetModule from './domains/pet/PetModule.js';
+
+// 领域模块 (ES Module - named exports)
+import { createRankingService, createArenaService } from './domains/ranking/RankingModule.js';
+import { createSigninService, createWelfareService } from './domains/signin/SigninModule.js';
 
 // 系统模块
-import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory, updateAutoSave } from './systems/persistence/SaveManager.js';
+import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
 import { 
-    OfflineManager, 
     OfflineSnapshot, 
-    PowerSync, 
+    PowerSync,
     IDLE_TASKS as OFFLINE_IDLE_TASKS,
-    OFFLINE_CONFIG 
+    OFFLINE_CONFIG,
+    powerSync
 } from './systems/offline/OfflineManager.js';
 
 // ===== 全局状态 =====
@@ -279,11 +279,11 @@ function initializeDomainModules() {
     domainModules.cultivation = createCultivationModule(() => gameState);
     
     // 背包模块
-    domainModules.inventory = createInventoryModule();
+    domainModules.inventory = InventoryModule;
     domainModules.inventory.initInventory(gameState);
     
     // 宠物模块
-    domainModules.pet = createPetModule();
+    domainModules.pet = PetModule;
     
     // 成就模块
     domainModules.achievement = createAchievementModule();
@@ -295,10 +295,10 @@ function initializeDomainModules() {
     domainModules.sect = SectModule;
     
     // 排行榜模块 (ES Module)
-    domainModules.ranking = RankingModule;
+    domainModules.ranking = { createRankingService, createArenaService };
     
     // 签到模块 (ES Module)
-    domainModules.signin = SigninModule;
+    domainModules.signin = { createSigninService, createWelfareService };
     
     console.log('[Main] 领域模块初始化完成');
 }
@@ -534,13 +534,7 @@ function autoSave() {
  * 初始化离线管理器
  */
 function initializeOfflineManager() {
-    offlineManager = new OfflineManager(gameState, {
-        maxOfflineHours: OFFLINE_CONFIG.maxOfflineHours,
-        offlineEfficiency: OFFLINE_CONFIG.offlineEfficiency,
-        onOfflineEarnings: (earnings) => {
-            addLog('good', '⏰ 离线收益', `离线收益: +${earnings} 灵石`);
-        }
-    });
+    // 离线管理器初始化（使用 powerSync 全局实例）
     console.log('[Main] 离线管理器初始化完成');
 }
 
@@ -548,9 +542,8 @@ function initializeOfflineManager() {
  * 处理离线收益
  */
 function processOfflineEarnings() {
-    if (!offlineManager || !isGameInitialized) return;
+    if (!isGameInitialized) return;
     
-    const powerSync = new PowerSync();
     const snapshot = powerSync.captureSnapshot(gameState);
     const result = powerSync.restoreFromSnapshot(snapshot, gameState);
     
@@ -984,7 +977,6 @@ export {
     getSaveHistory,
     
     // 离线系统
-    offlineManager,
     processOfflineEarnings,
     
     // 日志
