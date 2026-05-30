@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-d0235fc-2026-05-30T14-58-33-616Z */
+/* Cultivation Simulator DDD-v1.0.0-9dffcad-2026-05-30T15-17-09-916Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -7298,6 +7298,643 @@ var CultivationSimulator = (() => {
   };
   var reincarnationService = new ReincarnationService();
 
+  // src/domains/cultivation/services/TalentTreeService.js
+  init_SpiritRootEntity();
+  var TALENT_BRANCHES = ["attack", "defense", "cultivation", "perception"];
+  var BRANCH_NAMES = {
+    attack: "\u653B\u51FB",
+    defense: "\u9632\u5FA1",
+    cultivation: "\u4FEE\u70BC",
+    perception: "\u611F\u77E5"
+  };
+  var POINTS_PER_LAYER = [1, 2, 3, 4, 5];
+  var LAYER_EFFECTS = {
+    attack: [
+      { attack: 5 },
+      // 层1: 攻击+5
+      { attack: 10 },
+      // 层2: 攻击+10
+      { attack: 15 },
+      // 层3: 攻击+15
+      { attack: 25 },
+      // 层4: 攻击+25
+      { attack: 40 }
+      // 层5: 攻击+40
+    ],
+    defense: [
+      { defense: 5 },
+      // 层1: 防御+5
+      { defense: 10 },
+      // 层2: 防御+10
+      { defense: 15 },
+      // 层3: 防御+15
+      { defense: 25 },
+      // 层4: 防御+25
+      { defense: 40 }
+      // 层5: 防御+40
+    ],
+    cultivation: [
+      { cultivationSpeed: 5 },
+      // 层1: 修炼速度+5%
+      { cultivationSpeed: 10 },
+      // 层2: 修炼速度+10%
+      { cultivationSpeed: 15 },
+      // 层3: 修炼速度+15%
+      { cultivationSpeed: 25 },
+      // 层4: 修炼速度+25%
+      { cultivationSpeed: 40 }
+      // 层5: 修炼速度+40%
+    ],
+    perception: [
+      { critRate: 2 },
+      // 层1: 暴击率+2%
+      { critRate: 4 },
+      // 层2: 暴击率+4%
+      { critRate: 6 },
+      // 层3: 暴击率+6%
+      { critRate: 10 },
+      // 层4: 暴击率+10%
+      { critRate: 15 }
+      // 层5: 暴击率+15%
+    ]
+  };
+  var MASTERY_ELEMENTS = ["metal", "wood", "water", "fire", "earth", "thunder"];
+  var ELEMENT_NAMES = {
+    metal: "\u91D1",
+    wood: "\u6728",
+    water: "\u6C34",
+    fire: "\u706B",
+    earth: "\u571F",
+    thunder: "\u96F7"
+  };
+  var MASTERY_LEVELS = ["novice", "apprentice", "journeyman", "expert", "master", "grandmaster"];
+  var MASTERY_LEVEL_NAMES = {
+    novice: "\u521D\u7AA5",
+    apprentice: "\u5165\u95E8",
+    journeyman: "\u719F\u7EC3",
+    expert: "\u7CBE\u901A",
+    master: "\u5927\u5E08",
+    grandmaster: "\u5B97\u5E08"
+  };
+  var MASTERY_EXP_PER_LEVEL = [0, 100, 300, 600, 1e3, 1500];
+  var MASTERY_EFFECT_MULTIPLIERS = {
+    novice: 0.5,
+    apprentice: 1,
+    journeyman: 1.5,
+    expert: 2,
+    master: 3,
+    grandmaster: 5
+  };
+  var TALENT_RESET_ITEM = "\u6D17\u9AD3\u4E39";
+  function createInitialTalentData() {
+    const talentTree = {};
+    for (const branch of TALENT_BRANCHES) {
+      talentTree[branch] = {
+        points: 0,
+        // 已投入点数
+        layers: 0
+        // 已解锁层数 (0-5)
+      };
+    }
+    return {
+      talentTree,
+      talentPoints: 0,
+      // 可用天赋点
+      totalTalentPointsEarned: 0
+      // 累计获得天赋点
+    };
+  }
+  function createInitialMasteryData() {
+    const mastery = {};
+    for (const element of MASTERY_ELEMENTS) {
+      mastery[element] = {
+        level: 0,
+        // 0-5 (novice-grandmaster)
+        exp: 0,
+        // 当前经验值
+        totalExpEarned: 0
+        // 累计获得经验值
+      };
+    }
+    return {
+      mastery,
+      lastUpdateTime: Date.now()
+    };
+  }
+  var TalentTreeService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.hooks = /* @__PURE__ */ new Map();
+      this.hookIdCounter = 0;
+      this.initializeData();
+    }
+    /**
+     * 初始化天赋和精通数据
+     */
+    initializeData() {
+      if (!this.gameState.talentData) {
+        this.gameState.talentData = createInitialTalentData();
+      }
+      if (!this.gameState.masteryData) {
+        this.gameState.masteryData = createInitialMasteryData();
+      }
+    }
+    /**
+     * 获取天赋数据
+     */
+    getTalentData() {
+      return this.gameState.talentData;
+    }
+    /**
+     * 获取精通数据
+     */
+    getMasteryData() {
+      return this.gameState.masteryData;
+    }
+    // ===== 天赋点获取 =====
+    /**
+     * 获得天赋点
+     * @param {number} amount - 获得数量
+     * @param {string} reason - 原因 (levelup/breakthrough/reward)
+     */
+    gainTalentPoints(amount, reason = "reward") {
+      const talentData = this.getTalentData();
+      talentData.talentPoints += amount;
+      talentData.totalTalentPointsEarned += amount;
+      this.triggerHook("talentPointsGained", {
+        amount,
+        reason,
+        totalPoints: talentData.talentPoints,
+        totalEarned: talentData.totalTalentPointsEarned
+      });
+      return {
+        success: true,
+        gained: amount,
+        reason,
+        availablePoints: talentData.talentPoints,
+        totalEarned: talentData.totalTalentPointsEarned
+      };
+    }
+    /**
+     * 消耗天赋点
+     * @param {number} amount - 消耗数量
+     */
+    consumeTalentPoints(amount) {
+      const talentData = this.getTalentData();
+      if (talentData.talentPoints < amount) {
+        return {
+          success: false,
+          error: "\u5929\u8D4B\u70B9\u4E0D\u8DB3",
+          required: amount,
+          available: talentData.talentPoints
+        };
+      }
+      talentData.talentPoints -= amount;
+      return { success: true, consumed: amount, remaining: talentData.talentPoints };
+    }
+    // ===== 天赋树操作 =====
+    /**
+     * 分配天赋点
+     * @param {string} branch - 分支 (attack/defense/cultivation/perception)
+     * @param {number} layer - 层 (1-5)
+     */
+    allocateTalent(branch, layer) {
+      if (!TALENT_BRANCHES.includes(branch)) {
+        return { success: false, error: `\u65E0\u6548\u5206\u652F: ${branch}` };
+      }
+      if (layer < 1 || layer > 5) {
+        return { success: false, error: "\u5C42\u6570\u5FC5\u987B\u57281-5\u4E4B\u95F4" };
+      }
+      const talentData = this.getTalentData();
+      const branchData = talentData.talentTree[branch];
+      if (branchData.layers >= layer) {
+        return { success: false, error: `\u5206\u652F ${branch} \u7684\u7B2C ${layer} \u5C42\u5DF2\u89E3\u9501` };
+      }
+      if (layer > 1 && branchData.layers < layer - 1) {
+        return { success: false, error: `\u5FC5\u987B\u5148\u89E3\u9501\u7B2C ${layer - 1} \u5C42` };
+      }
+      const pointsNeeded = POINTS_PER_LAYER[layer - 1];
+      if (talentData.talentPoints < pointsNeeded) {
+        return {
+          success: false,
+          error: "\u5929\u8D4B\u70B9\u4E0D\u8DB3",
+          required: pointsNeeded,
+          available: talentData.talentPoints
+        };
+      }
+      const consumeResult = this.consumeTalentPoints(pointsNeeded);
+      if (!consumeResult.success) {
+        return consumeResult;
+      }
+      branchData.points += pointsNeeded;
+      branchData.layers = layer;
+      const effect = LAYER_EFFECTS[branch][layer - 1];
+      this.triggerHook("talentAllocated", {
+        branch,
+        layer,
+        pointsUsed: pointsNeeded,
+        effect,
+        totalPoints: branchData.points,
+        totalLayers: branchData.layers
+      });
+      return {
+        success: true,
+        branch,
+        layer,
+        pointsUsed: pointsNeeded,
+        effect,
+        remainingPoints: talentData.talentPoints,
+        totalPoints: branchData.points,
+        totalLayers: branchData.layers
+      };
+    }
+    /**
+     * 重置天赋树
+     * @param {boolean} hasItem - 是否有洗髓丹
+     */
+    resetTalentTree(hasItem = false) {
+      var _a;
+      if (!hasItem) {
+        const inventory = ((_a = this.gameState.inventory) == null ? void 0 : _a.items) || [];
+        const resetItemIndex = inventory.findIndex((item) => item.name === TALENT_RESET_ITEM);
+        if (resetItemIndex === -1) {
+          return {
+            success: false,
+            error: `\u9700\u8981 ${TALENT_RESET_ITEM} \u624D\u80FD\u91CD\u7F6E\u5929\u8D4B\u6811`
+          };
+        }
+        inventory.splice(resetItemIndex, 1);
+      }
+      const talentData = this.getTalentData();
+      const oldTree = JSON.parse(JSON.stringify(talentData.talentTree));
+      for (const branch of TALENT_BRANCHES) {
+        talentData.talentTree[branch] = {
+          points: 0,
+          layers: 0
+        };
+      }
+      this.triggerHook("talentReset", {
+        oldTree,
+        newTree: talentData.talentTree
+      });
+      return {
+        success: true,
+        message: "\u5929\u8D4B\u6811\u5DF2\u91CD\u7F6E",
+        itemConsumed: hasItem
+      };
+    }
+    /**
+     * 查询天赋树状态
+     */
+    queryTalentTree() {
+      const talentData = this.getTalentData();
+      const treeStatus = {};
+      for (const branch of TALENT_BRANCHES) {
+        const branchData = talentData.talentTree[branch];
+        const effects = [];
+        for (let i = 0; i < branchData.layers; i++) {
+          effects.push(LAYER_EFFECTS[branch][i]);
+        }
+        treeStatus[branch] = {
+          name: BRANCH_NAMES[branch],
+          points: branchData.points,
+          layers: branchData.layers,
+          maxLayers: 5,
+          effects,
+          nextLayerCost: branchData.layers < 5 ? POINTS_PER_LAYER[branchData.layers] : null,
+          nextLayerEffect: branchData.layers < 5 ? LAYER_EFFECTS[branch][branchData.layers] : null
+        };
+      }
+      return {
+        success: true,
+        availablePoints: talentData.talentPoints,
+        totalEarnedPoints: talentData.totalTalentPointsEarned,
+        tree: treeStatus
+      };
+    }
+    // ===== 元素精通操作 =====
+    /**
+     * 获得精通经验
+     * @param {string} element - 元素类型
+     * @param {number} exp - 经验值
+     */
+    gainMasteryExp(element, exp) {
+      if (!MASTERY_ELEMENTS.includes(element)) {
+        return { success: false, error: `\u65E0\u6548\u5143\u7D20: ${element}` };
+      }
+      const masteryData = this.getMasteryData();
+      const elementData = masteryData.mastery[element];
+      const oldLevel = elementData.level;
+      elementData.exp += exp;
+      elementData.totalExpEarned += exp;
+      let leveledUp = false;
+      while (elementData.level < 5 && elementData.exp >= MASTERY_EXP_PER_LEVEL[elementData.level + 1]) {
+        elementData.level++;
+        leveledUp = true;
+      }
+      const newLevel = elementData.level;
+      if (leveledUp) {
+        this.triggerHook("masteryLevelUp", {
+          element,
+          oldLevel,
+          newLevel,
+          newLevelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[newLevel]]
+        });
+      }
+      return {
+        success: true,
+        element,
+        expGained: exp,
+        currentExp: elementData.exp,
+        currentLevel: newLevel,
+        currentLevelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[newLevel]],
+        leveledUp,
+        nextLevelExp: newLevel < 5 ? MASTERY_EXP_PER_LEVEL[newLevel + 1] : null
+      };
+    }
+    /**
+     * 升级精通等级
+     * @param {string} element - 元素类型
+     */
+    upgradeMastery(element) {
+      if (!MASTERY_ELEMENTS.includes(element)) {
+        return { success: false, error: `\u65E0\u6548\u5143\u7D20: ${element}` };
+      }
+      const masteryData = this.getMasteryData();
+      const elementData = masteryData.mastery[element];
+      if (elementData.level >= 5) {
+        return {
+          success: false,
+          error: "\u5DF2\u8FBE\u5230\u6700\u9AD8\u7CBE\u901A\u7B49\u7EA7",
+          currentLevel: elementData.level,
+          currentLevelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[elementData.level]]
+        };
+      }
+      const currentLevelExp = MASTERY_EXP_PER_LEVEL[elementData.level];
+      const nextLevelExp = MASTERY_EXP_PER_LEVEL[elementData.level + 1];
+      const expNeeded = nextLevelExp - currentLevelExp;
+      if (elementData.exp < expNeeded) {
+        return {
+          success: false,
+          error: "\u7ECF\u9A8C\u503C\u4E0D\u8DB3",
+          required: expNeeded,
+          available: elementData.exp
+        };
+      }
+      const oldLevel = elementData.level;
+      elementData.exp -= expNeeded;
+      elementData.level++;
+      this.triggerHook("masteryUpgraded", {
+        element,
+        oldLevel,
+        newLevel: elementData.level,
+        newLevelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[elementData.level]]
+      });
+      return {
+        success: true,
+        element,
+        newLevel: elementData.level,
+        newLevelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[elementData.level]],
+        effectMultiplier: MASTERY_EFFECT_MULTIPLIERS[MASTERY_LEVELS[elementData.level]]
+      };
+    }
+    /**
+     * 查询元素精通
+     * @param {string} element - 元素类型 (可选，不传则查询全部)
+     */
+    queryMastery(element = null) {
+      const masteryData = this.getMasteryData();
+      if (element) {
+        if (!MASTERY_ELEMENTS.includes(element)) {
+          return { success: false, error: `\u65E0\u6548\u5143\u7D20: ${element}` };
+        }
+        const elementData = masteryData.mastery[element];
+        return {
+          success: true,
+          element,
+          level: elementData.level,
+          levelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[elementData.level]],
+          exp: elementData.exp,
+          totalExpEarned: elementData.totalExpEarned,
+          effectMultiplier: MASTERY_EFFECT_MULTIPLIERS[MASTERY_LEVELS[elementData.level]],
+          nextLevelExp: elementData.level < 5 ? MASTERY_EXP_PER_LEVEL[elementData.level + 1] : null
+        };
+      }
+      const allMastery = {};
+      for (const elem of MASTERY_ELEMENTS) {
+        const elementData = masteryData.mastery[elem];
+        allMastery[elem] = {
+          name: ELEMENT_NAMES[elem],
+          level: elementData.level,
+          levelName: MASTERY_LEVEL_NAMES[MASTERY_LEVELS[elementData.level]],
+          exp: elementData.exp,
+          effectMultiplier: MASTERY_EFFECT_MULTIPLIERS[MASTERY_LEVELS[elementData.level]],
+          progress: elementData.level < 5 ? (elementData.exp / MASTERY_EXP_PER_LEVEL[elementData.level + 1] * 100).toFixed(1) + "%" : "100%"
+        };
+      }
+      return {
+        success: true,
+        mastery: allMastery
+      };
+    }
+    // ===== Hook系统 =====
+    /**
+     * 注册钩子
+     * @param {string} type - 钩子类型
+     * @param {Function} callback - 回调函数
+     */
+    registerHook(type, callback) {
+      const hookId = ++this.hookIdCounter;
+      this.hooks.set(hookId, {
+        type,
+        callback,
+        enabled: true
+      });
+      return {
+        success: true,
+        hookId,
+        type,
+        message: `\u5DF2\u6CE8\u518C\u94A9\u5B50: ${type}`
+      };
+    }
+    /**
+     * 注销钩子
+     * @param {number} hookId - 钩子ID
+     */
+    unregisterHook(hookId) {
+      if (!this.hooks.has(hookId)) {
+        return { success: false, error: `\u94A9\u5B50\u4E0D\u5B58\u5728: ${hookId}` };
+      }
+      const hook = this.hooks.get(hookId);
+      this.hooks.delete(hookId);
+      return {
+        success: true,
+        message: `\u5DF2\u6CE8\u9500\u94A9\u5B50: ${hook.type}`
+      };
+    }
+    /**
+     * 触发钩子
+     * @param {string} type - 钩子类型
+     * @param {object} data - 传递给回调的数据
+     */
+    triggerHook(type, data) {
+      const triggeredHooks = [];
+      for (const [hookId, hook] of this.hooks) {
+        if (hook.type === type && hook.enabled) {
+          try {
+            hook.callback(data);
+            triggeredHooks.push(hookId);
+          } catch (e) {
+            console.error(`[TalentTree] Hook error: ${type}`, e);
+          }
+        }
+      }
+      return triggeredHooks;
+    }
+    /**
+     * 获取所有已注册的钩子
+     */
+    listHooks() {
+      const hookList = [];
+      for (const [hookId, hook] of this.hooks) {
+        hookList.push({
+          hookId,
+          type: hook.type,
+          enabled: hook.enabled
+        });
+      }
+      return hookList;
+    }
+    // ===== 工具方法 =====
+    /**
+     * 根据灵根类型和品级计算天赋点奖励
+     */
+    calculateTalentPointsReward() {
+      const spiritRoot = this.gameState.spiritRoot || { type: "wood", tier: 1 };
+      const tier = spiritRoot.tier || 1;
+      const realm = this.gameState.realm || 0;
+      return tier * 2 + realm;
+    }
+    /**
+     * 获取当前所有加成效果汇总
+     */
+    getAllBonuses() {
+      const talentData = this.getTalentData();
+      const bonuses = {
+        attack: 0,
+        defense: 0,
+        cultivationSpeed: 0,
+        critRate: 0
+      };
+      for (const branch of TALENT_BRANCHES) {
+        const branchData = talentData.talentTree[branch];
+        for (let i = 0; i < branchData.layers; i++) {
+          const effect = LAYER_EFFECTS[branch][i];
+          for (const [key, value] of Object.entries(effect)) {
+            if (bonuses[key] !== void 0) {
+              bonuses[key] += value;
+            }
+          }
+        }
+      }
+      const spiritRoot = new SpiritRootEntity(this.gameState.spiritRoot);
+      const rootBonuses = spiritRoot.getBonuses();
+      for (const [key, value] of Object.entries(rootBonuses)) {
+        if (bonuses[key] !== void 0) {
+          bonuses[key] += value;
+        }
+      }
+      return bonuses;
+    }
+    /**
+     * 获取精通加成倍率
+     * @param {string} element - 元素类型
+     */
+    getMasteryMultiplier(element) {
+      if (!MASTERY_ELEMENTS.includes(element)) {
+        return 1;
+      }
+      const masteryData = this.getMasteryData();
+      const level = masteryData.mastery[element].level;
+      return MASTERY_EFFECT_MULTIPLIERS[MASTERY_LEVELS[level]];
+    }
+    /**
+     * 序列化数据 (用于保存)
+     */
+    serialize() {
+      const hookData = [];
+      for (const [hookId, hook] of this.hooks) {
+        hookData.push({ hookId, type: hook.type, enabled: hook.enabled });
+      }
+      return {
+        talentData: this.gameState.talentData,
+        masteryData: this.gameState.masteryData,
+        hookIdCounter: this.hookIdCounter,
+        registeredHooks: hookData
+      };
+    }
+    /**
+     * 从存档恢复
+     */
+    deserialize(data) {
+      if (data.talentData) {
+        this.gameState.talentData = data.talentData;
+      }
+      if (data.masteryData) {
+        this.gameState.masteryData = data.masteryData;
+      }
+      if (data.hookIdCounter) {
+        this.hookIdCounter = data.hookIdCounter;
+      }
+    }
+  };
+  function createTalentTreeMCPHandlers(gameState3) {
+    const service = new TalentTreeService(gameState3);
+    return {
+      /**
+       * spirit.talent.allocate - 分配天赋点
+       */
+      "spirit.talent.allocate": (params) => {
+        const { branch, layer } = params || {};
+        return service.allocateTalent(branch, layer);
+      },
+      /**
+       * spirit.talent.reset - 重置天赋树
+       */
+      "spirit.talent.reset": (params) => {
+        const { hasItem } = params || {};
+        return service.resetTalentTree(hasItem);
+      },
+      /**
+       * spirit.talent.query - 查询天赋树状态
+       */
+      "spirit.talent.query": () => {
+        return service.queryTalentTree();
+      },
+      /**
+       * spirit.mastery.query - 查询元素精通
+       */
+      "spirit.mastery.query": (params) => {
+        const { element } = params || {};
+        return service.queryMastery(element);
+      },
+      /**
+       * spirit.mastery.upgrade - 提升精通等级
+       */
+      "spirit.mastery.upgrade": (params) => {
+        const { element } = params || {};
+        return service.upgradeMastery(element);
+      },
+      /**
+       * spirit.hook.register - 注册灵根变化钩子
+       */
+      "spirit.hook.register": (params) => {
+        const { type, callback } = params || {};
+        return service.registerHook(type, callback);
+      }
+    };
+  }
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -8784,6 +9421,7 @@ var CultivationSimulator = (() => {
     domainModules.signin = { createSigninService, createWelfareService };
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState2);
+    domainModules.talentTree = new TalentTreeService(gameState2);
     npcEvolutionEngine.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -8972,6 +9610,67 @@ var CultivationSimulator = (() => {
       description: "Get reincarnation cycle status and memory layer info",
       inputSchema: { type: "object", properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState2));
+    const talentTreeHandlers = createTalentTreeMCPHandlers(gameState2);
+    mcpRegistry.registerTool("spirit.talent.allocate", {
+      name: "spirit.talent.allocate",
+      description: "Allocate talent points to a branch layer",
+      inputSchema: {
+        type: "object",
+        properties: {
+          branch: { type: "string", enum: ["attack", "defense", "cultivation", "perception"] },
+          layer: { type: "number", minimum: 1, maximum: 5 }
+        },
+        required: ["branch", "layer"]
+      }
+    }, (params) => talentTreeHandlers["spirit.talent.allocate"](params));
+    mcpRegistry.registerTool("spirit.talent.reset", {
+      name: "spirit.talent.reset",
+      description: "Reset talent tree (requires \u6D17\u9AD3\u4E39)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          hasItem: { type: "boolean", description: "Whether player has \u6D17\u9AD3\u4E39" }
+        }
+      }
+    }, (params) => talentTreeHandlers["spirit.talent.reset"](params));
+    mcpRegistry.registerTool("spirit.talent.query", {
+      name: "spirit.talent.query",
+      description: "Query talent tree status",
+      inputSchema: { type: "object", properties: {} }
+    }, () => talentTreeHandlers["spirit.talent.query"]());
+    mcpRegistry.registerTool("spirit.mastery.query", {
+      name: "spirit.mastery.query",
+      description: "Query elemental mastery",
+      inputSchema: {
+        type: "object",
+        properties: {
+          element: { type: "string", enum: ["metal", "wood", "water", "fire", "earth", "thunder"] }
+        }
+      }
+    }, (params) => talentTreeHandlers["spirit.mastery.query"](params));
+    mcpRegistry.registerTool("spirit.mastery.upgrade", {
+      name: "spirit.mastery.upgrade",
+      description: "Upgrade elemental mastery level",
+      inputSchema: {
+        type: "object",
+        properties: {
+          element: { type: "string", enum: ["metal", "wood", "water", "fire", "earth", "thunder"] },
+          required: ["element"]
+        }
+      }
+    }, (params) => talentTreeHandlers["spirit.mastery.upgrade"](params));
+    mcpRegistry.registerTool("spirit.hook.register", {
+      name: "spirit.hook.register",
+      description: "Register a spirit root change hook",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Hook type" },
+          callback: { type: "function", description: "Callback function" }
+        },
+        required: ["type"]
+      }
+    }, (params) => talentTreeHandlers["spirit.hook.register"](params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -9444,4 +10143,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-d0235fc-2026-05-30T14-58-33-616Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-9dffcad-2026-05-30T15-17-09-916Z";
