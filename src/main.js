@@ -51,6 +51,9 @@ import { createImmortalSectService } from './domains/sect/services/ImmortalSectS
 // 灵界洞府系统 (V233 Direction U: 灵界洞府系统)
 import { createCaveDwellingService } from './domains/player/services/CaveDwellingService.js';
 
+// 万界战争系统 (V234 Direction V: 万界战争系统 - generic-agent/nanobot)
+import { createRealmWarfareService } from './domains/combat/services/RealmWarfareService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -265,7 +268,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V233',
+        gameVersion: 'V234',
         
         // 设置
         settings: {
@@ -367,6 +370,11 @@ function initializeDomainModules() {
     const caveDwellingService = createCaveDwellingService(gameState);
     caveDwellingService.init(gameState);
     domainModules.caveDwelling = caveDwellingService;
+
+    // 万界战争系统 (V234 Direction V: 万界战争系统 - generic-agent/nanobot)
+    const realmWarfareService = createRealmWarfareService(gameState);
+    realmWarfareService.init(gameState);
+    domainModules.realmWarfare = realmWarfareService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
