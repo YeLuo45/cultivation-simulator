@@ -71,6 +71,9 @@ import { realmEventBus, EVENT_BUS_TOOLS } from './systems/event/RealmEventBus.js
 // 事件分析服务 (Direction O续: 仙界事件总线 - 事件历史分析)
 import { eventAnalyticsService, EVENT_ANALYTICS_TOOLS } from './systems/event/EventAnalyticsService.js';
 
+// 天道意志系统 (V232 Direction T: 天道意志系统 - ruflo/thunderbolt)
+import { celestialDecreeService, CELESTIAL_DECREE_TOOLS } from './systems/world/CelestialDecreeService.js';
+
 // ===== 全局状态 =====
 
 /**
@@ -259,7 +262,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V231',
+        gameVersion: 'V232',
         
         // 设置
         settings: {
@@ -365,6 +368,10 @@ function initializeDomainModules() {
 
     // 事件分析服务 (Direction O续: 仙界事件总线 - 事件历史分析)
     eventAnalyticsService.init(gameState);
+
+    // 天道意志系统 (V232 Direction T: 天道意志系统 - ruflo/thunderbolt)
+    celestialDecreeService.init(gameState);
+    domainModules.celestialDecree = celestialDecreeService;
 
     console.log('[Main] 领域模块初始化完成');
 }
@@ -1430,6 +1437,74 @@ function registerDomainMCPTools() {
         const { mcpAnalyticsForecast } = require('./systems/event/EventAnalyticsService.js');
         return mcpAnalyticsForecast(params);
     });
+
+    // 天道意志系统MCP工具 (V232 Direction T: 天道意志系统 - ruflo/thunderbolt)
+    mcpRegistry.registerTool('world.decree.list', {
+        name: 'world.decree.list',
+        description: '查看当前天道法旨列表',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                status: { type: 'string', description: '过滤状态 (active/accepted/completed/expired)' },
+                type: { type: 'string', description: '过滤类型 (reward/punishment/quest)' }
+            }
+        }
+    }, (params) => celestialDecreeService.listDecrees(params || {}));
+
+    mcpRegistry.registerTool('world.decree.accept', {
+        name: 'world.decree.accept',
+        description: '接受一个天道法旨任务',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                decreeId: { type: 'string', description: '法旨ID' }
+            },
+            required: ['decreeId']
+        }
+    }, (params) => celestialDecreeService.acceptDecree(params?.decreeId));
+
+    mcpRegistry.registerTool('world.favor.query', {
+        name: 'world.favor.query',
+        description: '查询当前恩宠立场',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => celestialDecreeService.queryFavor());
+
+    mcpRegistry.registerTool('world.favor.adjust', {
+        name: 'world.favor.adjust',
+        description: '调整恩宠值（通过行为触发）',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                amount: { type: 'number', description: '调整数值（正负）' },
+                reason: { type: 'string', description: '调整原因' }
+            },
+            required: ['amount']
+        }
+    }, (params) => celestialDecreeService.adjustFavor(params?.amount || 0, params?.reason || ''));
+
+    mcpRegistry.registerTool('world.awakening.trigger', {
+        name: 'world.awakening.trigger',
+        description: '触发世界觉醒事件',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', description: '觉醒类型 (qi_tide/beast_rampage/realm_unseal)' }
+            },
+            required: ['type']
+        }
+    }, (params) => celestialDecreeService.triggerAwakening(params?.type));
+
+    mcpRegistry.registerTool('world.blessing.claim', {
+        name: 'world.blessing.claim',
+        description: '领取天道赐福',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                blessingId: { type: 'string', description: '赐福ID' }
+            },
+            required: ['blessingId']
+        }
+    }, (params) => celestialDecreeService.claimBlessing(params?.blessingId));
 }
 
 // ===== 持久化系统 =====
