@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-b1fc522-2026-05-30T16-07-18-090Z */
+/* Cultivation Simulator DDD-v1.0.0-54a83f7-2026-05-30T16-18-38-270Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -12586,6 +12586,785 @@ var CultivationSimulator = (() => {
   // src/main.js
   init_RealmEventBus();
   init_EventAnalyticsService();
+
+  // src/systems/world/CelestialDecreeService.js
+  var CELESTIAL_CONFIG = {
+    // 恩宠立场范围
+    FAVOR_RANGE: { min: -100, max: 100 },
+    // 法旨过期时间 (ms)
+    DECREE_EXPIRE_TIME: 24 * 60 * 60 * 1e3,
+    // 24小时
+    // 世界觉醒阈值 (功德)
+    AWAKENING_MERIT_THRESHOLD: 1e4,
+    // 最大法旨数量
+    MAX_DECREES: 5,
+    // 赐福最大数量
+    MAX_BLESSINGS: 3,
+    // 赐福过期时间 (ms)
+    BLESSING_EXPIRE_TIME: 7 * 24 * 60 * 60 * 1e3
+    // 7天
+  };
+  var DECREE_TYPES = {
+    REWARD: "reward",
+    // 奖励型
+    PUNISHMENT: "punishment",
+    // 惩罚型
+    QUEST: "quest"
+    // 任务型
+  };
+  var DECREE_STATUS = {
+    ACTIVE: "active",
+    ACCEPTED: "accepted",
+    COMPLETED: "completed",
+    EXPIRED: "expired",
+    REJECTED: "rejected"
+  };
+  var AWAKENING_TYPES = {
+    QI_TIDE: "qi_tide",
+    // 灵气潮汐
+    BEAST_RAMPAGE: "beast_rampage",
+    // 妖兽暴动
+    REALM_UNSEAL: "realm_unseal"
+    // 秘境开启
+  };
+  var BLESSING_TYPES3 = {
+    CULTIVATION: "cultivation",
+    // 修为加成
+    MERIT: "merit",
+    // 功德加成
+    PROTECTION: "protection",
+    // 护体
+    REVELATION: "revelation"
+    // 天机启示
+  };
+  var CelestialDecree = class {
+    constructor(type, title, description, options = {}) {
+      this.id = `decree_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.title = title;
+      this.description = description;
+      this.status = options.status || DECREE_STATUS.ACTIVE;
+      this.favorImpact = options.favorImpact || 0;
+      this.reward = options.reward || null;
+      this.penalty = options.penalty || null;
+      this.expiresAt = options.expiresAt || Date.now() + CELESTIAL_CONFIG.DECREE_EXPIRE_TIME;
+      this.createdAt = Date.now();
+      this.acceptedAt = options.acceptedAt || null;
+      this.completedAt = options.completedAt || null;
+      this.questTarget = options.questTarget || null;
+      this.questProgress = 0;
+    }
+    /**
+     * 是否已过期
+     */
+    isExpired() {
+      return Date.now() > this.expiresAt;
+    }
+    /**
+     * 获取剩余时间 (ms)
+     */
+    getRemainingTime() {
+      return Math.max(0, this.expiresAt - Date.now());
+    }
+    /**
+     * 接受法旨
+     */
+    accept() {
+      if (this.status !== DECREE_STATUS.ACTIVE) {
+        return { success: false, error: "Decree is not active" };
+      }
+      this.status = DECREE_STATUS.ACCEPTED;
+      this.acceptedAt = Date.now();
+      return { success: true };
+    }
+    /**
+     * 完成法旨
+     */
+    complete() {
+      if (this.status !== DECREE_STATUS.ACCEPTED) {
+        return { success: false, error: "Decree is not accepted" };
+      }
+      this.status = DECREE_STATUS.COMPLETED;
+      this.completedAt = Date.now();
+      return { success: true };
+    }
+    /**
+     * 更新任务进度
+     */
+    updateProgress(progress) {
+      this.questProgress = Math.min(progress, this.questTarget || progress);
+      return { success: true, progress: this.questProgress };
+    }
+  };
+  var CelestialBlessing = class {
+    constructor(type, title, description, options = {}) {
+      this.id = `blessing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.title = title;
+      this.description = description;
+      this.claimed = false;
+      this.claimedAt = null;
+      this.effect = options.effect || null;
+      this.expiresAt = options.expiresAt || Date.now() + CELESTIAL_CONFIG.BLESSING_EXPIRE_TIME;
+      this.createdAt = Date.now();
+      this.favorRequired = options.favorRequired || 0;
+    }
+    /**
+     * 是否已过期
+     */
+    isExpired() {
+      return Date.now() > this.expiresAt;
+    }
+    /**
+     * 领取赐福
+     */
+    claim() {
+      if (this.claimed) {
+        return { success: false, error: "Blessing already claimed" };
+      }
+      if (this.isExpired()) {
+        return { success: false, error: "Blessing has expired" };
+      }
+      this.claimed = true;
+      this.claimedAt = Date.now();
+      return { success: true };
+    }
+  };
+  var WorldAwakening = class {
+    constructor(type, title, description, options = {}) {
+      this.id = `awakening_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.title = title;
+      this.description = description;
+      this.triggeredAt = null;
+      this.meritRequired = options.meritRequired || CELESTIAL_CONFIG.AWAKENING_MERIT_THRESHOLD;
+      this.rewards = options.rewards || null;
+      this.duration = options.duration || 36e5;
+      this.active = false;
+      this.endsAt = null;
+    }
+    /**
+     * 触发觉醒
+     */
+    trigger() {
+      if (this.active) {
+        return { success: false, error: "Awakening already active" };
+      }
+      this.active = true;
+      this.triggeredAt = Date.now();
+      this.endsAt = Date.now() + this.duration;
+      return { success: true };
+    }
+    /**
+     * 是否已结束
+     */
+    isEnded() {
+      return this.active && Date.now() > this.endsAt;
+    }
+    /**
+     * 获取剩余时间
+     */
+    getRemainingTime() {
+      if (!this.active) return 0;
+      return Math.max(0, this.endsAt - Date.now());
+    }
+  };
+  var CelestialDecreeService = class {
+    constructor() {
+      this.decrees = [];
+      this.blessings = [];
+      this.awakenings = [];
+      this.favor = 0;
+      this.totalMerit = 0;
+      this.gameState = null;
+      this.lastDecreeTime = 0;
+      this.decreeInterval = 36e5;
+    }
+    /**
+     * 初始化服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.celestial) {
+        gameState3.celestial = {
+          decrees: [],
+          blessings: [],
+          awakenings: [],
+          favor: 0,
+          totalMerit: 0
+        };
+      }
+      this.decrees = gameState3.celestial.decrees || [];
+      this.blessings = gameState3.celestial.blessings || [];
+      this.awakenings = gameState3.celestial.awakenings || [];
+      this.favor = gameState3.celestial.favor || 0;
+      this.totalMerit = gameState3.celestial.totalMerit || 0;
+      console.log("[CelestialDecree] \u5929\u9053\u610F\u5FD7\u7CFB\u7EDF\u521D\u59CB\u5316\u5B8C\u6210");
+      return { success: true };
+    }
+    /**
+     * 保存状态到游戏状态
+     */
+    saveState() {
+      if (!this.gameState) return;
+      this.gameState.celestial = {
+        decrees: this.decrees,
+        blessings: this.blessings,
+        awakenings: this.awakenings,
+        favor: this.favor,
+        totalMerit: this.totalMerit
+      };
+    }
+    // ===== 法旨管理 =====
+    /**
+     * 生成随机法旨
+     */
+    generateDecree() {
+      const types = [DECREE_TYPES.REWARD, DECREE_TYPES.PUNISHMENT, DECREE_TYPES.QUEST];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const decrees = {
+        [DECREE_TYPES.REWARD]: [
+          { title: "\u5929\u8D50\u7075\u6839", description: "\u5929\u9053\u8D50\u4E88\u4F60\u4E00\u682A\u4E0A\u54C1\u7075\u8349", favorImpact: 10, reward: { type: "herb", name: "\u4E0A\u54C1\u7075\u8349", quantity: 1 } },
+          { title: "\u798F\u6CFD\u6DF1\u539A", description: "\u4F60\u7684\u5584\u884C\u611F\u52A8\u5929\u9053\uFF0C\u83B7\u5F97\u529F\u5FB7\u52A0\u6301", favorImpact: 15, reward: { type: "merit", amount: 500 } },
+          { title: "\u987F\u609F\u5951\u673A", description: "\u5929\u673A\u663E\u73B0\uFF0C\u4F60\u83B7\u5F97\u4FEE\u70BC\u9886\u609F", favorImpact: 20, reward: { type: "cultivation", amount: 1e3 } }
+        ],
+        [DECREE_TYPES.PUNISHMENT]: [
+          { title: "\u5929\u8C34\u9884\u8B66", description: "\u4F60\u7684\u884C\u4E3A\u5F15\u8D77\u5929\u9053\u6CE8\u610F\uFF0C\u9700\u8981\u5FCF\u6094", favorImpact: -15, penalty: { type: "cultivation", amount: 500 } },
+          { title: "\u4E1A\u706B\u964D\u4E34", description: "\u5929\u52AB\u4E1A\u706B\u711A\u8EAB\uFF0C\u4FEE\u4E3A\u53D7\u635F", favorImpact: -20, penalty: { type: "cultivation", amount: 1e3 } },
+          { title: "\u6C14\u8FD0\u6D41\u5931", description: "\u5929\u9053\u6536\u56DE\u90E8\u5206\u6C14\u8FD0", favorImpact: -10, penalty: { type: "qi", amount: 300 } }
+        ],
+        [DECREE_TYPES.QUEST]: [
+          { title: "\u9664\u9B54\u536B\u9053", description: "\u65A9\u6740\u4E00\u5934\u5996\u517D\uFF0C\u8BC1\u660E\u4F60\u7684\u5B9E\u529B", favorImpact: 25, questTarget: 1, reward: { type: "merit", amount: 1e3 } },
+          { title: "\u6D4E\u4E16\u6551\u4EBA", description: "\u6551\u6CBB10\u4F4D\u82E6\u96BE\u51E1\u4EBA", favorImpact: 30, questTarget: 10, reward: { type: "merit", amount: 2e3 } },
+          { title: "\u62A4\u9053\u9664\u90AA", description: "\u6E05\u9664\u4E00\u4E2A\u90AA\u4FEE\u5DE2\u7A74", favorImpact: 35, questTarget: 1, reward: { type: "equipment", name: "\u5929\u9053\u7B26\u7B93", quantity: 1 } }
+        ]
+      };
+      const options = decrees[type][Math.floor(Math.random() * decrees[type].length)];
+      if (this.decrees.length >= CELESTIAL_CONFIG.MAX_DECREES) {
+        this.cleanupDecrees();
+        if (this.decrees.length >= CELESTIAL_CONFIG.MAX_DECREES) {
+          return null;
+        }
+      }
+      const decree = new CelestialDecree(type, options.title, options.description, {
+        favorImpact: options.favorImpact,
+        reward: options.reward,
+        penalty: options.penalty,
+        questTarget: options.questTarget
+      });
+      this.decrees.push(decree);
+      this.saveState();
+      return decree;
+    }
+    /**
+     * 清理过期法旨
+     */
+    cleanupDecrees() {
+      const before = this.decrees.length;
+      this.decrees = this.decrees.filter((d) => !d.isExpired() || d.status === DECREE_STATUS.ACCEPTED);
+      return { removed: before - this.decrees.length };
+    }
+    /**
+     * 获取法旨列表
+     */
+    listDecrees(options = {}) {
+      this.cleanupDecrees();
+      let result = [...this.decrees];
+      if (options.status) {
+        result = result.filter((d) => d.status === options.status);
+      }
+      if (options.type) {
+        result = result.filter((d) => d.type === options.type);
+      }
+      result.sort((a, b) => b.createdAt - a.createdAt);
+      return {
+        success: true,
+        decrees: result.map((d) => ({
+          id: d.id,
+          type: d.type,
+          title: d.title,
+          description: d.description,
+          status: d.status,
+          favorImpact: d.favorImpact,
+          reward: d.reward,
+          penalty: d.penalty,
+          questTarget: d.questTarget,
+          questProgress: d.questProgress,
+          remainingTime: d.getRemainingTime(),
+          createdAt: d.createdAt
+        })),
+        total: result.length
+      };
+    }
+    /**
+     * 接受法旨
+     */
+    acceptDecree(decreeId) {
+      const decree = this.decrees.find((d) => d.id === decreeId);
+      if (!decree) {
+        return { success: false, error: "Decree not found" };
+      }
+      if (decree.status !== DECREE_STATUS.ACTIVE) {
+        return { success: false, error: `Decree is ${decree.status}, cannot accept` };
+      }
+      if (decree.isExpired()) {
+        decree.status = DECREE_STATUS.EXPIRED;
+        this.saveState();
+        return { success: false, error: "Decree has expired" };
+      }
+      const result = decree.accept();
+      if (result.success) {
+        this.saveState();
+      }
+      return {
+        ...result,
+        decree: {
+          id: decree.id,
+          type: decree.type,
+          title: decree.title,
+          status: decree.status
+        }
+      };
+    }
+    /**
+     * 完成法旨任务
+     */
+    completeDecreeQuest(decreeId, progress) {
+      const decree = this.decrees.find((d) => d.id === decreeId);
+      if (!decree) {
+        return { success: false, error: "Decree not found" };
+      }
+      if (decree.status !== DECREE_STATUS.ACCEPTED) {
+        return { success: false, error: "Decree is not accepted" };
+      }
+      if (!decree.questTarget) {
+        return { success: false, error: "Decree is not a quest type" };
+      }
+      decree.updateProgress(progress);
+      this.saveState();
+      if (progress >= decree.questTarget) {
+        const completeResult = decree.complete();
+        if (completeResult.success) {
+          this.applyDecreeEffect(decree);
+          this.adjustFavor(decree.favorImpact, `\u6CD5\u65E8\u5B8C\u6210: ${decree.title}`);
+        }
+      }
+      return {
+        success: true,
+        progress: decree.questProgress,
+        target: decree.questTarget,
+        completed: progress >= decree.questTarget
+      };
+    }
+    /**
+     * 应用法旨效果
+     */
+    applyDecreeEffect(decree) {
+      if (decree.reward) {
+        this.applyReward(decree.reward);
+      }
+      if (decree.penalty) {
+        this.applyPenalty(decree.penalty);
+      }
+    }
+    /**
+     * 应用奖励
+     */
+    applyReward(reward) {
+      if (!this.gameState) return;
+      switch (reward.type) {
+        case "herb":
+        case "equipment":
+          if (!this.gameState.inventory.items) {
+            this.gameState.inventory.items = [];
+          }
+          this.gameState.inventory.items.push({
+            name: reward.name,
+            type: reward.type,
+            quantity: reward.quantity || 1,
+            quality: "\u7CBE\u826F"
+          });
+          break;
+        case "merit":
+          this.addMerit(reward.amount);
+          break;
+        case "cultivation":
+          this.gameState.cultivationXP = (this.gameState.cultivationXP || 0) + reward.amount;
+          break;
+      }
+    }
+    /**
+     * 应用惩罚
+     */
+    applyPenalty(penalty) {
+      if (!this.gameState) return;
+      switch (penalty.type) {
+        case "cultivation":
+          this.gameState.cultivationXP = Math.max(0, (this.gameState.cultivationXP || 0) - penalty.amount);
+          break;
+        case "qi":
+          this.gameState.player.qi = Math.max(0, (this.gameState.player.qi || 0) - penalty.amount);
+          break;
+      }
+    }
+    // ===== 恩宠管理 =====
+    /**
+     * 查询恩宠值
+     */
+    queryFavor() {
+      const stance = this.getFavorStance();
+      return {
+        success: true,
+        favor: this.favor,
+        stance,
+        range: CELESTIAL_CONFIG.FAVOR_RANGE
+      };
+    }
+    /**
+     * 获取恩宠立场描述
+     */
+    getFavorStance() {
+      if (this.favor >= 80) return "\u5929\u9053\u7737\u987E";
+      if (this.favor >= 50) return "\u9887\u53D7\u7737\u987E";
+      if (this.favor >= 20) return "\u7565\u6709\u7737\u987E";
+      if (this.favor >= -20) return "\u4E2D\u7ACB";
+      if (this.favor >= -50) return "\u7565\u6709\u538C\u5F03";
+      if (this.favor >= -80) return "\u9887\u53D7\u538C\u5F03";
+      return "\u5929\u9053\u538C\u5F03";
+    }
+    /**
+     * 调整恩宠值
+     */
+    adjustFavor(amount, reason = "") {
+      const oldFavor = this.favor;
+      this.favor = Math.max(
+        CELESTIAL_CONFIG.FAVOR_RANGE.min,
+        Math.min(CELESTIAL_CONFIG.FAVOR_RANGE.max, this.favor + amount)
+      );
+      this.saveState();
+      return {
+        success: true,
+        oldFavor,
+        newFavor: this.favor,
+        change: amount,
+        reason,
+        newStance: this.getFavorStance()
+      };
+    }
+    // ===== 世界觉醒 =====
+    /**
+     * 检查是否可以触发世界觉醒
+     */
+    canTriggerAwakening() {
+      return this.totalMerit >= CELESTIAL_CONFIG.AWAKENING_MERIT_THRESHOLD;
+    }
+    /**
+     * 触发世界觉醒
+     */
+    triggerAwakening(type) {
+      const activeAwakening = this.awakenings.find((a) => a.active && !a.isEnded());
+      if (activeAwakening) {
+        return {
+          success: false,
+          error: "A world awakening is already active",
+          activeAwakening: {
+            id: activeAwakening.id,
+            type: activeAwakening.type,
+            title: activeAwakening.title,
+            remainingTime: activeAwakening.getRemainingTime()
+          }
+        };
+      }
+      if (!this.canTriggerAwakening()) {
+        return {
+          success: false,
+          error: "Merit threshold not reached",
+          currentMerit: this.totalMerit,
+          requiredMerit: CELESTIAL_CONFIG.AWAKENING_MERIT_THRESHOLD
+        };
+      }
+      const awakeningConfigs = {
+        [AWAKENING_TYPES.QI_TIDE]: {
+          title: "\u7075\u6C14\u6F6E\u6C50",
+          description: "\u5929\u5730\u7075\u6C14\u6D8C\u52A8\uFF0C\u4FEE\u70BC\u6548\u7387\u5927\u5E45\u63D0\u5347",
+          rewards: { cultivationBonus: 2 },
+          duration: 36e5
+        },
+        [AWAKENING_TYPES.BEAST_RAMPAGE]: {
+          title: "\u5996\u517D\u66B4\u52A8",
+          description: "\u5996\u517D\u7FA4\u8D77\u66B4\u52A8\uFF0C\u51FB\u6740\u53EF\u83B7\u5927\u91CF\u529F\u5FB7",
+          rewards: { meritBonus: 1.5, expBonus: 1.5 },
+          duration: 72e5
+        },
+        [AWAKENING_TYPES.REALM_UNSEAL]: {
+          title: "\u79D8\u5883\u5F00\u542F",
+          description: "\u4E0A\u53E4\u79D8\u5883\u73B0\u4E16\uFF0C\u5185\u6709\u65E0\u9650\u673A\u7F18",
+          rewards: { artifactBonus: 3, treasureChance: 0.5 },
+          duration: 36e5
+        }
+      };
+      const config = awakeningConfigs[type];
+      if (!config) {
+        return { success: false, error: "Invalid awakening type" };
+      }
+      const awakening = new WorldAwakening(type, config.title, config.description, {
+        rewards: config.rewards,
+        duration: config.duration
+      });
+      const result = awakening.trigger();
+      if (result.success) {
+        this.awakenings.push(awakening);
+        this.saveState();
+      }
+      return {
+        ...result,
+        awakening: {
+          id: awakening.id,
+          type: awakening.type,
+          title: awakening.title,
+          description: awakening.description,
+          remainingTime: awakening.getRemainingTime()
+        }
+      };
+    }
+    /**
+     * 获取世界觉醒状态
+     */
+    getAwakeningStatus() {
+      const activeAwakening = this.awakenings.find((a) => a.active && !a.isEnded());
+      return {
+        success: true,
+        activeAwakening: activeAwakening ? {
+          id: activeAwakening.id,
+          type: activeAwakening.type,
+          title: activeAwakening.title,
+          description: activeAwakening.description,
+          rewards: activeAwakening.rewards,
+          remainingTime: activeAwakening.getRemainingTime(),
+          endsAt: activeAwakening.endsAt
+        } : null,
+        currentMerit: this.totalMerit,
+        meritThreshold: CELESTIAL_CONFIG.AWAKENING_MERIT_THRESHOLD,
+        canAwakening: this.canTriggerAwakening() ? true : false,
+        availableTypes: Object.keys(AWAKENING_TYPES)
+      };
+    }
+    /**
+     * 更新世界觉醒状态
+     */
+    updateAwakenings() {
+      for (const awakening of this.awakenings) {
+        if (awakening.active && awakening.isEnded()) {
+          awakening.active = false;
+        }
+      }
+      this.saveState();
+    }
+    // ===== 天道赐福 =====
+    /**
+     * 生成赐福
+     */
+    generateBlessing() {
+      if (this.blessings.length >= CELESTIAL_CONFIG.MAX_BLESSINGS) {
+        return null;
+      }
+      const blessingTemplates = [
+        { type: BLESSING_TYPES3.CULTIVATION, title: "\u5929\u9053\u52A0\u6301", description: "\u4FEE\u70BC\u901F\u5EA6\u63D0\u534750%", favorRequired: 30, effect: { cultivationSpeed: 1.5 } },
+        { type: BLESSING_TYPES3.MERIT, title: "\u529F\u5FB7\u704C\u9876", description: "\u83B7\u53D6\u529F\u5FB7\u65F6\u83B7\u5F97\u989D\u591620%\u52A0\u6210", favorRequired: 50, effect: { meritBonus: 1.2 } },
+        { type: BLESSING_TYPES3.PROTECTION, title: "\u5929\u9053\u62A4\u4F53", description: "\u53D7\u5230\u81F4\u547D\u4F24\u5BB3\u65F6\u514D\u9664\u4E00\u6B21", favorRequired: 40, effect: { surviveFatal: true } },
+        { type: BLESSING_TYPES3.REVELATION, title: "\u5929\u673A\u542F\u793A", description: "\u4E0B\u4E00\u6B21\u7A81\u7834\u6210\u529F\u7387\u63D0\u534730%", favorRequired: 20, effect: { breakthroughBonus: 0.3 } }
+      ];
+      const available = blessingTemplates.filter((b) => this.favor >= b.favorRequired);
+      if (available.length === 0) return null;
+      const template = available[Math.floor(Math.random() * available.length)];
+      const blessing = new CelestialBlessing(template.type, template.title, template.description, {
+        effect: template.effect,
+        favorRequired: template.favorRequired
+      });
+      this.blessings.push(blessing);
+      this.saveState();
+      return blessing;
+    }
+    /**
+     * 领取赐福
+     */
+    claimBlessing(blessingId) {
+      const blessing = this.blessings.find((b) => b.id === blessingId);
+      if (!blessing) {
+        return { success: false, error: "Blessing not found" };
+      }
+      if (this.favor < blessing.favorRequired) {
+        return {
+          success: false,
+          error: "Favor level too low",
+          required: blessing.favorRequired,
+          current: this.favor
+        };
+      }
+      const result = blessing.claim();
+      if (result.success) {
+        this.applyBlessingEffect(blessing);
+        this.saveState();
+      }
+      return {
+        ...result,
+        blessing: {
+          id: blessing.id,
+          type: blessing.type,
+          title: blessing.title
+        }
+      };
+    }
+    /**
+     * 应用赐福效果
+     */
+    applyBlessingEffect(blessing) {
+      if (!this.gameState) return;
+      if (!this.gameState.blessings) {
+        this.gameState.blessings = [];
+      }
+      this.gameState.blessings.push({
+        id: blessing.id,
+        type: blessing.type,
+        title: blessing.title,
+        effect: blessing.effect,
+        expiresAt: blessing.expiresAt
+      });
+    }
+    /**
+     * 获取可用赐福列表
+     */
+    listBlessings(options = {}) {
+      const validBlessings = this.blessings.filter((b) => !b.claimed && !b.isExpired());
+      let result = [...validBlessings];
+      if (options.unclaimedOnly) {
+        result = result.filter((b) => !b.claimed);
+      }
+      result.sort((a, b) => b.favorRequired - a.favorRequired);
+      return {
+        success: true,
+        blessings: result.map((b) => ({
+          id: b.id,
+          type: b.type,
+          title: b.title,
+          description: b.description,
+          effect: b.effect,
+          favorRequired: b.favorRequired,
+          claimed: b.claimed,
+          remainingTime: typeof b.getRemainingTime === "function" ? b.getRemainingTime() : 0,
+          createdAt: b.createdAt
+        })),
+        total: result.length
+      };
+    }
+    // ===== 功德管理 =====
+    /**
+     * 添加功德
+     */
+    addMerit(amount) {
+      this.totalMerit += amount;
+      this.saveState();
+      return { success: true, totalMerit: this.totalMerit };
+    }
+    /**
+     * 消耗功德
+     */
+    consumeMerit(amount) {
+      if (this.totalMerit < amount) {
+        return { success: false, error: "Insufficient merit" };
+      }
+      this.totalMerit -= amount;
+      this.saveState();
+      return { success: true, totalMerit: this.totalMerit };
+    }
+    /**
+     * 获取功德状态
+     */
+    getMeritStatus() {
+      return {
+        success: true,
+        totalMerit: this.totalMerit,
+        awakeningThreshold: CELESTIAL_CONFIG.AWAKENING_MERIT_THRESHOLD,
+        canAwakening: this.canTriggerAwakening()
+      };
+    }
+    // ===== 定期生成 =====
+    /**
+     * 尝试生成新的法旨
+     */
+    tryGenerateDecree() {
+      const now = Date.now();
+      if (now - this.lastDecreeTime < this.decreeInterval) {
+        return { success: false, error: "Too soon to generate new decree" };
+      }
+      const decree = this.generateDecree();
+      if (decree) {
+        this.lastDecreeTime = now;
+        return {
+          success: true,
+          decree: {
+            id: decree.id,
+            type: decree.type,
+            title: decree.title,
+            description: decree.description
+          }
+        };
+      }
+      return { success: false, error: "Could not generate decree" };
+    }
+    /**
+     * 尝试生成赐福
+     */
+    tryGenerateBlessing() {
+      const blessing = this.generateBlessing();
+      if (blessing) {
+        return {
+          success: true,
+          blessing: {
+            id: blessing.id,
+            type: blessing.type,
+            title: blessing.title,
+            description: blessing.description
+          }
+        };
+      }
+      return { success: false, error: "Could not generate blessing" };
+    }
+    /**
+     * 重置服务
+     */
+    reset() {
+      this.decrees = [];
+      this.blessings = [];
+      this.awakenings = [];
+      this.favor = 0;
+      this.totalMerit = 0;
+      this.lastDecreeTime = 0;
+      this.saveState();
+      return { success: true };
+    }
+    /**
+     * 获取统计信息
+     */
+    getStats() {
+      this.updateAwakenings();
+      return {
+        success: true,
+        favor: this.favor,
+        stance: this.getFavorStance(),
+        totalMerit: this.totalMerit,
+        decreeCount: this.decrees.length,
+        activeDecreeCount: this.decrees.filter((d) => d.status === DECREE_STATUS.ACTIVE || d.status === DECREE_STATUS.ACCEPTED).length,
+        blessingCount: this.blessings.length,
+        unclaimedBlessingCount: this.blessings.filter((b) => !b.claimed).length,
+        awakeningActive: this.awakenings.some((a) => a.active && !a.isEnded()),
+        canAwakening: this.canTriggerAwakening()
+      };
+    }
+  };
+  var celestialDecreeService = new CelestialDecreeService();
+
+  // src/main.js
   var gameState2 = null;
   var isGameInitialized = false;
   var gameLoopTimer = null;
@@ -12718,7 +13497,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V231",
+      gameVersion: "V232",
       // 设置
       settings: {
         soundEnabled: true,
@@ -12763,6 +13542,8 @@ var CultivationSimulator = (() => {
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
+    celestialDecreeService.init(gameState2);
+    domainModules.celestialDecree = celestialDecreeService;
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -13717,6 +14498,67 @@ var CultivationSimulator = (() => {
       const { mcpAnalyticsForecast: mcpAnalyticsForecast2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
       return mcpAnalyticsForecast2(params);
     });
+    mcpRegistry.registerTool("world.decree.list", {
+      name: "world.decree.list",
+      description: "\u67E5\u770B\u5F53\u524D\u5929\u9053\u6CD5\u65E8\u5217\u8868",
+      inputSchema: {
+        type: "object",
+        properties: {
+          status: { type: "string", description: "\u8FC7\u6EE4\u72B6\u6001 (active/accepted/completed/expired)" },
+          type: { type: "string", description: "\u8FC7\u6EE4\u7C7B\u578B (reward/punishment/quest)" }
+        }
+      }
+    }, (params) => celestialDecreeService.listDecrees(params || {}));
+    mcpRegistry.registerTool("world.decree.accept", {
+      name: "world.decree.accept",
+      description: "\u63A5\u53D7\u4E00\u4E2A\u5929\u9053\u6CD5\u65E8\u4EFB\u52A1",
+      inputSchema: {
+        type: "object",
+        properties: {
+          decreeId: { type: "string", description: "\u6CD5\u65E8ID" }
+        },
+        required: ["decreeId"]
+      }
+    }, (params) => celestialDecreeService.acceptDecree(params == null ? void 0 : params.decreeId));
+    mcpRegistry.registerTool("world.favor.query", {
+      name: "world.favor.query",
+      description: "\u67E5\u8BE2\u5F53\u524D\u6069\u5BA0\u7ACB\u573A",
+      inputSchema: { type: "object", properties: {} }
+    }, () => celestialDecreeService.queryFavor());
+    mcpRegistry.registerTool("world.favor.adjust", {
+      name: "world.favor.adjust",
+      description: "\u8C03\u6574\u6069\u5BA0\u503C\uFF08\u901A\u8FC7\u884C\u4E3A\u89E6\u53D1\uFF09",
+      inputSchema: {
+        type: "object",
+        properties: {
+          amount: { type: "number", description: "\u8C03\u6574\u6570\u503C\uFF08\u6B63\u8D1F\uFF09" },
+          reason: { type: "string", description: "\u8C03\u6574\u539F\u56E0" }
+        },
+        required: ["amount"]
+      }
+    }, (params) => celestialDecreeService.adjustFavor((params == null ? void 0 : params.amount) || 0, (params == null ? void 0 : params.reason) || ""));
+    mcpRegistry.registerTool("world.awakening.trigger", {
+      name: "world.awakening.trigger",
+      description: "\u89E6\u53D1\u4E16\u754C\u89C9\u9192\u4E8B\u4EF6",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "\u89C9\u9192\u7C7B\u578B (qi_tide/beast_rampage/realm_unseal)" }
+        },
+        required: ["type"]
+      }
+    }, (params) => celestialDecreeService.triggerAwakening(params == null ? void 0 : params.type));
+    mcpRegistry.registerTool("world.blessing.claim", {
+      name: "world.blessing.claim",
+      description: "\u9886\u53D6\u5929\u9053\u8D50\u798F",
+      inputSchema: {
+        type: "object",
+        properties: {
+          blessingId: { type: "string", description: "\u8D50\u798FID" }
+        },
+        required: ["blessingId"]
+      }
+    }, (params) => celestialDecreeService.claimBlessing(params == null ? void 0 : params.blessingId));
   }
   function doSaveGameWithFeedback() {
     const result = doSaveGame();
@@ -14011,4 +14853,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-b1fc522-2026-05-30T16-07-18-090Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-54a83f7-2026-05-30T16-18-38-270Z";
