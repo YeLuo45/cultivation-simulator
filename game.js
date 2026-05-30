@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-9e218b3-2026-05-30T15-37-15-096Z */
+/* Cultivation Simulator DDD-v1.0.0-68dd331-2026-05-30T15-41-50-650Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10954,6 +10954,534 @@ var CultivationSimulator = (() => {
   };
   var npcEvolutionEngine = new NPCEvolutionEngine();
 
+  // src/systems/ai/NPCDialogueService.js
+  init_NPCCollaboration();
+  var DIALOGUE_TEMPLATES = {
+    master: {
+      formal: [
+        { template: "\u5F92\u513F\uFF0C{topic}\uFF0C\u4E3A\u5E08\u751A\u611F\u6B23\u6170\u3002", variables: ["topic"] },
+        { template: "\u4FEE\u4ED9\u4E4B\u8DEF\u8270\u96BE\uFF0C{topic}\uFF0C\u4F60\u9700\u52E4\u52A0\u4FEE\u70BC\u3002", variables: ["topic"] },
+        { template: "\u4E3A\u5E08\u89C2\u4F60\u6839\u9AA8\uFF0C{topic}\uFF0C\u65E5\u540E\u5FC5\u6210\u5927\u5668\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u5F92\u513F\u554A\uFF0C{topic}\uFF0C\u8FD9\u4E8B\u4E3A\u5E08\u4E5F\u4E0D\u597D\u591A\u8BF4\u3002", variables: ["topic"] },
+        { template: "\u8BF4\u8D77\u6765\uFF0C{topic}\uFF0C\u4F60\u81EA\u5DF1\u597D\u597D\u7422\u78E8\u7422\u78E8\u3002", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u5929\u673A\u4E0D\u53EF\u6CC4\u9732\uFF0C{topic}\uFF0C\u4F60\u4E14\u8BB0\u4F4F\u4FBF\u662F\u3002", variables: ["topic"] },
+        { template: "\u51A5\u51A5\u4E4B\u4E2D\u81EA\u6709\u5B9A\u6570\uFF0C{topic}\uFF0C\u65E0\u9700\u591A\u95EE\u3002", variables: ["topic"] }
+      ]
+    },
+    merchant: {
+      formal: [
+        { template: "\u8FD9\u4F4D\u9053\u53CB\uFF0C{topic}\uFF0C\u672C\u5E97\u5E94\u6709\u5C3D\u6709\u3002", variables: ["topic"] },
+        { template: "\u5BA2\u5B98\uFF0C{topic}\uFF0C\u60A8\u773C\u5149\u771F\u662F\u72EC\u5230\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u54DF\uFF0C{topic}\uFF0C\u6765\u770B\u770B\u8FD9\u4E2A\uFF0C\u4FDD\u8BC1\u4FBF\u5B9C\uFF01", variables: ["topic"] },
+        { template: "\u563F\uFF0C{topic}\uFF0C\u6211\u8FD9\u513F\u53EF\u662F\u8D27\u771F\u4EF7\u5B9E\uFF01", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u8FD9\u4E9B\u4E1C\u897F\u561B\uFF0C{topic}\uFF0C\u6765\u5386\u53EF\u4E0D\u7B80\u5355\u3002", variables: ["topic"] },
+        { template: "\u4F60\u6211\u6709\u7F18\uFF0C{topic}\uFF0C\u4FBF\u8D60\u4F60\u4E00\u53E5\uFF1A\u83AB\u8D2A\u4FBF\u5B9C\u3002", variables: ["topic"] }
+      ]
+    },
+    fellow: {
+      formal: [
+        { template: "\u9053\u5144\uFF0C{topic}\uFF0C\u4E0D\u77E5\u6709\u4F55\u89C1\u6559\uFF1F", variables: ["topic"] },
+        { template: "\u8FD9\u4F4D\u9053\u53CB\uFF0C{topic}\uFF0C\u543E\u7B49\u5F53\u5171\u52C9\u4E4B\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u563F\uFF0C{topic}\uFF0C\u6700\u8FD1\u4FEE\u70BC\u5F97\u600E\u4E48\u6837\uFF1F", variables: ["topic"] },
+        { template: "\u8BF4\u8D77\u6765\uFF0C{topic}\uFF0C\u54B1\u4EEC\u4E00\u5757\u513F\u53BB\u63A2\u9669\u5982\u4F55\uFF1F", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u6211\u6628\u591C\u5360\u4E86\u4E00\u5366\uFF0C{topic}\uFF0C\u4F60\u4E14\u542C\u597D\u3002", variables: ["topic"] },
+        { template: "\u5929\u673A\u793A\u73B0\uFF0C{topic}\uFF0C\u6050\u6709\u5927\u4E8B\u53D1\u751F\u3002", variables: ["topic"] }
+      ]
+    },
+    monster: {
+      formal: [
+        { template: "\u5351\u5FAE\u7684\u4EBA\u7C7B\uFF0C{topic}\uFF0C\u901F\u901F\u79BB\u53BB\uFF01", variables: ["topic"] },
+        { template: "\u54FC\uFF0C{topic}\uFF0C\u672C\u5EA7\u4E0D\u5C51\u4E0E\u4F60\u8BA1\u8F83\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u54DF\uFF0C{topic}\uFF0C\u53C8\u6765\u9001\u6B7B\u4E86\uFF1F", variables: ["topic"] },
+        { template: "\u54C8\u54C8\u54C8\uFF0C{topic}\uFF0C\u6B63\u597D\u997F\u4E86\uFF01", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u5343\u5E74\u6C89\u7761\u4E2D\uFF0C{topic}\uFF0C\u543E\u5DF2\u7B49\u5F85\u591A\u65F6\u3002", variables: ["topic"] },
+        { template: "\u547D\u8FD0\u7684\u9F7F\u8F6E\u8F6C\u52A8\uFF0C{topic}\uFF0C\u4E00\u5207\u7686\u6709\u5B9A\u6570\u3002", variables: ["topic"] }
+      ]
+    }
+  };
+  var DEFAULT_TEMPLATES = {
+    formal: [
+      { template: "\u8FD9\u4F4D\u4FEE\u58EB\uFF0C{topic}\uFF0C\u6709\u4F55\u8D35\u5E72\uFF1F", variables: ["topic"] }
+    ],
+    casual: [
+      { template: "\u563F\uFF0C{topic}\uFF0C\u6709\u4EC0\u4E48\u4E8B\u5417\uFF1F", variables: ["topic"] }
+    ],
+    mysterious: [
+      { template: "\u5929\u673A\u7384\u5999\uFF0C{topic}\uFF0C\u543E\u96BE\u4EE5\u53C2\u900F\u3002", variables: ["topic"] }
+    ]
+  };
+  var DialogueContext = class {
+    constructor(npcId) {
+      this.npcId = npcId;
+      this.conversationHistory = [];
+      this.currentTopic = null;
+      this.emotion = "neutral";
+      this.goal = null;
+      this.turnCount = 0;
+      this.lastPlayerMessage = null;
+      this.lastGeneratedDialogue = null;
+      this.tone = "formal";
+      this.createdAt = Date.now();
+      this.updatedAt = Date.now();
+    }
+    /**
+     * 添加对话到历史
+     */
+    addToHistory(playerMessage, npcResponse) {
+      this.conversationHistory.push({
+        playerMessage,
+        npcResponse,
+        timestamp: Date.now(),
+        turn: this.turnCount
+      });
+      this.lastPlayerMessage = playerMessage;
+      this.lastGeneratedDialogue = npcResponse;
+      this.turnCount++;
+      this.updatedAt = Date.now();
+    }
+    /**
+     * 重置上下文
+     */
+    reset() {
+      this.conversationHistory = [];
+      this.currentTopic = null;
+      this.emotion = "neutral";
+      this.goal = null;
+      this.turnCount = 0;
+      this.lastPlayerMessage = null;
+      this.lastGeneratedDialogue = null;
+      this.updatedAt = Date.now();
+    }
+  };
+  var NPCMemoryEntry = class {
+    constructor(type, content, metadata = {}) {
+      this.id = `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.content = content;
+      this.metadata = metadata;
+      this.importance = metadata.importance || 0.5;
+      this.createdAt = Date.now();
+      this.lastAccessedAt = Date.now();
+      this.accessCount = 0;
+    }
+    /**
+     * 访问记忆
+     */
+    access() {
+      this.lastAccessedAt = Date.now();
+      this.accessCount++;
+    }
+  };
+  var NPCDialogueService = class {
+    constructor() {
+      this.contexts = /* @__PURE__ */ new Map();
+      this.memories = /* @__PURE__ */ new Map();
+      this.toneSettings = /* @__PURE__ */ new Map();
+      this.gameState = null;
+      this.initialized = false;
+      this.templateCache = /* @__PURE__ */ new Map();
+      this.maxMemoriesPerNPC = 100;
+      this.maxContextHistory = 50;
+    }
+    /**
+     * 初始化服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      this.initialized = true;
+      console.log("[NPCDialogueService] NPC\u5BF9\u8BDD\u751F\u6210\u670D\u52A1\u521D\u59CB\u5316\u5B8C\u6210");
+      return { success: true };
+    }
+    /**
+     * 获取或创建NPC上下文
+     */
+    getOrCreateContext(npcId) {
+      if (!this.contexts.has(npcId)) {
+        this.contexts.set(npcId, new DialogueContext(npcId));
+      }
+      return this.contexts.get(npcId);
+    }
+    /**
+     * 获取玩家上下文信息
+     */
+    getPlayerContext() {
+      var _a, _b, _c;
+      if (!this.gameState) return null;
+      return {
+        name: ((_a = this.gameState.player) == null ? void 0 : _a.name) || "\u672A\u77E5\u4FEE\u58EB",
+        level: ((_b = this.gameState.player) == null ? void 0 : _b.level) || 1,
+        realm: this.gameState.realm || 0,
+        stage: this.gameState.stage || 0,
+        reputation: ((_c = this.gameState.player) == null ? void 0 : _c.reputation) || 0
+      };
+    }
+    /**
+     * 从NPCEvolutionEngine获取NPC学习状态
+     */
+    getNPCLearningStatus(npcId) {
+      try {
+        const status = npcEvolutionEngine.registry.getLearningStatus(npcId);
+        return status;
+      } catch (e) {
+        return null;
+      }
+    }
+    // ===== MCP工具实现 =====
+    /**
+     * MCP: npc.dialogue.generate
+     * 生成NPC对话回复
+     */
+    mcpGenerateDialogue(params = {}) {
+      const { npcId, playerMessage, context: customContext } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!playerMessage) {
+        return { success: false, reason: "Missing playerMessage parameter" };
+      }
+      const role = this.extractRole(npcId);
+      const ctx = this.getOrCreateContext(npcId);
+      const memories = this.getMemories(npcId);
+      const relevantMemories = this.findRelevantMemories(memories, playerMessage);
+      const generated = this.generateDialogue(npcId, role, playerMessage, ctx, relevantMemories);
+      ctx.addToHistory(playerMessage, generated.text);
+      if (ctx.turnCount === 1) {
+        ctx.currentTopic = this.extractTopic(playerMessage);
+      }
+      this.recordMemory(npcId, "interaction", {
+        playerMessage,
+        npcResponse: generated.text
+      }, { importance: 0.5 });
+      return {
+        tool: "npc.dialogue.generate",
+        success: true,
+        npcId,
+        dialogue: generated,
+        context: {
+          turnCount: ctx.turnCount,
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          tone: ctx.tone
+        }
+      };
+    }
+    /**
+     * 提取NPC角色
+     */
+    extractRole(npcId) {
+      const lowerNpcId = npcId.toLowerCase();
+      if (NPC_ROLE_REGISTRY[lowerNpcId]) {
+        return lowerNpcId;
+      }
+      for (const role of Object.keys(NPC_ROLE_REGISTRY)) {
+        if (lowerNpcId.startsWith(role) || lowerNpcId.includes(role)) {
+          return role;
+        }
+      }
+      return "fellow";
+    }
+    /**
+     * 提取话题
+     */
+    extractTopic(message) {
+      const keywords = {
+        "\u4FEE\u70BC": "cultivation",
+        "\u7A81\u7834": "breakthrough",
+        "\u7075\u6839": "spirit_root",
+        "\u4E39\u836F": "pill",
+        "\u529F\u6CD5": "technique",
+        "\u4EFB\u52A1": "task",
+        "\u6218\u6597": "combat",
+        "\u4EA4\u6613": "trade",
+        "\u5207\u78CB": "sparring"
+      };
+      for (const [keyword, topic] of Object.entries(keywords)) {
+        if (message.includes(keyword)) {
+          return topic;
+        }
+      }
+      return "general";
+    }
+    /**
+     * 生成对话
+     */
+    generateDialogue(npcId, role, playerMessage, context, memories) {
+      const tone = this.toneSettings.get(npcId) || context.tone || "formal";
+      const templates = DIALOGUE_TEMPLATES[role] || DEFAULT_TEMPLATES;
+      const toneTemplates = templates[tone] || templates.formal;
+      if (toneTemplates.length === 0) {
+        return { text: "...", tone, source: "default" };
+      }
+      let selectedTemplate = toneTemplates[Math.floor(Math.random() * toneTemplates.length)];
+      if (memories.length > 0) {
+        const recentMemory = memories[0];
+        if (recentMemory.content.npcResponse) {
+          const variantIndex = Math.floor(Math.random() * toneTemplates.length);
+          selectedTemplate = toneTemplates[variantIndex];
+        }
+      }
+      let text = selectedTemplate.template;
+      const topic = this.extractTopic(playerMessage);
+      const topicMap = {
+        "cultivation": "\u4FEE\u70BC\u4E4B\u4E8B",
+        "breakthrough": "\u7A81\u7834\u4E4B\u673A",
+        "spirit_root": "\u7075\u6839\u4E4B\u9053",
+        "pill": "\u4E39\u836F\u4E4B\u7406",
+        "technique": "\u529F\u6CD5\u4E4B\u5999",
+        "task": "\u4EFB\u52A1\u4E4B\u7EA6",
+        "combat": "\u6218\u6597\u4E4B\u9053",
+        "trade": "\u4EA4\u6613\u4E4B\u9053",
+        "sparring": "\u5207\u78CB\u4E4B\u8C0A",
+        "general": "\u4FEE\u884C\u4E4B\u8DEF"
+      };
+      text = text.replace("{topic}", topicMap[topic] || topicMap.general);
+      return {
+        text,
+        tone,
+        template: selectedTemplate.template,
+        source: "template"
+      };
+    }
+    /**
+     * MCP: npc.dialogue.context
+     * 获取当前对话上下文
+     */
+    mcpGetContext(params = {}) {
+      const { npcId } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const ctx = this.contexts.get(npcId);
+      if (!ctx) {
+        return {
+          success: true,
+          npcId,
+          exists: false,
+          message: "No active dialogue context"
+        };
+      }
+      return {
+        tool: "npc.dialogue.context",
+        success: true,
+        npcId,
+        exists: true,
+        context: {
+          conversationHistory: ctx.conversationHistory.slice(-10),
+          // 最近10条
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          goal: ctx.goal,
+          turnCount: ctx.turnCount,
+          lastPlayerMessage: ctx.lastPlayerMessage,
+          lastGeneratedDialogue: ctx.lastGeneratedDialogue,
+          tone: ctx.tone,
+          createdAt: ctx.createdAt,
+          updatedAt: ctx.updatedAt
+        }
+      };
+    }
+    /**
+     * MCP: npc.memory.retrieve
+     * 检索NPC记忆
+     */
+    mcpRetrieveMemory(params = {}) {
+      const { npcId, type, limit = 10 } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const learningStatus = this.getNPCLearningStatus(npcId);
+      const memories = this.getMemories(npcId);
+      let filtered = memories;
+      if (type) {
+        filtered = memories.filter((m) => m.type === type);
+      }
+      filtered.sort((a, b) => b.importance - a.importance);
+      filtered = filtered.slice(0, limit);
+      for (const memory of filtered) {
+        memory.access();
+      }
+      return {
+        tool: "npc.memory.retrieve",
+        success: true,
+        npcId,
+        memories: filtered,
+        totalMemories: memories.length,
+        learningStatus: learningStatus ? {
+          adaptationLevel: learningStatus.adaptationLevel,
+          behaviorPattern: learningStatus.behaviorPattern,
+          stats: learningStatus.stats
+        } : null
+      };
+    }
+    /**
+     * 获取NPC记忆
+     */
+    getMemories(npcId) {
+      if (!this.memories.has(npcId)) {
+        this.memories.set(npcId, []);
+      }
+      return this.memories.get(npcId);
+    }
+    /**
+     * 记录记忆
+     */
+    recordMemory(npcId, type, content, metadata = {}) {
+      const memories = this.getMemories(npcId);
+      const entry = new NPCMemoryEntry(type, content, metadata);
+      memories.push(entry);
+      if (memories.length > this.maxMemoriesPerNPC) {
+        memories.sort((a, b) => a.importance - b.importance);
+        memories.shift();
+      }
+      return entry;
+    }
+    /**
+     * 查找相关记忆
+     */
+    findRelevantMemories(memories, query) {
+      if (memories.length === 0) return [];
+      const queryWords = query.toLowerCase().split(/\s+/);
+      return memories.map((memory) => {
+        let relevance = 0;
+        const contentStr = JSON.stringify(memory.content).toLowerCase();
+        for (const word of queryWords) {
+          if (contentStr.includes(word)) {
+            relevance += 0.3;
+          }
+        }
+        relevance += Math.min(memory.accessCount * 0.05, 0.3);
+        relevance += memory.importance * 0.2;
+        return { memory, relevance };
+      }).filter((item) => item.relevance > 0.1).sort((a, b) => b.relevance - a.relevance).slice(0, 5).map((item) => item.memory);
+    }
+    /**
+     * MCP: npc.context.update
+     * 更新对话上下文
+     */
+    mcpUpdateContext(params = {}) {
+      const { npcId, updates } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!updates) {
+        return { success: false, reason: "Missing updates parameter" };
+      }
+      const ctx = this.getOrCreateContext(npcId);
+      if (updates.currentTopic !== void 0) {
+        ctx.currentTopic = updates.currentTopic;
+      }
+      if (updates.emotion !== void 0) {
+        ctx.emotion = updates.emotion;
+      }
+      if (updates.goal !== void 0) {
+        ctx.goal = updates.goal;
+      }
+      if (updates.tone !== void 0) {
+        ctx.tone = updates.tone;
+        this.toneSettings.set(npcId, updates.tone);
+      }
+      ctx.updatedAt = Date.now();
+      return {
+        tool: "npc.context.update",
+        success: true,
+        npcId,
+        updatedFields: Object.keys(updates),
+        context: {
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          goal: ctx.goal,
+          tone: ctx.tone,
+          turnCount: ctx.turnCount
+        }
+      };
+    }
+    /**
+     * MCP: npc.dialogue.reset
+     * 重置NPC对话状态
+     */
+    mcpResetDialogue(params = {}) {
+      const { npcId, clearMemories = false } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const ctx = this.contexts.get(npcId);
+      const hadContext = !!ctx;
+      if (ctx) {
+        ctx.reset();
+      }
+      if (clearMemories) {
+        this.memories.delete(npcId);
+      }
+      this.toneSettings.delete(npcId);
+      return {
+        tool: "npc.dialogue.reset",
+        success: true,
+        npcId,
+        hadContext,
+        memoriesCleared: clearMemories
+      };
+    }
+    /**
+     * MCP: npc.tone.set
+     * 设置NPC对话语气
+     */
+    mcpSetTone(params = {}) {
+      const { npcId, tone } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!tone) {
+        return { success: false, reason: "Missing tone parameter" };
+      }
+      const validTones = ["formal", "casual", "mysterious"];
+      if (!validTones.includes(tone)) {
+        return {
+          success: false,
+          reason: `Invalid tone. Must be one of: ${validTones.join(", ")}`
+        };
+      }
+      this.toneSettings.set(npcId, tone);
+      const ctx = this.getOrCreateContext(npcId);
+      ctx.tone = tone;
+      ctx.updatedAt = Date.now();
+      return {
+        tool: "npc.tone.set",
+        success: true,
+        npcId,
+        tone,
+        message: `NPC ${npcId} tone set to ${tone}`
+      };
+    }
+    /**
+     * 获取服务状态
+     */
+    getStatus() {
+      return {
+        initialized: this.initialized,
+        activeContexts: this.contexts.size,
+        totalMemories: Array.from(this.memories.values()).reduce((sum, arr) => sum + arr.length, 0),
+        toneSettings: this.toneSettings.size
+      };
+    }
+  };
+  var npcDialogueService = new NPCDialogueService();
+
   // src/main.js
   init_RealmEventBus();
   init_EventAnalyticsService();
@@ -11125,6 +11653,7 @@ var CultivationSimulator = (() => {
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
     npcEvolutionEngine.init(gameState2);
+    npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -11580,6 +12109,87 @@ var CultivationSimulator = (() => {
         required: ["npcId"]
       }
     }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.generate", {
+      name: "npc.dialogue.generate",
+      description: "Generate NPC dialogue response based on player input and context",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          playerMessage: { type: "string", description: "Player message to respond to" }
+        },
+        required: ["npcId", "playerMessage"]
+      }
+    }, (params) => npcDialogueService.mcpGenerateDialogue(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.context", {
+      name: "npc.dialogue.context",
+      description: "Get current dialogue context for NPC",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpGetContext(params || {}));
+    mcpRegistry.registerTool("npc.memory.retrieve", {
+      name: "npc.memory.retrieve",
+      description: "Retrieve NPC memories and learning status",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          type: { type: "string", description: "Memory type filter (interaction/preference/event/relationship)" },
+          limit: { type: "number", description: "Maximum memories to retrieve" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpRetrieveMemory(params || {}));
+    mcpRegistry.registerTool("npc.context.update", {
+      name: "npc.context.update",
+      description: "Update dialogue context fields for NPC",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          updates: {
+            type: "object",
+            description: "Fields to update (currentTopic, emotion, goal, tone)",
+            properties: {
+              currentTopic: { type: "string" },
+              emotion: { type: "string" },
+              goal: { type: "string" },
+              tone: { type: "string" }
+            }
+          }
+        },
+        required: ["npcId", "updates"]
+      }
+    }, (params) => npcDialogueService.mcpUpdateContext(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.reset", {
+      name: "npc.dialogue.reset",
+      description: "Reset NPC dialogue state",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          clearMemories: { type: "boolean", description: "Also clear NPC memories" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpResetDialogue(params || {}));
+    mcpRegistry.registerTool("npc.tone.set", {
+      name: "npc.tone.set",
+      description: "Set NPC dialogue tone",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          tone: { type: "string", description: "Tone to set (formal/casual/mysterious)" }
+        },
+        required: ["npcId", "tone"]
+      }
+    }, (params) => npcDialogueService.mcpSetTone(params || {}));
     mcpRegistry.registerTool("event.bus.publish", {
       name: "event.bus.publish",
       description: "Publish an event to the realm event bus",
@@ -12077,4 +12687,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-9e218b3-2026-05-30T15-37-15-096Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-68dd331-2026-05-30T15-41-50-650Z";
