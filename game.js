@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-3435f4a-2026-05-30T16-23-15-504Z */
+/* Cultivation Simulator DDD-v1.0.0-c8a82fd-2026-05-30T16-33-21-654Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -11122,6 +11122,905 @@ var CultivationSimulator = (() => {
     return service;
   }
 
+  // src/domains/combat/services/RealmWarfareService.js
+  var REALM_WARFARE_CONFIG = {
+    declareCost: 1e5,
+    // 宣战消耗灵石
+    preparePhaseDuration: 36e5,
+    // 准备期1小时 (ms)
+    warPhaseDuration: 72e5,
+    // 战争进行期2小时 (ms)
+    executePhaseDuration: 18e5,
+    // 执行期30分钟 (ms)
+    maxArmySize: 1e3,
+    // 最大军队规模
+    maxSoldiersPerType: 400,
+    // 每种兵种最大数量
+    victoryRewardMultiplier: 1.5,
+    // 战胜奖励倍率
+    defeatPenaltyMultiplier: 0.5,
+    // 战败惩罚倍率
+    allianceSupportCost: 5e4,
+    // 请求联盟支援消耗
+    armyTypes: ["infantry", "cavalry", "archer", "mage", "guardian"],
+    // 兵种类型
+    strategyTypes: ["aggressive", "defensive", "balanced", "guerrilla", "siege"],
+    // 战略类型
+    unitStats: {
+      infantry: { attack: 10, defense: 15, speed: 5, cost: 100 },
+      cavalry: { attack: 20, defense: 10, speed: 25, cost: 300 },
+      archer: { attack: 15, defense: 5, speed: 10, cost: 200 },
+      mage: { attack: 30, defense: 5, speed: 8, cost: 500 },
+      guardian: { attack: 5, defense: 30, speed: 3, cost: 400 }
+    }
+  };
+  var UNIT_COUNTER_TABLE = {
+    infantry: { beats: "cavalry", weakTo: "archer", multiplier: 1.5 },
+    cavalry: { beats: "archer", weakTo: "infantry", multiplier: 1.3 },
+    archer: { beats: "mage", weakTo: "cavalry", multiplier: 1.4 },
+    mage: { beats: "guardian", weakTo: "infantry", multiplier: 1.2 },
+    guardian: { beats: "archer", weakTo: "mage", multiplier: 1.3 }
+  };
+  var WAR_STATES = {
+    NONE: "none",
+    PREPARING: "preparing",
+    // 准备期
+    EXECUTING: "executing",
+    // 执行期
+    ENDED: "ended"
+    // 已结束
+  };
+  function createWarRecord(attackerId, defenderId, attackerName, defenderName) {
+    return {
+      uid: "war_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+      attacker: {
+        sectId: attackerId,
+        name: attackerName,
+        troops: { infantry: 0, cavalry: 0, archer: 0, mage: 0, guardian: 0 },
+        strategy: null,
+        morale: 100,
+        casualties: { infantry: 0, cavalry: 0, archer: 0, mage: 0, guardian: 0 }
+      },
+      defender: {
+        sectId: defenderId,
+        name: defenderName,
+        troops: { infantry: 0, cavalry: 0, archer: 0, mage: 0, guardian: 0 },
+        strategy: null,
+        morale: 100,
+        casualties: { infantry: 0, cavalry: 0, archer: 0, mage: 0, guardian: 0 }
+      },
+      state: WAR_STATES.PREPARING,
+      declareTime: Date.now(),
+      prepareEndTime: Date.now() + REALM_WARFARE_CONFIG.preparePhaseDuration,
+      executeStartTime: null,
+      executeEndTime: null,
+      winner: null,
+      rewards: {
+        spiritStones: 0,
+        pills: 0,
+        techniques: 0,
+        territory: null
+      },
+      battleLog: []
+    };
+  }
+  function createRealmWarfareService(gameState3) {
+    return new RealmWarfareService(gameState3);
+  }
+  var RealmWarfareService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.wars = /* @__PURE__ */ new Map();
+      this.playerWarId = null;
+    }
+    /**
+     * 初始化万界战争系统
+     */
+    init(gameState3) {
+      if (!gameState3.realmWarfare) {
+        gameState3.realmWarfare = {
+          wars: [],
+          // 所有战争记录
+          playerWarId: null,
+          // 玩家当前参与的战争ID
+          totalWarsDeclared: 0,
+          // 总宣战次数
+          totalVictories: 0,
+          // 总胜利次数
+          totalDefeats: 0,
+          // 总失败次数
+          claimedRewards: []
+          // 已领取的奖励记录
+        };
+      }
+      this.wars = gameState3.realmWarfare;
+      return gameState3;
+    }
+    /**
+     * 检查玩家是否已飞升
+     */
+    isPlayerAscended() {
+      var _a;
+      return ((_a = this.gameState.ascension) == null ? void 0 : _a.ascended) === true;
+    }
+    /**
+     * 获取玩家当前仙界宗门
+     */
+    getPlayerSect() {
+      var _a, _b;
+      if (!this.wars.playerSectId) return null;
+      return (_b = (_a = this.gameState.immortalSects) == null ? void 0 : _a.sects) == null ? void 0 : _b.find(
+        (s) => s.uid === this.gameState.immortalSects.playerSectId
+      );
+    }
+    /**
+     * 获取玩家所在仙界宗门
+     */
+    getPlayerImmortalSect() {
+      var _a;
+      if (!((_a = this.gameState.immortalSects) == null ? void 0 : _a.playerSectId)) return null;
+      return this.gameState.immortalSects.sects.find(
+        (s) => s.uid === this.gameState.immortalSects.playerSectId
+      );
+    }
+    /**
+     * 获取玩家当前参与的战争
+     */
+    getPlayerWar() {
+      if (!this.wars.playerWarId) return null;
+      return this.wars.wars.find((w) => w.uid === this.wars.playerWarId);
+    }
+    /**
+     * 计算军队总战力
+     * @param {Object} troops - 军队编制 {infantry, cavalry, archer, mage, guardian}
+     */
+    calculateArmyPower(troops) {
+      let totalPower = 0;
+      for (const [type, count] of Object.entries(troops)) {
+        const stats = REALM_WARFARE_CONFIG.unitStats[type];
+        if (stats) {
+          totalPower += stats.attack * count + stats.defense * count * 0.5;
+        }
+      }
+      return Math.floor(totalPower);
+    }
+    /**
+     * 获取战略对战斗力的影响
+     * @param {string} strategy - 战略类型
+     * @param {boolean} isAttacker - 是否为攻方
+     */
+    getStrategyBonus(strategy, isAttacker) {
+      const bonuses = {
+        aggressive: { attackBonus: 1.3, defenseBonus: 0.8, speedBonus: 1.2 },
+        defensive: { attackBonus: 0.8, defenseBonus: 1.4, speedBonus: 0.9 },
+        balanced: { attackBonus: 1, defenseBonus: 1, speedBonus: 1 },
+        guerrilla: { attackBonus: 1.1, defenseBonus: 0.7, speedBonus: 1.5 },
+        siege: { attackBonus: 1.5, defenseBonus: 0.6, speedBonus: 0.5 }
+      };
+      const bonus = bonuses[strategy] || bonuses.balanced;
+      return bonus;
+    }
+    /**
+     * 计算兵种相克效果
+     * @param {string} attackerType - 攻击方兵种
+     * @param {string} defenderType - 防守方兵种
+     * @param {number} baseDamage - 基础伤害
+     */
+    calculateCounterBonus(attackerType, defenderType, baseDamage) {
+      const counter = UNIT_COUNTER_TABLE[attackerType];
+      if (counter && counter.beats === defenderType) {
+        return baseDamage * counter.multiplier;
+      }
+      if (counter && counter.weakTo === defenderType) {
+        return baseDamage / counter.multiplier;
+      }
+      return baseDamage;
+    }
+    // ========== MCP 工具实现 ==========
+    /**
+     * war.declare - 宣战
+     * @param {Object} params - { targetSectId: string }
+     */
+    mcpWarDeclare(params = {}) {
+      var _a, _b, _c, _d;
+      const { targetSectId } = params;
+      if (!this.isPlayerAscended()) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u98DE\u5347\uFF0C\u65E0\u6CD5\u53C2\u4E0E\u4E07\u754C\u6218\u4E89"
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (this.wars.playerWarId) {
+        const existingWar = this.getPlayerWar();
+        if (existingWar && existingWar.state !== WAR_STATES.ENDED) {
+          return {
+            success: false,
+            error: "\u4F60\u5DF2\u53C2\u4E0E\u4E00\u573A\u6218\u4E89\uFF0C\u8BF7\u7B49\u5F85\u5F53\u524D\u6218\u4E89\u7ED3\u675F"
+          };
+        }
+      }
+      if (!targetSectId) {
+        return {
+          success: false,
+          error: "\u8BF7\u6307\u5B9A\u76EE\u6807\u5B97\u95E8ID"
+        };
+      }
+      const targetSect = (_b = (_a = this.gameState.immortalSects) == null ? void 0 : _a.sects) == null ? void 0 : _b.find(
+        (s) => s.uid === targetSectId
+      );
+      if (!targetSect) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u4ED9\u754C\u5B97\u95E8\u4E0D\u5B58\u5728"
+        };
+      }
+      if (targetSectId === playerSect.uid) {
+        return {
+          success: false,
+          error: "\u4E0D\u80FD\u5BF9\u81EA\u5DF1\u7684\u5B97\u95E8\u5BA3\u6218"
+        };
+      }
+      if ((_c = playerSect.enemies) == null ? void 0 : _c.includes(targetSectId)) {
+        return {
+          success: false,
+          error: "\u8BE5\u5B97\u95E8\u5DF2\u5728\u654C\u5BF9\u540D\u5355\u4E2D\uFF0C\u8BF7\u5148\u89E3\u9664\u654C\u5BF9\u5173\u7CFB"
+        };
+      }
+      const cost = REALM_WARFARE_CONFIG.declareCost;
+      if ((this.gameState.spiritStones || 0) < cost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981 ${cost} \u7075\u77F3\u6765\u5BA3\u6218`
+        };
+      }
+      const sectResources = ((_d = playerSect.resources) == null ? void 0 : _d.spiritStones) || 0;
+      if (sectResources < cost * 0.5) {
+        return {
+          success: false,
+          error: "\u5B97\u95E8\u8D44\u6E90\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u652F\u6491\u6218\u4E89"
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const war = createWarRecord(
+        playerSect.uid,
+        targetSectId,
+        playerSect.name,
+        targetSect.name
+      );
+      const defenderScale = targetSect.sectLevel * 0.3 + 0.5;
+      war.defender.troops = {
+        infantry: Math.floor(100 * defenderScale),
+        cavalry: Math.floor(50 * defenderScale),
+        archer: Math.floor(30 * defenderScale),
+        mage: Math.floor(20 * defenderScale),
+        guardian: Math.floor(25 * defenderScale)
+      };
+      this.wars.wars.push(war);
+      this.wars.playerWarId = war.uid;
+      this.wars.totalWarsDeclared++;
+      if (!playerSect.enemies) playerSect.enemies = [];
+      playerSect.enemies.push(targetSectId);
+      if (!targetSect.enemies) targetSect.enemies = [];
+      targetSect.enemies.push(playerSect.uid);
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "system",
+        message: `${playerSect.name} \u5411 ${targetSect.name} \u5BA3\u6218\uFF01`
+      });
+      return {
+        success: true,
+        message: `\u5411\u300C${targetSect.name}\u300D\u5BA3\u6218\u6210\u529F\uFF01`,
+        war: {
+          uid: war.uid,
+          attacker: war.attacker.name,
+          defender: war.defender.name,
+          state: war.state,
+          prepareEndTime: war.prepareEndTime,
+          costDeducted: cost
+        }
+      };
+    }
+    /**
+     * war.army.recruit - 招募军队
+     * @param {Object} params - { unitType: string, count: number }
+     */
+    mcpArmyRecruit(params = {}) {
+      const { unitType, count } = params;
+      const war = this.getPlayerWar();
+      if (!war) {
+        return {
+          success: false,
+          error: "\u4F60\u5F53\u524D\u6CA1\u6709\u53C2\u4E0E\u4EFB\u4F55\u6218\u4E89"
+        };
+      }
+      if (war.state !== WAR_STATES.PREPARING) {
+        return {
+          success: false,
+          error: `\u6218\u4E89\u5DF2\u8FDB\u5165${war.state}\u9636\u6BB5\uFF0C\u65E0\u6CD5\u62DB\u52DF\u519B\u961F`
+        };
+      }
+      if (!REALM_WARFARE_CONFIG.armyTypes.includes(unitType)) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u5175\u79CD\u7C7B\u578B\uFF0C\u53EF\u9009: ${REALM_WARFARE_CONFIG.armyTypes.join(", ")}`
+        };
+      }
+      if (!count || count <= 0) {
+        return {
+          success: false,
+          error: "\u62DB\u52DF\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0"
+        };
+      }
+      const maxPerType = REALM_WARFARE_CONFIG.maxSoldiersPerType;
+      if (count > maxPerType) {
+        return {
+          success: false,
+          error: `\u5355\u79CD\u5175\u79CD\u6700\u591A\u62DB\u52DF ${maxPerType} \u540D`
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const currentTotal = Object.values(war.attacker.troops).reduce((a, b) => a + b, 0);
+      if (currentTotal + count > REALM_WARFARE_CONFIG.maxArmySize) {
+        return {
+          success: false,
+          error: `\u519B\u961F\u603B\u89C4\u6A21\u4E0D\u80FD\u8D85\u8FC7 ${REALM_WARFARE_CONFIG.maxArmySize} \u4EBA\uFF0C\u5F53\u524D: ${currentTotal}`
+        };
+      }
+      const unitStats = REALM_WARFARE_CONFIG.unitStats[unitType];
+      const totalCost = unitStats.cost * count;
+      if ((this.gameState.spiritStones || 0) < totalCost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981 ${totalCost} \u7075\u77F3\u62DB\u52DF ${count} \u540D${unitType}`
+        };
+      }
+      this.gameState.spiritStones -= totalCost;
+      war.attacker.troops[unitType] = (war.attacker.troops[unitType] || 0) + count;
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "recruit",
+        message: `\u62DB\u52DF ${count} \u540D${unitType}\uFF0C\u6D88\u8017 ${totalCost} \u7075\u77F3`
+      });
+      const totalArmy = Object.values(war.attacker.troops).reduce((a, b) => a + b, 0);
+      const armyPower = this.calculateArmyPower(war.attacker.troops);
+      return {
+        success: true,
+        message: `\u6210\u529F\u62DB\u52DF ${count} \u540D${unitType}\uFF01`,
+        recruitment: {
+          unitType,
+          count,
+          cost: totalCost,
+          totalTroops: war.attacker.troops
+        },
+        armyStatus: {
+          totalSize: totalArmy,
+          power: armyPower,
+          troops: war.attacker.troops
+        }
+      };
+    }
+    /**
+     * war.strategy.set - 设置战略
+     * @param {Object} params - { strategyType: string }
+     */
+    mcpStrategySet(params = {}) {
+      const { strategyType } = params;
+      const war = this.getPlayerWar();
+      if (!war) {
+        return {
+          success: false,
+          error: "\u4F60\u5F53\u524D\u6CA1\u6709\u53C2\u4E0E\u4EFB\u4F55\u6218\u4E89"
+        };
+      }
+      if (war.state !== WAR_STATES.PREPARING) {
+        return {
+          success: false,
+          error: `\u6218\u4E89\u5DF2\u8FDB\u5165${war.state}\u9636\u6BB5\uFF0C\u65E0\u6CD5\u8BBE\u7F6E\u6218\u7565`
+        };
+      }
+      if (!REALM_WARFARE_CONFIG.strategyTypes.includes(strategyType)) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u6218\u7565\u7C7B\u578B\uFF0C\u53EF\u9009: ${REALM_WARFARE_CONFIG.strategyTypes.join(", ")}`
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const isAttacker = war.attacker.sectId === playerSect.uid;
+      const targetSide = isAttacker ? war.attacker : war.defender;
+      targetSide.strategy = strategyType;
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "strategy",
+        message: `${targetSide.name} \u8BBE\u7F6E\u6218\u7565: ${strategyType}`
+      });
+      const bonus = this.getStrategyBonus(strategyType, isAttacker);
+      return {
+        success: true,
+        message: `\u6218\u7565\u5DF2\u8BBE\u7F6E\u4E3A\u300C${strategyType}\u300D`,
+        strategy: {
+          type: strategyType,
+          side: isAttacker ? "attacker" : "defender",
+          bonuses: {
+            attackBonus: bonus.attackBonus,
+            defenseBonus: bonus.defenseBonus,
+            speedBonus: bonus.speedBonus
+          }
+        }
+      };
+    }
+    /**
+     * war.execute - 执行战斗
+     * @param {Object} params - { warId?: string }
+     */
+    mcpWarExecute(params = {}) {
+      const { warId } = params;
+      let war;
+      if (warId) {
+        war = this.wars.wars.find((w) => w.uid === warId);
+      } else {
+        war = this.getPlayerWar();
+      }
+      if (!war) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6218\u4E89\u8BB0\u5F55"
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const isParticipant = war.attacker.sectId === playerSect.uid || war.defender.sectId === playerSect.uid;
+      if (!isParticipant) {
+        return {
+          success: false,
+          error: "\u4F60\u4E0D\u662F\u8FD9\u573A\u6218\u4E89\u7684\u53C2\u4E0E\u65B9"
+        };
+      }
+      if (war.state === WAR_STATES.ENDED) {
+        return {
+          success: false,
+          error: "\u6218\u4E89\u5DF2\u7ED3\u675F"
+        };
+      }
+      if (war.state === WAR_STATES.EXECUTING) {
+        return {
+          success: false,
+          error: "\u6218\u6597\u6B63\u5728\u6267\u884C\u4E2D"
+        };
+      }
+      if (war.state === WAR_STATES.PREPARING && Date.now() < war.prepareEndTime) {
+        const remaining = Math.ceil((war.prepareEndTime - Date.now()) / 6e4);
+        return {
+          success: false,
+          error: `\u51C6\u5907\u671F\u8FD8\u672A\u7ED3\u675F\uFF0C\u8FD8\u9700 ${remaining} \u5206\u949F`
+        };
+      }
+      war.state = WAR_STATES.EXECUTING;
+      war.executeStartTime = Date.now();
+      war.executeEndTime = Date.now() + REALM_WARFARE_CONFIG.executePhaseDuration;
+      const attackerPower = this.calculateArmyPower(war.attacker.troops);
+      const defenderPower = this.calculateArmyPower(war.defender.troops);
+      let attackerBonus = 1;
+      let defenderBonus = 1;
+      if (war.attacker.strategy) {
+        attackerBonus = this.getStrategyBonus(war.attacker.strategy, true);
+      }
+      if (war.defender.strategy) {
+        defenderBonus = this.getStrategyBonus(war.defender.strategy, false);
+      }
+      const effectiveAttackerPower = Math.floor(attackerPower * attackerBonus);
+      const effectiveDefenderPower = Math.floor(defenderPower * defenderBonus);
+      const totalPower = effectiveAttackerPower + effectiveDefenderPower;
+      const attackerRatio = effectiveAttackerPower / totalPower;
+      const defenderRatio = effectiveDefenderPower / totalPower;
+      const baseLossRate = 0.2;
+      let attackerLosses = {};
+      let defenderLosses = {};
+      for (const type of REALM_WARFARE_CONFIG.armyTypes) {
+        const attackerCount = war.attacker.troops[type] || 0;
+        const defenderCount = war.defender.troops[type] || 0;
+        attackerLosses[type] = Math.floor(attackerCount * baseLossRate * defenderRatio);
+        war.attacker.casualties[type] = attackerLosses[type];
+        war.attacker.troops[type] = Math.max(0, attackerCount - attackerLosses[type]);
+        defenderLosses[type] = Math.floor(defenderCount * baseLossRate * attackerRatio);
+        war.defender.casualties[type] = defenderLosses[type];
+        war.defender.troops[type] = Math.max(0, defenderCount - defenderLosses[type]);
+      }
+      war.attacker.morale = Math.max(20, 100 - attackerRatio * 100);
+      war.defender.morale = Math.max(20, 100 - defenderRatio * 100);
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "battle",
+        message: `\u6218\u6597\u5F00\u59CB\uFF01\u653B\u65B9\u6218\u529B: ${effectiveAttackerPower}\uFF0C\u5B88\u65B9\u6218\u529B: ${effectiveDefenderPower}`
+      });
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "casualties",
+        message: `\u653B\u51FB\u65B9\u635F\u5931: ${Object.values(attackerLosses).reduce((a, b) => a + b, 0)} \u4EBA`
+      });
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "casualties",
+        message: `\u9632\u5B88\u65B9\u635F\u5931: ${Object.values(defenderLosses).reduce((a, b) => a + b, 0)} \u4EBA`
+      });
+      const isAttacker = war.attacker.sectId === playerSect.uid;
+      let winner;
+      let reward;
+      if (effectiveAttackerPower > effectiveDefenderPower * 1.2) {
+        winner = "attacker";
+        war.winner = war.attacker.sectId;
+        war.attacker.morale = 100;
+        war.defender.morale = 30;
+        reward = this.calculateRewards(war, "attacker");
+        war.rewards = reward;
+        if (isAttacker) {
+          this.wars.totalVictories++;
+        } else {
+          this.wars.totalDefeats++;
+        }
+      } else if (effectiveDefenderPower > effectiveAttackerPower * 1.2) {
+        winner = "defender";
+        war.winner = war.defender.sectId;
+        war.defender.morale = 100;
+        war.attacker.morale = 30;
+        reward = this.calculateRewards(war, "defender");
+        war.rewards = reward;
+        if (isAttacker) {
+          this.wars.totalDefeats++;
+        } else {
+          this.wars.totalVictories++;
+        }
+      } else {
+        winner = "draw";
+        war.battleLog.push({
+          timestamp: Date.now(),
+          type: "system",
+          message: "\u53CC\u65B9\u52BF\u5747\u529B\u654C\uFF0C\u6218\u6597\u9677\u5165\u50F5\u5C40\uFF01"
+        });
+      }
+      return {
+        success: true,
+        message: winner === "draw" ? "\u6218\u6597\u9677\u5165\u50F5\u5C40\uFF01" : `\u6218\u6597\u7ED3\u675F\uFF0C${winner === "attacker" ? war.attacker.name : war.defender.name}\u83B7\u80DC\uFF01`,
+        battleResult: {
+          warId: war.uid,
+          winner,
+          attackerPower: effectiveAttackerPower,
+          defenderPower: effectiveDefenderPower,
+          attackerLosses,
+          defenderLosses,
+          attackerMorale: war.attacker.morale,
+          defenderMorale: war.defender.morale,
+          remainingTroops: {
+            attacker: war.attacker.troops,
+            defender: war.defender.troops
+          },
+          rewards: war.rewards
+        }
+      };
+    }
+    /**
+     * 计算战争奖励
+     * @param {Object} war - 战争记录
+     * @param {string} winnerSide - 获胜方 'attacker' or 'defender'
+     */
+    calculateRewards(war, winnerSide) {
+      const loserSide = winnerSide === "attacker" ? "defender" : "attacker";
+      const loserTroops = war[loserSide].troops;
+      const loserPower = this.calculateArmyPower(loserTroops);
+      const baseReward = Math.floor(loserPower * 0.5);
+      const multiplier = REALM_WARFARE_CONFIG.victoryRewardMultiplier;
+      return {
+        spiritStones: Math.floor(baseReward * multiplier * 0.6),
+        pills: Math.floor(baseReward * multiplier * 0.2),
+        techniques: Math.floor(baseReward * multiplier * 0.1),
+        territory: null
+      };
+    }
+    /**
+     * war.result.claim - 领取战利品
+     * @param {Object} params - { warId?: string }
+     */
+    mcpResultClaim(params = {}) {
+      var _a;
+      const { warId } = params;
+      let war;
+      if (warId) {
+        war = this.wars.wars.find((w) => w.uid === warId);
+      } else {
+        war = this.getPlayerWar();
+      }
+      if (!war) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6218\u4E89\u8BB0\u5F55"
+        };
+      }
+      if (war.state !== WAR_STATES.ENDED) {
+        return {
+          success: false,
+          error: "\u6218\u4E89\u5C1A\u672A\u7ED3\u675F\uFF0C\u65E0\u6CD5\u9886\u53D6\u6218\u5229\u54C1"
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const isParticipant = war.attacker.sectId === playerSect.uid || war.defender.sectId === playerSect.uid;
+      if (!isParticipant) {
+        return {
+          success: false,
+          error: "\u4F60\u4E0D\u662F\u8FD9\u573A\u6218\u4E89\u7684\u53C2\u4E0E\u65B9"
+        };
+      }
+      const isWinner = war.winner === playerSect.uid;
+      if (!isWinner) {
+        return {
+          success: false,
+          error: "\u4F60\u8F93\u6389\u4E86\u8FD9\u573A\u6218\u4E89\uFF0C\u65E0\u6CD5\u9886\u53D6\u6218\u5229\u54C1"
+        };
+      }
+      if ((_a = this.wars.claimedRewards) == null ? void 0 : _a.includes(war.uid)) {
+        return {
+          success: false,
+          error: "\u4F60\u5DF2\u7ECF\u9886\u53D6\u8FC7\u8FD9\u573A\u6218\u4E89\u7684\u6218\u5229\u54C1"
+        };
+      }
+      if (!war.rewards || war.rewards.spiritStones === 0 && war.rewards.pills === 0) {
+        return {
+          success: false,
+          error: "\u8FD9\u573A\u6218\u4E89\u6CA1\u6709\u53EF\u9886\u53D6\u7684\u6218\u5229\u54C1"
+        };
+      }
+      const claimed = {
+        spiritStones: war.rewards.spiritStones || 0,
+        pills: war.rewards.pills || 0,
+        techniques: war.rewards.techniques || 0
+      };
+      playerSect.resources.spiritStones = (playerSect.resources.spiritStones || 0) + claimed.spiritStones;
+      playerSect.resources.pills = (playerSect.resources.pills || 0) + claimed.pills;
+      playerSect.resources.techniques = (playerSect.resources.techniques || 0) + claimed.techniques;
+      this.gameState.spiritStones = (this.gameState.spiritStones || 0) + Math.floor(claimed.spiritStones * 0.3);
+      if (!this.wars.claimedRewards) this.wars.claimedRewards = [];
+      this.wars.claimedRewards.push(war.uid);
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "claim",
+        message: `${playerSect.name} \u9886\u53D6\u6218\u5229\u54C1: \u7075\u77F3${claimed.spiritStones}\uFF0C\u4E39\u836F${claimed.pills}\uFF0C\u529F\u6CD5${claimed.techniques}`
+      });
+      return {
+        success: true,
+        message: "\u6210\u529F\u9886\u53D6\u6218\u5229\u54C1\uFF01",
+        claimed: {
+          warId: war.uid,
+          spiritStones: claimed.spiritStones,
+          pills: claimed.pills,
+          techniques: claimed.techniques,
+          personalBonus: Math.floor(claimed.spiritStones * 0.3)
+        },
+        sectResources: playerSect.resources
+      };
+    }
+    /**
+     * war.alliance.support - 请求联盟支援
+     * @param {Object} params - { warId?: string }
+     */
+    mcpAllianceSupport(params = {}) {
+      var _a, _b;
+      const { warId } = params;
+      if (!this.isPlayerAscended()) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u98DE\u5347\uFF0C\u65E0\u6CD5\u8BF7\u6C42\u8054\u76DF\u652F\u63F4"
+        };
+      }
+      const playerSect = this.getPlayerImmortalSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (!playerSect.alliances || playerSect.alliances.length === 0) {
+        return {
+          success: false,
+          error: "\u4F60\u7684\u5B97\u95E8\u6CA1\u6709\u7ED3\u76DF\uFF0C\u65E0\u6CD5\u8BF7\u6C42\u652F\u63F4"
+        };
+      }
+      let war;
+      if (warId) {
+        war = this.wars.wars.find((w) => w.uid === warId);
+      } else {
+        war = this.getPlayerWar();
+      }
+      if (!war) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6218\u4E89\u8BB0\u5F55"
+        };
+      }
+      const isParticipant = war.attacker.sectId === playerSect.uid || war.defender.sectId === playerSect.uid;
+      if (!isParticipant) {
+        return {
+          success: false,
+          error: "\u4F60\u4E0D\u662F\u8FD9\u573A\u6218\u4E89\u7684\u53C2\u4E0E\u65B9"
+        };
+      }
+      if (war.state !== WAR_STATES.PREPARING) {
+        return {
+          success: false,
+          error: `\u6218\u4E89\u5DF2\u8FDB\u5165${war.state}\u9636\u6BB5\uFF0C\u65E0\u6CD5\u8BF7\u6C42\u652F\u63F4`
+        };
+      }
+      const cost = REALM_WARFARE_CONFIG.allianceSupportCost;
+      if ((this.gameState.spiritStones || 0) < cost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981 ${cost} \u7075\u77F3\u8BF7\u6C42\u8054\u76DF\u652F\u63F4`
+        };
+      }
+      const alliedSects = [];
+      for (const allianceId of playerSect.alliances) {
+        const alliedSect = (_b = (_a = this.gameState.immortalSects) == null ? void 0 : _a.sects) == null ? void 0 : _b.find((s) => s.uid === allianceId);
+        if (alliedSect) {
+          const isInWar = war.attacker.sectId === allianceId || war.defender.sectId === allianceId;
+          if (isInWar) {
+            const playerSide = war.attacker.sectId === playerSect.uid ? "attacker" : "defender";
+            const allySide = war.attacker.sectId === allianceId ? "attacker" : "defender";
+            if (playerSide === allySide) {
+              alliedSects.push({
+                uid: alliedSect.uid,
+                name: alliedSect.name,
+                troops: { infantry: 0, cavalry: 0, archer: 0, mage: 0, guardian: 0 },
+                supportPower: 0
+              });
+            }
+          }
+        }
+      }
+      if (alliedSects.length === 0) {
+        return {
+          success: false,
+          error: "\u6CA1\u6709\u76DF\u519B\u53C2\u4E0E\u8FD9\u573A\u6218\u4E89"
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const isAttacker = war.attacker.sectId === playerSect.uid;
+      const targetSide = isAttacker ? war.attacker : war.defender;
+      for (const allied of alliedSects) {
+        const supportScale = 0.2;
+        const baseTroops = {
+          infantry: 50,
+          cavalry: 30,
+          archer: 20,
+          mage: 10,
+          guardian: 15
+        };
+        for (const type of REALM_WARFARE_CONFIG.armyTypes) {
+          const contributed = Math.floor(baseTroops[type] * supportScale);
+          allied.troops[type] = contributed;
+          allied.supportPower += this.calculateArmyPower({ [type]: contributed });
+          targetSide.troops[type] = (targetSide.troops[type] || 0) + contributed;
+        }
+      }
+      war.battleLog.push({
+        timestamp: Date.now(),
+        type: "alliance",
+        message: `${playerSect.name} \u8BF7\u6C42\u8054\u76DF\u652F\u63F4\uFF0C\u83B7\u5F97 ${alliedSects.length} \u4E2A\u76DF\u519B\u652F\u63F4`
+      });
+      return {
+        success: true,
+        message: `\u6210\u529F\u8BF7\u6C42 ${alliedSects.length} \u4E2A\u76DF\u519B\u652F\u63F4\uFF01`,
+        support: {
+          cost,
+          alliedSects: alliedSects.map((a) => ({
+            name: a.name,
+            troops: a.troops,
+            supportPower: a.supportPower
+          })),
+          totalSupportPower: alliedSects.reduce((sum, a) => sum + a.supportPower, 0)
+        }
+      };
+    }
+    /**
+     * 获取战争列表
+     * @param {Object} params - { state?: string, limit?: number }
+     */
+    mcpWarList(params = {}) {
+      const { state, limit = 50 } = params;
+      let wars = this.wars.wars;
+      if (state) {
+        wars = wars.filter((w) => w.state === state);
+      }
+      wars = wars.sort((a, b) => b.declareTime - a.declareTime).slice(0, limit);
+      return {
+        success: true,
+        wars: wars.map((w) => ({
+          uid: w.uid,
+          attacker: w.attacker.name,
+          defender: w.defender.name,
+          state: w.state,
+          declareTime: w.declareTime,
+          winner: w.winner,
+          attackerPower: this.calculateArmyPower(w.attacker.troops),
+          defenderPower: this.calculateArmyPower(w.defender.troops)
+        })),
+        totalCount: this.wars.wars.length
+      };
+    }
+    /**
+     * 获取战争详情
+     * @param {Object} params - { warId: string }
+     */
+    mcpWarDetail(params = {}) {
+      const { warId } = params;
+      const war = this.wars.wars.find((w) => w.uid === warId);
+      if (!war) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6218\u4E89\u8BB0\u5F55"
+        };
+      }
+      return {
+        success: true,
+        war: {
+          uid: war.uid,
+          attacker: {
+            sectId: war.attacker.sectId,
+            name: war.attacker.name,
+            troops: war.attacker.troops,
+            strategy: war.attacker.strategy,
+            morale: war.attacker.morale,
+            casualties: war.attacker.casualties,
+            power: this.calculateArmyPower(war.attacker.troops)
+          },
+          defender: {
+            sectId: war.defender.sectId,
+            name: war.defender.name,
+            troops: war.defender.troops,
+            strategy: war.defender.strategy,
+            morale: war.defender.morale,
+            casualties: war.defender.casualties,
+            power: this.calculateArmyPower(war.defender.troops)
+          },
+          state: war.state,
+          declareTime: war.declareTime,
+          prepareEndTime: war.prepareEndTime,
+          executeStartTime: war.executeStartTime,
+          executeEndTime: war.executeEndTime,
+          winner: war.winner,
+          rewards: war.rewards,
+          battleLog: war.battleLog
+        }
+      };
+    }
+  };
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -13886,7 +14785,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V233",
+      gameVersion: "V234",
       // 设置
       settings: {
         soundEnabled: true,
@@ -13931,6 +14830,9 @@ var CultivationSimulator = (() => {
     const caveDwellingService = createCaveDwellingService(gameState2);
     caveDwellingService.init(gameState2);
     domainModules.caveDwelling = caveDwellingService;
+    const realmWarfareService = createRealmWarfareService(gameState2);
+    realmWarfareService.init(gameState2);
+    domainModules.realmWarfare = realmWarfareService;
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
@@ -15313,4 +16215,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-3435f4a-2026-05-30T16-23-15-504Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-c8a82fd-2026-05-30T16-33-21-654Z";
