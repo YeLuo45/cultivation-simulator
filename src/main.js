@@ -33,6 +33,7 @@ import { createSigninService, createWelfareService } from './domains/signin/Sign
 import CombatModule from './domains/combat/CombatModule.js';
 import SectModule from './domains/sect/SectModule.js';
 import { reincarnationService } from './domains/reincarnation/services/ReincarnationService.js';
+import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultivation/services/TalentTreeService.js';
 
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
@@ -313,6 +314,9 @@ function initializeDomainModules() {
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState);
 
+    // 天赋树模块 (Direction P: 灵根天赋系统)
+    domainModules.talentTree = new TalentTreeService(gameState);
+
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
 
@@ -544,6 +548,75 @@ function registerDomainMCPTools() {
         description: 'Get reincarnation cycle status and memory layer info',
         inputSchema: { type: 'object', properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState));
+
+    // 天赋树MCP工具 (Direction P: 灵根天赋系统)
+    const talentTreeHandlers = createTalentTreeMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('spirit.talent.allocate', {
+        name: 'spirit.talent.allocate',
+        description: 'Allocate talent points to a branch layer',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                branch: { type: 'string', enum: ['attack', 'defense', 'cultivation', 'perception'] },
+                layer: { type: 'number', minimum: 1, maximum: 5 }
+            },
+            required: ['branch', 'layer']
+        }
+    }, (params) => talentTreeHandlers['spirit.talent.allocate'](params));
+    
+    mcpRegistry.registerTool('spirit.talent.reset', {
+        name: 'spirit.talent.reset',
+        description: 'Reset talent tree (requires 洗髓丹)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                hasItem: { type: 'boolean', description: 'Whether player has 洗髓丹' }
+            }
+        }
+    }, (params) => talentTreeHandlers['spirit.talent.reset'](params));
+    
+    mcpRegistry.registerTool('spirit.talent.query', {
+        name: 'spirit.talent.query',
+        description: 'Query talent tree status',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => talentTreeHandlers['spirit.talent.query']());
+    
+    mcpRegistry.registerTool('spirit.mastery.query', {
+        name: 'spirit.mastery.query',
+        description: 'Query elemental mastery',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                element: { type: 'string', enum: ['metal', 'wood', 'water', 'fire', 'earth', 'thunder'] }
+            }
+        }
+    }, (params) => talentTreeHandlers['spirit.mastery.query'](params));
+    
+    mcpRegistry.registerTool('spirit.mastery.upgrade', {
+        name: 'spirit.mastery.upgrade',
+        description: 'Upgrade elemental mastery level',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                element: { type: 'string', enum: ['metal', 'wood', 'water', 'fire', 'earth', 'thunder'] },
+                required: ['element']
+            }
+        }
+    }, (params) => talentTreeHandlers['spirit.mastery.upgrade'](params));
+    
+    mcpRegistry.registerTool('spirit.hook.register', {
+        name: 'spirit.hook.register',
+        description: 'Register a spirit root change hook',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', description: 'Hook type' },
+                callback: { type: 'function', description: 'Callback function' }
+            },
+            required: ['type']
+        }
+    }, (params) => talentTreeHandlers['spirit.hook.register'](params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {
