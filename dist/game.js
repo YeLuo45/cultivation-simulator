@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-b1fc522-2026-05-30T16-18-07-111Z */
+/* Cultivation Simulator DDD-v1.0.0-54a83f7-2026-05-30T16-22-48-746Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10733,6 +10733,395 @@ var CultivationSimulator = (() => {
     }
   };
 
+  // src/domains/player/services/CaveDwellingService.js
+  var CAVE_LOCATIONS = ["\u79D8\u5883", "\u4ED9\u5C71", "\u6D77\u5E95", "\u6DF1\u6E0A", "\u4E91\u7AEF"];
+  var CAVE_SCALES = ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u6D1E\u5929"];
+  var CAVE_LEVEL_CONFIG = {
+    1: { name: "\u521D\u6210", cultivationBonus: 5, spiritStoneCost: 500, materials: ["\u7075\u77F3x100", "\u7075\u6728x20"] },
+    2: { name: "\u5C0F\u6210", cultivationBonus: 10, spiritStoneCost: 1500, materials: ["\u7075\u77F3x300", "\u7075\u6728x50", "\u7075\u7389x10"] },
+    3: { name: "\u5927\u6210", cultivationBonus: 20, spiritStoneCost: 5e3, materials: ["\u7075\u77F3x1000", "\u7075\u6728x150", "\u7075\u7389x30", "\u5929\u6750x5"] },
+    4: { name: "\u5706\u6EE1", cultivationBonus: 35, spiritStoneCost: 15e3, materials: ["\u7075\u77F3x3000", "\u7075\u6728x400", "\u7075\u7389x80", "\u5929\u6750x15"] },
+    5: { name: "\u6D1E\u5929", cultivationBonus: 50, spiritStoneCost: 5e4, materials: ["\u7075\u77F3x10000", "\u7075\u6728x1000", "\u7075\u7389x200", "\u5929\u6750x50"] }
+  };
+  var LOCATION_BLESSING_CONFIG = {
+    "\u79D8\u5883": { primaryBonus: "serendipity", secondaryBonus: "cultivation", cultivationBonus: 1.5, serendipityBonus: 2, description: "\u79D8\u5883\u6D1E\u5E9C - \u5947\u9047\u52A0\u6210" },
+    "\u4ED9\u5C71": { primaryBonus: "cultivation", secondaryBonus: "qi", cultivationBonus: 2, qiBonus: 1.5, description: "\u4ED9\u5C71\u6D1E\u5E9C - \u4FEE\u70BC\u52A0\u6210" },
+    "\u6D77\u5E95": { primaryBonus: "qi", secondaryBonus: "spiritStones", cultivationBonus: 1.3, qiBonus: 2, spiritStoneBonus: 1.5, description: "\u6D77\u5E95\u6D1E\u5E9C - \u7075\u6C14\u52A0\u6210" },
+    "\u6DF1\u6E0A": { primaryBonus: "combat", secondaryBonus: "cultivation", cultivationBonus: 1.5, combatBonus: 2, description: "\u6DF1\u6E0A\u6D1E\u5E9C - \u6218\u6597\u52A0\u6210" },
+    "\u4E91\u7AEF": { primaryBonus: "reputation", secondaryBonus: "cultivation", cultivationBonus: 1.8, reputationBonus: 2, description: "\u4E91\u7AEF\u6D1E\u5E9C - \u540D\u671B\u52A0\u6210" }
+  };
+  var CaveDwellingService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.residences = /* @__PURE__ */ new Map();
+      this.visitHistory = [];
+      this.tradeHistory = [];
+    }
+    /**
+     * 初始化洞府服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.residence) {
+        gameState3.residence = {
+          hasResidence: false,
+          residence: null,
+          upgradeLevel: 0,
+          location: null,
+          scale: null,
+          builtAt: null,
+          lastVisitAt: null,
+          totalBlessings: 0,
+          visitors: [],
+          tradeOffers: []
+        };
+      }
+      if (!gameState3.residence.residences) {
+        gameState3.residence.residences = [];
+      }
+      console.log("[CaveDwelling] \u7075\u754C\u6D1E\u5E9C\u7CFB\u7EDF\u521D\u59CB\u5316\u5B8C\u6210");
+      return this;
+    }
+    /**
+     * 获取MCP工具处理器
+     */
+    getMCPHandlers() {
+      return {
+        "residence.build": (params) => this.mcpBuild(params),
+        "residence.upgrade": (params) => this.mcpUpgrade(params),
+        "residence.query": (params) => this.mcpQuery(params),
+        "residence.blessing": (params) => this.mcpBlessing(params),
+        "residence.visit": (params) => this.mcpVisit(params),
+        "residence.trade": (params) => this.mcpTrade(params)
+      };
+    }
+    // ===== residence.build - 建造洞府 =====
+    /**
+     * MCP工具: 建造洞府
+     */
+    mcpBuild(params = {}) {
+      const { location: location2, scale, customName } = params;
+      if (!location2 || !CAVE_LOCATIONS.includes(location2)) {
+        return { success: false, error: "\u65E0\u6548\u7684\u6D1E\u5E9C\u4F4D\u7F6E", validLocations: CAVE_LOCATIONS };
+      }
+      if (!scale || !CAVE_SCALES.includes(scale)) {
+        return { success: false, error: "\u65E0\u6548\u7684\u6D1E\u5E9C\u89C4\u6A21", validScales: CAVE_SCALES };
+      }
+      const levelConfig = CAVE_LEVEL_CONFIG[1];
+      const cost = levelConfig.spiritStoneCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return { success: false, error: "\u7075\u77F3\u4E0D\u8DB3", required: cost, available: currentStones };
+      }
+      this.gameState.spiritStones -= cost;
+      const residence = {
+        id: `residence_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: customName || `${location2}${scale}\u6D1E\u5E9C`,
+        location: location2,
+        scale,
+        level: 1,
+        builtAt: Date.now(),
+        lastUpgradeAt: Date.now(),
+        cultivationProgress: 0,
+        totalVisits: 0,
+        blessings: this.calculateBlessing(location2, scale, 1)
+      };
+      this.gameState.residence.hasResidence = true;
+      this.gameState.residence.residence = residence;
+      this.gameState.residence.upgradeLevel = 1;
+      this.gameState.residence.location = location2;
+      this.gameState.residence.scale = scale;
+      this.gameState.residence.builtAt = residence.builtAt;
+      this.residences.set(residence.id, residence);
+      return {
+        success: true,
+        message: `\u6D1E\u5E9C\u3010${residence.name}\u3011\u5EFA\u9020\u6210\u529F\uFF01`,
+        residence: {
+          id: residence.id,
+          name: residence.name,
+          location: residence.location,
+          scale: residence.scale,
+          level: residence.level,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== residence.upgrade - 升级洞府 =====
+    /**
+     * MCP工具: 升级洞府
+     */
+    mcpUpgrade(params = {}) {
+      const { confirm: confirm2 } = params;
+      if (!this.gameState.residence.hasResidence) {
+        return { success: false, error: "\u5C1A\u672A\u5EFA\u9020\u6D1E\u5E9C" };
+      }
+      const residence = this.gameState.residence.residence;
+      const currentLevel = residence.level;
+      if (currentLevel >= 5) {
+        return { success: false, error: "\u6D1E\u5E9C\u5DF2\u8FBE\u5230\u6700\u9AD8\u7B49\u7EA7(5\u7EA7)" };
+      }
+      const nextLevelConfig = CAVE_LEVEL_CONFIG[currentLevel + 1];
+      const cost = nextLevelConfig.spiritStoneCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: cost,
+          available: currentStones,
+          shortfall: cost - currentStones
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const oldLevel = residence.level;
+      residence.level = currentLevel + 1;
+      residence.lastUpgradeAt = Date.now();
+      residence.blessings = this.calculateBlessing(residence.location, residence.scale, residence.level);
+      this.gameState.residence.upgradeLevel = residence.level;
+      return {
+        success: true,
+        message: `\u6D1E\u5E9C\u5347\u7EA7\u6210\u529F\uFF01${CAVE_LEVEL_CONFIG[oldLevel].name} \u2192 ${CAVE_LEVEL_CONFIG[residence.level].name}`,
+        upgrade: {
+          fromLevel: oldLevel,
+          toLevel: residence.level,
+          newBonus: residence.blessings.cultivationBonus,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== residence.query - 查询洞府状态 =====
+    /**
+     * MCP工具: 查询洞府状态
+     */
+    mcpQuery(params = {}) {
+      const { detailed } = params;
+      if (!this.gameState.residence.hasResidence) {
+        return {
+          hasResidence: false,
+          message: "\u5C1A\u672A\u5EFA\u9020\u6D1E\u5E9C\uFF0C\u8BF7\u4F7F\u7528 residence.build \u5EFA\u9020"
+        };
+      }
+      const residence = this.gameState.residence.residence;
+      const levelConfig = CAVE_LEVEL_CONFIG[residence.level];
+      const locationConfig = LOCATION_BLESSING_CONFIG[residence.location];
+      const result = {
+        hasResidence: true,
+        residence: {
+          id: residence.id,
+          name: residence.name,
+          location: residence.location,
+          scale: residence.scale,
+          level: residence.level,
+          levelName: levelConfig.name,
+          builtAt: residence.builtAt,
+          lastUpgradeAt: residence.lastUpgradeAt,
+          totalVisits: residence.totalVisits
+        },
+        blessings: {
+          cultivationBonus: residence.blessings.cultivationBonus,
+          primaryBonus: locationConfig.primaryBonus,
+          description: locationConfig.description
+        }
+      };
+      if (detailed) {
+        result.detailed = {
+          scaleName: residence.scale,
+          locationBonus: locationConfig,
+          nextLevelUpgrade: residence.level < 5 ? {
+            level: residence.level + 1,
+            name: CAVE_LEVEL_CONFIG[residence.level + 1].name,
+            cost: CAVE_LEVEL_CONFIG[residence.level + 1].spiritStoneCost,
+            bonus: CAVE_LEVEL_CONFIG[residence.level + 1].cultivationBonus
+          } : null,
+          age: Date.now() - residence.builtAt,
+          visitors: residence.totalVisits
+        };
+      }
+      return result;
+    }
+    // ===== residence.blessing - 获取洞府加成 =====
+    /**
+     * MCP工具: 获取洞府加成
+     */
+    mcpBlessing(params = {}) {
+      const { type } = params;
+      if (!this.gameState.residence.hasResidence) {
+        return { success: false, error: "\u5C1A\u672A\u5EFA\u9020\u6D1E\u5E9C" };
+      }
+      const residence = this.gameState.residence.residence;
+      const locationConfig = LOCATION_BLESSING_CONFIG[residence.location];
+      const levelConfig = CAVE_LEVEL_CONFIG[residence.level];
+      const blessings = {
+        cultivation: {
+          bonus: residence.blessings.cultivationBonus,
+          description: `\u4FEE\u70BC\u901F\u5EA6\u63D0\u5347${residence.blessings.cultivationBonus}%`
+        },
+        location: {
+          bonus: locationConfig,
+          description: locationConfig.description
+        },
+        total: {
+          combinedBonus: this.calculateCombinedBonus(residence, locationConfig),
+          description: "\u6D1E\u5E9C\u7EFC\u5408\u52A0\u6210"
+        }
+      };
+      if (type && blessings[type]) {
+        return { success: true, blessing: blessings[type] };
+      }
+      return {
+        success: true,
+        residenceId: residence.id,
+        residenceName: residence.name,
+        currentLevel: residence.level,
+        levelName: levelConfig.name,
+        blessings
+      };
+    }
+    // ===== residence.visit - 拜访他人洞府 =====
+    /**
+     * MCP工具: 拜访他人洞府
+     */
+    mcpVisit(params = {}) {
+      var _a;
+      const { hostId, hostName } = params;
+      const visitResult = {
+        success: true,
+        visitedAt: Date.now(),
+        hostId: hostId || "npc_001",
+        hostName: hostName || "\u795E\u79D8\u4FEE\u58EB",
+        duration: 36e5,
+        // 1小时
+        rewards: {}
+      };
+      const baseReward = 10;
+      const levelMultiplier = (((_a = this.gameState.residence.residence) == null ? void 0 : _a.level) || 1) * 0.5;
+      visitResult.rewards.spiritStones = Math.floor(baseReward * levelMultiplier);
+      visitResult.rewards.cultivationProgress = Math.floor(baseReward * levelMultiplier * 2);
+      this.visitHistory.push({
+        visitedAt: visitResult.visitedAt,
+        hostId: visitResult.hostId,
+        hostName: visitResult.hostName
+      });
+      if (this.gameState.residence.hasResidence) {
+        this.gameState.residence.residence.totalVisits = (this.gameState.residence.residence.totalVisits || 0) + 1;
+      }
+      return {
+        success: true,
+        message: `\u62DC\u8BBF\u3010${visitResult.hostName}\u3011\u7684\u6D1E\u5E9C\u6210\u529F\uFF01`,
+        visit: visitResult,
+        rewards: visitResult.rewards
+      };
+    }
+    // ===== residence.trade - 洞府资源交易 =====
+    /**
+     * MCP工具: 洞府资源交易
+     */
+    mcpTrade(params = {}) {
+      var _a;
+      const { resourceType, amount, price, action } = params;
+      if (!this.gameState.residence.hasResidence) {
+        return { success: false, error: "\u5C1A\u672A\u5EFA\u9020\u6D1E\u5E9C\uFF0C\u65E0\u6CD5\u8FDB\u884C\u4EA4\u6613" };
+      }
+      if (action === "list") {
+        const currentOffers = this.gameState.residence.tradeOffers || [];
+        return {
+          success: true,
+          action: "list",
+          offers: currentOffers,
+          count: currentOffers.length
+        };
+      }
+      const validResources = ["spiritStones", "materials", "pills", "herbs"];
+      if (!resourceType || !validResources.includes(resourceType)) {
+        return { success: false, error: "\u65E0\u6548\u7684\u4EA4\u6613\u8D44\u6E90\u7C7B\u578B", validTypes: validResources };
+      }
+      if (!amount || amount <= 0) {
+        return { success: false, error: "\u4EA4\u6613\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0" };
+      }
+      if (!price || price <= 0) {
+        return { success: false, error: "\u4EA4\u6613\u4EF7\u683C\u5FC5\u987B\u5927\u4E8E0" };
+      }
+      if (action === "execute") {
+        const totalCost = amount * price;
+        const currentStones = this.gameState.spiritStones || 0;
+        if (currentStones < totalCost) {
+          return { success: false, error: "\u7075\u77F3\u4E0D\u8DB3", required: totalCost, available: currentStones };
+        }
+        this.gameState.spiritStones -= totalCost;
+        const tradeResult = {
+          id: `trade_${Date.now()}`,
+          resourceType,
+          amount,
+          price,
+          totalCost,
+          executedAt: Date.now(),
+          seller: "system"
+        };
+        this.tradeHistory.push(tradeResult);
+        return {
+          success: true,
+          message: `\u4EA4\u6613\u6210\u529F\uFF01\u82B1\u8D39${totalCost}\u7075\u77F3\u8D2D\u4E70${amount}\u4E2A${resourceType}`,
+          trade: tradeResult,
+          remainingStones: this.gameState.spiritStones
+        };
+      }
+      const offer = {
+        id: `offer_${Date.now()}`,
+        resourceType,
+        amount,
+        price,
+        createdAt: Date.now(),
+        seller: ((_a = this.gameState.player) == null ? void 0 : _a.name) || "\u533F\u540D\u4FEE\u58EB"
+      };
+      if (!this.gameState.residence.tradeOffers) {
+        this.gameState.residence.tradeOffers = [];
+      }
+      this.gameState.residence.tradeOffers.push(offer);
+      return {
+        success: true,
+        message: `\u4EA4\u6613\u6302\u5355\u521B\u5EFA\u6210\u529F\uFF01`,
+        offer
+      };
+    }
+    // ===== 私有辅助方法 =====
+    /**
+     * 计算洞府加成
+     */
+    calculateBlessing(location2, scale, level) {
+      const locationConfig = LOCATION_BLESSING_CONFIG[location2];
+      const levelConfig = CAVE_LEVEL_CONFIG[level];
+      const scaleBonus = {
+        "\u5C0F\u578B": 1,
+        "\u4E2D\u578B": 1.3,
+        "\u5927\u578B": 1.6,
+        "\u6D1E\u5929": 2
+      };
+      return {
+        cultivationBonus: Math.floor(locationConfig.cultivationBonus * levelConfig.cultivationBonus * scaleBonus[scale]),
+        serendipityBonus: locationConfig.serendipityBonus || 1,
+        qiBonus: locationConfig.qiBonus || 1,
+        spiritStoneBonus: locationConfig.spiritStoneBonus || 1,
+        combatBonus: locationConfig.combatBonus || 1,
+        reputationBonus: locationConfig.reputationBonus || 1
+      };
+    }
+    /**
+     * 计算综合加成
+     */
+    calculateCombinedBonus(residence, locationConfig) {
+      const baseBonus = residence.blessings.cultivationBonus;
+      const locationBonus = locationConfig.cultivationBonus;
+      return Math.floor(baseBonus * locationBonus);
+    }
+  };
+  function createCaveDwellingService(gameState3) {
+    const service = new CaveDwellingService(gameState3);
+    service.init(gameState3);
+    return service;
+  }
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -13497,7 +13886,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V232",
+      gameVersion: "V233",
       // 设置
       settings: {
         soundEnabled: true,
@@ -13539,6 +13928,9 @@ var CultivationSimulator = (() => {
     const immortalSectService = createImmortalSectService(gameState2);
     immortalSectService.init(gameState2);
     domainModules.immortalSect = immortalSectService;
+    const caveDwellingService = createCaveDwellingService(gameState2);
+    caveDwellingService.init(gameState2);
+    domainModules.caveDwelling = caveDwellingService;
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
@@ -14138,6 +14530,74 @@ var CultivationSimulator = (() => {
         required: ["targetSectId"]
       }
     }, (params) => domainModules.immortalSect.mcpAllianceForm(params));
+    mcpRegistry.registerTool("residence.build", {
+      name: "residence.build",
+      description: "Build a cave dwelling in the spirit realm",
+      inputSchema: {
+        type: "object",
+        properties: {
+          location: { type: "string", enum: ["\u79D8\u5883", "\u4ED9\u5C71", "\u6D77\u5E95", "\u6DF1\u6E0A", "\u4E91\u7AEF"], description: "Location of the dwelling" },
+          scale: { type: "string", enum: ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u6D1E\u5929"], description: "Scale of the dwelling" },
+          customName: { type: "string", description: "Custom name for the dwelling" }
+        },
+        required: ["location", "scale"]
+      }
+    }, (params) => domainModules.caveDwelling.mcpBuild(params));
+    mcpRegistry.registerTool("residence.upgrade", {
+      name: "residence.upgrade",
+      description: "Upgrade the cave dwelling",
+      inputSchema: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "Confirm upgrade" }
+        }
+      }
+    }, (params) => domainModules.caveDwelling.mcpUpgrade(params));
+    mcpRegistry.registerTool("residence.query", {
+      name: "residence.query",
+      description: "Query cave dwelling status",
+      inputSchema: {
+        type: "object",
+        properties: {
+          detailed: { type: "boolean", description: "Include detailed info" }
+        }
+      }
+    }, (params) => domainModules.caveDwelling.mcpQuery(params));
+    mcpRegistry.registerTool("residence.blessing", {
+      name: "residence.blessing",
+      description: "Get cave dwelling blessing bonuses",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["cultivation", "location", "total"], description: "Blessing type to query" }
+        }
+      }
+    }, (params) => domainModules.caveDwelling.mcpBlessing(params));
+    mcpRegistry.registerTool("residence.visit", {
+      name: "residence.visit",
+      description: "Visit another player's cave dwelling",
+      inputSchema: {
+        type: "object",
+        properties: {
+          hostId: { type: "string", description: "Host player ID" },
+          hostName: { type: "string", description: "Host player name" }
+        }
+      }
+    }, (params) => domainModules.caveDwelling.mcpVisit(params));
+    mcpRegistry.registerTool("residence.trade", {
+      name: "residence.trade",
+      description: "Trade resources at the cave dwelling",
+      inputSchema: {
+        type: "object",
+        properties: {
+          resourceType: { type: "string", enum: ["spiritStones", "materials", "pills", "herbs"], description: "Resource type" },
+          amount: { type: "number", description: "Amount to trade" },
+          price: { type: "number", description: "Price per unit" },
+          action: { type: "string", enum: ["list", "execute"], description: "Trade action" }
+        },
+        required: ["resourceType", "amount", "price"]
+      }
+    }, (params) => domainModules.caveDwelling.mcpTrade(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -14853,4 +15313,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-b1fc522-2026-05-30T16-18-07-111Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-54a83f7-2026-05-30T16-22-48-746Z";

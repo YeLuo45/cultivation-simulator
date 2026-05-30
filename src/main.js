@@ -48,6 +48,9 @@ import { getAscensionService } from './domains/cultivation/services/AscensionSer
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
+// 灵界洞府系统 (V233 Direction U: 灵界洞府系统)
+import { createCaveDwellingService } from './domains/player/services/CaveDwellingService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -262,7 +265,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V232',
+        gameVersion: 'V233',
         
         // 设置
         settings: {
@@ -359,6 +362,11 @@ function initializeDomainModules() {
     const immortalSectService = createImmortalSectService(gameState);
     immortalSectService.init(gameState);
     domainModules.immortalSect = immortalSectService;
+
+    // 灵界洞府系统 (V233 Direction U: 灵界洞府系统)
+    const caveDwellingService = createCaveDwellingService(gameState);
+    caveDwellingService.init(gameState);
+    domainModules.caveDwelling = caveDwellingService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
@@ -1051,6 +1059,81 @@ function registerDomainMCPTools() {
             required: ['targetSectId']
         }
     }, (params) => domainModules.immortalSect.mcpAllianceForm(params));
+
+    // 灵界洞府MCP工具 (V233 Direction U: 灵界洞府系统)
+    mcpRegistry.registerTool('residence.build', {
+        name: 'residence.build',
+        description: 'Build a cave dwelling in the spirit realm',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                location: { type: 'string', enum: ['秘境', '仙山', '海底', '深渊', '云端'], description: 'Location of the dwelling' },
+                scale: { type: 'string', enum: ['小型', '中型', '大型', '洞天'], description: 'Scale of the dwelling' },
+                customName: { type: 'string', description: 'Custom name for the dwelling' }
+            },
+            required: ['location', 'scale']
+        }
+    }, (params) => domainModules.caveDwelling.mcpBuild(params));
+
+    mcpRegistry.registerTool('residence.upgrade', {
+        name: 'residence.upgrade',
+        description: 'Upgrade the cave dwelling',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                confirm: { type: 'boolean', description: 'Confirm upgrade' }
+            }
+        }
+    }, (params) => domainModules.caveDwelling.mcpUpgrade(params));
+
+    mcpRegistry.registerTool('residence.query', {
+        name: 'residence.query',
+        description: 'Query cave dwelling status',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                detailed: { type: 'boolean', description: 'Include detailed info' }
+            }
+        }
+    }, (params) => domainModules.caveDwelling.mcpQuery(params));
+
+    mcpRegistry.registerTool('residence.blessing', {
+        name: 'residence.blessing',
+        description: 'Get cave dwelling blessing bonuses',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', enum: ['cultivation', 'location', 'total'], description: 'Blessing type to query' }
+            }
+        }
+    }, (params) => domainModules.caveDwelling.mcpBlessing(params));
+
+    mcpRegistry.registerTool('residence.visit', {
+        name: 'residence.visit',
+        description: 'Visit another player\'s cave dwelling',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                hostId: { type: 'string', description: 'Host player ID' },
+                hostName: { type: 'string', description: 'Host player name' }
+            }
+        }
+    }, (params) => domainModules.caveDwelling.mcpVisit(params));
+
+    mcpRegistry.registerTool('residence.trade', {
+        name: 'residence.trade',
+        description: 'Trade resources at the cave dwelling',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                resourceType: { type: 'string', enum: ['spiritStones', 'materials', 'pills', 'herbs'], description: 'Resource type' },
+                amount: { type: 'number', description: 'Amount to trade' },
+                price: { type: 'number', description: 'Price per unit' },
+                action: { type: 'string', enum: ['list', 'execute'], description: 'Trade action' }
+            },
+            required: ['resourceType', 'amount', 'price']
+        }
+    }, (params) => domainModules.caveDwelling.mcpTrade(params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {
