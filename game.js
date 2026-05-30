@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-5658cba-2026-05-30T16-04-05-967Z */
+/* Cultivation Simulator DDD-v1.0.0-b1fc522-2026-05-30T16-07-18-090Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10172,6 +10172,567 @@ var CultivationSimulator = (() => {
   // src/domains/cultivation/services/AscensionService.js
   init_CultivationService();
 
+  // src/domains/sect/services/ImmortalSectService.js
+  var IMMORTAL_SECT_CONFIG = {
+    createCost: 5e4,
+    // 创建仙界宗门消耗灵石
+    joinCost: 1e4,
+    // 加入仙界宗门消耗灵石
+    maxSectLevel: 5,
+    // 最高5星宗门
+    resourceTypes: ["spiritStones", "pills", "techniques", "merit"],
+    // 资源类型
+    tradeTaxRate: 0.05,
+    // 交易税率5%
+    eliteDiscipleLimit: 10,
+    // 每宗门最多10名精英弟子
+    allianceMaxSects: 5
+    // 联盟最多5个宗门
+  };
+  function createImmortalSect(name, founderId) {
+    return {
+      uid: "ims_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+      name,
+      founder: founderId,
+      sectLevel: 1,
+      // 1-5星
+      members: [{
+        uid: founderId,
+        role: "founder",
+        joinedAt: Date.now(),
+        contribution: 0,
+        isElite: false
+      }],
+      resources: {
+        spiritStones: 0,
+        pills: 0,
+        techniques: 0,
+        merit: 0
+      },
+      eliteDisciples: [],
+      // 精英弟子UID列表
+      alliances: [],
+      // 结盟宗门UID列表
+      enemies: [],
+      // 敌对宗门UID列表
+      createdAt: Date.now(),
+      reputation: 100,
+      activeTrades: []
+      // 进行中的交易
+    };
+  }
+  function createEliteDisciple(discipleInfo) {
+    return {
+      uid: "eld_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+      originalUid: discipleInfo.uid,
+      name: discipleInfo.name,
+      realm: discipleInfo.realm || 6,
+      // 默认地仙境界
+      talentIndex: discipleInfo.talentIndex || 3,
+      specialSkills: [],
+      // 特殊技能
+      cultivationSpeed: 1,
+      combatPower: 0,
+      promotedAt: Date.now(),
+      contribution: 0
+    };
+  }
+  function createImmortalSectService(gameState3) {
+    return new ImmortalSectService(gameState3);
+  }
+  var ImmortalSectService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.immortalSects = /* @__PURE__ */ new Map();
+      this.playerSectId = null;
+    }
+    /**
+     * 初始化仙界宗门系统
+     */
+    init(gameState3) {
+      if (!gameState3.immortalSects) {
+        gameState3.immortalSects = {
+          sects: [],
+          // 所有仙界宗门列表
+          playerSectId: null,
+          // 玩家所在的仙界宗门ID
+          tradeHistory: [],
+          // 交易历史
+          allianceRecords: []
+          // 结盟记录
+        };
+      }
+      this.immortalSects = gameState3.immortalSects;
+      return gameState3;
+    }
+    /**
+     * 检查玩家是否已飞升
+     */
+    isPlayerAscended() {
+      var _a;
+      return ((_a = this.gameState.ascension) == null ? void 0 : _a.ascended) === true;
+    }
+    /**
+     * 获取玩家当前仙界宗门
+     */
+    getPlayerSect() {
+      if (!this.immortalSects.playerSectId) return null;
+      return this.immortalSects.sects.find((s) => s.uid === this.immortalSects.playerSectId);
+    }
+    // ========== MCP 工具实现 ==========
+    /**
+     * sect.immortal.create - 创建仙界宗门
+     * @param {Object} params - { name: string }
+     */
+    mcpCreate(params = {}) {
+      var _a, _b;
+      const { name } = params;
+      if (!this.isPlayerAscended()) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u98DE\u5347\uFF0C\u65E0\u6CD5\u521B\u5EFA\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (this.immortalSects.playerSectId) {
+        return {
+          success: false,
+          error: "\u4F60\u5DF2\u52A0\u5165\u4ED9\u754C\u5B97\u95E8\uFF0C\u65E0\u6CD5\u518D\u6B21\u521B\u5EFA"
+        };
+      }
+      if (!name || name.trim().length < 2) {
+        return {
+          success: false,
+          error: "\u5B97\u95E8\u540D\u79F0\u81F3\u5C11\u9700\u89812\u4E2A\u5B57\u7B26"
+        };
+      }
+      if (name.length > 20) {
+        return {
+          success: false,
+          error: "\u5B97\u95E8\u540D\u79F0\u4E0D\u80FD\u8D85\u8FC720\u4E2A\u5B57\u7B26"
+        };
+      }
+      const cost = IMMORTAL_SECT_CONFIG.createCost;
+      if ((this.gameState.spiritStones || 0) < cost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981 ${cost} \u7075\u77F3\u6765\u521B\u5EFA\u4ED9\u754C\u5B97\u95E8`
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const sect = createImmortalSect(name, ((_a = this.gameState.player) == null ? void 0 : _a.uid) || "player");
+      sect.founder = ((_b = this.gameState.player) == null ? void 0 : _b.name) || "\u5B97\u4E3B";
+      this.immortalSects.sects.push(sect);
+      this.immortalSects.playerSectId = sect.uid;
+      return {
+        success: true,
+        message: `\u4ED9\u754C\u5B97\u95E8\u300C${name}\u300D\u521B\u5EFA\u6210\u529F\uFF01`,
+        sect: {
+          uid: sect.uid,
+          name: sect.name,
+          sectLevel: sect.sectLevel,
+          founder: sect.founder,
+          memberCount: sect.members.length,
+          resources: sect.resources
+        },
+        costDeducted: cost
+      };
+    }
+    /**
+     * sect.immortal.join - 加入仙界宗门
+     * @param {Object} params - { sectId: string }
+     */
+    mcpJoin(params = {}) {
+      var _a;
+      const { sectId } = params;
+      if (!this.isPlayerAscended()) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u98DE\u5347\uFF0C\u65E0\u6CD5\u52A0\u5165\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (this.immortalSects.playerSectId) {
+        return {
+          success: false,
+          error: "\u4F60\u5DF2\u52A0\u5165\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const targetSect = this.immortalSects.sects.find((s) => s.uid === sectId);
+      if (!targetSect) {
+        return {
+          success: false,
+          error: "\u4ED9\u754C\u5B97\u95E8\u4E0D\u5B58\u5728"
+        };
+      }
+      const maxMembers = IMMORTAL_SECT_CONFIG.maxSectLevel * 10;
+      if (targetSect.members.length >= maxMembers) {
+        return {
+          success: false,
+          error: "\u8BE5\u5B97\u95E8\u4EBA\u6570\u5DF2\u6EE1"
+        };
+      }
+      const cost = IMMORTAL_SECT_CONFIG.joinCost;
+      if ((this.gameState.spiritStones || 0) < cost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981 ${cost} \u7075\u77F3\u52A0\u5165\u5B97\u95E8`
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const playerInfo = {
+        uid: ((_a = this.gameState.player) == null ? void 0 : _a.uid) || "player",
+        role: "member",
+        joinedAt: Date.now(),
+        contribution: 0,
+        isElite: false
+      };
+      targetSect.members.push(playerInfo);
+      this.immortalSects.playerSectId = sectId;
+      return {
+        success: true,
+        message: `\u6210\u529F\u52A0\u5165\u4ED9\u754C\u5B97\u95E8\u300C${targetSect.name}\u300D\uFF01`,
+        sect: {
+          uid: targetSect.uid,
+          name: targetSect.name,
+          sectLevel: targetSect.sectLevel,
+          memberCount: targetSect.members.length,
+          resources: targetSect.resources
+        },
+        costDeducted: cost
+      };
+    }
+    /**
+     * sect.immortal.resource.list - 查看宗门资源
+     * @param {Object} params - { sectId?: string }
+     */
+    mcpResourceList(params = {}) {
+      const { sectId } = params;
+      let sect;
+      if (sectId) {
+        sect = this.immortalSects.sects.find((s) => s.uid === sectId);
+      } else {
+        sect = this.getPlayerSect();
+      }
+      if (!sect) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const dailyIncome = this.calculateDailyIncome(sect);
+      const recentTrades = this.immortalSects.tradeHistory.filter((t) => t.sectId === sect.uid).slice(-10);
+      return {
+        success: true,
+        sect: {
+          uid: sect.uid,
+          name: sect.name,
+          sectLevel: sect.sectLevel,
+          resources: sect.resources,
+          dailyIncome,
+          memberCount: sect.members.length,
+          eliteDiscipleCount: sect.eliteDisciples.length,
+          allianceCount: sect.alliances.length,
+          reputation: sect.reputation
+        },
+        recentTrades
+      };
+    }
+    /**
+     * 计算宗门每日产出
+     */
+    calculateDailyIncome(sect) {
+      const memberCount = sect.members.length;
+      const eliteCount = sect.eliteDisciples.length;
+      const levelBonus = sect.sectLevel * 0.2 + 1;
+      return {
+        spiritStones: Math.floor(100 * memberCount * levelBonus),
+        pills: Math.floor(5 * eliteCount * levelBonus),
+        techniques: Math.floor(1 * memberCount * levelBonus),
+        merit: Math.floor(10 * memberCount * levelBonus)
+      };
+    }
+    /**
+     * sect.immortal.trade.execute - 执行宗门间交易
+     * @param {Object} params - { targetSectId, resourceType, amount, price }
+     */
+    mcpTradeExecute(params = {}) {
+      const { targetSectId, resourceType, amount, price } = params;
+      const playerSect = this.getPlayerSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (!targetSectId) {
+        return {
+          success: false,
+          error: "\u8BF7\u6307\u5B9A\u76EE\u6807\u5B97\u95E8ID"
+        };
+      }
+      if (!IMMORTAL_SECT_CONFIG.resourceTypes.includes(resourceType)) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u8D44\u6E90\u7C7B\u578B\uFF0C\u53EF\u9009: ${IMMORTAL_SECT_CONFIG.resourceTypes.join(", ")}`
+        };
+      }
+      if (!amount || amount <= 0) {
+        return {
+          success: false,
+          error: "\u4EA4\u6613\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0"
+        };
+      }
+      if (!price || price <= 0) {
+        return {
+          success: false,
+          error: "\u4EA4\u6613\u4EF7\u683C\u5FC5\u987B\u5927\u4E8E0"
+        };
+      }
+      const targetSect = this.immortalSects.sects.find((s) => s.uid === targetSectId);
+      if (!targetSect) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u4ED9\u754C\u5B97\u95E8\u4E0D\u5B58\u5728"
+        };
+      }
+      if (playerSect.enemies.includes(targetSectId)) {
+        return {
+          success: false,
+          error: "\u4E0E\u8BE5\u5B97\u95E8\u5904\u4E8E\u654C\u5BF9\u72B6\u6001\uFF0C\u65E0\u6CD5\u4EA4\u6613"
+        };
+      }
+      const playerResource = playerSect.resources[resourceType] || 0;
+      if (playerResource < amount) {
+        return {
+          success: false,
+          error: `${resourceType} \u4E0D\u8DB3\uFF0C\u5F53\u524D\u62E5\u6709 ${playerResource}`
+        };
+      }
+      const tax = Math.floor(price * IMMORTAL_SECT_CONFIG.tradeTaxRate);
+      const totalCost = price + tax;
+      playerSect.resources[resourceType] -= amount;
+      const tradeRecord = {
+        id: "trd_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
+        sectId: playerSect.uid,
+        targetSectId,
+        resourceType,
+        amount,
+        price,
+        tax,
+        timestamp: Date.now(),
+        status: "pending"
+      };
+      this.immortalSects.tradeHistory.push(tradeRecord);
+      return {
+        success: true,
+        message: `\u5411\u300C${targetSect.name}\u300D\u53D1\u8D77${resourceType}\u4EA4\u6613\u8BF7\u6C42`,
+        trade: {
+          id: tradeRecord.id,
+          resourceType,
+          amount,
+          price,
+          tax,
+          totalCost,
+          status: "pending"
+        },
+        remainingResource: playerSect.resources[resourceType]
+      };
+    }
+    /**
+     * sect.immortal.disciple.promote - 晋升精英弟子
+     * @param {Object} params - { discipleUid: string }
+     */
+    mcpDisciplePromote(params = {}) {
+      const { discipleUid } = params;
+      const playerSect = this.getPlayerSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      if (playerSect.eliteDisciples.length >= IMMORTAL_SECT_CONFIG.eliteDiscipleLimit) {
+        return {
+          success: false,
+          error: `\u7CBE\u82F1\u5F1F\u5B50\u6570\u91CF\u5DF2\u8FBE\u4E0A\u9650\uFF08${IMMORTAL_SECT_CONFIG.eliteDiscipleLimit}\u540D\uFF09`
+        };
+      }
+      const mortalSect = this.gameState.sect;
+      if (!mortalSect || !mortalSect.disciples) {
+        return {
+          success: false,
+          error: "\u51E1\u754C\u5B97\u95E8\u4E0D\u5B58\u5728\u6216\u65E0\u5F1F\u5B50"
+        };
+      }
+      const disciple = mortalSect.disciples.find((d) => d.uid === discipleUid);
+      if (!disciple) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u8BE5\u5F1F\u5B50"
+        };
+      }
+      if (playerSect.eliteDisciples.find((e) => e.originalUid === discipleUid)) {
+        return {
+          success: false,
+          error: "\u8BE5\u5F1F\u5B50\u5DF2\u7ECF\u662F\u7CBE\u82F1\u5F1F\u5B50"
+        };
+      }
+      if ((disciple.realm || 0) < 2) {
+        return {
+          success: false,
+          error: "\u5F1F\u5B50\u5883\u754C\u8FC7\u4F4E\uFF0C\u9700\u8981\u91D1\u4E39\u671F\u4EE5\u4E0A\u624D\u80FD\u664B\u5347\u7CBE\u82F1"
+        };
+      }
+      const eliteDisciple = createEliteDisciple({
+        uid: disciple.uid,
+        name: disciple.name,
+        realm: disciple.realm,
+        talentIndex: disciple.talentIndex || 1
+      });
+      eliteDisciple.specialSkills = this.assignSpecialSkills(eliteDisciple);
+      playerSect.eliteDisciples.push(eliteDisciple);
+      return {
+        success: true,
+        message: `${disciple.name}\u664B\u5347\u4E3A\u7CBE\u82F1\u5F1F\u5B50\uFF01`,
+        eliteDisciple: {
+          uid: eliteDisciple.uid,
+          name: eliteDisciple.name,
+          realm: eliteDisciple.realm,
+          specialSkills: eliteDisciple.specialSkills,
+          promotedAt: eliteDisciple.promotedAt
+        },
+        eliteDiscipleCount: playerSect.eliteDisciples.length
+      };
+    }
+    /**
+     * 分配特殊技能
+     */
+    assignSpecialSkills(disciple) {
+      const skillPool = [
+        { id: "spiritShield", name: "\u7075\u529B\u62A4\u76FE", effect: "defense +30%" },
+        { id: "quickStrike", name: "\u75BE\u98CE\u65A9", effect: "attack +25%" },
+        { id: "meditation", name: "\u5165\u5B9A", effect: "cultivationSpeed +20%" },
+        { id: "eyeOfTruth", name: "\u6D1E\u5BDF\u4E4B\u773C", effect: "perception +35%" },
+        { id: "swiftFoot", name: "\u7F29\u5730\u672F", effect: "evasion +30%" },
+        { id: "alchemyTalent", name: "\u70BC\u4E39\u5929\u8D4B", effect: "pillQuality +25%" }
+      ];
+      const skillCount = Math.min(3, Math.floor((disciple.talentIndex || 1) / 2) + 1);
+      const selected = [];
+      const shuffled = skillPool.sort(() => Math.random() - 0.5);
+      for (let i = 0; i < skillCount; i++) {
+        selected.push(shuffled[i]);
+      }
+      return selected;
+    }
+    /**
+     * sect.immortal.alliance.form - 形成宗门联盟
+     * @param {Object} params - { targetSectId: string }
+     */
+    mcpAllianceForm(params = {}) {
+      const { targetSectId } = params;
+      const playerSect = this.getPlayerSect();
+      if (!playerSect) {
+        return {
+          success: false,
+          error: "\u4F60\u672A\u52A0\u5165\u4EFB\u4F55\u4ED9\u754C\u5B97\u95E8"
+        };
+      }
+      const targetSect = this.immortalSects.sects.find((s) => s.uid === targetSectId);
+      if (!targetSect) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u4ED9\u754C\u5B97\u95E8\u4E0D\u5B58\u5728"
+        };
+      }
+      if (targetSectId === playerSect.uid) {
+        return {
+          success: false,
+          error: "\u65E0\u6CD5\u4E0E\u81EA\u5DF1\u7ED3\u76DF"
+        };
+      }
+      if (playerSect.alliances.includes(targetSectId)) {
+        return {
+          success: false,
+          error: "\u5DF2\u662F\u76DF\u53CB"
+        };
+      }
+      if (playerSect.enemies.includes(targetSectId)) {
+        return {
+          success: false,
+          error: "\u4E0E\u8BE5\u5B97\u95E8\u5904\u4E8E\u654C\u5BF9\u72B6\u6001\uFF0C\u65E0\u6CD5\u7ED3\u76DF"
+        };
+      }
+      if (playerSect.alliances.length >= IMMORTAL_SECT_CONFIG.allianceMaxSects) {
+        return {
+          success: false,
+          error: `\u76DF\u53CB\u6570\u91CF\u5DF2\u8FBE\u4E0A\u9650\uFF08${IMMORTAL_SECT_CONFIG.allianceMaxSects}\u4E2A\u5B97\u95E8\uFF09`
+        };
+      }
+      if (targetSect.alliances.length >= IMMORTAL_SECT_CONFIG.allianceMaxSects) {
+        return {
+          success: false,
+          error: "\u5BF9\u65B9\u5B97\u95E8\u76DF\u53CB\u6570\u5DF2\u8FBE\u4E0A\u9650"
+        };
+      }
+      playerSect.alliances.push(targetSectId);
+      targetSect.alliances.push(playerSect.uid);
+      const allianceRecord = {
+        id: "al_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
+        sectId: playerSect.uid,
+        targetSectId,
+        formedAt: Date.now(),
+        type: "mutual"
+      };
+      this.immortalSects.allianceRecords.push(allianceRecord);
+      playerSect.reputation += 50;
+      targetSect.reputation += 50;
+      return {
+        success: true,
+        message: `\u4E0E\u300C${targetSect.name}\u300D\u6210\u529F\u7ED3\u76DF\uFF01`,
+        alliance: {
+          id: allianceRecord.id,
+          sectName: playerSect.name,
+          targetSectName: targetSect.name,
+          formedAt: allianceRecord.formedAt
+        },
+        playerAllianceCount: playerSect.alliances.length,
+        targetAllianceCount: targetSect.alliances.length
+      };
+    }
+    /**
+     * 获取所有仙界宗门列表（用于MCP工具注册）
+     */
+    getAllSects() {
+      return this.immortalSects.sects.map((s) => ({
+        uid: s.uid,
+        name: s.name,
+        sectLevel: s.sectLevel,
+        memberCount: s.members.length,
+        reputation: s.reputation
+      }));
+    }
+    /**
+     * 获取玩家的精英弟子列表
+     */
+    getEliteDisciples() {
+      const playerSect = this.getPlayerSect();
+      if (!playerSect) return [];
+      return playerSect.eliteDisciples;
+    }
+    /**
+     * 列出所有可用的MCP工具处理器
+     */
+    getMCPHandlers() {
+      return {
+        "sect.immortal.create": (params) => this.mcpCreate(params),
+        "sect.immortal.join": (params) => this.mcpJoin(params),
+        "sect.immortal.resource.list": (params) => this.mcpResourceList(params),
+        "sect.immortal.trade.execute": (params) => this.mcpTradeExecute(params),
+        "sect.immortal.disciple.promote": (params) => this.mcpDisciplePromote(params),
+        "sect.immortal.alliance.form": (params) => this.mcpAllianceForm(params)
+      };
+    }
+  };
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -12157,7 +12718,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V230",
+      gameVersion: "V231",
       // 设置
       settings: {
         soundEnabled: true,
@@ -12196,6 +12757,9 @@ var CultivationSimulator = (() => {
     domainModules.herbDiscovery = herbDiscoveryService;
     ascensionService.init(gameState2);
     domainModules.ascension = ascensionService;
+    const immortalSectService = createImmortalSectService(gameState2);
+    immortalSectService.init(gameState2);
+    domainModules.immortalSect = immortalSectService;
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
@@ -12725,6 +13289,74 @@ var CultivationSimulator = (() => {
         }
       }
     }, (params) => ascensionService.mcpBlessingList(params));
+    mcpRegistry.registerTool("sect.immortal.create", {
+      name: "sect.immortal.create",
+      description: "Create an immortal sect in the immortal realm",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Name of the immortal sect" }
+        },
+        required: ["name"]
+      }
+    }, (params) => domainModules.immortalSect.mcpCreate(params));
+    mcpRegistry.registerTool("sect.immortal.join", {
+      name: "sect.immortal.join",
+      description: "Join an existing immortal sect",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sectId: { type: "string", description: "UID of the sect to join" }
+        },
+        required: ["sectId"]
+      }
+    }, (params) => domainModules.immortalSect.mcpJoin(params));
+    mcpRegistry.registerTool("sect.immortal.resource.list", {
+      name: "sect.immortal.resource.list",
+      description: "List resources of an immortal sect",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sectId: { type: "string", description: "UID of the sect (optional, defaults to player sect)" }
+        }
+      }
+    }, (params) => domainModules.immortalSect.mcpResourceList(params));
+    mcpRegistry.registerTool("sect.immortal.trade.execute", {
+      name: "sect.immortal.trade.execute",
+      description: "Execute a trade between immortal sects",
+      inputSchema: {
+        type: "object",
+        properties: {
+          targetSectId: { type: "string", description: "Target sect ID" },
+          resourceType: { type: "string", enum: ["spiritStones", "pills", "techniques", "merit"] },
+          amount: { type: "number" },
+          price: { type: "number" }
+        },
+        required: ["targetSectId", "resourceType", "amount", "price"]
+      }
+    }, (params) => domainModules.immortalSect.mcpTradeExecute(params));
+    mcpRegistry.registerTool("sect.immortal.disciple.promote", {
+      name: "sect.immortal.disciple.promote",
+      description: "Promote a mortal sect disciple to elite disciple",
+      inputSchema: {
+        type: "object",
+        properties: {
+          discipleUid: { type: "string", description: "UID of the disciple to promote" }
+        },
+        required: ["discipleUid"]
+      }
+    }, (params) => domainModules.immortalSect.mcpDisciplePromote(params));
+    mcpRegistry.registerTool("sect.immortal.alliance.form", {
+      name: "sect.immortal.alliance.form",
+      description: "Form an alliance with another immortal sect",
+      inputSchema: {
+        type: "object",
+        properties: {
+          targetSectId: { type: "string", description: "Target sect ID to ally with" }
+        },
+        required: ["targetSectId"]
+      }
+    }, (params) => domainModules.immortalSect.mcpAllianceForm(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -13379,4 +14011,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-5658cba-2026-05-30T16-04-05-967Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-b1fc522-2026-05-30T16-07-18-090Z";
