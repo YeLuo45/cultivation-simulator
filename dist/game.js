@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-0c2dcab-2026-05-30T14-50-37-528Z */
+/* Cultivation Simulator DDD-v1.0.0-9033875-2026-05-30T14-58-07-926Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2024,6 +2024,1130 @@ var CultivationSimulator = (() => {
         "\u767D\u864E": { attack: 18, defense: 12, speed: 10, rarity: "legendary" },
         "\u91D1\u9E4F": { attack: 20, defense: 8, speed: 18, rarity: "mythic" }
       };
+    }
+  });
+
+  // src/systems/ai/NPCCollaboration.js
+  var NPC_ROLE_REGISTRY, NpcMessageBus, npcMessageBus, NpcCollabGraph, npcCollabGraph, NpcTaskManager, NpcCollaborationRewards, NpcReputationSystem, npcReputationSystem, npcTaskManager, npcCollabRewards, CollaborationRoom, CollaborationManager, collabManager;
+  var init_NPCCollaboration = __esm({
+    "src/systems/ai/NPCCollaboration.js"() {
+      NPC_ROLE_REGISTRY = {
+        "master": {
+          role: "master",
+          title: "\u5E08\u5C0A",
+          skills: ["teach", "assign_task", "evaluate", "reward"],
+          collaborationWeight: 0.3,
+          responseSpeed: "slow"
+        },
+        "monster": {
+          role: "monster",
+          title: "\u5996\u517D",
+          skills: ["challenge", "guard", "drop_item"],
+          collaborationWeight: 0.2,
+          responseSpeed: "fast"
+        },
+        "merchant": {
+          role: "merchant",
+          title: "\u5546\u4EBA",
+          skills: ["trade", "appraise", "special_goods"],
+          collaborationWeight: 0.25,
+          responseSpeed: "medium"
+        },
+        "fellow": {
+          role: "fellow",
+          title: "\u540C\u9053",
+          skills: ["practice_together", "share_resource", "mutual_help"],
+          collaborationWeight: 0.25,
+          responseSpeed: "medium"
+        }
+      };
+      NpcMessageBus = class {
+        constructor() {
+          this.messages = [];
+          this.listeners = /* @__PURE__ */ new Map();
+          this.messageId = 0;
+          this.messageHistory = [];
+          this.maxHistoryLength = 500;
+        }
+        /**
+         * 发送消息给指定角色
+         */
+        send(fromRole, toRole, type, payload) {
+          const msg = {
+            id: ++this.messageId,
+            from: fromRole,
+            to: toRole,
+            type,
+            // 'task' | 'response' | 'broadcast'
+            payload,
+            timestamp: Date.now(),
+            status: "pending"
+          };
+          this.messages.push(msg);
+          this.addToHistory(msg);
+          return msg;
+        }
+        /**
+         * 广播消息给所有角色
+         */
+        broadcast(fromRole, type, payload) {
+          const msg = {
+            id: ++this.messageId,
+            from: fromRole,
+            to: "*",
+            // wildcard = all roles
+            type,
+            // 'announcement' | 'emergency' | 'opportunity'
+            payload,
+            timestamp: Date.now(),
+            status: "pending"
+          };
+          this.messages.push(msg);
+          this.addToHistory(msg);
+          return msg;
+        }
+        /**
+         * 订阅角色消息
+         */
+        subscribe(role, callback) {
+          if (!this.listeners.has(role)) {
+            this.listeners.set(role, []);
+          }
+          this.listeners.get(role).push(callback);
+          return () => {
+            const callbacks = this.listeners.get(role);
+            const idx = callbacks.indexOf(callback);
+            if (idx >= 0) callbacks.splice(idx, 1);
+          };
+        }
+        /**
+         * 分发消息给订阅者
+         */
+        dispatch() {
+          const delivered = [];
+          for (const msg of this.messages) {
+            if (msg.status !== "pending") continue;
+            const listeners = this.listeners.get(msg.to) || [];
+            for (const cb of listeners) {
+              cb(msg);
+              msg.status = "delivered";
+              delivered.push(msg.id);
+            }
+            if (msg.to === "*") {
+              for (const [role, cbs] of this.listeners) {
+                if (role !== msg.from) {
+                  for (const cb of cbs) {
+                    cb(msg);
+                  }
+                }
+              }
+              msg.status = "broadcast";
+              delivered.push(msg.id);
+            }
+          }
+          this.messages = this.messages.filter((m) => m.status === "pending");
+          return delivered;
+        }
+        /**
+         * 获取角色的消息
+         */
+        getMessages(role, since = 0) {
+          return this.messages.filter(
+            (m) => (m.from === role || m.to === role || m.to === "*") && m.timestamp > since
+          );
+        }
+        /**
+         * 添加到历史记录
+         */
+        addToHistory(msg) {
+          this.messageHistory.push({ ...msg });
+          if (this.messageHistory.length > this.maxHistoryLength) {
+            this.messageHistory = this.messageHistory.slice(-this.maxHistoryLength);
+          }
+        }
+        /**
+         * 获取消息历史
+         */
+        getHistory(role = null, limit = 100) {
+          let history = this.messageHistory;
+          if (role) {
+            history = history.filter((m) => m.from === role || m.to === role);
+          }
+          return history.slice(-limit);
+        }
+        /**
+         * 清除消息
+         */
+        clearMessages() {
+          this.messages = [];
+        }
+        /**
+         * 获取状态
+         */
+        getStatus() {
+          return {
+            pendingMessages: this.messages.length,
+            registeredListeners: this.listeners.size,
+            historyLength: this.messageHistory.length
+          };
+        }
+      };
+      npcMessageBus = new NpcMessageBus();
+      NpcCollabGraph = class {
+        constructor() {
+          this.nodes = /* @__PURE__ */ new Map();
+          this.edges = [];
+          this.activeTasks = /* @__PURE__ */ new Map();
+          this.taskIdCounter = 0;
+        }
+        /**
+         * 添加节点
+         */
+        addNode(nodeId, config) {
+          this.nodes.set(nodeId, {
+            id: nodeId,
+            type: config.type,
+            // 'publish_task' | 'execute' | 'review' | 'reward'
+            owner: config.owner,
+            status: "idle",
+            prerequisites: config.prerequisites || [],
+            outcomes: config.outcomes || {},
+            maxProgress: config.maxProgress || 100
+          });
+        }
+        /**
+         * 添加边
+         */
+        addEdge(from, to, type = "sequence") {
+          this.edges.push({ from, to, type });
+        }
+        /**
+         * 获取准备就绪的节点（所有前置条件已满足）
+         */
+        getReadyNodes() {
+          const ready = [];
+          for (const [nodeId, node] of this.nodes) {
+            if (node.status !== "idle") continue;
+            const prereqs = node.prerequisites || [];
+            const allMet = prereqs.every((p) => {
+              const n = this.nodes.get(p);
+              return n && n.status === "completed";
+            });
+            if (allMet) ready.push(nodeId);
+          }
+          return ready;
+        }
+        /**
+         * 启动任务
+         */
+        startTask(nodeId, assignedTo) {
+          const node = this.nodes.get(nodeId);
+          if (!node) return null;
+          const taskId = `task_${nodeId}_${++this.taskIdCounter}`;
+          node.status = "in_progress";
+          this.activeTasks.set(taskId, {
+            nodeId,
+            assignedTo,
+            startTime: Date.now(),
+            progress: 0
+          });
+          return taskId;
+        }
+        /**
+         * 更新任务进度
+         */
+        updateProgress(taskId, progress) {
+          const task = this.activeTasks.get(taskId);
+          if (!task) return;
+          task.progress = Math.min(progress, 100);
+          if (task.progress >= 100) {
+            const node = this.nodes.get(task.nodeId);
+            if (node) node.status = "completed";
+            task.status = "completed";
+            task.endTime = Date.now();
+          }
+        }
+        /**
+         * 获取链状态
+         */
+        getChainStatus(chainId) {
+          const nodes = Array.from(this.nodes.values()).filter((n) => n.type === chainId);
+          return {
+            total: nodes.length,
+            completed: nodes.filter((n) => n.status === "completed").length,
+            inProgress: nodes.filter((n) => n.status === "in_progress").length,
+            idle: nodes.filter((n) => n.status === "idle").length
+          };
+        }
+        /**
+         * 获取节点详情
+         */
+        getNode(nodeId) {
+          return this.nodes.get(nodeId);
+        }
+        /**
+         * 获取活跃任务
+         */
+        getActiveTasks() {
+          return Array.from(this.activeTasks.entries()).map(([id, task]) => ({
+            taskId: id,
+            ...task
+          }));
+        }
+        /**
+         * 重置图
+         */
+        reset() {
+          this.nodes.clear();
+          this.edges = [];
+          this.activeTasks.clear();
+        }
+      };
+      npcCollabGraph = new NpcCollabGraph();
+      NpcTaskManager = class {
+        constructor() {
+          this.activeTasks = /* @__PURE__ */ new Map();
+          this.taskIdCounter = 0;
+          this.taskDefinitions = /* @__PURE__ */ new Map();
+        }
+        /**
+         * 分配任务
+         */
+        assignTask(role, type, reward, durationMs) {
+          const taskId = `npc_task_${++this.taskIdCounter}`;
+          this.activeTasks.set(taskId, {
+            role,
+            type,
+            progress: 0,
+            reward,
+            deadline: Date.now() + durationMs,
+            startTime: Date.now(),
+            status: "assigned"
+          });
+          return taskId;
+        }
+        /**
+         * 更新进度
+         */
+        updateProgress(taskId, progress) {
+          const task = this.activeTasks.get(taskId);
+          if (task) {
+            task.progress = Math.min(progress, 100);
+            if (progress >= 100) {
+              task.status = "completed";
+              task.completedAt = Date.now();
+            }
+          }
+        }
+        /**
+         * 完成任务
+         */
+        completeTask(taskId) {
+          const task = this.activeTasks.get(taskId);
+          if (task) {
+            task.progress = 100;
+            task.status = "completed";
+            task.completedAt = Date.now();
+            return task;
+          }
+          return null;
+        }
+        /**
+         * 获取角色的活跃任务
+         */
+        getActiveTasks(role) {
+          return Array.from(this.activeTasks.values()).filter(
+            (t) => t.role === role && t.status !== "completed"
+          );
+        }
+        /**
+         * 获取过期任务
+         */
+        getExpiredTasks() {
+          const now = Date.now();
+          return Array.from(this.activeTasks.entries()).filter(
+            ([id, task]) => task.deadline < now && task.status !== "completed"
+          ).map(([id]) => id);
+        }
+        /**
+         * 清理过期任务
+         */
+        cleanupExpiredTasks() {
+          const expired = this.getExpiredTasks();
+          for (const taskId of expired) {
+            const task = this.activeTasks.get(taskId);
+            if (task) {
+              task.status = "expired";
+              task.expiredAt = Date.now();
+            }
+          }
+          return expired.length;
+        }
+      };
+      NpcCollaborationRewards = class {
+        constructor() {
+          this.rewardPool = 0;
+          this.distributionRules = {
+            "master": { share: 0.4, bonusOn: ["teach", "evaluate"] },
+            "fellow": { share: 0.3, bonusOn: ["practice_together", "share_resource"] },
+            "merchant": { share: 0.2, bonusOn: ["trade", "appraise"] },
+            "monster": { share: 0.1, bonusOn: ["challenge", "drop_item"] }
+          };
+          this.totalDistributed = 0;
+        }
+        /**
+         * 添加到奖励池
+         */
+        addToPool(amount) {
+          this.rewardPool += amount;
+        }
+        /**
+         * 分配奖励
+         */
+        distribute(role) {
+          const rule = this.distributionRules[role];
+          if (!rule) return 0;
+          const amount = Math.floor(this.rewardPool * rule.share);
+          this.totalDistributed += amount;
+          return amount;
+        }
+        /**
+         * 获取剩余奖励池
+         */
+        getPool() {
+          return this.rewardPool;
+        }
+        /**
+         * 清空奖励池
+         */
+        clearPool() {
+          this.rewardPool = 0;
+        }
+      };
+      NpcReputationSystem = class {
+        constructor() {
+          this.reputations = /* @__PURE__ */ new Map();
+          this.initReputations();
+        }
+        initReputations() {
+          for (const [role, config] of Object.entries(NPC_ROLE_REGISTRY)) {
+            this.reputations.set(role, {
+              level: 1,
+              exp: 0,
+              totalInteractions: 0,
+              lastInteraction: 0
+            });
+          }
+        }
+        getReputation(role) {
+          return this.reputations.get(role) || { level: 0, exp: 0 };
+        }
+        addReputation(role, amount) {
+          const rep = this.getReputation(role);
+          rep.exp += amount;
+          rep.totalInteractions++;
+          rep.lastInteraction = Date.now();
+          while (rep.exp >= 100) {
+            rep.exp -= 100;
+            rep.level++;
+          }
+          this.reputations.set(role, rep);
+          return rep;
+        }
+        getReputationLevel(role) {
+          return this.getReputation(role).level;
+        }
+      };
+      npcReputationSystem = new NpcReputationSystem();
+      npcTaskManager = new NpcTaskManager();
+      npcCollabRewards = new NpcCollaborationRewards();
+      CollaborationRoom = class {
+        constructor(roomId, taskType) {
+          this.roomId = roomId;
+          this.taskType = taskType;
+          this.participants = /* @__PURE__ */ new Map();
+          this.maxParticipants = 5;
+          this.status = "recruiting";
+          this.chatLog = [];
+          this.resourcePool = 0;
+        }
+        join(playerId, playerName) {
+          if (this.status !== "recruiting") {
+            return { success: false, reason: "Room not recruiting" };
+          }
+          if (this.participants.size >= this.maxParticipants) {
+            return { success: false, reason: "Room full" };
+          }
+          this.participants.set(playerId, {
+            name: playerName,
+            joinedAt: Date.now(),
+            contribution: 0
+          });
+          this.addChatLog(playerName, "joined the room");
+          return { success: true, roomId: this.roomId };
+        }
+        leave(playerId) {
+          const participant = this.participants.get(playerId);
+          if (participant) {
+            this.addChatLog(participant.name, "left the room");
+            this.participants.delete(playerId);
+            return true;
+          }
+          return false;
+        }
+        addChatLog(playerName, message) {
+          this.chatLog.push({
+            playerName,
+            message,
+            timestamp: Date.now()
+          });
+        }
+        contribute(playerId, amount) {
+          const participant = this.participants.get(playerId);
+          if (participant) {
+            participant.contribution += amount;
+            this.resourcePool += amount;
+          }
+        }
+        distributeResources(perPlayer) {
+          for (const [pid, session] of this.participants) {
+            gameState.spiritStones += perPlayer;
+            this.addChatLog(pid, `received ${perPlayer} spirit stones`);
+          }
+        }
+        getParticipantCount() {
+          return this.participants.size;
+        }
+      };
+      CollaborationManager = class {
+        constructor() {
+          this.rooms = /* @__PURE__ */ new Map();
+          this.playerRooms = /* @__PURE__ */ new Map();
+          this.roomCounter = 0;
+        }
+        createRoom(taskType, maxParticipants = 5) {
+          this.roomCounter++;
+          const roomId = `collab_${taskType}_${this.roomCounter}`;
+          const room = new CollaborationRoom(roomId, taskType);
+          room.maxParticipants = maxParticipants;
+          this.rooms.set(roomId, room);
+          return room;
+        }
+        joinRoom(roomId, playerId, playerName) {
+          const room = this.rooms.get(roomId);
+          if (!room) return { success: false, reason: "Room not found" };
+          if (room.status !== "recruiting") return { success: false, reason: "Room not recruiting" };
+          const result = room.join(playerId, playerName);
+          if (result.success) {
+            if (!this.playerRooms.has(playerId)) {
+              this.playerRooms.set(playerId, []);
+            }
+            this.playerRooms.get(playerId).push(roomId);
+          }
+          return result;
+        }
+        leaveRoom(roomId, playerId) {
+          const room = this.rooms.get(roomId);
+          if (!room) return false;
+          const left = room.leave(playerId);
+          if (left) {
+            const rooms = this.playerRooms.get(playerId);
+            if (rooms) {
+              const idx = rooms.indexOf(roomId);
+              if (idx >= 0) rooms.splice(idx, 1);
+            }
+          }
+          return left;
+        }
+        getActiveRooms() {
+          return Array.from(this.rooms.values()).filter((r) => r.status === "recruiting");
+        }
+        getRoomStatus(roomId) {
+          const room = this.rooms.get(roomId);
+          if (!room) return null;
+          return {
+            roomId: room.roomId,
+            taskType: room.taskType,
+            participants: room.getParticipantCount(),
+            maxParticipants: room.maxParticipants,
+            status: room.status
+          };
+        }
+      };
+      collabManager = new CollaborationManager();
+    }
+  });
+
+  // src/systems/event/RealmEventBus.js
+  var RealmEventBus_exports = {};
+  __export(RealmEventBus_exports, {
+    EVENT_BUS_TOOLS: () => EVENT_BUS_TOOLS,
+    EVENT_CONFIG: () => EVENT_CONFIG,
+    EVENT_PRIORITIES: () => EVENT_PRIORITIES,
+    REALM_EVENT_TYPES: () => REALM_EVENT_TYPES,
+    RealmEvent: () => RealmEvent,
+    RealmEventBus: () => RealmEventBus,
+    SubscriberEntry: () => SubscriberEntry,
+    default: () => RealmEventBus_default,
+    mcpCascadeTrigger: () => mcpCascadeTrigger,
+    mcpHistory: () => mcpHistory,
+    mcpPublish: () => mcpPublish,
+    mcpSubscribe: () => mcpSubscribe,
+    mcpSubscriberList: () => mcpSubscriberList,
+    mcpUnsubscribe: () => mcpUnsubscribe,
+    realmEventBus: () => realmEventBus
+  });
+  function mcpPublish(params = {}) {
+    const { type, data = {}, source, target, priority } = params;
+    if (!type) {
+      return { success: false, error: "Event type is required" };
+    }
+    const result = realmEventBus.publish(type, data, {
+      source: source || "mcp",
+      target,
+      priority: priority || "medium"
+    });
+    return {
+      success: true,
+      eventId: result.eventId,
+      type: result.type,
+      timestamp: result.timestamp,
+      matchedCount: result.matchedCount
+    };
+  }
+  function mcpSubscribe(params = {}) {
+    const { pattern, subscriberId = "mcp", priority = "medium" } = params;
+    if (!pattern) {
+      return { success: false, error: "Event pattern is required" };
+    }
+    const callback = (event2) => {
+      return { received: true, eventId: event2.id, type: event2.type };
+    };
+    const result = realmEventBus.subscribe(pattern, callback, {
+      subscriberId,
+      priority
+    });
+    return {
+      success: result.success,
+      subscriberId: result.subscriberId,
+      pattern: result.pattern
+    };
+  }
+  function mcpUnsubscribe(params = {}) {
+    const { subscriberId } = params;
+    if (!subscriberId) {
+      return { success: false, error: "Subscriber ID is required" };
+    }
+    const result = realmEventBus.unsubscribe(subscriberId);
+    return result;
+  }
+  function mcpHistory(params = {}) {
+    const { eventType, source, since, limit } = params;
+    const history = realmEventBus.history({
+      eventType,
+      source,
+      since: since || 0,
+      limit: limit || 100
+    });
+    return {
+      success: true,
+      count: history.length,
+      events: history.map((e) => ({
+        id: e.id,
+        type: e.type,
+        source: e.source,
+        target: e.target,
+        timestamp: e.timestamp,
+        priority: e.priority,
+        data: e.data
+      }))
+    };
+  }
+  function mcpCascadeTrigger(params = {}) {
+    const { initialEvent, followUpEvents = [], maxDepth } = params;
+    if (!initialEvent || !initialEvent.type) {
+      return { success: false, error: "Initial event with type is required" };
+    }
+    const result = realmEventBus.triggerCascade(initialEvent, {
+      maxDepth: maxDepth || EVENT_CONFIG.cascadeDepthLimit,
+      followUpEvents
+    });
+    return result;
+  }
+  function mcpSubscriberList(params = {}) {
+    const { pattern, subscriberId } = params;
+    const subscribers = realmEventBus.listSubscribers({
+      pattern: pattern || null,
+      subscriberId: subscriberId || null
+    });
+    return {
+      success: true,
+      count: subscribers.length,
+      subscribers
+    };
+  }
+  var EVENT_CONFIG, EVENT_PRIORITIES, REALM_EVENT_TYPES, RealmEvent, SubscriberEntry, RealmEventBus, realmEventBus, EVENT_BUS_TOOLS, RealmEventBus_default;
+  var init_RealmEventBus = __esm({
+    "src/systems/event/RealmEventBus.js"() {
+      init_NPCCollaboration();
+      EVENT_CONFIG = {
+        maxHistoryLength: 1e3,
+        maxSubscribersPerEvent: 100,
+        cascadeDepthLimit: 5,
+        defaultPriority: "medium"
+      };
+      EVENT_PRIORITIES = {
+        high: 3,
+        medium: 2,
+        low: 1
+      };
+      REALM_EVENT_TYPES = {
+        // 玩家事件
+        PLAYER_CULTIVATION_BREAKTHROUGH: "player.cultivation.breakthrough",
+        PLAYER_LEVEL_UP: "player.level.up",
+        PLAYER_QUESTS_COMPLETE: "player.quest.complete",
+        // NPC事件
+        NPC_INTERACT: "npc.interact",
+        NPC_SPAWN: "npc.spawn",
+        NPC_DEFEAT: "npc.defeat",
+        // 仙界事件
+        REALM_QUAKE: "realm.quake",
+        REALM_TRIBULATION: "realm.tribulation",
+        REALM_BLESSING: "realm.blessing",
+        // 宗门事件
+        SECT_WAR: "sect.war",
+        SECT_JOIN: "sect.join",
+        SECT_TASK: "sect.task",
+        // 宝藏事件
+        TREASURE_DISCOVERED: "treasure.discovered",
+        TREASURE_OPENED: "treasure.opened",
+        // 系统事件
+        SYSTEM_INIT: "system.init",
+        SYSTEM_SAVE: "system.save",
+        SYSTEM_LOAD: "system.load"
+      };
+      RealmEvent = class {
+        constructor(type, data = {}, options = {}) {
+          this.id = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          this.type = type;
+          this.source = options.source || "system";
+          this.target = options.target || null;
+          this.timestamp = options.timestamp || Date.now();
+          this.data = data;
+          this.priority = options.priority || EVENT_CONFIG.defaultPriority;
+          this.cascadeLevel = options.cascadeLevel || 0;
+          this.processed = false;
+        }
+        /**
+         * 获取优先级数值
+         */
+        getPriorityValue() {
+          return EVENT_PRIORITIES[this.priority] || EVENT_PRIORITIES.medium;
+        }
+      };
+      SubscriberEntry = class {
+        constructor(pattern, callback, options = {}) {
+          this.id = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          this.pattern = pattern;
+          this.callback = callback;
+          this.priority = options.priority || EVENT_PRIORITIES.medium;
+          this.subscriberId = options.subscriberId || "anonymous";
+          this.active = true;
+          this.matchCount = 0;
+          this.createdAt = Date.now();
+        }
+        /**
+         * 获取优先级数值
+         */
+        getPriorityValue() {
+          return this.priority;
+        }
+      };
+      RealmEventBus = class {
+        constructor() {
+          this.subscribers = /* @__PURE__ */ new Map();
+          this.eventHistory = [];
+          this.subscriberStats = /* @__PURE__ */ new Map();
+          this.cascadeTracking = /* @__PURE__ */ new Set();
+          this.eventIdCounter = 0;
+          this.listenerCount = 0;
+        }
+        /**
+         * 创建事件
+         */
+        createEvent(type, data = {}, options = {}) {
+          return new RealmEvent(type, data, options);
+        }
+        /**
+         * 发布事件
+         */
+        publish(type, data = {}, options = {}) {
+          const event2 = this.createEvent(type, data, options);
+          this.eventHistory.push(event2);
+          if (this.eventHistory.length > EVENT_CONFIG.maxHistoryLength) {
+            this.eventHistory = this.eventHistory.slice(-EVENT_CONFIG.maxHistoryLength);
+          }
+          const matchedSubscribers = this.getMatchedSubscribers(type);
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          matchedSubscribers.sort((a, b) => {
+            const aVal = priorityOrder[a.getPriorityValue()] || 2;
+            const bVal = priorityOrder[b.getPriorityValue()] || 2;
+            return bVal - aVal;
+          });
+          const results = [];
+          for (const subscriber of matchedSubscribers) {
+            if (subscriber.active) {
+              try {
+                const result = subscriber.callback(event2);
+                subscriber.matchCount++;
+                results.push({
+                  subscriberId: subscriber.subscriberId,
+                  success: true,
+                  result
+                });
+              } catch (e) {
+                results.push({
+                  subscriberId: subscriber.subscriberId,
+                  success: false,
+                  error: e.message
+                });
+              }
+            }
+          }
+          return {
+            success: true,
+            eventId: event2.id,
+            type: event2.type,
+            timestamp: event2.timestamp,
+            matchedCount: matchedSubscribers.length,
+            results
+          };
+        }
+        /**
+         * 订阅事件
+         */
+        subscribe(pattern, callback, options = {}) {
+          const subscriber = new SubscriberEntry(pattern, callback, options);
+          if (!this.subscribers.has(pattern)) {
+            this.subscribers.set(pattern, []);
+          }
+          const subs = this.subscribers.get(pattern);
+          if (subs.length >= EVENT_CONFIG.maxSubscribersPerEvent) {
+            return {
+              success: false,
+              error: "Max subscribers reached for this pattern",
+              subscriberId: null
+            };
+          }
+          subs.push(subscriber);
+          this.listenerCount++;
+          const stats = this.subscriberStats.get(subscriber.subscriberId) || {
+            activeSubscriptions: 0,
+            totalMatches: 0
+          };
+          stats.activeSubscriptions++;
+          this.subscriberStats.set(subscriber.subscriberId, stats);
+          return {
+            success: true,
+            subscriberId: subscriber.id,
+            pattern: subscriber.pattern
+          };
+        }
+        /**
+         * 取消订阅
+         */
+        unsubscribe(subscriberId) {
+          let found = false;
+          for (const [pattern, subs] of this.subscribers) {
+            const index = subs.findIndex((s) => s.id === subscriberId);
+            if (index >= 0) {
+              const sub = subs[index];
+              sub.active = false;
+              subs.splice(index, 1);
+              this.listenerCount--;
+              found = true;
+              const stats = this.subscriberStats.get(sub.subscriberId);
+              if (stats) {
+                stats.activeSubscriptions--;
+              }
+              break;
+            }
+          }
+          return { success: found };
+        }
+        /**
+         * 取消订阅指定模式和订阅者ID
+         */
+        unsubscribeByPattern(pattern, subscriberId) {
+          const subs = this.subscribers.get(pattern);
+          if (!subs) return { success: false };
+          const index = subs.findIndex(
+            (s) => s.id === subscriberId || s.subscriberId === subscriberId
+          );
+          if (index >= 0) {
+            const sub = subs[index];
+            sub.active = false;
+            subs.splice(index, 1);
+            this.listenerCount--;
+            const stats = this.subscriberStats.get(sub.subscriberId);
+            if (stats) {
+              stats.activeSubscriptions--;
+            }
+            return { success: true };
+          }
+          return { success: false };
+        }
+        /**
+         * 获取事件历史
+         */
+        history(options = {}) {
+          const {
+            eventType = null,
+            source = null,
+            since = 0,
+            limit = 100
+          } = options;
+          let filtered = this.eventHistory;
+          if (eventType) {
+            filtered = filtered.filter((e) => e.type === eventType);
+          }
+          if (source) {
+            filtered = filtered.filter((e) => e.source === source);
+          }
+          if (since > 0) {
+            filtered = filtered.filter((e) => e.timestamp >= since);
+          }
+          return filtered.slice(-limit);
+        }
+        /**
+         * 获取订阅者列表
+         */
+        listSubscribers(options = {}) {
+          const { pattern = null, subscriberId = null } = options;
+          const allSubscribers = [];
+          for (const [pat, subs] of this.subscribers) {
+            for (const sub of subs) {
+              if (!sub.active) continue;
+              if (pattern && !this.matchPattern(pat, pattern)) continue;
+              if (subscriberId && sub.subscriberId !== subscriberId) continue;
+              allSubscribers.push({
+                id: sub.id,
+                pattern: sub.pattern,
+                subscriberId: sub.subscriberId,
+                priority: sub.priority,
+                matchCount: sub.matchCount,
+                active: sub.active,
+                createdAt: sub.createdAt
+              });
+            }
+          }
+          return allSubscribers;
+        }
+        /**
+         * 触发事件级联
+         * 用于手动触发事件链式反应
+         */
+        triggerCascade(initialEvent, cascadeConfig = {}) {
+          const {
+            maxDepth = EVENT_CONFIG.cascadeDepthLimit,
+            followUpEvents = []
+          } = cascadeConfig;
+          if (this.cascadeTracking.has(initialEvent.type)) {
+            return {
+              success: false,
+              error: "Circular cascade detected",
+              eventType: initialEvent.type
+            };
+          }
+          const event2 = this.createEvent(initialEvent.type, initialEvent.data || {}, {
+            source: initialEvent.source || "cascade",
+            cascadeLevel: 0
+          });
+          this.cascadeTracking.add(event2.type);
+          const cascadeResults = [];
+          try {
+            const initialResult = this.publish(event2.type, event2.data, {
+              source: event2.source,
+              cascadeLevel: 0
+            });
+            cascadeResults.push({
+              level: 0,
+              eventType: event2.type,
+              result: initialResult
+            });
+            let currentLevel = 0;
+            let pendingEvents = [...followUpEvents];
+            while (pendingEvents.length > 0 && currentLevel < maxDepth) {
+              currentLevel++;
+              const nextEvent = pendingEvents.shift();
+              const result = this.publish(nextEvent.type, nextEvent.data || {}, {
+                source: "cascade",
+                cascadeLevel: currentLevel
+              });
+              cascadeResults.push({
+                level: currentLevel,
+                eventType: nextEvent.type,
+                result
+              });
+            }
+          } finally {
+            this.cascadeTracking.delete(event2.type);
+          }
+          return {
+            success: true,
+            cascadeResults,
+            totalEvents: cascadeResults.length
+          };
+        }
+        /**
+         * 匹配事件类型模式
+         */
+        matchPattern(eventType, pattern) {
+          if (eventType === pattern) return true;
+          const regex = new RegExp(
+            "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$"
+          );
+          return regex.test(eventType);
+        }
+        /**
+         * 获取匹配的订阅者
+         */
+        getMatchedSubscribers(eventType) {
+          const matched = /* @__PURE__ */ new Map();
+          for (const [pattern, subs] of this.subscribers) {
+            if (this.matchPattern(eventType, pattern)) {
+              for (const sub of subs) {
+                if (sub.active && !matched.has(sub.id)) {
+                  matched.set(sub.id, sub);
+                }
+              }
+            }
+          }
+          return Array.from(matched.values());
+        }
+        /**
+         * 获取统计信息
+         */
+        getStats() {
+          return {
+            totalEvents: this.eventHistory.length,
+            totalSubscribers: this.listenerCount,
+            uniquePatterns: this.subscribers.size,
+            subscriberStats: Object.fromEntries(this.subscriberStats),
+            cascadeTracking: Array.from(this.cascadeTracking)
+          };
+        }
+        /**
+         * 清除历史
+         */
+        clearHistory() {
+          this.eventHistory = [];
+          return { success: true };
+        }
+        /**
+         * 重置
+         */
+        reset() {
+          this.subscribers.clear();
+          this.eventHistory = [];
+          this.subscriberStats.clear();
+          this.cascadeTracking.clear();
+          this.listenerCount = 0;
+          return { success: true };
+        }
+      };
+      realmEventBus = new RealmEventBus();
+      EVENT_BUS_TOOLS = {
+        "event.bus.publish": {
+          name: "event.bus.publish",
+          description: "Publish an event to the realm event bus",
+          inputSchema: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "Event type (e.g., player.cultivation.breakthrough)" },
+              data: { type: "object", description: "Event data payload" },
+              source: { type: "string", description: "Event source (default: mcp)" },
+              target: { type: "string", description: "Event target (optional)" },
+              priority: { type: "string", enum: ["high", "medium", "low"], description: "Event priority" }
+            },
+            required: ["type"]
+          }
+        },
+        "event.bus.subscribe": {
+          name: "event.bus.subscribe",
+          description: "Subscribe to events matching a pattern (supports glob: player.*, *.breakthrough)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              pattern: { type: "string", description: "Event pattern (glob supported: player.*, npc.interact)" },
+              subscriberId: { type: "string", description: "Subscriber identifier (default: mcp)" },
+              priority: { type: "string", enum: ["high", "medium", "low"], description: "Callback priority" }
+            },
+            required: ["pattern"]
+          }
+        },
+        "event.bus.unsubscribe": {
+          name: "event.bus.unsubscribe",
+          description: "Unsubscribe from an event",
+          inputSchema: {
+            type: "object",
+            properties: {
+              subscriberId: { type: "string", description: "Subscriber ID to remove" }
+            },
+            required: ["subscriberId"]
+          }
+        },
+        "event.bus.history": {
+          name: "event.bus.history",
+          description: "View event history",
+          inputSchema: {
+            type: "object",
+            properties: {
+              eventType: { type: "string", description: "Filter by event type" },
+              source: { type: "string", description: "Filter by source" },
+              since: { type: "number", description: "Filter events since timestamp" },
+              limit: { type: "number", description: "Max events to return (default: 100)" }
+            }
+          }
+        },
+        "event.cascade.trigger": {
+          name: "event.cascade.trigger",
+          description: "Manually trigger a cascade of events",
+          inputSchema: {
+            type: "object",
+            properties: {
+              initialEvent: {
+                type: "object",
+                description: "Initial event to trigger",
+                properties: {
+                  type: { type: "string" },
+                  data: { type: "object" },
+                  source: { type: "string" }
+                },
+                required: ["type"]
+              },
+              followUpEvents: {
+                type: "array",
+                description: "Array of follow-up events to trigger in order"
+              },
+              maxDepth: { type: "number", description: "Maximum cascade depth" }
+            },
+            required: ["initialEvent"]
+          }
+        },
+        "event.subscriber.list": {
+          name: "event.subscriber.list",
+          description: "List all event subscribers",
+          inputSchema: {
+            type: "object",
+            properties: {
+              pattern: { type: "string", description: "Filter by pattern" },
+              subscriberId: { type: "string", description: "Filter by subscriber ID" }
+            }
+          }
+        }
+      };
+      RealmEventBus_default = realmEventBus;
     }
   });
 
@@ -6841,553 +7965,8 @@ var CultivationSimulator = (() => {
   };
   var powerSync = new PowerSync();
 
-  // src/systems/ai/NPCCollaboration.js
-  var NPC_ROLE_REGISTRY = {
-    "master": {
-      role: "master",
-      title: "\u5E08\u5C0A",
-      skills: ["teach", "assign_task", "evaluate", "reward"],
-      collaborationWeight: 0.3,
-      responseSpeed: "slow"
-    },
-    "monster": {
-      role: "monster",
-      title: "\u5996\u517D",
-      skills: ["challenge", "guard", "drop_item"],
-      collaborationWeight: 0.2,
-      responseSpeed: "fast"
-    },
-    "merchant": {
-      role: "merchant",
-      title: "\u5546\u4EBA",
-      skills: ["trade", "appraise", "special_goods"],
-      collaborationWeight: 0.25,
-      responseSpeed: "medium"
-    },
-    "fellow": {
-      role: "fellow",
-      title: "\u540C\u9053",
-      skills: ["practice_together", "share_resource", "mutual_help"],
-      collaborationWeight: 0.25,
-      responseSpeed: "medium"
-    }
-  };
-  var NpcMessageBus = class {
-    constructor() {
-      this.messages = [];
-      this.listeners = /* @__PURE__ */ new Map();
-      this.messageId = 0;
-      this.messageHistory = [];
-      this.maxHistoryLength = 500;
-    }
-    /**
-     * 发送消息给指定角色
-     */
-    send(fromRole, toRole, type, payload) {
-      const msg = {
-        id: ++this.messageId,
-        from: fromRole,
-        to: toRole,
-        type,
-        // 'task' | 'response' | 'broadcast'
-        payload,
-        timestamp: Date.now(),
-        status: "pending"
-      };
-      this.messages.push(msg);
-      this.addToHistory(msg);
-      return msg;
-    }
-    /**
-     * 广播消息给所有角色
-     */
-    broadcast(fromRole, type, payload) {
-      const msg = {
-        id: ++this.messageId,
-        from: fromRole,
-        to: "*",
-        // wildcard = all roles
-        type,
-        // 'announcement' | 'emergency' | 'opportunity'
-        payload,
-        timestamp: Date.now(),
-        status: "pending"
-      };
-      this.messages.push(msg);
-      this.addToHistory(msg);
-      return msg;
-    }
-    /**
-     * 订阅角色消息
-     */
-    subscribe(role, callback) {
-      if (!this.listeners.has(role)) {
-        this.listeners.set(role, []);
-      }
-      this.listeners.get(role).push(callback);
-      return () => {
-        const callbacks = this.listeners.get(role);
-        const idx = callbacks.indexOf(callback);
-        if (idx >= 0) callbacks.splice(idx, 1);
-      };
-    }
-    /**
-     * 分发消息给订阅者
-     */
-    dispatch() {
-      const delivered = [];
-      for (const msg of this.messages) {
-        if (msg.status !== "pending") continue;
-        const listeners = this.listeners.get(msg.to) || [];
-        for (const cb of listeners) {
-          cb(msg);
-          msg.status = "delivered";
-          delivered.push(msg.id);
-        }
-        if (msg.to === "*") {
-          for (const [role, cbs] of this.listeners) {
-            if (role !== msg.from) {
-              for (const cb of cbs) {
-                cb(msg);
-              }
-            }
-          }
-          msg.status = "broadcast";
-          delivered.push(msg.id);
-        }
-      }
-      this.messages = this.messages.filter((m) => m.status === "pending");
-      return delivered;
-    }
-    /**
-     * 获取角色的消息
-     */
-    getMessages(role, since = 0) {
-      return this.messages.filter(
-        (m) => (m.from === role || m.to === role || m.to === "*") && m.timestamp > since
-      );
-    }
-    /**
-     * 添加到历史记录
-     */
-    addToHistory(msg) {
-      this.messageHistory.push({ ...msg });
-      if (this.messageHistory.length > this.maxHistoryLength) {
-        this.messageHistory = this.messageHistory.slice(-this.maxHistoryLength);
-      }
-    }
-    /**
-     * 获取消息历史
-     */
-    getHistory(role = null, limit = 100) {
-      let history = this.messageHistory;
-      if (role) {
-        history = history.filter((m) => m.from === role || m.to === role);
-      }
-      return history.slice(-limit);
-    }
-    /**
-     * 清除消息
-     */
-    clearMessages() {
-      this.messages = [];
-    }
-    /**
-     * 获取状态
-     */
-    getStatus() {
-      return {
-        pendingMessages: this.messages.length,
-        registeredListeners: this.listeners.size,
-        historyLength: this.messageHistory.length
-      };
-    }
-  };
-  var npcMessageBus = new NpcMessageBus();
-  var NpcCollabGraph = class {
-    constructor() {
-      this.nodes = /* @__PURE__ */ new Map();
-      this.edges = [];
-      this.activeTasks = /* @__PURE__ */ new Map();
-      this.taskIdCounter = 0;
-    }
-    /**
-     * 添加节点
-     */
-    addNode(nodeId, config) {
-      this.nodes.set(nodeId, {
-        id: nodeId,
-        type: config.type,
-        // 'publish_task' | 'execute' | 'review' | 'reward'
-        owner: config.owner,
-        status: "idle",
-        prerequisites: config.prerequisites || [],
-        outcomes: config.outcomes || {},
-        maxProgress: config.maxProgress || 100
-      });
-    }
-    /**
-     * 添加边
-     */
-    addEdge(from, to, type = "sequence") {
-      this.edges.push({ from, to, type });
-    }
-    /**
-     * 获取准备就绪的节点（所有前置条件已满足）
-     */
-    getReadyNodes() {
-      const ready = [];
-      for (const [nodeId, node] of this.nodes) {
-        if (node.status !== "idle") continue;
-        const prereqs = node.prerequisites || [];
-        const allMet = prereqs.every((p) => {
-          const n = this.nodes.get(p);
-          return n && n.status === "completed";
-        });
-        if (allMet) ready.push(nodeId);
-      }
-      return ready;
-    }
-    /**
-     * 启动任务
-     */
-    startTask(nodeId, assignedTo) {
-      const node = this.nodes.get(nodeId);
-      if (!node) return null;
-      const taskId = `task_${nodeId}_${++this.taskIdCounter}`;
-      node.status = "in_progress";
-      this.activeTasks.set(taskId, {
-        nodeId,
-        assignedTo,
-        startTime: Date.now(),
-        progress: 0
-      });
-      return taskId;
-    }
-    /**
-     * 更新任务进度
-     */
-    updateProgress(taskId, progress) {
-      const task = this.activeTasks.get(taskId);
-      if (!task) return;
-      task.progress = Math.min(progress, 100);
-      if (task.progress >= 100) {
-        const node = this.nodes.get(task.nodeId);
-        if (node) node.status = "completed";
-        task.status = "completed";
-        task.endTime = Date.now();
-      }
-    }
-    /**
-     * 获取链状态
-     */
-    getChainStatus(chainId) {
-      const nodes = Array.from(this.nodes.values()).filter((n) => n.type === chainId);
-      return {
-        total: nodes.length,
-        completed: nodes.filter((n) => n.status === "completed").length,
-        inProgress: nodes.filter((n) => n.status === "in_progress").length,
-        idle: nodes.filter((n) => n.status === "idle").length
-      };
-    }
-    /**
-     * 获取节点详情
-     */
-    getNode(nodeId) {
-      return this.nodes.get(nodeId);
-    }
-    /**
-     * 获取活跃任务
-     */
-    getActiveTasks() {
-      return Array.from(this.activeTasks.entries()).map(([id, task]) => ({
-        taskId: id,
-        ...task
-      }));
-    }
-    /**
-     * 重置图
-     */
-    reset() {
-      this.nodes.clear();
-      this.edges = [];
-      this.activeTasks.clear();
-    }
-  };
-  var npcCollabGraph = new NpcCollabGraph();
-  var NpcTaskManager = class {
-    constructor() {
-      this.activeTasks = /* @__PURE__ */ new Map();
-      this.taskIdCounter = 0;
-      this.taskDefinitions = /* @__PURE__ */ new Map();
-    }
-    /**
-     * 分配任务
-     */
-    assignTask(role, type, reward, durationMs) {
-      const taskId = `npc_task_${++this.taskIdCounter}`;
-      this.activeTasks.set(taskId, {
-        role,
-        type,
-        progress: 0,
-        reward,
-        deadline: Date.now() + durationMs,
-        startTime: Date.now(),
-        status: "assigned"
-      });
-      return taskId;
-    }
-    /**
-     * 更新进度
-     */
-    updateProgress(taskId, progress) {
-      const task = this.activeTasks.get(taskId);
-      if (task) {
-        task.progress = Math.min(progress, 100);
-        if (progress >= 100) {
-          task.status = "completed";
-          task.completedAt = Date.now();
-        }
-      }
-    }
-    /**
-     * 完成任务
-     */
-    completeTask(taskId) {
-      const task = this.activeTasks.get(taskId);
-      if (task) {
-        task.progress = 100;
-        task.status = "completed";
-        task.completedAt = Date.now();
-        return task;
-      }
-      return null;
-    }
-    /**
-     * 获取角色的活跃任务
-     */
-    getActiveTasks(role) {
-      return Array.from(this.activeTasks.values()).filter(
-        (t) => t.role === role && t.status !== "completed"
-      );
-    }
-    /**
-     * 获取过期任务
-     */
-    getExpiredTasks() {
-      const now = Date.now();
-      return Array.from(this.activeTasks.entries()).filter(
-        ([id, task]) => task.deadline < now && task.status !== "completed"
-      ).map(([id]) => id);
-    }
-    /**
-     * 清理过期任务
-     */
-    cleanupExpiredTasks() {
-      const expired = this.getExpiredTasks();
-      for (const taskId of expired) {
-        const task = this.activeTasks.get(taskId);
-        if (task) {
-          task.status = "expired";
-          task.expiredAt = Date.now();
-        }
-      }
-      return expired.length;
-    }
-  };
-  var NpcCollaborationRewards = class {
-    constructor() {
-      this.rewardPool = 0;
-      this.distributionRules = {
-        "master": { share: 0.4, bonusOn: ["teach", "evaluate"] },
-        "fellow": { share: 0.3, bonusOn: ["practice_together", "share_resource"] },
-        "merchant": { share: 0.2, bonusOn: ["trade", "appraise"] },
-        "monster": { share: 0.1, bonusOn: ["challenge", "drop_item"] }
-      };
-      this.totalDistributed = 0;
-    }
-    /**
-     * 添加到奖励池
-     */
-    addToPool(amount) {
-      this.rewardPool += amount;
-    }
-    /**
-     * 分配奖励
-     */
-    distribute(role) {
-      const rule = this.distributionRules[role];
-      if (!rule) return 0;
-      const amount = Math.floor(this.rewardPool * rule.share);
-      this.totalDistributed += amount;
-      return amount;
-    }
-    /**
-     * 获取剩余奖励池
-     */
-    getPool() {
-      return this.rewardPool;
-    }
-    /**
-     * 清空奖励池
-     */
-    clearPool() {
-      this.rewardPool = 0;
-    }
-  };
-  var NpcReputationSystem = class {
-    constructor() {
-      this.reputations = /* @__PURE__ */ new Map();
-      this.initReputations();
-    }
-    initReputations() {
-      for (const [role, config] of Object.entries(NPC_ROLE_REGISTRY)) {
-        this.reputations.set(role, {
-          level: 1,
-          exp: 0,
-          totalInteractions: 0,
-          lastInteraction: 0
-        });
-      }
-    }
-    getReputation(role) {
-      return this.reputations.get(role) || { level: 0, exp: 0 };
-    }
-    addReputation(role, amount) {
-      const rep = this.getReputation(role);
-      rep.exp += amount;
-      rep.totalInteractions++;
-      rep.lastInteraction = Date.now();
-      while (rep.exp >= 100) {
-        rep.exp -= 100;
-        rep.level++;
-      }
-      this.reputations.set(role, rep);
-      return rep;
-    }
-    getReputationLevel(role) {
-      return this.getReputation(role).level;
-    }
-  };
-  var npcReputationSystem = new NpcReputationSystem();
-  var npcTaskManager = new NpcTaskManager();
-  var npcCollabRewards = new NpcCollaborationRewards();
-  var CollaborationRoom = class {
-    constructor(roomId, taskType) {
-      this.roomId = roomId;
-      this.taskType = taskType;
-      this.participants = /* @__PURE__ */ new Map();
-      this.maxParticipants = 5;
-      this.status = "recruiting";
-      this.chatLog = [];
-      this.resourcePool = 0;
-    }
-    join(playerId, playerName) {
-      if (this.status !== "recruiting") {
-        return { success: false, reason: "Room not recruiting" };
-      }
-      if (this.participants.size >= this.maxParticipants) {
-        return { success: false, reason: "Room full" };
-      }
-      this.participants.set(playerId, {
-        name: playerName,
-        joinedAt: Date.now(),
-        contribution: 0
-      });
-      this.addChatLog(playerName, "joined the room");
-      return { success: true, roomId: this.roomId };
-    }
-    leave(playerId) {
-      const participant = this.participants.get(playerId);
-      if (participant) {
-        this.addChatLog(participant.name, "left the room");
-        this.participants.delete(playerId);
-        return true;
-      }
-      return false;
-    }
-    addChatLog(playerName, message) {
-      this.chatLog.push({
-        playerName,
-        message,
-        timestamp: Date.now()
-      });
-    }
-    contribute(playerId, amount) {
-      const participant = this.participants.get(playerId);
-      if (participant) {
-        participant.contribution += amount;
-        this.resourcePool += amount;
-      }
-    }
-    distributeResources(perPlayer) {
-      for (const [pid, session] of this.participants) {
-        gameState.spiritStones += perPlayer;
-        this.addChatLog(pid, `received ${perPlayer} spirit stones`);
-      }
-    }
-    getParticipantCount() {
-      return this.participants.size;
-    }
-  };
-  var CollaborationManager = class {
-    constructor() {
-      this.rooms = /* @__PURE__ */ new Map();
-      this.playerRooms = /* @__PURE__ */ new Map();
-      this.roomCounter = 0;
-    }
-    createRoom(taskType, maxParticipants = 5) {
-      this.roomCounter++;
-      const roomId = `collab_${taskType}_${this.roomCounter}`;
-      const room = new CollaborationRoom(roomId, taskType);
-      room.maxParticipants = maxParticipants;
-      this.rooms.set(roomId, room);
-      return room;
-    }
-    joinRoom(roomId, playerId, playerName) {
-      const room = this.rooms.get(roomId);
-      if (!room) return { success: false, reason: "Room not found" };
-      if (room.status !== "recruiting") return { success: false, reason: "Room not recruiting" };
-      const result = room.join(playerId, playerName);
-      if (result.success) {
-        if (!this.playerRooms.has(playerId)) {
-          this.playerRooms.set(playerId, []);
-        }
-        this.playerRooms.get(playerId).push(roomId);
-      }
-      return result;
-    }
-    leaveRoom(roomId, playerId) {
-      const room = this.rooms.get(roomId);
-      if (!room) return false;
-      const left = room.leave(playerId);
-      if (left) {
-        const rooms = this.playerRooms.get(playerId);
-        if (rooms) {
-          const idx = rooms.indexOf(roomId);
-          if (idx >= 0) rooms.splice(idx, 1);
-        }
-      }
-      return left;
-    }
-    getActiveRooms() {
-      return Array.from(this.rooms.values()).filter((r) => r.status === "recruiting");
-    }
-    getRoomStatus(roomId) {
-      const room = this.rooms.get(roomId);
-      if (!room) return null;
-      return {
-        roomId: room.roomId,
-        taskType: room.taskType,
-        participants: room.getParticipantCount(),
-        maxParticipants: room.maxParticipants,
-        status: room.status
-      };
-    }
-  };
-  var collabManager = new CollaborationManager();
-
   // src/systems/ai/NPCEvolutionEngine.js
+  init_NPCCollaboration();
   var NPCLearningEntry = class {
     constructor(npcId, role, initialData = {}) {
       this.npcId = npcId;
@@ -8042,6 +8621,7 @@ var CultivationSimulator = (() => {
   var npcEvolutionEngine = new NPCEvolutionEngine();
 
   // src/main.js
+  init_RealmEventBus();
   var gameState2 = null;
   var isGameInitialized = false;
   var gameLoopTimer = null;
@@ -8468,6 +9048,108 @@ var CultivationSimulator = (() => {
         required: ["npcId"]
       }
     }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
+    mcpRegistry.registerTool("event.bus.publish", {
+      name: "event.bus.publish",
+      description: "Publish an event to the realm event bus",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Event type" },
+          data: { type: "object", description: "Event data payload" },
+          source: { type: "string", description: "Event source" },
+          target: { type: "string", description: "Event target" },
+          priority: { type: "string", enum: ["high", "medium", "low"] }
+        },
+        required: ["type"]
+      }
+    }, (params) => {
+      const { mcpPublish: mcpPublish2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpPublish2(params);
+    });
+    mcpRegistry.registerTool("event.bus.subscribe", {
+      name: "event.bus.subscribe",
+      description: "Subscribe to events matching a pattern",
+      inputSchema: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Event pattern (glob supported)" },
+          subscriberId: { type: "string", description: "Subscriber ID" },
+          priority: { type: "string", enum: ["high", "medium", "low"] }
+        },
+        required: ["pattern"]
+      }
+    }, (params) => {
+      const { mcpSubscribe: mcpSubscribe2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpSubscribe2(params);
+    });
+    mcpRegistry.registerTool("event.bus.unsubscribe", {
+      name: "event.bus.unsubscribe",
+      description: "Unsubscribe from an event",
+      inputSchema: {
+        type: "object",
+        properties: {
+          subscriberId: { type: "string", description: "Subscriber ID to remove" }
+        },
+        required: ["subscriberId"]
+      }
+    }, (params) => {
+      const { mcpUnsubscribe: mcpUnsubscribe2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpUnsubscribe2(params);
+    });
+    mcpRegistry.registerTool("event.bus.history", {
+      name: "event.bus.history",
+      description: "View event history",
+      inputSchema: {
+        type: "object",
+        properties: {
+          eventType: { type: "string", description: "Filter by event type" },
+          source: { type: "string", description: "Filter by source" },
+          since: { type: "number", description: "Filter events since timestamp" },
+          limit: { type: "number", description: "Max events to return" }
+        }
+      }
+    }, (params) => {
+      const { mcpHistory: mcpHistory2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpHistory2(params);
+    });
+    mcpRegistry.registerTool("event.cascade.trigger", {
+      name: "event.cascade.trigger",
+      description: "Manually trigger a cascade of events",
+      inputSchema: {
+        type: "object",
+        properties: {
+          initialEvent: {
+            type: "object",
+            properties: {
+              type: { type: "string" },
+              data: { type: "object" },
+              source: { type: "string" }
+            },
+            required: ["type"]
+          },
+          followUpEvents: { type: "array" },
+          maxDepth: { type: "number" }
+        },
+        required: ["initialEvent"]
+      }
+    }, (params) => {
+      const { mcpCascadeTrigger: mcpCascadeTrigger2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpCascadeTrigger2(params);
+    });
+    mcpRegistry.registerTool("event.subscriber.list", {
+      name: "event.subscriber.list",
+      description: "List all event subscribers",
+      inputSchema: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Filter by pattern" },
+          subscriberId: { type: "string", description: "Filter by subscriber ID" }
+        }
+      }
+    }, (params) => {
+      const { mcpSubscriberList: mcpSubscriberList2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
+      return mcpSubscriberList2(params);
+    });
   }
   function doSaveGameWithFeedback() {
     const result = doSaveGame();
@@ -8762,4 +9444,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-0c2dcab-2026-05-30T14-50-37-528Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-9033875-2026-05-30T14-58-07-926Z";

@@ -48,6 +48,9 @@ import {
 // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
 import { npcEvolutionEngine } from './systems/ai/NPCEvolutionEngine.js';
 
+// 仙界事件总线 (Direction O: 全局事件总线 + 事件级联触发机制)
+import { realmEventBus, EVENT_BUS_TOOLS } from './systems/event/RealmEventBus.js';
+
 // ===== 全局状态 =====
 
 /**
@@ -624,6 +627,115 @@ function registerDomainMCPTools() {
             required: ['npcId']
         }
     }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
+
+    // 仙界事件总线工具 (Direction O: 全局事件总线 + 事件级联触发)
+    mcpRegistry.registerTool('event.bus.publish', {
+        name: 'event.bus.publish',
+        description: 'Publish an event to the realm event bus',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', description: 'Event type' },
+                data: { type: 'object', description: 'Event data payload' },
+                source: { type: 'string', description: 'Event source' },
+                target: { type: 'string', description: 'Event target' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'] }
+            },
+            required: ['type']
+        }
+    }, (params) => {
+        const { mcpPublish } = require('./systems/event/RealmEventBus.js');
+        return mcpPublish(params);
+    });
+
+    mcpRegistry.registerTool('event.bus.subscribe', {
+        name: 'event.bus.subscribe',
+        description: 'Subscribe to events matching a pattern',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                pattern: { type: 'string', description: 'Event pattern (glob supported)' },
+                subscriberId: { type: 'string', description: 'Subscriber ID' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'] }
+            },
+            required: ['pattern']
+        }
+    }, (params) => {
+        const { mcpSubscribe } = require('./systems/event/RealmEventBus.js');
+        return mcpSubscribe(params);
+    });
+
+    mcpRegistry.registerTool('event.bus.unsubscribe', {
+        name: 'event.bus.unsubscribe',
+        description: 'Unsubscribe from an event',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                subscriberId: { type: 'string', description: 'Subscriber ID to remove' }
+            },
+            required: ['subscriberId']
+        }
+    }, (params) => {
+        const { mcpUnsubscribe } = require('./systems/event/RealmEventBus.js');
+        return mcpUnsubscribe(params);
+    });
+
+    mcpRegistry.registerTool('event.bus.history', {
+        name: 'event.bus.history',
+        description: 'View event history',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                eventType: { type: 'string', description: 'Filter by event type' },
+                source: { type: 'string', description: 'Filter by source' },
+                since: { type: 'number', description: 'Filter events since timestamp' },
+                limit: { type: 'number', description: 'Max events to return' }
+            }
+        }
+    }, (params) => {
+        const { mcpHistory } = require('./systems/event/RealmEventBus.js');
+        return mcpHistory(params);
+    });
+
+    mcpRegistry.registerTool('event.cascade.trigger', {
+        name: 'event.cascade.trigger',
+        description: 'Manually trigger a cascade of events',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                initialEvent: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string' },
+                        data: { type: 'object' },
+                        source: { type: 'string' }
+                    },
+                    required: ['type']
+                },
+                followUpEvents: { type: 'array' },
+                maxDepth: { type: 'number' }
+            },
+            required: ['initialEvent']
+        }
+    }, (params) => {
+        const { mcpCascadeTrigger } = require('./systems/event/RealmEventBus.js');
+        return mcpCascadeTrigger(params);
+    });
+
+    mcpRegistry.registerTool('event.subscriber.list', {
+        name: 'event.subscriber.list',
+        description: 'List all event subscribers',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                pattern: { type: 'string', description: 'Filter by pattern' },
+                subscriberId: { type: 'string', description: 'Filter by subscriber ID' }
+            }
+        }
+    }, (params) => {
+        const { mcpSubscriberList } = require('./systems/event/RealmEventBus.js');
+        return mcpSubscriberList(params);
+    });
 }
 
 // ===== 持久化系统 =====
