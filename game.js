@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-d1a1d9a-2026-05-30T11-45-05-121Z */
+/* Cultivation Simulator DDD-v1.0.0-d1a1d9a-2026-05-30T12-03-45-621Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2030,7 +2030,7 @@ var CultivationSimulator = (() => {
   // src/main.js
   var main_exports = {};
   __export(main_exports, {
-    CONFIG: () => CONFIG,
+    CONFIG: () => CONFIG2,
     GAME_LOOP_CONFIG: () => GAME_LOOP_CONFIG,
     addLog: () => addLog2,
     advanceDay: () => advanceDay,
@@ -2070,7 +2070,7 @@ var CultivationSimulator = (() => {
   });
 
   // src/config/constants.js
-  var CONFIG = {
+  var CONFIG2 = {
     realms: ["\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347"],
     stages: ["\u521D\u671F", "\u4E2D\u671F", "\u540E\u671F"],
     stageNames: ["\u51E1\u4EBA", "\u4FEE\u58EB", "\u771F\u4EBA", "\u5929\u541B", "\u5927\u80FD"],
@@ -3492,7 +3492,7 @@ var CultivationSimulator = (() => {
       skill: "\u8D85\u8131\uFF1A\u514D\u75AB\u4E00\u5207\u8D1F\u9762\u72B6\u6001\uFF0C\u5BFF\u5143\u8017\u5C3D\u65F6\u81EA\u52A8\u8FDB\u5165\u8F6E\u56DE\u8F6C\u4E16\uFF0C\u4FDD\u7559\u5168\u90E8\u5C5E\u6027\u52A0\u6210"
     }
   };
-  var ENHANCE_CONFIG = {
+  var ENHANCE_CONFIG2 = {
     levels: [
       { cost: 100, bonus: 0.05, desc: "\u5F3A\u5316+1: \u57FA\u7840\u5C5E\u6027+5%" },
       { cost: 500, bonus: 0.1, desc: "\u5F3A\u5316+2: \u57FA\u7840\u5C5E\u6027+10%" },
@@ -4162,7 +4162,7 @@ var CultivationSimulator = (() => {
   function initInventory(gameState3) {
     return inventoryService2.init(gameState3);
   }
-  function addItemToInventory(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
+  function addItemToInventory2(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
     return inventoryService2.addItem(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel);
   }
   function useItem(gameState3, name) {
@@ -4193,7 +4193,7 @@ var CultivationSimulator = (() => {
     EQUIPMENT_TYPES,
     EQUIPMENT_SLOTS,
     HEAVENLY_DAO_SET_BONUSES,
-    ENHANCE_CONFIG,
+    ENHANCE_CONFIG: ENHANCE_CONFIG2,
     // Services
     InventoryService,
     inventoryService: inventoryService2,
@@ -4210,7 +4210,7 @@ var CultivationSimulator = (() => {
     createItem,
     createEquipment,
     initInventory,
-    addItemToInventory,
+    addItemToInventory: addItemToInventory2,
     useItem,
     getInventoryStats,
     doCraft,
@@ -5160,6 +5160,270 @@ var CultivationSimulator = (() => {
     return new WelfareService(gameStateAccessor);
   }
 
+  // src/domains/combat/entities/CombatState.js
+  var CombatState_exports = {};
+  __export(CombatState_exports, {
+    combatEnergy: () => combatEnergy2,
+    combatState: () => combatState2,
+    createCombatState: () => createCombatState2,
+    resetCombatState: () => resetCombatState2,
+    restoreCombatState: () => restoreCombatState2,
+    serializeCombatState: () => serializeCombatState2,
+    setCombatEnergy: () => setCombatEnergy,
+    setCombatState: () => setCombatState
+  });
+  var combatState2 = {
+    inProgress: false,
+    round: 0,
+    turn: "player",
+    // 'player' | 'opponent'
+    player: {
+      name: "\u4F60",
+      avatar: "\u{1F9D1}\u200D\u{1F393}",
+      realm: 0,
+      realmName: "\u70BC\u6C14\u671F",
+      maxHP: 500,
+      hp: 500,
+      attack: 80,
+      defense: 40,
+      speed: 80,
+      technique: "\u9752\u4E91\u8BC0",
+      techniqueColor: "#00ff88",
+      weapon: null,
+      weaponData: null,
+      armor: null,
+      armorData: null,
+      critRate: 0.1,
+      setBonuses: {},
+      skills: [],
+      accessories: [],
+      counterEnergy: 0,
+      inDefenseStance: false,
+      skillLevels: {}
+    },
+    opponent: null,
+    log: [],
+    effects: {
+      player: {
+        defending: false,
+        attackBoost: 0,
+        defenseBoost: 0,
+        ignoreDefense: false,
+        burning: 0,
+        frozen: 0,
+        defenseBoostObj: 0,
+        critBoostNext: 0,
+        healRate: 0,
+        damageReduction: 0,
+        counterRate: 0,
+        speedReduce: 0,
+        armorBroken: false,
+        fireResist: 0,
+        fireDrain: 0,
+        reflect: 0,
+        maxHpBoost: 0,
+        cleanseStacks: 0,
+        invincible: 0,
+        thunderBonus: 0,
+        doubleHit: 0,
+        pierce: 0,
+        cleave: 0,
+        freezeAura: 0,
+        burnAura: 0,
+        curse: 0
+      },
+      opponent: {
+        defending: false,
+        attackBoost: 0,
+        defenseBoost: 0,
+        burning: 0,
+        frozen: 0,
+        speedReduce: 0,
+        armorBroken: false,
+        curse: 0
+      }
+    }
+  };
+  var combatEnergy2 = 0;
+  function createCombatState2() {
+    return {
+      inProgress: false,
+      round: 0,
+      turn: "player",
+      player: {
+        name: "\u4F60",
+        avatar: "\u{1F9D1}\u200D\u{1F393}",
+        realm: 0,
+        realmName: "\u70BC\u6C14\u671F",
+        maxHP: 500,
+        hp: 500,
+        attack: 80,
+        defense: 40,
+        speed: 80,
+        technique: "\u9752\u4E91\u8BC0",
+        techniqueColor: "#00ff88",
+        weapon: null,
+        weaponData: null,
+        armor: null,
+        armorData: null,
+        critRate: 0.1,
+        setBonuses: {},
+        skills: [],
+        accessories: [],
+        counterEnergy: 0,
+        inDefenseStance: false,
+        skillLevels: {},
+        attackPercent: 1,
+        critBonus: 0,
+        defensePercent: 1,
+        qiRegenBonus: 0
+      },
+      opponent: null,
+      log: [],
+      effects: {
+        player: {
+          defending: false,
+          attackBoost: 0,
+          defenseBoost: 0,
+          ignoreDefense: false,
+          burning: 0,
+          frozen: 0
+        },
+        opponent: {
+          defending: false,
+          attackBoost: 0,
+          defenseBoost: 0,
+          burning: 0,
+          frozen: 0
+        }
+      }
+    };
+  }
+  function serializeCombatState2() {
+    return JSON.parse(JSON.stringify(combatState2));
+  }
+  function restoreCombatState2(saved) {
+    if (saved) {
+      combatState2 = saved;
+    }
+  }
+  function resetCombatState2() {
+    combatState2 = createCombatState2();
+    combatEnergy2 = 0;
+  }
+  function setCombatState(newState) {
+    combatState2 = newState;
+  }
+  function setCombatEnergy(value) {
+    combatEnergy2 = value;
+  }
+
+  // src/domains/combat/services/CombatService.js
+  var { setCombatState: setCombatState2, setCombatEnergy: setCombatEnergy2 } = CombatState_exports;
+
+  // src/domains/combat/CombatModule.js
+  var COMBAT_CONFIG = {
+    ENERGY_PER_ATTACK: 20,
+    COUNTER_ENERGY_COST: 50,
+    COUNTER_ENERGY_THRESHOLD: 100,
+    CRIT_BASE_RATE: 0.1,
+    CRIT_BONUS: 1.5,
+    DEFENSE_REDUCTION: 0.5,
+    TECHNIQUE_BONUS_MULTIPLIER: 1.5,
+    TECHNIQUE_PENALTY_MULTIPLIER: 0.7
+  };
+  var CombatModule_default = {
+    entities: {
+      CombatState: { combatState, combatEnergy, createCombatState, serializeCombatState, restoreCombatState, resetCombatState },
+      Action: { ACTION_TYPES, ACTION_RESULT_TYPES, STATUS_EFFECTS, createCombatLogEntry, createActionRecord, ACTION_METADATA }
+    },
+    services: {
+      CombatService: {
+        initCombat,
+        generateOpponent,
+        startCombatChallenge,
+        executePlayerAttack,
+        executePlayerDefend,
+        executePlayerEscape,
+        executeOpponentTurn,
+        endCombat,
+        addEnergy,
+        getItemCount,
+        selectCombatAction
+      },
+      CombatAIService: {
+        mcpBattleArenaList,
+        mcpBattleArenaJoin,
+        mcpBattleArenaReport,
+        mcpBattleCombatLog,
+        mcpBattleRankRise,
+        mcpBattleRewardClaim,
+        getPlayerRankInfo,
+        updatePlayerRank,
+        getRealmDivision,
+        getDailyChallenges,
+        generateAIOpponents,
+        getRankNameFromRating,
+        getOpponentAvatar,
+        startRankingPVP,
+        calculatePlayerPVPower,
+        calculateOpponentPower,
+        simulatePVPRound,
+        calculateRatingChange
+      }
+    },
+    config: COMBAT_CONFIG
+  };
+
+  // src/domains/sect/SectModule.js
+  var SectModule_default = {
+    entities: {
+      Sect: { createSect, SECT_CONFIG, getSectOverview, getSectResources, calculateSectIncome, getSectBuildings, serializeSect, canUpgradeSect },
+      Disciple: {
+        createDisciple,
+        NPC_ROLES,
+        NPC_PERSONALITIES,
+        NPC_GIFTS,
+        NPC_SKILL_CRYSTALS,
+        NPC_MEMORY_LAYERS,
+        initNpcMemory,
+        getDiscipleInfo,
+        getPersonalityInfo,
+        getNpcRoleIcon,
+        getNpcRoleTitle,
+        recordNpcMemory,
+        checkNpcSkillCrystallization,
+        checkNpcEvolution,
+        npcAutonomousDecision,
+        getNpcMemoryDisplay
+      }
+    },
+    services: {
+      SectService: {
+        createNewSect,
+        addDisciple,
+        recruitDisciple,
+        weightedRandom,
+        trainDisciple,
+        dispatchDiscipleToPalace,
+        recallDiscipleFromPalace,
+        selectDiscipleForDispatch,
+        selectDiscipleForRecall,
+        collectSectResources,
+        buildBuilding,
+        upgradeSect,
+        assignElder,
+        removeElder,
+        disbandSect,
+        processNpcAutonomousLoop,
+        processSectRandomEvent,
+        modifyAffection,
+        getMasterBonus,
+        addItemToInventory
+      }
+    }
+  };
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -5984,8 +6248,8 @@ var CultivationSimulator = (() => {
     domainModules.inventory.initInventory(gameState2);
     domainModules.pet = PetModule_default;
     domainModules.achievement = createAchievementModule();
-    domainModules.combat = CombatModule;
-    domainModules.sect = SectModule;
+    domainModules.combat = CombatModule_default;
+    domainModules.sect = SectModule_default;
     domainModules.ranking = { createRankingService, createArenaService };
     domainModules.signin = { createSigninService, createWelfareService };
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
@@ -6421,4 +6685,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-d1a1d9a-2026-05-30T11-45-05-121Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-d1a1d9a-2026-05-30T12-03-45-621Z";
