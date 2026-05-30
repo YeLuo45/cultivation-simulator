@@ -61,6 +61,9 @@ import { createImmortalSectService } from './domains/sect/services/ImmortalSectS
 // 灵界洞府系统 (V233 Direction U: 灵界洞府系统)
 import { createCaveDwellingService } from './domains/player/services/CaveDwellingService.js';
 
+// 洞天福地系统 (V242 Direction D: 洞天福地系统 - chatdev/nanobot)
+import { createCaveRealmService, CaveRealmService } from './domains/player/services/CaveRealmService.js';
+
 // 万界战争系统 (V234 Direction V: 万界战争系统 - generic-agent/nanobot)
 import { createRealmWarfareService } from './domains/combat/services/RealmWarfareService.js';
 
@@ -287,7 +290,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V241',
+        gameVersion: 'V242',
         
         // 设置
         settings: {
@@ -398,6 +401,11 @@ function initializeDomainModules() {
     const caveDwellingService = createCaveDwellingService(gameState);
     caveDwellingService.init(gameState);
     domainModules.caveDwelling = caveDwellingService;
+
+    // 洞天福地系统 (V242 Direction D: 洞天福地系统 - chatdev/nanobot)
+    const caveRealmService = createCaveRealmService(gameState);
+    caveRealmService.init(gameState);
+    domainModules.caveRealm = caveRealmService;
 
     // 万界战争系统 (V234 Direction V: 万界战争系统 - generic-agent/nanobot)
     const realmWarfareService = createRealmWarfareService(gameState);
@@ -516,6 +524,22 @@ function initializeDomainModules() {
         (params) => thunderTribulationHandlers['thunder.absorb'](params));
     mcpRegistry.registerTool('thunder.journal', THUNDER_TRIBULATION_TOOLS['thunder.journal'], 
         (params) => thunderTribulationHandlers['thunder.journal'](params));
+
+    // 洞天福地系统MCP工具 (V242 Direction D: 洞天福地系统)
+    const caveRealmHandlers = caveRealmService.getMCPHandlers();
+    
+    mcpRegistry.registerTool('cave.create', CaveRealmService.TOOLS['cave.create'], 
+        (params) => caveRealmHandlers['cave.create'](params));
+    mcpRegistry.registerTool('cave.expand', CaveRealmService.TOOLS['cave.expand'], 
+        (params) => caveRealmHandlers['cave.expand'](params));
+    mcpRegistry.registerTool('cave.resource', CaveRealmService.TOOLS['cave.resource'], 
+        (params) => caveRealmHandlers['cave.resource'](params));
+    mcpRegistry.registerTool('cave.blessed', CaveRealmService.TOOLS['cave.blessed'], 
+        (params) => caveRealmHandlers['cave.blessed'](params));
+    mcpRegistry.registerTool('cave.spirit', CaveRealmService.TOOLS['cave.spirit'], 
+        (params) => caveRealmHandlers['cave.spirit'](params));
+    mcpRegistry.registerTool('cave.harvest', CaveRealmService.TOOLS['cave.harvest'], 
+        (params) => caveRealmHandlers['cave.harvest'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
