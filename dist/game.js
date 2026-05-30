@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-ce97103-2026-05-30T15-29-50-725Z */
+/* Cultivation Simulator DDD-v1.0.0-55627ad-2026-05-30T15-36-47-719Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -3148,6 +3148,741 @@ var CultivationSimulator = (() => {
         }
       };
       RealmEventBus_default = realmEventBus;
+    }
+  });
+
+  // src/systems/event/EventAnalyticsService.js
+  var EventAnalyticsService_exports = {};
+  __export(EventAnalyticsService_exports, {
+    ANALYTICS_CONFIG: () => ANALYTICS_CONFIG,
+    EVENT_ANALYTICS_TOOLS: () => EVENT_ANALYTICS_TOOLS,
+    EVENT_TYPE_CATEGORIES: () => EVENT_TYPE_CATEGORIES,
+    EventAnalyticsService: () => EventAnalyticsService,
+    EventIndex: () => EventIndex,
+    default: () => EventAnalyticsService_default,
+    eventAnalyticsService: () => eventAnalyticsService,
+    mcpAnalyticsAnomaly: () => mcpAnalyticsAnomaly,
+    mcpAnalyticsForecast: () => mcpAnalyticsForecast,
+    mcpAnalyticsPattern: () => mcpAnalyticsPattern,
+    mcpAnalyticsStats: () => mcpAnalyticsStats,
+    mcpAnalyticsTrend: () => mcpAnalyticsTrend,
+    mcpHistoryQuery: () => mcpHistoryQuery
+  });
+  function mcpAnalyticsStats(params = {}) {
+    const { eventType, source, timeRange } = params;
+    try {
+      const stats = eventAnalyticsService.getStats({ eventType, source, timeRange });
+      return {
+        success: true,
+        ...stats
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  function mcpAnalyticsTrend(params = {}) {
+    const { windowSize, eventType, granularity } = params;
+    try {
+      const trend = eventAnalyticsService.getTrend({ windowSize, eventType, granularity });
+      return {
+        success: true,
+        ...trend
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  function mcpAnalyticsPattern(params = {}) {
+    const { sequenceLength, minOccurrences, eventType } = params;
+    try {
+      const pattern = eventAnalyticsService.detectPattern({
+        sequenceLength: sequenceLength || 5,
+        minOccurrences: minOccurrences || 2,
+        eventType
+      });
+      return {
+        success: true,
+        ...pattern
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  function mcpAnalyticsAnomaly(params = {}) {
+    const { threshold, windowSize, source } = params;
+    try {
+      const anomaly = eventAnalyticsService.detectAnomaly({
+        threshold: threshold || ANALYTICS_CONFIG.anomalyThreshold,
+        windowSize: windowSize || 50,
+        source
+      });
+      return {
+        success: true,
+        ...anomaly
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  function mcpHistoryQuery(params = {}) {
+    const {
+      eventType,
+      source,
+      since,
+      until,
+      priority,
+      dataFilter,
+      limit,
+      offset
+    } = params;
+    try {
+      const result = eventAnalyticsService.queryHistory({
+        eventType,
+        source,
+        since,
+        until,
+        priority,
+        dataFilter,
+        limit: limit || 100,
+        offset: offset || 0
+      });
+      return result;
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  function mcpAnalyticsForecast(params = {}) {
+    const { horizonHours, eventType } = params;
+    try {
+      const forecast = eventAnalyticsService.forecast({
+        horizonHours: horizonHours || ANALYTICS_CONFIG.forecastHorizonHours,
+        eventType
+      });
+      return {
+        success: true,
+        ...forecast
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  var ANALYTICS_CONFIG, EVENT_TYPE_CATEGORIES, EventIndex, EventAnalyticsService, eventAnalyticsService, EVENT_ANALYTICS_TOOLS, EventAnalyticsService_default;
+  var init_EventAnalyticsService = __esm({
+    "src/systems/event/EventAnalyticsService.js"() {
+      init_RealmEventBus();
+      ANALYTICS_CONFIG = {
+        maxHistoryLength: 1e3,
+        maxIndexedEvents: 2e3,
+        trendWindowSize: 100,
+        // 趋势分析窗口大小
+        anomalyThreshold: 2,
+        // 异常检测标准差倍数
+        forecastHorizonHours: 24,
+        // 预测时间范围
+        minSampleSize: 10
+        // 最小样本量
+      };
+      EVENT_TYPE_CATEGORIES = {
+        PLAYER: "player",
+        NPC: "npc",
+        REALM: "realm",
+        SECT: "sect",
+        TREASURE: "treasure",
+        SYSTEM: "system",
+        COMBAT: "combat",
+        CULTIVATION: "cultivation"
+      };
+      EventIndex = class {
+        constructor() {
+          this.byType = /* @__PURE__ */ new Map();
+          this.bySource = /* @__PURE__ */ new Map();
+          this.byTime = /* @__PURE__ */ new Map();
+          this.typeCounts = /* @__PURE__ */ new Map();
+          this.sourceCounts = /* @__PURE__ */ new Map();
+          this.hourlyCounts = /* @__PURE__ */ new Map();
+        }
+        /**
+         * 索引事件
+         */
+        index(event2) {
+          if (!this.byType.has(event2.type)) {
+            this.byType.set(event2.type, []);
+          }
+          this.byType.get(event2.type).push(event2);
+          if (!this.bySource.has(event2.source)) {
+            this.bySource.set(event2.source, []);
+          }
+          this.bySource.get(event2.source).push(event2);
+          const timeBucket = Math.floor(event2.timestamp / (5 * 60 * 1e3)) * (5 * 60 * 1e3);
+          if (!this.byTime.has(timeBucket)) {
+            this.byTime.set(timeBucket, []);
+          }
+          this.byTime.get(timeBucket).push(event2);
+          this.typeCounts.set(event2.type, (this.typeCounts.get(event2.type) || 0) + 1);
+          this.sourceCounts.set(event2.source, (this.sourceCounts.get(event2.source) || 0) + 1);
+          const hourBucket = Math.floor(event2.timestamp / (60 * 60 * 1e3)) * (60 * 60 * 1e3);
+          this.hourlyCounts.set(hourBucket, (this.hourlyCounts.get(hourBucket) || 0) + 1);
+        }
+        /**
+         * 清除索引
+         */
+        clear() {
+          this.byType.clear();
+          this.bySource.clear();
+          this.byTime.clear();
+          this.typeCounts.clear();
+          this.sourceCounts.clear();
+          this.hourlyCounts.clear();
+        }
+      };
+      EventAnalyticsService = class {
+        constructor() {
+          this.eventIndex = new EventIndex();
+          this.isInitialized = false;
+          this.listeners = [];
+        }
+        /**
+         * 初始化服务
+         */
+        init(gameState3) {
+          if (this.isInitialized) {
+            return { success: false, error: "Already initialized" };
+          }
+          this.subscribeToEventBus();
+          this.rebuildIndex();
+          this.isInitialized = true;
+          console.log("[EventAnalyticsService] Initialized successfully");
+          return { success: true };
+        }
+        /**
+         * 订阅事件总线
+         */
+        subscribeToEventBus() {
+          this.eventBusSubscription = realmEventBus.subscribe("*", (event2) => {
+            this.indexEvent(event2);
+          }, {
+            subscriberId: "event-analytics",
+            priority: "low"
+          });
+        }
+        /**
+         * 索引事件
+         */
+        indexEvent(event2) {
+          this.eventIndex.index(event2);
+        }
+        /**
+         * 重建索引
+         */
+        rebuildIndex() {
+          this.eventIndex.clear();
+          const history = realmEventBus.history({ limit: ANALYTICS_CONFIG.maxIndexedEvents });
+          for (const event2 of history) {
+            this.eventIndex.index(event2);
+          }
+        }
+        /**
+         * 获取事件统计
+         */
+        getStats(options = {}) {
+          const { eventType = null, source = null, timeRange = null } = options;
+          let events = realmEventBus.history({
+            eventType,
+            source,
+            since: (timeRange == null ? void 0 : timeRange.since) || 0,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          const typeStats = {};
+          const sourceStats = {};
+          const priorityStats = { high: 0, medium: 0, low: 0 };
+          let totalEvents = events.length;
+          for (const event2 of events) {
+            if (!typeStats[event2.type]) {
+              typeStats[event2.type] = { count: 0, percentage: 0 };
+            }
+            typeStats[event2.type].count++;
+            if (!sourceStats[event2.source]) {
+              sourceStats[event2.source] = { count: 0, percentage: 0 };
+            }
+            sourceStats[event2.source].count++;
+            if (priorityStats[event2.priority] !== void 0) {
+              priorityStats[event2.priority]++;
+            }
+          }
+          for (const type in typeStats) {
+            typeStats[type].percentage = totalEvents > 0 ? Math.round(typeStats[type].count / totalEvents * 1e4) / 100 : 0;
+          }
+          for (const src in sourceStats) {
+            sourceStats[src].percentage = totalEvents > 0 ? Math.round(sourceStats[src].count / totalEvents * 1e4) / 100 : 0;
+          }
+          const topTypes = Object.entries(typeStats).sort((a, b) => b[1].count - a[1].count).slice(0, 5).map(([type, stats]) => ({ type, count: stats.count, percentage: stats.percentage }));
+          const topSources = Object.entries(sourceStats).sort((a, b) => b[1].count - a[1].count).slice(0, 5).map(([source2, stats]) => ({ source: source2, count: stats.count, percentage: stats.percentage }));
+          return {
+            totalEvents,
+            typeStats,
+            sourceStats,
+            priorityStats,
+            topTypes,
+            topSources,
+            timeRange: timeRange ? {
+              since: timeRange.since,
+              until: timeRange.until || Date.now()
+            } : null
+          };
+        }
+        /**
+         * 获取事件趋势
+         */
+        getTrend(options = {}) {
+          const {
+            windowSize = ANALYTICS_CONFIG.trendWindowSize,
+            eventType = null,
+            granularity = "hour"
+            // 'hour', 'day', 'minute'
+          } = options;
+          const now = Date.now();
+          const intervals = [];
+          let intervalMs;
+          switch (granularity) {
+            case "minute":
+              intervalMs = 60 * 1e3;
+              break;
+            case "day":
+              intervalMs = 24 * 60 * 60 * 1e3;
+              break;
+            case "hour":
+            default:
+              intervalMs = 60 * 60 * 1e3;
+          }
+          const numWindows = Math.min(windowSize, 100);
+          for (let i = numWindows - 1; i >= 0; i--) {
+            const start = Math.floor((now - i * intervalMs) / intervalMs) * intervalMs;
+            const end = start + intervalMs;
+            intervals.push({ start, end, count: 0, types: {} });
+          }
+          const history = realmEventBus.history({
+            eventType,
+            since: intervals[0].start - intervalMs,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          for (const event2 of history) {
+            const bucketIndex = intervals.findIndex(
+              (i) => event2.timestamp >= i.start && event2.timestamp < i.end
+            );
+            if (bucketIndex >= 0) {
+              intervals[bucketIndex].count++;
+              if (!intervals[bucketIndex].types[event2.type]) {
+                intervals[bucketIndex].types[event2.type] = 0;
+              }
+              intervals[bucketIndex].types[event2.type]++;
+            }
+          }
+          const counts = intervals.map((i) => i.count);
+          const avgCount = counts.reduce((a, b) => a + b, 0) / counts.length || 0;
+          const movingAvg = [];
+          for (let i = 0; i < counts.length; i++) {
+            const window2 = counts.slice(Math.max(0, i - 4), i + 1);
+            movingAvg.push(window2.reduce((a, b) => a + b, 0) / window2.length);
+          }
+          let trendDirection = "stable";
+          if (counts.length >= 3) {
+            const recentAvg = (counts[counts.length - 1] + counts[counts.length - 2]) / 2;
+            const olderAvg = (counts[0] + counts[1]) / 2;
+            const change = olderAvg > 0 ? (recentAvg - olderAvg) / olderAvg : 0;
+            if (change > 0.15) {
+              trendDirection = "increasing";
+            } else if (change < -0.15) {
+              trendDirection = "decreasing";
+            }
+          }
+          return {
+            granularity,
+            windowSize: numWindows,
+            intervals,
+            averageCount: Math.round(avgCount * 100) / 100,
+            movingAverage: movingAvg.map((v) => Math.round(v * 100) / 100),
+            trendDirection,
+            peakTime: {
+              ...intervals.reduce((max, i) => i.count > max.count ? i : max, intervals[0]),
+              hour: intervals.reduce((max, i) => i.count > max.count ? i : max, intervals[0]).start
+            },
+            eventTypeFilter: eventType
+          };
+        }
+        /**
+         * 检测事件模式
+         */
+        detectPattern(options = {}) {
+          const {
+            sequenceLength = 5,
+            minOccurrences = 2,
+            eventType = null
+          } = options;
+          const history = realmEventBus.history({
+            eventType,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          const eventSequence = history.map((e) => e.type);
+          const patterns = /* @__PURE__ */ new Map();
+          for (let len = 2; len <= sequenceLength; len++) {
+            for (let i = 0; i <= eventSequence.length - len; i++) {
+              const pattern = eventSequence.slice(i, i + len).join("->");
+              if (!patterns.has(pattern)) {
+                patterns.set(pattern, {
+                  sequence: eventSequence.slice(i, i + len),
+                  count: 0,
+                  positions: []
+                });
+              }
+              patterns.get(pattern).count++;
+              patterns.get(pattern).positions.push(i);
+            }
+          }
+          const significantPatterns = [];
+          for (const [pattern, data] of patterns) {
+            if (data.count >= minOccurrences) {
+              significantPatterns.push({
+                pattern,
+                sequence: data.sequence,
+                occurrences: data.count,
+                positions: data.positions,
+                confidence: Math.min(data.count / 10, 1)
+              });
+            }
+          }
+          significantPatterns.sort((a, b) => b.occurrences - a.occurrences);
+          return {
+            totalPatternsFound: significantPatterns.length,
+            patterns: significantPatterns.slice(0, 10),
+            sequenceLength,
+            minOccurrences,
+            eventTypeFilter: eventType
+          };
+        }
+        /**
+         * 检测异常事件
+         */
+        detectAnomaly(options = {}) {
+          const {
+            threshold = ANALYTICS_CONFIG.anomalyThreshold,
+            windowSize = 50,
+            source = null
+          } = options;
+          const history = realmEventBus.history({
+            source,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          if (history.length < ANALYTICS_CONFIG.minSampleSize) {
+            return {
+              success: false,
+              error: "Insufficient data for anomaly detection",
+              minRequired: ANALYTICS_CONFIG.minSampleSize,
+              currentCount: history.length
+            };
+          }
+          const anomalies = [];
+          const hourlyStats = [];
+          const hourBuckets = /* @__PURE__ */ new Map();
+          for (const event2 of history) {
+            const hour = Math.floor(event2.timestamp / (60 * 60 * 1e3)) * (60 * 60 * 1e3);
+            if (!hourBuckets.has(hour)) {
+              hourBuckets.set(hour, { count: 0, types: /* @__PURE__ */ new Set() });
+            }
+            hourBuckets.get(hour).count++;
+            hourBuckets.get(hour).types.add(event2.type);
+          }
+          const sortedHours = Array.from(hourBuckets.entries()).sort((a, b) => a[0] - b[0]).map(([hour, data]) => ({
+            hour,
+            count: data.count,
+            uniqueTypes: data.types.size
+          }));
+          const counts = sortedHours.map((h) => h.count);
+          const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+          const variance = counts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / counts.length;
+          const stdDev = Math.sqrt(variance);
+          for (const hourData of sortedHours) {
+            const zScore = stdDev > 0 ? (hourData.count - mean) / stdDev : 0;
+            if (Math.abs(zScore) > threshold) {
+              anomalies.push({
+                hour: hourData.hour,
+                count: hourData.count,
+                zScore: Math.round(zScore * 100) / 100,
+                severity: Math.abs(zScore) > threshold * 2 ? "high" : "medium",
+                uniqueTypes: hourData.uniqueTypes
+              });
+            }
+          }
+          const typeCounts = /* @__PURE__ */ new Map();
+          for (const event2 of history) {
+            typeCounts.set(event2.type, (typeCounts.get(event2.type) || 0) + 1);
+          }
+          const avgTypeFreq = history.length / typeCounts.size;
+          const rareTypes = [];
+          for (const [type, count] of typeCounts) {
+            if (count <= avgTypeFreq * 0.2) {
+              rareTypes.push({ type, count, rarity: "rare" });
+            }
+          }
+          return {
+            success: true,
+            anomalies,
+            rareEventTypes: rareTypes,
+            statistics: {
+              mean: Math.round(mean * 100) / 100,
+              stdDev: Math.round(stdDev * 100) / 100,
+              threshold,
+              totalHoursAnalyzed: sortedHours.length,
+              totalEventsAnalyzed: history.length
+            }
+          };
+        }
+        /**
+         * 查询历史事件
+         */
+        queryHistory(options = {}) {
+          const {
+            eventType = null,
+            source = null,
+            since = null,
+            until = null,
+            priority = null,
+            dataFilter = null,
+            limit = 100,
+            offset = 0
+          } = options;
+          let events = realmEventBus.history({
+            eventType,
+            source,
+            since: since || 0,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          if (until) {
+            events = events.filter((e) => e.timestamp <= until);
+          }
+          if (priority) {
+            events = events.filter((e) => e.priority === priority);
+          }
+          if (dataFilter) {
+            events = events.filter((e) => {
+              if (typeof dataFilter === "object") {
+                for (const key in dataFilter) {
+                  if (e.data[key] !== dataFilter[key]) {
+                    return false;
+                  }
+                }
+              }
+              return true;
+            });
+          }
+          events.sort((a, b) => b.timestamp - a.timestamp);
+          const totalCount = events.length;
+          const paginatedEvents = events.slice(offset, offset + limit);
+          return {
+            success: true,
+            totalCount,
+            offset,
+            limit,
+            hasMore: offset + limit < totalCount,
+            events: paginatedEvents.map((e) => ({
+              id: e.id,
+              type: e.type,
+              source: e.source,
+              target: e.target,
+              timestamp: e.timestamp,
+              priority: e.priority,
+              cascadeLevel: e.cascadeLevel,
+              data: e.data
+            }))
+          };
+        }
+        /**
+         * 预测未来事件
+         */
+        forecast(options = {}) {
+          const {
+            horizonHours = ANALYTICS_CONFIG.forecastHorizonHours,
+            eventType = null
+          } = options;
+          const history = realmEventBus.history({
+            eventType,
+            limit: ANALYTICS_CONFIG.maxHistoryLength
+          });
+          if (history.length < ANALYTICS_CONFIG.minSampleSize) {
+            return {
+              success: false,
+              error: "Insufficient data for forecasting",
+              minRequired: ANALYTICS_CONFIG.minSampleSize,
+              currentCount: history.length
+            };
+          }
+          const hourCounts = /* @__PURE__ */ new Map();
+          let totalEvents = 0;
+          for (const event2 of history) {
+            const hour = Math.floor(event2.timestamp / (60 * 60 * 1e3)) * (60 * 60 * 1e3);
+            hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+            totalEvents++;
+          }
+          const avgEventsPerHour = totalEvents / (history.length > 0 ? history.length / (60 * 60 * 1e3) : 1);
+          const sortedHours = Array.from(hourCounts.keys()).sort();
+          let periodicity = "none";
+          if (sortedHours.length >= 4) {
+            const intervals = [];
+            for (let i = 1; i < sortedHours.length; i++) {
+              intervals.push(sortedHours[i] - sortedHours[i - 1]);
+            }
+            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            if (avgInterval > 20 * 60 * 60 * 1e3) {
+              periodicity = "daily";
+            } else if (avgInterval > 3 * 60 * 60 * 1e3) {
+              periodicity = "hourly";
+            }
+          }
+          const typeCounts = /* @__PURE__ */ new Map();
+          for (const event2 of history) {
+            typeCounts.set(event2.type, (typeCounts.get(event2.type) || 0) + 1);
+          }
+          const topTypes = Array.from(typeCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([type, count]) => ({
+            type,
+            probability: Math.round(count / totalEvents * 1e4) / 100,
+            expectedCount: Math.round(count / totalEvents * (horizonHours * avgEventsPerHour))
+          }));
+          const now = Date.now();
+          const futureSlots = [];
+          for (let i = 1; i <= horizonHours; i++) {
+            const slotTime = now + i * 60 * 60 * 1e3;
+            const hourBucket = Math.floor(slotTime / (60 * 60 * 1e3)) * (60 * 60 * 1e3);
+            const predictedCount = Math.round(avgEventsPerHour * 100) / 100;
+            futureSlots.push({
+              hour: i,
+              timestamp: slotTime,
+              predictedEvents: predictedCount,
+              confidence: totalEvents > 50 ? "high" : "medium"
+            });
+          }
+          return {
+            success: true,
+            horizonHours,
+            periodicity,
+            avgEventsPerHour: Math.round(avgEventsPerHour * 100) / 100,
+            totalHistoricalEvents: totalEvents,
+            topPredictedTypes: topTypes,
+            forecastSlots: futureSlots,
+            confidence: totalEvents > 100 ? "high" : totalEvents > 30 ? "medium" : "low",
+            basedOnEvents: history.length
+          };
+        }
+        /**
+         * 获取服务状态
+         */
+        getStatus() {
+          const busStats = realmEventBus.getStats();
+          return {
+            isInitialized: this.isInitialized,
+            totalIndexedEvents: busStats.totalEvents,
+            isSubscribedToEventBus: !!this.eventBusSubscription,
+            config: ANALYTICS_CONFIG
+          };
+        }
+        /**
+         * 重置服务
+         */
+        reset() {
+          this.eventIndex.clear();
+          this.rebuildIndex();
+          return { success: true };
+        }
+      };
+      eventAnalyticsService = new EventAnalyticsService();
+      EVENT_ANALYTICS_TOOLS = {
+        "event.analytics.stats": {
+          name: "event.analytics.stats",
+          description: "Get event statistics including counts by type, source, and priority",
+          inputSchema: {
+            type: "object",
+            properties: {
+              eventType: { type: "string", description: "Filter by event type" },
+              source: { type: "string", description: "Filter by source" },
+              timeRange: {
+                type: "object",
+                description: "Time range filter",
+                properties: {
+                  since: { type: "number", description: "Start timestamp" },
+                  until: { type: "number", description: "End timestamp" }
+                }
+              }
+            }
+          }
+        },
+        "event.analytics.trend": {
+          name: "event.analytics.trend",
+          description: "Get event trends over time with moving averages",
+          inputSchema: {
+            type: "object",
+            properties: {
+              windowSize: { type: "number", description: "Number of time windows (default: 100)" },
+              eventType: { type: "string", description: "Filter by event type" },
+              granularity: {
+                type: "string",
+                enum: ["minute", "hour", "day"],
+                description: "Time granularity (default: hour)"
+              }
+            }
+          }
+        },
+        "event.analytics.pattern": {
+          name: "event.analytics.pattern",
+          description: "Detect recurring event patterns and sequences",
+          inputSchema: {
+            type: "object",
+            properties: {
+              sequenceLength: { type: "number", description: "Max sequence length to detect (default: 5)" },
+              minOccurrences: { type: "number", description: "Minimum occurrences (default: 2)" },
+              eventType: { type: "string", description: "Filter by event type" }
+            }
+          }
+        },
+        "event.analytics.anomaly": {
+          name: "event.analytics.anomaly",
+          description: "Detect anomalous events using statistical analysis",
+          inputSchema: {
+            type: "object",
+            properties: {
+              threshold: { type: "number", description: "Z-score threshold for anomaly (default: 2.0)" },
+              windowSize: { type: "number", description: "Window size for analysis (default: 50)" },
+              source: { type: "string", description: "Filter by source" }
+            }
+          }
+        },
+        "event.history.query": {
+          name: "event.history.query",
+          description: "Query historical events with filtering and pagination",
+          inputSchema: {
+            type: "object",
+            properties: {
+              eventType: { type: "string", description: "Filter by event type" },
+              source: { type: "string", description: "Filter by source" },
+              since: { type: "number", description: "Start timestamp" },
+              until: { type: "number", description: "End timestamp" },
+              priority: { type: "string", enum: ["high", "medium", "low"] },
+              dataFilter: { type: "object", description: "Filter by event data" },
+              limit: { type: "number", description: "Max results (default: 100)" },
+              offset: { type: "number", description: "Offset for pagination (default: 0)" }
+            }
+          }
+        },
+        "event.analytics.forecast": {
+          name: "event.analytics.forecast",
+          description: "Predict future events based on historical patterns",
+          inputSchema: {
+            type: "object",
+            properties: {
+              horizonHours: { type: "number", description: "Forecast horizon in hours (default: 24)" },
+              eventType: { type: "string", description: "Filter by event type" }
+            }
+          }
+        }
+      };
+      EventAnalyticsService_default = eventAnalyticsService;
     }
   });
 
@@ -10221,6 +10956,7 @@ var CultivationSimulator = (() => {
 
   // src/main.js
   init_RealmEventBus();
+  init_EventAnalyticsService();
   var gameState2 = null;
   var isGameInitialized = false;
   var gameLoopTimer = null;
@@ -10389,6 +11125,7 @@ var CultivationSimulator = (() => {
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
     npcEvolutionEngine.init(gameState2);
+    eventAnalyticsService.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -10945,6 +11682,107 @@ var CultivationSimulator = (() => {
       const { mcpSubscriberList: mcpSubscriberList2 } = (init_RealmEventBus(), __toCommonJS(RealmEventBus_exports));
       return mcpSubscriberList2(params);
     });
+    mcpRegistry.registerTool("event.analytics.stats", {
+      name: "event.analytics.stats",
+      description: "Get event statistics including counts by type, source, and priority",
+      inputSchema: {
+        type: "object",
+        properties: {
+          eventType: { type: "string", description: "Filter by event type" },
+          source: { type: "string", description: "Filter by source" },
+          timeRange: {
+            type: "object",
+            description: "Time range filter",
+            properties: {
+              since: { type: "number" },
+              until: { type: "number" }
+            }
+          }
+        }
+      }
+    }, (params) => {
+      const { mcpAnalyticsStats: mcpAnalyticsStats2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpAnalyticsStats2(params);
+    });
+    mcpRegistry.registerTool("event.analytics.trend", {
+      name: "event.analytics.trend",
+      description: "Get event trends over time with moving averages",
+      inputSchema: {
+        type: "object",
+        properties: {
+          windowSize: { type: "number", description: "Number of time windows" },
+          eventType: { type: "string", description: "Filter by event type" },
+          granularity: { type: "string", enum: ["minute", "hour", "day"] }
+        }
+      }
+    }, (params) => {
+      const { mcpAnalyticsTrend: mcpAnalyticsTrend2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpAnalyticsTrend2(params);
+    });
+    mcpRegistry.registerTool("event.analytics.pattern", {
+      name: "event.analytics.pattern",
+      description: "Detect recurring event patterns and sequences",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sequenceLength: { type: "number", description: "Max sequence length" },
+          minOccurrences: { type: "number", description: "Minimum occurrences" },
+          eventType: { type: "string", description: "Filter by event type" }
+        }
+      }
+    }, (params) => {
+      const { mcpAnalyticsPattern: mcpAnalyticsPattern2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpAnalyticsPattern2(params);
+    });
+    mcpRegistry.registerTool("event.analytics.anomaly", {
+      name: "event.analytics.anomaly",
+      description: "Detect anomalous events using statistical analysis",
+      inputSchema: {
+        type: "object",
+        properties: {
+          threshold: { type: "number", description: "Z-score threshold" },
+          windowSize: { type: "number", description: "Window size for analysis" },
+          source: { type: "string", description: "Filter by source" }
+        }
+      }
+    }, (params) => {
+      const { mcpAnalyticsAnomaly: mcpAnalyticsAnomaly2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpAnalyticsAnomaly2(params);
+    });
+    mcpRegistry.registerTool("event.history.query", {
+      name: "event.history.query",
+      description: "Query historical events with filtering and pagination",
+      inputSchema: {
+        type: "object",
+        properties: {
+          eventType: { type: "string", description: "Filter by event type" },
+          source: { type: "string", description: "Filter by source" },
+          since: { type: "number", description: "Start timestamp" },
+          until: { type: "number", description: "End timestamp" },
+          priority: { type: "string", enum: ["high", "medium", "low"] },
+          dataFilter: { type: "object", description: "Filter by event data" },
+          limit: { type: "number", description: "Max results" },
+          offset: { type: "number", description: "Offset for pagination" }
+        }
+      }
+    }, (params) => {
+      const { mcpHistoryQuery: mcpHistoryQuery2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpHistoryQuery2(params);
+    });
+    mcpRegistry.registerTool("event.analytics.forecast", {
+      name: "event.analytics.forecast",
+      description: "Predict future events based on historical patterns",
+      inputSchema: {
+        type: "object",
+        properties: {
+          horizonHours: { type: "number", description: "Forecast horizon in hours" },
+          eventType: { type: "string", description: "Filter by event type" }
+        }
+      }
+    }, (params) => {
+      const { mcpAnalyticsForecast: mcpAnalyticsForecast2 } = (init_EventAnalyticsService(), __toCommonJS(EventAnalyticsService_exports));
+      return mcpAnalyticsForecast2(params);
+    });
   }
   function doSaveGameWithFeedback() {
     const result = doSaveGame();
@@ -11239,4 +12077,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-ce97103-2026-05-30T15-29-50-725Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-55627ad-2026-05-30T15-36-47-719Z";

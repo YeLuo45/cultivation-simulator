@@ -56,6 +56,9 @@ import { npcEvolutionEngine } from './systems/ai/NPCEvolutionEngine.js';
 // 仙界事件总线 (Direction O: 全局事件总线 + 事件级联触发机制)
 import { realmEventBus, EVENT_BUS_TOOLS } from './systems/event/RealmEventBus.js';
 
+// 事件分析服务 (Direction O续: 仙界事件总线 - 事件历史分析)
+import { eventAnalyticsService, EVENT_ANALYTICS_TOOLS } from './systems/event/EventAnalyticsService.js';
+
 // ===== 全局状态 =====
 
 /**
@@ -331,6 +334,9 @@ function initializeDomainModules() {
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
+
+    // 事件分析服务 (Direction O续: 仙界事件总线 - 事件历史分析)
+    eventAnalyticsService.init(gameState);
 
     console.log('[Main] 领域模块初始化完成');
 }
@@ -964,6 +970,114 @@ function registerDomainMCPTools() {
     }, (params) => {
         const { mcpSubscriberList } = require('./systems/event/RealmEventBus.js');
         return mcpSubscriberList(params);
+    });
+
+    // 事件分析工具 (Direction O续: 仙界事件总线 - 事件历史分析)
+    mcpRegistry.registerTool('event.analytics.stats', {
+        name: 'event.analytics.stats',
+        description: 'Get event statistics including counts by type, source, and priority',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                eventType: { type: 'string', description: 'Filter by event type' },
+                source: { type: 'string', description: 'Filter by source' },
+                timeRange: {
+                    type: 'object',
+                    description: 'Time range filter',
+                    properties: {
+                        since: { type: 'number' },
+                        until: { type: 'number' }
+                    }
+                }
+            }
+        }
+    }, (params) => {
+        const { mcpAnalyticsStats } = require('./systems/event/EventAnalyticsService.js');
+        return mcpAnalyticsStats(params);
+    });
+
+    mcpRegistry.registerTool('event.analytics.trend', {
+        name: 'event.analytics.trend',
+        description: 'Get event trends over time with moving averages',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                windowSize: { type: 'number', description: 'Number of time windows' },
+                eventType: { type: 'string', description: 'Filter by event type' },
+                granularity: { type: 'string', enum: ['minute', 'hour', 'day'] }
+            }
+        }
+    }, (params) => {
+        const { mcpAnalyticsTrend } = require('./systems/event/EventAnalyticsService.js');
+        return mcpAnalyticsTrend(params);
+    });
+
+    mcpRegistry.registerTool('event.analytics.pattern', {
+        name: 'event.analytics.pattern',
+        description: 'Detect recurring event patterns and sequences',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                sequenceLength: { type: 'number', description: 'Max sequence length' },
+                minOccurrences: { type: 'number', description: 'Minimum occurrences' },
+                eventType: { type: 'string', description: 'Filter by event type' }
+            }
+        }
+    }, (params) => {
+        const { mcpAnalyticsPattern } = require('./systems/event/EventAnalyticsService.js');
+        return mcpAnalyticsPattern(params);
+    });
+
+    mcpRegistry.registerTool('event.analytics.anomaly', {
+        name: 'event.analytics.anomaly',
+        description: 'Detect anomalous events using statistical analysis',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                threshold: { type: 'number', description: 'Z-score threshold' },
+                windowSize: { type: 'number', description: 'Window size for analysis' },
+                source: { type: 'string', description: 'Filter by source' }
+            }
+        }
+    }, (params) => {
+        const { mcpAnalyticsAnomaly } = require('./systems/event/EventAnalyticsService.js');
+        return mcpAnalyticsAnomaly(params);
+    });
+
+    mcpRegistry.registerTool('event.history.query', {
+        name: 'event.history.query',
+        description: 'Query historical events with filtering and pagination',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                eventType: { type: 'string', description: 'Filter by event type' },
+                source: { type: 'string', description: 'Filter by source' },
+                since: { type: 'number', description: 'Start timestamp' },
+                until: { type: 'number', description: 'End timestamp' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+                dataFilter: { type: 'object', description: 'Filter by event data' },
+                limit: { type: 'number', description: 'Max results' },
+                offset: { type: 'number', description: 'Offset for pagination' }
+            }
+        }
+    }, (params) => {
+        const { mcpHistoryQuery } = require('./systems/event/EventAnalyticsService.js');
+        return mcpHistoryQuery(params);
+    });
+
+    mcpRegistry.registerTool('event.analytics.forecast', {
+        name: 'event.analytics.forecast',
+        description: 'Predict future events based on historical patterns',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                horizonHours: { type: 'number', description: 'Forecast horizon in hours' },
+                eventType: { type: 'string', description: 'Filter by event type' }
+            }
+        }
+    }, (params) => {
+        const { mcpAnalyticsForecast } = require('./systems/event/EventAnalyticsService.js');
+        return mcpAnalyticsForecast(params);
     });
 }
 
