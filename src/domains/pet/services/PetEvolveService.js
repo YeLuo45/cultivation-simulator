@@ -541,7 +541,7 @@ const EVOLUTION_STAGE_NAMES = {
     5: '神化期'
 };
 
-module.exports = {
+export {
     PetEvolveService,
     EVOLUTION_STAGES,
     EVOLUTION_FORMS,

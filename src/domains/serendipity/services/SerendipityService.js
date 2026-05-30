@@ -372,6 +372,4 @@ class SerendipityDAG extends DAG {
 // 导出单例和服务
 const serendipityService = new SerendipityService();
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SerendipityService, serendipityService, SerendipityDAG };
-}
+export { SerendipityService, serendipityService, SerendipityDAG };

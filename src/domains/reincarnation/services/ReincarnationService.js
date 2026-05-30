@@ -412,11 +412,9 @@ const REINCARNATION_EVENTS = {
 // 导出单例
 const reincarnationService = new ReincarnationService();
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { 
-        ReincarnationService, 
-        reincarnationService,
-        CELESTIAL_REINCARNATION_CONFIG,
-        REINCARNATION_EVENTS
-    };
-}
+export { 
+    ReincarnationService, 
+    reincarnationService,
+    CELESTIAL_REINCARNATION_CONFIG,
+    REINCARNATION_EVENTS
+};

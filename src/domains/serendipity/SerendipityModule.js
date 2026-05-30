@@ -122,7 +122,7 @@ function mcpKarmaUpdate(eventId, karmaDelta, reason) {
 }
 
 // 导出
-module.exports = {
+export {
     // Entities
     Serendipity,
     SerendipityNode,

@@ -262,6 +262,4 @@ class DAGExecutor {
 // 导出单例
 const dagExecutor = new DAGExecutor();
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DAGExecutor, dagExecutor };
-}
+export { DAGExecutor, dagExecutor };

@@ -449,7 +449,7 @@ class AchievementService {
     }
 }
 
-module.exports = {
+export {
     AchievementService,
     ACHIEVEMENT_CONFIG,
     ACHIEVEMENT_STATE_INITIALIZERS,

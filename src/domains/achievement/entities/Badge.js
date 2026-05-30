@@ -235,7 +235,7 @@ const RARITY_ORDER = {
     mythic: 6,
 };
 
-module.exports = {
+export {
     Badge,
     BadgeRarity,
     BadgeType,

@@ -386,6 +386,4 @@ class InventoryService {
 // 导出单例
 const inventoryService = new InventoryService();
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { InventoryService, inventoryService };
-}
+export { InventoryService, inventoryService };

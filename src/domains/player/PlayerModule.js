@@ -51,16 +51,4 @@ function createPlayerModule(gameState) {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { createPlayerModule, PlayerEntity, PlayerService, REALMS, STAGES, STAGE_NAMES };
-} else {
-    // 浏览器环境
-    window.PlayerModule = {
-        createPlayerModule,
-        PlayerEntity,
-        PlayerService,
-        REALMS,
-        STAGES,
-        STAGE_NAMES
-    };
-}
+export { createPlayerModule, PlayerEntity, PlayerService, REALMS, STAGES, STAGE_NAMES };

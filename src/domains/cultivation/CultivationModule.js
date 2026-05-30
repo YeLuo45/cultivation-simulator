@@ -55,20 +55,4 @@ function createCultivationModule(gameState) {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { createCultivationModule, CultivationEntity, SpiritRootEntity, CultivationService, TIER_MAP, ROOT_TYPES, ROOT_TYPE_NAMES, TIER_BONUSES, TRIBULATIONS, BLESSING_TYPES };
-} else {
-    // 浏览器环境
-    window.CultivationModule = {
-        createCultivationModule,
-        CultivationEntity,
-        SpiritRootEntity,
-        CultivationService,
-        TIER_MAP,
-        ROOT_TYPES,
-        ROOT_TYPE_NAMES,
-        TIER_BONUSES,
-        TRIBULATIONS,
-        BLESSING_TYPES
-    };
-}
+export { createCultivationModule, CultivationEntity, SpiritRootEntity, CultivationService, TIER_MAP, ROOT_TYPES, ROOT_TYPE_NAMES, TIER_BONUSES, TRIBULATIONS, BLESSING_TYPES };

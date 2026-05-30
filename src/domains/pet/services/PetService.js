@@ -546,7 +546,7 @@ class PetService {
     }
 }
 
-module.exports = {
+export {
     PetService,
     PET_CONFIG,
     PET_CONFIG_V4,

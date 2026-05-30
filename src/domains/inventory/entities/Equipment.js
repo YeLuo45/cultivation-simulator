@@ -260,12 +260,10 @@ const ENHANCE_CONFIG = {
 };
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { 
-        Equipment, 
-        EQUIPMENT_TYPES, 
-        EQUIPMENT_SLOTS, 
-        HEAVENLY_DAO_SET_BONUSES,
-        ENHANCE_CONFIG 
-    };
-}
+export { 
+    Equipment, 
+    EQUIPMENT_TYPES, 
+    EQUIPMENT_SLOTS, 
+    HEAVENLY_DAO_SET_BONUSES,
+    ENHANCE_CONFIG 
+};

@@ -187,6 +187,4 @@ class CultivationEntity {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CultivationEntity };
-}
+export { CultivationEntity };

@@ -122,7 +122,7 @@ function mcpReincarnate(gameState) {
 }
 
 // 导出
-module.exports = {
+export { 
     // Entities
     Reincarnation,
     REINCARNATION_CAUSES,

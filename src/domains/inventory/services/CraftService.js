@@ -374,15 +374,13 @@ const MATERIALS = {
 // 导出单例
 const craftService = new CraftService();
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { 
-        CraftService, 
-        craftService,
-        ALCHEMY_RECIPES, 
-        FORGE_RECIPES, 
-        ADVANCED_FORGE_RECIPES,
-        FURNACES, 
-        ANVILS,
-        MATERIALS
-    };
-}
+export { 
+    CraftService, 
+    craftService,
+    ALCHEMY_RECIPES, 
+    FORGE_RECIPES, 
+    ADVANCED_FORGE_RECIPES,
+    FURNACES, 
+    ANVILS,
+    MATERIALS
+};

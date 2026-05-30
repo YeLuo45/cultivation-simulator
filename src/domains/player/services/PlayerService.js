@@ -379,6 +379,4 @@ class PlayerService {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PlayerService };
-}
+export { PlayerService };

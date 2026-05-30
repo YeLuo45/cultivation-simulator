@@ -3,10 +3,10 @@
  * 整合成就系统的所有功能
  */
 
-const { Achievement, AchievementCategory, AchievementRequirementType, AchievementRewardType, ACHIEVEMENT_POOL } = require('./entities/Achievement');
-const { Badge, BadgeRarity, BadgeType, BADGE_POOL, MAX_EQUIPPED_BADGES } = require('./entities/Badge');
-const { AchievementService } = require('./services/AchievementService');
-const { BadgeService } = require('./services/BadgeService');
+import { Achievement, AchievementCategory, AchievementRequirementType, AchievementRewardType, ACHIEVEMENT_POOL } from './entities/Achievement.js';
+import { Badge, BadgeRarity, BadgeType, BADGE_POOL, MAX_EQUIPPED_BADGES } from './entities/Badge.js';
+import { AchievementService } from './services/AchievementService.js';
+import { BadgeService } from './services/BadgeService.js';
 
 // 成就状态初始化
 const ACHIEVEMENT_STATE_INITIALIZERS = {
@@ -42,6 +42,7 @@ const ACHIEVEMENT_API_METHODS = [
     'mcpAchievementListV2',
     'mcpAchievementViewV2',
     'mcpAchievementUnlockV2',
+    'mcpAchievementRewardV2',
     'mcpAchievementListV3',
     'mcpAchievementViewV3',
     'mcpAchievementUnlockV3',
@@ -82,27 +83,38 @@ const BADGE_API_METHODS = [
     'mcpBadgeShowV8',
 ];
 
-// 导出所有成就模块内容
-module.exports = {
-    // 实体
-    Achievement,
-    Badge,
+/**
+ * 创建成就模块实例
+ * @param {Object} gameState - 游戏状态对象 (window.gameState)
+ */
+function createAchievementModule(gameState) {
+    const achievementService = new AchievementService(gameState);
+    const badgeService = new BadgeService(gameState);
     
-    // 服务
-    AchievementService,
-    BadgeService,
-    
-    // 配置
-    ACHIEVEMENT_STATE_INITIALIZERS,
-    BADGE_STATE_INITIALIZERS,
-    MAX_EQUIPPED_BADGES,
-    
-    // API方法列表
-    ACHIEVEMENT_API_METHODS,
-    BADGE_API_METHODS,
-    
-    // 模块信息
-    moduleName: 'achievement',
-    moduleVersion: 'V195',
-    moduleDescription: '成就系统 - 包含成就、徽章、奖励等功能',
-};
+    return {
+        // 实体
+        Achievement,
+        Badge,
+        
+        // 服务
+        achievementService,
+        badgeService,
+        
+        // 配置
+        ACHIEVEMENT_STATE_INITIALIZERS,
+        BADGE_STATE_INITIALIZERS,
+        MAX_EQUIPPED_BADGES,
+        
+        // API方法列表
+        ACHIEVEMENT_API_METHODS,
+        BADGE_API_METHODS,
+        
+        // 模块信息
+        moduleName: 'achievement',
+        moduleVersion: 'V195',
+        moduleDescription: '成就系统 - 包含成就、徽章、奖励等功能',
+    };
+}
+
+// 导出
+export { createAchievementModule, Achievement, Badge, AchievementService, BadgeService, ACHIEVEMENT_STATE_INITIALIZERS, BADGE_STATE_INITIALIZERS, MAX_EQUIPPED_BADGES, ACHIEVEMENT_API_METHODS, BADGE_API_METHODS };

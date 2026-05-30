@@ -282,6 +282,4 @@ class DAG {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DAG };
-}
+export { DAG };

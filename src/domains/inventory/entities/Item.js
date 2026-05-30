@@ -179,6 +179,4 @@ const ITEM_QUALITIES = {
 };
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Item, ITEM_TYPES, ITEM_QUALITIES };
-}
+export { Item, ITEM_TYPES, ITEM_QUALITIES };

@@ -440,7 +440,7 @@ class BadgeService {
     }
 }
 
-module.exports = {
+export {
     BadgeService,
     MAX_EQUIPPED_BADGES,
     BADGE_STATE_INITIALIZERS,

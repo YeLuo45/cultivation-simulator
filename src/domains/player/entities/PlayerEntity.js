@@ -169,6 +169,4 @@ class PlayerEntity {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PlayerEntity, REALMS, STAGES, STAGE_NAMES };
-}
+export { PlayerEntity, REALMS, STAGES, STAGE_NAMES };

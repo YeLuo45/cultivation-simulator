@@ -289,6 +289,4 @@ const REINCARNATION_QUALITY_BONUSES = {
 };
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Reincarnation, REINCARNATION_CAUSES, REINCARNATION_QUALITY_BONUSES };
-}
+export { Reincarnation, REINCARNATION_CAUSES, REINCARNATION_QUALITY_BONUSES };

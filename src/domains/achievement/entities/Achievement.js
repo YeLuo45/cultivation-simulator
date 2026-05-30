@@ -189,7 +189,7 @@ const ACHIEVEMENT_CATEGORY_NAMES = {
     [AchievementCategory.COLLECTION]: '收集',
 };
 
-module.exports = {
+export {
     Achievement,
     AchievementCategory,
     AchievementRequirementType,

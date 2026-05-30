@@ -186,13 +186,4 @@ function getTierName(tier) {
 }
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SpiritRootEntity, TIER_MAP, ROOT_TYPES, ROOT_TYPE_NAMES, TIER_BONUSES, getTierName };
-} else {
-    // 浏览器环境
-    window.SpiritRootEntity = SpiritRootEntity;
-    window.TIER_MAP = TIER_MAP;
-    window.ROOT_TYPES = ROOT_TYPES;
-    window.ROOT_TYPE_NAMES = ROOT_TYPE_NAMES;
-    window.TIER_BONUSES = TIER_BONUSES;
-}
+export { SpiritRootEntity, TIER_MAP, ROOT_TYPES, ROOT_TYPE_NAMES, TIER_BONUSES, getTierName };

@@ -338,6 +338,4 @@ const SERENDIPITY_TALISMANS = {
 };
 
 // 导出
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Serendipity, SerendipityNode, SuperNode, SERENDIPITY_EVENTS, SERENDIPITY_TALISMANS };
-}
+export { Serendipity, SerendipityNode, SuperNode, SERENDIPITY_EVENTS, SERENDIPITY_TALISMANS };

@@ -438,7 +438,7 @@ const PET_SPECIES_CONFIG = {
     '金鹏': { attack: 20, defense: 8, speed: 18, rarity: 'mythic' },
 };
 
-module.exports = {
+export {
     Pet,
     PetAttributes,
     PetBattleStats,
