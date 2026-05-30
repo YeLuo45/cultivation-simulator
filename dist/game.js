@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-d1a1d9a-2026-05-30T14-35-32-987Z */
+/* Cultivation Simulator DDD-v1.0.0-0c2dcab-2026-05-30T14-50-37-528Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -6841,6 +6841,1206 @@ var CultivationSimulator = (() => {
   };
   var powerSync = new PowerSync();
 
+  // src/systems/ai/NPCCollaboration.js
+  var NPC_ROLE_REGISTRY = {
+    "master": {
+      role: "master",
+      title: "\u5E08\u5C0A",
+      skills: ["teach", "assign_task", "evaluate", "reward"],
+      collaborationWeight: 0.3,
+      responseSpeed: "slow"
+    },
+    "monster": {
+      role: "monster",
+      title: "\u5996\u517D",
+      skills: ["challenge", "guard", "drop_item"],
+      collaborationWeight: 0.2,
+      responseSpeed: "fast"
+    },
+    "merchant": {
+      role: "merchant",
+      title: "\u5546\u4EBA",
+      skills: ["trade", "appraise", "special_goods"],
+      collaborationWeight: 0.25,
+      responseSpeed: "medium"
+    },
+    "fellow": {
+      role: "fellow",
+      title: "\u540C\u9053",
+      skills: ["practice_together", "share_resource", "mutual_help"],
+      collaborationWeight: 0.25,
+      responseSpeed: "medium"
+    }
+  };
+  var NpcMessageBus = class {
+    constructor() {
+      this.messages = [];
+      this.listeners = /* @__PURE__ */ new Map();
+      this.messageId = 0;
+      this.messageHistory = [];
+      this.maxHistoryLength = 500;
+    }
+    /**
+     * 发送消息给指定角色
+     */
+    send(fromRole, toRole, type, payload) {
+      const msg = {
+        id: ++this.messageId,
+        from: fromRole,
+        to: toRole,
+        type,
+        // 'task' | 'response' | 'broadcast'
+        payload,
+        timestamp: Date.now(),
+        status: "pending"
+      };
+      this.messages.push(msg);
+      this.addToHistory(msg);
+      return msg;
+    }
+    /**
+     * 广播消息给所有角色
+     */
+    broadcast(fromRole, type, payload) {
+      const msg = {
+        id: ++this.messageId,
+        from: fromRole,
+        to: "*",
+        // wildcard = all roles
+        type,
+        // 'announcement' | 'emergency' | 'opportunity'
+        payload,
+        timestamp: Date.now(),
+        status: "pending"
+      };
+      this.messages.push(msg);
+      this.addToHistory(msg);
+      return msg;
+    }
+    /**
+     * 订阅角色消息
+     */
+    subscribe(role, callback) {
+      if (!this.listeners.has(role)) {
+        this.listeners.set(role, []);
+      }
+      this.listeners.get(role).push(callback);
+      return () => {
+        const callbacks = this.listeners.get(role);
+        const idx = callbacks.indexOf(callback);
+        if (idx >= 0) callbacks.splice(idx, 1);
+      };
+    }
+    /**
+     * 分发消息给订阅者
+     */
+    dispatch() {
+      const delivered = [];
+      for (const msg of this.messages) {
+        if (msg.status !== "pending") continue;
+        const listeners = this.listeners.get(msg.to) || [];
+        for (const cb of listeners) {
+          cb(msg);
+          msg.status = "delivered";
+          delivered.push(msg.id);
+        }
+        if (msg.to === "*") {
+          for (const [role, cbs] of this.listeners) {
+            if (role !== msg.from) {
+              for (const cb of cbs) {
+                cb(msg);
+              }
+            }
+          }
+          msg.status = "broadcast";
+          delivered.push(msg.id);
+        }
+      }
+      this.messages = this.messages.filter((m) => m.status === "pending");
+      return delivered;
+    }
+    /**
+     * 获取角色的消息
+     */
+    getMessages(role, since = 0) {
+      return this.messages.filter(
+        (m) => (m.from === role || m.to === role || m.to === "*") && m.timestamp > since
+      );
+    }
+    /**
+     * 添加到历史记录
+     */
+    addToHistory(msg) {
+      this.messageHistory.push({ ...msg });
+      if (this.messageHistory.length > this.maxHistoryLength) {
+        this.messageHistory = this.messageHistory.slice(-this.maxHistoryLength);
+      }
+    }
+    /**
+     * 获取消息历史
+     */
+    getHistory(role = null, limit = 100) {
+      let history = this.messageHistory;
+      if (role) {
+        history = history.filter((m) => m.from === role || m.to === role);
+      }
+      return history.slice(-limit);
+    }
+    /**
+     * 清除消息
+     */
+    clearMessages() {
+      this.messages = [];
+    }
+    /**
+     * 获取状态
+     */
+    getStatus() {
+      return {
+        pendingMessages: this.messages.length,
+        registeredListeners: this.listeners.size,
+        historyLength: this.messageHistory.length
+      };
+    }
+  };
+  var npcMessageBus = new NpcMessageBus();
+  var NpcCollabGraph = class {
+    constructor() {
+      this.nodes = /* @__PURE__ */ new Map();
+      this.edges = [];
+      this.activeTasks = /* @__PURE__ */ new Map();
+      this.taskIdCounter = 0;
+    }
+    /**
+     * 添加节点
+     */
+    addNode(nodeId, config) {
+      this.nodes.set(nodeId, {
+        id: nodeId,
+        type: config.type,
+        // 'publish_task' | 'execute' | 'review' | 'reward'
+        owner: config.owner,
+        status: "idle",
+        prerequisites: config.prerequisites || [],
+        outcomes: config.outcomes || {},
+        maxProgress: config.maxProgress || 100
+      });
+    }
+    /**
+     * 添加边
+     */
+    addEdge(from, to, type = "sequence") {
+      this.edges.push({ from, to, type });
+    }
+    /**
+     * 获取准备就绪的节点（所有前置条件已满足）
+     */
+    getReadyNodes() {
+      const ready = [];
+      for (const [nodeId, node] of this.nodes) {
+        if (node.status !== "idle") continue;
+        const prereqs = node.prerequisites || [];
+        const allMet = prereqs.every((p) => {
+          const n = this.nodes.get(p);
+          return n && n.status === "completed";
+        });
+        if (allMet) ready.push(nodeId);
+      }
+      return ready;
+    }
+    /**
+     * 启动任务
+     */
+    startTask(nodeId, assignedTo) {
+      const node = this.nodes.get(nodeId);
+      if (!node) return null;
+      const taskId = `task_${nodeId}_${++this.taskIdCounter}`;
+      node.status = "in_progress";
+      this.activeTasks.set(taskId, {
+        nodeId,
+        assignedTo,
+        startTime: Date.now(),
+        progress: 0
+      });
+      return taskId;
+    }
+    /**
+     * 更新任务进度
+     */
+    updateProgress(taskId, progress) {
+      const task = this.activeTasks.get(taskId);
+      if (!task) return;
+      task.progress = Math.min(progress, 100);
+      if (task.progress >= 100) {
+        const node = this.nodes.get(task.nodeId);
+        if (node) node.status = "completed";
+        task.status = "completed";
+        task.endTime = Date.now();
+      }
+    }
+    /**
+     * 获取链状态
+     */
+    getChainStatus(chainId) {
+      const nodes = Array.from(this.nodes.values()).filter((n) => n.type === chainId);
+      return {
+        total: nodes.length,
+        completed: nodes.filter((n) => n.status === "completed").length,
+        inProgress: nodes.filter((n) => n.status === "in_progress").length,
+        idle: nodes.filter((n) => n.status === "idle").length
+      };
+    }
+    /**
+     * 获取节点详情
+     */
+    getNode(nodeId) {
+      return this.nodes.get(nodeId);
+    }
+    /**
+     * 获取活跃任务
+     */
+    getActiveTasks() {
+      return Array.from(this.activeTasks.entries()).map(([id, task]) => ({
+        taskId: id,
+        ...task
+      }));
+    }
+    /**
+     * 重置图
+     */
+    reset() {
+      this.nodes.clear();
+      this.edges = [];
+      this.activeTasks.clear();
+    }
+  };
+  var npcCollabGraph = new NpcCollabGraph();
+  var NpcTaskManager = class {
+    constructor() {
+      this.activeTasks = /* @__PURE__ */ new Map();
+      this.taskIdCounter = 0;
+      this.taskDefinitions = /* @__PURE__ */ new Map();
+    }
+    /**
+     * 分配任务
+     */
+    assignTask(role, type, reward, durationMs) {
+      const taskId = `npc_task_${++this.taskIdCounter}`;
+      this.activeTasks.set(taskId, {
+        role,
+        type,
+        progress: 0,
+        reward,
+        deadline: Date.now() + durationMs,
+        startTime: Date.now(),
+        status: "assigned"
+      });
+      return taskId;
+    }
+    /**
+     * 更新进度
+     */
+    updateProgress(taskId, progress) {
+      const task = this.activeTasks.get(taskId);
+      if (task) {
+        task.progress = Math.min(progress, 100);
+        if (progress >= 100) {
+          task.status = "completed";
+          task.completedAt = Date.now();
+        }
+      }
+    }
+    /**
+     * 完成任务
+     */
+    completeTask(taskId) {
+      const task = this.activeTasks.get(taskId);
+      if (task) {
+        task.progress = 100;
+        task.status = "completed";
+        task.completedAt = Date.now();
+        return task;
+      }
+      return null;
+    }
+    /**
+     * 获取角色的活跃任务
+     */
+    getActiveTasks(role) {
+      return Array.from(this.activeTasks.values()).filter(
+        (t) => t.role === role && t.status !== "completed"
+      );
+    }
+    /**
+     * 获取过期任务
+     */
+    getExpiredTasks() {
+      const now = Date.now();
+      return Array.from(this.activeTasks.entries()).filter(
+        ([id, task]) => task.deadline < now && task.status !== "completed"
+      ).map(([id]) => id);
+    }
+    /**
+     * 清理过期任务
+     */
+    cleanupExpiredTasks() {
+      const expired = this.getExpiredTasks();
+      for (const taskId of expired) {
+        const task = this.activeTasks.get(taskId);
+        if (task) {
+          task.status = "expired";
+          task.expiredAt = Date.now();
+        }
+      }
+      return expired.length;
+    }
+  };
+  var NpcCollaborationRewards = class {
+    constructor() {
+      this.rewardPool = 0;
+      this.distributionRules = {
+        "master": { share: 0.4, bonusOn: ["teach", "evaluate"] },
+        "fellow": { share: 0.3, bonusOn: ["practice_together", "share_resource"] },
+        "merchant": { share: 0.2, bonusOn: ["trade", "appraise"] },
+        "monster": { share: 0.1, bonusOn: ["challenge", "drop_item"] }
+      };
+      this.totalDistributed = 0;
+    }
+    /**
+     * 添加到奖励池
+     */
+    addToPool(amount) {
+      this.rewardPool += amount;
+    }
+    /**
+     * 分配奖励
+     */
+    distribute(role) {
+      const rule = this.distributionRules[role];
+      if (!rule) return 0;
+      const amount = Math.floor(this.rewardPool * rule.share);
+      this.totalDistributed += amount;
+      return amount;
+    }
+    /**
+     * 获取剩余奖励池
+     */
+    getPool() {
+      return this.rewardPool;
+    }
+    /**
+     * 清空奖励池
+     */
+    clearPool() {
+      this.rewardPool = 0;
+    }
+  };
+  var NpcReputationSystem = class {
+    constructor() {
+      this.reputations = /* @__PURE__ */ new Map();
+      this.initReputations();
+    }
+    initReputations() {
+      for (const [role, config] of Object.entries(NPC_ROLE_REGISTRY)) {
+        this.reputations.set(role, {
+          level: 1,
+          exp: 0,
+          totalInteractions: 0,
+          lastInteraction: 0
+        });
+      }
+    }
+    getReputation(role) {
+      return this.reputations.get(role) || { level: 0, exp: 0 };
+    }
+    addReputation(role, amount) {
+      const rep = this.getReputation(role);
+      rep.exp += amount;
+      rep.totalInteractions++;
+      rep.lastInteraction = Date.now();
+      while (rep.exp >= 100) {
+        rep.exp -= 100;
+        rep.level++;
+      }
+      this.reputations.set(role, rep);
+      return rep;
+    }
+    getReputationLevel(role) {
+      return this.getReputation(role).level;
+    }
+  };
+  var npcReputationSystem = new NpcReputationSystem();
+  var npcTaskManager = new NpcTaskManager();
+  var npcCollabRewards = new NpcCollaborationRewards();
+  var CollaborationRoom = class {
+    constructor(roomId, taskType) {
+      this.roomId = roomId;
+      this.taskType = taskType;
+      this.participants = /* @__PURE__ */ new Map();
+      this.maxParticipants = 5;
+      this.status = "recruiting";
+      this.chatLog = [];
+      this.resourcePool = 0;
+    }
+    join(playerId, playerName) {
+      if (this.status !== "recruiting") {
+        return { success: false, reason: "Room not recruiting" };
+      }
+      if (this.participants.size >= this.maxParticipants) {
+        return { success: false, reason: "Room full" };
+      }
+      this.participants.set(playerId, {
+        name: playerName,
+        joinedAt: Date.now(),
+        contribution: 0
+      });
+      this.addChatLog(playerName, "joined the room");
+      return { success: true, roomId: this.roomId };
+    }
+    leave(playerId) {
+      const participant = this.participants.get(playerId);
+      if (participant) {
+        this.addChatLog(participant.name, "left the room");
+        this.participants.delete(playerId);
+        return true;
+      }
+      return false;
+    }
+    addChatLog(playerName, message) {
+      this.chatLog.push({
+        playerName,
+        message,
+        timestamp: Date.now()
+      });
+    }
+    contribute(playerId, amount) {
+      const participant = this.participants.get(playerId);
+      if (participant) {
+        participant.contribution += amount;
+        this.resourcePool += amount;
+      }
+    }
+    distributeResources(perPlayer) {
+      for (const [pid, session] of this.participants) {
+        gameState.spiritStones += perPlayer;
+        this.addChatLog(pid, `received ${perPlayer} spirit stones`);
+      }
+    }
+    getParticipantCount() {
+      return this.participants.size;
+    }
+  };
+  var CollaborationManager = class {
+    constructor() {
+      this.rooms = /* @__PURE__ */ new Map();
+      this.playerRooms = /* @__PURE__ */ new Map();
+      this.roomCounter = 0;
+    }
+    createRoom(taskType, maxParticipants = 5) {
+      this.roomCounter++;
+      const roomId = `collab_${taskType}_${this.roomCounter}`;
+      const room = new CollaborationRoom(roomId, taskType);
+      room.maxParticipants = maxParticipants;
+      this.rooms.set(roomId, room);
+      return room;
+    }
+    joinRoom(roomId, playerId, playerName) {
+      const room = this.rooms.get(roomId);
+      if (!room) return { success: false, reason: "Room not found" };
+      if (room.status !== "recruiting") return { success: false, reason: "Room not recruiting" };
+      const result = room.join(playerId, playerName);
+      if (result.success) {
+        if (!this.playerRooms.has(playerId)) {
+          this.playerRooms.set(playerId, []);
+        }
+        this.playerRooms.get(playerId).push(roomId);
+      }
+      return result;
+    }
+    leaveRoom(roomId, playerId) {
+      const room = this.rooms.get(roomId);
+      if (!room) return false;
+      const left = room.leave(playerId);
+      if (left) {
+        const rooms = this.playerRooms.get(playerId);
+        if (rooms) {
+          const idx = rooms.indexOf(roomId);
+          if (idx >= 0) rooms.splice(idx, 1);
+        }
+      }
+      return left;
+    }
+    getActiveRooms() {
+      return Array.from(this.rooms.values()).filter((r) => r.status === "recruiting");
+    }
+    getRoomStatus(roomId) {
+      const room = this.rooms.get(roomId);
+      if (!room) return null;
+      return {
+        roomId: room.roomId,
+        taskType: room.taskType,
+        participants: room.getParticipantCount(),
+        maxParticipants: room.maxParticipants,
+        status: room.status
+      };
+    }
+  };
+  var collabManager = new CollaborationManager();
+
+  // src/systems/ai/NPCEvolutionEngine.js
+  var NPCLearningEntry = class {
+    constructor(npcId, role, initialData = {}) {
+      this.npcId = npcId;
+      this.role = role;
+      this.registeredAt = Date.now();
+      this.lastInteraction = null;
+      this.adaptationLevel = 1;
+      this.interactions = [];
+      this.behaviorPattern = {
+        friendliness: 0.5,
+        // 0-1, 初始友好度
+        taskSuccessRate: 0.5,
+        // 0-1, 任务成功率
+        dialoguePreference: "neutral",
+        // neutral/positive/negative
+        adaptationScore: 0
+        // 适应评分
+      };
+      this.evolutionCount = 0;
+      this.lastEvolutionAt = null;
+      if (initialData.dialogueBase) {
+        this.dialogueBase = initialData.dialogueBase;
+      }
+    }
+  };
+  var InteractionRecord = class {
+    constructor(type, playerAction, npcResponse, outcome = {}) {
+      this.id = `interaction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.playerAction = playerAction;
+      this.npcResponse = npcResponse;
+      this.timestamp = Date.now();
+      this.outcome = {
+        success: outcome.success ?? false,
+        satisfaction: outcome.satisfaction ?? 0.5,
+        // 0-1
+        reward: outcome.reward ?? 0,
+        feedback: outcome.feedback ?? null
+      };
+    }
+  };
+  var DialogueEntry = class {
+    constructor(npcId, text, category = "base", metadata = {}) {
+      this.id = `dialogue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.npcId = npcId;
+      this.text = text;
+      this.category = category;
+      this.usageCount = 0;
+      this.lastUsed = null;
+      this.effectiveness = 0.5;
+      this.createdAt = Date.now();
+      this.metadata = metadata;
+    }
+  };
+  var NPCLearningRegistry = class {
+    constructor() {
+      this.entries = /* @__PURE__ */ new Map();
+      this.dialogueLibrary = /* @__PURE__ */ new Map();
+      this.interactionStats = /* @__PURE__ */ new Map();
+      this.maxInteractionsPerNPC = 500;
+      this.evolveThreshold = 10;
+    }
+    /**
+     * 注册NPC到学习系统
+     */
+    register(npcId, role, initialData = {}) {
+      if (this.entries.has(npcId)) {
+        return {
+          success: false,
+          reason: "NPC already registered",
+          entry: this.entries.get(npcId)
+        };
+      }
+      const entry = new NPCLearningEntry(npcId, role, initialData);
+      this.entries.set(npcId, entry);
+      if (initialData.dialogueBase) {
+        this.dialogueLibrary.set(npcId, initialData.dialogueBase.map(
+          (d) => new DialogueEntry(npcId, d.text, "base", d.metadata)
+        ));
+      } else {
+        this.dialogueLibrary.set(npcId, []);
+      }
+      this.interactionStats.set(npcId, {
+        totalInteractions: 0,
+        successfulInteractions: 0,
+        averageSatisfaction: 0,
+        lastInteractionType: null
+      });
+      return { success: true, entry };
+    }
+    /**
+     * 获取NPC学习条目
+     */
+    getEntry(npcId) {
+      return this.entries.get(npcId);
+    }
+    /**
+     * 记录NPC与玩家的交互
+     */
+    recordInteraction(npcId, type, playerAction, npcResponse, outcome = {}) {
+      const entry = this.entries.get(npcId);
+      if (!entry) {
+        return { success: false, reason: "NPC not registered" };
+      }
+      const record = new InteractionRecord(type, playerAction, npcResponse, outcome);
+      entry.interactions.push(record);
+      entry.lastInteraction = Date.now();
+      if (entry.interactions.length > this.maxInteractionsPerNPC) {
+        entry.interactions = entry.interactions.slice(-this.maxInteractionsPerNPC);
+      }
+      this.updateStats(npcId, record);
+      this.updateBehaviorPattern(npcId, record);
+      const shouldEvolve = this.checkEvolutionTrigger(npcId);
+      return {
+        success: true,
+        record,
+        shouldEvolve
+      };
+    }
+    /**
+     * 更新交互统计
+     */
+    updateStats(npcId, record) {
+      const stats = this.interactionStats.get(npcId) || {
+        totalInteractions: 0,
+        successfulInteractions: 0,
+        averageSatisfaction: 0,
+        lastInteractionType: null
+      };
+      stats.totalInteractions++;
+      if (record.outcome.success) {
+        stats.successfulInteractions++;
+      }
+      const totalSatisfaction = stats.averageSatisfaction * (stats.totalInteractions - 1) + record.outcome.satisfaction;
+      stats.averageSatisfaction = totalSatisfaction / stats.totalInteractions;
+      stats.lastInteractionType = record.type;
+      this.interactionStats.set(npcId, stats);
+    }
+    /**
+     * 更新行为模式
+     */
+    updateBehaviorPattern(npcId, record) {
+      const entry = this.entries.get(npcId);
+      if (!entry) return;
+      const pattern = entry.behaviorPattern;
+      if (record.outcome.success) {
+        pattern.friendliness = Math.min(1, pattern.friendliness + 0.02);
+      } else {
+        pattern.friendliness = Math.max(0, pattern.friendliness - 0.02);
+      }
+      if (record.type === "task") {
+        if (record.outcome.success) {
+          pattern.taskSuccessRate = Math.min(1, pattern.taskSuccessRate + 0.05);
+        }
+      }
+      pattern.adaptationScore = this.calculateAdaptationScore(npcId);
+    }
+    /**
+     * 计算适应评分
+     */
+    calculateAdaptationScore(npcId) {
+      const entry = this.entries.get(npcId);
+      const stats = this.interactionStats.get(npcId);
+      if (!entry || !stats) return 0;
+      const interactionScore = Math.min(entry.interactions.length / 100, 1) * 0.3;
+      const successScore = stats.totalInteractions > 0 ? stats.successfulInteractions / stats.totalInteractions * 0.3 : 0;
+      const satisfactionScore = stats.averageSatisfaction * 0.4;
+      return interactionScore + successScore + satisfactionScore;
+    }
+    /**
+     * 检查是否触发进化
+     */
+    checkEvolutionTrigger(npcId) {
+      const entry = this.entries.get(npcId);
+      if (!entry) return false;
+      if (entry.interactions.length >= this.evolveThreshold) {
+        return true;
+      }
+      if (entry.behaviorPattern.adaptationScore > 0.8 && entry.adaptationLevel < 10) {
+        return true;
+      }
+      return false;
+    }
+    /**
+     * 获取NPC学习状态
+     */
+    getLearningStatus(npcId) {
+      const entry = this.entries.get(npcId);
+      const stats = this.interactionStats.get(npcId);
+      if (!entry) {
+        return { error: "NPC not registered" };
+      }
+      return {
+        npcId: entry.npcId,
+        role: entry.role,
+        adaptationLevel: entry.adaptationLevel,
+        behaviorPattern: entry.behaviorPattern,
+        stats: {
+          totalInteractions: (stats == null ? void 0 : stats.totalInteractions) || 0,
+          successfulInteractions: (stats == null ? void 0 : stats.successfulInteractions) || 0,
+          averageSatisfaction: (stats == null ? void 0 : stats.averageSatisfaction) || 0,
+          lastInteractionType: (stats == null ? void 0 : stats.lastInteractionType) || null,
+          successRate: (stats == null ? void 0 : stats.totalInteractions) > 0 ? stats.successfulInteractions / stats.totalInteractions : 0
+        },
+        evolutionCount: entry.evolutionCount,
+        lastEvolutionAt: entry.lastEvolutionAt,
+        registeredAt: entry.registeredAt,
+        lastInteraction: entry.lastInteraction,
+        interactionCount: entry.interactions.length
+      };
+    }
+    /**
+     * 获取所有已注册的NPC
+     */
+    getAllRegisteredNPCs() {
+      return Array.from(this.entries.keys());
+    }
+  };
+  var BehaviorEvolutionEngine = class {
+    constructor(registry) {
+      this.registry = registry;
+      this.evolutionRules = this.initEvolutionRules();
+    }
+    initEvolutionRules() {
+      return {
+        // 进化维度
+        dimensions: {
+          friendliness: { min: 0, max: 1, weight: 0.3 },
+          taskSuccessRate: { min: 0, max: 1, weight: 0.4 },
+          dialoguePreference: {
+            values: ["neutral", "positive", "negative"],
+            weight: 0.2
+          },
+          adaptationScore: { min: 0, max: 1, weight: 0.1 }
+        },
+        // 进化触发阈值
+        thresholds: {
+          minInteractions: 10,
+          minAdaptationScore: 0.5,
+          evolutionCooldown: 36e5
+          // 1小时冷却
+        }
+      };
+    }
+    /**
+     * 评估并执行进化
+     */
+    evaluateEvolution(npcId) {
+      const entry = this.registry.getEntry(npcId);
+      if (!entry) {
+        return { success: false, reason: "NPC not registered" };
+      }
+      if (entry.lastEvolutionAt) {
+        const cooldown = this.evolutionRules.thresholds.evolutionCooldown;
+        if (Date.now() - entry.lastEvolutionAt < cooldown) {
+          return {
+            success: false,
+            reason: "Evolution on cooldown",
+            remainingCooldown: cooldown - (Date.now() - entry.lastEvolutionAt)
+          };
+        }
+      }
+      const evaluation = this.evaluateEvolutionConditions(npcId);
+      if (evaluation.canEvolve) {
+        return this.executeEvolution(npcId, evaluation);
+      }
+      return {
+        success: true,
+        evolved: false,
+        evaluation
+      };
+    }
+    /**
+     * 评估进化条件
+     */
+    evaluateEvolutionConditions(npcId) {
+      const entry = this.registry.getEntry(npcId);
+      const stats = this.registry.interactionStats.get(npcId);
+      const conditions = {
+        meetsMinInteractions: entry.interactions.length >= this.evolutionRules.thresholds.minInteractions,
+        meetsMinAdaptation: entry.behaviorPattern.adaptationScore >= this.evolutionRules.thresholds.minAdaptationScore,
+        hasPositiveTrend: this.checkPositiveTrend(npcId)
+      };
+      const canEvolve = conditions.meetsMinInteractions && (conditions.meetsMinAdaptation || conditions.hasPositiveTrend);
+      return {
+        canEvolve,
+        conditions,
+        currentLevel: entry.adaptationLevel,
+        maxLevel: 10,
+        gapToNextLevel: this.calculateGapToNextLevel(entry.adaptationLevel)
+      };
+    }
+    /**
+     * 检查是否有正向趋势
+     */
+    checkPositiveTrend(npcId) {
+      const entry = this.registry.getEntry(npcId);
+      if (!entry || entry.interactions.length < 5) return false;
+      const recent = entry.interactions.slice(-5);
+      const older = entry.interactions.slice(-10, -5);
+      if (older.length === 0) return true;
+      const recentAvgSatisfaction = recent.reduce((sum, r) => sum + r.outcome.satisfaction, 0) / recent.length;
+      const olderAvgSatisfaction = older.reduce((sum, r) => sum + r.outcome.satisfaction, 0) / older.length;
+      return recentAvgSatisfaction > olderAvgSatisfaction;
+    }
+    /**
+     * 计算到下一级的差距
+     */
+    calculateGapToNextLevel(currentLevel) {
+      const pointsNeeded = (currentLevel + 1) * 100;
+      return pointsNeeded;
+    }
+    /**
+     * 执行进化
+     */
+    executeEvolution(npcId, evaluation) {
+      const entry = this.registry.getEntry(npcId);
+      const evolutionVector = this.calculateEvolutionVector(npcId);
+      entry.adaptationLevel = Math.min(10, entry.adaptationLevel + 1);
+      entry.evolutionCount++;
+      entry.lastEvolutionAt = Date.now();
+      entry.behaviorPattern.friendliness = Math.min(
+        1,
+        entry.behaviorPattern.friendliness + evolutionVector.friendliness * 0.1
+      );
+      entry.behaviorPattern.taskSuccessRate = Math.min(
+        1,
+        entry.behaviorPattern.taskSuccessRate + evolutionVector.taskSuccessRate * 0.1
+      );
+      if (evolutionVector.dialoguePreferenceShift) {
+        const prefs = this.evolutionRules.dimensions.dialoguePreference.values;
+        const currentIdx = prefs.indexOf(entry.behaviorPattern.dialoguePreference);
+        if (currentIdx < prefs.length - 1) {
+          entry.behaviorPattern.dialoguePreference = prefs[currentIdx + 1];
+        }
+      }
+      return {
+        success: true,
+        evolved: true,
+        newLevel: entry.adaptationLevel,
+        evolutionVector,
+        changes: {
+          friendliness: evolutionVector.friendliness * 0.1,
+          taskSuccessRate: evolutionVector.taskSuccessRate * 0.1,
+          dialoguePreference: entry.behaviorPattern.dialoguePreference
+        }
+      };
+    }
+    /**
+     * 计算进化向量
+     */
+    calculateEvolutionVector(npcId) {
+      const entry = this.registry.getEntry(npcId);
+      const stats = this.registry.interactionStats.get(npcId);
+      const successRate = stats.totalInteractions > 0 ? stats.successfulInteractions / stats.totalInteractions : 0.5;
+      return {
+        friendliness: successRate > 0.6 ? 1 : successRate < 0.4 ? -1 : 0,
+        taskSuccessRate: entry.behaviorPattern.taskSuccessRate < 0.7 ? 1 : 0,
+        dialoguePreferenceShift: entry.behaviorPattern.dialoguePreference === "negative" && successRate > 0.5
+      };
+    }
+    /**
+     * 手动触发进化评估
+     */
+    triggerEvolution(npcId) {
+      return this.evaluateEvolution(npcId);
+    }
+  };
+  var AdaptiveDialogueSystem = class {
+    constructor(registry) {
+      this.registry = registry;
+      this.maxExtendedDialogues = 50;
+    }
+    /**
+     * 添加扩展对话
+     */
+    addDialogue(npcId, text, category = "extended", metadata = {}) {
+      const entry = this.registry.getEntry(npcId);
+      if (!entry) {
+        return { success: false, reason: "NPC not registered" };
+      }
+      const dialogues = this.registry.dialogueLibrary.get(npcId) || [];
+      const extendedCount = dialogues.filter((d) => d.category === "extended").length;
+      if (category === "extended" && extendedCount >= this.maxExtendedDialogues) {
+        return {
+          success: false,
+          reason: "Maximum extended dialogues reached",
+          maxExtendedDialogues: this.maxExtendedDialogues
+        };
+      }
+      const exists = dialogues.some((d) => d.text === text && d.npcId === npcId);
+      if (exists) {
+        return { success: false, reason: "Dialogue already exists" };
+      }
+      const dialogue = new DialogueEntry(npcId, text, category, metadata);
+      dialogues.push(dialogue);
+      this.registry.dialogueLibrary.set(npcId, dialogues);
+      return { success: true, dialogue };
+    }
+    /**
+     * 列出NPC的对话库
+     */
+    listDialogues(npcId, filter = {}) {
+      const dialogues = this.registry.dialogueLibrary.get(npcId) || [];
+      let filtered = dialogues;
+      if (filter.category) {
+        filtered = filtered.filter((d) => d.category === filter.category);
+      }
+      if (filter.minEffectiveness) {
+        filtered = filtered.filter((d) => d.effectiveness >= filter.minEffectiveness);
+      }
+      if (filter.sortBy === "usage") {
+        filtered.sort((a, b) => b.usageCount - a.usageCount);
+      } else if (filter.sortBy === "effectiveness") {
+        filtered.sort((a, b) => b.effectiveness - a.effectiveness);
+      } else {
+        filtered.sort((a, b) => a.createdAt - b.createdAt);
+      }
+      return {
+        success: true,
+        npcId,
+        total: dialogues.length,
+        filtered: filtered.length,
+        breakdown: {
+          base: dialogues.filter((d) => d.category === "base").length,
+          extended: dialogues.filter((d) => d.category === "extended").length,
+          adaptive: dialogues.filter((d) => d.category === "adaptive").length
+        },
+        dialogues: filtered
+      };
+    }
+    /**
+     * 选择最佳对话
+     */
+    selectDialogue(npcId, context = {}) {
+      const entry = this.registry.getEntry(npcId);
+      if (!entry) return null;
+      const dialogues = this.registry.dialogueLibrary.get(npcId) || [];
+      if (dialogues.length === 0) return null;
+      const preference = entry.behaviorPattern.dialoguePreference;
+      const effectiveDialogues = dialogues.filter((d) => d.effectiveness > 0.3);
+      const candidates = effectiveDialogues.length > 0 ? effectiveDialogues : dialogues;
+      if (preference === "positive") {
+        const positive = candidates.filter((d) => d.effectiveness > 0.6);
+        if (positive.length > 0) return positive[Math.floor(Math.random() * positive.length)];
+      }
+      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      selected.usageCount++;
+      selected.lastUsed = Date.now();
+      return selected;
+    }
+    /**
+     * 更新对话有效性（基于反馈）
+     */
+    updateDialogueEffectiveness(npcId, dialogueId, feedback) {
+      const dialogues = this.registry.dialogueLibrary.get(npcId) || [];
+      const dialogue = dialogues.find((d) => d.id === dialogueId);
+      if (!dialogue) return { success: false, reason: "Dialogue not found" };
+      const currentEffectiveness = dialogue.effectiveness;
+      dialogue.effectiveness = currentEffectiveness * 0.7 + feedback * 0.3;
+      return { success: true, newEffectiveness: dialogue.effectiveness };
+    }
+  };
+  var NPCEvolutionEngine = class {
+    constructor() {
+      this.registry = new NPCLearningRegistry();
+      this.evolutionEngine = new BehaviorEvolutionEngine(this.registry);
+      this.dialogueSystem = new AdaptiveDialogueSystem(this.registry);
+      this.initialized = false;
+    }
+    /**
+     * 初始化引擎
+     */
+    init(gameState3) {
+      this.initialized = true;
+      if (gameState3.npcEvolution) {
+        this.restoreFromState(gameState3.npcEvolution);
+      }
+      console.log("[NPCEvolutionEngine] NPC\u81EA\u4E3B\u8FDB\u5316\u5F15\u64CE\u521D\u59CB\u5316\u5B8C\u6210");
+      return { success: true };
+    }
+    /**
+     * 保存状态到gameState
+     */
+    saveToState() {
+      const state = {
+        entries: Array.from(this.registry.entries.entries()),
+        dialogueLibrary: Array.from(this.registry.dialogueLibrary.entries()),
+        stats: Array.from(this.registry.interactionStats.entries())
+      };
+      return state;
+    }
+    /**
+     * 从状态恢复
+     */
+    restoreFromState(state) {
+      if (state.entries) {
+        this.registry.entries = new Map(state.entries);
+      }
+      if (state.dialogueLibrary) {
+        this.registry.dialogueLibrary = new Map(state.dialogueLibrary.map(([k, v]) => {
+          const mappedDialogues = v.map((d) => {
+            const entry = new DialogueEntry(d.npcId, d.text, d.category, d.metadata);
+            return Object.assign(entry, d);
+          });
+          return [k, mappedDialogues];
+        }));
+      }
+      if (state.stats) {
+        this.registry.interactionStats = new Map(state.stats);
+      }
+    }
+    // ===== MCP工具实现 =====
+    /**
+     * MCP: npc.evolution.register
+     * 注册NPC到学习系统
+     */
+    mcpRegister(params = {}) {
+      const { npcId, role, dialogueBase } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      let actualRole = role;
+      if (!actualRole) {
+        const lowerNpcId = npcId.toLowerCase();
+        if (NPC_ROLE_REGISTRY[lowerNpcId]) {
+          actualRole = lowerNpcId;
+        } else {
+          for (const registryRole2 of Object.keys(NPC_ROLE_REGISTRY)) {
+            if (lowerNpcId.startsWith(registryRole2) || lowerNpcId.includes(registryRole2)) {
+              actualRole = registryRole2;
+              break;
+            }
+          }
+        }
+      }
+      const registryRole = actualRole ? NPC_ROLE_REGISTRY[actualRole] : null;
+      const initialData = {};
+      if (dialogueBase) {
+        initialData.dialogueBase = dialogueBase;
+      }
+      const result = this.registry.register(npcId, registryRole ? actualRole : "unknown", initialData);
+      return {
+        tool: "npc.evolution.register",
+        ...result
+      };
+    }
+    /**
+     * MCP: npc.evolution.record
+     * 记录NPC与玩家交互
+     */
+    mcpRecord(params = {}) {
+      const { npcId, type, playerAction, npcResponse, outcome } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!type) {
+        return { success: false, reason: "Missing type parameter" };
+      }
+      const result = this.registry.recordInteraction(
+        npcId,
+        type,
+        playerAction || "",
+        npcResponse || "",
+        outcome || {}
+      );
+      return {
+        tool: "npc.evolution.record",
+        ...result
+      };
+    }
+    /**
+     * MCP: npc.evolution.get
+     * 获取NPC当前学习状态
+     */
+    mcpGet(params = {}) {
+      const { npcId } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const status = this.registry.getLearningStatus(npcId);
+      return {
+        tool: "npc.evolution.get",
+        ...status
+      };
+    }
+    /**
+     * MCP: npc.dialogue.add
+     * 为NPC添加扩展对话
+     */
+    mcpAddDialogue(params = {}) {
+      const { npcId, text, category, metadata } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!text) {
+        return { success: false, reason: "Missing text parameter" };
+      }
+      const result = this.dialogueSystem.addDialogue(npcId, text, category || "extended", metadata || {});
+      return {
+        tool: "npc.dialogue.add",
+        ...result
+      };
+    }
+    /**
+     * MCP: npc.dialogue.list
+     * 查看NPC的对话库
+     */
+    mcpListDialogues(params = {}) {
+      const { npcId, filter } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const entry = this.registry.getEntry(npcId);
+      if (!entry) {
+        return { success: false, reason: "NPC not registered" };
+      }
+      const result = this.dialogueSystem.listDialogues(npcId, filter || {});
+      return {
+        tool: "npc.dialogue.list",
+        ...result
+      };
+    }
+    /**
+     * MCP: npc.evolution.trigger
+     * 手动触发NPC行为进化评估
+     */
+    mcpTriggerEvolution(params = {}) {
+      const { npcId } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const result = this.evolutionEngine.triggerEvolution(npcId);
+      return {
+        tool: "npc.evolution.trigger",
+        ...result
+      };
+    }
+    /**
+     * 获取引擎状态摘要
+     */
+    getStatus() {
+      return {
+        initialized: this.initialized,
+        registeredNPCs: this.registry.entries.size,
+        evolutionEngine: {
+          evolutionRules: this.evolutionEngine.evolutionRules.dimensions
+        }
+      };
+    }
+  };
+  var npcEvolutionEngine = new NPCEvolutionEngine();
+
   // src/main.js
   var gameState2 = null;
   var isGameInitialized = false;
@@ -7004,6 +8204,7 @@ var CultivationSimulator = (() => {
     domainModules.signin = { createSigninService, createWelfareService };
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState2);
+    npcEvolutionEngine.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -7191,6 +8392,82 @@ var CultivationSimulator = (() => {
       description: "Get reincarnation cycle status and memory layer info",
       inputSchema: { type: "object", properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState2));
+    mcpRegistry.registerTool("npc.evolution.register", {
+      name: "npc.evolution.register",
+      description: "Register NPC to learning system",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "Unique NPC identifier" },
+          role: { type: "string", description: "NPC role (master/monster/merchant/fellow)" },
+          dialogueBase: { type: "array", description: "Base dialogue entries" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcEvolutionEngine.mcpRegister(params || {}));
+    mcpRegistry.registerTool("npc.evolution.record", {
+      name: "npc.evolution.record",
+      description: "Record NPC-player interaction",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          type: { type: "string", description: "Interaction type (trade/task/chat/combat/social)" },
+          playerAction: { type: "string", description: "Player action description" },
+          npcResponse: { type: "string", description: "NPC response description" },
+          outcome: { type: "object", description: "Interaction outcome" }
+        },
+        required: ["npcId", "type"]
+      }
+    }, (params) => npcEvolutionEngine.mcpRecord(params || {}));
+    mcpRegistry.registerTool("npc.evolution.get", {
+      name: "npc.evolution.get",
+      description: "Get NPC current learning status",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcEvolutionEngine.mcpGet(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.add", {
+      name: "npc.dialogue.add",
+      description: "Add extended dialogue for NPC",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          text: { type: "string", description: "Dialogue text" },
+          category: { type: "string", description: "Dialogue category (base/extended/adaptive)" },
+          metadata: { type: "object", description: "Additional metadata" }
+        },
+        required: ["npcId", "text"]
+      }
+    }, (params) => npcEvolutionEngine.mcpAddDialogue(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.list", {
+      name: "npc.dialogue.list",
+      description: "View NPC dialogue library",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          filter: { type: "object", description: "Filter options" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcEvolutionEngine.mcpListDialogues(params || {}));
+    mcpRegistry.registerTool("npc.evolution.trigger", {
+      name: "npc.evolution.trigger",
+      description: "Manually trigger NPC behavior evolution evaluation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
   }
   function doSaveGameWithFeedback() {
     const result = doSaveGame();
@@ -7301,24 +8578,24 @@ var CultivationSimulator = (() => {
   }
   var eventQueue = [];
   function scheduleEvent(eventName, callback, delay = 0) {
-    const event = {
+    const event2 = {
       id: Date.now() + Math.random(),
       eventName,
       callback,
       executeAt: Date.now() + delay,
       delay
     };
-    eventQueue.push(event);
-    return event.id;
+    eventQueue.push(event2);
+    return event2.id;
   }
   function processEventQueue() {
     const now = Date.now();
     const dueEvents = eventQueue.filter((e) => e.executeAt <= now);
-    for (const event of dueEvents) {
+    for (const event2 of dueEvents) {
       try {
-        event.callback();
+        event2.callback();
       } catch (e) {
-        console.error(`[Event] Event ${event.eventName} error:`, e);
+        console.error(`[Event] Event ${event2.eventName} error:`, e);
       }
     }
     eventQueue.splice(0, dueEvents.length);
@@ -7485,4 +8762,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-d1a1d9a-2026-05-30T14-35-32-987Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-0c2dcab-2026-05-30T14-50-37-528Z";

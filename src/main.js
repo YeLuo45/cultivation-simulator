@@ -45,6 +45,9 @@ import {
     powerSync
 } from './systems/offline/OfflineManager.js';
 
+// NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
+import { npcEvolutionEngine } from './systems/ai/NPCEvolutionEngine.js';
+
 // ===== 全局状态 =====
 
 /**
@@ -307,6 +310,9 @@ function initializeDomainModules() {
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState);
 
+    // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
+    npcEvolutionEngine.init(gameState);
+
     console.log('[Main] 领域模块初始化完成');
 }
 
@@ -535,6 +541,89 @@ function registerDomainMCPTools() {
         description: 'Get reincarnation cycle status and memory layer info',
         inputSchema: { type: 'object', properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState));
+
+    // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
+    mcpRegistry.registerTool('npc.evolution.register', {
+        name: 'npc.evolution.register',
+        description: 'Register NPC to learning system',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'Unique NPC identifier' },
+                role: { type: 'string', description: 'NPC role (master/monster/merchant/fellow)' },
+                dialogueBase: { type: 'array', description: 'Base dialogue entries' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcEvolutionEngine.mcpRegister(params || {}));
+
+    mcpRegistry.registerTool('npc.evolution.record', {
+        name: 'npc.evolution.record',
+        description: 'Record NPC-player interaction',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                type: { type: 'string', description: 'Interaction type (trade/task/chat/combat/social)' },
+                playerAction: { type: 'string', description: 'Player action description' },
+                npcResponse: { type: 'string', description: 'NPC response description' },
+                outcome: { type: 'object', description: 'Interaction outcome' }
+            },
+            required: ['npcId', 'type']
+        }
+    }, (params) => npcEvolutionEngine.mcpRecord(params || {}));
+
+    mcpRegistry.registerTool('npc.evolution.get', {
+        name: 'npc.evolution.get',
+        description: 'Get NPC current learning status',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcEvolutionEngine.mcpGet(params || {}));
+
+    mcpRegistry.registerTool('npc.dialogue.add', {
+        name: 'npc.dialogue.add',
+        description: 'Add extended dialogue for NPC',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                text: { type: 'string', description: 'Dialogue text' },
+                category: { type: 'string', description: 'Dialogue category (base/extended/adaptive)' },
+                metadata: { type: 'object', description: 'Additional metadata' }
+            },
+            required: ['npcId', 'text']
+        }
+    }, (params) => npcEvolutionEngine.mcpAddDialogue(params || {}));
+
+    mcpRegistry.registerTool('npc.dialogue.list', {
+        name: 'npc.dialogue.list',
+        description: 'View NPC dialogue library',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                filter: { type: 'object', description: 'Filter options' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcEvolutionEngine.mcpListDialogues(params || {}));
+
+    mcpRegistry.registerTool('npc.evolution.trigger', {
+        name: 'npc.evolution.trigger',
+        description: 'Manually trigger NPC behavior evolution evaluation',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
 }
 
 // ===== 持久化系统 =====
