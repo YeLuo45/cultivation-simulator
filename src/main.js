@@ -53,6 +53,9 @@ import {
 // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
 import { npcEvolutionEngine } from './systems/ai/NPCEvolutionEngine.js';
 
+// NPC对话生成服务 (V228 Direction N续: NPC自主进化引擎 - 对话生成)
+import { npcDialogueService } from './systems/ai/NPCDialogueService.js';
+
 // 仙界事件总线 (Direction O: 全局事件总线 + 事件级联触发机制)
 import { realmEventBus, EVENT_BUS_TOOLS } from './systems/event/RealmEventBus.js';
 
@@ -334,6 +337,9 @@ function initializeDomainModules() {
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
+
+    // NPC对话生成服务 (V228 Direction N续: NPC自主进化引擎 - 对话生成)
+    npcDialogueService.init(gameState);
 
     // 事件分析服务 (Direction O续: 仙界事件总线 - 事件历史分析)
     eventAnalyticsService.init(gameState);
@@ -863,7 +869,93 @@ function registerDomainMCPTools() {
         }
     }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
 
-    // 仙界事件总线工具 (Direction O: 全局事件总线 + 事件级联触发)
+    // NPC对话生成服务 MCP工具 (V228 Direction N续: NPC自主进化引擎 - 对话生成)
+    mcpRegistry.registerTool('npc.dialogue.generate', {
+        name: 'npc.dialogue.generate',
+        description: 'Generate NPC dialogue response based on player input and context',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                playerMessage: { type: 'string', description: 'Player message to respond to' }
+            },
+            required: ['npcId', 'playerMessage']
+        }
+    }, (params) => npcDialogueService.mcpGenerateDialogue(params || {}));
+
+    mcpRegistry.registerTool('npc.dialogue.context', {
+        name: 'npc.dialogue.context',
+        description: 'Get current dialogue context for NPC',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcDialogueService.mcpGetContext(params || {}));
+
+    mcpRegistry.registerTool('npc.memory.retrieve', {
+        name: 'npc.memory.retrieve',
+        description: 'Retrieve NPC memories and learning status',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                type: { type: 'string', description: 'Memory type filter (interaction/preference/event/relationship)' },
+                limit: { type: 'number', description: 'Maximum memories to retrieve' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcDialogueService.mcpRetrieveMemory(params || {}));
+
+    mcpRegistry.registerTool('npc.context.update', {
+        name: 'npc.context.update',
+        description: 'Update dialogue context fields for NPC',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                updates: {
+                    type: 'object',
+                    description: 'Fields to update (currentTopic, emotion, goal, tone)',
+                    properties: {
+                        currentTopic: { type: 'string' },
+                        emotion: { type: 'string' },
+                        goal: { type: 'string' },
+                        tone: { type: 'string' }
+                    }
+                }
+            },
+            required: ['npcId', 'updates']
+        }
+    }, (params) => npcDialogueService.mcpUpdateContext(params || {}));
+
+    mcpRegistry.registerTool('npc.dialogue.reset', {
+        name: 'npc.dialogue.reset',
+        description: 'Reset NPC dialogue state',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                clearMemories: { type: 'boolean', description: 'Also clear NPC memories' }
+            },
+            required: ['npcId']
+        }
+    }, (params) => npcDialogueService.mcpResetDialogue(params || {}));
+
+    mcpRegistry.registerTool('npc.tone.set', {
+        name: 'npc.tone.set',
+        description: 'Set NPC dialogue tone',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                npcId: { type: 'string', description: 'NPC identifier' },
+                tone: { type: 'string', description: 'Tone to set (formal/casual/mysterious)' }
+            },
+            required: ['npcId', 'tone']
+        }
+    }, (params) => npcDialogueService.mcpSetTone(params || {}));
     mcpRegistry.registerTool('event.bus.publish', {
         name: 'event.bus.publish',
         description: 'Publish an event to the realm event bus',
