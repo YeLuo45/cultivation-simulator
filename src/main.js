@@ -58,6 +58,9 @@ import { createRealmWarfareService } from './domains/combat/services/RealmWarfar
 // 混沌灵宝系统 (V237 Direction Y: 混沌灵宝系统 - claude-code/nanobot)
 import { createChaosTreasureMCPHandlers, CHAOS_TREASURE_TOOLS } from './domains/inventory/services/ChaosTreasureService.js';
 
+// 天道意志终极系统 (V238 Direction Z: 天道意志终极系统 - thunderbolt/ruflo 最终轮9/9)
+import { createCosmicCycleMCPHandlers, COSMIC_CYCLE_TOOLS } from './systems/cosmic/CosmicCycleService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -275,7 +278,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V237',
+        gameVersion: 'V238',
         
         // 设置
         settings: {
@@ -435,6 +438,22 @@ function initializeDomainModules() {
         (params) => chaosTreasureHandlers['treasure.resonance'](params));
     mcpRegistry.registerTool('treasure.strengthen', CHAOS_TREASURE_TOOLS['treasure.strengthen'], 
         (params) => chaosTreasureHandlers['treasure.strengthen'](params));
+
+    // 天道意志终极系统MCP工具 (V238 Direction Z: 天道意志终极系统)
+    const cosmicCycleHandlers = createCosmicCycleMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('cosmic.cycle.query', COSMIC_CYCLE_TOOLS['cosmic.cycle.query'], 
+        (params) => cosmicCycleHandlers['cosmic.cycle.query'](params));
+    mcpRegistry.registerTool('cosmic.world.evolve', COSMIC_CYCLE_TOOLS['cosmic.world.evolve'], 
+        (params) => cosmicCycleHandlers['cosmic.world.evolve'](params));
+    mcpRegistry.registerTool('cosmic.heaven.judge', COSMIC_CYCLE_TOOLS['cosmic.heaven.judge'], 
+        (params) => cosmicCycleHandlers['cosmic.heaven.judge'](params));
+    mcpRegistry.registerTool('cosmic.blessing.grant', COSMIC_CYCLE_TOOLS['cosmic.blessing.grant'], 
+        (params) => cosmicCycleHandlers['cosmic.blessing.grant'](params));
+    mcpRegistry.registerTool('cosmic.reset.execute', COSMIC_CYCLE_TOOLS['cosmic.reset.execute'], 
+        (params) => cosmicCycleHandlers['cosmic.reset.execute'](params));
+    mcpRegistry.registerTool('cosmic.legacy.inherit', COSMIC_CYCLE_TOOLS['cosmic.legacy.inherit'], 
+        (params) => cosmicCycleHandlers['cosmic.legacy.inherit'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
