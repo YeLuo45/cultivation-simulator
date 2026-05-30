@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-e8afe6b-2026-05-30T17-03-10-121Z */
+/* Cultivation Simulator DDD-v1.0.0-d31f416-2026-05-30T17-21-32-992Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10871,6 +10871,616 @@ var CultivationSimulator = (() => {
   // src/domains/cultivation/services/AscensionService.js
   init_CultivationService();
 
+  // src/domains/cultivation/services/YuanInfantService.js
+  init_CultivationService();
+  var YUAN_INFANT_REQUIREMENTS = {
+    minRealm: 5,
+    // 化神境 (realm=5)
+    minSpiritEnergy: 500,
+    // 最低灵力要求
+    formCost: 1e3,
+    // 凝聚元婴消耗
+    separationDuration: 36e5,
+    // 分离持续时间 (1小时)
+    projectionRange: 1e3,
+    // 投射范围 (里)
+    projectionCost: 200
+    // 投射消耗灵力
+  };
+  var YUAN_INFANT_STATES = {
+    NONE: "none",
+    // 未形成
+    FORMING: "forming",
+    // 凝聚中
+    FORMED: "formed",
+    // 已形成
+    SEPARATED: "separated",
+    // 已分离
+    PROJECTING: "projecting",
+    // 星体投射中
+    SYNCHRONIZING: "synchronizing"
+    // 同步中
+  };
+  var YUAN_INFANT_ATTRIBUTES = {
+    spiritualPower: { name: "\u7CBE\u795E\u529B", base: 100, growth: 20 },
+    perceptionRange: { name: "\u611F\u77E5\u8303\u56F4", base: 50, growth: 10 },
+    syncRate: { name: "\u540C\u6B65\u7387", base: 100, growth: 0 }
+  };
+  var YuanInfantService = class _YuanInfantService {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.yuanInfantState = null;
+    }
+    /**
+     * 初始化元婴系统
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 初始化后的游戏状态
+     */
+    init(gameState3) {
+      if (!gameState3.yuanInfant) {
+        gameState3.yuanInfant = {
+          state: YUAN_INFANT_STATES.NONE,
+          spiritualPower: 0,
+          perceptionRange: 0,
+          syncRate: 100,
+          formationTime: null,
+          separationTime: null,
+          separationEndTime: null,
+          projectionTarget: null,
+          projectionInfo: [],
+          lastSyncTime: null,
+          history: []
+        };
+      }
+      this.yuanInfantState = gameState3.yuanInfant;
+      return gameState3;
+    }
+    /**
+     * 记录历史事件
+     */
+    recordHistory(action, details) {
+      if (!this.yuanInfantState.history) {
+        this.yuanInfantState.history = [];
+      }
+      this.yuanInfantState.history.push({
+        action,
+        details,
+        timestamp: Date.now()
+      });
+      if (this.yuanInfantState.history.length > 50) {
+        this.yuanInfantState.history = this.yuanInfantState.history.slice(-50);
+      }
+    }
+    /**
+     * 检查是否满足凝聚元婴条件
+     * @returns {Object} 条件检查结果
+     */
+    checkFormationRequirements() {
+      const gs = this.gameState;
+      const requirements = [];
+      const realmMet = (gs.realm || 0) >= YUAN_INFANT_REQUIREMENTS.minRealm;
+      requirements.push({
+        type: "realm",
+        desc: `\u5883\u754C\u8FBE\u5230\u5316\u795E\u5883 (realm\u2265${YUAN_INFANT_REQUIREMENTS.minRealm})`,
+        met: realmMet,
+        current: gs.realm || 0,
+        required: YUAN_INFANT_REQUIREMENTS.minRealm
+      });
+      const spiritEnergyMet = (gs.spiritEnergy || 0) >= YUAN_INFANT_REQUIREMENTS.minSpiritEnergy;
+      requirements.push({
+        type: "spiritEnergy",
+        desc: `\u7075\u529B\u8FBE\u5230${YUAN_INFANT_REQUIREMENTS.minSpiritEnergy}`,
+        met: spiritEnergyMet,
+        current: gs.spiritEnergy || 0,
+        required: YUAN_INFANT_REQUIREMENTS.minSpiritEnergy
+      });
+      const spiritStonesMet = (gs.spiritStones || 0) >= YUAN_INFANT_REQUIREMENTS.formCost;
+      requirements.push({
+        type: "spiritStones",
+        desc: `\u62E5\u6709\u81F3\u5C11${YUAN_INFANT_REQUIREMENTS.formCost}\u7075\u77F3`,
+        met: spiritStonesMet,
+        current: gs.spiritStones || 0,
+        required: YUAN_INFANT_REQUIREMENTS.formCost
+      });
+      const notFormed = this.yuanInfantState.state === YUAN_INFANT_STATES.NONE;
+      requirements.push({
+        type: "notFormed",
+        desc: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210",
+        met: notFormed,
+        current: this.yuanInfantState.state,
+        required: YUAN_INFANT_STATES.NONE
+      });
+      const metCount = requirements.filter((r) => r.met).length;
+      const allMet = metCount === requirements.length;
+      return {
+        success: true,
+        canForm: allMet,
+        requirementsMet: metCount,
+        requirementsTotal: requirements.length,
+        requirements
+      };
+    }
+    /**
+     * 凝聚元婴 (yuaninfant.form)
+     * @param {Object} params - 可选参数
+     * @returns {Object} 凝聚结果
+     */
+    formYuanInfant(params = {}) {
+      var _a;
+      if (this.yuanInfantState.state !== YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u7ECF\u5F62\u6210\uFF0C\u65E0\u6CD5\u518D\u6B21\u51DD\u805A",
+          currentState: this.yuanInfantState.state
+        };
+      }
+      const reqCheck = this.checkFormationRequirements();
+      if (!reqCheck.canForm) {
+        const unmet = reqCheck.requirements.filter((r) => !r.met).map((r) => r.desc);
+        return {
+          success: false,
+          error: "\u51DD\u805A\u5143\u5A74\u6761\u4EF6\u672A\u6EE1\u8DB3",
+          unmetRequirements: unmet,
+          requirementsCheck: reqCheck
+        };
+      }
+      const cost = YUAN_INFANT_REQUIREMENTS.formCost;
+      this.gameState.spiritStones -= cost;
+      this.yuanInfantState.state = YUAN_INFANT_STATES.FORMING;
+      const realm = this.gameState.realm || 5;
+      const spiritRootTier = ((_a = this.gameState.spiritRoot) == null ? void 0 : _a.tier) || 1;
+      const baseSp = YUAN_INFANT_ATTRIBUTES.spiritualPower.base + realm * YUAN_INFANT_ATTRIBUTES.spiritualPower.growth;
+      const basePr = YUAN_INFANT_ATTRIBUTES.perceptionRange.base + realm * YUAN_INFANT_ATTRIBUTES.perceptionRange.growth;
+      this.yuanInfantState.spiritualPower = Math.floor(baseSp * (1 + spiritRootTier * 0.1));
+      this.yuanInfantState.perceptionRange = Math.floor(basePr * (1 + spiritRootTier * 0.1));
+      this.yuanInfantState.syncRate = YUAN_INFANT_ATTRIBUTES.syncRate.base;
+      this.yuanInfantState.formationTime = Date.now();
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - YUAN_INFANT_REQUIREMENTS.minSpiritEnergy);
+      this.recordHistory("form", {
+        spiritualPower: this.yuanInfantState.spiritualPower,
+        perceptionRange: this.yuanInfantState.perceptionRange,
+        cost
+      });
+      return {
+        success: true,
+        message: "\u5143\u5A74\u51DD\u805A\u6210\u529F\uFF01\u606D\u559C\u8E0F\u5165\u5143\u5A74\u5883\uFF01",
+        yuanInfant: {
+          state: YUAN_INFANT_STATES.FORMED,
+          spiritualPower: this.yuanInfantState.spiritualPower,
+          perceptionRange: this.yuanInfantState.perceptionRange,
+          syncRate: this.yuanInfantState.syncRate,
+          formationTime: this.yuanInfantState.formationTime
+        },
+        costDeducted: cost
+      };
+    }
+    /**
+     * 灵魂分离 (yuaninfant.separate)
+     * @param {Object} params - { duration?: number } 分离持续时间(ms)
+     * @returns {Object} 分离结果
+     */
+    separateSoul(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u7075\u9B42\u5206\u79BB"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.SEPARATED) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u7ECF\u5206\u79BB\uFF0C\u8BF7\u5148\u53EC\u56DE"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.PROJECTING) {
+        return {
+          success: false,
+          error: "\u6B63\u5728\u8FDB\u884C\u661F\u4F53\u6295\u5C04\uFF0C\u8BF7\u5148\u7ED3\u675F\u6295\u5C04"
+        };
+      }
+      const duration = params.duration || YUAN_INFANT_REQUIREMENTS.separationDuration;
+      const now = Date.now();
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const baseSuccessRate = 0.7 + spiritualPower / 1e3;
+      const syncRate = (this.yuanInfantState.syncRate || 100) / 100;
+      const successRate = Math.min(0.95, baseSuccessRate * syncRate);
+      const roll = Math.random();
+      const success = roll < successRate;
+      if (!success) {
+        this.recordHistory("separate_failed", {
+          successRate: (successRate * 100).toFixed(1) + "%",
+          roll: (roll * 100).toFixed(1) + "%"
+        });
+        return {
+          success: true,
+          result: "failed",
+          message: "\u7075\u9B42\u5206\u79BB\u5931\u8D25\uFF01\u7CBE\u795E\u529B\u4E0D\u8DB3\u4EE5\u652F\u6491\u5206\u79BB",
+          successRate: (successRate * 100).toFixed(1) + "%",
+          tip: "\u63D0\u5347\u7CBE\u795E\u529B\u6216\u540C\u6B65\u7387\u540E\u53EF\u518D\u6B21\u5C1D\u8BD5"
+        };
+      }
+      this.yuanInfantState.state = YUAN_INFANT_STATES.SEPARATED;
+      this.yuanInfantState.separationTime = now;
+      this.yuanInfantState.separationEndTime = now + duration;
+      this.gameState.playerStatus = this.gameState.playerStatus || {};
+      this.gameState.playerStatus.dormant = true;
+      this.gameState.playerStatus.dormantUntil = now + duration;
+      this.recordHistory("separate", {
+        duration,
+        spiritualPower,
+        syncRate: this.yuanInfantState.syncRate
+      });
+      return {
+        success: true,
+        result: "success",
+        message: "\u7075\u9B42\u5206\u79BB\u6210\u529F\uFF01\u5143\u5A74\u5DF2\u51FA\u7A8D",
+        separation: {
+          startTime: now,
+          endTime: now + duration,
+          duration,
+          spiritualPower,
+          syncRate: this.yuanInfantState.syncRate
+        },
+        warning: "\u672C\u4F53\u8FDB\u5165\u4F11\u7720\u72B6\u6001\uFF0C\u8BF7\u53CA\u65F6\u53EC\u56DE\u5143\u5A74"
+      };
+    }
+    /**
+     * 星体投射 (yuaninfant.project)
+     * @param {Object} params - { target?: string, range?: number }
+     * @returns {Object} 投射结果
+     */
+    projectAstral(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.PROJECTING) {
+        return {
+          success: false,
+          error: "\u661F\u4F53\u6295\u5C04\u5DF2\u5728\u8FDB\u884C\u4E2D"
+        };
+      }
+      if (this.yuanInfantState.state !== YUAN_INFANT_STATES.SEPARATED) {
+        return {
+          success: false,
+          error: "\u9700\u8981\u5148\u8FDB\u884C\u7075\u9B42\u5206\u79BB\u624D\u80FD\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      const cost = YUAN_INFANT_REQUIREMENTS.projectionCost;
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      const target = params.target || "unknown";
+      const range = params.range || YUAN_INFANT_REQUIREMENTS.projectionRange;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const actualRange = Math.floor(range * (spiritualPower / 100));
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - cost);
+      const projectionInfo = {
+        target,
+        range: actualRange,
+        spiritualPower,
+        timestamp: Date.now()
+      };
+      this.yuanInfantState.projectionTarget = target;
+      this.yuanInfantState.projectionInfo.push(projectionInfo);
+      if (this.yuanInfantState.projectionInfo.length > 20) {
+        this.yuanInfantState.projectionInfo = this.yuanInfantState.projectionInfo.slice(-20);
+      }
+      this.recordHistory("project", projectionInfo);
+      const infoTypes = this.getProjectionInfoTypes(actualRange);
+      return {
+        success: true,
+        message: `\u661F\u4F53\u6295\u5C04\u6210\u529F\uFF01\u611F\u77E5\u8303\u56F4${actualRange}\u91CC`,
+        projection: {
+          target,
+          range: actualRange,
+          spiritualPower,
+          infoTypes,
+          timestamp: projectionInfo.timestamp
+        },
+        infoTypes
+      };
+    }
+    /**
+     * 根据投射范围获取可感知的信息类型
+     */
+    getProjectionInfoTypes(range) {
+      const types = [];
+      if (range >= 100) types.push({ type: "basic", desc: "\u57FA\u7840\u73AF\u5883\u611F\u77E5" });
+      if (range >= 300) types.push({ type: "spiritual", desc: "\u7075\u529B\u6CE2\u52A8\u611F\u77E5" });
+      if (range >= 500) types.push({ type: "creatures", desc: "\u751F\u7269\u6C14\u606F\u611F\u77E5" });
+      if (range >= 800) types.push({ type: "treasures", desc: "\u7075\u5B9D\u836F\u6750\u611F\u77E5" });
+      if (range >= 1e3) types.push({ type: "secrets", desc: "\u9690\u85CF\u4FE1\u606F\u611F\u77E5" });
+      return types;
+    }
+    /**
+     * 同步元婴 (yuaninfant.sync)
+     * @param {Object} params - { force?: boolean }
+     * @returns {Object} 同步结果
+     */
+    syncYuanInfant(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u540C\u6B65"
+        };
+      }
+      const force = params.force || false;
+      const currentSyncRate = this.yuanInfantState.syncRate || 100;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const baseGain = 5 + Math.floor(spiritualPower / 50);
+      const newSyncRate = force ? 100 : Math.min(100, currentSyncRate + baseGain);
+      const oldSyncRate = this.yuanInfantState.syncRate;
+      this.yuanInfantState.syncRate = newSyncRate;
+      this.yuanInfantState.lastSyncTime = Date.now();
+      this.recordHistory("sync", {
+        oldSyncRate,
+        newSyncRate,
+        force,
+        spiritualPower
+      });
+      return {
+        success: true,
+        message: force ? "\u5F3A\u5236\u540C\u6B65\u5B8C\u6210\uFF0C\u5143\u5A74\u4E0E\u672C\u4F53\u5B8C\u5168\u540C\u6B65" : "\u540C\u6B65\u5B8C\u6210\uFF0C\u540C\u6B65\u7387\u63D0\u5347",
+        sync: {
+          oldSyncRate,
+          newSyncRate,
+          gain: newSyncRate - oldSyncRate,
+          force,
+          spiritualPower
+        }
+      };
+    }
+    /**
+     * 召回元婴 (yuaninfant.recall)
+     * @param {Object} params - { emergency?: boolean }
+     * @returns {Object} 召回结果
+     */
+    recallYuanInfant(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u53EC\u56DE"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.FORMED) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u5728\u672C\u4F53\u4E2D\uFF0C\u65E0\u9700\u53EC\u56DE"
+        };
+      }
+      const emergency = params.emergency || false;
+      const previousState = this.yuanInfantState.state;
+      const syncRate = this.yuanInfantState.syncRate || 100;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const recallCost = emergency ? Math.floor(spiritualPower * 0.3) : Math.floor(spiritualPower * 0.1);
+      if ((this.gameState.spiritEnergy || 0) < recallCost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u53EC\u56DE\u5143\u5A74",
+          required: recallCost,
+          current: this.gameState.spiritEnergy || 0
+        };
+      }
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - recallCost);
+      if (this.gameState.playerStatus) {
+        this.gameState.playerStatus.dormant = false;
+        this.gameState.playerStatus.dormantUntil = null;
+      }
+      this.yuanInfantState.state = YUAN_INFANT_STATES.FORMED;
+      this.yuanInfantState.separationTime = null;
+      this.yuanInfantState.separationEndTime = null;
+      this.yuanInfantState.projectionTarget = null;
+      if (emergency) {
+        const penalty = Math.floor(syncRate * 0.1);
+        this.yuanInfantState.syncRate = Math.max(50, this.yuanInfantState.syncRate - penalty);
+      }
+      this.recordHistory("recall", {
+        previousState,
+        emergency,
+        cost: recallCost,
+        syncRateAfter: this.yuanInfantState.syncRate
+      });
+      return {
+        success: true,
+        message: emergency ? "\u7D27\u6025\u53EC\u56DE\u5B8C\u6210\uFF01\u5143\u5A74\u5DF2\u8FD4\u56DE\u672C\u4F53" : "\u5143\u5A74\u53EC\u56DE\u6210\u529F\uFF0C\u5DF2\u8FD4\u56DE\u672C\u4F53",
+        recall: {
+          previousState,
+          emergency,
+          cost: recallCost,
+          syncRate: this.yuanInfantState.syncRate,
+          penalty: emergency ? "\u540C\u6B65\u7387\u4E0B\u964D" : "\u65E0"
+        }
+      };
+    }
+    /**
+     * 查询元婴状态 (yuaninfant.status)
+     * @param {Object} params - { detailed?: boolean }
+     * @returns {Object} 状态信息
+     */
+    getYuanInfantStatus(params = {}) {
+      var _a, _b;
+      const detailed = params.detailed || false;
+      const state = this.yuanInfantState;
+      const result = {
+        success: true,
+        state: state.state,
+        stateName: this.getStateName(state.state),
+        spiritualPower: state.spiritualPower || 0,
+        perceptionRange: state.perceptionRange || 0,
+        syncRate: state.syncRate || 100,
+        isSeparated: state.state === YUAN_INFANT_STATES.SEPARATED,
+        isProjecting: state.state === YUAN_INFANT_STATES.PROJECTING,
+        isFormed: state.state !== YUAN_INFANT_STATES.NONE
+      };
+      if (detailed) {
+        result.detailed = {
+          formationTime: state.formationTime,
+          separationTime: state.separationTime,
+          separationEndTime: state.separationEndTime,
+          lastSyncTime: state.lastSyncTime,
+          projectionTarget: state.projectionTarget,
+          projectionInfoCount: (state.projectionInfo || []).length,
+          historyCount: (state.history || []).length,
+          history: ((_a = state.history) == null ? void 0 : _a.slice(-10)) || []
+        };
+      }
+      if (state.state === YUAN_INFANT_STATES.SEPARATED && state.separationEndTime) {
+        const remaining = Math.max(0, state.separationEndTime - Date.now());
+        result.separationRemaining = remaining;
+        result.separationRemainingStr = this.formatDuration(remaining);
+      }
+      if ((_b = this.gameState.playerStatus) == null ? void 0 : _b.dormant) {
+        result.bodyStatus = "dormant";
+        result.bodyDormantUntil = this.gameState.playerStatus.dormantUntil;
+      } else {
+        result.bodyStatus = "normal";
+      }
+      return result;
+    }
+    /**
+     * 获取状态名称
+     */
+    getStateName(state) {
+      const names = {
+        [YUAN_INFANT_STATES.NONE]: "\u672A\u5F62\u6210",
+        [YUAN_INFANT_STATES.FORMING]: "\u51DD\u805A\u4E2D",
+        [YUAN_INFANT_STATES.FORMED]: "\u5DF2\u5F62\u6210",
+        [YUAN_INFANT_STATES.SEPARATED]: "\u5DF2\u5206\u79BB",
+        [YUAN_INFANT_STATES.PROJECTING]: "\u6295\u5C04\u4E2D",
+        [YUAN_INFANT_STATES.SYNCHRONIZING]: "\u540C\u6B65\u4E2D"
+      };
+      return names[state] || "\u672A\u77E5";
+    }
+    /**
+     * 格式化时长
+     */
+    formatDuration(ms) {
+      if (ms <= 0) return "\u5DF2\u7ED3\u675F";
+      const seconds = Math.floor(ms / 1e3);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      if (hours > 0) {
+        return `${hours}\u5C0F\u65F6${minutes % 60}\u5206\u949F`;
+      }
+      if (minutes > 0) {
+        return `${minutes}\u5206\u949F${seconds % 60}\u79D2`;
+      }
+      return `${seconds}\u79D2`;
+    }
+    /**
+     * 获取MCP工具处理器
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} MCP工具处理器映射
+     */
+    static getMCPHandlers(gameState3) {
+      const service = new _YuanInfantService(gameState3);
+      service.init(gameState3);
+      return {
+        "yuaninfant.form": (params) => service.formYuanInfant(params),
+        "yuaninfant.separate": (params) => service.separateSoul(params),
+        "yuaninfant.project": (params) => service.projectAstral(params),
+        "yuaninfant.sync": (params) => service.syncYuanInfant(params),
+        "yuaninfant.recall": (params) => service.recallYuanInfant(params),
+        "yuaninfant.status": (params) => service.getYuanInfantStatus(params)
+      };
+    }
+  };
+  var YUAN_INFANT_TOOLS = {
+    "yuaninfant.form": {
+      name: "yuaninfant.form",
+      description: "\u51DD\u805A\u5143\u5A74 - \u5C06\u7075\u9B42\u51DD\u805A\u6210\u5143\u5A74\u5F62\u6001 (\u9700\u8981\u8FBE\u5230\u5316\u795E\u5883)",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        description: "\u65E0\u53C2\u6570"
+      }
+    },
+    "yuaninfant.separate": {
+      name: "yuaninfant.separate",
+      description: "\u7075\u9B42\u5206\u79BB - \u5C06\u5143\u5A74\u4ECE\u672C\u4F53\u4E2D\u5206\u79BB\u51FA\u53BB\u8FDB\u884C\u63A2\u7D22",
+      inputSchema: {
+        type: "object",
+        properties: {
+          duration: {
+            type: "number",
+            description: "\u5206\u79BB\u6301\u7EED\u65F6\u95F4(\u6BEB\u79D2)\uFF0C\u9ED8\u8BA41\u5C0F\u65F6"
+          }
+        }
+      }
+    },
+    "yuaninfant.project": {
+      name: "yuaninfant.project",
+      description: "\u661F\u4F53\u6295\u5C04 - \u5143\u5A74\u51FA\u7A8D\u540E\u8FDB\u884C\u8FDC\u7A0B\u611F\u77E5\u6295\u5C04",
+      inputSchema: {
+        type: "object",
+        properties: {
+          target: {
+            type: "string",
+            description: "\u6295\u5C04\u76EE\u6807\u533A\u57DF\u63CF\u8FF0"
+          },
+          range: {
+            type: "number",
+            description: "\u6295\u5C04\u8303\u56F4(\u91CC)\uFF0C\u9ED8\u8BA41000"
+          }
+        }
+      }
+    },
+    "yuaninfant.sync": {
+      name: "yuaninfant.sync",
+      description: "\u540C\u6B65\u5143\u5A74 - \u63D0\u5347\u5143\u5A74\u4E0E\u672C\u4F53\u7684\u540C\u6B65\u7387",
+      inputSchema: {
+        type: "object",
+        properties: {
+          force: {
+            type: "boolean",
+            description: "\u5F3A\u5236\u540C\u6B65\u5230100%"
+          }
+        }
+      }
+    },
+    "yuaninfant.recall": {
+      name: "yuaninfant.recall",
+      description: "\u53EC\u56DE\u5143\u5A74 - \u5C06\u5206\u79BB\u7684\u5143\u5A74\u53EC\u56DE\u672C\u4F53",
+      inputSchema: {
+        type: "object",
+        properties: {
+          emergency: {
+            type: "boolean",
+            description: "\u7D27\u6025\u53EC\u56DE(\u6D88\u8017\u66F4\u591A\u7075\u529B\u4F46\u66F4\u5FEB)"
+          }
+        }
+      }
+    },
+    "yuaninfant.status": {
+      name: "yuaninfant.status",
+      description: "\u67E5\u8BE2\u5143\u5A74\u72B6\u6001 - \u83B7\u53D6\u5143\u5A74\u5F53\u524D\u72B6\u6001\u8BE6\u60C5",
+      inputSchema: {
+        type: "object",
+        properties: {
+          detailed: {
+            type: "boolean",
+            description: "\u8FD4\u56DE\u8BE6\u7EC6\u4FE1\u606F"
+          }
+        }
+      }
+    }
+  };
+  var _yuanInfantServiceInstance = null;
+  function getYuanInfantService(gameState3) {
+    if (!_yuanInfantServiceInstance) {
+      _yuanInfantServiceInstance = new YuanInfantService(gameState3);
+    } else {
+      _yuanInfantServiceInstance.gameState = gameState3;
+    }
+    return _yuanInfantServiceInstance;
+  }
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -17658,7 +18268,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V238",
+      gameVersion: "V239",
       // 设置
       settings: {
         soundEnabled: true,
@@ -17699,6 +18309,9 @@ var CultivationSimulator = (() => {
     domainModules.herbDiscovery = herbDiscoveryService;
     ascensionService.init(gameState2);
     domainModules.ascension = ascensionService;
+    const yuanInfantService = getYuanInfantService(gameState2);
+    yuanInfantService.init(gameState2);
+    domainModules.yuanInfant = yuanInfantService;
     const immortalSectService = createImmortalSectService(gameState2);
     immortalSectService.init(gameState2);
     domainModules.immortalSect = immortalSectService;
@@ -17807,6 +18420,37 @@ var CultivationSimulator = (() => {
       "cosmic.legacy.inherit",
       COSMIC_CYCLE_TOOLS["cosmic.legacy.inherit"],
       (params) => cosmicCycleHandlers["cosmic.legacy.inherit"](params)
+    );
+    const yuanInfantHandlers = YuanInfantService.getMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "yuaninfant.form",
+      YUAN_INFANT_TOOLS["yuaninfant.form"],
+      (params) => yuanInfantHandlers["yuaninfant.form"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.separate",
+      YUAN_INFANT_TOOLS["yuaninfant.separate"],
+      (params) => yuanInfantHandlers["yuaninfant.separate"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.project",
+      YUAN_INFANT_TOOLS["yuaninfant.project"],
+      (params) => yuanInfantHandlers["yuaninfant.project"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.sync",
+      YUAN_INFANT_TOOLS["yuaninfant.sync"],
+      (params) => yuanInfantHandlers["yuaninfant.sync"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.recall",
+      YUAN_INFANT_TOOLS["yuaninfant.recall"],
+      (params) => yuanInfantHandlers["yuaninfant.recall"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.status",
+      YUAN_INFANT_TOOLS["yuaninfant.status"],
+      (params) => yuanInfantHandlers["yuaninfant.status"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -19185,4 +19829,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-e8afe6b-2026-05-30T17-03-10-121Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-d31f416-2026-05-30T17-21-32-992Z";
