@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-68dd331-2026-05-30T15-41-50-650Z */
+/* Cultivation Simulator DDD-v1.0.0-1f60e7e-2026-05-30T15-47-05-137Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -7524,6 +7524,543 @@ var CultivationSimulator = (() => {
   };
   var alchemyKBService = new AlchemyKBService();
 
+  // src/domains/inventory/services/HerbDiscoveryService.js
+  var HerbDiscoveryService = class {
+    constructor() {
+      this.initialized = false;
+      this.gameState = null;
+      this.regionHerbs = {
+        "\u5E73\u539F": {
+          common: ["\u7518\u8349", "\u9EC4\u82AA", "\u4EBA\u53C2\u53F6", "\u91CE\u83CA\u82B1"],
+          uncommon: ["\u7075\u829D", "\u4F55\u9996\u4E4C", "\u67B8\u675E\u5B50"],
+          rare: ["\u5929\u9EBB", "\u9EC4\u7CBE"],
+          legendary: []
+        },
+        "\u5C71\u6797": {
+          common: ["\u91D1\u94F6\u82B1", "\u8FDE\u7FD8", "\u677F\u84DD\u6839", "\u84B2\u516C\u82F1"],
+          uncommon: ["\u5929\u51AC", "\u9EA6\u51AC", "\u832F\u82D3"],
+          rare: ["\u866B\u8349", "\u677E\u8338"],
+          legendary: ["\u5343\u5E74\u7075\u829D"]
+        },
+        "\u6E56\u6CCA": {
+          common: ["\u8377\u53F6", "\u83B2\u5B50", "\u82A6\u82C7", "\u9999\u84B2"],
+          uncommon: ["\u73CD\u73E0\u7C89", "\u8D1D\u6BCD", "\u83B2\u82B1\u854A"],
+          rare: ["\u4E5D\u773C\u77F3", "\u83B2\u5FC3\u8349"],
+          legendary: ["\u51B0\u83B2"]
+        },
+        "\u6C99\u6F20": {
+          common: ["\u8089\u82C1\u84C9", "\u9501\u9633", "\u6C99\u53C2"],
+          uncommon: ["\u7EA2\u666F\u5929", "\u9EBB\u9EC4"],
+          rare: ["\u8089\u6842", "\u6A80\u9999"],
+          legendary: ["\u6C99\u4E4B\u773C"]
+        },
+        "\u96EA\u5C71": {
+          common: ["\u96EA\u83B2", "\u7EA2\u82B1", "\u827E\u53F6"],
+          uncommon: ["\u96EA\u8336", "\u51B0\u8349"],
+          rare: ["\u96EA\u86E4", "\u51B0\u87FE"],
+          legendary: ["\u51B0\u9B44\u5BD2\u83B2"]
+        },
+        "\u79D8\u5883": {
+          common: ["\u4E03\u5F69\u8349", "\u5E7B\u5F71\u82B1", "\u5E7D\u51A5\u85E4"],
+          uncommon: ["\u8840\u7CBE\u8349", "\u9B42\u82B1"],
+          rare: ["\u865A\u7A7A\u5170", "\u547D\u8FD0\u82B1"],
+          legendary: ["\u9053\u97F5\u82B1", "\u5929\u547D\u679C"]
+        }
+      };
+      this.seasonalHerbs = {
+        "\u6625": {
+          available: ["\u4EBA\u53C2\u53F6", "\u91CE\u83CA\u82B1", "\u91D1\u94F6\u82B1", "\u8FDE\u7FD8", "\u84B2\u516C\u82F1", "\u5929\u51AC", "\u9EA6\u51AC", "\u832F\u82D3"],
+          bonus: ["\u7075\u829D", "\u866B\u8349"],
+          spawnRate: 1.2
+        },
+        "\u590F": {
+          available: ["\u7518\u8349", "\u9EC4\u82AA", "\u677F\u84DD\u6839", "\u8377\u53F6", "\u83B2\u5B50", "\u82A6\u82C7", "\u9999\u84B2", "\u73CD\u73E0\u7C89"],
+          bonus: ["\u677E\u8338", "\u51B0\u8349"],
+          spawnRate: 1
+        },
+        "\u79CB": {
+          available: ["\u67B8\u675E\u5B50", "\u5929\u9EBB", "\u9EC4\u7CBE", "\u866B\u8349", "\u677E\u8338", "\u8089\u82C1\u84C9", "\u9501\u9633", "\u6C99\u53C2"],
+          bonus: ["\u96EA\u83B2", "\u7EA2\u666F\u5929"],
+          spawnRate: 1.1
+        },
+        "\u51AC": {
+          available: ["\u96EA\u83B2", "\u7EA2\u82B1", "\u827E\u53F6", "\u96EA\u8336", "\u51B0\u8349", "\u96EA\u86E4", "\u51B0\u87FE", "\u51B0\u83B2"],
+          bonus: ["\u5343\u5E74\u7075\u829D", "\u51B0\u9B44\u5BD2\u83B2"],
+          spawnRate: 0.9
+        }
+      };
+      this.rarityLevels = {
+        "common": { name: "\u666E\u901A", color: "#9E9E9E", discoveryChance: 0.8, masteryBonus: 1 },
+        "uncommon": { name: "\u7A00\u6709", color: "#4CAF50", discoveryChance: 0.5, masteryBonus: 2 },
+        "rare": { name: "\u73CD\u7A00", color: "#2196F3", discoveryChance: 0.25, masteryBonus: 3 },
+        "legendary": { name: "\u4F20\u8BF4", color: "#FF9800", discoveryChance: 0.1, masteryBonus: 5 }
+      };
+      this.herbSynergies = {
+        "\u7075\u829D+\u866B\u8349": { result: "\u5F3A\u5316\u7075\u529B", efficiency: 1.5 },
+        "\u4EBA\u53C2\u53F6+\u67B8\u675E\u5B50": { result: "\u8865\u6C14\u517B\u8840", efficiency: 1.3 },
+        "\u96EA\u83B2+\u51B0\u8349": { result: "\u5BD2\u51B0\u6DEC\u4F53", efficiency: 1.4 },
+        "\u5929\u9EBB+\u9EC4\u7CBE": { result: "\u5B89\u795E\u76CA\u667A", efficiency: 1.2 },
+        "\u832F\u82D3+\u83B2\u5B50": { result: "\u5065\u813E\u5B81\u5FC3", efficiency: 1.3 },
+        "\u91D1\u94F6\u82B1+\u8FDE\u7FD8": { result: "\u6E05\u70ED\u89E3\u6BD2", efficiency: 1.4 },
+        "\u8089\u82C1\u84C9+\u9501\u9633": { result: "\u58EE\u9633\u8865\u80BE", efficiency: 1.5 },
+        "\u73CD\u73E0\u7C89+\u8D1D\u6BCD": { result: "\u6DA6\u80BA\u517B\u989C", efficiency: 1.3 },
+        "\u5343\u5E74\u7075\u829D+\u866B\u8349": { result: "\u5EF6\u5E74\u76CA\u5BFF", efficiency: 2 },
+        "\u51B0\u9B44\u5BD2\u83B2+\u96EA\u86E4": { result: "\u51B0\u808C\u7389\u9AA8", efficiency: 1.8 },
+        "\u9053\u97F5\u82B1+\u5929\u547D\u679C": { result: "\u9006\u5929\u6539\u547D", efficiency: 2.5 },
+        "\u8840\u7CBE\u8349+\u9B42\u82B1": { result: "\u8840\u796D\u7075\u9B42", efficiency: 1.6 },
+        "\u865A\u7A7A\u5170+\u5E7B\u5F71\u82B1": { result: "\u865A\u5B9E\u76F8\u751F", efficiency: 1.7 },
+        "\u4E03\u5F69\u8349+\u5E7D\u51A5\u85E4": { result: "\u9634\u9633\u8C03\u548C", efficiency: 1.5 }
+      };
+      this.discoveredHerbs = /* @__PURE__ */ new Set();
+      this.herbKnowledge = {
+        metal: 0,
+        // 金
+        wood: 0,
+        // 木
+        water: 0,
+        // 水
+        fire: 0,
+        // 火
+        earth: 0
+        // 土
+      };
+      this.exploreCooldown = 0;
+      this.cooldownDuration = 5e3;
+    }
+    /**
+     * 初始化药材探索服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.herbDiscovery) {
+        gameState3.herbDiscovery = {
+          discoveredHerbs: [],
+          herbKnowledge: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+          totalExplorations: 0,
+          successfulDiscoveries: 0,
+          regionVisits: {},
+          seasonHarvests: {}
+        };
+      }
+      this.discoveredHerbs = new Set(gameState3.herbDiscovery.discoveredHerbs || []);
+      this.herbKnowledge = { ...this.herbKnowledge, ...gameState3.herbDiscovery.herbKnowledge || {} };
+      this.initialized = true;
+      return gameState3;
+    }
+    /**
+     * 获取当前季节
+     */
+    getCurrentSeason() {
+      var _a;
+      const days = ((_a = this.gameState) == null ? void 0 : _a.days) || 1;
+      const seasonIndex = Math.floor(days % 365 / 91);
+      const seasons = ["\u6625", "\u590F", "\u79CB", "\u51AC"];
+      return seasons[seasonIndex] || "\u6625";
+    }
+    /**
+     * 计算发现概率
+     */
+    calculateDiscoveryChance(rarity, elementBonus = 0) {
+      const rarityData = this.rarityLevels[rarity] || this.rarityLevels["common"];
+      const baseChance = rarityData.discoveryChance;
+      const masteryBonus = rarityData.masteryBonus;
+      const elementMultiplier = 1 + elementBonus * 0.1;
+      return Math.min(0.95, baseChance * elementMultiplier);
+    }
+    /**
+     * 计算协同效应
+     */
+    calculateSynergy(herbs) {
+      const synergies = [];
+      const sortedHerbs = [...herbs].sort();
+      for (const [combo, effect] of Object.entries(this.herbSynergies)) {
+        const [herb1, herb2] = combo.split("+");
+        if (sortedHerbs.includes(herb1) && sortedHerbs.includes(herb2)) {
+          synergies.push({
+            herbs: [herb1, herb2],
+            effect: effect.result,
+            efficiency: effect.efficiency
+          });
+        }
+      }
+      synergies.sort((a, b) => b.efficiency - a.efficiency);
+      return synergies;
+    }
+    // ===== MCP 工具实现 =====
+    /**
+     * herb.explore.region - 在指定地域探索药材
+     */
+    exploreRegion(params) {
+      var _a, _b;
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { region, useMastery = true } = params || {};
+      if (this.exploreCooldown > Date.now()) {
+        const remaining = Math.ceil((this.exploreCooldown - Date.now()) / 1e3);
+        return { success: false, error: `\u63A2\u7D22\u51B7\u5374\u4E2D\uFF0C\u8BF7\u7B49\u5F85 ${remaining} \u79D2` };
+      }
+      if (!region || !this.regionHerbs[region]) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5730\u57DF",
+          validRegions: Object.keys(this.regionHerbs)
+        };
+      }
+      let elementBonus = 0;
+      if (useMastery && ((_b = (_a = this.gameState) == null ? void 0 : _a.spiritRoot) == null ? void 0 : _b.attributes)) {
+        const attrs = this.gameState.spiritRoot.attributes;
+        elementBonus = (attrs.metal || 0) + (attrs.wood || 0) + (attrs.water || 0) + (attrs.fire || 0) + (attrs.earth || 0);
+      }
+      const regionData = this.regionHerbs[region];
+      const season = this.getCurrentSeason();
+      const seasonData = this.seasonalHerbs[season];
+      const availableHerbs = [...regionData.common];
+      if (seasonData.bonus.some((h) => regionData.uncommon.includes(h))) {
+        availableHerbs.push(...regionData.uncommon.filter((h) => seasonData.bonus.includes(h)));
+      }
+      const rarityRoll = Math.random();
+      let selectedRarity;
+      let herbs;
+      if (rarityRoll < 0.6) {
+        selectedRarity = "common";
+        herbs = regionData.common;
+      } else if (rarityRoll < 0.85) {
+        selectedRarity = "uncommon";
+        herbs = regionData.uncommon;
+      } else if (rarityRoll < 0.97) {
+        selectedRarity = "rare";
+        herbs = regionData.rare;
+      } else {
+        selectedRarity = "legendary";
+        herbs = regionData.legendary;
+      }
+      while (herbs.length === 0 && selectedRarity !== "common") {
+        if (selectedRarity === "legendary") selectedRarity = "rare";
+        else if (selectedRarity === "rare") selectedRarity = "uncommon";
+        else if (selectedRarity === "uncommon") selectedRarity = "common";
+        herbs = regionData[selectedRarity];
+      }
+      const discoveryChance = this.calculateDiscoveryChance(selectedRarity, elementBonus);
+      const seasonMultiplier = seasonData.spawnRate;
+      const finalChance = discoveryChance * seasonMultiplier;
+      const roll = Math.random();
+      const discovered = roll < finalChance;
+      this.exploreCooldown = Date.now() + this.cooldownDuration;
+      this.gameState.herbDiscovery.totalExplorations++;
+      this.gameState.herbDiscovery.regionVisits[region] = (this.gameState.herbDiscovery.regionVisits[region] || 0) + 1;
+      if (discovered && herbs.length > 0) {
+        const herb = herbs[Math.floor(Math.random() * herbs.length)];
+        const isNew = !this.discoveredHerbs.has(herb);
+        if (isNew) {
+          this.discoveredHerbs.add(herb);
+          this.gameState.herbDiscovery.discoveredHerbs.push(herb);
+          this.gameState.herbDiscovery.successfulDiscoveries++;
+        }
+        return {
+          success: true,
+          region,
+          season,
+          herb,
+          rarity: selectedRarity,
+          rarityName: this.rarityLevels[selectedRarity].name,
+          isNew,
+          discoveryChance: finalChance,
+          roll,
+          seasonBonus: seasonMultiplier > 1 ? "good" : seasonMultiplier < 1 ? "bad" : "normal"
+        };
+      }
+      return {
+        success: false,
+        reason: "\u672A\u53D1\u73B0\u836F\u6750",
+        region,
+        season,
+        discoveryChance: finalChance,
+        roll,
+        regionHerbs: regionData.common.slice(0, 3)
+      };
+    }
+    /**
+     * herb.season.query - 查询当前季节的药材
+     */
+    querySeasonalHerbs(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { season } = params || {};
+      const targetSeason = season || this.getCurrentSeason();
+      const seasonData = this.seasonalHerbs[targetSeason];
+      if (!seasonData) {
+        return { success: false, error: `\u65E0\u6548\u7684\u5B63\u8282: ${season}` };
+      }
+      const rarityCounts = {
+        common: seasonData.available.filter(
+          (h) => Object.values(this.regionHerbs).some((r) => r.common.includes(h))
+        ).length,
+        uncommon: seasonData.bonus.filter(
+          (h) => Object.values(this.regionHerbs).some((r) => r.uncommon.includes(h))
+        ).length
+      };
+      return {
+        success: true,
+        season: targetSeason,
+        availableHerbs: seasonData.available,
+        bonusHerbs: seasonData.bonus,
+        spawnRate: seasonData.spawnRate,
+        rarityCounts,
+        description: this.getSeasonDescription(targetSeason)
+      };
+    }
+    /**
+     * 获取季节描述
+     */
+    getSeasonDescription(season) {
+      const descriptions = {
+        "\u6625": "\u6625\u5B63\u4E07\u7269\u590D\u82CF\uFF0C\u8349\u6728\u751F\u957F\u65FA\u76DB\uFF0C\u662F\u91C7\u96C6\u7075\u8349\u7684\u597D\u65F6\u8282\u3002",
+        "\u590F": "\u590F\u5B63\u9633\u5149\u5145\u8DB3\uFF0C\u6E56\u6CCA\u836F\u6750\u751F\u957F\u8FC5\u901F\uFF0C\u4F46\u5C71\u6797\u836F\u6750\u8F83\u5C11\u3002",
+        "\u79CB": "\u79CB\u5B63\u662F\u6536\u83B7\u7684\u5B63\u8282\uFF0C\u5927\u90E8\u5206\u836F\u6750\u90FD\u5728\u6B64\u65F6\u6210\u719F\u3002",
+        "\u51AC": "\u51AC\u5B63\u5BD2\u51B7\uFF0C\u51B0\u96EA\u836F\u6750\u54C1\u8D28\u6700\u4F73\uFF0C\u4F46\u6570\u91CF\u8F83\u5C11\u3002"
+      };
+      return descriptions[season] || "";
+    }
+    /**
+     * herb.discovery.list - 查看已发现药材
+     */
+    listDiscoveredHerbs(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { filter, rarity } = params || {};
+      let herbs = Array.from(this.discoveredHerbs);
+      if (rarity) {
+        herbs = herbs.filter(
+          (h) => Object.entries(this.regionHerbs).some(
+            ([, data]) => {
+              var _a;
+              return (_a = data[rarity]) == null ? void 0 : _a.includes(h);
+            }
+          )
+        );
+      }
+      if (filter) {
+        herbs = herbs.filter((h) => h.includes(filter));
+      }
+      const classifiedHerbs = {
+        common: [],
+        uncommon: [],
+        rare: [],
+        legendary: []
+      };
+      for (const herb of herbs) {
+        for (const [rarity2, data] of Object.entries(this.regionHerbs)) {
+          if (data.legendary.includes(herb)) {
+            classifiedHerbs.legendary.push(herb);
+          } else if (data.rare.includes(herb)) {
+            classifiedHerbs.rare.push(herb);
+          } else if (data.uncommon.includes(herb)) {
+            classifiedHerbs.uncommon.push(herb);
+          } else if (data.common.includes(herb)) {
+            classifiedHerbs.common.push(herb);
+          }
+        }
+      }
+      return {
+        success: true,
+        totalCount: herbs.length,
+        herbs: herbs.sort(),
+        classified: classifiedHerbs,
+        stats: {
+          totalExplorations: this.gameState.herbDiscovery.totalExplorations,
+          successfulDiscoveries: this.gameState.herbDiscovery.successfulDiscoveries,
+          discoveryRate: this.gameState.herbDiscovery.totalExplorations > 0 ? (this.gameState.herbDiscovery.successfulDiscoveries / this.gameState.herbDiscovery.totalExplorations * 100).toFixed(1) + "%" : "0%"
+        }
+      };
+    }
+    /**
+     * herb.rarity.classify - 药材稀有度分类
+     */
+    classifyHerbsByRarity(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { herb } = params || {};
+      if (herb) {
+        for (const [rarity, data] of Object.entries(this.regionHerbs)) {
+          for (const [rarityType, herbs] of Object.entries(data)) {
+            if (herbs.includes(herb)) {
+              const rarityData = this.rarityLevels[rarityType];
+              return {
+                success: true,
+                herb,
+                rarity: rarityType,
+                rarityName: rarityData.name,
+                color: rarityData.color,
+                discoveryChance: rarityData.discoveryChance,
+                masteryBonus: rarityData.masteryBonus,
+                regions: this.findHerbRegions(herb)
+              };
+            }
+          }
+        }
+        return { success: false, error: `\u672A\u627E\u5230\u836F\u6750: ${herb}` };
+      }
+      const classification = {};
+      for (const [regionName, data] of Object.entries(this.regionHerbs)) {
+        for (const [rarityType, herbs] of Object.entries(data)) {
+          if (!classification[rarityType]) {
+            classification[rarityType] = {
+              name: this.rarityLevels[rarityType].name,
+              color: this.rarityLevels[rarityType].color,
+              herbs: []
+            };
+          }
+          classification[rarityType].herbs.push(...herbs);
+        }
+      }
+      for (const rarity of Object.keys(classification)) {
+        classification[rarity].herbs = [...new Set(classification[rarity].herbs)];
+        classification[rarity].count = classification[rarity].herbs.length;
+      }
+      return {
+        success: true,
+        classification,
+        totalHerbs: Object.values(classification).reduce((sum, c) => sum + c.count, 0)
+      };
+    }
+    /**
+     * 查找药材存在的地域
+     */
+    findHerbRegions(herb) {
+      const regions = [];
+      for (const [regionName, data] of Object.entries(this.regionHerbs)) {
+        for (const [rarity, herbs] of Object.entries(data)) {
+          if (herbs.includes(herb)) {
+            regions.push({
+              region: regionName,
+              rarity
+            });
+          }
+        }
+      }
+      return regions;
+    }
+    /**
+     * herb.synergy.analyze - 分析药材协同效应
+     */
+    analyzeSynergy(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { herbs } = params || {};
+      if (!herbs || !Array.isArray(herbs) || herbs.length < 2) {
+        return {
+          success: false,
+          error: "\u8BF7\u63D0\u4F9B\u81F3\u5C112\u79CD\u836F\u6750\u8FDB\u884C\u5206\u6790",
+          availableSynergies: Object.keys(this.herbSynergies).slice(0, 5)
+        };
+      }
+      const synergies = this.calculateSynergy(herbs);
+      const totalEfficiency = synergies.reduce((sum, s) => sum + s.efficiency, 0);
+      const discoveredCount = herbs.filter((h) => this.discoveredHerbs.has(h)).length;
+      const possibleCombos = [];
+      for (const [combo, effect] of Object.entries(this.herbSynergies)) {
+        const [h1, h2] = combo.split("+");
+        if (herbs.includes(h1) || herbs.includes(h2)) {
+          const hasBoth = herbs.includes(h1) && herbs.includes(h2);
+          const hasOne = herbs.includes(h1) || herbs.includes(h2);
+          if (!hasBoth) {
+            possibleCombos.push({
+              existing: herbs.includes(h1) ? h1 : h2,
+              missing: herbs.includes(h1) ? h2 : h1,
+              effect: effect.result,
+              efficiency: effect.efficiency
+            });
+          }
+        }
+      }
+      return {
+        success: true,
+        inputHerbs: herbs,
+        synergies,
+        totalEfficiency,
+        hasSynergy: synergies.length > 0,
+        discoveredCount,
+        missingCount: herbs.length - discoveredCount,
+        possibleCombos: possibleCombos.slice(0, 5)
+      };
+    }
+    /**
+     * herb.knowledge.gain - 获取药材知识（升级精通）
+     */
+    gainHerbKnowledge(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { element, amount } = params || {};
+      const knowledgeGain = amount || 1;
+      const validElements = ["metal", "wood", "water", "fire", "earth"];
+      if (element && !validElements.includes(element)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5143\u7D20",
+          validElements
+        };
+      }
+      if (element) {
+        const oldLevel = this.herbKnowledge[element];
+        this.herbKnowledge[element] += knowledgeGain;
+        const newLevel = this.herbKnowledge[element];
+        this.gameState.herbDiscovery.herbKnowledge[element] = newLevel;
+        return {
+          success: true,
+          element,
+          knowledgeGain,
+          oldLevel,
+          newLevel,
+          levelUp: Math.floor(newLevel / 10) > Math.floor(oldLevel / 10),
+          bonusMultiplier: 1 + newLevel * 0.1
+        };
+      }
+      const totalKnowledge = Object.values(this.herbKnowledge).reduce((sum, v) => sum + v, 0);
+      const elementDescriptions = {
+        metal: "\u91D1 - \u63A7\u5236\u77FF\u7269\u548C\u91D1\u5C5E\u7C7B\u836F\u6750",
+        wood: "\u6728 - \u63A7\u5236\u8349\u672C\u548C\u690D\u7269\u7C7B\u836F\u6750",
+        water: "\u6C34 - \u63A7\u5236\u6C34\u7CFB\u548C\u5BD2\u6027\u836F\u6750",
+        fire: "\u706B - \u63A7\u5236\u706B\u7CFB\u548C\u70ED\u6027\u836F\u6750",
+        earth: "\u571F - \u63A7\u5236\u571F\u7CFB\u548C\u77FF\u7269\u7C7B\u836F\u6750"
+      };
+      return {
+        success: true,
+        herbKnowledge: this.herbKnowledge,
+        totalKnowledge,
+        elementDescriptions,
+        overallBonus: 1 + totalKnowledge * 0.05,
+        levelSummary: Object.fromEntries(
+          Object.entries(this.herbKnowledge).map(([el, val]) => [el, Math.floor(val / 10)])
+        )
+      };
+    }
+    /**
+     * 获取服务状态
+     */
+    getStatus() {
+      var _a, _b, _c, _d;
+      return {
+        initialized: this.initialized,
+        discoveredCount: this.discoveredHerbs.size,
+        totalKnowledge: Object.values(this.herbKnowledge).reduce((sum, v) => sum + v, 0),
+        cooldownActive: this.exploreCooldown > Date.now(),
+        cooldownRemaining: Math.max(0, this.exploreCooldown - Date.now()),
+        currentSeason: this.getCurrentSeason(),
+        stats: {
+          totalExplorations: ((_b = (_a = this.gameState) == null ? void 0 : _a.herbDiscovery) == null ? void 0 : _b.totalExplorations) || 0,
+          successfulDiscoveries: ((_d = (_c = this.gameState) == null ? void 0 : _c.herbDiscovery) == null ? void 0 : _d.successfulDiscoveries) || 0
+        }
+      };
+    }
+  };
+  var herbDiscoveryService = new HerbDiscoveryService();
+
   // src/domains/ranking/RankingModule.js
   function createRankingService(gameStateAccessor) {
     return new RankingService(gameStateAccessor);
@@ -11652,6 +12189,8 @@ var CultivationSimulator = (() => {
     domainModules.talentTree = new TalentTreeService(gameState2);
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
+    herbDiscoveryService.init(gameState2);
+    domainModules.herbDiscovery = herbDiscoveryService;
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
@@ -12033,6 +12572,92 @@ var CultivationSimulator = (() => {
         }
       }
     }, (params) => alchemyKBService.exportKB(params));
+    mcpRegistry.registerTool("herb.explore.region", {
+      name: "herb.explore.region",
+      description: "Explore a region to discover herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          region: {
+            type: "string",
+            enum: ["\u5E73\u539F", "\u5C71\u6797", "\u6E56\u6CCA", "\u6C99\u6F20", "\u96EA\u5C71", "\u79D8\u5883"],
+            description: "Region to explore"
+          },
+          useMastery: { type: "boolean", description: "Use elemental mastery bonus", default: true }
+        },
+        required: ["region"]
+      }
+    }, (params) => herbDiscoveryService.exploreRegion(params));
+    mcpRegistry.registerTool("herb.season.query", {
+      name: "herb.season.query",
+      description: "Query herbs available in current or specified season",
+      inputSchema: {
+        type: "object",
+        properties: {
+          season: {
+            type: "string",
+            enum: ["\u6625", "\u590F", "\u79CB", "\u51AC"],
+            description: "Season to query"
+          }
+        }
+      }
+    }, (params) => herbDiscoveryService.querySeasonalHerbs(params));
+    mcpRegistry.registerTool("herb.discovery.list", {
+      name: "herb.discovery.list",
+      description: "List all discovered herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filter: { type: "string", description: "Filter by herb name" },
+          rarity: {
+            type: "string",
+            enum: ["common", "uncommon", "rare", "legendary"],
+            description: "Filter by rarity"
+          }
+        }
+      }
+    }, (params) => herbDiscoveryService.listDiscoveredHerbs(params));
+    mcpRegistry.registerTool("herb.rarity.classify", {
+      name: "herb.rarity.classify",
+      description: "Classify herbs by rarity or query specific herb rarity",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herb: { type: "string", description: "Specific herb to query" }
+        }
+      }
+    }, (params) => herbDiscoveryService.classifyHerbsByRarity(params));
+    mcpRegistry.registerTool("herb.synergy.analyze", {
+      name: "herb.synergy.analyze",
+      description: "Analyze synergy effects between herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herbs: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of herbs to analyze",
+            required: ["herbs"]
+          }
+        },
+        required: ["herbs"]
+      }
+    }, (params) => herbDiscoveryService.analyzeSynergy(params));
+    mcpRegistry.registerTool("herb.knowledge.gain", {
+      name: "herb.knowledge.gain",
+      description: "Gain herb knowledge and upgrade elemental mastery",
+      inputSchema: {
+        type: "object",
+        properties: {
+          element: {
+            type: "string",
+            enum: ["metal", "wood", "water", "fire", "earth"],
+            description: "Element to gain knowledge in"
+          },
+          amount: { type: "number", description: "Knowledge amount to gain", default: 1 }
+        }
+      }
+    }, (params) => herbDiscoveryService.gainHerbKnowledge(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -12687,4 +13312,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-68dd331-2026-05-30T15-41-50-650Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-1f60e7e-2026-05-30T15-47-05-137Z";
