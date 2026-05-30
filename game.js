@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-178924d-2026-05-30T16-41-13-895Z */
+/* Cultivation Simulator DDD-v1.0.0-be4e209-2026-05-30T16-48-22-669Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -9532,6 +9532,705 @@ var CultivationSimulator = (() => {
   };
   var reincarnationBookService = new ReincarnationBookService();
 
+  // src/domains/reincarnation/services/DharmaFruitService.js
+  var DHARMA_TYPES = {
+    \u6CD5: "\u6CD5",
+    // 法之道果
+    \u9053: "\u9053",
+    // 道之道果
+    \u4F53: "\u4F53",
+    // 体之道果
+    \u795E: "\u795E",
+    // 神之道果
+    \u5FC3: "\u5FC3"
+    // 心之道果
+  };
+  var DHARMA_LEVELS = {
+    \u521D: "\u521D",
+    // 初级
+    \u4E2D: "\u4E2D",
+    // 中级
+    \u9AD8: "\u9AD8",
+    // 高级
+    \u5706\u6EE1: "\u5706\u6EE1"
+    // 圆满级
+  };
+  var DHARMA_FRUITS = {
+    \u6CD5: {
+      name: "\u6CD5\u4E4B\u9053\u679C",
+      description: "\u8574\u542B\u65E0\u4E0A\u6CD5\u95E8\uFF0C\u4FEE\u70BC\u901F\u5EA6\u5927\u5E45\u63D0\u5347",
+      baseEffect: { cultivationSpeed: 0.1 },
+      levelEffects: [
+        { cultivationSpeed: 0.1 },
+        { cultivationSpeed: 0.2 },
+        { cultivationSpeed: 0.35 },
+        { cultivationSpeed: 0.5 }
+      ]
+    },
+    \u9053: {
+      name: "\u9053\u4E4B\u9053\u679C",
+      description: "\u8574\u542B\u5929\u5730\u5927\u9053\uFF0C\u5BF9\u5929\u9053\u611F\u609F\u52A0\u6DF1",
+      baseEffect: { tiandaoMerit: 1 },
+      levelEffects: [
+        { tiandaoMerit: 1 },
+        { tiandaoMerit: 3 },
+        { tiandaoMerit: 6 },
+        { tiandaoMerit: 10 }
+      ]
+    },
+    \u4F53: {
+      name: "\u4F53\u4E4B\u9053\u679C",
+      description: "\u5F3A\u5316\u8089\u8EAB\uFF0C\u4F53\u529B\u4E0E\u9632\u5FA1\u63D0\u5347",
+      baseEffect: { defense: 0.1, maxEnergy: 10 },
+      levelEffects: [
+        { defense: 0.1, maxEnergy: 10 },
+        { defense: 0.2, maxEnergy: 25 },
+        { defense: 0.35, maxEnergy: 50 },
+        { defense: 0.5, maxEnergy: 100 }
+      ]
+    },
+    \u795E: {
+      name: "\u795E\u4E4B\u9053\u679C",
+      description: "\u6ECB\u517B\u795E\u9B42\uFF0C\u795E\u8BC6\u4E0E\u611F\u77E5\u63D0\u5347",
+      baseEffect: { perception: 0.1, spiritDamage: 0.1 },
+      levelEffects: [
+        { perception: 0.1, spiritDamage: 0.1 },
+        { perception: 0.2, spiritDamage: 0.2 },
+        { perception: 0.35, spiritDamage: 0.35 },
+        { perception: 0.5, spiritDamage: 0.5 }
+      ]
+    },
+    \u5FC3: {
+      name: "\u5FC3\u4E4B\u9053\u679C",
+      description: "\u6DEC\u70BC\u9053\u5FC3\uFF0C\u5FC3\u5883\u4E0E\u5947\u9047\u63D0\u5347",
+      baseEffect: { serendipityChance: 0.05, karmaGood: 1 },
+      levelEffects: [
+        { serendipityChance: 0.05, karmaGood: 1 },
+        { serendipityChance: 0.1, karmaGood: 3 },
+        { serendipityChance: 0.2, karmaGood: 6 },
+        { serendipityChance: 0.35, karmaGood: 10 }
+      ]
+    }
+  };
+  var FUSION_RECIPES = {
+    "\u6CD5+\u9053": { result: "\u9053", bonus: { cultivationSpeed: 0.15 } },
+    "\u6CD5+\u4F53": { result: "\u4F53", bonus: { defense: 0.15 } },
+    "\u6CD5+\u795E": { result: "\u795E", bonus: { spiritDamage: 0.15 } },
+    "\u6CD5+\u5FC3": { result: "\u5FC3", bonus: { serendipityChance: 0.1 } },
+    "\u9053+\u4F53": { result: "\u4F53", bonus: { maxEnergy: 20 } },
+    "\u9053+\u795E": { result: "\u795E", bonus: { perception: 0.15 } },
+    "\u9053+\u5FC3": { result: "\u5FC3", bonus: { tiandaoMerit: 2 } },
+    "\u4F53+\u795E": { result: "\u795E", bonus: { defense: 0.1, spiritDamage: 0.1 } },
+    "\u4F53+\u5FC3": { result: "\u5FC3", bonus: { maxEnergy: 15, serendipityChance: 0.05 } },
+    "\u795E+\u5FC3": { result: "\u795E", bonus: { perception: 0.1, spiritDamage: 0.1 } }
+  };
+  var DharmaFruitService = class {
+    constructor() {
+      this.gameState = null;
+      this.dharmaFruits = [];
+      this.maxFruits = 10;
+      this.ultimateUnlocked = false;
+    }
+    /**
+     * 初始化道果系统
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.dharmaFruit) {
+        gameState3.dharmaFruit = {
+          fruits: [],
+          inheritedFruits: [],
+          ultimateUnlocked: false,
+          totalFruitsClaimed: 0,
+          fruitsCombined: 0,
+          lastReincarnationAt: null
+        };
+      }
+      this.dharmaFruits = gameState3.dharmaFruit.fruits;
+      this.ultimateUnlocked = gameState3.dharmaFruit.ultimateUnlocked;
+      return gameState3;
+    }
+    /**
+     * 生成唯一ID
+     */
+    generateId() {
+      return `df_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * 获取道果等级索引
+     */
+    getLevelIndex(level) {
+      const levelMap = { "\u521D": 0, "\u4E2D": 1, "\u9AD8": 2, "\u5706\u6EE1": 3 };
+      return levelMap[level] ?? 0;
+    }
+    /**
+     * 获取道果定义
+     */
+    getDharmaDefinition(type) {
+      return DHARMA_FRUITS[type];
+    }
+    /**
+     * 计算道果效果
+     */
+    calculateFruitEffects() {
+      const effects = {
+        cultivationSpeed: 0,
+        tiandaoMerit: 0,
+        defense: 0,
+        maxEnergy: 0,
+        perception: 0,
+        spiritDamage: 0,
+        serendipityChance: 0,
+        karmaGood: 0
+      };
+      for (const fruit of this.dharmaFruits) {
+        const def = DHARMA_FRUITS[fruit.type];
+        if (def) {
+          const levelIdx = this.getLevelIndex(fruit.level);
+          const levelEffect = def.levelEffects[levelIdx];
+          if (levelEffect) {
+            for (const [key, value] of Object.entries(levelEffect)) {
+              if (effects.hasOwnProperty(key)) {
+                effects[key] += value;
+              }
+            }
+          }
+        }
+      }
+      return effects;
+    }
+    /**
+     * 检查是否满足终极蜕变条件
+     */
+    checkUltimateCondition() {
+      if (this.ultimateUnlocked) {
+        return { canTrigger: false, reason: "\u7EC8\u6781\u8715\u53D8\u5DF2\u89E3\u9501" };
+      }
+      const typeCount = {};
+      for (const fruit of this.dharmaFruits) {
+        if (!typeCount[fruit.type]) {
+          typeCount[fruit.type] = { count: 0, maxLevel: false };
+        }
+        typeCount[fruit.type].count++;
+        if (fruit.level === "\u5706\u6EE1") {
+          typeCount[fruit.type].maxLevel = true;
+        }
+      }
+      const allTypes = Object.keys(DHARMA_TYPES);
+      const hasAllTypes = allTypes.every((type) => {
+        var _a;
+        return ((_a = typeCount[type]) == null ? void 0 : _a.count) > 0;
+      });
+      const allMaxLevel = allTypes.every((type) => {
+        var _a;
+        return (_a = typeCount[type]) == null ? void 0 : _a.maxLevel;
+      });
+      if (hasAllTypes && allMaxLevel) {
+        return { canTrigger: true, reason: "\u6240\u6709\u9053\u679C\u5DF2\u8FBE\u5706\u6EE1\uFF0C\u53EF\u89E6\u53D1\u7EC8\u6781\u8715\u53D8" };
+      }
+      const missingTypes = allTypes.filter((type) => {
+        var _a;
+        return !((_a = typeCount[type]) == null ? void 0 : _a.count);
+      });
+      const nonMaxTypes = allTypes.filter((type) => {
+        var _a;
+        return !((_a = typeCount[type]) == null ? void 0 : _a.maxLevel);
+      });
+      return {
+        canTrigger: false,
+        reason: missingTypes.length > 0 ? `\u7F3A\u5C11\u9053\u679C\u7C7B\u578B: ${missingTypes.join(", ")}` : nonMaxTypes.length > 0 ? `\u4EE5\u4E0B\u9053\u679C\u672A\u8FBE\u5706\u6EE1: ${nonMaxTypes.join(", ")}` : "\u6761\u4EF6\u672A\u6EE1\u8DB3"
+      };
+    }
+    // ==================== MCP 工具实现 ====================
+    /**
+     * dharma.fruit.claim - 领取道果
+     * 轮回后可以领取新的道果
+     */
+    mcpFruitClaim(params = {}) {
+      const { type, level = "\u521D" } = params;
+      if (!type || !DHARMA_TYPES[type]) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u9053\u679C\u7C7B\u578B\uFF0C\u6709\u6548\u503C: ${Object.keys(DHARMA_TYPES).join(", ")}`
+        };
+      }
+      if (!DHARMA_LEVELS[level]) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u9053\u679C\u7B49\u7EA7\uFF0C\u6709\u6548\u503C: ${Object.keys(DHARMA_LEVELS).join(", ")}`
+        };
+      }
+      const existingType = this.dharmaFruits.find((f) => f.type === type);
+      if (existingType) {
+        return {
+          success: false,
+          error: `\u5DF2\u62E5\u6709${DHARMA_FRUITS[type].name}\uFF0C\u9053\u679C\u6570\u91CF\u4E0A\u9650\u4E3A${this.maxFruits}\u4E2A`
+        };
+      }
+      if (this.dharmaFruits.length >= this.maxFruits) {
+        return {
+          success: false,
+          error: `\u9053\u679C\u6570\u91CF\u5DF2\u8FBE\u4E0A\u9650(${this.maxFruits}\u4E2A)\uFF0C\u8BF7\u5148\u878D\u5408\u6216\u4F20\u627F\u65E7\u9053\u679C`
+        };
+      }
+      const fruit = {
+        id: this.generateId(),
+        type,
+        level,
+        acquiredAt: Date.now(),
+        effects: DHARMA_FRUITS[type].levelEffects[this.getLevelIndex(level)]
+      };
+      this.dharmaFruits.push(fruit);
+      this.gameState.dharmaFruit.totalFruitsClaimed++;
+      return {
+        success: true,
+        message: `\u6210\u529F\u9886\u53D6${DHARMA_FRUITS[type].name}[${level}]`,
+        fruit: {
+          id: fruit.id,
+          type: fruit.type,
+          level: fruit.level,
+          name: DHARMA_FRUITS[type].name,
+          description: DHARMA_FRUITS[type].description,
+          effects: fruit.effects
+        },
+        currentFruits: this.dharmaFruits.map((f) => ({
+          id: f.id,
+          type: f.type,
+          level: f.level,
+          name: DHARMA_FRUITS[f.type].name
+        })),
+        totalClaimed: this.gameState.dharmaFruit.totalFruitsClaimed
+      };
+    }
+    /**
+     * dharma.fruit.inherit - 传承道果
+     * 轮回时可以选择传承道果
+     */
+    mcpFruitInherit(params = {}) {
+      const { fruitId, inheritLevel = "\u4E2D" } = params;
+      const fruit = this.dharmaFruits.find((f) => f.id === fruitId);
+      if (!fruit) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6307\u5B9A\u9053\u679C"
+        };
+      }
+      if (!DHARMA_LEVELS[inheritLevel]) {
+        return {
+          success: false,
+          error: `\u65E0\u6548\u7684\u4F20\u627F\u7B49\u7EA7\uFF0C\u6709\u6548\u503C: ${Object.keys(DHARMA_LEVELS).join(", ")}`
+        };
+      }
+      const currentLevelIdx = this.getLevelIndex(fruit.level);
+      const inheritLevelIdx = this.getLevelIndex(inheritLevel);
+      if (inheritLevelIdx < currentLevelIdx) {
+        return {
+          success: false,
+          error: `\u4F20\u627F\u7B49\u7EA7(${inheritLevel})\u4E0D\u80FD\u4F4E\u4E8E\u5F53\u524D\u7B49\u7EA7(${fruit.level})`
+        };
+      }
+      const inheritedFruit = {
+        id: this.generateId(),
+        type: fruit.type,
+        level: inheritLevel,
+        inheritedFrom: fruit.id,
+        inheritedAt: Date.now(),
+        effects: DHARMA_FRUITS[fruit.type].levelEffects[inheritLevelIdx]
+      };
+      this.gameState.dharmaFruit.inheritedFruits.push(inheritedFruit);
+      this.dharmaFruits = this.dharmaFruits.filter((f) => f.id !== fruitId);
+      return {
+        success: true,
+        message: `${DHARMA_FRUITS[fruit.type].name}\u5DF2\u4F20\u627F\u4E3A[${inheritLevel}]\u7EA7`,
+        inheritedFruit: {
+          id: inheritedFruit.id,
+          type: inheritedFruit.type,
+          level: inheritedFruit.level,
+          name: DHARMA_FRUITS[inheritedFruit.type].name,
+          effects: inheritedFruit.effects
+        },
+        remainingFruits: this.dharmaFruits.map((f) => ({
+          id: f.id,
+          type: f.type,
+          level: f.level,
+          name: DHARMA_FRUITS[f.type].name
+        }))
+      };
+    }
+    /**
+     * dharma.fruit.upgrade - 升级道果
+     * 将道果从当前等级提升到下一等级
+     */
+    mcpFruitUpgrade(params = {}) {
+      var _a;
+      const { fruitId, useMerit = false } = params;
+      const fruit = this.dharmaFruits.find((f) => f.id === fruitId);
+      if (!fruit) {
+        return {
+          success: false,
+          error: "\u672A\u627E\u5230\u6307\u5B9A\u9053\u679C"
+        };
+      }
+      if (fruit.level === "\u5706\u6EE1") {
+        return {
+          success: false,
+          error: `${DHARMA_FRUITS[fruit.type].name}\u5DF2\u8FBE\u5706\u6EE1\u7B49\u7EA7\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u5347\u7EA7`
+        };
+      }
+      const levelCosts = { "\u521D": 10, "\u4E2D": 30, "\u9AD8": 60 };
+      const currentLevelIdx = this.getLevelIndex(fruit.level);
+      const cost = levelCosts[fruit.level];
+      if (useMerit) {
+        const currentMerit = ((_a = this.gameState.player) == null ? void 0 : _a.karmaPoints) || 0;
+        if (currentMerit < cost) {
+          return {
+            success: false,
+            error: `\u5929\u9053\u529F\u5FB7\u4E0D\u8DB3\uFF0C\u9700\u8981${cost}\u70B9\uFF0C\u5F53\u524D${currentMerit}\u70B9`
+          };
+        }
+        this.gameState.player.karmaPoints -= cost;
+      }
+      const levels = ["\u521D", "\u4E2D", "\u9AD8", "\u5706\u6EE1"];
+      fruit.level = levels[currentLevelIdx + 1];
+      fruit.effects = DHARMA_FRUITS[fruit.type].levelEffects[currentLevelIdx + 1];
+      fruit.upgradedAt = Date.now();
+      return {
+        success: true,
+        message: `${DHARMA_FRUITS[fruit.type].name}\u5DF2\u5347\u7EA7\u81F3[${fruit.level}]`,
+        fruit: {
+          id: fruit.id,
+          type: fruit.type,
+          level: fruit.level,
+          name: DHARMA_FRUITS[fruit.type].name,
+          effects: fruit.effects
+        },
+        totalEffects: this.calculateFruitEffects()
+      };
+    }
+    /**
+     * dharma.fruit.query - 查询道果状态
+     * 查看当前所有道果及效果
+     */
+    mcpFruitQuery(params = {}) {
+      const { fruitId, includeEffects = true } = params;
+      if (fruitId) {
+        const fruit = this.dharmaFruits.find((f) => f.id === fruitId);
+        if (!fruit) {
+          return {
+            success: false,
+            error: "\u672A\u627E\u5230\u6307\u5B9A\u9053\u679C"
+          };
+        }
+        return {
+          success: true,
+          fruit: {
+            id: fruit.id,
+            type: fruit.type,
+            level: fruit.level,
+            name: DHARMA_FRUITS[fruit.type].name,
+            description: DHARMA_FRUITS[fruit.type].description,
+            effects: fruit.effects,
+            acquiredAt: fruit.acquiredAt,
+            upgradedAt: fruit.upgradedAt
+          },
+          totalEffects: includeEffects ? this.calculateFruitEffects() : null,
+          ultimateCondition: this.checkUltimateCondition()
+        };
+      }
+      return {
+        success: true,
+        fruits: this.dharmaFruits.map((f) => ({
+          id: f.id,
+          type: f.type,
+          level: f.level,
+          name: DHARMA_FRUITS[f.type].name,
+          description: DHARMA_FRUITS[f.type].description,
+          effects: includeEffects ? f.effects : null,
+          acquiredAt: f.acquiredAt,
+          upgradedAt: f.upgradedAt
+        })),
+        totalEffects: includeEffects ? this.calculateFruitEffects() : null,
+        stats: {
+          totalFruits: this.dharmaFruits.length,
+          maxFruits: this.maxFruits,
+          totalClaimed: this.gameState.dharmaFruit.totalFruitsClaimed,
+          totalCombined: this.gameState.dharmaFruit.fruitsCombined,
+          inheritedCount: this.gameState.dharmaFruit.inheritedFruits.length,
+          ultimateUnlocked: this.ultimateUnlocked
+        },
+        ultimateCondition: this.checkUltimateCondition(),
+        availableTypes: Object.keys(DHARMA_TYPES).filter(
+          (type) => !this.dharmaFruits.some((f) => f.type === type)
+        )
+      };
+    }
+    /**
+     * dharma.transformation.trigger - 触发终极蜕变
+     * 当所有道果都达到圆满时触发
+     */
+    mcpTransformationTrigger(params = {}) {
+      var _a;
+      const { force = false } = params;
+      const condition = this.checkUltimateCondition();
+      if (!condition.canTrigger) {
+        if (!force) {
+          return {
+            success: false,
+            error: `\u65E0\u6CD5\u89E6\u53D1\u7EC8\u6781\u8715\u53D8: ${condition.reason}`
+          };
+        }
+        const meritCost = 500;
+        const currentMerit = ((_a = this.gameState.player) == null ? void 0 : _a.karmaPoints) || 0;
+        if (currentMerit < meritCost) {
+          return {
+            success: false,
+            error: `\u5F3A\u5236\u89E6\u53D1\u9700\u8981${meritCost}\u70B9\u5929\u9053\u529F\u5FB7\uFF0C\u5F53\u524D${currentMerit}\u70B9`
+          };
+        }
+        this.gameState.player.karmaPoints -= meritCost;
+      }
+      this.ultimateUnlocked = true;
+      this.gameState.dharmaFruit.ultimateUnlocked = true;
+      const ultimateBonus = {
+        cultivationSpeed: 1,
+        // 修炼速度翻倍
+        allAttributes: 0.5,
+        // 全属性+50%
+        serendipityChance: 0.5,
+        // 奇遇率+50%
+        tiandaoMerit: 20,
+        // 天道功德+20
+        maxEnergy: 200,
+        // 体力上限+200
+        perception: 1,
+        // 感知翻倍
+        spiritDamage: 1
+        // 神识伤害翻倍
+      };
+      if (this.gameState.player) {
+        this.gameState.player.cultivationSpeedBonus = (this.gameState.player.cultivationSpeedBonus || 0) + ultimateBonus.cultivationSpeed;
+        this.gameState.player.serendipityChanceBonus = (this.gameState.player.serendipityChanceBonus || 0) + ultimateBonus.serendipityChance;
+        this.gameState.player.karmaPoints = (this.gameState.player.karmaPoints || 0) + ultimateBonus.tiandaoMerit;
+        this.gameState.player.maxEnergy = (this.gameState.player.maxEnergy || 100) + ultimateBonus.maxEnergy;
+      }
+      return {
+        success: true,
+        message: "\u606D\u559C\uFF01\u7EC8\u6781\u8715\u53D8\u5DF2\u89E6\u53D1\uFF01\u60A8\u5DF2\u5316\u8EAB\u4E3A\u7EC8\u6781\u5B58\u5728\uFF01",
+        ultimateForm: {
+          name: "\u7EC8\u6781\u5F62\u6001",
+          description: "\u6240\u6709\u9053\u679C\u5706\u6EE1\uFF0C\u5316\u8EAB\u7EC8\u6781\u5B58\u5728",
+          bonus: ultimateBonus,
+          unlockedAt: Date.now()
+        },
+        playerBonuses: {
+          cultivationSpeedBonus: ultimateBonus.cultivationSpeed,
+          serendipityChanceBonus: ultimateBonus.serendipityChance,
+          karmaPointsBonus: ultimateBonus.tiandaoMerit,
+          maxEnergyBonus: ultimateBonus.maxEnergy,
+          perceptionBonus: ultimateBonus.perception,
+          spiritDamageBonus: ultimateBonus.spiritDamage
+        },
+        totalEffects: this.calculateFruitEffects()
+      };
+    }
+    /**
+     * dharma.fruit.combine - 融合道果
+     * 将两个道果融合，产生新的道果或加成效果
+     */
+    mcpFruitCombine(params = {}) {
+      const { fruitId1, fruitId2 } = params;
+      if (!fruitId1 || !fruitId2) {
+        return {
+          success: false,
+          error: "\u8BF7\u63D0\u4F9B\u4E24\u4E2A\u9053\u679C\u7684ID"
+        };
+      }
+      if (fruitId1 === fruitId2) {
+        return {
+          success: false,
+          error: "\u8BF7\u9009\u62E9\u4E24\u4E2A\u4E0D\u540C\u7684\u9053\u679C\u8FDB\u884C\u878D\u5408"
+        };
+      }
+      const fruit1 = this.dharmaFruits.find((f) => f.id === fruitId1);
+      const fruit2 = this.dharmaFruits.find((f) => f.id === fruitId2);
+      if (!fruit1) {
+        return {
+          success: false,
+          error: `\u672A\u627E\u5230ID\u4E3A${fruitId1}\u7684\u9053\u679C`
+        };
+      }
+      if (!fruit2) {
+        return {
+          success: false,
+          error: `\u672A\u627E\u5230ID\u4E3A${fruitId2}\u7684\u9053\u679C`
+        };
+      }
+      const key1 = `${fruit1.type}+${fruit2.type}`;
+      const key2 = `${fruit2.type}+${fruit1.type}`;
+      const recipe = FUSION_RECIPES[key1] || FUSION_RECIPES[key2];
+      if (!recipe) {
+        return {
+          success: false,
+          error: `${DHARMA_FRUITS[fruit1.type].name}\u548C${DHARMA_FRUITS[fruit2.type].name}\u65E0\u6CD5\u878D\u5408`
+        };
+      }
+      const newFruit = {
+        id: this.generateId(),
+        type: recipe.result,
+        level: "\u521D",
+        combinedFrom: [fruit1.id, fruit2.id],
+        combinedAt: Date.now(),
+        effects: DHARMA_FRUITS[recipe.result].levelEffects[0],
+        bonusEffects: recipe.bonus
+      };
+      this.dharmaFruits = this.dharmaFruits.filter(
+        (f) => f.id !== fruitId1 && f.id !== fruitId2
+      );
+      this.dharmaFruits.push(newFruit);
+      this.gameState.dharmaFruit.fruitsCombined++;
+      return {
+        success: true,
+        message: `${DHARMA_FRUITS[fruit1.type].name}\u548C${DHARMA_FRUITS[fruit2.type].name}\u878D\u5408\u6210\u529F\uFF01`,
+        newFruit: {
+          id: newFruit.id,
+          type: newFruit.type,
+          level: newFruit.level,
+          name: DHARMA_FRUITS[newFruit.type].name,
+          description: DHARMA_FRUITS[newFruit.type].description,
+          effects: newFruit.effects,
+          bonusEffects: newFruit.bonusEffects
+        },
+        remainingFruits: this.dharmaFruits.map((f) => ({
+          id: f.id,
+          type: f.type,
+          level: f.level,
+          name: DHARMA_FRUITS[f.type].name
+        })),
+        totalEffects: this.calculateFruitEffects()
+      };
+    }
+    /**
+     * 获取道果统计信息
+     */
+    getStats() {
+      var _a, _b, _c, _d;
+      return {
+        totalFruits: this.dharmaFruits.length,
+        maxFruits: this.maxFruits,
+        totalClaimed: ((_a = this.gameState.dharmaFruit) == null ? void 0 : _a.totalFruitsClaimed) || 0,
+        totalCombined: ((_b = this.gameState.dharmaFruit) == null ? void 0 : _b.fruitsCombined) || 0,
+        inheritedCount: ((_d = (_c = this.gameState.dharmaFruit) == null ? void 0 : _c.inheritedFruits) == null ? void 0 : _d.length) || 0,
+        ultimateUnlocked: this.ultimateUnlocked,
+        fruitsByType: this.dharmaFruits.reduce((acc, f) => {
+          acc[f.type] = (acc[f.type] || 0) + 1;
+          return acc;
+        }, {}),
+        fruitsByLevel: this.dharmaFruits.reduce((acc, f) => {
+          acc[f.level] = (acc[f.level] || 0) + 1;
+          return acc;
+        }, {})
+      };
+    }
+  };
+  var dharmaFruitService = new DharmaFruitService();
+  function createDharmaFruitMCPHandlers(gameState3) {
+    const service = new DharmaFruitService();
+    service.init(gameState3);
+    return {
+      "dharma.fruit.claim": (params) => service.mcpFruitClaim(params),
+      "dharma.fruit.inherit": (params) => service.mcpFruitInherit(params),
+      "dharma.fruit.upgrade": (params) => service.mcpFruitUpgrade(params),
+      "dharma.fruit.query": (params) => service.mcpFruitQuery(params),
+      "dharma.transformation.trigger": (params) => service.mcpTransformationTrigger(params),
+      "dharma.fruit.combine": (params) => service.mcpFruitCombine(params)
+    };
+  }
+  var DHARMA_FRUITS_TOOLS = {
+    "dharma.fruit.claim": {
+      name: "dharma.fruit.claim",
+      description: "Claim a dharma fruit after reincarnation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["\u6CD5", "\u9053", "\u4F53", "\u795E", "\u5FC3"],
+            description: "Dharma fruit type"
+          },
+          level: {
+            type: "string",
+            enum: ["\u521D", "\u4E2D", "\u9AD8", "\u5706\u6EE1"],
+            description: "Dharma fruit level",
+            default: "\u521D"
+          }
+        },
+        required: ["type"]
+      }
+    },
+    "dharma.fruit.inherit": {
+      name: "dharma.fruit.inherit",
+      description: "Inherit a dharma fruit during reincarnation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          fruitId: { type: "string", description: "ID of the fruit to inherit" },
+          inheritLevel: {
+            type: "string",
+            enum: ["\u521D", "\u4E2D", "\u9AD8", "\u5706\u6EE1"],
+            description: "Inheritance level",
+            default: "\u4E2D"
+          }
+        },
+        required: ["fruitId"]
+      }
+    },
+    "dharma.fruit.upgrade": {
+      name: "dharma.fruit.upgrade",
+      description: "Upgrade a dharma fruit to the next level",
+      inputSchema: {
+        type: "object",
+        properties: {
+          fruitId: { type: "string", description: "ID of the fruit to upgrade" },
+          useMerit: { type: "boolean", description: "Use tiandao merit for upgrade" }
+        },
+        required: ["fruitId"]
+      }
+    },
+    "dharma.fruit.query": {
+      name: "dharma.fruit.query",
+      description: "Query dharma fruit status and effects",
+      inputSchema: {
+        type: "object",
+        properties: {
+          fruitId: { type: "string", description: "Specific fruit ID to query" },
+          includeEffects: { type: "boolean", description: "Include effects in response", default: true }
+        }
+      }
+    },
+    "dharma.transformation.trigger": {
+      name: "dharma.transformation.trigger",
+      description: "Trigger ultimate transformation when all fruits reach max level",
+      inputSchema: {
+        type: "object",
+        properties: {
+          force: { type: "boolean", description: "Force trigger (requires 500 merit)" }
+        }
+      }
+    },
+    "dharma.fruit.combine": {
+      name: "dharma.fruit.combine",
+      description: "Combine two dharma fruits to create a new one",
+      inputSchema: {
+        type: "object",
+        properties: {
+          fruitId1: { type: "string", description: "ID of first fruit" },
+          fruitId2: { type: "string", description: "ID of second fruit" }
+        },
+        required: ["fruitId1", "fruitId2"]
+      }
+    }
+  };
+
   // src/domains/cultivation/services/TalentTreeService.js
   init_SpiritRootEntity();
   var TALENT_BRANCHES = ["attack", "defense", "cultivation", "perception"];
@@ -15189,7 +15888,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V235",
+      gameVersion: "V236",
       // 设置
       settings: {
         soundEnabled: true,
@@ -15221,6 +15920,8 @@ var CultivationSimulator = (() => {
     reincarnationService.init(gameState2);
     domainModules.reincarnationBook = reincarnationBookService;
     reincarnationBookService.init(gameState2);
+    dharmaFruitService.init(gameState2);
+    domainModules.dharmaFruit = dharmaFruitService;
     domainModules.talentTree = new TalentTreeService(gameState2);
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
@@ -15244,6 +15945,37 @@ var CultivationSimulator = (() => {
     domainModules.celestialDecree = celestialDecreeService;
     heavenRankService.init(gameState2);
     domainModules.heavenRank = heavenRankService;
+    const dharmaFruitHandlers = createDharmaFruitMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "dharma.fruit.claim",
+      DHARMA_FRUITS_TOOLS["dharma.fruit.claim"],
+      (params) => dharmaFruitHandlers["dharma.fruit.claim"](params)
+    );
+    mcpRegistry.registerTool(
+      "dharma.fruit.inherit",
+      DHARMA_FRUITS_TOOLS["dharma.fruit.inherit"],
+      (params) => dharmaFruitHandlers["dharma.fruit.inherit"](params)
+    );
+    mcpRegistry.registerTool(
+      "dharma.fruit.upgrade",
+      DHARMA_FRUITS_TOOLS["dharma.fruit.upgrade"],
+      (params) => dharmaFruitHandlers["dharma.fruit.upgrade"](params)
+    );
+    mcpRegistry.registerTool(
+      "dharma.fruit.query",
+      DHARMA_FRUITS_TOOLS["dharma.fruit.query"],
+      (params) => dharmaFruitHandlers["dharma.fruit.query"](params)
+    );
+    mcpRegistry.registerTool(
+      "dharma.transformation.trigger",
+      DHARMA_FRUITS_TOOLS["dharma.transformation.trigger"],
+      (params) => dharmaFruitHandlers["dharma.transformation.trigger"](params)
+    );
+    mcpRegistry.registerTool(
+      "dharma.fruit.combine",
+      DHARMA_FRUITS_TOOLS["dharma.fruit.combine"],
+      (params) => dharmaFruitHandlers["dharma.fruit.combine"](params)
+    );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -16621,4 +17353,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-178924d-2026-05-30T16-41-13-895Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-be4e209-2026-05-30T16-48-22-669Z";
