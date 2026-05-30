@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-55627ad-2026-05-30T15-36-47-719Z */
+/* Cultivation Simulator DDD-v1.0.0-68dd331-2026-05-30T15-46-32-421Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -7524,6 +7524,543 @@ var CultivationSimulator = (() => {
   };
   var alchemyKBService = new AlchemyKBService();
 
+  // src/domains/inventory/services/HerbDiscoveryService.js
+  var HerbDiscoveryService = class {
+    constructor() {
+      this.initialized = false;
+      this.gameState = null;
+      this.regionHerbs = {
+        "\u5E73\u539F": {
+          common: ["\u7518\u8349", "\u9EC4\u82AA", "\u4EBA\u53C2\u53F6", "\u91CE\u83CA\u82B1"],
+          uncommon: ["\u7075\u829D", "\u4F55\u9996\u4E4C", "\u67B8\u675E\u5B50"],
+          rare: ["\u5929\u9EBB", "\u9EC4\u7CBE"],
+          legendary: []
+        },
+        "\u5C71\u6797": {
+          common: ["\u91D1\u94F6\u82B1", "\u8FDE\u7FD8", "\u677F\u84DD\u6839", "\u84B2\u516C\u82F1"],
+          uncommon: ["\u5929\u51AC", "\u9EA6\u51AC", "\u832F\u82D3"],
+          rare: ["\u866B\u8349", "\u677E\u8338"],
+          legendary: ["\u5343\u5E74\u7075\u829D"]
+        },
+        "\u6E56\u6CCA": {
+          common: ["\u8377\u53F6", "\u83B2\u5B50", "\u82A6\u82C7", "\u9999\u84B2"],
+          uncommon: ["\u73CD\u73E0\u7C89", "\u8D1D\u6BCD", "\u83B2\u82B1\u854A"],
+          rare: ["\u4E5D\u773C\u77F3", "\u83B2\u5FC3\u8349"],
+          legendary: ["\u51B0\u83B2"]
+        },
+        "\u6C99\u6F20": {
+          common: ["\u8089\u82C1\u84C9", "\u9501\u9633", "\u6C99\u53C2"],
+          uncommon: ["\u7EA2\u666F\u5929", "\u9EBB\u9EC4"],
+          rare: ["\u8089\u6842", "\u6A80\u9999"],
+          legendary: ["\u6C99\u4E4B\u773C"]
+        },
+        "\u96EA\u5C71": {
+          common: ["\u96EA\u83B2", "\u7EA2\u82B1", "\u827E\u53F6"],
+          uncommon: ["\u96EA\u8336", "\u51B0\u8349"],
+          rare: ["\u96EA\u86E4", "\u51B0\u87FE"],
+          legendary: ["\u51B0\u9B44\u5BD2\u83B2"]
+        },
+        "\u79D8\u5883": {
+          common: ["\u4E03\u5F69\u8349", "\u5E7B\u5F71\u82B1", "\u5E7D\u51A5\u85E4"],
+          uncommon: ["\u8840\u7CBE\u8349", "\u9B42\u82B1"],
+          rare: ["\u865A\u7A7A\u5170", "\u547D\u8FD0\u82B1"],
+          legendary: ["\u9053\u97F5\u82B1", "\u5929\u547D\u679C"]
+        }
+      };
+      this.seasonalHerbs = {
+        "\u6625": {
+          available: ["\u4EBA\u53C2\u53F6", "\u91CE\u83CA\u82B1", "\u91D1\u94F6\u82B1", "\u8FDE\u7FD8", "\u84B2\u516C\u82F1", "\u5929\u51AC", "\u9EA6\u51AC", "\u832F\u82D3"],
+          bonus: ["\u7075\u829D", "\u866B\u8349"],
+          spawnRate: 1.2
+        },
+        "\u590F": {
+          available: ["\u7518\u8349", "\u9EC4\u82AA", "\u677F\u84DD\u6839", "\u8377\u53F6", "\u83B2\u5B50", "\u82A6\u82C7", "\u9999\u84B2", "\u73CD\u73E0\u7C89"],
+          bonus: ["\u677E\u8338", "\u51B0\u8349"],
+          spawnRate: 1
+        },
+        "\u79CB": {
+          available: ["\u67B8\u675E\u5B50", "\u5929\u9EBB", "\u9EC4\u7CBE", "\u866B\u8349", "\u677E\u8338", "\u8089\u82C1\u84C9", "\u9501\u9633", "\u6C99\u53C2"],
+          bonus: ["\u96EA\u83B2", "\u7EA2\u666F\u5929"],
+          spawnRate: 1.1
+        },
+        "\u51AC": {
+          available: ["\u96EA\u83B2", "\u7EA2\u82B1", "\u827E\u53F6", "\u96EA\u8336", "\u51B0\u8349", "\u96EA\u86E4", "\u51B0\u87FE", "\u51B0\u83B2"],
+          bonus: ["\u5343\u5E74\u7075\u829D", "\u51B0\u9B44\u5BD2\u83B2"],
+          spawnRate: 0.9
+        }
+      };
+      this.rarityLevels = {
+        "common": { name: "\u666E\u901A", color: "#9E9E9E", discoveryChance: 0.8, masteryBonus: 1 },
+        "uncommon": { name: "\u7A00\u6709", color: "#4CAF50", discoveryChance: 0.5, masteryBonus: 2 },
+        "rare": { name: "\u73CD\u7A00", color: "#2196F3", discoveryChance: 0.25, masteryBonus: 3 },
+        "legendary": { name: "\u4F20\u8BF4", color: "#FF9800", discoveryChance: 0.1, masteryBonus: 5 }
+      };
+      this.herbSynergies = {
+        "\u7075\u829D+\u866B\u8349": { result: "\u5F3A\u5316\u7075\u529B", efficiency: 1.5 },
+        "\u4EBA\u53C2\u53F6+\u67B8\u675E\u5B50": { result: "\u8865\u6C14\u517B\u8840", efficiency: 1.3 },
+        "\u96EA\u83B2+\u51B0\u8349": { result: "\u5BD2\u51B0\u6DEC\u4F53", efficiency: 1.4 },
+        "\u5929\u9EBB+\u9EC4\u7CBE": { result: "\u5B89\u795E\u76CA\u667A", efficiency: 1.2 },
+        "\u832F\u82D3+\u83B2\u5B50": { result: "\u5065\u813E\u5B81\u5FC3", efficiency: 1.3 },
+        "\u91D1\u94F6\u82B1+\u8FDE\u7FD8": { result: "\u6E05\u70ED\u89E3\u6BD2", efficiency: 1.4 },
+        "\u8089\u82C1\u84C9+\u9501\u9633": { result: "\u58EE\u9633\u8865\u80BE", efficiency: 1.5 },
+        "\u73CD\u73E0\u7C89+\u8D1D\u6BCD": { result: "\u6DA6\u80BA\u517B\u989C", efficiency: 1.3 },
+        "\u5343\u5E74\u7075\u829D+\u866B\u8349": { result: "\u5EF6\u5E74\u76CA\u5BFF", efficiency: 2 },
+        "\u51B0\u9B44\u5BD2\u83B2+\u96EA\u86E4": { result: "\u51B0\u808C\u7389\u9AA8", efficiency: 1.8 },
+        "\u9053\u97F5\u82B1+\u5929\u547D\u679C": { result: "\u9006\u5929\u6539\u547D", efficiency: 2.5 },
+        "\u8840\u7CBE\u8349+\u9B42\u82B1": { result: "\u8840\u796D\u7075\u9B42", efficiency: 1.6 },
+        "\u865A\u7A7A\u5170+\u5E7B\u5F71\u82B1": { result: "\u865A\u5B9E\u76F8\u751F", efficiency: 1.7 },
+        "\u4E03\u5F69\u8349+\u5E7D\u51A5\u85E4": { result: "\u9634\u9633\u8C03\u548C", efficiency: 1.5 }
+      };
+      this.discoveredHerbs = /* @__PURE__ */ new Set();
+      this.herbKnowledge = {
+        metal: 0,
+        // 金
+        wood: 0,
+        // 木
+        water: 0,
+        // 水
+        fire: 0,
+        // 火
+        earth: 0
+        // 土
+      };
+      this.exploreCooldown = 0;
+      this.cooldownDuration = 5e3;
+    }
+    /**
+     * 初始化药材探索服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.herbDiscovery) {
+        gameState3.herbDiscovery = {
+          discoveredHerbs: [],
+          herbKnowledge: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+          totalExplorations: 0,
+          successfulDiscoveries: 0,
+          regionVisits: {},
+          seasonHarvests: {}
+        };
+      }
+      this.discoveredHerbs = new Set(gameState3.herbDiscovery.discoveredHerbs || []);
+      this.herbKnowledge = { ...this.herbKnowledge, ...gameState3.herbDiscovery.herbKnowledge || {} };
+      this.initialized = true;
+      return gameState3;
+    }
+    /**
+     * 获取当前季节
+     */
+    getCurrentSeason() {
+      var _a;
+      const days = ((_a = this.gameState) == null ? void 0 : _a.days) || 1;
+      const seasonIndex = Math.floor(days % 365 / 91);
+      const seasons = ["\u6625", "\u590F", "\u79CB", "\u51AC"];
+      return seasons[seasonIndex] || "\u6625";
+    }
+    /**
+     * 计算发现概率
+     */
+    calculateDiscoveryChance(rarity, elementBonus = 0) {
+      const rarityData = this.rarityLevels[rarity] || this.rarityLevels["common"];
+      const baseChance = rarityData.discoveryChance;
+      const masteryBonus = rarityData.masteryBonus;
+      const elementMultiplier = 1 + elementBonus * 0.1;
+      return Math.min(0.95, baseChance * elementMultiplier);
+    }
+    /**
+     * 计算协同效应
+     */
+    calculateSynergy(herbs) {
+      const synergies = [];
+      const sortedHerbs = [...herbs].sort();
+      for (const [combo, effect] of Object.entries(this.herbSynergies)) {
+        const [herb1, herb2] = combo.split("+");
+        if (sortedHerbs.includes(herb1) && sortedHerbs.includes(herb2)) {
+          synergies.push({
+            herbs: [herb1, herb2],
+            effect: effect.result,
+            efficiency: effect.efficiency
+          });
+        }
+      }
+      synergies.sort((a, b) => b.efficiency - a.efficiency);
+      return synergies;
+    }
+    // ===== MCP 工具实现 =====
+    /**
+     * herb.explore.region - 在指定地域探索药材
+     */
+    exploreRegion(params) {
+      var _a, _b;
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { region, useMastery = true } = params || {};
+      if (this.exploreCooldown > Date.now()) {
+        const remaining = Math.ceil((this.exploreCooldown - Date.now()) / 1e3);
+        return { success: false, error: `\u63A2\u7D22\u51B7\u5374\u4E2D\uFF0C\u8BF7\u7B49\u5F85 ${remaining} \u79D2` };
+      }
+      if (!region || !this.regionHerbs[region]) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5730\u57DF",
+          validRegions: Object.keys(this.regionHerbs)
+        };
+      }
+      let elementBonus = 0;
+      if (useMastery && ((_b = (_a = this.gameState) == null ? void 0 : _a.spiritRoot) == null ? void 0 : _b.attributes)) {
+        const attrs = this.gameState.spiritRoot.attributes;
+        elementBonus = (attrs.metal || 0) + (attrs.wood || 0) + (attrs.water || 0) + (attrs.fire || 0) + (attrs.earth || 0);
+      }
+      const regionData = this.regionHerbs[region];
+      const season = this.getCurrentSeason();
+      const seasonData = this.seasonalHerbs[season];
+      const availableHerbs = [...regionData.common];
+      if (seasonData.bonus.some((h) => regionData.uncommon.includes(h))) {
+        availableHerbs.push(...regionData.uncommon.filter((h) => seasonData.bonus.includes(h)));
+      }
+      const rarityRoll = Math.random();
+      let selectedRarity;
+      let herbs;
+      if (rarityRoll < 0.6) {
+        selectedRarity = "common";
+        herbs = regionData.common;
+      } else if (rarityRoll < 0.85) {
+        selectedRarity = "uncommon";
+        herbs = regionData.uncommon;
+      } else if (rarityRoll < 0.97) {
+        selectedRarity = "rare";
+        herbs = regionData.rare;
+      } else {
+        selectedRarity = "legendary";
+        herbs = regionData.legendary;
+      }
+      while (herbs.length === 0 && selectedRarity !== "common") {
+        if (selectedRarity === "legendary") selectedRarity = "rare";
+        else if (selectedRarity === "rare") selectedRarity = "uncommon";
+        else if (selectedRarity === "uncommon") selectedRarity = "common";
+        herbs = regionData[selectedRarity];
+      }
+      const discoveryChance = this.calculateDiscoveryChance(selectedRarity, elementBonus);
+      const seasonMultiplier = seasonData.spawnRate;
+      const finalChance = discoveryChance * seasonMultiplier;
+      const roll = Math.random();
+      const discovered = roll < finalChance;
+      this.exploreCooldown = Date.now() + this.cooldownDuration;
+      this.gameState.herbDiscovery.totalExplorations++;
+      this.gameState.herbDiscovery.regionVisits[region] = (this.gameState.herbDiscovery.regionVisits[region] || 0) + 1;
+      if (discovered && herbs.length > 0) {
+        const herb = herbs[Math.floor(Math.random() * herbs.length)];
+        const isNew = !this.discoveredHerbs.has(herb);
+        if (isNew) {
+          this.discoveredHerbs.add(herb);
+          this.gameState.herbDiscovery.discoveredHerbs.push(herb);
+          this.gameState.herbDiscovery.successfulDiscoveries++;
+        }
+        return {
+          success: true,
+          region,
+          season,
+          herb,
+          rarity: selectedRarity,
+          rarityName: this.rarityLevels[selectedRarity].name,
+          isNew,
+          discoveryChance: finalChance,
+          roll,
+          seasonBonus: seasonMultiplier > 1 ? "good" : seasonMultiplier < 1 ? "bad" : "normal"
+        };
+      }
+      return {
+        success: false,
+        reason: "\u672A\u53D1\u73B0\u836F\u6750",
+        region,
+        season,
+        discoveryChance: finalChance,
+        roll,
+        regionHerbs: regionData.common.slice(0, 3)
+      };
+    }
+    /**
+     * herb.season.query - 查询当前季节的药材
+     */
+    querySeasonalHerbs(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { season } = params || {};
+      const targetSeason = season || this.getCurrentSeason();
+      const seasonData = this.seasonalHerbs[targetSeason];
+      if (!seasonData) {
+        return { success: false, error: `\u65E0\u6548\u7684\u5B63\u8282: ${season}` };
+      }
+      const rarityCounts = {
+        common: seasonData.available.filter(
+          (h) => Object.values(this.regionHerbs).some((r) => r.common.includes(h))
+        ).length,
+        uncommon: seasonData.bonus.filter(
+          (h) => Object.values(this.regionHerbs).some((r) => r.uncommon.includes(h))
+        ).length
+      };
+      return {
+        success: true,
+        season: targetSeason,
+        availableHerbs: seasonData.available,
+        bonusHerbs: seasonData.bonus,
+        spawnRate: seasonData.spawnRate,
+        rarityCounts,
+        description: this.getSeasonDescription(targetSeason)
+      };
+    }
+    /**
+     * 获取季节描述
+     */
+    getSeasonDescription(season) {
+      const descriptions = {
+        "\u6625": "\u6625\u5B63\u4E07\u7269\u590D\u82CF\uFF0C\u8349\u6728\u751F\u957F\u65FA\u76DB\uFF0C\u662F\u91C7\u96C6\u7075\u8349\u7684\u597D\u65F6\u8282\u3002",
+        "\u590F": "\u590F\u5B63\u9633\u5149\u5145\u8DB3\uFF0C\u6E56\u6CCA\u836F\u6750\u751F\u957F\u8FC5\u901F\uFF0C\u4F46\u5C71\u6797\u836F\u6750\u8F83\u5C11\u3002",
+        "\u79CB": "\u79CB\u5B63\u662F\u6536\u83B7\u7684\u5B63\u8282\uFF0C\u5927\u90E8\u5206\u836F\u6750\u90FD\u5728\u6B64\u65F6\u6210\u719F\u3002",
+        "\u51AC": "\u51AC\u5B63\u5BD2\u51B7\uFF0C\u51B0\u96EA\u836F\u6750\u54C1\u8D28\u6700\u4F73\uFF0C\u4F46\u6570\u91CF\u8F83\u5C11\u3002"
+      };
+      return descriptions[season] || "";
+    }
+    /**
+     * herb.discovery.list - 查看已发现药材
+     */
+    listDiscoveredHerbs(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { filter, rarity } = params || {};
+      let herbs = Array.from(this.discoveredHerbs);
+      if (rarity) {
+        herbs = herbs.filter(
+          (h) => Object.entries(this.regionHerbs).some(
+            ([, data]) => {
+              var _a;
+              return (_a = data[rarity]) == null ? void 0 : _a.includes(h);
+            }
+          )
+        );
+      }
+      if (filter) {
+        herbs = herbs.filter((h) => h.includes(filter));
+      }
+      const classifiedHerbs = {
+        common: [],
+        uncommon: [],
+        rare: [],
+        legendary: []
+      };
+      for (const herb of herbs) {
+        for (const [rarity2, data] of Object.entries(this.regionHerbs)) {
+          if (data.legendary.includes(herb)) {
+            classifiedHerbs.legendary.push(herb);
+          } else if (data.rare.includes(herb)) {
+            classifiedHerbs.rare.push(herb);
+          } else if (data.uncommon.includes(herb)) {
+            classifiedHerbs.uncommon.push(herb);
+          } else if (data.common.includes(herb)) {
+            classifiedHerbs.common.push(herb);
+          }
+        }
+      }
+      return {
+        success: true,
+        totalCount: herbs.length,
+        herbs: herbs.sort(),
+        classified: classifiedHerbs,
+        stats: {
+          totalExplorations: this.gameState.herbDiscovery.totalExplorations,
+          successfulDiscoveries: this.gameState.herbDiscovery.successfulDiscoveries,
+          discoveryRate: this.gameState.herbDiscovery.totalExplorations > 0 ? (this.gameState.herbDiscovery.successfulDiscoveries / this.gameState.herbDiscovery.totalExplorations * 100).toFixed(1) + "%" : "0%"
+        }
+      };
+    }
+    /**
+     * herb.rarity.classify - 药材稀有度分类
+     */
+    classifyHerbsByRarity(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { herb } = params || {};
+      if (herb) {
+        for (const [rarity, data] of Object.entries(this.regionHerbs)) {
+          for (const [rarityType, herbs] of Object.entries(data)) {
+            if (herbs.includes(herb)) {
+              const rarityData = this.rarityLevels[rarityType];
+              return {
+                success: true,
+                herb,
+                rarity: rarityType,
+                rarityName: rarityData.name,
+                color: rarityData.color,
+                discoveryChance: rarityData.discoveryChance,
+                masteryBonus: rarityData.masteryBonus,
+                regions: this.findHerbRegions(herb)
+              };
+            }
+          }
+        }
+        return { success: false, error: `\u672A\u627E\u5230\u836F\u6750: ${herb}` };
+      }
+      const classification = {};
+      for (const [regionName, data] of Object.entries(this.regionHerbs)) {
+        for (const [rarityType, herbs] of Object.entries(data)) {
+          if (!classification[rarityType]) {
+            classification[rarityType] = {
+              name: this.rarityLevels[rarityType].name,
+              color: this.rarityLevels[rarityType].color,
+              herbs: []
+            };
+          }
+          classification[rarityType].herbs.push(...herbs);
+        }
+      }
+      for (const rarity of Object.keys(classification)) {
+        classification[rarity].herbs = [...new Set(classification[rarity].herbs)];
+        classification[rarity].count = classification[rarity].herbs.length;
+      }
+      return {
+        success: true,
+        classification,
+        totalHerbs: Object.values(classification).reduce((sum, c) => sum + c.count, 0)
+      };
+    }
+    /**
+     * 查找药材存在的地域
+     */
+    findHerbRegions(herb) {
+      const regions = [];
+      for (const [regionName, data] of Object.entries(this.regionHerbs)) {
+        for (const [rarity, herbs] of Object.entries(data)) {
+          if (herbs.includes(herb)) {
+            regions.push({
+              region: regionName,
+              rarity
+            });
+          }
+        }
+      }
+      return regions;
+    }
+    /**
+     * herb.synergy.analyze - 分析药材协同效应
+     */
+    analyzeSynergy(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { herbs } = params || {};
+      if (!herbs || !Array.isArray(herbs) || herbs.length < 2) {
+        return {
+          success: false,
+          error: "\u8BF7\u63D0\u4F9B\u81F3\u5C112\u79CD\u836F\u6750\u8FDB\u884C\u5206\u6790",
+          availableSynergies: Object.keys(this.herbSynergies).slice(0, 5)
+        };
+      }
+      const synergies = this.calculateSynergy(herbs);
+      const totalEfficiency = synergies.reduce((sum, s) => sum + s.efficiency, 0);
+      const discoveredCount = herbs.filter((h) => this.discoveredHerbs.has(h)).length;
+      const possibleCombos = [];
+      for (const [combo, effect] of Object.entries(this.herbSynergies)) {
+        const [h1, h2] = combo.split("+");
+        if (herbs.includes(h1) || herbs.includes(h2)) {
+          const hasBoth = herbs.includes(h1) && herbs.includes(h2);
+          const hasOne = herbs.includes(h1) || herbs.includes(h2);
+          if (!hasBoth) {
+            possibleCombos.push({
+              existing: herbs.includes(h1) ? h1 : h2,
+              missing: herbs.includes(h1) ? h2 : h1,
+              effect: effect.result,
+              efficiency: effect.efficiency
+            });
+          }
+        }
+      }
+      return {
+        success: true,
+        inputHerbs: herbs,
+        synergies,
+        totalEfficiency,
+        hasSynergy: synergies.length > 0,
+        discoveredCount,
+        missingCount: herbs.length - discoveredCount,
+        possibleCombos: possibleCombos.slice(0, 5)
+      };
+    }
+    /**
+     * herb.knowledge.gain - 获取药材知识（升级精通）
+     */
+    gainHerbKnowledge(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u836F\u6750\u63A2\u7D22\u670D\u52A1\u672A\u521D\u59CB\u5316" };
+      }
+      const { element, amount } = params || {};
+      const knowledgeGain = amount || 1;
+      const validElements = ["metal", "wood", "water", "fire", "earth"];
+      if (element && !validElements.includes(element)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5143\u7D20",
+          validElements
+        };
+      }
+      if (element) {
+        const oldLevel = this.herbKnowledge[element];
+        this.herbKnowledge[element] += knowledgeGain;
+        const newLevel = this.herbKnowledge[element];
+        this.gameState.herbDiscovery.herbKnowledge[element] = newLevel;
+        return {
+          success: true,
+          element,
+          knowledgeGain,
+          oldLevel,
+          newLevel,
+          levelUp: Math.floor(newLevel / 10) > Math.floor(oldLevel / 10),
+          bonusMultiplier: 1 + newLevel * 0.1
+        };
+      }
+      const totalKnowledge = Object.values(this.herbKnowledge).reduce((sum, v) => sum + v, 0);
+      const elementDescriptions = {
+        metal: "\u91D1 - \u63A7\u5236\u77FF\u7269\u548C\u91D1\u5C5E\u7C7B\u836F\u6750",
+        wood: "\u6728 - \u63A7\u5236\u8349\u672C\u548C\u690D\u7269\u7C7B\u836F\u6750",
+        water: "\u6C34 - \u63A7\u5236\u6C34\u7CFB\u548C\u5BD2\u6027\u836F\u6750",
+        fire: "\u706B - \u63A7\u5236\u706B\u7CFB\u548C\u70ED\u6027\u836F\u6750",
+        earth: "\u571F - \u63A7\u5236\u571F\u7CFB\u548C\u77FF\u7269\u7C7B\u836F\u6750"
+      };
+      return {
+        success: true,
+        herbKnowledge: this.herbKnowledge,
+        totalKnowledge,
+        elementDescriptions,
+        overallBonus: 1 + totalKnowledge * 0.05,
+        levelSummary: Object.fromEntries(
+          Object.entries(this.herbKnowledge).map(([el, val]) => [el, Math.floor(val / 10)])
+        )
+      };
+    }
+    /**
+     * 获取服务状态
+     */
+    getStatus() {
+      var _a, _b, _c, _d;
+      return {
+        initialized: this.initialized,
+        discoveredCount: this.discoveredHerbs.size,
+        totalKnowledge: Object.values(this.herbKnowledge).reduce((sum, v) => sum + v, 0),
+        cooldownActive: this.exploreCooldown > Date.now(),
+        cooldownRemaining: Math.max(0, this.exploreCooldown - Date.now()),
+        currentSeason: this.getCurrentSeason(),
+        stats: {
+          totalExplorations: ((_b = (_a = this.gameState) == null ? void 0 : _a.herbDiscovery) == null ? void 0 : _b.totalExplorations) || 0,
+          successfulDiscoveries: ((_d = (_c = this.gameState) == null ? void 0 : _c.herbDiscovery) == null ? void 0 : _d.successfulDiscoveries) || 0
+        }
+      };
+    }
+  };
+  var herbDiscoveryService = new HerbDiscoveryService();
+
   // src/domains/ranking/RankingModule.js
   function createRankingService(gameStateAccessor) {
     return new RankingService(gameStateAccessor);
@@ -10954,6 +11491,534 @@ var CultivationSimulator = (() => {
   };
   var npcEvolutionEngine = new NPCEvolutionEngine();
 
+  // src/systems/ai/NPCDialogueService.js
+  init_NPCCollaboration();
+  var DIALOGUE_TEMPLATES = {
+    master: {
+      formal: [
+        { template: "\u5F92\u513F\uFF0C{topic}\uFF0C\u4E3A\u5E08\u751A\u611F\u6B23\u6170\u3002", variables: ["topic"] },
+        { template: "\u4FEE\u4ED9\u4E4B\u8DEF\u8270\u96BE\uFF0C{topic}\uFF0C\u4F60\u9700\u52E4\u52A0\u4FEE\u70BC\u3002", variables: ["topic"] },
+        { template: "\u4E3A\u5E08\u89C2\u4F60\u6839\u9AA8\uFF0C{topic}\uFF0C\u65E5\u540E\u5FC5\u6210\u5927\u5668\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u5F92\u513F\u554A\uFF0C{topic}\uFF0C\u8FD9\u4E8B\u4E3A\u5E08\u4E5F\u4E0D\u597D\u591A\u8BF4\u3002", variables: ["topic"] },
+        { template: "\u8BF4\u8D77\u6765\uFF0C{topic}\uFF0C\u4F60\u81EA\u5DF1\u597D\u597D\u7422\u78E8\u7422\u78E8\u3002", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u5929\u673A\u4E0D\u53EF\u6CC4\u9732\uFF0C{topic}\uFF0C\u4F60\u4E14\u8BB0\u4F4F\u4FBF\u662F\u3002", variables: ["topic"] },
+        { template: "\u51A5\u51A5\u4E4B\u4E2D\u81EA\u6709\u5B9A\u6570\uFF0C{topic}\uFF0C\u65E0\u9700\u591A\u95EE\u3002", variables: ["topic"] }
+      ]
+    },
+    merchant: {
+      formal: [
+        { template: "\u8FD9\u4F4D\u9053\u53CB\uFF0C{topic}\uFF0C\u672C\u5E97\u5E94\u6709\u5C3D\u6709\u3002", variables: ["topic"] },
+        { template: "\u5BA2\u5B98\uFF0C{topic}\uFF0C\u60A8\u773C\u5149\u771F\u662F\u72EC\u5230\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u54DF\uFF0C{topic}\uFF0C\u6765\u770B\u770B\u8FD9\u4E2A\uFF0C\u4FDD\u8BC1\u4FBF\u5B9C\uFF01", variables: ["topic"] },
+        { template: "\u563F\uFF0C{topic}\uFF0C\u6211\u8FD9\u513F\u53EF\u662F\u8D27\u771F\u4EF7\u5B9E\uFF01", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u8FD9\u4E9B\u4E1C\u897F\u561B\uFF0C{topic}\uFF0C\u6765\u5386\u53EF\u4E0D\u7B80\u5355\u3002", variables: ["topic"] },
+        { template: "\u4F60\u6211\u6709\u7F18\uFF0C{topic}\uFF0C\u4FBF\u8D60\u4F60\u4E00\u53E5\uFF1A\u83AB\u8D2A\u4FBF\u5B9C\u3002", variables: ["topic"] }
+      ]
+    },
+    fellow: {
+      formal: [
+        { template: "\u9053\u5144\uFF0C{topic}\uFF0C\u4E0D\u77E5\u6709\u4F55\u89C1\u6559\uFF1F", variables: ["topic"] },
+        { template: "\u8FD9\u4F4D\u9053\u53CB\uFF0C{topic}\uFF0C\u543E\u7B49\u5F53\u5171\u52C9\u4E4B\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u563F\uFF0C{topic}\uFF0C\u6700\u8FD1\u4FEE\u70BC\u5F97\u600E\u4E48\u6837\uFF1F", variables: ["topic"] },
+        { template: "\u8BF4\u8D77\u6765\uFF0C{topic}\uFF0C\u54B1\u4EEC\u4E00\u5757\u513F\u53BB\u63A2\u9669\u5982\u4F55\uFF1F", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u6211\u6628\u591C\u5360\u4E86\u4E00\u5366\uFF0C{topic}\uFF0C\u4F60\u4E14\u542C\u597D\u3002", variables: ["topic"] },
+        { template: "\u5929\u673A\u793A\u73B0\uFF0C{topic}\uFF0C\u6050\u6709\u5927\u4E8B\u53D1\u751F\u3002", variables: ["topic"] }
+      ]
+    },
+    monster: {
+      formal: [
+        { template: "\u5351\u5FAE\u7684\u4EBA\u7C7B\uFF0C{topic}\uFF0C\u901F\u901F\u79BB\u53BB\uFF01", variables: ["topic"] },
+        { template: "\u54FC\uFF0C{topic}\uFF0C\u672C\u5EA7\u4E0D\u5C51\u4E0E\u4F60\u8BA1\u8F83\u3002", variables: ["topic"] }
+      ],
+      casual: [
+        { template: "\u54DF\uFF0C{topic}\uFF0C\u53C8\u6765\u9001\u6B7B\u4E86\uFF1F", variables: ["topic"] },
+        { template: "\u54C8\u54C8\u54C8\uFF0C{topic}\uFF0C\u6B63\u597D\u997F\u4E86\uFF01", variables: ["topic"] }
+      ],
+      mysterious: [
+        { template: "\u5343\u5E74\u6C89\u7761\u4E2D\uFF0C{topic}\uFF0C\u543E\u5DF2\u7B49\u5F85\u591A\u65F6\u3002", variables: ["topic"] },
+        { template: "\u547D\u8FD0\u7684\u9F7F\u8F6E\u8F6C\u52A8\uFF0C{topic}\uFF0C\u4E00\u5207\u7686\u6709\u5B9A\u6570\u3002", variables: ["topic"] }
+      ]
+    }
+  };
+  var DEFAULT_TEMPLATES = {
+    formal: [
+      { template: "\u8FD9\u4F4D\u4FEE\u58EB\uFF0C{topic}\uFF0C\u6709\u4F55\u8D35\u5E72\uFF1F", variables: ["topic"] }
+    ],
+    casual: [
+      { template: "\u563F\uFF0C{topic}\uFF0C\u6709\u4EC0\u4E48\u4E8B\u5417\uFF1F", variables: ["topic"] }
+    ],
+    mysterious: [
+      { template: "\u5929\u673A\u7384\u5999\uFF0C{topic}\uFF0C\u543E\u96BE\u4EE5\u53C2\u900F\u3002", variables: ["topic"] }
+    ]
+  };
+  var DialogueContext = class {
+    constructor(npcId) {
+      this.npcId = npcId;
+      this.conversationHistory = [];
+      this.currentTopic = null;
+      this.emotion = "neutral";
+      this.goal = null;
+      this.turnCount = 0;
+      this.lastPlayerMessage = null;
+      this.lastGeneratedDialogue = null;
+      this.tone = "formal";
+      this.createdAt = Date.now();
+      this.updatedAt = Date.now();
+    }
+    /**
+     * 添加对话到历史
+     */
+    addToHistory(playerMessage, npcResponse) {
+      this.conversationHistory.push({
+        playerMessage,
+        npcResponse,
+        timestamp: Date.now(),
+        turn: this.turnCount
+      });
+      this.lastPlayerMessage = playerMessage;
+      this.lastGeneratedDialogue = npcResponse;
+      this.turnCount++;
+      this.updatedAt = Date.now();
+    }
+    /**
+     * 重置上下文
+     */
+    reset() {
+      this.conversationHistory = [];
+      this.currentTopic = null;
+      this.emotion = "neutral";
+      this.goal = null;
+      this.turnCount = 0;
+      this.lastPlayerMessage = null;
+      this.lastGeneratedDialogue = null;
+      this.updatedAt = Date.now();
+    }
+  };
+  var NPCMemoryEntry = class {
+    constructor(type, content, metadata = {}) {
+      this.id = `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.content = content;
+      this.metadata = metadata;
+      this.importance = metadata.importance || 0.5;
+      this.createdAt = Date.now();
+      this.lastAccessedAt = Date.now();
+      this.accessCount = 0;
+    }
+    /**
+     * 访问记忆
+     */
+    access() {
+      this.lastAccessedAt = Date.now();
+      this.accessCount++;
+    }
+  };
+  var NPCDialogueService = class {
+    constructor() {
+      this.contexts = /* @__PURE__ */ new Map();
+      this.memories = /* @__PURE__ */ new Map();
+      this.toneSettings = /* @__PURE__ */ new Map();
+      this.gameState = null;
+      this.initialized = false;
+      this.templateCache = /* @__PURE__ */ new Map();
+      this.maxMemoriesPerNPC = 100;
+      this.maxContextHistory = 50;
+    }
+    /**
+     * 初始化服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      this.initialized = true;
+      console.log("[NPCDialogueService] NPC\u5BF9\u8BDD\u751F\u6210\u670D\u52A1\u521D\u59CB\u5316\u5B8C\u6210");
+      return { success: true };
+    }
+    /**
+     * 获取或创建NPC上下文
+     */
+    getOrCreateContext(npcId) {
+      if (!this.contexts.has(npcId)) {
+        this.contexts.set(npcId, new DialogueContext(npcId));
+      }
+      return this.contexts.get(npcId);
+    }
+    /**
+     * 获取玩家上下文信息
+     */
+    getPlayerContext() {
+      var _a, _b, _c;
+      if (!this.gameState) return null;
+      return {
+        name: ((_a = this.gameState.player) == null ? void 0 : _a.name) || "\u672A\u77E5\u4FEE\u58EB",
+        level: ((_b = this.gameState.player) == null ? void 0 : _b.level) || 1,
+        realm: this.gameState.realm || 0,
+        stage: this.gameState.stage || 0,
+        reputation: ((_c = this.gameState.player) == null ? void 0 : _c.reputation) || 0
+      };
+    }
+    /**
+     * 从NPCEvolutionEngine获取NPC学习状态
+     */
+    getNPCLearningStatus(npcId) {
+      try {
+        const status = npcEvolutionEngine.registry.getLearningStatus(npcId);
+        return status;
+      } catch (e) {
+        return null;
+      }
+    }
+    // ===== MCP工具实现 =====
+    /**
+     * MCP: npc.dialogue.generate
+     * 生成NPC对话回复
+     */
+    mcpGenerateDialogue(params = {}) {
+      const { npcId, playerMessage, context: customContext } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!playerMessage) {
+        return { success: false, reason: "Missing playerMessage parameter" };
+      }
+      const role = this.extractRole(npcId);
+      const ctx = this.getOrCreateContext(npcId);
+      const memories = this.getMemories(npcId);
+      const relevantMemories = this.findRelevantMemories(memories, playerMessage);
+      const generated = this.generateDialogue(npcId, role, playerMessage, ctx, relevantMemories);
+      ctx.addToHistory(playerMessage, generated.text);
+      if (ctx.turnCount === 1) {
+        ctx.currentTopic = this.extractTopic(playerMessage);
+      }
+      this.recordMemory(npcId, "interaction", {
+        playerMessage,
+        npcResponse: generated.text
+      }, { importance: 0.5 });
+      return {
+        tool: "npc.dialogue.generate",
+        success: true,
+        npcId,
+        dialogue: generated,
+        context: {
+          turnCount: ctx.turnCount,
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          tone: ctx.tone
+        }
+      };
+    }
+    /**
+     * 提取NPC角色
+     */
+    extractRole(npcId) {
+      const lowerNpcId = npcId.toLowerCase();
+      if (NPC_ROLE_REGISTRY[lowerNpcId]) {
+        return lowerNpcId;
+      }
+      for (const role of Object.keys(NPC_ROLE_REGISTRY)) {
+        if (lowerNpcId.startsWith(role) || lowerNpcId.includes(role)) {
+          return role;
+        }
+      }
+      return "fellow";
+    }
+    /**
+     * 提取话题
+     */
+    extractTopic(message) {
+      const keywords = {
+        "\u4FEE\u70BC": "cultivation",
+        "\u7A81\u7834": "breakthrough",
+        "\u7075\u6839": "spirit_root",
+        "\u4E39\u836F": "pill",
+        "\u529F\u6CD5": "technique",
+        "\u4EFB\u52A1": "task",
+        "\u6218\u6597": "combat",
+        "\u4EA4\u6613": "trade",
+        "\u5207\u78CB": "sparring"
+      };
+      for (const [keyword, topic] of Object.entries(keywords)) {
+        if (message.includes(keyword)) {
+          return topic;
+        }
+      }
+      return "general";
+    }
+    /**
+     * 生成对话
+     */
+    generateDialogue(npcId, role, playerMessage, context, memories) {
+      const tone = this.toneSettings.get(npcId) || context.tone || "formal";
+      const templates = DIALOGUE_TEMPLATES[role] || DEFAULT_TEMPLATES;
+      const toneTemplates = templates[tone] || templates.formal;
+      if (toneTemplates.length === 0) {
+        return { text: "...", tone, source: "default" };
+      }
+      let selectedTemplate = toneTemplates[Math.floor(Math.random() * toneTemplates.length)];
+      if (memories.length > 0) {
+        const recentMemory = memories[0];
+        if (recentMemory.content.npcResponse) {
+          const variantIndex = Math.floor(Math.random() * toneTemplates.length);
+          selectedTemplate = toneTemplates[variantIndex];
+        }
+      }
+      let text = selectedTemplate.template;
+      const topic = this.extractTopic(playerMessage);
+      const topicMap = {
+        "cultivation": "\u4FEE\u70BC\u4E4B\u4E8B",
+        "breakthrough": "\u7A81\u7834\u4E4B\u673A",
+        "spirit_root": "\u7075\u6839\u4E4B\u9053",
+        "pill": "\u4E39\u836F\u4E4B\u7406",
+        "technique": "\u529F\u6CD5\u4E4B\u5999",
+        "task": "\u4EFB\u52A1\u4E4B\u7EA6",
+        "combat": "\u6218\u6597\u4E4B\u9053",
+        "trade": "\u4EA4\u6613\u4E4B\u9053",
+        "sparring": "\u5207\u78CB\u4E4B\u8C0A",
+        "general": "\u4FEE\u884C\u4E4B\u8DEF"
+      };
+      text = text.replace("{topic}", topicMap[topic] || topicMap.general);
+      return {
+        text,
+        tone,
+        template: selectedTemplate.template,
+        source: "template"
+      };
+    }
+    /**
+     * MCP: npc.dialogue.context
+     * 获取当前对话上下文
+     */
+    mcpGetContext(params = {}) {
+      const { npcId } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const ctx = this.contexts.get(npcId);
+      if (!ctx) {
+        return {
+          success: true,
+          npcId,
+          exists: false,
+          message: "No active dialogue context"
+        };
+      }
+      return {
+        tool: "npc.dialogue.context",
+        success: true,
+        npcId,
+        exists: true,
+        context: {
+          conversationHistory: ctx.conversationHistory.slice(-10),
+          // 最近10条
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          goal: ctx.goal,
+          turnCount: ctx.turnCount,
+          lastPlayerMessage: ctx.lastPlayerMessage,
+          lastGeneratedDialogue: ctx.lastGeneratedDialogue,
+          tone: ctx.tone,
+          createdAt: ctx.createdAt,
+          updatedAt: ctx.updatedAt
+        }
+      };
+    }
+    /**
+     * MCP: npc.memory.retrieve
+     * 检索NPC记忆
+     */
+    mcpRetrieveMemory(params = {}) {
+      const { npcId, type, limit = 10 } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const learningStatus = this.getNPCLearningStatus(npcId);
+      const memories = this.getMemories(npcId);
+      let filtered = memories;
+      if (type) {
+        filtered = memories.filter((m) => m.type === type);
+      }
+      filtered.sort((a, b) => b.importance - a.importance);
+      filtered = filtered.slice(0, limit);
+      for (const memory of filtered) {
+        memory.access();
+      }
+      return {
+        tool: "npc.memory.retrieve",
+        success: true,
+        npcId,
+        memories: filtered,
+        totalMemories: memories.length,
+        learningStatus: learningStatus ? {
+          adaptationLevel: learningStatus.adaptationLevel,
+          behaviorPattern: learningStatus.behaviorPattern,
+          stats: learningStatus.stats
+        } : null
+      };
+    }
+    /**
+     * 获取NPC记忆
+     */
+    getMemories(npcId) {
+      if (!this.memories.has(npcId)) {
+        this.memories.set(npcId, []);
+      }
+      return this.memories.get(npcId);
+    }
+    /**
+     * 记录记忆
+     */
+    recordMemory(npcId, type, content, metadata = {}) {
+      const memories = this.getMemories(npcId);
+      const entry = new NPCMemoryEntry(type, content, metadata);
+      memories.push(entry);
+      if (memories.length > this.maxMemoriesPerNPC) {
+        memories.sort((a, b) => a.importance - b.importance);
+        memories.shift();
+      }
+      return entry;
+    }
+    /**
+     * 查找相关记忆
+     */
+    findRelevantMemories(memories, query) {
+      if (memories.length === 0) return [];
+      const queryWords = query.toLowerCase().split(/\s+/);
+      return memories.map((memory) => {
+        let relevance = 0;
+        const contentStr = JSON.stringify(memory.content).toLowerCase();
+        for (const word of queryWords) {
+          if (contentStr.includes(word)) {
+            relevance += 0.3;
+          }
+        }
+        relevance += Math.min(memory.accessCount * 0.05, 0.3);
+        relevance += memory.importance * 0.2;
+        return { memory, relevance };
+      }).filter((item) => item.relevance > 0.1).sort((a, b) => b.relevance - a.relevance).slice(0, 5).map((item) => item.memory);
+    }
+    /**
+     * MCP: npc.context.update
+     * 更新对话上下文
+     */
+    mcpUpdateContext(params = {}) {
+      const { npcId, updates } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!updates) {
+        return { success: false, reason: "Missing updates parameter" };
+      }
+      const ctx = this.getOrCreateContext(npcId);
+      if (updates.currentTopic !== void 0) {
+        ctx.currentTopic = updates.currentTopic;
+      }
+      if (updates.emotion !== void 0) {
+        ctx.emotion = updates.emotion;
+      }
+      if (updates.goal !== void 0) {
+        ctx.goal = updates.goal;
+      }
+      if (updates.tone !== void 0) {
+        ctx.tone = updates.tone;
+        this.toneSettings.set(npcId, updates.tone);
+      }
+      ctx.updatedAt = Date.now();
+      return {
+        tool: "npc.context.update",
+        success: true,
+        npcId,
+        updatedFields: Object.keys(updates),
+        context: {
+          currentTopic: ctx.currentTopic,
+          emotion: ctx.emotion,
+          goal: ctx.goal,
+          tone: ctx.tone,
+          turnCount: ctx.turnCount
+        }
+      };
+    }
+    /**
+     * MCP: npc.dialogue.reset
+     * 重置NPC对话状态
+     */
+    mcpResetDialogue(params = {}) {
+      const { npcId, clearMemories = false } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      const ctx = this.contexts.get(npcId);
+      const hadContext = !!ctx;
+      if (ctx) {
+        ctx.reset();
+      }
+      if (clearMemories) {
+        this.memories.delete(npcId);
+      }
+      this.toneSettings.delete(npcId);
+      return {
+        tool: "npc.dialogue.reset",
+        success: true,
+        npcId,
+        hadContext,
+        memoriesCleared: clearMemories
+      };
+    }
+    /**
+     * MCP: npc.tone.set
+     * 设置NPC对话语气
+     */
+    mcpSetTone(params = {}) {
+      const { npcId, tone } = params;
+      if (!npcId) {
+        return { success: false, reason: "Missing npcId parameter" };
+      }
+      if (!tone) {
+        return { success: false, reason: "Missing tone parameter" };
+      }
+      const validTones = ["formal", "casual", "mysterious"];
+      if (!validTones.includes(tone)) {
+        return {
+          success: false,
+          reason: `Invalid tone. Must be one of: ${validTones.join(", ")}`
+        };
+      }
+      this.toneSettings.set(npcId, tone);
+      const ctx = this.getOrCreateContext(npcId);
+      ctx.tone = tone;
+      ctx.updatedAt = Date.now();
+      return {
+        tool: "npc.tone.set",
+        success: true,
+        npcId,
+        tone,
+        message: `NPC ${npcId} tone set to ${tone}`
+      };
+    }
+    /**
+     * 获取服务状态
+     */
+    getStatus() {
+      return {
+        initialized: this.initialized,
+        activeContexts: this.contexts.size,
+        totalMemories: Array.from(this.memories.values()).reduce((sum, arr) => sum + arr.length, 0),
+        toneSettings: this.toneSettings.size
+      };
+    }
+  };
+  var npcDialogueService = new NPCDialogueService();
+
   // src/main.js
   init_RealmEventBus();
   init_EventAnalyticsService();
@@ -11124,7 +12189,10 @@ var CultivationSimulator = (() => {
     domainModules.talentTree = new TalentTreeService(gameState2);
     alchemyKBService.init(gameState2);
     domainModules.alchemyKB = alchemyKBService;
+    herbDiscoveryService.init(gameState2);
+    domainModules.herbDiscovery = herbDiscoveryService;
     npcEvolutionEngine.init(gameState2);
+    npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -11504,6 +12572,92 @@ var CultivationSimulator = (() => {
         }
       }
     }, (params) => alchemyKBService.exportKB(params));
+    mcpRegistry.registerTool("herb.explore.region", {
+      name: "herb.explore.region",
+      description: "Explore a region to discover herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          region: {
+            type: "string",
+            enum: ["\u5E73\u539F", "\u5C71\u6797", "\u6E56\u6CCA", "\u6C99\u6F20", "\u96EA\u5C71", "\u79D8\u5883"],
+            description: "Region to explore"
+          },
+          useMastery: { type: "boolean", description: "Use elemental mastery bonus", default: true }
+        },
+        required: ["region"]
+      }
+    }, (params) => herbDiscoveryService.exploreRegion(params));
+    mcpRegistry.registerTool("herb.season.query", {
+      name: "herb.season.query",
+      description: "Query herbs available in current or specified season",
+      inputSchema: {
+        type: "object",
+        properties: {
+          season: {
+            type: "string",
+            enum: ["\u6625", "\u590F", "\u79CB", "\u51AC"],
+            description: "Season to query"
+          }
+        }
+      }
+    }, (params) => herbDiscoveryService.querySeasonalHerbs(params));
+    mcpRegistry.registerTool("herb.discovery.list", {
+      name: "herb.discovery.list",
+      description: "List all discovered herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filter: { type: "string", description: "Filter by herb name" },
+          rarity: {
+            type: "string",
+            enum: ["common", "uncommon", "rare", "legendary"],
+            description: "Filter by rarity"
+          }
+        }
+      }
+    }, (params) => herbDiscoveryService.listDiscoveredHerbs(params));
+    mcpRegistry.registerTool("herb.rarity.classify", {
+      name: "herb.rarity.classify",
+      description: "Classify herbs by rarity or query specific herb rarity",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herb: { type: "string", description: "Specific herb to query" }
+        }
+      }
+    }, (params) => herbDiscoveryService.classifyHerbsByRarity(params));
+    mcpRegistry.registerTool("herb.synergy.analyze", {
+      name: "herb.synergy.analyze",
+      description: "Analyze synergy effects between herbs",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herbs: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of herbs to analyze",
+            required: ["herbs"]
+          }
+        },
+        required: ["herbs"]
+      }
+    }, (params) => herbDiscoveryService.analyzeSynergy(params));
+    mcpRegistry.registerTool("herb.knowledge.gain", {
+      name: "herb.knowledge.gain",
+      description: "Gain herb knowledge and upgrade elemental mastery",
+      inputSchema: {
+        type: "object",
+        properties: {
+          element: {
+            type: "string",
+            enum: ["metal", "wood", "water", "fire", "earth"],
+            description: "Element to gain knowledge in"
+          },
+          amount: { type: "number", description: "Knowledge amount to gain", default: 1 }
+        }
+      }
+    }, (params) => herbDiscoveryService.gainHerbKnowledge(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -11580,6 +12734,87 @@ var CultivationSimulator = (() => {
         required: ["npcId"]
       }
     }, (params) => npcEvolutionEngine.mcpTriggerEvolution(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.generate", {
+      name: "npc.dialogue.generate",
+      description: "Generate NPC dialogue response based on player input and context",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          playerMessage: { type: "string", description: "Player message to respond to" }
+        },
+        required: ["npcId", "playerMessage"]
+      }
+    }, (params) => npcDialogueService.mcpGenerateDialogue(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.context", {
+      name: "npc.dialogue.context",
+      description: "Get current dialogue context for NPC",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpGetContext(params || {}));
+    mcpRegistry.registerTool("npc.memory.retrieve", {
+      name: "npc.memory.retrieve",
+      description: "Retrieve NPC memories and learning status",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          type: { type: "string", description: "Memory type filter (interaction/preference/event/relationship)" },
+          limit: { type: "number", description: "Maximum memories to retrieve" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpRetrieveMemory(params || {}));
+    mcpRegistry.registerTool("npc.context.update", {
+      name: "npc.context.update",
+      description: "Update dialogue context fields for NPC",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          updates: {
+            type: "object",
+            description: "Fields to update (currentTopic, emotion, goal, tone)",
+            properties: {
+              currentTopic: { type: "string" },
+              emotion: { type: "string" },
+              goal: { type: "string" },
+              tone: { type: "string" }
+            }
+          }
+        },
+        required: ["npcId", "updates"]
+      }
+    }, (params) => npcDialogueService.mcpUpdateContext(params || {}));
+    mcpRegistry.registerTool("npc.dialogue.reset", {
+      name: "npc.dialogue.reset",
+      description: "Reset NPC dialogue state",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          clearMemories: { type: "boolean", description: "Also clear NPC memories" }
+        },
+        required: ["npcId"]
+      }
+    }, (params) => npcDialogueService.mcpResetDialogue(params || {}));
+    mcpRegistry.registerTool("npc.tone.set", {
+      name: "npc.tone.set",
+      description: "Set NPC dialogue tone",
+      inputSchema: {
+        type: "object",
+        properties: {
+          npcId: { type: "string", description: "NPC identifier" },
+          tone: { type: "string", description: "Tone to set (formal/casual/mysterious)" }
+        },
+        required: ["npcId", "tone"]
+      }
+    }, (params) => npcDialogueService.mcpSetTone(params || {}));
     mcpRegistry.registerTool("event.bus.publish", {
       name: "event.bus.publish",
       description: "Publish an event to the realm event bus",
@@ -12077,4 +13312,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-55627ad-2026-05-30T15-36-47-719Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-68dd331-2026-05-30T15-46-32-421Z";

@@ -30,6 +30,9 @@ import PetModule from './domains/pet/PetModule.js';
 // 丹方知识图谱 (Direction Q: 丹药丹方知识图谱)
 import { alchemyKBService } from './domains/inventory/services/AlchemyKBService.js';
 
+// 药材探索系统 (V229 Direction Q续: 丹药丹方知识图谱 - 药材探索)
+import { herbDiscoveryService } from './domains/inventory/services/HerbDiscoveryService.js';
+
 // 领域模块 (ES Module - named exports)
 import { createRankingService, createArenaService } from './domains/ranking/RankingModule.js';
 import { createSigninService, createWelfareService } from './domains/signin/SigninModule.js';
@@ -334,6 +337,10 @@ function initializeDomainModules() {
     // 丹方知识图谱 (Direction Q: 丹药丹方知识图谱)
     alchemyKBService.init(gameState);
     domainModules.alchemyKB = alchemyKBService;
+
+    // 药材探索系统 (V229 Direction Q续: 丹药丹方知识图谱 - 药材探索)
+    herbDiscoveryService.init(gameState);
+    domainModules.herbDiscovery = herbDiscoveryService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
@@ -785,6 +792,99 @@ function registerDomainMCPTools() {
             }
         }
     }, (params) => alchemyKBService.exportKB(params));
+
+    // 药材探索MCP工具 (V229 Direction Q续: 丹药丹方知识图谱 - 药材探索)
+    mcpRegistry.registerTool('herb.explore.region', {
+        name: 'herb.explore.region',
+        description: 'Explore a region to discover herbs',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                region: { 
+                    type: 'string', 
+                    enum: ['平原', '山林', '湖泊', '沙漠', '雪山', '秘境'],
+                    description: 'Region to explore' 
+                },
+                useMastery: { type: 'boolean', description: 'Use elemental mastery bonus', default: true }
+            },
+            required: ['region']
+        }
+    }, (params) => herbDiscoveryService.exploreRegion(params));
+
+    mcpRegistry.registerTool('herb.season.query', {
+        name: 'herb.season.query',
+        description: 'Query herbs available in current or specified season',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                season: { 
+                    type: 'string', 
+                    enum: ['春', '夏', '秋', '冬'],
+                    description: 'Season to query' 
+                }
+            }
+        }
+    }, (params) => herbDiscoveryService.querySeasonalHerbs(params));
+
+    mcpRegistry.registerTool('herb.discovery.list', {
+        name: 'herb.discovery.list',
+        description: 'List all discovered herbs',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                filter: { type: 'string', description: 'Filter by herb name' },
+                rarity: { 
+                    type: 'string', 
+                    enum: ['common', 'uncommon', 'rare', 'legendary'],
+                    description: 'Filter by rarity' 
+                }
+            }
+        }
+    }, (params) => herbDiscoveryService.listDiscoveredHerbs(params));
+
+    mcpRegistry.registerTool('herb.rarity.classify', {
+        name: 'herb.rarity.classify',
+        description: 'Classify herbs by rarity or query specific herb rarity',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                herb: { type: 'string', description: 'Specific herb to query' }
+            }
+        }
+    }, (params) => herbDiscoveryService.classifyHerbsByRarity(params));
+
+    mcpRegistry.registerTool('herb.synergy.analyze', {
+        name: 'herb.synergy.analyze',
+        description: 'Analyze synergy effects between herbs',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                herbs: { 
+                    type: 'array', 
+                    items: { type: 'string' },
+                    description: 'List of herbs to analyze',
+                    required: ['herbs']
+                }
+            },
+            required: ['herbs']
+        }
+    }, (params) => herbDiscoveryService.analyzeSynergy(params));
+
+    mcpRegistry.registerTool('herb.knowledge.gain', {
+        name: 'herb.knowledge.gain',
+        description: 'Gain herb knowledge and upgrade elemental mastery',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                element: { 
+                    type: 'string', 
+                    enum: ['metal', 'wood', 'water', 'fire', 'earth'],
+                    description: 'Element to gain knowledge in' 
+                },
+                amount: { type: 'number', description: 'Knowledge amount to gain', default: 1 }
+            }
+        }
+    }, (params) => herbDiscoveryService.gainHerbKnowledge(params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {
