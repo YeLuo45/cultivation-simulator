@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-c8a82fd-2026-05-30T16-33-21-654Z */
+/* Cultivation Simulator DDD-v1.0.0-178924d-2026-05-30T16-41-13-895Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -14652,6 +14652,410 @@ var CultivationSimulator = (() => {
   };
   var celestialDecreeService = new CelestialDecreeService();
 
+  // src/systems/ranking/HeavenRankService.js
+  var HEAVEN_RANK_CONFIG = {
+    // 榜单类型
+    RANK_TYPES: {
+      POWER: "power",
+      // 战力榜
+      WEALTH: "wealth",
+      // 财富榜
+      KARMA: "karma",
+      // 功德榜
+      REALM: "realm"
+      // 境界榜
+    },
+    // 榜单容量
+    MAX_RANK_SIZE: 100,
+    // 历史记录数量
+    MAX_HISTORY_RECORDS: 50,
+    // 排名变化通知阈值
+    RANK_CHANGE_THRESHOLD: 5,
+    // 排名变化超过5位时通知
+    // 挑战冷却时间 (ms)
+    CHALLENGE_COOLDOWN: 60 * 60 * 1e3,
+    // 1小时
+    // 奖励结算周期 (ms) - 每周
+    REWARD_CYCLE: 7 * 24 * 60 * 60 * 1e3,
+    // 连续上榜加成阈值
+    CONSECUTIVE_BONUS_THRESHOLD: 4
+    // 连续上榜4周以上获得加成
+  };
+  var RANK_REWARD_TIERS = [
+    { minRank: 1, maxRank: 1, baseReward: 1e4, title: "\u5929\u673A\u699C\u9996" },
+    { minRank: 2, maxRank: 2, baseReward: 5e3, title: "\u5929\u673A\u699C\u699C\u773C" },
+    { minRank: 3, maxRank: 3, baseReward: 3e3, title: "\u5929\u673A\u699C\u63A2\u82B1" },
+    { minRank: 4, maxRank: 10, baseReward: 1e3, title: "\u5929\u673A\u699C\u9AD8\u624B" },
+    { minRank: 11, maxRank: 50, baseReward: 500, title: "\u5929\u673A\u699C\u4FEE\u58EB" },
+    { minRank: 51, maxRank: 100, baseReward: 100, title: "\u5929\u673A\u699C\u65B0\u4EBA" }
+  ];
+  var HeavenRankEntry = class {
+    constructor(playerId, playerName, rankType, value) {
+      this.id = `rank_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.playerId = playerId;
+      this.playerName = playerName;
+      this.rankType = rankType;
+      this.value = value;
+      this.rank = 0;
+      this.previousRank = 0;
+      this.changeAmount = 0;
+      this.consecutiveWeeks = 1;
+      this.highestRank = 0;
+      this.lastUpdated = Date.now();
+    }
+    /**
+     * 更新排名
+     */
+    updateRank(newRank, newValue) {
+      this.previousRank = this.rank || newRank;
+      this.rank = newRank;
+      this.value = newValue;
+      this.changeAmount = this.previousRank - newRank;
+      this.lastUpdated = Date.now();
+      if (newRank > 0 && (this.highestRank === 0 || newRank < this.highestRank)) {
+        this.highestRank = newRank;
+      }
+    }
+    /**
+     * 增加连续上榜周数
+     */
+    incrementConsecutiveWeeks() {
+      this.consecutiveWeeks++;
+    }
+    /**
+     * 重置连续上榜周数
+     */
+    resetConsecutiveWeeks() {
+      this.consecutiveWeeks = 1;
+    }
+    /**
+     * 获取变化描述
+     */
+    getChangeDescription() {
+      if (this.changeAmount > 0) {
+        return `\u2191${this.changeAmount}`;
+      } else if (this.changeAmount < 0) {
+        return `\u2193${Math.abs(this.changeAmount)}`;
+      }
+      return "\u2014";
+    }
+  };
+  var HeavenRankHistory = class {
+    constructor(playerId, rankType) {
+      this.id = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.playerId = playerId;
+      this.rankType = rankType;
+      this.records = [];
+    }
+    /**
+     * 添加历史记录
+     */
+    addRecord(rank, value) {
+      const week = this.getWeekNumber();
+      this.records.push({
+        week,
+        rank,
+        value,
+        timestamp: Date.now()
+      });
+      if (this.records.length > HEAVEN_RANK_CONFIG.MAX_HISTORY_RECORDS) {
+        this.records.shift();
+      }
+    }
+    /**
+     * 获取周数
+     */
+    getWeekNumber() {
+      const now = /* @__PURE__ */ new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekNumber = Math.ceil(((now - startOfYear) / 864e5 + startOfYear.getDay() + 1) / 7);
+      return weekNumber;
+    }
+    /**
+     * 获取排名趋势
+     */
+    getTrend() {
+      if (this.records.length < 2) return "stable";
+      const recent = this.records.slice(-5);
+      const firstRank = recent[0].rank;
+      const lastRank = recent[recent.length - 1].rank;
+      if (lastRank < firstRank) return "rising";
+      if (lastRank > firstRank) return "falling";
+      return "stable";
+    }
+  };
+  var HeavenRankReward = class {
+    constructor(week, rankType, tier) {
+      this.id = `reward_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.week = week;
+      this.rankType = rankType;
+      this.tier = tier;
+      this.claimed = false;
+      this.claimedAt = null;
+      this.createdAt = Date.now();
+    }
+    /**
+     * 领取奖励
+     */
+    claim() {
+      if (this.claimed) {
+        return { success: false, error: "Reward already claimed" };
+      }
+      this.claimed = true;
+      this.claimedAt = Date.now();
+      return { success: true };
+    }
+    /**
+     * 计算实际奖励（含连续上榜加成）
+     */
+    calculateActualReward(consecutiveWeeks) {
+      let multiplier = 1;
+      if (consecutiveWeeks >= HEAVEN_RANK_CONFIG.CONSECUTIVE_BONUS_THRESHOLD) {
+        multiplier = 1 + (consecutiveWeeks - HEAVEN_RANK_CONFIG.CONSECUTIVE_BONUS_THRESHOLD + 1) * 0.1;
+        multiplier = Math.min(multiplier, 2);
+      }
+      return Math.floor(this.tier.baseReward * multiplier);
+    }
+  };
+  var HeavenRankService = class {
+    constructor() {
+      this.gameState = null;
+      this.initialized = false;
+      this.powerRank = [];
+      this.wealthRank = [];
+      this.karmaRank = [];
+      this.realmRank = [];
+      this.history = {};
+      this.pendingRewards = [];
+      this.challengeRecords = {};
+      this.lastSettlementTime = Date.now();
+    }
+    /**
+     * 初始化服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.heavenRank) {
+        gameState3.heavenRank = {
+          powerRank: [],
+          wealthRank: [],
+          karmaRank: [],
+          realmRank: [],
+          history: {},
+          pendingRewards: [],
+          challengeRecords: {},
+          lastSettlementTime: Date.now(),
+          lastRankUpdateTime: Date.now()
+        };
+      }
+      this.powerRank = gameState3.heavenRank.powerRank.map((e) => Object.assign(new HeavenRankEntry(e.playerId, e.playerName, HEAVEN_RANK_CONFIG.RANK_TYPES.POWER, e.value), e));
+      this.wealthRank = gameState3.heavenRank.wealthRank.map((e) => Object.assign(new HeavenRankEntry(e.playerId, e.playerName, HEAVEN_RANK_CONFIG.RANK_TYPES.WEALTH, e.value), e));
+      this.karmaRank = gameState3.heavenRank.karmaRank.map((e) => Object.assign(new HeavenRankEntry(e.playerId, e.playerName, HEAVEN_RANK_CONFIG.RANK_TYPES.KARMA, e.value), e));
+      this.realmRank = gameState3.heavenRank.realmRank.map((e) => Object.assign(new HeavenRankEntry(e.playerId, e.playerName, HEAVEN_RANK_CONFIG.RANK_TYPES.REALM, e.value), e));
+      this.history = {};
+      for (const [key, h] of Object.entries(gameState3.heavenRank.history || {})) {
+        this.history[key] = Object.assign(new HeavenRankHistory(h.playerId, h.rankType), h);
+      }
+      this.pendingRewards = (gameState3.heavenRank.pendingRewards || []).map((r) => Object.assign(new HeavenRankReward(r.week, r.rankType, RANK_REWARD_TIERS.find((t) => t.minRank <= r.rank && r.rank <= t.maxRank) || RANK_REWARD_TIERS[5]), r));
+      this.challengeRecords = gameState3.heavenRank.challengeRecords || {};
+      this.lastSettlementTime = gameState3.heavenRank.lastSettlementTime || Date.now();
+      this.initialized = true;
+      return { success: true };
+    }
+    /**
+     * 保存状态
+     */
+    saveState() {
+      if (!this.gameState || !this.gameState.heavenRank) return;
+      this.gameState.heavenRank.powerRank = this.powerRank;
+      this.gameState.heavenRank.wealthRank = this.wealthRank;
+      this.gameState.heavenRank.karmaRank = this.realmRank;
+      this.gameState.heavenRank.realmRank = this.realmRank;
+      this.gameState.heavenRank.history = this.history;
+      this.gameState.heavenRank.pendingRewards = this.pendingRewards;
+      this.gameState.heavenRank.challengeRecords = this.challengeRecords;
+      this.gameState.heavenRank.lastSettlementTime = this.lastSettlementTime;
+      this.gameState.heavenRank.lastRankUpdateTime = Date.now();
+    }
+    /**
+     * 获取榜单
+     */
+    getRank(rankType) {
+      switch (rankType) {
+        case HEAVEN_RANK_CONFIG.RANK_TYPES.POWER:
+          return this.powerRank;
+        case HEAVEN_RANK_CONFIG.RANK_TYPES.WEALTH:
+          return this.wealthRank;
+        case HEAVEN_RANK_CONFIG.RANK_TYPES.KARMA:
+          return this.karmaRank;
+        case HEAVEN_RANK_CONFIG.RANK_TYPES.REALM:
+          return this.realmRank;
+        default:
+          return [];
+      }
+    }
+    /**
+     * 获取玩家排名
+     */
+    getPlayerRank(playerId, rankType) {
+      const rank = this.getRank(rankType);
+      return rank.findIndex((e) => e.playerId === playerId) + 1;
+    }
+    /**
+     * 更新玩家排名
+     */
+    updatePlayerRank(playerId, playerName, rankType, value) {
+      const rank = this.getRank(rankType);
+      const existingEntry = rank.find((e) => e.playerId === playerId);
+      if (existingEntry) {
+        const newRank = this.calculateNewRank(rank, playerId, value);
+        existingEntry.updateRank(newRank, value);
+      } else {
+        const newEntry = new HeavenRankEntry(playerId, playerName, rankType, value);
+        this.addToRank(rank, newEntry);
+      }
+      this.saveState();
+    }
+    /**
+     * 计算新排名
+     */
+    calculateNewRank(rank, playerId, newValue) {
+      let newRank = 1;
+      for (const entry of rank) {
+        if (entry.playerId === playerId) continue;
+        if (entry.value >= newValue) {
+          newRank++;
+        }
+      }
+      return newRank;
+    }
+    /**
+     * 添加到榜单
+     */
+    addToRank(rank, entry) {
+      const insertIndex = rank.findIndex((e) => e.value < entry.value);
+      if (insertIndex >= 0) {
+        rank.splice(insertIndex, 0, entry);
+      } else {
+        rank.push(entry);
+      }
+      rank.forEach((e, i) => {
+        e.rank = i + 1;
+      });
+      while (rank.length > HEAVEN_RANK_CONFIG.MAX_RANK_SIZE) {
+        rank.pop();
+      }
+    }
+    /**
+     * 获取玩家历史
+     */
+    getPlayerHistory(playerId, rankType) {
+      const key = `${playerId}_${rankType}`;
+      return this.history[key] || null;
+    }
+    /**
+     * 记录玩家历史
+     */
+    recordPlayerHistory(playerId, rankType, rank, value) {
+      const key = `${playerId}_${rankType}`;
+      if (!this.history[key]) {
+        this.history[key] = new HeavenRankHistory(playerId, rankType);
+      }
+      this.history[key].addRecord(rank, value);
+      this.saveState();
+    }
+    /**
+     * 获取排名奖励
+     */
+    getRewardForRank(rank) {
+      return RANK_REWARD_TIERS.find((t) => rank >= t.minRank && rank <= t.maxRank) || RANK_REWARD_TIERS[RANK_REWARD_TIERS.length - 1];
+    }
+    /**
+     * 生成待领取奖励
+     */
+    generatePendingRewards() {
+      const currentWeek = this.getWeekNumber();
+      for (const rankType of Object.values(HEAVEN_RANK_CONFIG.RANK_TYPES)) {
+        const rank = this.getRank(rankType);
+        for (let i = 0; i < rank.length; i++) {
+          const entry = rank[i];
+          const tier = this.getRewardForRank(entry.rank);
+          const existingReward = this.pendingRewards.find(
+            (r) => r.week === currentWeek && r.rankType === rankType && r.tier.minRank === tier.minRank
+          );
+          if (!existingReward) {
+            const reward = new HeavenRankReward(currentWeek, rankType, tier);
+            this.pendingRewards.push(reward);
+          }
+        }
+      }
+      this.saveState();
+    }
+    /**
+     * 获取周数
+     */
+    getWeekNumber() {
+      const now = /* @__PURE__ */ new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      return Math.ceil(((now - startOfYear) / 864e5 + startOfYear.getDay() + 1) / 7);
+    }
+    /**
+     * 检查挑战冷却
+     */
+    isChallengeOnCooldown(playerId, targetPlayerId) {
+      const key = `${playerId}_${targetPlayerId}`;
+      const lastChallenge = this.challengeRecords[key];
+      if (!lastChallenge) return false;
+      const cooldownRemaining = HEAVEN_RANK_CONFIG.CHALLENGE_COOLDOWN - (Date.now() - lastChallenge);
+      return cooldownRemaining > 0;
+    }
+    /**
+     * 获取挑战冷却剩余时间
+     */
+    getChallengeCooldown(playerId, targetPlayerId) {
+      const key = `${playerId}_${targetPlayerId}`;
+      const lastChallenge = this.challengeRecords[key];
+      if (!lastChallenge) return 0;
+      const cooldownRemaining = HEAVEN_RANK_CONFIG.CHALLENGE_COOLDOWN - (Date.now() - lastChallenge);
+      return Math.max(0, cooldownRemaining);
+    }
+    /**
+     * 记录挑战
+     */
+    recordChallenge(playerId, targetPlayerId) {
+      const key = `${playerId}_${targetPlayerId}`;
+      this.challengeRecords[key] = Date.now();
+      this.saveState();
+    }
+    /**
+     * 检测排名剧烈变化
+     */
+    detectRankVolatility(playerId, rankType) {
+      const history = this.getPlayerHistory(playerId, rankType);
+      if (!history || history.records.length < 3) {
+        return { volatile: false, changes: [] };
+      }
+      const recent = history.records.slice(-5);
+      const changes = [];
+      for (let i = 1; i < recent.length; i++) {
+        const change = recent[i - 1].rank - recent[i].rank;
+        if (Math.abs(change) >= HEAVEN_RANK_CONFIG.RANK_CHANGE_THRESHOLD) {
+          changes.push({
+            from: recent[i - 1].rank,
+            to: recent[i].rank,
+            change,
+            week: recent[i].week
+          });
+        }
+      }
+      return {
+        volatile: changes.length >= 2,
+        changes
+      };
+    }
+  };
+  var heavenRankService = new HeavenRankService();
+
   // src/main.js
   var gameState2 = null;
   var isGameInitialized = false;
@@ -14785,7 +15189,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V234",
+      gameVersion: "V235",
       // 设置
       settings: {
         soundEnabled: true,
@@ -14838,6 +15242,8 @@ var CultivationSimulator = (() => {
     eventAnalyticsService.init(gameState2);
     celestialDecreeService.init(gameState2);
     domainModules.celestialDecree = celestialDecreeService;
+    heavenRankService.init(gameState2);
+    domainModules.heavenRank = heavenRankService;
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -16215,4 +16621,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-c8a82fd-2026-05-30T16-33-21-654Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-178924d-2026-05-30T16-41-13-895Z";
