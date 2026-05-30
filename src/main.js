@@ -52,6 +52,9 @@ import { YuanInfantService, getYuanInfantService, YUAN_INFANT_TOOLS } from './do
 // 阴阳五行系统 (V240 Direction B: 阴阳五行系统 - nanobot/ruflo)
 import { YinYangWuXingService, getYinYangWuXingService, YIN_YANG_WUXING_TOOLS } from './domains/cultivation/services/YinYangWuXingService.js';
 
+// 天雷劫数系统 (V241 Direction C: 天雷劫数系统 - thunderbolt/claude-code)
+import { ThunderTribulationService, THUNDER_TRIBULATION_TOOLS } from './domains/cultivation/services/ThunderTribulationService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -284,7 +287,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V240',
+        gameVersion: 'V241',
         
         // 设置
         settings: {
@@ -497,6 +500,22 @@ function initializeDomainModules() {
         (params) => yinYangWuXingHandlers['wuxing.cycle'](params));
     mcpRegistry.registerTool('wuxing.affinity', YIN_YANG_WUXING_TOOLS['wuxing.affinity'], 
         (params) => yinYangWuXingHandlers['wuxing.affinity'](params));
+
+    // 天雷劫数系统MCP工具 (V241 Direction C: 天雷劫数系统)
+    const thunderTribulationHandlers = ThunderTribulationService.getMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('thunder.prepare', THUNDER_TRIBULATION_TOOLS['thunder.prepare'], 
+        (params) => thunderTribulationHandlers['thunder.prepare'](params));
+    mcpRegistry.registerTool('thunder.execute', THUNDER_TRIBULATION_TOOLS['thunder.execute'], 
+        (params) => thunderTribulationHandlers['thunder.execute'](params));
+    mcpRegistry.registerTool('thunder.bless', THUNDER_TRIBULATION_TOOLS['thunder.bless'], 
+        (params) => thunderTribulationHandlers['thunder.bless'](params));
+    mcpRegistry.registerTool('thunder.mastery', THUNDER_TRIBULATION_TOOLS['thunder.mastery'], 
+        (params) => thunderTribulationHandlers['thunder.mastery'](params));
+    mcpRegistry.registerTool('thunder.absorb', THUNDER_TRIBULATION_TOOLS['thunder.absorb'], 
+        (params) => thunderTribulationHandlers['thunder.absorb'](params));
+    mcpRegistry.registerTool('thunder.journal', THUNDER_TRIBULATION_TOOLS['thunder.journal'], 
+        (params) => thunderTribulationHandlers['thunder.journal'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
