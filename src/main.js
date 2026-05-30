@@ -80,6 +80,9 @@ import { eventAnalyticsService, EVENT_ANALYTICS_TOOLS } from './systems/event/Ev
 // 天道意志系统 (V232 Direction T: 天道意志系统 - ruflo/thunderbolt)
 import { celestialDecreeService, CELESTIAL_DECREE_TOOLS } from './systems/world/CelestialDecreeService.js';
 
+// 天机榜系统 (V235 Direction W: 天机榜系统 - chatdev/thunderbolt)
+import { heavenRankService, HEAVEN_RANK_TOOLS } from './systems/ranking/HeavenRankService.js';
+
 // ===== 全局状态 =====
 
 /**
@@ -268,7 +271,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V234',
+        gameVersion: 'V235',
         
         // 设置
         settings: {
@@ -388,6 +391,10 @@ function initializeDomainModules() {
     // 天道意志系统 (V232 Direction T: 天道意志系统 - ruflo/thunderbolt)
     celestialDecreeService.init(gameState);
     domainModules.celestialDecree = celestialDecreeService;
+
+    // 天机榜系统 (V235 Direction W: 天机榜系统 - chatdev/thunderbolt)
+    heavenRankService.init(gameState);
+    domainModules.heavenRank = heavenRankService;
 
     console.log('[Main] 领域模块初始化完成');
 }
