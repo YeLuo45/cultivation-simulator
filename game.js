@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-be4e209-2026-05-30T16-48-22-669Z */
+/* Cultivation Simulator DDD-v1.0.0-8eafe05-2026-05-30T16-55-36-311Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -12720,6 +12720,727 @@ var CultivationSimulator = (() => {
     }
   };
 
+  // src/domains/inventory/services/ChaosTreasureService.js
+  var ChaosTreasureService = class {
+    constructor() {
+      this.gameState = null;
+      this.treasures = [];
+      this.equippedTreasures = {};
+      this.resonancePairs = [];
+      this.maxTreasures = 50;
+    }
+    /**
+     * 初始化灵宝系统
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.chaosTreasure) {
+        gameState3.chaosTreasure = {
+          treasures: [],
+          equippedTreasures: {},
+          resonancePairs: [],
+          totalRefined: 0,
+          totalAwakened: 0,
+          totalResonated: 0,
+          totalStrengthened: 0
+        };
+      }
+      this.treasures = gameState3.chaosTreasure.treasures;
+      this.equippedTreasures = gameState3.chaosTreasure.equippedTreasures;
+      this.resonancePairs = gameState3.chaosTreasure.resonancePairs;
+      return gameState3;
+    }
+    /**
+     * 生成唯一ID
+     */
+    generateId() {
+      return `ct_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * 获取灵宝类型枚举
+     */
+    getTreasureTypes() {
+      return { ...TREASURE_TYPES };
+    }
+    /**
+     * 获取灵宝等级枚举
+     */
+    getTreasureLevels() {
+      return { ...TREASURE_LEVELS };
+    }
+    /**
+     * 获取灵宝属性枚举
+     */
+    getTreasureAttributes() {
+      return { ...TREASURE_ATTRIBUTES };
+    }
+    /**
+     * 获取灵宝类型定义
+     */
+    getTreasureDefinition(type) {
+      return TREASURE_DEFINITIONS[type];
+    }
+    /**
+     * 获取灵宝等级定义
+     */
+    getLevelDefinition(level) {
+      return LEVEL_DEFINITIONS[level];
+    }
+    /**
+     * 计算灵宝基础属性
+     */
+    calculateBaseAttributes(treasure) {
+      const def = TREASURE_DEFINITIONS[treasure.type];
+      const levelIdx = this.getLevelIndex(treasure.level);
+      const levelDef = LEVEL_DEFINITIONS[treasure.level];
+      const baseMultiplier = (levelDef == null ? void 0 : levelDef.multiplier) || 1;
+      const attrs = {};
+      for (const attr of Object.keys(def.baseAttributes)) {
+        attrs[attr] = Math.floor(def.baseAttributes[attr] * baseMultiplier * (1 + treasure.enhanceLevel * 0.1));
+      }
+      return attrs;
+    }
+    /**
+     * 获取等级索引
+     */
+    getLevelIndex(level) {
+      const levelMap = { "\u51E1": 0, "\u7075": 1, "\u4ED9": 2, "\u795E": 3, "\u9053": 4 };
+      return levelMap[level] ?? 0;
+    }
+    /**
+     * 获取共鸣效果
+     */
+    getResonanceEffect(pair) {
+      const def1 = TREASURE_DEFINITIONS[pair[0].type];
+      const def2 = TREASURE_DEFINITIONS[pair[1].type];
+      return RESONANCE_EFFECTS[`${def1.resonanceTag}+${def2.resonanceTag}`] || RESONANCE_EFFECTS[`${def2.resonanceTag}+${def1.resonanceTag}`] || { bonusAttribute: "attack", bonusPercent: 0.05 };
+    }
+    /**
+     * 计算总共鸣加成
+     */
+    calculateResonanceBonus() {
+      let bonus = {
+        attack: 0,
+        defense: 0,
+        life: 0,
+        speed: 0
+      };
+      for (const pair of this.resonancePairs) {
+        const effect = this.getResonanceEffect(pair);
+        bonus[effect.bonusAttribute] += effect.bonusPercent;
+      }
+      return bonus;
+    }
+    /**
+     * 炼制灵宝 (treasure.refine)
+     */
+    mcpRefine(params) {
+      const { type, level = "\u51E1", useStones = true } = params;
+      if (!TREASURE_DEFINITIONS[type]) {
+        return { success: false, error: `\u65E0\u6548\u7684\u7075\u5B9D\u7C7B\u578B: ${type}` };
+      }
+      if (!LEVEL_DEFINITIONS[level]) {
+        return { success: false, error: `\u65E0\u6548\u7684\u7075\u5B9D\u7B49\u7EA7: ${level}` };
+      }
+      const cost = this.getRefineCost(level);
+      if (useStones) {
+        if (this.gameState.player.spiritStones < cost) {
+          return { success: false, error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${cost}\u7075\u77F3` };
+        }
+        this.gameState.player.spiritStones -= cost;
+      }
+      const successRate = this.getRefineSuccessRate(level);
+      const success = Math.random() < successRate;
+      if (!success) {
+        this.gameState.chaosTreasure.totalRefined++;
+        return {
+          success: false,
+          error: "\u70BC\u5236\u5931\u8D25\uFF0C\u7075\u5B9D\u7834\u788E",
+          materialsConsumed: true
+        };
+      }
+      const treasure = {
+        id: this.generateId(),
+        type,
+        level,
+        name: TREASURE_DEFINITIONS[type].name,
+        description: TREASURE_DEFINITIONS[type].description,
+        baseAttributes: TREASURE_DEFINITIONS[type].baseAttributes,
+        enhanceLevel: 0,
+        awakenLevel: 0,
+        skills: [],
+        resonanceSlots: TREASURE_DEFINITIONS[type].resonanceSlots,
+        refineAt: Date.now()
+      };
+      this.treasures.push(treasure);
+      this.gameState.chaosTreasure.totalRefined++;
+      return {
+        success: true,
+        message: `\u70BC\u5236\u6210\u529F\uFF01\u83B7\u5F97${TREASURE_DEFINITIONS[type].name}`,
+        treasure: this.formatTreasure(treasure),
+        remainingTreasures: this.treasures.length
+      };
+    }
+    /**
+     * 灵宝觉醒 (treasure.awaken)
+     */
+    mcpAwaken(params) {
+      const { treasureId } = params;
+      const treasure = this.treasures.find((t) => t.id === treasureId);
+      if (!treasure) {
+        return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId}\u7684\u7075\u5B9D` };
+      }
+      if (treasure.awakenLevel >= 3) {
+        return { success: false, error: "\u7075\u5B9D\u5DF2\u8FBE\u6700\u5927\u89C9\u9192\u7B49\u7EA7" };
+      }
+      const cost = this.getAwakenCost(treasure.level, treasure.awakenLevel);
+      if (this.gameState.player.spiritStones < cost) {
+        return { success: false, error: `\u89C9\u9192\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${cost}\u7075\u77F3` };
+      }
+      const karmaCost = this.getAwakenKarmaCost(treasure.awakenLevel);
+      if (this.gameState.player.karmaPoints < karmaCost) {
+        return { success: false, error: `\u4E1A\u529B\u4E0D\u8DB3\uFF0C\u9700\u8981${karmaCost}\u4E1A\u529B` };
+      }
+      this.gameState.player.spiritStones -= cost;
+      this.gameState.player.karmaPoints -= karmaCost;
+      treasure.awakenLevel++;
+      const skill = this.awakenSkill(treasure);
+      if (skill) {
+        treasure.skills.push(skill);
+      }
+      this.gameState.chaosTreasure.totalAwakened++;
+      return {
+        success: true,
+        message: `\u89C9\u9192\u6210\u529F\uFF01\u7075\u5B9D\u89E3\u9501\u65B0\u6280\u80FD`,
+        treasure: this.formatTreasure(treasure),
+        newSkill: skill,
+        awakenLevel: treasure.awakenLevel
+      };
+    }
+    /**
+     * 查询灵宝 (treasure.query)
+     */
+    mcpQuery(params) {
+      const { treasureId, listAll = false, filterType, filterLevel } = params;
+      if (listAll) {
+        let filtered = [...this.treasures];
+        if (filterType) {
+          filtered = filtered.filter((t) => t.type === filterType);
+        }
+        if (filterLevel) {
+          filtered = filtered.filter((t) => t.level === filterLevel);
+        }
+        return {
+          treasures: filtered.map((t) => this.formatTreasure(t)),
+          total: filtered.length,
+          equipped: this.getEquippedList()
+        };
+      }
+      if (treasureId) {
+        const treasure = this.treasures.find((t) => t.id === treasureId);
+        if (!treasure) {
+          return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId}\u7684\u7075\u5B9D` };
+        }
+        const attributes = this.calculateTreasureAttributes(treasure);
+        const resonanceBonus = this.calculateResonanceBonus();
+        return {
+          treasure: this.formatTreasure(treasure),
+          calculatedAttributes: attributes,
+          resonanceBonus,
+          isEquipped: this.isEquipped(treasureId)
+        };
+      }
+      return {
+        treasures: this.treasures.map((t) => this.formatTreasure(t)),
+        total: this.treasures.length,
+        stats: this.getStats()
+      };
+    }
+    /**
+     * 装备灵宝 (treasure.equip)
+     */
+    mcpEquip(params) {
+      const { treasureId, slot, unequip = false } = params;
+      if (unequip) {
+        return this.unequipTreasure(treasureId);
+      }
+      const treasure = this.treasures.find((t) => t.id === treasureId);
+      if (!treasure) {
+        return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId}\u7684\u7075\u5B9D` };
+      }
+      const validSlots = TREASURE_DEFINITIONS[treasure.type].slots;
+      if (slot && !validSlots.includes(slot)) {
+        return { success: false, error: `\u8BE5\u7075\u5B9D\u65E0\u6CD5\u88C5\u5907\u5230${slot}\u69FD\u4F4D` };
+      }
+      const targetSlot = slot || validSlots[0];
+      if (this.equippedTreasures[targetSlot]) {
+        const oldTreasure = this.equippedTreasures[targetSlot];
+        oldTreasure.equipped = false;
+      }
+      this.equippedTreasures[targetSlot] = treasure;
+      treasure.equippedSlot = targetSlot;
+      return {
+        success: true,
+        message: `\u7075\u5B9D\u5DF2\u88C5\u5907\u5230${targetSlot}`,
+        treasure: this.formatTreasure(treasure),
+        slot: targetSlot
+      };
+    }
+    /**
+     * 灵宝共鸣 (treasure.resonance)
+     */
+    mcpResonance(params) {
+      const { treasureId1, treasureId2, removeResonance = false } = params;
+      if (removeResonance) {
+        return this.removeResonance(treasureId1, treasureId2);
+      }
+      const treasure1 = this.treasures.find((t) => t.id === treasureId1);
+      const treasure2 = this.treasures.find((t) => t.id === treasureId2);
+      if (!treasure1) {
+        return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId1}\u7684\u7075\u5B9D` };
+      }
+      if (!treasure2) {
+        return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId2}\u7684\u7075\u5B9D` };
+      }
+      if (treasureId1 === treasureId2) {
+        return { success: false, error: "\u65E0\u6CD5\u4E0E\u81EA\u5DF1\u5171\u9E23" };
+      }
+      const existing = this.resonancePairs.find(
+        (p) => p[0].id === treasureId1 && p[1].id === treasureId2 || p[0].id === treasureId2 && p[1].id === treasureId1
+      );
+      if (existing) {
+        return { success: false, error: "\u8FD9\u4E24\u4EF6\u7075\u5B9D\u5DF2\u5728\u5171\u9E23\u72B6\u6001" };
+      }
+      const cost = this.getResonanceCost();
+      if (this.gameState.player.spiritStones < cost) {
+        return { success: false, error: `\u5171\u9E23\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${cost}\u7075\u77F3` };
+      }
+      this.gameState.player.spiritStones -= cost;
+      this.resonancePairs.push([treasure1, treasure2]);
+      treasure1.inResonance = true;
+      treasure2.inResonance = true;
+      const effect = this.getResonanceEffect([treasure1, treasure2]);
+      this.gameState.chaosTreasure.totalResonated++;
+      return {
+        success: true,
+        message: `\u5171\u9E23\u5EFA\u7ACB\u6210\u529F\uFF01${effect.bonusAttribute}\u5C5E\u6027+${(effect.bonusPercent * 100).toFixed(0)}%`,
+        pair: [
+          this.formatTreasure(treasure1),
+          this.formatTreasure(treasure2)
+        ],
+        effect,
+        resonancePairs: this.resonancePairs.length
+      };
+    }
+    /**
+     * 灵宝强化 (treasure.strengthen)
+     */
+    mcpStrengthen(params) {
+      const { treasureId, autoIncrement = false } = params;
+      const treasure = this.treasures.find((t) => t.id === treasureId);
+      if (!treasure) {
+        return { success: false, error: `\u672A\u627E\u5230ID\u4E3A${treasureId}\u7684\u7075\u5B9D` };
+      }
+      const maxLevel = 20;
+      if (treasure.enhanceLevel >= maxLevel) {
+        return { success: false, error: "\u7075\u5B9D\u5DF2\u8FBE\u6700\u5927\u5F3A\u5316\u7B49\u7EA7" };
+      }
+      const successRate = this.getStrengthenSuccessRate(treasure.enhanceLevel);
+      const cost = this.getStrengthenCost(treasure.level, treasure.enhanceLevel);
+      if (this.gameState.player.spiritStones < cost) {
+        return { success: false, error: `\u5F3A\u5316\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${cost}\u7075\u77F3` };
+      }
+      this.gameState.player.spiritStones -= cost;
+      this.gameState.chaosTreasure.totalStrengthened++;
+      const success = Math.random() < successRate;
+      if (!success) {
+        return {
+          success: false,
+          error: "\u5F3A\u5316\u5931\u8D25\uFF0C\u7075\u5B9D\u6CA1\u6709\u53D8\u5316",
+          enhanceLevel: treasure.enhanceLevel,
+          costConsumed: cost
+        };
+      }
+      if (autoIncrement) {
+        treasure.enhanceLevel++;
+      }
+      const newAttributes = this.calculateTreasureAttributes(treasure);
+      return {
+        success: true,
+        message: autoIncrement ? `\u5F3A\u5316\u6210\u529F\uFF01\u7075\u5B9D\u5F3A\u5316\u7B49\u7EA7\u63D0\u5347\u81F3${treasure.enhanceLevel}` : "\u5F3A\u5316\u6210\u529F\uFF01",
+        treasure: this.formatTreasure(treasure),
+        newAttributes,
+        enhanceLevel: treasure.enhanceLevel
+      };
+    }
+    // ==================== 内部方法 ====================
+    /**
+     * 获取炼制消耗
+     */
+    getRefineCost(level) {
+      const costs = { "\u51E1": 50, "\u7075": 200, "\u4ED9": 1e3, "\u795E": 5e3, "\u9053": 25e3 };
+      return costs[level] || 50;
+    }
+    /**
+     * 获取炼制成功率
+     */
+    getRefineSuccessRate(level) {
+      const rates = { "\u51E1": 0.9, "\u7075": 0.7, "\u4ED9": 0.5, "\u795E": 0.3, "\u9053": 0.15 };
+      return rates[level] || 0.9;
+    }
+    /**
+     * 获取觉醒消耗
+     */
+    getAwakenCost(level, awakenLevel) {
+      const baseCosts = { "\u51E1": 100, "\u7075": 500, "\u4ED9": 2500, "\u795E": 12500, "\u9053": 62500 };
+      return (baseCosts[level] || 100) * (awakenLevel + 1);
+    }
+    /**
+     * 获取觉醒业力消耗
+     */
+    getAwakenKarmaCost(awakenLevel) {
+      return (awakenLevel + 1) * 10;
+    }
+    /**
+     * 获取共鸣消耗
+     */
+    getResonanceCost() {
+      return 500;
+    }
+    /**
+     * 获取强化消耗
+     */
+    getStrengthenCost(level, enhanceLevel) {
+      const baseCosts = { "\u51E1": 30, "\u7075": 150, "\u4ED9": 750, "\u795E": 3750, "\u9053": 18750 };
+      return (baseCosts[level] || 30) * (enhanceLevel + 1);
+    }
+    /**
+     * 获取强化成功率
+     */
+    getStrengthenSuccessRate(enhanceLevel) {
+      if (enhanceLevel < 5) return 0.8;
+      if (enhanceLevel < 10) return 0.6;
+      if (enhanceLevel < 15) return 0.4;
+      return 0.2;
+    }
+    /**
+     * 觉醒技能
+     */
+    awakenSkill(treasure) {
+      var _a;
+      const skillTree = (_a = TREASURE_DEFINITIONS[treasure.type]) == null ? void 0 : _a.skillTree;
+      if (!skillTree || !skillTree[treasure.awakenLevel]) {
+        return null;
+      }
+      return {
+        id: this.generateId(),
+        name: skillTree[treasure.awakenLevel].name,
+        description: skillTree[treasure.awakenLevel].description,
+        awakenLevel: treasure.awakenLevel,
+        acquiredAt: Date.now()
+      };
+    }
+    /**
+     * 计算灵宝总属性
+     */
+    calculateTreasureAttributes(treasure) {
+      const base = this.calculateBaseAttributes(treasure);
+      const resonanceBonus = this.calculateResonanceBonus();
+      const awakenBonus = treasure.awakenLevel * 0.15;
+      const result = {};
+      for (const attr of Object.keys(base)) {
+        const bonus = resonanceBonus[attr] || 0;
+        result[attr] = Math.floor(base[attr] * (1 + bonus + awakenBonus));
+      }
+      return result;
+    }
+    /**
+     * 格式化灵宝输出
+     */
+    formatTreasure(treasure) {
+      return {
+        id: treasure.id,
+        type: treasure.type,
+        level: treasure.level,
+        name: treasure.name,
+        description: treasure.description,
+        enhanceLevel: treasure.enhanceLevel,
+        awakenLevel: treasure.awakenLevel,
+        skills: treasure.skills || [],
+        resonanceSlots: treasure.resonanceSlots,
+        baseAttributes: treasure.baseAttributes,
+        equippedSlot: treasure.equippedSlot || null,
+        inResonance: treasure.inResonance || false,
+        refineAt: treasure.refineAt
+      };
+    }
+    /**
+     * 获取已装备列表
+     */
+    getEquippedList() {
+      return Object.entries(this.equippedTreasures).map(([slot, treasure]) => ({
+        slot,
+        treasure: this.formatTreasure(treasure)
+      }));
+    }
+    /**
+     * 检查灵宝是否已装备
+     */
+    isEquipped(treasureId) {
+      return Object.values(this.equippedTreasures).some((t) => t.id === treasureId);
+    }
+    /**
+     * 卸下灵宝
+     */
+    unequipTreasure(treasureId) {
+      for (const [slot, treasure] of Object.entries(this.equippedTreasures)) {
+        if (treasure.id === treasureId) {
+          delete this.equippedTreasures[slot];
+          treasure.equippedSlot = null;
+          return {
+            success: true,
+            message: `\u7075\u5B9D\u5DF2\u4ECE${slot}\u69FD\u4F4D\u5378\u4E0B`,
+            treasure: this.formatTreasure(treasure)
+          };
+        }
+      }
+      return { success: false, error: "\u8BE5\u7075\u5B9D\u672A\u88C5\u5907" };
+    }
+    /**
+     * 移除共鸣
+     */
+    removeResonance(treasureId1, treasureId2) {
+      const idx = this.resonancePairs.findIndex(
+        (p) => p[0].id === treasureId1 && p[1].id === treasureId2 || p[0].id === treasureId2 && p[1].id === treasureId1
+      );
+      if (idx === -1) {
+        return { success: false, error: "\u672A\u627E\u5230\u5171\u9E23\u5173\u7CFB" };
+      }
+      const pair = this.resonancePairs.splice(idx, 1)[0];
+      pair[0].inResonance = false;
+      pair[1].inResonance = false;
+      return {
+        success: true,
+        message: "\u5171\u9E23\u5DF2\u89E3\u9664",
+        remainingPairs: this.resonancePairs.length
+      };
+    }
+    /**
+     * 获取统计数据
+     */
+    getStats() {
+      var _a, _b, _c, _d;
+      return {
+        totalTreasures: this.treasures.length,
+        maxTreasures: this.maxTreasures,
+        totalRefined: ((_a = this.gameState.chaosTreasure) == null ? void 0 : _a.totalRefined) || 0,
+        totalAwakened: ((_b = this.gameState.chaosTreasure) == null ? void 0 : _b.totalAwakened) || 0,
+        totalResonated: ((_c = this.gameState.chaosTreasure) == null ? void 0 : _c.totalResonated) || 0,
+        totalStrengthened: ((_d = this.gameState.chaosTreasure) == null ? void 0 : _d.totalStrengthened) || 0,
+        resonancePairs: this.resonancePairs.length,
+        equippedCount: Object.keys(this.equippedTreasures).length,
+        treasuresByLevel: this.treasures.reduce((acc, t) => {
+          acc[t.level] = (acc[t.level] || 0) + 1;
+          return acc;
+        }, {}),
+        treasuresByType: this.treasures.reduce((acc, t) => {
+          acc[t.type] = (acc[t.type] || 0) + 1;
+          return acc;
+        }, {})
+      };
+    }
+  };
+  var TREASURE_TYPES = {
+    \u6B66\u5668: "\u6B66\u5668",
+    \u9632\u5177: "\u9632\u5177",
+    \u9970\u54C1: "\u9970\u54C1",
+    \u79D8\u5B9D: "\u79D8\u5B9D"
+  };
+  var TREASURE_LEVELS = {
+    \u51E1: "\u51E1",
+    \u7075: "\u7075",
+    \u4ED9: "\u4ED9",
+    \u795E: "\u795E",
+    \u9053: "\u9053"
+  };
+  var TREASURE_ATTRIBUTES = {
+    \u653B\u51FB: "attack",
+    \u9632\u5FA1: "defense",
+    \u751F\u547D: "life",
+    \u901F\u5EA6: "speed"
+  };
+  var TREASURE_DEFINITIONS = {
+    \u6B66\u5668: {
+      name: "\u6DF7\u6C8C\u795E\u5175",
+      description: "\u8574\u542B\u6DF7\u6C8C\u4E4B\u529B\u7684\u795E\u5175\u5229\u5668",
+      slots: ["\u4E3B\u624B", "\u526F\u624B"],
+      resonanceTag: "attack",
+      baseAttributes: { attack: 100, speed: 20 },
+      resonanceSlots: 2,
+      skillTree: {
+        1: { name: "\u6DF7\u6C8C\u65A9", description: "\u653B\u51FB\u65F6\u6709\u51E0\u7387\u89E6\u53D1\u6DF7\u6C8C\u65A9\u51FB" },
+        2: { name: "\u66B4\u6012\u4E4B\u950B", description: "\u653B\u51FB\u4F24\u5BB3\u63D0\u534715%" },
+        3: { name: "\u7EC8\u6781\u6DF7\u6C8C", description: "\u91CA\u653E\u7EC8\u6781\u6DF7\u6C8C\u65A9" }
+      }
+    },
+    \u9632\u5177: {
+      name: "\u6DF7\u6C8C\u62A4\u7532",
+      description: "\u8574\u542B\u6DF7\u6C8C\u4E4B\u529B\u7684\u9632\u5FA1\u94E0\u7532",
+      slots: ["\u62A4\u7532", "\u62A4\u80A9"],
+      resonanceTag: "defense",
+      baseAttributes: { defense: 100, life: 200 },
+      resonanceSlots: 2,
+      skillTree: {
+        1: { name: "\u6DF7\u6C8C\u62A4\u76FE", description: "\u53D7\u5230\u4F24\u5BB3\u65F6\u6709\u51E0\u7387\u751F\u6210\u62A4\u76FE" },
+        2: { name: "\u53CD\u5C04\u4E4B\u58C1", description: "\u5C0610%\u4F24\u5BB3\u53CD\u5C04\u7ED9\u653B\u51FB\u8005" },
+        3: { name: "\u7EC8\u6781\u4E0D\u706D", description: "\u53D7\u5230\u81F4\u547D\u4F24\u5BB3\u65F6\u514D\u75AB\u4E00\u6B21" }
+      }
+    },
+    \u9970\u54C1: {
+      name: "\u6DF7\u6C8C\u7075\u9970",
+      description: "\u8574\u542B\u6DF7\u6C8C\u4E4B\u529B\u7684\u7075\u6027\u9970\u54C1",
+      slots: ["\u9879\u94FE", "\u6212\u6307", "\u624B\u956F"],
+      resonanceTag: "life",
+      baseAttributes: { life: 300, defense: 30 },
+      resonanceSlots: 2,
+      skillTree: {
+        1: { name: "\u751F\u547D\u6C72\u53D6", description: "\u653B\u51FB\u65F6\u5438\u53D6\u751F\u547D" },
+        2: { name: "\u7075\u529B\u6D8C\u52A8", description: "\u751F\u547D\u4E0A\u9650\u63D0\u534720%" },
+        3: { name: "\u7EC8\u6781\u5171\u751F", description: "\u751F\u547D\u4E0E\u7075\u529B\u4E92\u76F8\u8F6C\u5316" }
+      }
+    },
+    \u79D8\u5B9D: {
+      name: "\u6DF7\u6C8C\u79D8\u5B9D",
+      description: "\u8574\u542B\u6DF7\u6C8C\u4E4B\u529B\u7684\u795E\u79D8\u5B9D\u7269",
+      slots: ["\u79D8\u5B9D"],
+      resonanceTag: "speed",
+      baseAttributes: { speed: 50, attack: 30 },
+      resonanceSlots: 2,
+      skillTree: {
+        1: { name: "\u77AC\u79FB", description: "\u901F\u5EA6\u4E34\u65F6\u63D0\u5347" },
+        2: { name: "\u65F6\u95F4\u626D\u66F2", description: "\u884C\u52A8\u987A\u5E8F\u63D0\u524D" },
+        3: { name: "\u7EC8\u6781\u65F6\u505C", description: "\u4F7F\u76EE\u6807\u884C\u52A8\u8FDF\u7F13" }
+      }
+    }
+  };
+  var LEVEL_DEFINITIONS = {
+    \u51E1: { name: "\u51E1\u54C1", multiplier: 1 },
+    \u7075: { name: "\u7075\u54C1", multiplier: 1.5 },
+    \u4ED9: { name: "\u4ED9\u54C1", multiplier: 2.5 },
+    \u795E: { name: "\u795E\u54C1", multiplier: 4 },
+    \u9053: { name: "\u9053\u54C1", multiplier: 7 }
+  };
+  var RESONANCE_EFFECTS = {
+    "attack+defense": { bonusAttribute: "defense", bonusPercent: 0.1 },
+    "attack+life": { bonusAttribute: "attack", bonusPercent: 0.08 },
+    "attack+speed": { bonusAttribute: "attack", bonusPercent: 0.12 },
+    "defense+life": { bonusAttribute: "defense", bonusPercent: 0.1 },
+    "defense+speed": { bonusAttribute: "defense", bonusPercent: 0.08 },
+    "life+speed": { bonusAttribute: "life", bonusPercent: 0.1 },
+    "attack+attack": { bonusAttribute: "attack", bonusPercent: 0.15 },
+    "defense+defense": { bonusAttribute: "defense", bonusPercent: 0.15 },
+    "life+life": { bonusAttribute: "life", bonusPercent: 0.15 },
+    "speed+speed": { bonusAttribute: "speed", bonusPercent: 0.15 }
+  };
+  var chaosTreasureService = new ChaosTreasureService();
+  function createChaosTreasureMCPHandlers(gameState3) {
+    const service = new ChaosTreasureService();
+    service.init(gameState3);
+    return {
+      "treasure.refine": (params) => service.mcpRefine(params),
+      "treasure.awaken": (params) => service.mcpAwaken(params),
+      "treasure.query": (params) => service.mcpQuery(params),
+      "treasure.equip": (params) => service.mcpEquip(params),
+      "treasure.resonance": (params) => service.mcpResonance(params),
+      "treasure.strengthen": (params) => service.mcpStrengthen(params)
+    };
+  }
+  var CHAOS_TREASURE_TOOLS = {
+    "treasure.refine": {
+      name: "treasure.refine",
+      description: "\u70BC\u5236\u6DF7\u6C8C\u7075\u5B9D",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["\u6B66\u5668", "\u9632\u5177", "\u9970\u54C1", "\u79D8\u5B9D"],
+            description: "\u7075\u5B9D\u7C7B\u578B"
+          },
+          level: {
+            type: "string",
+            enum: ["\u51E1", "\u7075", "\u4ED9", "\u795E", "\u9053"],
+            description: "\u7075\u5B9D\u7B49\u7EA7",
+            default: "\u51E1"
+          },
+          useStones: { type: "boolean", description: "\u662F\u5426\u6D88\u8017\u7075\u77F3", default: true }
+        },
+        required: ["type"]
+      }
+    },
+    "treasure.awaken": {
+      name: "treasure.awaken",
+      description: "\u7075\u5B9D\u89C9\u9192\uFF0C\u63D0\u5347\u7075\u5B9D\u80FD\u529B",
+      inputSchema: {
+        type: "object",
+        properties: {
+          treasureId: { type: "string", description: "\u7075\u5B9DID" }
+        },
+        required: ["treasureId"]
+      }
+    },
+    "treasure.query": {
+      name: "treasure.query",
+      description: "\u67E5\u8BE2\u7075\u5B9D\u4FE1\u606F",
+      inputSchema: {
+        type: "object",
+        properties: {
+          treasureId: { type: "string", description: "\u7075\u5B9DID" },
+          listAll: { type: "boolean", description: "\u5217\u51FA\u6240\u6709\u7075\u5B9D" },
+          filterType: { type: "string", enum: ["\u6B66\u5668", "\u9632\u5177", "\u9970\u54C1", "\u79D8\u5B9D"], description: "\u6309\u7C7B\u578B\u7B5B\u9009" },
+          filterLevel: { type: "string", enum: ["\u51E1", "\u7075", "\u4ED9", "\u795E", "\u9053"], description: "\u6309\u7B49\u7EA7\u7B5B\u9009" }
+        }
+      }
+    },
+    "treasure.equip": {
+      name: "treasure.equip",
+      description: "\u88C5\u5907\u7075\u5B9D\u5230\u89D2\u8272",
+      inputSchema: {
+        type: "object",
+        properties: {
+          treasureId: { type: "string", description: "\u7075\u5B9DID" },
+          slot: { type: "string", description: "\u88C5\u5907\u69FD\u4F4D" },
+          unequip: { type: "boolean", description: "\u662F\u5426\u5378\u4E0B", default: false }
+        },
+        required: ["treasureId"]
+      }
+    },
+    "treasure.resonance": {
+      name: "treasure.resonance",
+      description: "\u7075\u5B9D\u5171\u9E23\uFF0C\u4E24\u4EF6\u7075\u5B9D\u4EA7\u751F\u5171\u9E23\u6548\u679C",
+      inputSchema: {
+        type: "object",
+        properties: {
+          treasureId1: { type: "string", description: "\u7B2C\u4E00\u4EF6\u7075\u5B9DID" },
+          treasureId2: { type: "string", description: "\u7B2C\u4E8C\u4EF6\u7075\u5B9DID" },
+          removeResonance: { type: "boolean", description: "\u662F\u5426\u89E3\u9664\u5171\u9E23", default: false }
+        }
+      }
+    },
+    "treasure.strengthen": {
+      name: "treasure.strengthen",
+      description: "\u5F3A\u5316\u7075\u5B9D\uFF0C\u63D0\u5347\u57FA\u7840\u5C5E\u6027",
+      inputSchema: {
+        type: "object",
+        properties: {
+          treasureId: { type: "string", description: "\u7075\u5B9DID" },
+          autoIncrement: { type: "boolean", description: "\u662F\u5426\u81EA\u52A8\u63D0\u5347\u5F3A\u5316\u7B49\u7EA7", default: false }
+        },
+        required: ["treasureId"]
+      }
+    }
+  };
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -15888,7 +16609,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V236",
+      gameVersion: "V237",
       // 设置
       settings: {
         soundEnabled: true,
@@ -15975,6 +16696,37 @@ var CultivationSimulator = (() => {
       "dharma.fruit.combine",
       DHARMA_FRUITS_TOOLS["dharma.fruit.combine"],
       (params) => dharmaFruitHandlers["dharma.fruit.combine"](params)
+    );
+    const chaosTreasureHandlers = createChaosTreasureMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "treasure.refine",
+      CHAOS_TREASURE_TOOLS["treasure.refine"],
+      (params) => chaosTreasureHandlers["treasure.refine"](params)
+    );
+    mcpRegistry.registerTool(
+      "treasure.awaken",
+      CHAOS_TREASURE_TOOLS["treasure.awaken"],
+      (params) => chaosTreasureHandlers["treasure.awaken"](params)
+    );
+    mcpRegistry.registerTool(
+      "treasure.query",
+      CHAOS_TREASURE_TOOLS["treasure.query"],
+      (params) => chaosTreasureHandlers["treasure.query"](params)
+    );
+    mcpRegistry.registerTool(
+      "treasure.equip",
+      CHAOS_TREASURE_TOOLS["treasure.equip"],
+      (params) => chaosTreasureHandlers["treasure.equip"](params)
+    );
+    mcpRegistry.registerTool(
+      "treasure.resonance",
+      CHAOS_TREASURE_TOOLS["treasure.resonance"],
+      (params) => chaosTreasureHandlers["treasure.resonance"](params)
+    );
+    mcpRegistry.registerTool(
+      "treasure.strengthen",
+      CHAOS_TREASURE_TOOLS["treasure.strengthen"],
+      (params) => chaosTreasureHandlers["treasure.strengthen"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -17353,4 +18105,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-be4e209-2026-05-30T16-48-22-669Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-8eafe05-2026-05-30T16-55-36-311Z";
