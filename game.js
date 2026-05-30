@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-9dffcad-2026-05-30T15-17-09-916Z */
+/* Cultivation Simulator DDD-v1.0.0-ce97103-2026-05-30T15-23-36-265Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -6268,6 +6268,527 @@ var CultivationSimulator = (() => {
     moduleDescription: "\u5BA0\u7269\u7CFB\u7EDF - \u5305\u542B\u7075\u5BA0\u6355\u6349\u3001\u57F9\u517B\u3001\u8FDB\u5316\u3001\u63A2\u9669\u7B49\u529F\u80FD"
   };
 
+  // src/domains/inventory/services/AlchemyKBService.js
+  var AlchemyKBService = class {
+    constructor() {
+      this.initialized = false;
+      this.gameState = null;
+      this.knowledgeGraph = {
+        nodes: [],
+        edges: [],
+        recipes: {},
+        // 已发现的丹方
+        herbEfficacies: {}
+        // 药材属性映射
+      };
+      this.herbEfficacyDatabase = {
+        "\u7075\u8349": ["qi_restoration", "cultivation_boost"],
+        "\u5996\u517D\u8840": ["attack_boost", "beast_summon"],
+        "\u5929\u6750": ["all_attributes", "breakthrough_help"],
+        "\u6DF7\u6C8C\u77F3": ["chaos_attribute", "legendary_boost"],
+        "\u7384\u94C1": ["defense_boost", "weapon_material"],
+        "\u5996\u517D\u76AE": ["defense_boost", "armor_material"],
+        "\u5996\u517D\u9AA8": ["attack_boost", "tool_material"],
+        "\u7075\u77F3": ["energy_source", "universal"]
+      };
+      this.initialRecipes = {
+        "\u56DE\u6C14\u4E39": {
+          materials: ["\u7075\u8349"],
+          efficacies: ["qi_restoration"],
+          discovered: true,
+          discoverProbability: 0
+        },
+        "\u7597\u4F24\u4E39": {
+          materials: ["\u7075\u8349", "\u5996\u517D\u8840"],
+          efficacies: ["healing", "attack_boost"],
+          discovered: true,
+          discoverProbability: 0
+        },
+        "\u805A\u7075\u4E39": {
+          materials: ["\u7075\u77F3", "\u7075\u8349"],
+          efficacies: ["cultivation_boost", "qi_restoration"],
+          discovered: true,
+          discoverProbability: 0
+        },
+        "\u7834\u5883\u4E39": {
+          materials: ["\u7075\u77F3", "\u5929\u6750"],
+          efficacies: ["breakthrough_help", "realm_barrier"],
+          discovered: true,
+          discoverProbability: 0
+        },
+        "\u6E21\u52AB\u4E39": {
+          materials: ["\u5929\u6750", "\u7075\u77F3"],
+          efficacies: ["tribulation_help", "mindset_boost"],
+          discovered: true,
+          discoverProbability: 0
+        },
+        "\u6D17\u9AD3\u4E39": {
+          materials: ["\u5929\u6750", "\u7075\u77F3"],
+          efficacies: ["spirit_root_refresh", "all_attributes"],
+          discovered: true,
+          discoverProbability: 0
+        }
+      };
+      this.synergyEffects = {
+        "qi_restoration+cultivation_boost": "enhanced_cultivation",
+        "attack_boost+defense_boost": "balanced_combat",
+        "all_attributes+legendary_boost": "ultimate_pill",
+        "breakthrough_help+mindset_boost": "smooth_breakthrough",
+        "healing+qi_restoration": "full_recovery"
+      };
+      this.discoveryCost = 500;
+    }
+    /**
+     * 初始化丹方知识图谱
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.alchemyKB) {
+        gameState3.alchemyKB = {
+          recipes: { ...this.initialRecipes },
+          herbEfficacies: { ...this.herbEfficacyDatabase },
+          totalDiscoveries: 0,
+          lastDiscoveryDate: null
+        };
+      }
+      this.knowledgeGraph.recipes = gameState3.alchemyKB.recipes;
+      this.knowledgeGraph.herbEfficacies = gameState3.alchemyKB.herbEfficacies;
+      this.buildKnowledgeGraph();
+      this.initialized = true;
+      return gameState3;
+    }
+    /**
+     * 构建知识图谱
+     */
+    buildKnowledgeGraph() {
+      const nodes = [];
+      const edges = [];
+      for (const herb of Object.keys(this.knowledgeGraph.herbEfficacies)) {
+        nodes.push({
+          id: `herb_${herb}`,
+          type: "herb",
+          name: herb,
+          properties: {
+            efficacies: this.knowledgeGraph.herbEfficacies[herb]
+          }
+        });
+      }
+      const efficacySet = /* @__PURE__ */ new Set();
+      for (const herbEfficacies of Object.values(this.knowledgeGraph.herbEfficacies)) {
+        for (const eff of herbEfficacies) {
+          efficacySet.add(eff);
+        }
+      }
+      for (const eff of efficacySet) {
+        nodes.push({
+          id: `efficacy_${eff}`,
+          type: "efficacy",
+          name: eff,
+          properties: {}
+        });
+      }
+      for (const [recipeName, recipe] of Object.entries(this.knowledgeGraph.recipes)) {
+        if (recipe.discovered) {
+          nodes.push({
+            id: `recipe_${recipeName}`,
+            type: "recipe",
+            name: recipeName,
+            properties: {
+              materials: recipe.materials,
+              efficacies: recipe.efficacies
+            }
+          });
+          for (const mat of recipe.materials) {
+            edges.push({
+              source: `herb_${mat}`,
+              target: `recipe_${recipeName}`,
+              relation: "material_for"
+            });
+          }
+          for (const eff of recipe.efficacies) {
+            edges.push({
+              source: `efficacy_${eff}`,
+              target: `recipe_${recipeName}`,
+              relation: "contributes_to"
+            });
+          }
+        }
+      }
+      this.knowledgeGraph.nodes = nodes;
+      this.knowledgeGraph.edges = edges;
+    }
+    // ===== MCP 工具实现 =====
+    /**
+     * alchemy.kb.query - 查询丹方知识库
+     */
+    query(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { type, name } = params || {};
+      if (!type && !name) {
+        return {
+          success: true,
+          data: {
+            totalNodes: this.knowledgeGraph.nodes.length,
+            totalEdges: this.knowledgeGraph.edges.length,
+            discoveredRecipes: Object.values(this.knowledgeGraph.recipes).filter((r) => r.discovered).length,
+            totalRecipes: Object.keys(this.knowledgeGraph.recipes).length,
+            herbCount: Object.keys(this.knowledgeGraph.herbEfficacies).length
+          }
+        };
+      }
+      if (type === "recipe" && name) {
+        const recipe = this.knowledgeGraph.recipes[name];
+        if (!recipe) {
+          return { success: false, error: `\u4E39\u65B9 ${name} \u4E0D\u5B58\u5728` };
+        }
+        const recipeNode = this.knowledgeGraph.nodes.find((n) => n.id === `recipe_${name}`);
+        const incomingEdges = this.knowledgeGraph.edges.filter((e) => e.target === `recipe_${name}`);
+        return {
+          success: true,
+          data: {
+            name,
+            discovered: recipe.discovered,
+            materials: recipe.materials,
+            efficacies: recipe.efficacies,
+            relatedHerbs: incomingEdges.filter((e) => e.relation === "material_for").map((e) => e.source.replace("herb_", "")),
+            relatedEfficacies: incomingEdges.filter((e) => e.relation === "contributes_to").map((e) => e.source.replace("efficacy_", ""))
+          }
+        };
+      }
+      if (type === "herb" && name) {
+        const efficacies = this.knowledgeGraph.herbEfficacies[name];
+        if (!efficacies) {
+          return { success: false, error: `\u836F\u6750 ${name} \u4E0D\u5B58\u5728` };
+        }
+        const relatedRecipes = Object.entries(this.knowledgeGraph.recipes).filter(([, recipe]) => recipe.discovered && recipe.materials.includes(name)).map(([name2]) => name2);
+        return {
+          success: true,
+          data: {
+            name,
+            efficacies,
+            relatedRecipes
+          }
+        };
+      }
+      if (type === "efficacy" && name) {
+        const efficacyNode = this.knowledgeGraph.nodes.find((n) => n.id === `efficacy_${name}`);
+        if (!efficacyNode) {
+          return { success: false, error: `\u5C5E\u6027 ${name} \u4E0D\u5B58\u5728` };
+        }
+        const relatedEdges = this.knowledgeGraph.edges.filter((e) => e.source === `efficacy_${name}`);
+        const relatedRecipes = relatedEdges.map((e) => e.target.replace("recipe_", ""));
+        return {
+          success: true,
+          data: {
+            name,
+            relatedRecipes
+          }
+        };
+      }
+      return { success: false, error: "\u65E0\u6548\u7684\u67E5\u8BE2\u53C2\u6570" };
+    }
+    /**
+     * alchemy.recipe.discover - 手动研究新丹方（消耗灵气）
+     */
+    discover(params) {
+      var _a, _b;
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { herbs, qiCost } = params || {};
+      const cost = qiCost || this.discoveryCost;
+      if (this.gameState.player.qi < cost) {
+        return { success: false, error: `\u7075\u6C14\u4E0D\u8DB3\uFF0C\u9700\u8981 ${cost} \u70B9` };
+      }
+      this.gameState.player.qi -= cost;
+      const elementMastery = ((_b = (_a = this.gameState.spiritRoot) == null ? void 0 : _a.attributes) == null ? void 0 : _b.wood) || 0;
+      const baseProbability = 0.1 + elementMastery / 100;
+      const allRecipesKnown = Object.values(this.knowledgeGraph.recipes).every((r) => r.discovered);
+      if (allRecipesKnown) {
+        return { success: false, error: "\u6240\u6709\u4E39\u65B9\u5DF2\u53D1\u73B0", qiSpent: cost, discoveryChance: 0 };
+      }
+      const unknownRecipes = Object.entries(this.knowledgeGraph.recipes).filter(([, recipe]) => !recipe.discovered);
+      if (unknownRecipes.length === 0) {
+        return { success: false, error: "\u6CA1\u6709\u53EF\u53D1\u73B0\u7684\u4E39\u65B9", qiSpent: cost };
+      }
+      let discoveryChance = baseProbability;
+      if (herbs && herbs.length > 0) {
+        for (const [recipeName, recipe] of unknownRecipes) {
+          const matchedMaterials = recipe.materials.filter((m) => herbs.includes(m));
+          if (matchedMaterials.length > 0) {
+            discoveryChance += matchedMaterials.length / recipe.materials.length * 0.3;
+          }
+        }
+      }
+      const roll = Math.random();
+      const discovered = roll < discoveryChance;
+      if (discovered) {
+        const [discoveredName, discoveredRecipe] = unknownRecipes[Math.floor(Math.random() * unknownRecipes.length)];
+        this.knowledgeGraph.recipes[discoveredName].discovered = true;
+        this.gameState.alchemyKB.recipes[discoveredName].discovered = true;
+        this.gameState.alchemyKB.totalDiscoveries++;
+        this.gameState.alchemyKB.lastDiscoveryDate = Date.now();
+        this.buildKnowledgeGraph();
+        return {
+          success: true,
+          discovered: discoveredName,
+          materials: discoveredRecipe.materials,
+          efficacies: discoveredRecipe.efficacies,
+          qiSpent: cost,
+          discoveryChance
+        };
+      }
+      return {
+        success: false,
+        reason: "\u7814\u7A76\u5931\u8D25\uFF0C\u672A\u53D1\u73B0\u65B0\u4E39\u65B9",
+        qiSpent: cost,
+        discoveryChance,
+        roll
+      };
+    }
+    /**
+     * alchemy.recipe.list - 列出已发现的丹方
+     */
+    listRecipes(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { filter } = params || {};
+      let recipes = Object.entries(this.knowledgeGraph.recipes).filter(([, recipe]) => recipe.discovered).map(([name, recipe]) => ({
+        name,
+        materials: recipe.materials,
+        efficacies: recipe.efficacies
+      }));
+      if (filter) {
+        recipes = recipes.filter(
+          (r) => r.name.includes(filter) || r.materials.some((m) => m.includes(filter)) || r.efficacies.some((e) => e.includes(filter))
+        );
+      }
+      return {
+        success: true,
+        count: recipes.length,
+        totalKnown: Object.keys(this.knowledgeGraph.recipes).length,
+        recipes
+      };
+    }
+    /**
+     * alchemy.efficacy.map - 查看药材属性映射
+     */
+    getEfficacyMap(params) {
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { herb } = params || {};
+      if (herb) {
+        const efficacies = this.knowledgeGraph.herbEfficacies[herb];
+        if (!efficacies) {
+          return { success: false, error: `\u836F\u6750 ${herb} \u4E0D\u5B58\u5728` };
+        }
+        const synergyInfo = {};
+        for (const eff of efficacies) {
+          for (const [combo, result] of Object.entries(this.synergyEffects)) {
+            if (combo.includes(eff)) {
+              synergyInfo[combo] = result;
+            }
+          }
+        }
+        return {
+          success: true,
+          herb,
+          efficacies,
+          synergies: synergyInfo
+        };
+      }
+      return {
+        success: true,
+        totalHerbs: Object.keys(this.knowledgeGraph.herbEfficacies).length,
+        herbEfficacyMap: { ...this.knowledgeGraph.herbEfficacies },
+        synergyEffects: { ...this.synergyEffects }
+      };
+    }
+    /**
+     * alchemy.craft.calculate - 计算炼丹结果预览
+     */
+    calculateCraft(params) {
+      var _a, _b;
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { materials } = params || {};
+      if (!materials || !Array.isArray(materials) || materials.length === 0) {
+        return { success: false, error: "\u8BF7\u63D0\u4F9B\u6750\u6599\u5217\u8868" };
+      }
+      const materialCheck = this.checkMaterials(materials);
+      if (!materialCheck.available) {
+        return {
+          success: false,
+          error: "\u6750\u6599\u4E0D\u8DB3",
+          missing: materialCheck.missing
+        };
+      }
+      const matchedRecipes = [];
+      for (const [recipeName, recipe] of Object.entries(this.knowledgeGraph.recipes)) {
+        if (!recipe.discovered) continue;
+        const matchedMaterials = recipe.materials.filter((m) => materials.includes(m));
+        const matchRatio = matchedMaterials.length / recipe.materials.length;
+        if (matchRatio > 0) {
+          matchedRecipes.push({
+            name: recipeName,
+            matchRatio,
+            matchDetails: {
+              matched: matchedMaterials,
+              required: recipe.materials,
+              missing: recipe.materials.filter((m) => !materials.includes(m))
+            },
+            expectedEfficacies: recipe.efficacies
+          });
+        }
+      }
+      matchedRecipes.sort((a, b) => b.matchRatio - a.matchRatio);
+      const materialEfficacies = [];
+      for (const mat of materials) {
+        const effs = this.knowledgeGraph.herbEfficacies[mat];
+        if (effs) {
+          materialEfficacies.push(...effs);
+        }
+      }
+      const activeSynergies = [];
+      for (const [combo, result] of Object.entries(this.synergyEffects)) {
+        const comboEffs = combo.split("+");
+        if (comboEffs.every((e) => materialEfficacies.includes(e))) {
+          activeSynergies.push({ combo, result });
+        }
+      }
+      let estimatedQuality = "common";
+      if (activeSynergies.length >= 2) {
+        estimatedQuality = "rare";
+      }
+      if (activeSynergies.length >= 3 || ((_a = matchedRecipes[0]) == null ? void 0 : _a.matchRatio) === 1) {
+        estimatedQuality = "precious";
+      }
+      if (activeSynergies.length >= 4 && ((_b = matchedRecipes[0]) == null ? void 0 : _b.matchRatio) === 1) {
+        estimatedQuality = "legendary";
+      }
+      return {
+        success: true,
+        inputMaterials: materials,
+        matchedRecipes: matchedRecipes.slice(0, 5),
+        activeSynergies,
+        estimatedQuality,
+        materialEfficacies: [...new Set(materialEfficacies)]
+      };
+    }
+    /**
+     * alchemy.kb.export - 导出知识图谱
+     */
+    exportKB(params) {
+      var _a;
+      if (!this.initialized) {
+        return { success: false, error: "\u77E5\u8BC6\u5E93\u672A\u521D\u59CB\u5316" };
+      }
+      const { format, includeHidden } = params || {};
+      const exportData = {
+        meta: {
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          totalNodes: this.knowledgeGraph.nodes.length,
+          totalEdges: this.knowledgeGraph.edges.length,
+          discoveredRecipes: Object.values(this.knowledgeGraph.recipes).filter((r) => r.discovered).length,
+          totalDiscoveries: ((_a = this.gameState.alchemyKB) == null ? void 0 : _a.totalDiscoveries) || 0
+        },
+        nodes: this.knowledgeGraph.nodes,
+        edges: this.knowledgeGraph.edges,
+        recipes: includeHidden ? this.knowledgeGraph.recipes : Object.fromEntries(
+          Object.entries(this.knowledgeGraph.recipes).map(([k, v]) => [k, { ...v, discoverProbability: void 0 }])
+        ),
+        herbEfficacies: this.knowledgeGraph.herbEfficacies,
+        synergyEffects: this.synergyEffects
+      };
+      if (format === "json") {
+        return {
+          success: true,
+          data: JSON.stringify(exportData, null, 2),
+          mimeType: "application/json"
+        };
+      }
+      return {
+        success: true,
+        data: exportData
+      };
+    }
+    // ===== 辅助方法 =====
+    /**
+     * 检查材料是否足够
+     */
+    checkMaterials(materials) {
+      const missing = [];
+      for (const mat of materials) {
+        if (mat === "\u7075\u77F3") {
+          continue;
+        }
+        const hasItem = this.gameState.inventory.some(
+          (item) => item.name === mat && item.quantity >= 1
+        );
+        if (!hasItem) {
+          missing.push(mat);
+        }
+      }
+      return {
+        available: missing.length === 0,
+        missing
+      };
+    }
+    /**
+     * 根据炼丹结果发现新丹方
+     */
+    onCraftResult(craftResult) {
+      var _a, _b;
+      if (!this.initialized || !(craftResult == null ? void 0 : craftResult.success)) return;
+      const { materials, recipeName } = craftResult;
+      const unknownRecipes = Object.entries(this.knowledgeGraph.recipes).filter(([, recipe]) => !recipe.discovered);
+      if (unknownRecipes.length === 0) return;
+      const elementMastery = ((_b = (_a = this.gameState.spiritRoot) == null ? void 0 : _a.attributes) == null ? void 0 : _b.wood) || 0;
+      let discoveryChance = 0.05 + elementMastery / 200;
+      for (const [name, recipe] of unknownRecipes) {
+        const matchedMaterials = recipe.materials.filter((m) => materials.includes(m));
+        discoveryChance += matchedMaterials.length / recipe.materials.length * 0.1;
+      }
+      const roll = Math.random();
+      if (roll < discoveryChance) {
+        const [discoveredName, discoveredRecipe] = unknownRecipes[Math.floor(Math.random() * unknownRecipes.length)];
+        this.knowledgeGraph.recipes[discoveredName].discovered = true;
+        this.gameState.alchemyKB.recipes[discoveredName].discovered = true;
+        this.gameState.alchemyKB.totalDiscoveries++;
+        this.gameState.alchemyKB.lastDiscoveryDate = Date.now();
+        this.buildKnowledgeGraph();
+        return {
+          discovered: true,
+          recipeName: discoveredName,
+          materials: discoveredRecipe.materials,
+          efficacies: discoveredRecipe.efficacies
+        };
+      }
+      return { discovered: false };
+    }
+    /**
+     * 获取统计信息
+     */
+    getStats() {
+      var _a, _b;
+      return {
+        totalNodes: this.knowledgeGraph.nodes.length,
+        totalEdges: this.knowledgeGraph.edges.length,
+        discoveredRecipes: Object.values(this.knowledgeGraph.recipes).filter((r) => r.discovered).length,
+        totalRecipes: Object.keys(this.knowledgeGraph.recipes).length,
+        herbCount: Object.keys(this.knowledgeGraph.herbEfficacies).length,
+        totalDiscoveries: ((_a = this.gameState.alchemyKB) == null ? void 0 : _a.totalDiscoveries) || 0,
+        lastDiscovery: ((_b = this.gameState.alchemyKB) == null ? void 0 : _b.lastDiscoveryDate) || null
+      };
+    }
+  };
+  var alchemyKBService = new AlchemyKBService();
+
   // src/domains/ranking/RankingModule.js
   function createRankingService(gameStateAccessor) {
     return new RankingService(gameStateAccessor);
@@ -9391,7 +9912,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V210",
+      gameVersion: "V225",
       // 设置
       settings: {
         soundEnabled: true,
@@ -9422,6 +9943,8 @@ var CultivationSimulator = (() => {
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState2);
     domainModules.talentTree = new TalentTreeService(gameState2);
+    alchemyKBService.init(gameState2);
+    domainModules.alchemyKB = alchemyKBService;
     npcEvolutionEngine.init(gameState2);
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -9671,6 +10194,70 @@ var CultivationSimulator = (() => {
         required: ["type"]
       }
     }, (params) => talentTreeHandlers["spirit.hook.register"](params));
+    mcpRegistry.registerTool("alchemy.kb.query", {
+      name: "alchemy.kb.query",
+      description: "Query the alchemy knowledge base",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["recipe", "herb", "efficacy"], description: "Query type" },
+          name: { type: "string", description: "Name to query" }
+        }
+      }
+    }, (params) => alchemyKBService.query(params));
+    mcpRegistry.registerTool("alchemy.recipe.discover", {
+      name: "alchemy.recipe.discover",
+      description: "Manually research to discover new alchemy recipes (consumes qi)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herbs: { type: "array", items: { type: "string" }, description: "Herbs to use for research" },
+          qiCost: { type: "number", description: "Qi cost for discovery" }
+        }
+      }
+    }, (params) => alchemyKBService.discover(params));
+    mcpRegistry.registerTool("alchemy.recipe.list", {
+      name: "alchemy.recipe.list",
+      description: "List all discovered alchemy recipes",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filter: { type: "string", description: "Filter recipes by name, material, or efficacy" }
+        }
+      }
+    }, (params) => alchemyKBService.listRecipes(params));
+    mcpRegistry.registerTool("alchemy.efficacy.map", {
+      name: "alchemy.efficacy.map",
+      description: "View herb efficacy mapping and synergy effects",
+      inputSchema: {
+        type: "object",
+        properties: {
+          herb: { type: "string", description: "Specific herb to query" }
+        }
+      }
+    }, (params) => alchemyKBService.getEfficacyMap(params));
+    mcpRegistry.registerTool("alchemy.craft.calculate", {
+      name: "alchemy.craft.calculate",
+      description: "Calculate crafting result preview with given materials",
+      inputSchema: {
+        type: "object",
+        properties: {
+          materials: { type: "array", items: { type: "string" }, description: "Materials to use", required: ["materials"] }
+        },
+        required: ["materials"]
+      }
+    }, (params) => alchemyKBService.calculateCraft(params));
+    mcpRegistry.registerTool("alchemy.kb.export", {
+      name: "alchemy.kb.export",
+      description: "Export the knowledge graph",
+      inputSchema: {
+        type: "object",
+        properties: {
+          format: { type: "string", enum: ["json"], description: "Export format" },
+          includeHidden: { type: "boolean", description: "Include undiscovered recipes" }
+        }
+      }
+    }, (params) => alchemyKBService.exportKB(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -10143,4 +10730,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-9dffcad-2026-05-30T15-17-09-916Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-ce97103-2026-05-30T15-23-36-265Z";
