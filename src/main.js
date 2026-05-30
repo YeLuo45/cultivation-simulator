@@ -36,6 +36,7 @@ import { createSigninService, createWelfareService } from './domains/signin/Sign
 import CombatModule from './domains/combat/CombatModule.js';
 import SectModule from './domains/sect/SectModule.js';
 import { reincarnationService } from './domains/reincarnation/services/ReincarnationService.js';
+import { reincarnationBookService } from './domains/reincarnation/services/ReincarnationBookService.js';
 import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultivation/services/TalentTreeService.js';
 
 // 系统模块
@@ -243,7 +244,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V225',
+        gameVersion: 'V226',
         
         // 设置
         settings: {
@@ -316,6 +317,10 @@ function initializeDomainModules() {
     // 轮回模块 (ES Module)
     domainModules.reincarnation = reincarnationService;
     reincarnationService.init(gameState);
+
+    // 轮回簿天道记录 (V226: Direction M续)
+    domainModules.reincarnationBook = reincarnationBookService;
+    reincarnationBookService.init(gameState);
 
     // 天赋树模块 (Direction P: 灵根天赋系统)
     domainModules.talentTree = new TalentTreeService(gameState);
@@ -555,6 +560,79 @@ function registerDomainMCPTools() {
         description: 'Get reincarnation cycle status and memory layer info',
         inputSchema: { type: 'object', properties: {} }
     }, () => reincarnationService.mcpCycleStatus(gameState));
+
+    // 轮回簿天道记录MCP工具 (V226: Direction M续)
+    mcpRegistry.registerTool('reincarnation.book.list', {
+        name: 'reincarnation.book.list',
+        description: 'View reincarnation history (reincarnation book)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                limit: { type: 'number', description: 'Number of records to return', default: 20 },
+                offset: { type: 'number', description: 'Offset for pagination', default: 0 },
+                filter: { type: 'string', enum: ['all', 'good', 'bad'], description: 'Filter by karma', default: 'all' }
+            }
+        }
+    }, (params) => reincarnationBookService.mcpBookList(params || {}));
+
+    mcpRegistry.registerTool('reincarnation.karma.record', {
+        name: 'reincarnation.karma.record',
+        description: 'Record karma behavior',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', description: 'Behavior type (rescue/charity/honest/medicine/protect/kill/steal/lie/harm/betray)' },
+                action: { type: 'string', enum: ['good', 'bad'], description: 'Good or bad action' },
+                amount: { type: 'number', description: 'Karma amount' },
+                description: { type: 'string', description: 'Custom description' }
+            },
+            required: ['type', 'action']
+        }
+    }, (params) => reincarnationBookService.mcpKarmaRecord(params || {}));
+
+    mcpRegistry.registerTool('reincarnation.karma.query', {
+        name: 'reincarnation.karma.query',
+        description: 'Query current karma status',
+        inputSchema: { type: 'object', properties: {} }
+    }, () => reincarnationBookService.mcpKarmaQuery());
+
+    mcpRegistry.registerTool('reincarnation.tiandao.record', {
+        name: 'reincarnation.tiandao.record',
+        description: 'Record tiandao merit event',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                eventType: { type: 'string', description: 'Event type (breakthrough/fly/tribulation/merit/serendipity/alchemy)' },
+                merit: { type: 'number', description: 'Merit amount to record' },
+                description: { type: 'string', description: 'Custom description' }
+            },
+            required: ['eventType']
+        }
+    }, (params) => reincarnationBookService.mcpTiandaoRecord(params || {}));
+
+    mcpRegistry.registerTool('reincarnation.tiandao.bless', {
+        name: 'reincarnation.tiandao.bless',
+        description: 'Receive tiandao blessing (consumes merit)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                level: { type: 'string', enum: ['SSS', 'SS', 'S', 'A', 'B', 'C'], description: 'Blessing level' },
+                reason: { type: 'string', description: 'Reason for blessing' }
+            }
+        }
+    }, (params) => reincarnationBookService.mcpTiandaoBless(params || {}));
+
+    mcpRegistry.registerTool('reincarnation.history.export', {
+        name: 'reincarnation.history.export',
+        description: 'Export reincarnation history',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                format: { type: 'string', enum: ['json', 'text'], description: 'Export format', default: 'json' },
+                includeDetails: { type: 'boolean', description: 'Include karma and tiandao records', default: true }
+            }
+        }
+    }, (params) => reincarnationBookService.mcpHistoryExport(params || {}));
 
     // 天赋树MCP工具 (Direction P: 灵根天赋系统)
     const talentTreeHandlers = createTalentTreeMCPHandlers(gameState);
