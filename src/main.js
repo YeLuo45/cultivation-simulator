@@ -55,6 +55,9 @@ import { createCaveDwellingService } from './domains/player/services/CaveDwellin
 // 万界战争系统 (V234 Direction V: 万界战争系统 - generic-agent/nanobot)
 import { createRealmWarfareService } from './domains/combat/services/RealmWarfareService.js';
 
+// 混沌灵宝系统 (V237 Direction Y: 混沌灵宝系统 - claude-code/nanobot)
+import { createChaosTreasureMCPHandlers, CHAOS_TREASURE_TOOLS } from './domains/inventory/services/ChaosTreasureService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -272,7 +275,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V236',
+        gameVersion: 'V237',
         
         // 设置
         settings: {
@@ -416,6 +419,22 @@ function initializeDomainModules() {
         (params) => dharmaFruitHandlers['dharma.transformation.trigger'](params));
     mcpRegistry.registerTool('dharma.fruit.combine', DHARMA_FRUITS_TOOLS['dharma.fruit.combine'], 
         (params) => dharmaFruitHandlers['dharma.fruit.combine'](params));
+
+    // 混沌灵宝MCP工具 (V237 Direction Y: 混沌灵宝系统)
+    const chaosTreasureHandlers = createChaosTreasureMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('treasure.refine', CHAOS_TREASURE_TOOLS['treasure.refine'], 
+        (params) => chaosTreasureHandlers['treasure.refine'](params));
+    mcpRegistry.registerTool('treasure.awaken', CHAOS_TREASURE_TOOLS['treasure.awaken'], 
+        (params) => chaosTreasureHandlers['treasure.awaken'](params));
+    mcpRegistry.registerTool('treasure.query', CHAOS_TREASURE_TOOLS['treasure.query'], 
+        (params) => chaosTreasureHandlers['treasure.query'](params));
+    mcpRegistry.registerTool('treasure.equip', CHAOS_TREASURE_TOOLS['treasure.equip'], 
+        (params) => chaosTreasureHandlers['treasure.equip'](params));
+    mcpRegistry.registerTool('treasure.resonance', CHAOS_TREASURE_TOOLS['treasure.resonance'], 
+        (params) => chaosTreasureHandlers['treasure.resonance'](params));
+    mcpRegistry.registerTool('treasure.strengthen', CHAOS_TREASURE_TOOLS['treasure.strengthen'], 
+        (params) => chaosTreasureHandlers['treasure.strengthen'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
