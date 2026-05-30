@@ -40,6 +40,7 @@ import CombatModule from './domains/combat/CombatModule.js';
 import SectModule from './domains/sect/SectModule.js';
 import { reincarnationService } from './domains/reincarnation/services/ReincarnationService.js';
 import { reincarnationBookService } from './domains/reincarnation/services/ReincarnationBookService.js';
+import { dharmaFruitService, createDharmaFruitMCPHandlers, DHARMA_FRUITS_TOOLS } from './domains/reincarnation/services/DharmaFruitService.js';
 import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultivation/services/TalentTreeService.js';
 
 // 飞升系统 (V230 Direction R: 飞升系统)
@@ -271,7 +272,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V235',
+        gameVersion: 'V236',
         
         // 设置
         settings: {
@@ -349,6 +350,10 @@ function initializeDomainModules() {
     domainModules.reincarnationBook = reincarnationBookService;
     reincarnationBookService.init(gameState);
 
+    // 轮回道果系统 (V236 Direction X: 轮回道果系统 - generic-agent/ruflo)
+    dharmaFruitService.init(gameState);
+    domainModules.dharmaFruit = dharmaFruitService;
+
     // 天赋树模块 (Direction P: 灵根天赋系统)
     domainModules.talentTree = new TalentTreeService(gameState);
 
@@ -395,6 +400,22 @@ function initializeDomainModules() {
     // 天机榜系统 (V235 Direction W: 天机榜系统 - chatdev/thunderbolt)
     heavenRankService.init(gameState);
     domainModules.heavenRank = heavenRankService;
+
+    // 轮回道果MCP工具 (V236 Direction X: 轮回道果系统)
+    const dharmaFruitHandlers = createDharmaFruitMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('dharma.fruit.claim', DHARMA_FRUITS_TOOLS['dharma.fruit.claim'], 
+        (params) => dharmaFruitHandlers['dharma.fruit.claim'](params));
+    mcpRegistry.registerTool('dharma.fruit.inherit', DHARMA_FRUITS_TOOLS['dharma.fruit.inherit'], 
+        (params) => dharmaFruitHandlers['dharma.fruit.inherit'](params));
+    mcpRegistry.registerTool('dharma.fruit.upgrade', DHARMA_FRUITS_TOOLS['dharma.fruit.upgrade'], 
+        (params) => dharmaFruitHandlers['dharma.fruit.upgrade'](params));
+    mcpRegistry.registerTool('dharma.fruit.query', DHARMA_FRUITS_TOOLS['dharma.fruit.query'], 
+        (params) => dharmaFruitHandlers['dharma.fruit.query'](params));
+    mcpRegistry.registerTool('dharma.transformation.trigger', DHARMA_FRUITS_TOOLS['dharma.transformation.trigger'], 
+        (params) => dharmaFruitHandlers['dharma.transformation.trigger'](params));
+    mcpRegistry.registerTool('dharma.fruit.combine', DHARMA_FRUITS_TOOLS['dharma.fruit.combine'], 
+        (params) => dharmaFruitHandlers['dharma.fruit.combine'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
