@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-3a15ff8-2026-05-30T17-30-48-583Z */
+/* Cultivation Simulator DDD-v1.0.0-3e150f1-2026-05-30T17-36-13-909Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -12324,6 +12324,693 @@ var CultivationSimulator = (() => {
     }
   };
 
+  // src/domains/cultivation/services/ThunderTribulationService.js
+  init_CultivationService();
+  var TRIBULATION_STATES = {
+    NONE: "none",
+    // 未渡劫
+    PREPARING: "preparing",
+    // 准备中
+    IN_PROGRESS: "in_progress",
+    // 渡劫中
+    SUCCESS: "success",
+    // 渡劫成功
+    FAILED: "failed",
+    // 渡劫失败
+    BLESSED: "blessed"
+    // 已获赐福
+  };
+  var THUNDER_TRIBULATION_CONFIG = {
+    // 劫数等级与境界对应关系
+    realmToTribulationLevel: {
+      0: 1,
+      // 炼气→筑基需要1重劫
+      1: 2,
+      // 筑基→金丹需要2重劫
+      2: 3,
+      // 金丹→元婴需要3重劫
+      3: 4,
+      // 元婴→化神需要4重劫
+      4: 5,
+      // 化神→飞升需要5重劫
+      5: 9
+      // 飞升后大圆满需要9重劫
+    },
+    // 渡劫基础成功率
+    baseSuccessRate: 0.5,
+    // 每重劫数增加的基础强度
+    baseIntensityPerLevel: 100,
+    // 功德抵消天罚系数
+    meritOffsetFactor: 0.1,
+    // 天雷赐福基础增益
+    blessingBaseBonus: 0.1,
+    // 雷法精通最大等级
+    maxMasteryLevel: 9,
+    // 吸收雷劫恢复比例
+    absorbRecoveryRate: 0.3,
+    // 渡劫消耗灵石基数
+    tribulationStoneCost: 500
+  };
+  var THUNDER_TRIBULATION_TOOLS = {
+    "thunder.prepare": {
+      name: "thunder.prepare",
+      description: "\u51C6\u5907\u6E21\u52AB\uFF0C\u68C0\u6D4B\u6E21\u52AB\u6761\u4EF6\u5E76\u8BBE\u7F6E\u6E21\u52AB\u76EE\u6807",
+      parameters: {
+        type: "object",
+        properties: {
+          targetRealm: {
+            type: "number",
+            description: "\u76EE\u6807\u5883\u754C (0-5: \u70BC\u6C14\u3001\u7B51\u57FA\u3001\u91D1\u4E39\u3001\u5143\u5A74\u3001\u5316\u795E\u3001\u98DE\u5347)"
+          }
+        }
+      }
+    },
+    "thunder.execute": {
+      name: "thunder.execute",
+      description: "\u6267\u884C\u6E21\u52AB\uFF0C\u8FDB\u884C\u5929\u96F7\u6D17\u793C",
+      parameters: {
+        type: "object",
+        properties: {
+          useItems: {
+            type: "boolean",
+            description: "\u662F\u5426\u4F7F\u7528\u9053\u5177\u8F85\u52A9\u6E21\u52AB"
+          }
+        }
+      }
+    },
+    "thunder.bless": {
+      name: "thunder.bless",
+      description: "\u5929\u96F7\u8D50\u798F\uFF0C\u5C06\u96F7\u52AB\u4E4B\u529B\u8F6C\u5316\u4E3A\u4FEE\u70BC\u589E\u76CA",
+      parameters: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["cultivation", "attribute", "skill"],
+            description: "\u8D50\u798F\u7C7B\u578B"
+          }
+        }
+      }
+    },
+    "thunder.mastery": {
+      name: "thunder.mastery",
+      description: "\u96F7\u6CD5\u7CBE\u901A\uFF0C\u63D0\u5347\u96F7\u6CD5\u795E\u901A\u7B49\u7EA7",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["query", "upgrade", "use"],
+            description: "\u96F7\u6CD5\u64CD\u4F5C\u7C7B\u578B"
+          }
+        }
+      }
+    },
+    "thunder.absorb": {
+      name: "thunder.absorb",
+      description: "\u5438\u6536\u96F7\u52AB\uFF0C\u5C06\u5929\u96F7\u4E4B\u529B\u8F6C\u5316\u4E3A\u81EA\u8EAB\u7075\u529B",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: {
+            type: "number",
+            description: "\u5438\u6536\u91CF (1-100)"
+          }
+        }
+      }
+    },
+    "thunder.journal": {
+      name: "thunder.journal",
+      description: "\u6E21\u52AB\u65E5\u5FD7\uFF0C\u67E5\u770B\u5386\u53F2\u6E21\u52AB\u8BB0\u5F55",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "\u8FD4\u56DE\u8BB0\u5F55\u6570\u91CF"
+          }
+        }
+      }
+    }
+  };
+  var ThunderTribulationService = class _ThunderTribulationService {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.tribulationState = null;
+    }
+    /**
+     * 初始化天雷劫数系统
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 初始化后的游戏状态
+     */
+    init(gameState3) {
+      if (!gameState3.thunderTribulation) {
+        gameState3.thunderTribulation = {
+          // 渡劫状态
+          state: TRIBULATION_STATES.NONE,
+          // 当前劫数等级 (1-9)
+          currentLevel: 0,
+          // 目标境界
+          targetRealm: null,
+          // 天雷强度
+          lightningIntensity: 0,
+          // 雷击次数
+          lightningCount: 0,
+          // 渡劫进度 (0-100)
+          progress: 0,
+          // 历史记录
+          history: [],
+          // 雷法精通等级 (0-9)
+          lightningMastery: 0,
+          // 雷法神通列表
+          lightningSkills: [],
+          // 天雷赐福效果
+          blessingEffects: [],
+          // 累积天罚值
+          divinePunishment: 0,
+          // 功德值
+          meritPoints: 0,
+          // 最后渡劫时间
+          lastTribulationTime: null,
+          // 渡劫成功率加成
+          successRateBonus: 0,
+          // 已吸收雷劫能量
+          absorbedEnergy: 0
+        };
+      }
+      this.tribulationState = gameState3.thunderTribulation;
+      if (this.gameState.player && this.gameState.player.karmaPoints === void 0) {
+        this.gameState.player.karmaPoints = 0;
+      }
+      return gameState3;
+    }
+    /**
+     * 记录历史事件
+     */
+    recordHistory(action, details) {
+      if (!this.tribulationState.history) {
+        this.tribulationState.history = [];
+      }
+      this.tribulationState.history.push({
+        action,
+        details,
+        timestamp: Date.now()
+      });
+      if (this.tribulationState.history.length > 50) {
+        this.tribulationState.history = this.tribulationState.history.slice(-50);
+      }
+    }
+    /**
+     * 获取当前境界所需劫数等级
+     */
+    getRequiredTribulationLevel(targetRealm) {
+      const realm = targetRealm !== void 0 ? targetRealm : this.gameState.realm || 0;
+      return THUNDER_TRIBULATION_CONFIG.realmToTribulationLevel[realm] || 1;
+    }
+    /**
+     * 计算渡劫成功率
+     * 成功率 = (实力 + 功德) / (劫数 × 20)
+     */
+    calculateSuccessRate(params = {}) {
+      var _a;
+      const gs = this.gameState;
+      const level = this.tribulationState.currentLevel || this.getRequiredTribulationLevel();
+      const realmPower = (gs.realm || 0) * 100;
+      const cultivationPower = gs.cultivationProgress || 0;
+      const basePower = realmPower + cultivationPower;
+      const merit = this.tribulationState.meritPoints || (((_a = gs.player) == null ? void 0 : _a.karmaPoints) || 0);
+      const divinePunishment = this.tribulationState.divinePunishment || 0;
+      const effectiveMerit = Math.max(0, merit - divinePunishment * THUNDER_TRIBULATION_CONFIG.meritOffsetFactor);
+      const successRate = (basePower + effectiveMerit) / (level * 20);
+      return {
+        basePower,
+        merit: effectiveMerit,
+        level,
+        rawRate: successRate,
+        finalRate: Math.min(0.95, Math.max(0.05, successRate + (this.tribulationState.successRateBonus || 0)))
+      };
+    }
+    /**
+     * 准备渡劫 (thunder.prepare)
+     * @param {Object} params - 参数 { targetRealm: number }
+     * @returns {Object} 准备结果
+     */
+    prepare(params = {}) {
+      var _a, _b;
+      const gs = this.gameState;
+      if (this.tribulationState.state === TRIBULATION_STATES.IN_PROGRESS) {
+        return {
+          success: false,
+          error: "\u6E21\u52AB\u6B63\u5728\u8FDB\u884C\u4E2D\uFF0C\u65E0\u6CD5\u518D\u6B21\u51C6\u5907",
+          currentState: this.tribulationState.state
+        };
+      }
+      if (this.tribulationState.state === TRIBULATION_STATES.PREPARING) {
+        return {
+          success: false,
+          error: "\u6E21\u52AB\u5DF2\u51C6\u5907\u597D\uFF0C\u8BF7\u6267\u884C\u6E21\u52AB",
+          currentState: this.tribulationState.state
+        };
+      }
+      const targetRealm = params.targetRealm !== void 0 ? params.targetRealm : (gs.realm || 0) + 1;
+      if (targetRealm < 0 || targetRealm > 5) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u76EE\u6807\u5883\u754C"
+        };
+      }
+      if (targetRealm <= (gs.realm || 0)) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u5883\u754C\u5FC5\u987B\u9AD8\u4E8E\u5F53\u524D\u5883\u754C"
+        };
+      }
+      const requiredLevel = this.getRequiredTribulationLevel(targetRealm);
+      const stoneCost = THUNDER_TRIBULATION_CONFIG.tribulationStoneCost * requiredLevel;
+      if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < stoneCost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${stoneCost}\u7075\u77F3\u51C6\u5907\u6E21\u52AB`,
+          shortage: stoneCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+        };
+      }
+      this.tribulationState.state = TRIBULATION_STATES.PREPARING;
+      this.tribulationState.targetRealm = targetRealm;
+      this.tribulationState.currentLevel = requiredLevel;
+      this.tribulationState.lightningIntensity = THUNDER_TRIBULATION_CONFIG.baseIntensityPerLevel * requiredLevel;
+      const successRateInfo = this.calculateSuccessRate({ targetRealm });
+      this.recordHistory("prepare", {
+        targetRealm,
+        requiredLevel,
+        stoneCost,
+        successRate: successRateInfo.finalRate
+      });
+      return {
+        success: true,
+        action: "thunder.prepare",
+        state: TRIBULATION_STATES.PREPARING,
+        targetRealm,
+        requiredLevel,
+        lightningIntensity: this.tribulationState.lightningIntensity,
+        stoneCost,
+        successRate: successRateInfo.finalRate,
+        message: `\u51C6\u5907\u6E21\u52AB\uFF0C\u76EE\u6807\uFF1A${this.getRealmName(targetRealm)}\uFF0C\u9700\u8981${requiredLevel}\u91CD\u96F7\u52AB`
+      };
+    }
+    /**
+     * 执行渡劫 (thunder.execute)
+     * @param {Object} params - 参数 { useItems: boolean }
+     * @returns {Object} 渡劫结果
+     */
+    execute(params = {}) {
+      var _a, _b;
+      const gs = this.gameState;
+      if (this.tribulationState.state !== TRIBULATION_STATES.PREPARING) {
+        if (this.tribulationState.state === TRIBULATION_STATES.NONE) {
+          const prepResult = this.prepare(params);
+          if (!prepResult.success) {
+            return prepResult;
+          }
+        } else {
+          return {
+            success: false,
+            error: "\u8BF7\u5148\u51C6\u5907\u6E21\u52AB",
+            currentState: this.tribulationState.state
+          };
+        }
+      }
+      const stoneCost = THUNDER_TRIBULATION_CONFIG.tribulationStoneCost * this.tribulationState.currentLevel;
+      if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < stoneCost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3\uFF0C\u6E21\u52AB\u5931\u8D25",
+          shortage: stoneCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+        };
+      }
+      gs.player.spiritStones -= stoneCost;
+      this.tribulationState.state = TRIBULATION_STATES.IN_PROGRESS;
+      this.tribulationState.lightningCount = 0;
+      this.tribulationState.progress = 0;
+      const successRateInfo = this.calculateSuccessRate();
+      const maxLightning = this.tribulationState.currentLevel * 3;
+      const passedLightning = [];
+      for (let i = 0; i < maxLightning; i++) {
+        const lightningSuccess = Math.random() < successRateInfo.finalRate;
+        this.tribulationState.lightningCount++;
+        this.tribulationState.progress = (i + 1) / maxLightning * 100;
+        passedLightning.push({
+          index: i + 1,
+          intensity: this.tribulationState.lightningIntensity * (1 + i * 0.1),
+          passed: lightningSuccess
+        });
+        if (!lightningSuccess) {
+          this.tribulationState.state = TRIBULATION_STATES.FAILED;
+          this.tribulationState.lastTribulationTime = Date.now();
+          this.recordHistory("execute", {
+            targetRealm: this.tribulationState.targetRealm,
+            level: this.tribulationState.currentLevel,
+            lightningCount: this.tribulationState.lightningCount,
+            passedLightning: passedLightning.length,
+            result: "failed"
+          });
+          return {
+            success: false,
+            action: "thunder.execute",
+            state: TRIBULATION_STATES.FAILED,
+            message: `\u6E21\u52AB\u5931\u8D25\uFF01\u7B2C${i + 1}\u9053\u5929\u96F7\u672A\u80FD\u6E21\u8FC7`,
+            lightningCount: this.tribulationState.lightningCount,
+            progress: this.tribulationState.progress,
+            targetRealm: this.tribulationState.targetRealm,
+            failureReason: "\u5929\u96F7\u6D17\u793C\u5931\u8D25"
+          };
+        }
+      }
+      this.tribulationState.state = TRIBULATION_STATES.SUCCESS;
+      this.tribulationState.lastTribulationTime = Date.now();
+      const oldRealm = gs.realm || 0;
+      gs.realm = this.tribulationState.targetRealm;
+      gs.stage = 0;
+      gs.cultivationProgress = 0;
+      this.tribulationState.lightningMastery = Math.min(
+        this.tribulationState.lightningMastery + 1,
+        THUNDER_TRIBULATION_CONFIG.maxMasteryLevel
+      );
+      this.recordHistory("execute", {
+        targetRealm: this.tribulationState.targetRealm,
+        level: this.tribulationState.currentLevel,
+        lightningCount: this.tribulationState.lightningCount,
+        passedLightning: passedLightning.length,
+        result: "success"
+      });
+      return {
+        success: true,
+        action: "thunder.execute",
+        state: TRIBULATION_STATES.SUCCESS,
+        message: `\u6E21\u52AB\u6210\u529F\uFF01\u6210\u529F\u7A81\u7834\u81F3${this.getRealmName(gs.realm)}`,
+        realmProgress: {
+          from: oldRealm,
+          to: gs.realm,
+          realmName: this.getRealmName(gs.realm)
+        },
+        lightningMastery: this.tribulationState.lightningMastery,
+        lightningCount: this.tribulationState.lightningCount,
+        progress: this.tribulationState.progress
+      };
+    }
+    /**
+     * 天雷赐福 (thunder.bless)
+     * @param {Object} params - 参数 { type: 'cultivation'|'attribute'|'skill' }
+     * @returns {Object} 赐福结果
+     */
+    bless(params = {}) {
+      const gs = this.gameState;
+      if (this.tribulationState.state !== TRIBULATION_STATES.SUCCESS) {
+        return {
+          success: false,
+          error: "\u9700\u8981\u5148\u6210\u529F\u6E21\u52AB\u624D\u80FD\u83B7\u5F97\u8D50\u798F"
+        };
+      }
+      if (this.tribulationState.state === TRIBULATION_STATES.BLESSED) {
+        return {
+          success: false,
+          error: "\u672C\u6B21\u6E21\u52AB\u8D50\u798F\u5DF2\u9886\u53D6"
+        };
+      }
+      const type = params.type || "cultivation";
+      let blessingEffect;
+      const baseBonus = THUNDER_TRIBULATION_CONFIG.blessingBaseBonus;
+      const levelBonus = (this.tribulationState.currentLevel || 1) * 0.05;
+      switch (type) {
+        case "cultivation":
+          gs.cultivationProgress = (gs.cultivationProgress || 0) + 20 * (baseBonus + levelBonus);
+          blessingEffect = {
+            type: "cultivation",
+            name: "\u5929\u96F7\u6DEC\u4F53",
+            bonus: (baseBonus + levelBonus) * 100,
+            description: `\u4FEE\u70BC\u901F\u5EA6\u63D0\u5347${((baseBonus + levelBonus) * 100).toFixed(0)}%`
+          };
+          break;
+        case "attribute":
+          if (gs.player) {
+            gs.player.level = (gs.player.level || 1) + Math.floor(this.tribulationState.currentLevel || 1);
+          }
+          blessingEffect = {
+            type: "attribute",
+            name: "\u5929\u96F7\u953B\u4F53",
+            bonus: (baseBonus + levelBonus) * 100,
+            description: `\u7B49\u7EA7\u63D0\u5347${Math.floor(this.tribulationState.currentLevel || 1)}\u7EA7`
+          };
+          break;
+        case "skill":
+          const skillBonus = baseBonus + levelBonus;
+          blessingEffect = {
+            type: "skill",
+            name: "\u96F7\u6CD5\u795E\u901A",
+            bonus: skillBonus * 100,
+            description: `\u96F7\u6CD5\u5A01\u529B\u63D0\u5347${(skillBonus * 100).toFixed(0)}%`
+          };
+          break;
+        default:
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u8D50\u798F\u7C7B\u578B"
+          };
+      }
+      this.tribulationState.state = TRIBULATION_STATES.BLESSED;
+      this.tribulationState.blessingEffects.push(blessingEffect);
+      this.recordHistory("bless", {
+        type,
+        blessingEffect
+      });
+      return {
+        success: true,
+        action: "thunder.bless",
+        blessingEffect,
+        message: `\u83B7\u5F97${blessingEffect.name}\u6548\u679C\uFF1A${blessingEffect.description}`
+      };
+    }
+    /**
+     * 雷法精通 (thunder.mastery)
+     * @param {Object} params - 参数 { action: 'query'|'upgrade'|'use' }
+     * @returns {Object} 结果
+     */
+    mastery(params = {}) {
+      var _a, _b, _c, _d;
+      const gs = this.gameState;
+      const action = params.action || "query";
+      switch (action) {
+        case "query":
+          return {
+            success: true,
+            action: "thunder.mastery",
+            currentLevel: this.tribulationState.lightningMastery,
+            maxLevel: THUNDER_TRIBULATION_CONFIG.maxMasteryLevel,
+            skills: this.tribulationState.lightningSkills,
+            experienceProgress: this.getMasteryProgress()
+          };
+        case "upgrade":
+          if (this.tribulationState.state !== TRIBULATION_STATES.SUCCESS && this.tribulationState.state !== TRIBULATION_STATES.BLESSED) {
+            return {
+              success: false,
+              error: "\u9700\u8981\u5148\u6210\u529F\u6E21\u52AB\u624D\u80FD\u63D0\u5347\u96F7\u6CD5\u7CBE\u901A"
+            };
+          }
+          if (this.tribulationState.lightningMastery >= THUNDER_TRIBULATION_CONFIG.maxMasteryLevel) {
+            return {
+              success: false,
+              error: "\u96F7\u6CD5\u7CBE\u901A\u5DF2\u8FBE\u5230\u6700\u5927\u7B49\u7EA7"
+            };
+          }
+          const upgradeCost = 1e3 * (this.tribulationState.lightningMastery + 1);
+          if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < upgradeCost) {
+            return {
+              success: false,
+              error: `\u5347\u7EA7\u9700\u8981${upgradeCost}\u7075\u77F3`,
+              shortage: upgradeCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+            };
+          }
+          gs.player.spiritStones -= upgradeCost;
+          this.tribulationState.lightningMastery++;
+          this.recordHistory("mastery_upgrade", {
+            newLevel: this.tribulationState.lightningMastery,
+            cost: upgradeCost
+          });
+          return {
+            success: true,
+            action: "thunder.mastery",
+            newLevel: this.tribulationState.lightningMastery,
+            message: `\u96F7\u6CD5\u7CBE\u901A\u63D0\u5347\u81F3${this.tribulationState.lightningMastery}\u7EA7`
+          };
+        case "use":
+          if (this.tribulationState.lightningMastery < 1) {
+            return {
+              success: false,
+              error: "\u96F7\u6CD5\u7CBE\u901A\u7B49\u7EA7\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u4F7F\u7528\u96F7\u6CD5"
+            };
+          }
+          const useCost = 50 * this.tribulationState.lightningMastery;
+          if ((((_c = gs.player) == null ? void 0 : _c.qi) || 0) < useCost) {
+            return {
+              success: false,
+              error: `\u4F7F\u7528\u96F7\u6CD5\u9700\u8981${useCost}\u7075\u529B`,
+              shortage: useCost - (((_d = gs.player) == null ? void 0 : _d.qi) || 0)
+            };
+          }
+          gs.player.qi -= useCost;
+          const damage = 100 * this.tribulationState.lightningMastery;
+          this.recordHistory("mastery_use", {
+            damage,
+            qiCost: useCost
+          });
+          return {
+            success: true,
+            action: "thunder.mastery",
+            message: `\u65BD\u5C55\u96F7\u6CD5\uFF0C\u9020\u6210${damage}\u4F24\u5BB3`,
+            damage,
+            qiSpent: useCost,
+            masteryLevel: this.tribulationState.lightningMastery
+          };
+        default:
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u64CD\u4F5C\u7C7B\u578B"
+          };
+      }
+    }
+    /**
+     * 获取雷法精通进度
+     */
+    getMasteryProgress() {
+      const current = this.tribulationState.lightningMastery;
+      const max = THUNDER_TRIBULATION_CONFIG.maxMasteryLevel;
+      return {
+        current,
+        max,
+        percentage: current / max * 100
+      };
+    }
+    /**
+     * 吸收雷劫 (thunder.absorb)
+     * @param {Object} params - 参数 { amount: number }
+     * @returns {Object} 吸收结果
+     */
+    absorb(params = {}) {
+      var _a;
+      const gs = this.gameState;
+      if (this.tribulationState.absorbedEnergy <= 0 && this.tribulationState.state !== TRIBULATION_STATES.SUCCESS) {
+        return {
+          success: false,
+          error: "\u5F53\u524D\u6CA1\u6709\u53EF\u5438\u6536\u7684\u96F7\u52AB\u80FD\u91CF"
+        };
+      }
+      const amount = Math.min(params.amount || 50, 100);
+      const maxAbsorb = this.tribulationState.absorbedEnergy || THUNDER_TRIBULATION_CONFIG.absorbRecoveryRate * this.tribulationState.lightningIntensity;
+      const actualAbsorb = Math.min(amount, maxAbsorb);
+      const currentQi = ((_a = gs.player) == null ? void 0 : _a.qi) || 0;
+      const maxQi = 100 + (gs.realm || 0) * 50;
+      const qiRecovery = actualAbsorb * THUNDER_TRIBULATION_CONFIG.absorbRecoveryRate;
+      gs.player.qi = Math.min(currentQi + qiRecovery, maxQi);
+      this.tribulationState.absorbedEnergy = Math.max(0, (this.tribulationState.absorbedEnergy || 0) - actualAbsorb);
+      this.recordHistory("absorb", {
+        amount: actualAbsorb,
+        qiRecovered: qiRecovery
+      });
+      return {
+        success: true,
+        action: "thunder.absorb",
+        amount: actualAbsorb,
+        qiRecovered: qiRecovery,
+        currentQi: gs.player.qi,
+        maxQi,
+        message: `\u5438\u6536${actualAbsorb}\u96F7\u52AB\u80FD\u91CF\uFF0C\u56DE\u590D${qiRecovery.toFixed(1)}\u7075\u529B`
+      };
+    }
+    /**
+     * 渡劫日志 (thunder.journal)
+     * @param {Object} params - 参数 { limit: number }
+     * @returns {Object} 日志结果
+     */
+    journal(params = {}) {
+      const limit = params.limit || 10;
+      const history = this.tribulationState.history || [];
+      const recentHistory = history.slice(-limit).reverse();
+      const stats = {
+        totalTribulations: history.filter((h) => h.action === "execute").length,
+        successfulTribulations: history.filter((h) => {
+          var _a;
+          return h.action === "execute" && ((_a = h.details) == null ? void 0 : _a.result) === "success";
+        }).length,
+        failedTribulations: history.filter((h) => {
+          var _a;
+          return h.action === "execute" && ((_a = h.details) == null ? void 0 : _a.result) === "failed";
+        }).length,
+        totalLightningAbsorbed: history.filter((h) => h.action === "absorb").reduce((sum, h) => {
+          var _a;
+          return sum + (((_a = h.details) == null ? void 0 : _a.amount) || 0);
+        }, 0),
+        currentMastery: this.tribulationState.lightningMastery,
+        highestLevel: this.getHighestTribulationLevel(history)
+      };
+      return {
+        success: true,
+        action: "thunder.journal",
+        stats,
+        history: recentHistory.map((h) => ({
+          action: h.action,
+          details: h.details,
+          timestamp: h.timestamp,
+          timeDesc: this.formatTimestamp(h.timestamp)
+        }))
+      };
+    }
+    /**
+     * 获取最高渡劫等级
+     */
+    getHighestTribulationLevel(history) {
+      if (!history || history.length === 0) return 0;
+      return Math.max(...history.filter((h) => {
+        var _a;
+        return (_a = h.details) == null ? void 0 : _a.level;
+      }).map((h) => h.details.level));
+    }
+    /**
+     * 格式化时间戳
+     */
+    formatTimestamp(timestamp) {
+      if (!timestamp) return "";
+      const date = new Date(timestamp);
+      const now = /* @__PURE__ */ new Date();
+      const diff = now - date;
+      if (diff < 6e4) return "\u521A\u521A";
+      if (diff < 36e5) return `${Math.floor(diff / 6e4)}\u5206\u949F\u524D`;
+      if (diff < 864e5) return `${Math.floor(diff / 36e5)}\u5C0F\u65F6\u524D`;
+      return date.toLocaleDateString();
+    }
+    /**
+     * 获取境界名称
+     */
+    getRealmName(realm) {
+      const realms = ["\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347"];
+      return realms[realm] || "\u672A\u77E5";
+    }
+    /**
+     * 获取MCP工具处理器
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} MCP处理器映射
+     */
+    static getMCPHandlers(gameState3) {
+      const service = new _ThunderTribulationService(gameState3);
+      return {
+        "thunder.prepare": (params) => service.prepare(params || {}),
+        "thunder.execute": (params) => service.execute(params || {}),
+        "thunder.bless": (params) => service.bless(params || {}),
+        "thunder.mastery": (params) => service.mastery(params || {}),
+        "thunder.absorb": (params) => service.absorb(params || {}),
+        "thunder.journal": (params) => service.journal(params || {})
+      };
+    }
+  };
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -19111,7 +19798,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V240",
+      gameVersion: "V241",
       // 设置
       settings: {
         soundEnabled: true,
@@ -19325,6 +20012,37 @@ var CultivationSimulator = (() => {
       "wuxing.affinity",
       YIN_YANG_WUXING_TOOLS["wuxing.affinity"],
       (params) => yinYangWuXingHandlers["wuxing.affinity"](params)
+    );
+    const thunderTribulationHandlers = ThunderTribulationService.getMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "thunder.prepare",
+      THUNDER_TRIBULATION_TOOLS["thunder.prepare"],
+      (params) => thunderTribulationHandlers["thunder.prepare"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.execute",
+      THUNDER_TRIBULATION_TOOLS["thunder.execute"],
+      (params) => thunderTribulationHandlers["thunder.execute"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.bless",
+      THUNDER_TRIBULATION_TOOLS["thunder.bless"],
+      (params) => thunderTribulationHandlers["thunder.bless"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.mastery",
+      THUNDER_TRIBULATION_TOOLS["thunder.mastery"],
+      (params) => thunderTribulationHandlers["thunder.mastery"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.absorb",
+      THUNDER_TRIBULATION_TOOLS["thunder.absorb"],
+      (params) => thunderTribulationHandlers["thunder.absorb"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.journal",
+      THUNDER_TRIBULATION_TOOLS["thunder.journal"],
+      (params) => thunderTribulationHandlers["thunder.journal"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -20703,4 +21421,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-3a15ff8-2026-05-30T17-30-48-583Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-3e150f1-2026-05-30T17-36-13-909Z";
