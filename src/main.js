@@ -49,6 +49,9 @@ import { getAscensionService } from './domains/cultivation/services/AscensionSer
 // 元婴出窍系统 (V239 Direction A: 元婴出窍系统 - generic-agent/chatdev)
 import { YuanInfantService, getYuanInfantService, YUAN_INFANT_TOOLS } from './domains/cultivation/services/YuanInfantService.js';
 
+// 阴阳五行系统 (V240 Direction B: 阴阳五行系统 - nanobot/ruflo)
+import { YinYangWuXingService, getYinYangWuXingService, YIN_YANG_WUXING_TOOLS } from './domains/cultivation/services/YinYangWuXingService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -281,7 +284,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V239',
+        gameVersion: 'V240',
         
         // 设置
         settings: {
@@ -478,6 +481,22 @@ function initializeDomainModules() {
         (params) => yuanInfantHandlers['yuaninfant.recall'](params));
     mcpRegistry.registerTool('yuaninfant.status', YUAN_INFANT_TOOLS['yuaninfant.status'], 
         (params) => yuanInfantHandlers['yuaninfant.status'](params));
+
+    // 阴阳五行系统MCP工具 (V240 Direction B: 阴阳五行系统)
+    const yinYangWuXingHandlers = YinYangWuXingService.getMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('wuxing.analyze', YIN_YANG_WUXING_TOOLS['wuxing.analyze'], 
+        (params) => yinYangWuXingHandlers['wuxing.analyze'](params));
+    mcpRegistry.registerTool('wuxing.balance', YIN_YANG_WUXING_TOOLS['wuxing.balance'], 
+        (params) => yinYangWuXingHandlers['wuxing.balance'](params));
+    mcpRegistry.registerTool('wuxing.imbue', YIN_YANG_WUXING_TOOLS['wuxing.imbue'], 
+        (params) => yinYangWuXingHandlers['wuxing.imbue'](params));
+    mcpRegistry.registerTool('wuxing.resonate', YIN_YANG_WUXING_TOOLS['wuxing.resonate'], 
+        (params) => yinYangWuXingHandlers['wuxing.resonate'](params));
+    mcpRegistry.registerTool('wuxing.cycle', YIN_YANG_WUXING_TOOLS['wuxing.cycle'], 
+        (params) => yinYangWuXingHandlers['wuxing.cycle'](params));
+    mcpRegistry.registerTool('wuxing.affinity', YIN_YANG_WUXING_TOOLS['wuxing.affinity'], 
+        (params) => yinYangWuXingHandlers['wuxing.affinity'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }
