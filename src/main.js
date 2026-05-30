@@ -42,6 +42,9 @@ import { reincarnationService } from './domains/reincarnation/services/Reincarna
 import { reincarnationBookService } from './domains/reincarnation/services/ReincarnationBookService.js';
 import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultivation/services/TalentTreeService.js';
 
+// 飞升系统 (V230 Direction R: 飞升系统)
+import { getAscensionService } from './domains/cultivation/services/AscensionService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -253,7 +256,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V226',
+        gameVersion: 'V230',
         
         // 设置
         settings: {
@@ -341,6 +344,10 @@ function initializeDomainModules() {
     // 药材探索系统 (V229 Direction Q续: 丹药丹方知识图谱 - 药材探索)
     herbDiscoveryService.init(gameState);
     domainModules.herbDiscovery = herbDiscoveryService;
+
+    // 飞升系统 (V230 Direction R: 飞升系统)
+    ascensionService.init(gameState);
+    domainModules.ascension = ascensionService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
@@ -885,6 +892,75 @@ function registerDomainMCPTools() {
             }
         }
     }, (params) => herbDiscoveryService.gainHerbKnowledge(params));
+
+    // 飞升系统MCP工具 (V230 Direction R: 飞升系统)
+    mcpRegistry.registerTool('ascension.requirements.check', {
+        name: 'ascension.requirements.check',
+        description: 'Check if player meets ascension requirements',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                detailed: { type: 'boolean', description: 'Include detailed requirement info' }
+            }
+        }
+    }, (params) => ascensionService.mcpRequirementsCheck(params));
+
+    mcpRegistry.registerTool('ascension.initiate', {
+        name: 'ascension.initiate',
+        description: 'Initiate the ascension process',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                confirm: { type: 'boolean', description: 'Confirm ascension' }
+            }
+        }
+    }, (params) => ascensionService.mcpInitiate(params));
+
+    mcpRegistry.registerTool('ascension.tribulation.execute', {
+        name: 'ascension.tribulation.execute',
+        description: 'Execute the divine tribulation',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                strikeNumber: { type: 'number', description: 'Current strike number' },
+                resisted: { type: 'boolean', description: 'Whether the strike was resisted' }
+            }
+        }
+    }, (params) => ascensionService.mcpTribulationExecute(params));
+
+    mcpRegistry.registerTool('ascension.reward.claim', {
+        name: 'ascension.reward.claim',
+        description: 'Claim ascension rewards',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                rewardIndex: { type: 'number', description: 'Specific reward index to claim (0-3), all if undefined' }
+            }
+        }
+    }, (params) => ascensionService.mcpRewardClaim(params));
+
+    mcpRegistry.registerTool('ascension.realm.query', {
+        name: 'ascension.realm.query',
+        description: 'Query current immortal realm status',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                detailed: { type: 'boolean', description: 'Include detailed info' }
+            }
+        }
+    }, (params) => ascensionService.mcpRealmQuery(params));
+
+    mcpRegistry.registerTool('ascension.blessing.list', {
+        name: 'ascension.blessing.list',
+        description: 'List all divine blessings',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                filter: { type: 'string', description: 'Filter by name or description' },
+                showAll: { type: 'boolean', description: 'Show all blessings including acquired ones' }
+            }
+        }
+    }, (params) => ascensionService.mcpBlessingList(params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {

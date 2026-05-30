@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-68dd331-2026-05-30T15-46-32-421Z */
+/* Cultivation Simulator DDD-v1.0.0-1f60e7e-2026-05-30T16-03-34-678Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10169,6 +10169,9 @@ var CultivationSimulator = (() => {
     };
   }
 
+  // src/domains/cultivation/services/AscensionService.js
+  init_CultivationService();
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -12154,7 +12157,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V226",
+      gameVersion: "V230",
       // 设置
       settings: {
         soundEnabled: true,
@@ -12191,6 +12194,8 @@ var CultivationSimulator = (() => {
     domainModules.alchemyKB = alchemyKBService;
     herbDiscoveryService.init(gameState2);
     domainModules.herbDiscovery = herbDiscoveryService;
+    ascensionService.init(gameState2);
+    domainModules.ascension = ascensionService;
     npcEvolutionEngine.init(gameState2);
     npcDialogueService.init(gameState2);
     eventAnalyticsService.init(gameState2);
@@ -12658,6 +12663,68 @@ var CultivationSimulator = (() => {
         }
       }
     }, (params) => herbDiscoveryService.gainHerbKnowledge(params));
+    mcpRegistry.registerTool("ascension.requirements.check", {
+      name: "ascension.requirements.check",
+      description: "Check if player meets ascension requirements",
+      inputSchema: {
+        type: "object",
+        properties: {
+          detailed: { type: "boolean", description: "Include detailed requirement info" }
+        }
+      }
+    }, (params) => ascensionService.mcpRequirementsCheck(params));
+    mcpRegistry.registerTool("ascension.initiate", {
+      name: "ascension.initiate",
+      description: "Initiate the ascension process",
+      inputSchema: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "Confirm ascension" }
+        }
+      }
+    }, (params) => ascensionService.mcpInitiate(params));
+    mcpRegistry.registerTool("ascension.tribulation.execute", {
+      name: "ascension.tribulation.execute",
+      description: "Execute the divine tribulation",
+      inputSchema: {
+        type: "object",
+        properties: {
+          strikeNumber: { type: "number", description: "Current strike number" },
+          resisted: { type: "boolean", description: "Whether the strike was resisted" }
+        }
+      }
+    }, (params) => ascensionService.mcpTribulationExecute(params));
+    mcpRegistry.registerTool("ascension.reward.claim", {
+      name: "ascension.reward.claim",
+      description: "Claim ascension rewards",
+      inputSchema: {
+        type: "object",
+        properties: {
+          rewardIndex: { type: "number", description: "Specific reward index to claim (0-3), all if undefined" }
+        }
+      }
+    }, (params) => ascensionService.mcpRewardClaim(params));
+    mcpRegistry.registerTool("ascension.realm.query", {
+      name: "ascension.realm.query",
+      description: "Query current immortal realm status",
+      inputSchema: {
+        type: "object",
+        properties: {
+          detailed: { type: "boolean", description: "Include detailed info" }
+        }
+      }
+    }, (params) => ascensionService.mcpRealmQuery(params));
+    mcpRegistry.registerTool("ascension.blessing.list", {
+      name: "ascension.blessing.list",
+      description: "List all divine blessings",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filter: { type: "string", description: "Filter by name or description" },
+          showAll: { type: "boolean", description: "Show all blessings including acquired ones" }
+        }
+      }
+    }, (params) => ascensionService.mcpBlessingList(params));
     mcpRegistry.registerTool("npc.evolution.register", {
       name: "npc.evolution.register",
       description: "Register NPC to learning system",
@@ -13312,4 +13379,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-68dd331-2026-05-30T15-46-32-421Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-1f60e7e-2026-05-30T16-03-34-678Z";
