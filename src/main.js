@@ -45,6 +45,9 @@ import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultiv
 // 飞升系统 (V230 Direction R: 飞升系统)
 import { getAscensionService } from './domains/cultivation/services/AscensionService.js';
 
+// 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
+import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
+
 // 系统模块
 import { saveGame, doSaveGame, showSaveLoadModal, getSaveHistory } from './systems/persistence/SaveManager.js';
 import { loadGame, doLoadGame } from './systems/persistence/LoadManager.js';
@@ -256,7 +259,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V230',
+        gameVersion: 'V231',
         
         // 设置
         settings: {
@@ -348,6 +351,11 @@ function initializeDomainModules() {
     // 飞升系统 (V230 Direction R: 飞升系统)
     ascensionService.init(gameState);
     domainModules.ascension = ascensionService;
+
+    // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
+    const immortalSectService = createImmortalSectService(gameState);
+    immortalSectService.init(gameState);
+    domainModules.immortalSect = immortalSectService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
@@ -961,6 +969,81 @@ function registerDomainMCPTools() {
             }
         }
     }, (params) => ascensionService.mcpBlessingList(params));
+
+    // 仙界宗门MCP工具 (V231 Direction S: 仙界宗门系统)
+    mcpRegistry.registerTool('sect.immortal.create', {
+        name: 'sect.immortal.create',
+        description: 'Create an immortal sect in the immortal realm',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string', description: 'Name of the immortal sect' }
+            },
+            required: ['name']
+        }
+    }, (params) => domainModules.immortalSect.mcpCreate(params));
+
+    mcpRegistry.registerTool('sect.immortal.join', {
+        name: 'sect.immortal.join',
+        description: 'Join an existing immortal sect',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                sectId: { type: 'string', description: 'UID of the sect to join' }
+            },
+            required: ['sectId']
+        }
+    }, (params) => domainModules.immortalSect.mcpJoin(params));
+
+    mcpRegistry.registerTool('sect.immortal.resource.list', {
+        name: 'sect.immortal.resource.list',
+        description: 'List resources of an immortal sect',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                sectId: { type: 'string', description: 'UID of the sect (optional, defaults to player sect)' }
+            }
+        }
+    }, (params) => domainModules.immortalSect.mcpResourceList(params));
+
+    mcpRegistry.registerTool('sect.immortal.trade.execute', {
+        name: 'sect.immortal.trade.execute',
+        description: 'Execute a trade between immortal sects',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                targetSectId: { type: 'string', description: 'Target sect ID' },
+                resourceType: { type: 'string', enum: ['spiritStones', 'pills', 'techniques', 'merit'] },
+                amount: { type: 'number' },
+                price: { type: 'number' }
+            },
+            required: ['targetSectId', 'resourceType', 'amount', 'price']
+        }
+    }, (params) => domainModules.immortalSect.mcpTradeExecute(params));
+
+    mcpRegistry.registerTool('sect.immortal.disciple.promote', {
+        name: 'sect.immortal.disciple.promote',
+        description: 'Promote a mortal sect disciple to elite disciple',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                discipleUid: { type: 'string', description: 'UID of the disciple to promote' }
+            },
+            required: ['discipleUid']
+        }
+    }, (params) => domainModules.immortalSect.mcpDisciplePromote(params));
+
+    mcpRegistry.registerTool('sect.immortal.alliance.form', {
+        name: 'sect.immortal.alliance.form',
+        description: 'Form an alliance with another immortal sect',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                targetSectId: { type: 'string', description: 'Target sect ID to ally with' }
+            },
+            required: ['targetSectId']
+        }
+    }, (params) => domainModules.immortalSect.mcpAllianceForm(params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {
