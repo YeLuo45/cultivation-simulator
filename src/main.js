@@ -27,6 +27,9 @@ import { createAchievementModule } from './domains/achievement/AchievementModule
 import InventoryModule from './domains/inventory/InventoryModule.js';
 import PetModule from './domains/pet/PetModule.js';
 
+// 丹方知识图谱 (Direction Q: 丹药丹方知识图谱)
+import { alchemyKBService } from './domains/inventory/services/AlchemyKBService.js';
+
 // 领域模块 (ES Module - named exports)
 import { createRankingService, createArenaService } from './domains/ranking/RankingModule.js';
 import { createSigninService, createWelfareService } from './domains/signin/SigninModule.js';
@@ -240,7 +243,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V210',
+        gameVersion: 'V225',
         
         // 设置
         settings: {
@@ -316,6 +319,10 @@ function initializeDomainModules() {
 
     // 天赋树模块 (Direction P: 灵根天赋系统)
     domainModules.talentTree = new TalentTreeService(gameState);
+
+    // 丹方知识图谱 (Direction Q: 丹药丹方知识图谱)
+    alchemyKBService.init(gameState);
+    domainModules.alchemyKB = alchemyKBService;
 
     // NPC进化引擎 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     npcEvolutionEngine.init(gameState);
@@ -617,6 +624,77 @@ function registerDomainMCPTools() {
             required: ['type']
         }
     }, (params) => talentTreeHandlers['spirit.hook.register'](params));
+
+    // 丹方知识图谱MCP工具 (Direction Q: 丹药丹方知识图谱)
+    mcpRegistry.registerTool('alchemy.kb.query', {
+        name: 'alchemy.kb.query',
+        description: 'Query the alchemy knowledge base',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                type: { type: 'string', enum: ['recipe', 'herb', 'efficacy'], description: 'Query type' },
+                name: { type: 'string', description: 'Name to query' }
+            }
+        }
+    }, (params) => alchemyKBService.query(params));
+
+    mcpRegistry.registerTool('alchemy.recipe.discover', {
+        name: 'alchemy.recipe.discover',
+        description: 'Manually research to discover new alchemy recipes (consumes qi)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                herbs: { type: 'array', items: { type: 'string' }, description: 'Herbs to use for research' },
+                qiCost: { type: 'number', description: 'Qi cost for discovery' }
+            }
+        }
+    }, (params) => alchemyKBService.discover(params));
+
+    mcpRegistry.registerTool('alchemy.recipe.list', {
+        name: 'alchemy.recipe.list',
+        description: 'List all discovered alchemy recipes',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                filter: { type: 'string', description: 'Filter recipes by name, material, or efficacy' }
+            }
+        }
+    }, (params) => alchemyKBService.listRecipes(params));
+
+    mcpRegistry.registerTool('alchemy.efficacy.map', {
+        name: 'alchemy.efficacy.map',
+        description: 'View herb efficacy mapping and synergy effects',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                herb: { type: 'string', description: 'Specific herb to query' }
+            }
+        }
+    }, (params) => alchemyKBService.getEfficacyMap(params));
+
+    mcpRegistry.registerTool('alchemy.craft.calculate', {
+        name: 'alchemy.craft.calculate',
+        description: 'Calculate crafting result preview with given materials',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                materials: { type: 'array', items: { type: 'string' }, description: 'Materials to use', required: ['materials'] }
+            },
+            required: ['materials']
+        }
+    }, (params) => alchemyKBService.calculateCraft(params));
+
+    mcpRegistry.registerTool('alchemy.kb.export', {
+        name: 'alchemy.kb.export',
+        description: 'Export the knowledge graph',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                format: { type: 'string', enum: ['json'], description: 'Export format' },
+                includeHidden: { type: 'boolean', description: 'Include undiscovered recipes' }
+            }
+        }
+    }, (params) => alchemyKBService.exportKB(params));
 
     // NPC进化工具 (Direction N: nanobot分布式mesh注册表 + generic-agent自我进化)
     mcpRegistry.registerTool('npc.evolution.register', {
