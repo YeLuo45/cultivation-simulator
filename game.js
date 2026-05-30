@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-3e150f1-2026-05-30T17-36-13-909Z */
+/* Cultivation Simulator DDD-v1.0.0-dfe61a7-2026-05-30T17-41-36-700Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13961,6 +13961,545 @@ var CultivationSimulator = (() => {
     return service;
   }
 
+  // src/domains/player/services/CaveRealmService.js
+  var CAVE_TIERS = ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"];
+  var CAVE_TIER_CONFIG = {
+    "\u5C0F\u578B": {
+      capacity: 2,
+      resourceSlots: 3,
+      spiritBonus: 1,
+      expandCost: 500,
+      createCost: 200
+    },
+    "\u4E2D\u578B": {
+      capacity: 5,
+      resourceSlots: 6,
+      spiritBonus: 1.3,
+      expandCost: 1500,
+      createCost: 0
+    },
+    "\u5927\u578B": {
+      capacity: 10,
+      resourceSlots: 10,
+      spiritBonus: 1.6,
+      expandCost: 5e3,
+      createCost: 0
+    },
+    "\u5DE8\u578B": {
+      capacity: 20,
+      resourceSlots: 20,
+      spiritBonus: 2,
+      expandCost: 2e4,
+      createCost: 0
+    }
+  };
+  var BLESSED_LAND_CONFIG = {
+    1: { name: "\u798F\u5730\u521D\u6210", qiRegenBonus: 1.2, cultivationBonus: 5, expandCost: 300 },
+    2: { name: "\u798F\u5730\u5C0F\u6210", qiRegenBonus: 1.5, cultivationBonus: 10, expandCost: 800 },
+    3: { name: "\u798F\u5730\u5927\u6210", qiRegenBonus: 1.8, cultivationBonus: 20, expandCost: 2e3 },
+    4: { name: "\u798F\u5730\u5706\u6EE1", qiRegenBonus: 2.2, cultivationBonus: 35, expandCost: 6e3 },
+    5: { name: "\u6D1E\u5929\u798F\u5730", qiRegenBonus: 3, cultivationBonus: 50, expandCost: 15e3 }
+  };
+  var RESOURCE_TYPES = {
+    "spiritStone": { name: "\u7075\u77F3", baseYield: 10, regenTime: 36e5 },
+    "qiCrystal": { name: "\u7075\u6C14\u7ED3\u6676", baseYield: 5, regenTime: 72e5 },
+    "essence": { name: "\u7CBE\u534E", baseYield: 2, regenTime: 108e5 },
+    "mysticHerb": { name: "\u7075\u8349", baseYield: 3, regenTime: 54e5 }
+  };
+  var CaveRealmService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.realms = /* @__PURE__ */ new Map();
+      this.blessedLands = /* @__PURE__ */ new Map();
+      this.resourceTimers = /* @__PURE__ */ new Map();
+      this.harvestHistory = [];
+    }
+    /**
+     * 初始化洞天福地服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.caveRealm) {
+        gameState3.caveRealm = {
+          hasCave: false,
+          cave: null,
+          blessedLands: [],
+          resources: [],
+          totalHarvests: 0,
+          spiritBalance: 0,
+          lastSpiritUpdate: Date.now()
+        };
+      }
+      if (!gameState3.caveRealm.realms) {
+        gameState3.caveRealm.realms = [];
+      }
+      if (!gameState3.caveRealm.blessedLands) {
+        gameState3.caveRealm.blessedLands = [];
+      }
+      if (!gameState3.caveRealm.resources) {
+        gameState3.caveRealm.resources = [];
+      }
+      console.log("[CaveRealm] \u6D1E\u5929\u798F\u5730\u7CFB\u7EDF\u521D\u59CB\u5316\u5B8C\u6210");
+      return this;
+    }
+    /**
+     * 获取MCP工具处理器
+     */
+    getMCPHandlers() {
+      return {
+        "cave.create": (params) => this.mcpCreate(params),
+        "cave.expand": (params) => this.mcpExpand(params),
+        "cave.resource": (params) => this.mcpResource(params),
+        "cave.blessed": (params) => this.mcpBlessed(params),
+        "cave.spirit": (params) => this.mcpSpirit(params),
+        "cave.harvest": (params) => this.mcpHarvest(params)
+      };
+    }
+    /**
+     * 获取所有工具定义
+     */
+    static get TOOLS() {
+      return {
+        "cave.create": {
+          name: "cave.create",
+          description: "\u521B\u5EFA\u6D1E\u5929 - \u5F00\u8F9F\u5C5E\u4E8E\u81EA\u5DF1\u7684\u79D8\u5883\u7A7A\u95F4",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "\u6D1E\u5929\u540D\u79F0" },
+              tier: { type: "string", enum: ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"], description: "\u6D1E\u5929\u89C4\u6A21" }
+            }
+          }
+        },
+        "cave.expand": {
+          name: "cave.expand",
+          description: "\u6269\u5C55\u6D1E\u5929 - \u63D0\u5347\u6D1E\u5929\u7B49\u7EA7\u548C\u5BB9\u91CF",
+          inputSchema: {
+            type: "object",
+            properties: {
+              targetTier: { type: "string", enum: ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"], description: "\u76EE\u6807\u89C4\u6A21" }
+            }
+          }
+        },
+        "cave.resource": {
+          name: "cave.resource",
+          description: "\u6D1E\u5929\u8D44\u6E90 - \u67E5\u770B\u6D1E\u5929\u5185\u8D44\u6E90\u72B6\u6001",
+          inputSchema: {
+            type: "object",
+            properties: {
+              resourceType: { type: "string", description: "\u8D44\u6E90\u7C7B\u578B\uFF08\u53EF\u9009\uFF09" }
+            }
+          }
+        },
+        "cave.blessed": {
+          name: "cave.blessed",
+          description: "\u798F\u5730\u589E\u76CA - \u83B7\u53D6\u798F\u5730\u63D0\u4F9B\u7684\u52A0\u6210",
+          inputSchema: {
+            type: "object",
+            properties: {
+              blessedLandId: { type: "string", description: "\u798F\u5730ID\uFF08\u53EF\u9009\uFF09" }
+            }
+          }
+        },
+        "cave.spirit": {
+          name: "cave.spirit",
+          description: "\u7075\u6C14\u5145\u76C8 - \u5145\u76C8\u6D1E\u5929\u7075\u6C14",
+          inputSchema: {
+            type: "object",
+            properties: {
+              amount: { type: "number", description: "\u7075\u6C14\u6570\u91CF" }
+            }
+          }
+        },
+        "cave.harvest": {
+          name: "cave.harvest",
+          description: "\u6536\u83B7\u8D44\u6E90 - \u6536\u83B7\u6D1E\u5929\u5185\u5DF2\u6210\u719F\u7684\u8D44\u6E90",
+          inputSchema: {
+            type: "object",
+            properties: {
+              resourceId: { type: "string", description: "\u8D44\u6E90ID\uFF08\u53EF\u9009\uFF0C\u6536\u83B7\u5168\u90E8\uFF09" }
+            }
+          }
+        }
+      };
+    }
+    // ===== cave.create - 创建洞天 =====
+    /**
+     * MCP工具: 创建洞天
+     */
+    mcpCreate(params = {}) {
+      const { name, tier = "\u5C0F\u578B" } = params;
+      if (!CAVE_TIERS.includes(tier)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u6D1E\u5929\u89C4\u6A21",
+          validTiers: CAVE_TIERS
+        };
+      }
+      if (this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5DF2\u5B58\u5728\u6D1E\u5929\uFF0C\u8BF7\u4F7F\u7528 cave.expand \u6269\u5C55"
+        };
+      }
+      const tierConfig = CAVE_TIER_CONFIG[tier];
+      const cost = tierConfig.createCost || CAVE_TIER_CONFIG["\u5C0F\u578B"].expandCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: cost,
+          available: currentStones
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const cave = {
+        id: `cave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name || `${tier}\u6D1E\u5929`,
+        tier,
+        capacity: tierConfig.capacity,
+        resourceSlots: tierConfig.resourceSlots,
+        spiritBonus: tierConfig.spiritBonus,
+        createdAt: Date.now(),
+        lastExpandAt: Date.now(),
+        resourceSlotsUsed: 0,
+        totalResourcesProduced: 0
+      };
+      this.gameState.caveRealm.hasCave = true;
+      this.gameState.caveRealm.cave = cave;
+      this.gameState.caveRealm.realms.push(cave);
+      this.realms.set(cave.id, cave);
+      return {
+        success: true,
+        message: `\u6D1E\u5929\u3010${cave.name}\u3011\u521B\u5EFA\u6210\u529F\uFF01`,
+        cave: {
+          id: cave.id,
+          name: cave.name,
+          tier: cave.tier,
+          capacity: cave.capacity,
+          resourceSlots: cave.resourceSlots,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== cave.expand - 扩展洞天 =====
+    /**
+     * MCP工具: 扩展洞天
+     */
+    mcpExpand(params = {}) {
+      const { targetTier } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929\uFF0C\u8BF7\u5148\u4F7F\u7528 cave.create"
+        };
+      }
+      const cave = this.gameState.caveRealm.cave;
+      const currentTierIndex = CAVE_TIERS.indexOf(cave.tier);
+      if (!targetTier || !CAVE_TIERS.includes(targetTier)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u76EE\u6807\u89C4\u6A21",
+          validTiers: CAVE_TIERS
+        };
+      }
+      const targetTierIndex = CAVE_TIERS.indexOf(targetTier);
+      if (targetTierIndex <= currentTierIndex) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u89C4\u6A21\u5FC5\u987B\u5927\u4E8E\u5F53\u524D\u89C4\u6A21",
+          currentTier: cave.tier
+        };
+      }
+      const tierConfig = CAVE_TIER_CONFIG[targetTier];
+      const cost = tierConfig.expandCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: cost,
+          available: currentStones,
+          shortfall: cost - currentStones
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const oldTier = cave.tier;
+      cave.tier = targetTier;
+      cave.capacity = tierConfig.capacity;
+      cave.resourceSlots = tierConfig.resourceSlots;
+      cave.spiritBonus = tierConfig.spiritBonus;
+      cave.lastExpandAt = Date.now();
+      return {
+        success: true,
+        message: `\u6D1E\u5929\u6269\u5C55\u6210\u529F\uFF01${oldTier} \u2192 ${targetTier}`,
+        expand: {
+          fromTier: oldTier,
+          toTier: targetTier,
+          newCapacity: cave.capacity,
+          newResourceSlots: cave.resourceSlots,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== cave.resource - 洞天资源 =====
+    /**
+     * MCP工具: 洞天资源
+     */
+    mcpResource(params = {}) {
+      const { resourceType } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const cave = this.gameState.caveRealm.cave;
+      const resources = this.gameState.caveRealm.resources;
+      if (resourceType) {
+        if (!RESOURCE_TYPES[resourceType]) {
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u8D44\u6E90\u7C7B\u578B",
+            validTypes: Object.keys(RESOURCE_TYPES)
+          };
+        }
+        const filtered = resources.filter((r) => r.type === resourceType);
+        return {
+          success: true,
+          resourceType,
+          resources: filtered,
+          count: filtered.length
+        };
+      }
+      return {
+        success: true,
+        cave: {
+          id: cave.id,
+          name: cave.name,
+          tier: cave.tier,
+          capacity: cave.capacity,
+          resourceSlots: cave.resourceSlots,
+          resourceSlotsUsed: resources.length,
+          resourceSlotsAvailable: cave.resourceSlots - resources.length
+        },
+        resources: resources.map((r) => {
+          var _a;
+          return {
+            id: r.id,
+            type: r.type,
+            name: ((_a = RESOURCE_TYPES[r.type]) == null ? void 0 : _a.name) || r.type,
+            amount: r.amount,
+            readyAt: r.readyAt,
+            isReady: Date.now() >= r.readyAt
+          };
+        }),
+        totalResources: resources.length,
+        availableTypes: Object.keys(RESOURCE_TYPES)
+      };
+    }
+    // ===== cave.blessed - 福地增益 =====
+    /**
+     * MCP工具: 福地增益
+     */
+    mcpBlessed(params = {}) {
+      const { blessedLandId } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const blessedLands = this.gameState.caveRealm.blessedLands;
+      if (blessedLandId) {
+        const land = blessedLands.find((l) => l.id === blessedLandId);
+        if (!land) {
+          return {
+            success: false,
+            error: "\u798F\u5730\u4E0D\u5B58\u5728",
+            validIds: blessedLands.map((l) => l.id)
+          };
+        }
+        const config = BLESSED_LAND_CONFIG[land.level];
+        return {
+          success: true,
+          blessedLand: {
+            id: land.id,
+            name: land.name,
+            level: land.level,
+            levelName: config.name,
+            qiRegenBonus: land.qiRegenBonus,
+            cultivationBonus: land.cultivationBonus,
+            createdAt: land.createdAt
+          }
+        };
+      }
+      let totalQiRegenBonus = 1;
+      let totalCultivationBonus = 0;
+      for (const land of blessedLands) {
+        totalQiRegenBonus *= land.qiRegenBonus;
+        totalCultivationBonus += land.cultivationBonus;
+      }
+      return {
+        success: true,
+        blessedLands: blessedLands.map((land) => {
+          const config = BLESSED_LAND_CONFIG[land.level];
+          return {
+            id: land.id,
+            name: land.name,
+            level: land.level,
+            levelName: config.name,
+            qiRegenBonus: land.qiRegenBonus,
+            cultivationBonus: land.cultivationBonus
+          };
+        }),
+        totalBlessedLands: blessedLands.length,
+        totalQiRegenBonus,
+        totalCultivationBonus
+      };
+    }
+    // ===== cave.spirit - 灵气充盈 =====
+    /**
+     * MCP工具: 灵气充盈
+     */
+    mcpSpirit(params = {}) {
+      const { amount = 100 } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      if (amount <= 0) {
+        return {
+          success: false,
+          error: "\u7075\u6C14\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0"
+        };
+      }
+      const currentQi = this.gameState.qi || 0;
+      const cave = this.gameState.caveRealm.cave;
+      const bonusMultiplier = cave.spiritBonus;
+      const actualAdded = Math.floor(amount * bonusMultiplier);
+      this.gameState.caveRealm.spiritBalance = (this.gameState.caveRealm.spiritBalance || 0) + actualAdded;
+      this.gameState.caveRealm.lastSpiritUpdate = Date.now();
+      return {
+        success: true,
+        message: `\u7075\u6C14\u5145\u76C8\u6210\u529F\uFF01+${actualAdded}\u7075\u6C14\uFF08\u500D\u7387${bonusMultiplier}\uFF09`,
+        spirit: {
+          added: actualAdded,
+          bonusMultiplier,
+          totalBalance: this.gameState.caveRealm.spiritBalance,
+          currentQi
+        }
+      };
+    }
+    // ===== cave.harvest - 收获资源 =====
+    /**
+     * MCP工具: 收获资源
+     */
+    mcpHarvest(params = {}) {
+      const { resourceId } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const resources = this.gameState.caveRealm.resources;
+      const now = Date.now();
+      let toHarvest;
+      if (resourceId) {
+        toHarvest = resources.find((r) => r.id === resourceId);
+        if (!toHarvest) {
+          return {
+            success: false,
+            error: "\u8D44\u6E90\u4E0D\u5B58\u5728"
+          };
+        }
+        if (now < toHarvest.readyAt) {
+          return {
+            success: false,
+            error: "\u8D44\u6E90\u5C1A\u672A\u6210\u719F",
+            readyAt: toHarvest.readyAt,
+            remainingMs: toHarvest.readyAt - now
+          };
+        }
+        toHarvest = [toHarvest];
+      } else {
+        toHarvest = resources.filter((r) => now >= r.readyAt);
+      }
+      if (toHarvest.length === 0) {
+        return {
+          success: true,
+          message: "\u6682\u65E0\u53EF\u6536\u83B7\u7684\u8D44\u6E90",
+          harvested: [],
+          totalHarvested: 0
+        };
+      }
+      const harvested = toHarvest.map((r) => {
+        const resourceConfig = RESOURCE_TYPES[r.type];
+        return {
+          id: r.id,
+          type: r.type,
+          name: (resourceConfig == null ? void 0 : resourceConfig.name) || r.type,
+          amount: r.amount,
+          harvestedAt: now
+        };
+      });
+      this.gameState.caveRealm.totalHarvests += harvested.length;
+      this.harvestHistory.push(...harvested);
+      const harvestedIds = harvested.map((h) => h.id);
+      this.gameState.caveRealm.resources = resources.filter((r) => !harvestedIds.includes(r.id));
+      let totalSpiritStones = 0;
+      let totalQi = 0;
+      for (const h of harvested) {
+        if (h.type === "spiritStone") {
+          totalSpiritStones += h.amount;
+        } else if (h.type === "qiCrystal") {
+          totalQi += h.amount * 10;
+        }
+      }
+      if (totalSpiritStones > 0) {
+        this.gameState.spiritStones = (this.gameState.spiritStones || 0) + totalSpiritStones;
+      }
+      if (totalQi > 0) {
+        this.gameState.qi = (this.gameState.qi || 0) + totalQi;
+      }
+      return {
+        success: true,
+        message: `\u6536\u83B7\u6210\u529F\uFF01\u83B7\u5F97${harvested.length}\u4E2A\u8D44\u6E90`,
+        harvested,
+        rewards: {
+          spiritStones: totalSpiritStones,
+          qi: totalQi
+        },
+        totalHarvests: this.gameState.caveRealm.totalHarvests,
+        remainingResources: this.gameState.caveRealm.resources.length
+      };
+    }
+    // ===== 私有辅助方法 =====
+    /**
+     * 生成资源ID
+     */
+    generateResourceId() {
+      return `resource_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * 计算资源再生时间
+     */
+    calculateRegenTime(resourceType, tierMultiplier = 1) {
+      const config = RESOURCE_TYPES[resourceType];
+      if (!config) return 0;
+      return Math.floor(config.regenTime / tierMultiplier);
+    }
+  };
+  function createCaveRealmService(gameState3) {
+    return new CaveRealmService(gameState3);
+  }
+
   // src/domains/combat/services/RealmWarfareService.js
   var REALM_WARFARE_CONFIG = {
     declareCost: 1e5,
@@ -19798,7 +20337,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V241",
+      gameVersion: "V242",
       // 设置
       settings: {
         soundEnabled: true,
@@ -19848,6 +20387,9 @@ var CultivationSimulator = (() => {
     const caveDwellingService = createCaveDwellingService(gameState2);
     caveDwellingService.init(gameState2);
     domainModules.caveDwelling = caveDwellingService;
+    const caveRealmService = createCaveRealmService(gameState2);
+    caveRealmService.init(gameState2);
+    domainModules.caveRealm = caveRealmService;
     const realmWarfareService = createRealmWarfareService(gameState2);
     realmWarfareService.init(gameState2);
     domainModules.realmWarfare = realmWarfareService;
@@ -20043,6 +20585,37 @@ var CultivationSimulator = (() => {
       "thunder.journal",
       THUNDER_TRIBULATION_TOOLS["thunder.journal"],
       (params) => thunderTribulationHandlers["thunder.journal"](params)
+    );
+    const caveRealmHandlers = caveRealmService.getMCPHandlers();
+    mcpRegistry.registerTool(
+      "cave.create",
+      CaveRealmService.TOOLS["cave.create"],
+      (params) => caveRealmHandlers["cave.create"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.expand",
+      CaveRealmService.TOOLS["cave.expand"],
+      (params) => caveRealmHandlers["cave.expand"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.resource",
+      CaveRealmService.TOOLS["cave.resource"],
+      (params) => caveRealmHandlers["cave.resource"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.blessed",
+      CaveRealmService.TOOLS["cave.blessed"],
+      (params) => caveRealmHandlers["cave.blessed"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.spirit",
+      CaveRealmService.TOOLS["cave.spirit"],
+      (params) => caveRealmHandlers["cave.spirit"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.harvest",
+      CaveRealmService.TOOLS["cave.harvest"],
+      (params) => caveRealmHandlers["cave.harvest"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -21421,4 +21994,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-3e150f1-2026-05-30T17-36-13-909Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-dfe61a7-2026-05-30T17-41-36-700Z";
