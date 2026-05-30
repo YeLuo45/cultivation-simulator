@@ -46,6 +46,9 @@ import { TalentTreeService, createTalentTreeMCPHandlers } from './domains/cultiv
 // 飞升系统 (V230 Direction R: 飞升系统)
 import { getAscensionService } from './domains/cultivation/services/AscensionService.js';
 
+// 元婴出窍系统 (V239 Direction A: 元婴出窍系统 - generic-agent/chatdev)
+import { YuanInfantService, getYuanInfantService, YUAN_INFANT_TOOLS } from './domains/cultivation/services/YuanInfantService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -278,7 +281,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V238',
+        gameVersion: 'V239',
         
         // 设置
         settings: {
@@ -375,6 +378,11 @@ function initializeDomainModules() {
     ascensionService.init(gameState);
     domainModules.ascension = ascensionService;
 
+    // 元婴出窍系统 (V239 Direction A: 元婴出窍系统)
+    const yuanInfantService = getYuanInfantService(gameState);
+    yuanInfantService.init(gameState);
+    domainModules.yuanInfant = yuanInfantService;
+
     // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
     const immortalSectService = createImmortalSectService(gameState);
     immortalSectService.init(gameState);
@@ -454,6 +462,22 @@ function initializeDomainModules() {
         (params) => cosmicCycleHandlers['cosmic.reset.execute'](params));
     mcpRegistry.registerTool('cosmic.legacy.inherit', COSMIC_CYCLE_TOOLS['cosmic.legacy.inherit'], 
         (params) => cosmicCycleHandlers['cosmic.legacy.inherit'](params));
+
+    // 元婴出窍系统MCP工具 (V239 Direction A: 元婴出窍系统)
+    const yuanInfantHandlers = YuanInfantService.getMCPHandlers(gameState);
+    
+    mcpRegistry.registerTool('yuaninfant.form', YUAN_INFANT_TOOLS['yuaninfant.form'], 
+        (params) => yuanInfantHandlers['yuaninfant.form'](params));
+    mcpRegistry.registerTool('yuaninfant.separate', YUAN_INFANT_TOOLS['yuaninfant.separate'], 
+        (params) => yuanInfantHandlers['yuaninfant.separate'](params));
+    mcpRegistry.registerTool('yuaninfant.project', YUAN_INFANT_TOOLS['yuaninfant.project'], 
+        (params) => yuanInfantHandlers['yuaninfant.project'](params));
+    mcpRegistry.registerTool('yuaninfant.sync', YUAN_INFANT_TOOLS['yuaninfant.sync'], 
+        (params) => yuanInfantHandlers['yuaninfant.sync'](params));
+    mcpRegistry.registerTool('yuaninfant.recall', YUAN_INFANT_TOOLS['yuaninfant.recall'], 
+        (params) => yuanInfantHandlers['yuaninfant.recall'](params));
+    mcpRegistry.registerTool('yuaninfant.status', YUAN_INFANT_TOOLS['yuaninfant.status'], 
+        (params) => yuanInfantHandlers['yuaninfant.status'](params));
 
     console.log('[Main] 领域模块初始化完成');
 }

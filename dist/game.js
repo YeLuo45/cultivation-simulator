@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-be4e209-2026-05-30T16-55-13-316Z */
+/* Cultivation Simulator DDD-v1.0.0-8eafe05-2026-05-30T16-58-23-422Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13441,6 +13441,1055 @@ var CultivationSimulator = (() => {
     }
   };
 
+  // src/systems/cosmic/CosmicCycleService.js
+  var COSMIC_CONFIG = {
+    // 轮回周期 (ms) - 一个宇宙轮回
+    CYCLE_DURATION: 1e3 * 60 * 60 * 24 * 365,
+    // 1年虚拟时间
+    // 世界等级范围
+    WORLD_LEVEL_RANGE: { min: 1, max: 100 },
+    // 裁决阈值
+    JUDGMENT_THRESHOLD: {
+      BLESSED: 1e4,
+      // 大善人
+      RIGHTEOUS: 5e3,
+      // 正道
+      NEUTRAL: 0,
+      // 中立
+      EVIL: -5e3,
+      // 邪道
+      DAMNED: -1e4
+      // 大恶人
+    },
+    // 传承保留比例
+    LEGACY_RETENTION_RATIO: 0.5,
+    // 最大遗产数量
+    MAX_LEGACY_ITEMS: 10,
+    // 赐福最大数量
+    MAX_COSMIC_BLESSINGS: 5,
+    // 重置冷却 (ms)
+    RESET_COOLDOWN: 1e3 * 60 * 60 * 24 * 30
+    // 30天
+  };
+  var CYCLE_PHASES = {
+    CREATION: "creation",
+    // 创世期
+    EVOLUTION: "evolution",
+    // 演化期
+    FLORAGE: "florage",
+    // 繁荣期
+    DECAY: "decay",
+    // 衰败期
+    RENEWAL: "renewal"
+    // 新生期
+  };
+  var WORLD_EVOLUTION_STAGES = {
+    PRIMORDIAL: "primordial",
+    // 混沌
+    FORMING: "forming",
+    // 成形
+    STABLE: "stable",
+    // 稳定
+    FLOURISHING: "flourishing",
+    // 繁荣
+    TRANSENDING: "transending",
+    // 飞升
+    CELESTIAL: "celestial"
+    // 天界
+  };
+  var JUDGMENT_TYPES = {
+    BLESSING: "blessing",
+    // 天道赐福裁决
+    PUNISHMENT: "punishment",
+    // 天道惩罚裁决
+    TRIAL: "trial",
+    // 天道考验
+    ASCENSION: "ascension"
+    // 飞升裁决
+  };
+  var LEGACY_TYPES = {
+    CULTIVATION: "cultivation",
+    // 修为传承
+    MERIT: "merit",
+    // 功德传承
+    TREASURE: "treasure",
+    // 灵宝传承
+    WISDOM: "wisdom"
+    // 智慧传承
+  };
+  var CosmicCycle = class {
+    constructor(options = {}) {
+      this.id = `cycle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.cycleNumber = options.cycleNumber || 1;
+      this.startTime = options.startTime || Date.now();
+      this.endTime = options.endTime || this.startTime + COSMIC_CONFIG.CYCLE_DURATION;
+      this.currentPhase = options.currentPhase || CYCLE_PHASES.CREATION;
+      this.worldLevel = options.worldLevel || 1;
+      this.completed = false;
+      this.completedAt = null;
+      this.events = [];
+    }
+    /**
+     * 获取已过时间 (ms)
+     */
+    getElapsedTime() {
+      return Date.now() - this.startTime;
+    }
+    /**
+     * 获取剩余时间 (ms)
+     */
+    getRemainingTime() {
+      return Math.max(0, this.endTime - Date.now());
+    }
+    /**
+     * 获取进度 (0-1)
+     */
+    getProgress() {
+      const elapsed = this.getElapsedTime();
+      const total = COSMIC_CONFIG.CYCLE_DURATION;
+      return Math.min(1, elapsed / total);
+    }
+    /**
+     * 更新阶段
+     */
+    updatePhase() {
+      const progress = this.getProgress();
+      if (progress < 0.2) {
+        this.currentPhase = CYCLE_PHASES.CREATION;
+      } else if (progress < 0.4) {
+        this.currentPhase = CYCLE_PHASES.EVOLUTION;
+      } else if (progress < 0.7) {
+        this.currentPhase = CYCLE_PHASES.FLORAGE;
+      } else if (progress < 0.9) {
+        this.currentPhase = CYCLE_PHASES.DECAY;
+      } else {
+        this.currentPhase = CYCLE_PHASES.RENEWAL;
+      }
+      return this.currentPhase;
+    }
+    /**
+     * 完成轮回
+     */
+    complete() {
+      this.completed = true;
+      this.completedAt = Date.now();
+      return { success: true, cycleNumber: this.cycleNumber };
+    }
+    /**
+     * 添加事件
+     */
+    addEvent(type, description, data = {}) {
+      this.events.push({
+        type,
+        description,
+        data,
+        timestamp: Date.now()
+      });
+    }
+  };
+  var WorldEvolution = class {
+    constructor(options = {}) {
+      this.id = `evolution_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.stage = options.stage || WORLD_EVOLUTION_STAGES.PRIMORDIAL;
+      this.level = options.level || 1;
+      this.experience = options.experience || 0;
+      this.requiredExperience = options.requiredExperience || 1e3;
+      this.meritBonus = options.meritBonus || 1;
+      this.cultivationSpeedBonus = options.cultivationSpeedBonus || 1;
+      this.blessingPower = options.blessingPower || 1;
+      this.lastEvolutionAt = options.lastEvolutionAt || Date.now();
+      this.evolved = false;
+    }
+    /**
+     * 增加经验
+     */
+    addExperience(amount) {
+      this.experience += amount;
+      this.lastEvolutionAt = Date.now();
+      if (this.experience >= this.requiredExperience && this.level < COSMIC_CONFIG.WORLD_LEVEL_RANGE.max) {
+        return this.evolve();
+      }
+      return { evolved: false, experience: this.experience };
+    }
+    /**
+     * 进化
+     */
+    evolve() {
+      this.level++;
+      this.experience = 0;
+      this.requiredExperience = Math.floor(this.requiredExperience * 1.5);
+      this.evolved = true;
+      const stages = Object.values(WORLD_EVOLUTION_STAGES);
+      const currentIndex = stages.indexOf(this.stage);
+      if (currentIndex < stages.length - 1) {
+        this.stage = stages[currentIndex + 1];
+      }
+      this.meritBonus = 1 + this.level * 0.1;
+      this.cultivationSpeedBonus = 1 + this.level * 0.05;
+      this.blessingPower = 1 + this.level * 0.2;
+      return {
+        evolved: true,
+        level: this.level,
+        stage: this.stage,
+        bonuses: {
+          meritBonus: this.meritBonus,
+          cultivationSpeedBonus: this.cultivationSpeedBonus,
+          blessingPower: this.blessingPower
+        }
+      };
+    }
+    /**
+     * 获取升级进度 (0-1)
+     */
+    getUpgradeProgress() {
+      return Math.min(1, this.experience / this.requiredExperience);
+    }
+  };
+  var HeavenJudgment = class {
+    constructor(type, description, options = {}) {
+      this.id = `judgment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.description = description;
+      this.targetPlayerId = options.targetPlayerId || null;
+      this.karmaValue = options.karmaValue || 0;
+      this.meritValue = options.meritValue || 0;
+      this.result = options.result || null;
+      this.executed = false;
+      this.executedAt = null;
+      this.effects = options.effects || {};
+      this.createdAt = Date.now();
+    }
+    /**
+     * 执行裁决
+     */
+    execute() {
+      if (this.executed) {
+        return { success: false, error: "Judgment already executed" };
+      }
+      this.executed = true;
+      this.executedAt = Date.now();
+      const karma = this.karmaValue;
+      if (karma >= COSMIC_CONFIG.JUDGMENT_THRESHOLD.BLESSED) {
+        this.result = JUDGMENT_TYPES.BLESSING;
+      } else if (karma <= COSMIC_CONFIG.JUDGMENT_THRESHOLD.DAMNED) {
+        this.result = JUDGMENT_TYPES.PUNISHMENT;
+      } else if (karma >= COSMIC_CONFIG.JUDGMENT_THRESHOLD.RIGHTEOUS) {
+        this.result = JUDGMENT_TYPES.ASCENSION;
+      } else if (karma <= COSMIC_CONFIG.JUDGMENT_THRESHOLD.EVIL) {
+        this.result = JUDGMENT_TYPES.TRIAL;
+      } else {
+        this.result = Math.random() > 0.5 ? JUDGMENT_TYPES.BLESSING : JUDGMENT_TYPES.TRIAL;
+      }
+      return {
+        success: true,
+        result: this.result,
+        effects: this.effects
+      };
+    }
+  };
+  var CosmicBlessing = class {
+    constructor(type, title, description, options = {}) {
+      this.id = `cosmic_blessing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.title = title;
+      this.description = description;
+      this.power = options.power || 1;
+      this.duration = options.duration || COSMIC_CONFIG.CYCLE_DURATION;
+      this.grantedAt = Date.now();
+      this.grantedBy = options.grantedBy || "\u5929\u9053";
+      this.targetPlayerId = options.targetPlayerId || null;
+      this.claimed = false;
+      this.claimedAt = null;
+      this.effects = options.effects || {};
+    }
+    /**
+     * 是否已过期
+     */
+    isExpired() {
+      return Date.now() > this.grantedAt + this.duration;
+    }
+    /**
+     * 领取赐福
+     */
+    claim() {
+      if (this.claimed) {
+        return { success: false, error: "Blessing already claimed" };
+      }
+      if (this.isExpired()) {
+        return { success: false, error: "Blessing has expired" };
+      }
+      this.claimed = true;
+      this.claimedAt = Date.now();
+      return { success: true, effects: this.effects };
+    }
+  };
+  var LegacyInheritance = class {
+    constructor(type, name, description, options = {}) {
+      this.id = `legacy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.type = type;
+      this.name = name;
+      this.description = description;
+      this.value = options.value || 1;
+      this.quality = options.quality || "\u666E\u901A";
+      this.rarity = options.rarity || "common";
+      this.retentionRatio = options.retentionRatio || COSMIC_CONFIG.LEGACY_RETENTION_RATIO;
+      this.preserved = options.preserved || false;
+      this.sourceCycle = options.sourceCycle || 1;
+      this.createdAt = Date.now();
+    }
+    /**
+     * 获取传承值
+     */
+    getInheritedValue() {
+      return Math.floor(this.value * this.retentionRatio);
+    }
+    /**
+     * 激活传承
+     */
+    activate() {
+      this.preserved = true;
+      return {
+        success: true,
+        inheritedValue: this.getInheritedValue()
+      };
+    }
+  };
+  var CosmicCycleService = class {
+    constructor() {
+      this.gameState = null;
+      this.currentCycle = null;
+      this.worldEvolution = null;
+      this.judgments = [];
+      this.cosmicBlessings = [];
+      this.legacies = [];
+      this.lastResetTime = null;
+      this.totalCycles = 0;
+    }
+    /**
+     * 初始化服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.cosmic) {
+        gameState3.cosmic = {
+          currentCycle: null,
+          worldEvolution: null,
+          judgments: [],
+          cosmicBlessings: [],
+          legacies: [],
+          lastResetTime: null,
+          totalCycles: 0
+        };
+      }
+      this.currentCycle = gameState3.cosmic.currentCycle;
+      this.worldEvolution = gameState3.cosmic.worldEvolution;
+      this.judgments = gameState3.cosmic.judgments || [];
+      this.cosmicBlessings = gameState3.cosmic.cosmicBlessings || [];
+      this.legacies = gameState3.cosmic.legacies || [];
+      this.lastResetTime = gameState3.cosmic.lastResetTime;
+      this.totalCycles = gameState3.cosmic.totalCycles || 0;
+      if (!this.currentCycle || this.currentCycle.completed) {
+        this.startNewCycle();
+      }
+      if (!this.worldEvolution) {
+        this.worldEvolution = new WorldEvolution();
+        this.saveState();
+      }
+      console.log("[CosmicCycle] \u5929\u9053\u610F\u5FD7\u7EC8\u6781\u7CFB\u7EDF\u521D\u59CB\u5316\u5B8C\u6210");
+      return { success: true };
+    }
+    /**
+     * 保存状态到游戏状态
+     */
+    saveState() {
+      if (!this.gameState) return;
+      this.gameState.cosmic = {
+        currentCycle: this.currentCycle,
+        worldEvolution: this.worldEvolution,
+        judgments: this.judgments,
+        cosmicBlessings: this.cosmicBlessings,
+        legacies: this.legacies,
+        lastResetTime: this.lastResetTime,
+        totalCycles: this.totalCycles
+      };
+    }
+    // ===== 轮回管理 =====
+    /**
+     * 开始新轮回
+     */
+    startNewCycle() {
+      if (this.currentCycle && !this.currentCycle.completed) {
+        this.currentCycle.complete();
+      }
+      this.totalCycles++;
+      this.currentCycle = new CosmicCycle({
+        cycleNumber: this.totalCycles,
+        startTime: Date.now()
+      });
+      this.saveState();
+      console.log(`[CosmicCycle] \u5B87\u5B99\u8F6E\u56DE #${this.totalCycles} \u5F00\u59CB`);
+      return {
+        success: true,
+        cycle: this.getCycleInfo()
+      };
+    }
+    /**
+     * 获取轮回信息
+     */
+    getCycleInfo() {
+      if (!this.currentCycle) return null;
+      return {
+        id: this.currentCycle.id,
+        cycleNumber: this.currentCycle.cycleNumber,
+        startTime: this.currentCycle.startTime,
+        endTime: this.currentCycle.endTime,
+        currentPhase: this.currentCycle.currentPhase,
+        worldLevel: this.currentCycle.worldLevel,
+        progress: this.currentCycle.getProgress(),
+        elapsedTime: this.currentCycle.getElapsedTime(),
+        remainingTime: this.currentCycle.getRemainingTime(),
+        completed: this.currentCycle.completed,
+        events: this.currentCycle.events.slice(-10)
+        // 最近10个事件
+      };
+    }
+    /**
+     * 更新轮回阶段
+     */
+    updateCyclePhase() {
+      if (!this.currentCycle || this.currentCycle.completed) {
+        return { success: false, error: "No active cycle" };
+      }
+      const oldPhase = this.currentCycle.currentPhase;
+      const newPhase = this.currentCycle.updatePhase();
+      if (oldPhase !== newPhase) {
+        this.currentCycle.addEvent("phase_change", `\u8F6E\u56DE\u9636\u6BB5\u4ECE ${oldPhase} \u53D8\u4E3A ${newPhase}`);
+        this.saveState();
+      }
+      return {
+        success: true,
+        oldPhase,
+        newPhase,
+        progress: this.currentCycle.getProgress()
+      };
+    }
+    // ===== 世界演化管理 =====
+    /**
+     * 获取世界演化信息
+     */
+    getWorldEvolutionInfo() {
+      if (!this.worldEvolution) {
+        this.worldEvolution = new WorldEvolution();
+      }
+      return {
+        id: this.worldEvolution.id,
+        stage: this.worldEvolution.stage,
+        level: this.worldEvolution.level,
+        experience: this.worldEvolution.experience,
+        requiredExperience: this.worldEvolution.requiredExperience,
+        upgradeProgress: this.worldEvolution.getUpgradeProgress(),
+        bonuses: {
+          meritBonus: this.worldEvolution.meritBonus,
+          cultivationSpeedBonus: this.worldEvolution.cultivationSpeedBonus,
+          blessingPower: this.worldEvolution.blessingPower
+        },
+        lastEvolutionAt: this.worldEvolution.lastEvolutionAt
+      };
+    }
+    /**
+     * 触发世界演化
+     */
+    triggerWorldEvolution(options = {}) {
+      var _a;
+      if (!this.worldEvolution) {
+        this.worldEvolution = new WorldEvolution();
+      }
+      const experienceAmount = options.experience || 100;
+      const result = this.worldEvolution.addExperience(experienceAmount);
+      (_a = this.currentCycle) == null ? void 0 : _a.addEvent("world_evolution", `\u4E16\u754C\u6F14\u5316\u89E6\u53D1\uFF0C\u83B7\u5F97 ${experienceAmount} \u7ECF\u9A8C`, result);
+      this.saveState();
+      return {
+        success: true,
+        evolution: this.getWorldEvolutionInfo(),
+        result
+      };
+    }
+    // ===== 天道裁决 =====
+    /**
+     * 执行天道裁决
+     */
+    executeJudgment(options = {}) {
+      var _a, _b, _c;
+      const karmaValue = options.karmaValue || ((_b = (_a = this.gameState) == null ? void 0 : _a.player) == null ? void 0 : _b.karmaPoints) || 0;
+      const meritValue = options.meritValue || 0;
+      const judgment = new HeavenJudgment(
+        options.type || JUDGMENT_TYPES.TRIAL,
+        options.description || "\u5929\u9053\u5BF9\u73A9\u5BB6\u7684\u88C1\u51B3",
+        {
+          targetPlayerId: options.targetPlayerId,
+          karmaValue,
+          meritValue,
+          effects: options.effects || {}
+        }
+      );
+      const executeResult = judgment.execute();
+      this.judgments.push(judgment);
+      if (executeResult.success) {
+        this.applyJudgmentEffect(judgment);
+      }
+      (_c = this.currentCycle) == null ? void 0 : _c.addEvent("judgment", `\u5929\u9053\u88C1\u51B3: ${judgment.result}`, executeResult);
+      this.saveState();
+      return {
+        success: true,
+        judgment: {
+          id: judgment.id,
+          type: judgment.type,
+          result: judgment.result,
+          karmaValue: judgment.karmaValue,
+          executed: judgment.executed
+        },
+        executeResult
+      };
+    }
+    /**
+     * 应用裁决效果
+     */
+    applyJudgmentEffect(judgment) {
+      if (!this.gameState) return;
+      const result = judgment.result;
+      const effects = judgment.effects;
+      switch (result) {
+        case JUDGMENT_TYPES.BLESSING:
+          this.gameState.player.qi = (this.gameState.player.qi || 0) + (effects.qiBonus || 100);
+          this.gameState.cultivationXP = (this.gameState.cultivationXP || 0) + (effects.cultivationBonus || 500);
+          this.grantCosmicBlessing({
+            type: "judgment_blessing",
+            title: "\u5929\u9053\u6069\u8D50",
+            description: "\u56E0\u4F60\u7684\u5584\u884C\uFF0C\u5929\u9053\u8D50\u4E88\u4F60\u65E0\u4E0A\u6069\u5178",
+            power: effects.power || 2,
+            effects
+          });
+          break;
+        case JUDGMENT_TYPES.PUNISHMENT:
+          this.gameState.player.qi = Math.max(0, (this.gameState.player.qi || 0) - (effects.qiPenalty || 50));
+          this.gameState.cultivationXP = Math.max(0, (this.gameState.cultivationXP || 0) - (effects.cultivationPenalty || 200));
+          break;
+        case JUDGMENT_TYPES.TRIAL:
+          this.grantCosmicBlessing({
+            type: "trial",
+            title: "\u5929\u9053\u8003\u9A8C",
+            description: "\u5929\u9053\u5BF9\u4F60\u8FDB\u884C\u8003\u9A8C\uFF0C\u5B8C\u6210\u540E\u53EF\u83B7\u5F97\u4E30\u539A\u5956\u52B1",
+            power: 1.5,
+            effects
+          });
+          break;
+        case JUDGMENT_TYPES.ASCENSION:
+          this.gameState.blessings = this.gameState.blessings || [];
+          this.gameState.blessings.push({
+            name: "\u98DE\u5347\u673A\u7F18",
+            description: "\u5929\u9053\u8BA4\u53EF\u4F60\u7684\u4FEE\u884C",
+            duration: COSMIC_CONFIG.CYCLE_DURATION,
+            effect: { cultivationSpeed: 2 }
+          });
+          break;
+      }
+    }
+    /**
+     * 获取裁决列表
+     */
+    listJudgments(options = {}) {
+      let result = [...this.judgments];
+      if (options.type) {
+        result = result.filter((j) => j.type === options.type);
+      }
+      if (options.result) {
+        result = result.filter((j) => j.result === options.result);
+      }
+      if (options.executed !== void 0) {
+        result = result.filter((j) => j.executed === options.executed);
+      }
+      return {
+        success: true,
+        judgments: result.map((j) => ({
+          id: j.id,
+          type: j.type,
+          description: j.description,
+          result: j.result,
+          karmaValue: j.karmaValue,
+          executed: j.executed,
+          executedAt: j.executedAt,
+          createdAt: j.createdAt
+        })),
+        total: result.length
+      };
+    }
+    // ===== 宇宙赐福 =====
+    /**
+     * 授予宇宙赐福
+     */
+    grantCosmicBlessing(options = {}) {
+      var _a;
+      if (this.cosmicBlessings.length >= COSMIC_CONFIG.MAX_COSMIC_BLESSINGS) {
+        this.cosmicBlessings = this.cosmicBlessings.filter((b) => !b.isExpired());
+        if (this.cosmicBlessings.length >= COSMIC_CONFIG.MAX_COSMIC_BLESSINGS) {
+          this.cosmicBlessings.shift();
+        }
+      }
+      const blessing = new CosmicBlessing(
+        options.type || "general",
+        options.title || "\u5929\u9053\u8D50\u798F",
+        options.description || "\u5929\u9053\u7684\u6069\u8D50",
+        {
+          power: options.power || 1,
+          duration: options.duration,
+          grantedBy: options.grantedBy || "\u5929\u9053",
+          targetPlayerId: options.targetPlayerId,
+          effects: options.effects || {}
+        }
+      );
+      this.cosmicBlessings.push(blessing);
+      (_a = this.currentCycle) == null ? void 0 : _a.addEvent("blessing", `\u6388\u4E88\u5B87\u5B99\u8D50\u798F: ${blessing.title}`);
+      this.saveState();
+      return {
+        success: true,
+        blessing: {
+          id: blessing.id,
+          type: blessing.type,
+          title: blessing.title,
+          power: blessing.power,
+          grantedAt: blessing.grantedAt
+        }
+      };
+    }
+    /**
+     * 领取宇宙赐福
+     */
+    claimCosmicBlessing(blessingId) {
+      const blessing = this.cosmicBlessings.find((b) => b.id === blessingId);
+      if (!blessing) {
+        return { success: false, error: "Blessing not found" };
+      }
+      const claimResult = blessing.claim();
+      if (claimResult.success) {
+        if (this.gameState && blessing.effects) {
+          if (blessing.effects.qiBonus) {
+            this.gameState.player.qi = (this.gameState.player.qi || 0) + blessing.effects.qiBonus;
+          }
+          if (blessing.effects.cultivationBonus) {
+            this.gameState.cultivationXP = (this.gameState.cultivationXP || 0) + blessing.effects.cultivationBonus;
+          }
+          if (blessing.effects.meritBonus) {
+            this.gameState.player.karmaPoints = (this.gameState.player.karmaPoints || 0) + blessing.effects.meritBonus;
+          }
+        }
+        this.saveState();
+      }
+      return claimResult;
+    }
+    /**
+     * 获取宇宙赐福列表
+     */
+    listCosmicBlessings(options = {}) {
+      let result = [...this.cosmicBlessings];
+      if (!options.includeExpired) {
+        result = result.filter((b) => !b.isExpired());
+      }
+      if (!options.includeClaimed) {
+        result = result.filter((b) => !b.claimed);
+      }
+      if (options.type) {
+        result = result.filter((b) => b.type === options.type);
+      }
+      return {
+        success: true,
+        blessings: result.map((b) => ({
+          id: b.id,
+          type: b.type,
+          title: b.title,
+          description: b.description,
+          power: b.power,
+          duration: b.duration,
+          grantedAt: b.grantedAt,
+          grantedBy: b.grantedBy,
+          claimed: b.claimed,
+          claimedAt: b.claimedAt,
+          effects: b.effects,
+          isExpired: b.isExpired()
+        })),
+        total: result.length
+      };
+    }
+    // ===== 宇宙重置 =====
+    /**
+     * 执行宇宙重置
+     */
+    executeReset(options = {}) {
+      if (this.lastResetTime) {
+        const timeSinceReset = Date.now() - this.lastResetTime;
+        if (timeSinceReset < COSMIC_CONFIG.RESET_COOLDOWN) {
+          const remainingCooldown = COSMIC_CONFIG.RESET_COOLDOWN - timeSinceReset;
+          return {
+            success: false,
+            error: "Reset cooldown active",
+            remainingCooldown
+          };
+        }
+      }
+      const forceReset = options.force || false;
+      const preserveLegacy = options.preserveLegacy !== false;
+      if (preserveLegacy) {
+        this.preserveLegacy();
+      }
+      if (this.currentCycle) {
+        this.currentCycle.complete();
+      }
+      const resetResult = {
+        previousCycle: this.totalCycles,
+        legaciesPreserved: preserveLegacy ? this.legacies.length : 0,
+        blessingsReset: this.cosmicBlessings.length,
+        judgmentsReset: this.judgments.length
+      };
+      this.startNewCycle();
+      this.lastResetTime = Date.now();
+      this.cosmicBlessings = [];
+      this.judgments = [];
+      this.saveState();
+      return {
+        success: true,
+        reset: resetResult,
+        newCycle: this.getCycleInfo()
+      };
+    }
+    /**
+     * 获取重置冷却时间
+     */
+    getResetCooldown() {
+      if (!this.lastResetTime) {
+        return { onCooldown: false, remainingTime: 0 };
+      }
+      const timeSinceReset = Date.now() - this.lastResetTime;
+      const remaining = Math.max(0, COSMIC_CONFIG.RESET_COOLDOWN - timeSinceReset);
+      return {
+        onCooldown: remaining > 0,
+        remainingTime: remaining,
+        lastResetTime: this.lastResetTime
+      };
+    }
+    // ===== 传承遗产 =====
+    /**
+     * 保留遗产
+     */
+    preserveLegacy() {
+      var _a, _b;
+      if (!this.gameState) return { success: false, error: "No game state" };
+      const legacyItems = [];
+      const cultivationXP = this.gameState.cultivationXP || 0;
+      if (cultivationXP > 0) {
+        const legacy = new LegacyInheritance(
+          LEGACY_TYPES.CULTIVATION,
+          "\u4FEE\u4E3A\u4F20\u627F",
+          "\u524D\u4E16\u4FEE\u884C\u6240\u79EF\u7D2F\u7684\u4FEE\u4E3A",
+          {
+            value: cultivationXP,
+            quality: cultivationXP > 1e4 ? "\u6781\u54C1" : "\u4E0A\u54C1",
+            rarity: cultivationXP > 1e4 ? "legendary" : "rare",
+            sourceCycle: this.totalCycles
+          }
+        );
+        legacy.activate();
+        this.legacies.push(legacy);
+        legacyItems.push(legacy);
+      }
+      const merit = ((_a = this.gameState.player) == null ? void 0 : _a.karmaPoints) || 0;
+      if (merit > 0) {
+        const legacy = new LegacyInheritance(
+          LEGACY_TYPES.MERIT,
+          "\u529F\u5FB7\u4F20\u627F",
+          "\u524D\u4E16\u884C\u5584\u79EF\u6512\u7684\u529F\u5FB7",
+          {
+            value: merit,
+            quality: merit > 5e3 ? "\u6781\u54C1" : "\u4E0A\u54C1",
+            rarity: merit > 5e3 ? "legendary" : "rare",
+            sourceCycle: this.totalCycles
+          }
+        );
+        legacy.activate();
+        this.legacies.push(legacy);
+        legacyItems.push(legacy);
+      }
+      const inventory = ((_b = this.gameState.inventory) == null ? void 0 : _b.items) || [];
+      const valuableItems = inventory.filter((item) => item.quality === "\u6781\u54C1" || item.quality === "\u4E0A\u54C1");
+      for (const item of valuableItems.slice(0, COSMIC_CONFIG.MAX_LEGACY_ITEMS - this.legacies.length)) {
+        const legacy = new LegacyInheritance(
+          LEGACY_TYPES.TREASURE,
+          item.name,
+          item.description || "\u73CD\u8D35\u5B9D\u7269",
+          {
+            value: 1,
+            quality: item.quality,
+            rarity: item.quality === "\u6781\u54C1" ? "legendary" : "rare",
+            sourceCycle: this.totalCycles
+          }
+        );
+        legacy.activate();
+        this.legacies.push(legacy);
+        legacyItems.push(legacy);
+      }
+      if (this.legacies.length > COSMIC_CONFIG.MAX_LEGACY_ITEMS) {
+        this.legacies = this.legacies.slice(-COSMIC_CONFIG.MAX_LEGACY_ITEMS);
+      }
+      this.saveState();
+      return {
+        success: true,
+        preservedCount: legacyItems.length,
+        legacies: legacyItems.map((l) => ({
+          id: l.id,
+          type: l.type,
+          name: l.name,
+          inheritedValue: l.getInheritedValue()
+        }))
+      };
+    }
+    /**
+     * 继承遗产
+     */
+    inheritLegacy(legacyId) {
+      const legacy = this.legacies.find((l) => l.id === legacyId);
+      if (!legacy) {
+        return { success: false, error: "Legacy not found" };
+      }
+      if (!legacy.preserved) {
+        return { success: false, error: "Legacy not preserved" };
+      }
+      if (!this.gameState) {
+        return { success: false, error: "No game state" };
+      }
+      const inheritedValue = legacy.getInheritedValue();
+      switch (legacy.type) {
+        case LEGACY_TYPES.CULTIVATION:
+          this.gameState.cultivationXP = (this.gameState.cultivationXP || 0) + inheritedValue;
+          break;
+        case LEGACY_TYPES.MERIT:
+          this.gameState.player.karmaPoints = (this.gameState.player.karmaPoints || 0) + inheritedValue;
+          break;
+        case LEGACY_TYPES.TREASURE:
+          this.gameState.inventory = this.gameState.inventory || { items: [] };
+          this.gameState.inventory.items.push({
+            name: legacy.name,
+            type: "equipment",
+            quantity: 1,
+            quality: legacy.quality,
+            description: legacy.description
+          });
+          break;
+        case LEGACY_TYPES.WISDOM:
+          this.gameState.player.level = (this.gameState.player.level || 1) + 1;
+          break;
+      }
+      this.legacies = this.legacies.filter((l) => l.id !== legacyId);
+      this.saveState();
+      return {
+        success: true,
+        inherited: {
+          type: legacy.type,
+          name: legacy.name,
+          inheritedValue
+        }
+      };
+    }
+    /**
+     * 获取遗产列表
+     */
+    listLegacies(options = {}) {
+      let result = [...this.legacies];
+      if (options.type) {
+        result = result.filter((l) => l.type === options.type);
+      }
+      if (options.preserved !== void 0) {
+        result = result.filter((l) => l.preserved === options.preserved);
+      }
+      return {
+        success: true,
+        legacies: result.map((l) => ({
+          id: l.id,
+          type: l.type,
+          name: l.name,
+          description: l.description,
+          value: l.value,
+          quality: l.quality,
+          rarity: l.rarity,
+          retentionRatio: l.retentionRatio,
+          inheritedValue: l.getInheritedValue(),
+          preserved: l.preserved,
+          sourceCycle: l.sourceCycle,
+          createdAt: l.createdAt
+        })),
+        total: result.length
+      };
+    }
+    // ===== MCP工具实现 =====
+    /**
+     * cosmic.cycle.query - 查询宇宙轮回状态
+     */
+    mcpCycleQuery(params = {}) {
+      const cycleInfo = this.getCycleInfo();
+      const evolutionInfo = this.getWorldEvolutionInfo();
+      const cooldown = this.getResetCooldown();
+      return {
+        success: true,
+        cycle: cycleInfo,
+        worldEvolution: evolutionInfo,
+        resetCooldown: cooldown,
+        totalCycles: this.totalCycles
+      };
+    }
+    /**
+     * cosmic.world.evolve - 触发世界演化
+     */
+    mcpWorldEvolve(params = {}) {
+      return this.triggerWorldEvolution({
+        experience: (params == null ? void 0 : params.experience) || 100
+      });
+    }
+    /**
+     * cosmic.heaven.judge - 天道裁决
+     */
+    mcpHeavenJudge(params = {}) {
+      return this.executeJudgment({
+        type: params == null ? void 0 : params.type,
+        description: params == null ? void 0 : params.description,
+        karmaValue: params == null ? void 0 : params.karmaValue,
+        meritValue: params == null ? void 0 : params.meritValue,
+        effects: params == null ? void 0 : params.effects
+      });
+    }
+    /**
+     * cosmic.blessing.grant - 天道赐福
+     */
+    mcpBlessingGrant(params = {}) {
+      return this.grantCosmicBlessing({
+        type: (params == null ? void 0 : params.type) || "general",
+        title: (params == null ? void 0 : params.title) || "\u5929\u9053\u8D50\u798F",
+        description: params == null ? void 0 : params.description,
+        power: (params == null ? void 0 : params.power) || 1,
+        duration: params == null ? void 0 : params.duration,
+        effects: params == null ? void 0 : params.effects
+      });
+    }
+    /**
+     * cosmic.reset.execute - 执行宇宙重置
+     */
+    mcpResetExecute(params = {}) {
+      return this.executeReset({
+        force: (params == null ? void 0 : params.force) || false,
+        preserveLegacy: (params == null ? void 0 : params.preserveLegacy) !== false
+      });
+    }
+    /**
+     * cosmic.legacy.inherit - 传承遗产
+     */
+    mcpLegacyInherit(params = {}) {
+      if (!(params == null ? void 0 : params.legacyId)) {
+        const legacies = this.listLegacies({ preserved: true });
+        return {
+          success: true,
+          available: legacies.legacies,
+          total: legacies.total
+        };
+      }
+      return this.inheritLegacy(params.legacyId);
+    }
+  };
+  var COSMIC_CYCLE_TOOLS = {
+    "cosmic.cycle.query": {
+      name: "cosmic.cycle.query",
+      description: "Query the current cosmic cycle status, world evolution state, and reset cooldown",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    },
+    "cosmic.world.evolve": {
+      name: "cosmic.world.evolve",
+      description: "Trigger world evolution to gain experience and potentially level up the world",
+      inputSchema: {
+        type: "object",
+        properties: {
+          experience: { type: "number", description: "Experience amount to add", default: 100 }
+        },
+        required: []
+      }
+    },
+    "cosmic.heaven.judge": {
+      name: "cosmic.heaven.judge",
+      description: "Execute heaven judgment on a player based on their karma",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Judgment type" },
+          description: { type: "string", description: "Judgment description" },
+          karmaValue: { type: "number", description: "Karma value for judgment" },
+          meritValue: { type: "number", description: "Merit value for judgment" },
+          effects: { type: "object", description: "Effects to apply" }
+        },
+        required: []
+      }
+    },
+    "cosmic.blessing.grant": {
+      name: "cosmic.blessing.grant",
+      description: "Grant a cosmic blessing to the player",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "Blessing type" },
+          title: { type: "string", description: "Blessing title" },
+          description: { type: "string", description: "Blessing description" },
+          power: { type: "number", description: "Blessing power multiplier", default: 1 },
+          duration: { type: "number", description: "Blessing duration in ms" },
+          effects: { type: "object", description: "Blessing effects" }
+        },
+        required: []
+      }
+    },
+    "cosmic.reset.execute": {
+      name: "cosmic.reset.execute",
+      description: "Execute a cosmic reset to start a new cycle (requires cooldown)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          force: { type: "boolean", description: "Force reset even with penalties", default: false },
+          preserveLegacy: { type: "boolean", description: "Preserve legacies for next cycle", default: true }
+        },
+        required: []
+      }
+    },
+    "cosmic.legacy.inherit": {
+      name: "cosmic.legacy.inherit",
+      description: "Inherit a preserved legacy from previous cycles",
+      inputSchema: {
+        type: "object",
+        properties: {
+          legacyId: { type: "string", description: "Legacy ID to inherit (omit to list available legacies)" }
+        },
+        required: []
+      }
+    }
+  };
+  function createCosmicCycleMCPHandlers(gameState3) {
+    const service = new CosmicCycleService();
+    service.init(gameState3);
+    return {
+      "cosmic.cycle.query": (params) => service.mcpCycleQuery(params),
+      "cosmic.world.evolve": (params) => service.mcpWorldEvolve(params),
+      "cosmic.heaven.judge": (params) => service.mcpHeavenJudge(params),
+      "cosmic.blessing.grant": (params) => service.mcpBlessingGrant(params),
+      "cosmic.reset.execute": (params) => service.mcpResetExecute(params),
+      "cosmic.legacy.inherit": (params) => service.mcpLegacyInherit(params)
+    };
+  }
+  var cosmicCycleService = new CosmicCycleService();
+
   // src/systems/persistence/SaveManager.js
   var SAVE_CONFIG = {
     storageKey: "cultivationSave",
@@ -16609,7 +17658,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V237",
+      gameVersion: "V238",
       // 设置
       settings: {
         soundEnabled: true,
@@ -16727,6 +17776,37 @@ var CultivationSimulator = (() => {
       "treasure.strengthen",
       CHAOS_TREASURE_TOOLS["treasure.strengthen"],
       (params) => chaosTreasureHandlers["treasure.strengthen"](params)
+    );
+    const cosmicCycleHandlers = createCosmicCycleMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "cosmic.cycle.query",
+      COSMIC_CYCLE_TOOLS["cosmic.cycle.query"],
+      (params) => cosmicCycleHandlers["cosmic.cycle.query"](params)
+    );
+    mcpRegistry.registerTool(
+      "cosmic.world.evolve",
+      COSMIC_CYCLE_TOOLS["cosmic.world.evolve"],
+      (params) => cosmicCycleHandlers["cosmic.world.evolve"](params)
+    );
+    mcpRegistry.registerTool(
+      "cosmic.heaven.judge",
+      COSMIC_CYCLE_TOOLS["cosmic.heaven.judge"],
+      (params) => cosmicCycleHandlers["cosmic.heaven.judge"](params)
+    );
+    mcpRegistry.registerTool(
+      "cosmic.blessing.grant",
+      COSMIC_CYCLE_TOOLS["cosmic.blessing.grant"],
+      (params) => cosmicCycleHandlers["cosmic.blessing.grant"](params)
+    );
+    mcpRegistry.registerTool(
+      "cosmic.reset.execute",
+      COSMIC_CYCLE_TOOLS["cosmic.reset.execute"],
+      (params) => cosmicCycleHandlers["cosmic.reset.execute"](params)
+    );
+    mcpRegistry.registerTool(
+      "cosmic.legacy.inherit",
+      COSMIC_CYCLE_TOOLS["cosmic.legacy.inherit"],
+      (params) => cosmicCycleHandlers["cosmic.legacy.inherit"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -18105,4 +19185,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-be4e209-2026-05-30T16-55-13-316Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-8eafe05-2026-05-30T16-58-23-422Z";
