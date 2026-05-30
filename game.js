@@ -22,6 +22,9 @@ var CultivationSimulator = (() => {
 
   // src/domains/cultivation/entities/CultivationEntity.js
   var CultivationEntity_exports = {};
+  __export(CultivationEntity_exports, {
+    CultivationEntity: () => CultivationEntity
+  });
   var CultivationEntity;
   var init_CultivationEntity = __esm({
     "src/domains/cultivation/entities/CultivationEntity.js"() {
@@ -178,14 +181,19 @@ var CultivationSimulator = (() => {
           };
         }
       };
-      if (typeof module !== "undefined" && module.exports) {
-        module.exports = { CultivationEntity };
-      }
     }
   });
 
   // src/domains/cultivation/entities/SpiritRootEntity.js
   var SpiritRootEntity_exports = {};
+  __export(SpiritRootEntity_exports, {
+    ROOT_TYPES: () => ROOT_TYPES,
+    ROOT_TYPE_NAMES: () => ROOT_TYPE_NAMES,
+    SpiritRootEntity: () => SpiritRootEntity,
+    TIER_BONUSES: () => TIER_BONUSES,
+    TIER_MAP: () => TIER_MAP,
+    getTierName: () => getTierName
+  });
   function getTierName(tier) {
     return TIER_MAP[tier] || "\u51E1\u54C1";
   }
@@ -330,15 +338,6 @@ var CultivationSimulator = (() => {
           };
         }
       };
-      if (typeof module !== "undefined" && module.exports) {
-        module.exports = { SpiritRootEntity, TIER_MAP, ROOT_TYPES, ROOT_TYPE_NAMES, TIER_BONUSES, getTierName };
-      } else {
-        window.SpiritRootEntity = SpiritRootEntity;
-        window.TIER_MAP = TIER_MAP;
-        window.ROOT_TYPES = ROOT_TYPES;
-        window.ROOT_TYPE_NAMES = ROOT_TYPE_NAMES;
-        window.TIER_BONUSES = TIER_BONUSES;
-      }
     }
   });
 
@@ -377,7 +376,7 @@ var CultivationSimulator = (() => {
          * 获取修炼实体
          */
         getCultivationEntity() {
-          return new (void 0)({
+          return new CultivationEntity({
             realm: this.gameState.realm,
             stage: this.gameState.stage,
             cultivationProgress: this.gameState.cultivationProgress,
@@ -399,7 +398,7 @@ var CultivationSimulator = (() => {
          * 获取灵根实体
          */
         getSpiritRootEntity() {
-          return new (void 0)(this.gameState.spiritRoot || { type: "wood", tier: 1 });
+          return new SpiritRootEntity(this.gameState.spiritRoot || { type: "wood", tier: 1 });
         }
         /**
          * 开始修炼/冥想
@@ -692,7 +691,7 @@ var CultivationSimulator = (() => {
             tierName: TIER_MAP3[tier]
           };
           if (detail) {
-            result.attributes = (void 0)[tier] || {};
+            result.attributes = TIER_BONUSES[tier] || {};
             result.evolveCost = tier * 500;
             result.isMaxTier = tier >= 5;
           }
@@ -736,6 +735,12 @@ var CultivationSimulator = (() => {
 
   // src/domains/player/entities/PlayerEntity.js
   var PlayerEntity_exports = {};
+  __export(PlayerEntity_exports, {
+    PlayerEntity: () => PlayerEntity,
+    REALMS: () => REALMS,
+    STAGES: () => STAGES,
+    STAGE_NAMES: () => STAGE_NAMES
+  });
   var REALMS, STAGES, STAGE_NAMES, PlayerEntity;
   var init_PlayerEntity = __esm({
     "src/domains/player/entities/PlayerEntity.js"() {
@@ -862,14 +867,14 @@ var CultivationSimulator = (() => {
           };
         }
       };
-      if (typeof module !== "undefined" && module.exports) {
-        module.exports = { PlayerEntity, REALMS, STAGES, STAGE_NAMES };
-      }
     }
   });
 
   // src/domains/player/services/PlayerService.js
   var PlayerService_exports = {};
+  __export(PlayerService_exports, {
+    PlayerService: () => PlayerService
+  });
   var PlayerEntity2, REALMS2, STAGES2, PlayerService;
   var init_PlayerService = __esm({
     "src/domains/player/services/PlayerService.js"() {
@@ -1210,14 +1215,19 @@ var CultivationSimulator = (() => {
           return { success: true };
         }
       };
-      if (typeof module !== "undefined" && module.exports) {
-        module.exports = { PlayerService };
-      }
     }
   });
 
   // src/domains/achievement/entities/Achievement.js
   var Achievement_exports = {};
+  __export(Achievement_exports, {
+    ACHIEVEMENT_CATEGORY_NAMES: () => ACHIEVEMENT_CATEGORY_NAMES,
+    ACHIEVEMENT_POOL: () => ACHIEVEMENT_POOL,
+    Achievement: () => Achievement,
+    AchievementCategory: () => AchievementCategory,
+    AchievementRequirementType: () => AchievementRequirementType,
+    AchievementRewardType: () => AchievementRewardType
+  });
   var AchievementCategory, AchievementRequirementType, AchievementRewardType, Achievement, ACHIEVEMENT_POOL, ACHIEVEMENT_CATEGORY_NAMES;
   var init_Achievement = __esm({
     "src/domains/achievement/entities/Achievement.js"() {
@@ -1386,19 +1396,22 @@ var CultivationSimulator = (() => {
         [AchievementCategory.SOCIAL]: "\u793E\u4EA4",
         [AchievementCategory.COLLECTION]: "\u6536\u96C6"
       };
-      module.exports = {
-        Achievement,
-        AchievementCategory,
-        AchievementRequirementType,
-        AchievementRewardType,
-        ACHIEVEMENT_POOL,
-        ACHIEVEMENT_CATEGORY_NAMES
-      };
     }
   });
 
   // src/domains/achievement/entities/Badge.js
   var Badge_exports = {};
+  __export(Badge_exports, {
+    BADGE_EFFECT_TYPES: () => BADGE_EFFECT_TYPES,
+    BADGE_POOL: () => BADGE_POOL,
+    Badge: () => Badge,
+    BadgeRarity: () => BadgeRarity,
+    BadgeType: () => BadgeType,
+    MAX_EQUIPPED_BADGES: () => MAX_EQUIPPED_BADGES,
+    RARITY_COLORS: () => RARITY_COLORS,
+    RARITY_NAMES: () => RARITY_NAMES,
+    RARITY_ORDER: () => RARITY_ORDER
+  });
   var BadgeRarity, RARITY_COLORS, RARITY_NAMES, BadgeType, MAX_EQUIPPED_BADGES, Badge, BADGE_POOL, BADGE_EFFECT_TYPES, RARITY_ORDER;
   var init_Badge = __esm({
     "src/domains/achievement/entities/Badge.js"() {
@@ -1598,919 +1611,23 @@ var CultivationSimulator = (() => {
         legendary: 5,
         mythic: 6
       };
-      module.exports = {
-        Badge,
-        BadgeRarity,
-        BadgeType,
-        RARITY_COLORS,
-        RARITY_NAMES,
-        MAX_EQUIPPED_BADGES,
-        BADGE_POOL,
-        BADGE_EFFECT_TYPES,
-        RARITY_ORDER
-      };
-    }
-  });
-
-  // src/domains/achievement/services/AchievementService.js
-  var AchievementService_exports = {};
-  var Achievement2, AchievementCategory2, AchievementRequirementType2, ACHIEVEMENT_POOL2, ACHIEVEMENT_CONFIG, ACHIEVEMENT_STATE_INITIALIZERS, AchievementService;
-  var init_AchievementService = __esm({
-    "src/domains/achievement/services/AchievementService.js"() {
-      ({ Achievement: Achievement2, AchievementCategory: AchievementCategory2, AchievementRequirementType: AchievementRequirementType2, ACHIEVEMENT_POOL: ACHIEVEMENT_POOL2 } = (init_Achievement(), __toCommonJS(Achievement_exports)));
-      ACHIEVEMENT_CONFIG = {
-        maxEquippedBadges: 3,
-        autoCheckEnabled: true,
-        progressUpdateInterval: 6e4
-        // 1分钟
-      };
-      ACHIEVEMENT_STATE_INITIALIZERS = {
-        V114: "_initAchievementState",
-        V124: "_initAchievementState",
-        V137: "_initAchievementState",
-        V155: "_initAchievementStateV2",
-        V165: "_initAchievementStateV3",
-        V175: "_initAchievementStateV4",
-        V185: "_initAchievementStateV5",
-        V195: "_initAchievementStateV6",
-        V203: "_initAchievementStateV7"
-      };
-      AchievementService = class {
-        constructor(gameState3) {
-          this.gs = gameState3;
-        }
-        /**
-         * 初始化成就状态 (V114基础版)
-         */
-        _initAchievementState() {
-          if (!this.gs.achievement) {
-            this.gs.achievement = {
-              unlocked: [],
-              rewardsClaimed: [],
-              achievementPool: [...ACHIEVEMENT_POOL2]
-            };
-          }
-          return this.gs.achievement;
-        }
-        /**
-         * 初始化成就状态V2 (V155)
-         */
-        _initAchievementStateV2() {
-          if (!this.gs.achievementV2) {
-            this.gs.achievementV2 = {
-              achievements: [...ACHIEVEMENT_POOL2].map((a) => ({ ...a, progress: 0, completed: false, completedAt: null, rewardClaimed: false })),
-              totalAchievements: 0,
-              completedCount: 0
-            };
-            this.gs.achievementV2.totalAchievements = this.gs.achievementV2.achievements.length;
-          }
-          return this.gs.achievementV2;
-        }
-        /**
-         * 初始化成就状态V3 (V165)
-         */
-        _initAchievementStateV3() {
-          if (!this.gs.achievementV3) {
-            this.gs.achievementV3 = {
-              achievements: [...ACHIEVEMENT_POOL2].map((a) => ({
-                ...a,
-                progress: 0,
-                completed: false,
-                completedAt: null,
-                reward: a.reward || { type: "spiritStone", amount: 100 }
-              })),
-              totalAchievements: 0,
-              completedCount: 0
-            };
-            this.gs.achievementV3.totalAchievements = this.gs.achievementV3.achievements.length;
-          }
-          return this.gs.achievementV3;
-        }
-        /**
-         * 初始化成就状态V6 (V195)
-         */
-        _initAchievementStateV6() {
-          if (!this.gs.achievementV6) {
-            this.gs.achievementV6 = {
-              achievements: [
-                { id: "ach_first_login_v6", name: "\u521D\u5165\u4ED9\u9014v6", description: "\u9996\u6B21\u767B\u5F55\u6E38\u620F", category: "beginner", requirement: { type: "login", count: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 100 } },
-                { id: "ach_realm_qi_v6", name: "\u70BC\u6C14\u521D\u671Fv6", description: "\u5883\u754C\u8FBE\u5230\u70BC\u6C14\u521D\u671F", category: "realm", requirement: { type: "realm", level: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
-                { id: "ach_realm_zhu_v6", name: "\u7B51\u57FA\u6210\u529Fv6", description: "\u5883\u754C\u8FBE\u5230\u7B51\u57FA", category: "realm", requirement: { type: "realm", level: 2 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 500 } },
-                { id: "ach_realm_jin_v6", name: "\u91D1\u4E39\u5927\u9053v6", description: "\u5883\u754C\u8FBE\u5230\u91D1\u4E39", category: "realm", requirement: { type: "realm", level: 3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } },
-                { id: "ach_realm_yuan_v6", name: "\u5143\u5A74\u7A81\u7834v6", description: "\u5883\u754C\u8FBE\u5230\u5143\u5A74", category: "realm", requirement: { type: "realm", level: 4 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 2e3 } },
-                { id: "ach_spirit_1000_v6", name: "\u7075\u6C14\u5145\u88D5v6", description: "\u7D2F\u8BA1\u83B7\u5F971000\u7075\u6C14", category: "resource", requirement: { type: "spirit", amount: 1e3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 300 } },
-                { id: "ach_stone_5000_v6", name: "\u5BCC\u7532\u4E00\u65B9v6", description: "\u7D2F\u8BA1\u83B7\u5F975000\u7075\u77F3", category: "resource", requirement: { type: "stone", amount: 5e3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 500 } },
-                { id: "ach_stone_50000_v6", name: "\u8170\u7F20\u4E07\u8D2Fv6", description: "\u7D2F\u8BA1\u83B7\u5F9750000\u7075\u77F3", category: "resource", requirement: { type: "stone", amount: 5e4 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 2e3 } },
-                { id: "ach_battle_10_v6", name: "\u521D\u8BD5\u950B\u8292v6", description: "\u5B8C\u621010\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 10 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
-                { id: "ach_battle_50_v6", name: "\u6218\u6597\u8FBE\u4EBAv6", description: "\u5B8C\u621050\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 50 }, progress: 0, completed: false, completedAt: null, reward: { type: "reputation", amount: 50 } },
-                { id: "ach_battle_100_v6", name: "\u767E\u6218\u767E\u80DCv6", description: "\u5B8C\u6210100\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 100 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } },
-                { id: "ach_quest_5_v6", name: "\u4EFB\u52A1\u8FBE\u4EBAv6", description: "\u5B8C\u62105\u4E2A\u4EFB\u52A1", category: "quest", requirement: { type: "quest", count: 5 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 300 } },
-                { id: "ach_quest_20_v6", name: "\u4EFB\u52A1\u5927\u5E08v6", description: "\u5B8C\u621020\u4E2A\u4EFB\u52A1", category: "quest", requirement: { type: "quest", count: 20 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 800 } },
-                { id: "ach_signin_7_v6", name: "\u8FDE\u7EED\u7B7E\u5230v6", description: "\u7D2F\u8BA1\u7B7E\u52307\u5929", category: "activity", requirement: { type: "signin", days: 7 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
-                { id: "ach_signin_30_v6", name: "\u7B7E\u5230\u4E4B\u661Fv6", description: "\u7D2F\u8BA1\u7B7E\u523030\u5929", category: "activity", requirement: { type: "signin", days: 30 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } }
-              ],
-              totalAchievements: 0,
-              completedCount: 0
-            };
-            this.gs.achievementV6.totalAchievements = this.gs.achievementV6.achievements.length;
-          }
-          return this.gs.achievementV6;
-        }
-        /**
-         * 获取成就列表 (V114/V124基础版)
-         */
-        mcpAchievementList() {
-          try {
-            const achievement = this._initAchievementState();
-            return {
-              success: true,
-              achievements: achievement.achievementPool,
-              total: achievement.achievementPool.length,
-              unlocked: achievement.unlocked.length
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 领取成就奖励 (V114/V124基础版)
-         */
-        mcpAchievementClaim(achievementId) {
-          try {
-            const achievement = this._initAchievementState();
-            const idx = achievement.unlocked.indexOf(achievementId);
-            if (idx === -1) return { error: "\u6210\u5C31\u672A\u89E3\u9501" };
-            if (achievement.rewardsClaimed.includes(achievementId)) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
-            const ach = achievement.achievementPool.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            achievement.rewardsClaimed.push(achievementId);
-            return { success: true, achievementId, reward: ach.reward };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取成就列表 (V137/V155/V165)
-         */
-        mcpAchievementListV2() {
-          try {
-            const achV2 = this._initAchievementStateV2();
-            return {
-              success: true,
-              achievements: achV2.achievements,
-              totalAchievements: achV2.totalAchievements,
-              completedCount: achV2.completedCount
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 查看成就详情 (V155)
-         */
-        mcpAchievementViewV2(achievementId) {
-          try {
-            const achV2 = this._initAchievementStateV2();
-            const ach = achV2.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            return { success: true, achievement: ach };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 解锁成就 (V155)
-         */
-        mcpAchievementUnlockV2(achievementId) {
-          try {
-            const achV2 = this._initAchievementStateV2();
-            const ach = achV2.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210" };
-            ach.completed = true;
-            ach.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-            achV2.completedCount = achV2.achievements.filter((a) => a.completed).length;
-            return { success: true, achievementId, message: "\u6210\u5C31\u89E3\u9501: " + ach.name };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取成就列表 (V165)
-         */
-        mcpAchievementListV3() {
-          try {
-            const achV3 = this._initAchievementStateV3();
-            return {
-              success: true,
-              achievements: achV3.achievements.map((a) => ({
-                id: a.id,
-                name: a.name,
-                description: a.description,
-                category: a.category,
-                progress: a.progress,
-                completed: a.completed,
-                reward: a.reward
-              })),
-              totalAchievements: achV3.totalAchievements,
-              completedCount: achV3.completedCount
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 查看成就详情 (V165)
-         */
-        mcpAchievementViewV3(achievementId) {
-          try {
-            const achV3 = this._initAchievementStateV3();
-            const ach = achV3.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            return { success: true, achievement: ach };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 解锁成就 (V165)
-         */
-        mcpAchievementUnlockV3(achievementId) {
-          try {
-            const achV3 = this._initAchievementStateV3();
-            if (!achievementId) {
-              let unlockedAny = false;
-              for (const ach2 of achV3.achievements) {
-                if (ach2.completed) continue;
-                let progress = 0;
-                switch (ach2.requirement.type) {
-                  case "login":
-                    progress = this.gs.loginCount || 1;
-                    break;
-                  case "realm":
-                    progress = this.gs.realmIndex || 0;
-                    break;
-                  case "spirit":
-                    progress = this.gs.totalSpirit || 0;
-                    break;
-                  case "stone":
-                    progress = this.gs.totalSpiritStones || 0;
-                    break;
-                  case "battle":
-                    progress = this.gs.battleCount || 0;
-                    break;
-                  case "quest":
-                    progress = this.gs.questCount || 0;
-                    break;
-                  case "signin":
-                    progress = this.gs.signinV6 ? this.gs.signinV6.totalCheckins : 0;
-                    break;
-                }
-                ach2.progress = progress;
-                if (progress >= (ach2.requirement.count || ach2.requirement.amount || ach2.requirement.level || 1)) {
-                  ach2.completed = true;
-                  ach2.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-                  unlockedAny = true;
-                }
-              }
-              achV3.completedCount = achV3.achievements.filter((a) => a.completed).length;
-              return { success: true, unlockedAny, completedCount: achV3.completedCount };
-            }
-            const ach = achV3.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210\uFF0C\u65E0\u9700\u91CD\u590D\u89E3\u9501" };
-            ach.completed = true;
-            ach.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-            achV3.completedCount = achV3.achievements.filter((a) => a.completed).length;
-            return { success: true, achievementId, completedCount: achV3.completedCount };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 领取成就奖励 (V165)
-         */
-        mcpAchievementRewardV3(achievementId) {
-          try {
-            const achV3 = this._initAchievementStateV3();
-            if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
-            const ach = achV3.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            if (!ach.completed) return { error: "\u6210\u5C31\u672A\u5B8C\u6210\uFF0C\u65E0\u6CD5\u9886\u53D6\u5956\u52B1" };
-            if (ach.rewardClaimed) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
-            let rewardMessage = "";
-            switch (ach.reward.type) {
-              case "spiritStone":
-                this.gs.spiritStones = (this.gs.spiritStones || 0) + ach.reward.amount;
-                rewardMessage = "\u7075\u77F3x" + ach.reward.amount;
-                break;
-              case "reputation":
-                this.gs.reputation = (this.gs.reputation || 0) + ach.reward.amount;
-                rewardMessage = "\u58F0\u671Bx" + ach.reward.amount;
-                break;
-            }
-            ach.rewardClaimed = true;
-            return { success: true, achievementId, reward: ach.reward, rewardMessage };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取成就列表 (V195/V203)
-         */
-        mcpAchievementListV6(category = "all") {
-          try {
-            const achV6 = this._initAchievementStateV6();
-            let achievements = achV6.achievements;
-            if (category && category !== "all") {
-              achievements = achievements.filter((a) => a.category === category);
-            }
-            const completedCount = achV6.achievements.filter((a) => a.completed).length;
-            return {
-              success: true,
-              achievements: achievements.map((a) => ({
-                id: a.id,
-                name: a.name,
-                description: a.description,
-                category: a.category,
-                requirement: a.requirement,
-                progress: a.progress,
-                completed: a.completed,
-                completedAt: a.completedAt,
-                reward: a.reward
-              })),
-              totalAchievements: achV6.totalAchievements,
-              completedCount
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 查看成就详情 (V195/V203)
-         */
-        mcpAchievementViewV6(achievementId) {
-          try {
-            const achV6 = this._initAchievementStateV6();
-            if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
-            const ach = achV6.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            return { success: true, achievement: ach };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 解锁成就 (V195/V203)
-         */
-        mcpAchievementUnlockV6(achievementId) {
-          try {
-            const achV6 = this._initAchievementStateV6();
-            const now = (/* @__PURE__ */ new Date()).toISOString();
-            if (!achievementId) {
-              let unlockedAny = false;
-              for (const ach2 of achV6.achievements) {
-                if (ach2.completed) continue;
-                let progress = 0;
-                switch (ach2.requirement.type) {
-                  case "login":
-                    progress = this.gs.loginCount || 1;
-                    break;
-                  case "realm":
-                    progress = this.gs.realmIndex || 0;
-                    break;
-                  case "spirit":
-                    progress = this.gs.totalSpirit || 0;
-                    break;
-                  case "stone":
-                    progress = this.gs.totalSpiritStones || 0;
-                    break;
-                  case "battle":
-                    progress = this.gs.battleCount || 0;
-                    break;
-                  case "quest":
-                    progress = this.gs.questCount || 0;
-                    break;
-                  case "signin":
-                    progress = this.gs.signinV6 ? this.gs.signinV6.totalCheckins : 0;
-                    break;
-                }
-                ach2.progress = progress;
-                const target = ach2.requirement.count || ach2.requirement.amount || ach2.requirement.level || 1;
-                if (progress >= target) {
-                  ach2.completed = true;
-                  ach2.completedAt = now;
-                  unlockedAny = true;
-                }
-              }
-              const completedCount2 = achV6.achievements.filter((a) => a.completed).length;
-              return { success: true, unlockedAny, completedCount: completedCount2 };
-            }
-            const ach = achV6.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210\uFF0C\u65E0\u9700\u91CD\u590D\u89E3\u9501" };
-            ach.completed = true;
-            ach.completedAt = now;
-            const completedCount = achV6.achievements.filter((a) => a.completed).length;
-            return { success: true, achievementId, completedCount };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 领取成就奖励 (V195/V203)
-         */
-        mcpAchievementRewardV6(achievementId) {
-          try {
-            const achV6 = this._initAchievementStateV6();
-            if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
-            const ach = achV6.achievements.find((a) => a.id === achievementId);
-            if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
-            if (!ach.completed) return { error: "\u6210\u5C31\u672A\u5B8C\u6210\uFF0C\u65E0\u6CD5\u9886\u53D6\u5956\u52B1" };
-            if (ach.rewardClaimed) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
-            let rewardMessage = "";
-            switch (ach.reward.type) {
-              case "spiritStone":
-                this.gs.spiritStones = (this.gs.spiritStones || 0) + ach.reward.amount;
-                rewardMessage = "\u7075\u77F3x" + ach.reward.amount;
-                break;
-              case "reputation":
-                this.gs.reputation = (this.gs.reputation || 0) + ach.reward.amount;
-                rewardMessage = "\u58F0\u671Bx" + ach.reward.amount;
-                break;
-            }
-            ach.rewardClaimed = true;
-            return { success: true, achievementId, reward: ach.reward, rewardMessage };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取成就统计信息
-         */
-        getAchievementStats() {
-          const achV6 = this._initAchievementStateV6();
-          const achievements = achV6.achievements;
-          const stats = {
-            total: achievements.length,
-            completed: achievements.filter((a) => a.completed).length,
-            inProgress: achievements.filter((a) => !a.completed && a.progress > 0).length,
-            notStarted: achievements.filter((a) => !a.completed && a.progress === 0).length,
-            rewardsClaimed: achievements.filter((a) => a.rewardClaimed).length,
-            byCategory: {}
-          };
-          const categories = [...new Set(achievements.map((a) => a.category))];
-          for (const cat of categories) {
-            const catAchievements = achievements.filter((a) => a.category === cat);
-            stats.byCategory[cat] = {
-              total: catAchievements.length,
-              completed: catAchievements.filter((a) => a.completed).length
-            };
-          }
-          return stats;
-        }
-      };
-      module.exports = {
-        AchievementService,
-        ACHIEVEMENT_CONFIG,
-        ACHIEVEMENT_STATE_INITIALIZERS
-      };
-    }
-  });
-
-  // src/domains/achievement/services/BadgeService.js
-  var BadgeService_exports = {};
-  var Badge2, BadgeRarity2, BadgeType2, BADGE_POOL2, RARITY_ORDER2, MAX_EQUIPPED_BADGES2, BADGE_STATE_INITIALIZERS, BadgeService;
-  var init_BadgeService = __esm({
-    "src/domains/achievement/services/BadgeService.js"() {
-      ({ Badge: Badge2, BadgeRarity: BadgeRarity2, BadgeType: BadgeType2, BADGE_POOL: BADGE_POOL2, RARITY_ORDER: RARITY_ORDER2 } = (init_Badge(), __toCommonJS(Badge_exports)));
-      MAX_EQUIPPED_BADGES2 = 3;
-      BADGE_STATE_INITIALIZERS = {
-        V114: "_initBadgeState",
-        V137: "_initBadgeState",
-        V155: "_initBadgeStateV2",
-        V165: "_initBadgeStateV3",
-        V175: "_initBadgeStateV4",
-        V185: "_initBadgeStateV5",
-        V195: "_initBadgeStateV6",
-        V203: "_initBadgeStateV7"
-      };
-      BadgeService = class {
-        constructor(gameState3) {
-          this.gs = gameState3;
-        }
-        /**
-         * 初始化徽章状态 (V114/V137基础版)
-         */
-        _initBadgeState() {
-          if (!this.gs.badge) {
-            this.gs.badge = {
-              badges: [...BADGE_POOL2].map((b) => ({ ...b, obtained: false, equipped: false, obtainedAt: null })),
-              equippedBadges: []
-            };
-          }
-          return this.gs.badge;
-        }
-        /**
-         * 初始化徽章状态V2 (V155)
-         */
-        _initBadgeStateV2() {
-          if (!this.gs.badgeV2) {
-            this.gs.badgeV2 = {
-              badges: [...BADGE_POOL2].map((b) => ({ ...b, obtained: false, equipped: false, obtainedAt: null })),
-              totalBadges: 0,
-              equippedBadges: []
-            };
-            this.gs.badgeV2.totalBadges = this.gs.badgeV2.badges.length;
-          }
-          return this.gs.badgeV2;
-        }
-        /**
-         * 初始化徽章状态V3 (V165)
-         */
-        _initBadgeStateV3() {
-          if (!this.gs.badgeV3) {
-            this.gs.badgeV3 = {
-              badges: [...BADGE_POOL2].map((b) => ({
-                ...b,
-                obtained: false,
-                equipped: false,
-                obtainedAt: null
-              })),
-              totalBadges: 0,
-              equippedBadges: []
-            };
-            this.gs.badgeV3.totalBadges = this.gs.badgeV3.badges.length;
-          }
-          return this.gs.badgeV3;
-        }
-        /**
-         * 初始化徽章状态V6 (V195)
-         */
-        _initBadgeStateV6() {
-          if (!this.gs.badgeV6) {
-            this.gs.badgeV6 = {
-              badges: [
-                { id: "badge_first_login_v6", name: "\u521D\u5165\u4ED9\u9014v6", description: "\u9996\u6B21\u767B\u5F55\u6E38\u620F", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_realm_qi_v6", name: "\u70BC\u6C14\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u70BC\u6C14\u671F", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_realm_zhu_v6", name: "\u7B51\u57FA\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u7B51\u57FA\u671F", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_realm_jin_v6", name: "\u91D1\u4E39\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u91D1\u4E39\u671F", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_realm_yuan_v6", name: "\u5143\u5A74\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u5143\u5A74\u671F", rarity: "epic", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_spirit_rich_v6", name: "\u7075\u6C14\u5145\u88D5v6", description: "\u7D2F\u8BA1\u83B7\u5F971000\u7075\u6C14", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_battle_master_v6", name: "\u6218\u6597\u8FBE\u4EBAv6", description: "\u5B8C\u6210100\u6B21\u6218\u6597", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_quest_master_v6", name: "\u4EFB\u52A1\u8FBE\u4EBAv6", description: "\u5B8C\u621050\u4E2A\u4EFB\u52A1", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_signin_30_v6", name: "\u7B7E\u5230\u4E4B\u661Fv6", description: "\u7D2F\u8BA1\u7B7E\u523030\u5929", rarity: "epic", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_wealth_v6", name: "\u5BCC\u7532\u4E00\u65B9v6", description: "\u7D2F\u8BA1\u83B7\u5F9710000\u7075\u77F3", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_legend_v6", name: "\u4F20\u8BF4\u4FEE\u58EBv6", description: "\u7D2F\u8BA1\u83B7\u5F9750000\u7075\u77F3", rarity: "legendary", obtained: false, equipped: false, obtainedAt: null },
-                { id: "badge_rare_collector_v6", name: "\u7A00\u6709\u6536\u85CF\u5BB6v6", description: "\u6536\u96C65\u4E2A\u7A00\u6709\u5FBD\u7AE0", rarity: "epic", obtained: false, equipped: false, obtainedAt: null }
-              ],
-              totalBadges: 0,
-              equippedBadges: []
-            };
-            this.gs.badgeV6.totalBadges = this.gs.badgeV6.badges.length;
-          }
-          return this.gs.badgeV6;
-        }
-        /**
-         * 获取徽章列表 (V114/V137基础版)
-         */
-        mcpBadgeList() {
-          try {
-            const badge = this._initBadgeState();
-            return {
-              success: true,
-              badges: badge.badges,
-              total: badge.badges.length,
-              equippedCount: badge.equippedBadges.length
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 装备徽章 (V114/V137基础版)
-         */
-        mcpBadgeEquip(badgeId) {
-          try {
-            const badge = this._initBadgeState();
-            const b = badge.badges.find((b2) => b2.id === badgeId);
-            if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-            if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
-            if (b.equipped) {
-              b.equipped = false;
-              badge.equippedBadges = badge.equippedBadges.filter((id) => id !== badgeId);
-              return { success: true, badgeId, equipped: false };
-            }
-            if (badge.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
-              return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0" };
-            }
-            b.equipped = true;
-            badge.equippedBadges.push(badgeId);
-            return { success: true, badgeId, equipped: true };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 卸下徽章 (V114/V137基础版)
-         */
-        mcpBadgeUnequip() {
-          try {
-            const badge = this._initBadgeState();
-            const equipped = badge.badges.find((b) => b.equipped);
-            if (!equipped) return { error: "\u6CA1\u6709\u88C5\u5907\u7684\u5FBD\u7AE0" };
-            equipped.equipped = false;
-            badge.equippedBadges = badge.equippedBadges.filter((id) => id !== equipped.id);
-            return { success: true, badgeId: equipped.id };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取徽章列表V2 (V155)
-         */
-        mcpBadgeListV2() {
-          try {
-            const badgeV2 = this._initBadgeStateV2();
-            return {
-              success: true,
-              badges: badgeV2.badges.map((b) => ({
-                id: b.id,
-                name: b.name,
-                description: b.description,
-                rarity: b.rarity,
-                effect: b.effect,
-                obtained: b.obtained,
-                equipped: b.equipped
-              })),
-              totalBadges: badgeV2.totalBadges,
-              equippedCount: badgeV2.equippedBadges.length
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 装备徽章V2 (V155)
-         */
-        mcpBadgeEquipV2(badgeId) {
-          try {
-            const badgeV2 = this._initBadgeStateV2();
-            const b = badgeV2.badges.find((b2) => b2.id === badgeId);
-            if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-            if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
-            if (b.equipped) {
-              b.equipped = false;
-              badgeV2.equippedBadges = badgeV2.equippedBadges.filter((id) => id !== badgeId);
-              return { success: true, badgeId, equipped: false };
-            }
-            if (badgeV2.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
-              return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0" };
-            }
-            b.equipped = true;
-            badgeV2.equippedBadges.push(badgeId);
-            return { success: true, badgeId, equipped: true };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 卸下徽章V2 (V155)
-         */
-        mcpBadgeUnequipV2(badgeId) {
-          try {
-            const badgeV2 = this._initBadgeStateV2();
-            if (badgeId) {
-              const b = badgeV2.badges.find((b2) => b2.id === badgeId);
-              if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-              b.equipped = false;
-              badgeV2.equippedBadges = badgeV2.equippedBadges.filter((id) => id !== badgeId);
-              return { success: true, badgeId };
-            }
-            for (const b of badgeV2.badges) {
-              if (b.equipped) b.equipped = false;
-            }
-            badgeV2.equippedBadges = [];
-            return { success: true };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取徽章列表V3 (V165)
-         */
-        mcpBadgeListV3() {
-          try {
-            const badgeV3 = this._initBadgeStateV3();
-            return {
-              success: true,
-              badges: badgeV3.badges.map((b) => ({
-                id: b.id,
-                name: b.name,
-                description: b.description,
-                rarity: b.rarity,
-                effect: b.effect,
-                obtained: b.obtained,
-                equipped: b.equipped,
-                obtainedAt: b.obtainedAt
-              })),
-              totalBadges: badgeV3.totalBadges,
-              obtainedCount: badgeV3.badges.filter((b) => b.obtained).length,
-              equippedCount: badgeV3.equippedBadges.length
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 装备徽章V3 (V165)
-         */
-        mcpBadgeEquipV3(badgeId) {
-          try {
-            const badgeV3 = this._initBadgeStateV3();
-            const b = badgeV3.badges.find((b2) => b2.id === badgeId);
-            if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-            if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
-            if (b.equipped) {
-              b.equipped = false;
-              badgeV3.equippedBadges = badgeV3.equippedBadges.filter((id) => id !== badgeId);
-              return { success: true, badgeId, equipped: false, equippedBadges: badgeV3.equippedBadges };
-            }
-            if (badgeV3.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
-              return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0\uFF0C\u8BF7\u5148\u5378\u4E0B\u4E00\u4E2A" };
-            }
-            b.equipped = true;
-            badgeV3.equippedBadges.push(badgeId);
-            return { success: true, badgeId, equipped: true, equippedBadges: badgeV3.equippedBadges };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 获取徽章列表V6 (V195/V203)
-         */
-        mcpBadgeListV6(filter = "all") {
-          try {
-            const badgeV6 = this._initBadgeStateV6();
-            let badges = badgeV6.badges;
-            if (filter === "obtained") {
-              badges = badges.filter((b) => b.obtained);
-            } else if (filter === "equipped") {
-              badges = badges.filter((b) => b.equipped);
-            }
-            const obtainedCount = badgeV6.badges.filter((b) => b.obtained).length;
-            const equippedCount = badgeV6.badges.filter((b) => b.equipped).length;
-            return {
-              success: true,
-              badges: badges.map((b) => ({
-                id: b.id,
-                name: b.name,
-                description: b.description,
-                rarity: b.rarity,
-                obtained: b.obtained,
-                equipped: b.equipped,
-                obtainedAt: b.obtainedAt
-              })),
-              totalBadges: badgeV6.totalBadges,
-              obtainedCount,
-              equippedCount
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 装备徽章V6 (V195/V203)
-         */
-        mcpBadgeEquipV6(badgeId) {
-          try {
-            const badgeV6 = this._initBadgeStateV6();
-            if (!badgeId) return { error: "\u8BF7\u6307\u5B9A\u5FBD\u7AE0ID" };
-            const badge = badgeV6.badges.find((b) => b.id === badgeId);
-            if (!badge) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-            if (!badge.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
-            if (badge.equipped) {
-              badge.equipped = false;
-              badgeV6.equippedBadges = badgeV6.equippedBadges.filter((id) => id !== badgeId);
-              return { success: true, badgeId, equipped: false, equippedBadges: badgeV6.equippedBadges };
-            }
-            if (badgeV6.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
-              return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0\uFF0C\u8BF7\u5148\u5378\u4E0B\u4E00\u4E2A" };
-            }
-            badge.equipped = true;
-            badgeV6.equippedBadges.push(badgeId);
-            return { success: true, badgeId, equipped: true, equippedBadges: badgeV6.equippedBadges };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 徽章展示V8 (V213)
-         */
-        mcpBadgeShowV8(badgeId) {
-          try {
-            const badgeV6 = this._initBadgeStateV6();
-            if (!badgeId) return { error: "\u8BF7\u6307\u5B9A\u5FBD\u7AE0ID" };
-            const badge = badgeV6.badges.find((b) => b.id === badgeId);
-            if (!badge) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-            return {
-              success: true,
-              badge: {
-                id: badge.id,
-                name: badge.name,
-                description: badge.description,
-                rarity: badge.rarity,
-                effect: badge.effect,
-                obtained: badge.obtained,
-                equipped: badge.equipped
-              },
-              message: badge.obtained ? badge.name + " - " + badge.effect : "\u5FBD\u7AE0\u672A\u83B7\u53D6"
-            };
-          } catch (e) {
-            return { error: e.message };
-          }
-        }
-        /**
-         * 授予徽章（内部方法，用于成就奖励等）
-         */
-        grantBadge(badgeId) {
-          const badgeV6 = this._initBadgeStateV6();
-          const badge = badgeV6.badges.find((b) => b.id === badgeId);
-          if (!badge) return { success: false, message: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
-          if (badge.obtained) return { success: false, message: "\u5FBD\u7AE0\u5DF2\u83B7\u53D6" };
-          badge.obtained = true;
-          badge.obtainedAt = (/* @__PURE__ */ new Date()).toISOString();
-          return { success: true, badgeId, message: "\u83B7\u5F97\u5FBD\u7AE0: " + badge.name };
-        }
-        /**
-         * 获取已装备徽章的效果加成
-         */
-        getEquippedBadgeEffects() {
-          const badgeV6 = this._initBadgeStateV6();
-          const equippedBadges = badgeV6.badges.filter((b) => b.equipped);
-          const effects = {
-            statBonus: {},
-            spiritBonus: 0,
-            stoneBonus: 0,
-            battleStatBonus: 0,
-            critRateBonus: 0,
-            cultivationSpeedBonus: 0
-          };
-          for (const badge of equippedBadges) {
-            if (badge.effectType === "stat_bonus" && badge.stats) {
-              for (const [stat, value] of Object.entries(badge.stats)) {
-                effects.statBonus[stat] = (effects.statBonus[stat] || 0) + value;
-              }
-            }
-            if (badge.effectType === "spirit_rate") effects.spiritBonus += badge.effectValue || 0;
-            if (badge.effectType === "stone_rate") effects.stoneBonus += badge.effectValue || 0;
-            if (badge.effectType === "battle_stat") effects.battleStatBonus += badge.effectValue || 0;
-            if (badge.effectType === "crit_rate") effects.critRateBonus += badge.effectValue || 0;
-            if (badge.effectType === "cultivation_speed") effects.cultivationSpeedBonus += badge.effectValue || 0;
-          }
-          return effects;
-        }
-        /**
-         * 获取徽章统计信息
-         */
-        getBadgeStats() {
-          const badgeV6 = this._initBadgeStateV6();
-          const badges = badgeV6.badges;
-          const stats = {
-            total: badges.length,
-            obtained: badges.filter((b) => b.obtained).length,
-            equipped: badges.filter((b) => b.equipped).length,
-            byRarity: {}
-          };
-          const rarities = Object.values(BadgeRarity2);
-          for (const rarity of rarities) {
-            const rarityBadges = badges.filter((b) => b.rarity === rarity);
-            stats.byRarity[rarity] = {
-              total: rarityBadges.length,
-              obtained: rarityBadges.filter((b) => b.obtained).length
-            };
-          }
-          return stats;
-        }
-        /**
-         * 检查是否满足稀有收藏家成就条件
-         */
-        checkRareCollectorAchievement() {
-          const badgeV6 = this._initBadgeStateV6();
-          const rareObtained = badgeV6.badges.filter((b) => b.rarity === "rare" && b.obtained).length;
-          return rareObtained >= 5;
-        }
-      };
-      module.exports = {
-        BadgeService,
-        MAX_EQUIPPED_BADGES: MAX_EQUIPPED_BADGES2,
-        BADGE_STATE_INITIALIZERS
-      };
     }
   });
 
   // src/domains/pet/entities/Pet.js
   var Pet_exports = {};
+  __export(Pet_exports, {
+    EvolutionStages: () => EvolutionStages,
+    PET_RARITY: () => PET_RARITY,
+    PET_SPECIES_CONFIG: () => PET_SPECIES_CONFIG,
+    PET_TYPES: () => PET_TYPES,
+    Pet: () => Pet,
+    PetAttributes: () => PetAttributes,
+    PetBattleStats: () => PetBattleStats,
+    PetForms: () => PetForms,
+    RARITY_COLORS: () => RARITY_COLORS2,
+    RARITY_POWER_MULT: () => RARITY_POWER_MULT
+  });
   var PetAttributes, PetBattleStats, EvolutionStages, PetForms, Pet, PET_TYPES, PET_RARITY, RARITY_COLORS2, RARITY_POWER_MULT, PET_SPECIES_CONFIG;
   var init_Pet = __esm({
     "src/domains/pet/entities/Pet.js"() {
@@ -2906,18 +2023,6 @@ var CultivationSimulator = (() => {
         "\u767D\u864E": { attack: 18, defense: 12, speed: 10, rarity: "legendary" },
         "\u91D1\u9E4F": { attack: 20, defense: 8, speed: 18, rarity: "mythic" }
       };
-      module.exports = {
-        Pet,
-        PetAttributes,
-        PetBattleStats,
-        EvolutionStages,
-        PetForms,
-        PET_TYPES,
-        PET_RARITY,
-        RARITY_COLORS: RARITY_COLORS2,
-        RARITY_POWER_MULT,
-        PET_SPECIES_CONFIG
-      };
     }
   });
 
@@ -2980,19 +2085,19 @@ var CultivationSimulator = (() => {
   };
 
   // src/domains/cultivation/CultivationModule.js
-  var { CultivationEntity: CultivationEntity3 } = (init_CultivationEntity(), __toCommonJS(CultivationEntity_exports));
-  var { SpiritRootEntity: SpiritRootEntity3, TIER_MAP: TIER_MAP2, ROOT_TYPES: ROOT_TYPES2, ROOT_TYPE_NAMES: ROOT_TYPE_NAMES2, TIER_BONUSES: TIER_BONUSES3 } = (init_SpiritRootEntity(), __toCommonJS(SpiritRootEntity_exports));
+  var { CultivationEntity: CultivationEntity2 } = (init_CultivationEntity(), __toCommonJS(CultivationEntity_exports));
+  var { SpiritRootEntity: SpiritRootEntity2, TIER_MAP: TIER_MAP2, ROOT_TYPES: ROOT_TYPES2, ROOT_TYPE_NAMES: ROOT_TYPE_NAMES2, TIER_BONUSES: TIER_BONUSES2 } = (init_SpiritRootEntity(), __toCommonJS(SpiritRootEntity_exports));
   var { CultivationService: CultivationService2, TRIBULATIONS: TRIBULATIONS2, BLESSING_TYPES: BLESSING_TYPES2 } = (init_CultivationService(), __toCommonJS(CultivationService_exports));
   function createCultivationModule(gameState3) {
     const cultivationService = new CultivationService2(gameState3);
     return {
       // 实体
-      CultivationEntity: CultivationEntity3,
-      SpiritRootEntity: SpiritRootEntity3,
+      CultivationEntity: CultivationEntity2,
+      SpiritRootEntity: SpiritRootEntity2,
       TIER_MAP: TIER_MAP2,
       ROOT_TYPES: ROOT_TYPES2,
       ROOT_TYPE_NAMES: ROOT_TYPE_NAMES2,
-      TIER_BONUSES: TIER_BONUSES3,
+      TIER_BONUSES: TIER_BONUSES2,
       // 服务
       cultivationService,
       // 配置
@@ -3016,22 +2121,6 @@ var CultivationSimulator = (() => {
       getSummary: () => cultivationService.getSummary(),
       getCultivationEntity: () => cultivationService.getCultivationEntity(),
       getSpiritRootEntity: () => cultivationService.getSpiritRootEntity()
-    };
-  }
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = { createCultivationModule, CultivationEntity: CultivationEntity3, SpiritRootEntity: SpiritRootEntity3, CultivationService: CultivationService2, TIER_MAP: TIER_MAP2, ROOT_TYPES: ROOT_TYPES2, ROOT_TYPE_NAMES: ROOT_TYPE_NAMES2, TIER_BONUSES: TIER_BONUSES3, TRIBULATIONS: TRIBULATIONS2, BLESSING_TYPES: BLESSING_TYPES2 };
-  } else {
-    window.CultivationModule = {
-      createCultivationModule,
-      CultivationEntity: CultivationEntity3,
-      SpiritRootEntity: SpiritRootEntity3,
-      CultivationService: CultivationService2,
-      TIER_MAP: TIER_MAP2,
-      ROOT_TYPES: ROOT_TYPES2,
-      ROOT_TYPE_NAMES: ROOT_TYPE_NAMES2,
-      TIER_BONUSES: TIER_BONUSES3,
-      TRIBULATIONS: TRIBULATIONS2,
-      BLESSING_TYPES: BLESSING_TYPES2
     };
   }
 
@@ -3073,25 +2162,861 @@ var CultivationSimulator = (() => {
       getPlayerEntity: () => playerService.getPlayerEntity()
     };
   }
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = { createPlayerModule, PlayerEntity: PlayerEntity3, PlayerService: PlayerService2, REALMS: REALMS3, STAGES: STAGES3, STAGE_NAMES: STAGE_NAMES2 };
-  } else {
-    window.PlayerModule = {
-      createPlayerModule,
-      PlayerEntity: PlayerEntity3,
-      PlayerService: PlayerService2,
-      REALMS: REALMS3,
-      STAGES: STAGES3,
-      STAGE_NAMES: STAGE_NAMES2
-    };
-  }
 
   // src/domains/achievement/AchievementModule.js
-  var { Achievement: Achievement3, AchievementCategory: AchievementCategory3, AchievementRequirementType: AchievementRequirementType3, AchievementRewardType: AchievementRewardType2, ACHIEVEMENT_POOL: ACHIEVEMENT_POOL3 } = (init_Achievement(), __toCommonJS(Achievement_exports));
-  var { Badge: Badge3, BadgeRarity: BadgeRarity3, BadgeType: BadgeType3, BADGE_POOL: BADGE_POOL3, MAX_EQUIPPED_BADGES: MAX_EQUIPPED_BADGES3 } = (init_Badge(), __toCommonJS(Badge_exports));
-  var { AchievementService: AchievementService2 } = (init_AchievementService(), __toCommonJS(AchievementService_exports));
-  var { BadgeService: BadgeService2 } = (init_BadgeService(), __toCommonJS(BadgeService_exports));
-  var ACHIEVEMENT_STATE_INITIALIZERS2 = {
+  init_Achievement();
+  init_Badge();
+
+  // src/domains/achievement/services/AchievementService.js
+  var { Achievement: Achievement2, AchievementCategory: AchievementCategory2, AchievementRequirementType: AchievementRequirementType2, ACHIEVEMENT_POOL: ACHIEVEMENT_POOL2 } = (init_Achievement(), __toCommonJS(Achievement_exports));
+  var AchievementService = class {
+    constructor(gameState3) {
+      this.gs = gameState3;
+    }
+    /**
+     * 初始化成就状态 (V114基础版)
+     */
+    _initAchievementState() {
+      if (!this.gs.achievement) {
+        this.gs.achievement = {
+          unlocked: [],
+          rewardsClaimed: [],
+          achievementPool: [...ACHIEVEMENT_POOL2]
+        };
+      }
+      return this.gs.achievement;
+    }
+    /**
+     * 初始化成就状态V2 (V155)
+     */
+    _initAchievementStateV2() {
+      if (!this.gs.achievementV2) {
+        this.gs.achievementV2 = {
+          achievements: [...ACHIEVEMENT_POOL2].map((a) => ({ ...a, progress: 0, completed: false, completedAt: null, rewardClaimed: false })),
+          totalAchievements: 0,
+          completedCount: 0
+        };
+        this.gs.achievementV2.totalAchievements = this.gs.achievementV2.achievements.length;
+      }
+      return this.gs.achievementV2;
+    }
+    /**
+     * 初始化成就状态V3 (V165)
+     */
+    _initAchievementStateV3() {
+      if (!this.gs.achievementV3) {
+        this.gs.achievementV3 = {
+          achievements: [...ACHIEVEMENT_POOL2].map((a) => ({
+            ...a,
+            progress: 0,
+            completed: false,
+            completedAt: null,
+            reward: a.reward || { type: "spiritStone", amount: 100 }
+          })),
+          totalAchievements: 0,
+          completedCount: 0
+        };
+        this.gs.achievementV3.totalAchievements = this.gs.achievementV3.achievements.length;
+      }
+      return this.gs.achievementV3;
+    }
+    /**
+     * 初始化成就状态V6 (V195)
+     */
+    _initAchievementStateV6() {
+      if (!this.gs.achievementV6) {
+        this.gs.achievementV6 = {
+          achievements: [
+            { id: "ach_first_login_v6", name: "\u521D\u5165\u4ED9\u9014v6", description: "\u9996\u6B21\u767B\u5F55\u6E38\u620F", category: "beginner", requirement: { type: "login", count: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 100 } },
+            { id: "ach_realm_qi_v6", name: "\u70BC\u6C14\u521D\u671Fv6", description: "\u5883\u754C\u8FBE\u5230\u70BC\u6C14\u521D\u671F", category: "realm", requirement: { type: "realm", level: 1 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
+            { id: "ach_realm_zhu_v6", name: "\u7B51\u57FA\u6210\u529Fv6", description: "\u5883\u754C\u8FBE\u5230\u7B51\u57FA", category: "realm", requirement: { type: "realm", level: 2 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 500 } },
+            { id: "ach_realm_jin_v6", name: "\u91D1\u4E39\u5927\u9053v6", description: "\u5883\u754C\u8FBE\u5230\u91D1\u4E39", category: "realm", requirement: { type: "realm", level: 3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } },
+            { id: "ach_realm_yuan_v6", name: "\u5143\u5A74\u7A81\u7834v6", description: "\u5883\u754C\u8FBE\u5230\u5143\u5A74", category: "realm", requirement: { type: "realm", level: 4 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 2e3 } },
+            { id: "ach_spirit_1000_v6", name: "\u7075\u6C14\u5145\u88D5v6", description: "\u7D2F\u8BA1\u83B7\u5F971000\u7075\u6C14", category: "resource", requirement: { type: "spirit", amount: 1e3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 300 } },
+            { id: "ach_stone_5000_v6", name: "\u5BCC\u7532\u4E00\u65B9v6", description: "\u7D2F\u8BA1\u83B7\u5F975000\u7075\u77F3", category: "resource", requirement: { type: "stone", amount: 5e3 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 500 } },
+            { id: "ach_stone_50000_v6", name: "\u8170\u7F20\u4E07\u8D2Fv6", description: "\u7D2F\u8BA1\u83B7\u5F9750000\u7075\u77F3", category: "resource", requirement: { type: "stone", amount: 5e4 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 2e3 } },
+            { id: "ach_battle_10_v6", name: "\u521D\u8BD5\u950B\u8292v6", description: "\u5B8C\u621010\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 10 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
+            { id: "ach_battle_50_v6", name: "\u6218\u6597\u8FBE\u4EBAv6", description: "\u5B8C\u621050\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 50 }, progress: 0, completed: false, completedAt: null, reward: { type: "reputation", amount: 50 } },
+            { id: "ach_battle_100_v6", name: "\u767E\u6218\u767E\u80DCv6", description: "\u5B8C\u6210100\u6B21\u6218\u6597", category: "battle", requirement: { type: "battle", count: 100 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } },
+            { id: "ach_quest_5_v6", name: "\u4EFB\u52A1\u8FBE\u4EBAv6", description: "\u5B8C\u62105\u4E2A\u4EFB\u52A1", category: "quest", requirement: { type: "quest", count: 5 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 300 } },
+            { id: "ach_quest_20_v6", name: "\u4EFB\u52A1\u5927\u5E08v6", description: "\u5B8C\u621020\u4E2A\u4EFB\u52A1", category: "quest", requirement: { type: "quest", count: 20 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 800 } },
+            { id: "ach_signin_7_v6", name: "\u8FDE\u7EED\u7B7E\u5230v6", description: "\u7D2F\u8BA1\u7B7E\u52307\u5929", category: "activity", requirement: { type: "signin", days: 7 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 200 } },
+            { id: "ach_signin_30_v6", name: "\u7B7E\u5230\u4E4B\u661Fv6", description: "\u7D2F\u8BA1\u7B7E\u523030\u5929", category: "activity", requirement: { type: "signin", days: 30 }, progress: 0, completed: false, completedAt: null, reward: { type: "spiritStone", amount: 1e3 } }
+          ],
+          totalAchievements: 0,
+          completedCount: 0
+        };
+        this.gs.achievementV6.totalAchievements = this.gs.achievementV6.achievements.length;
+      }
+      return this.gs.achievementV6;
+    }
+    /**
+     * 获取成就列表 (V114/V124基础版)
+     */
+    mcpAchievementList() {
+      try {
+        const achievement = this._initAchievementState();
+        return {
+          success: true,
+          achievements: achievement.achievementPool,
+          total: achievement.achievementPool.length,
+          unlocked: achievement.unlocked.length
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 领取成就奖励 (V114/V124基础版)
+     */
+    mcpAchievementClaim(achievementId) {
+      try {
+        const achievement = this._initAchievementState();
+        const idx = achievement.unlocked.indexOf(achievementId);
+        if (idx === -1) return { error: "\u6210\u5C31\u672A\u89E3\u9501" };
+        if (achievement.rewardsClaimed.includes(achievementId)) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
+        const ach = achievement.achievementPool.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        achievement.rewardsClaimed.push(achievementId);
+        return { success: true, achievementId, reward: ach.reward };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取成就列表 (V137/V155/V165)
+     */
+    mcpAchievementListV2() {
+      try {
+        const achV2 = this._initAchievementStateV2();
+        return {
+          success: true,
+          achievements: achV2.achievements,
+          totalAchievements: achV2.totalAchievements,
+          completedCount: achV2.completedCount
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 查看成就详情 (V155)
+     */
+    mcpAchievementViewV2(achievementId) {
+      try {
+        const achV2 = this._initAchievementStateV2();
+        const ach = achV2.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        return { success: true, achievement: ach };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 解锁成就 (V155)
+     */
+    mcpAchievementUnlockV2(achievementId) {
+      try {
+        const achV2 = this._initAchievementStateV2();
+        const ach = achV2.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210" };
+        ach.completed = true;
+        ach.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+        achV2.completedCount = achV2.achievements.filter((a) => a.completed).length;
+        return { success: true, achievementId, message: "\u6210\u5C31\u89E3\u9501: " + ach.name };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取成就列表 (V165)
+     */
+    mcpAchievementListV3() {
+      try {
+        const achV3 = this._initAchievementStateV3();
+        return {
+          success: true,
+          achievements: achV3.achievements.map((a) => ({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            category: a.category,
+            progress: a.progress,
+            completed: a.completed,
+            reward: a.reward
+          })),
+          totalAchievements: achV3.totalAchievements,
+          completedCount: achV3.completedCount
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 查看成就详情 (V165)
+     */
+    mcpAchievementViewV3(achievementId) {
+      try {
+        const achV3 = this._initAchievementStateV3();
+        const ach = achV3.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        return { success: true, achievement: ach };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 解锁成就 (V165)
+     */
+    mcpAchievementUnlockV3(achievementId) {
+      try {
+        const achV3 = this._initAchievementStateV3();
+        if (!achievementId) {
+          let unlockedAny = false;
+          for (const ach2 of achV3.achievements) {
+            if (ach2.completed) continue;
+            let progress = 0;
+            switch (ach2.requirement.type) {
+              case "login":
+                progress = this.gs.loginCount || 1;
+                break;
+              case "realm":
+                progress = this.gs.realmIndex || 0;
+                break;
+              case "spirit":
+                progress = this.gs.totalSpirit || 0;
+                break;
+              case "stone":
+                progress = this.gs.totalSpiritStones || 0;
+                break;
+              case "battle":
+                progress = this.gs.battleCount || 0;
+                break;
+              case "quest":
+                progress = this.gs.questCount || 0;
+                break;
+              case "signin":
+                progress = this.gs.signinV6 ? this.gs.signinV6.totalCheckins : 0;
+                break;
+            }
+            ach2.progress = progress;
+            if (progress >= (ach2.requirement.count || ach2.requirement.amount || ach2.requirement.level || 1)) {
+              ach2.completed = true;
+              ach2.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+              unlockedAny = true;
+            }
+          }
+          achV3.completedCount = achV3.achievements.filter((a) => a.completed).length;
+          return { success: true, unlockedAny, completedCount: achV3.completedCount };
+        }
+        const ach = achV3.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210\uFF0C\u65E0\u9700\u91CD\u590D\u89E3\u9501" };
+        ach.completed = true;
+        ach.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+        achV3.completedCount = achV3.achievements.filter((a) => a.completed).length;
+        return { success: true, achievementId, completedCount: achV3.completedCount };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 领取成就奖励 (V165)
+     */
+    mcpAchievementRewardV3(achievementId) {
+      try {
+        const achV3 = this._initAchievementStateV3();
+        if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
+        const ach = achV3.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        if (!ach.completed) return { error: "\u6210\u5C31\u672A\u5B8C\u6210\uFF0C\u65E0\u6CD5\u9886\u53D6\u5956\u52B1" };
+        if (ach.rewardClaimed) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
+        let rewardMessage = "";
+        switch (ach.reward.type) {
+          case "spiritStone":
+            this.gs.spiritStones = (this.gs.spiritStones || 0) + ach.reward.amount;
+            rewardMessage = "\u7075\u77F3x" + ach.reward.amount;
+            break;
+          case "reputation":
+            this.gs.reputation = (this.gs.reputation || 0) + ach.reward.amount;
+            rewardMessage = "\u58F0\u671Bx" + ach.reward.amount;
+            break;
+        }
+        ach.rewardClaimed = true;
+        return { success: true, achievementId, reward: ach.reward, rewardMessage };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取成就列表 (V195/V203)
+     */
+    mcpAchievementListV6(category = "all") {
+      try {
+        const achV6 = this._initAchievementStateV6();
+        let achievements = achV6.achievements;
+        if (category && category !== "all") {
+          achievements = achievements.filter((a) => a.category === category);
+        }
+        const completedCount = achV6.achievements.filter((a) => a.completed).length;
+        return {
+          success: true,
+          achievements: achievements.map((a) => ({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            category: a.category,
+            requirement: a.requirement,
+            progress: a.progress,
+            completed: a.completed,
+            completedAt: a.completedAt,
+            reward: a.reward
+          })),
+          totalAchievements: achV6.totalAchievements,
+          completedCount
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 查看成就详情 (V195/V203)
+     */
+    mcpAchievementViewV6(achievementId) {
+      try {
+        const achV6 = this._initAchievementStateV6();
+        if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
+        const ach = achV6.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        return { success: true, achievement: ach };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 解锁成就 (V195/V203)
+     */
+    mcpAchievementUnlockV6(achievementId) {
+      try {
+        const achV6 = this._initAchievementStateV6();
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        if (!achievementId) {
+          let unlockedAny = false;
+          for (const ach2 of achV6.achievements) {
+            if (ach2.completed) continue;
+            let progress = 0;
+            switch (ach2.requirement.type) {
+              case "login":
+                progress = this.gs.loginCount || 1;
+                break;
+              case "realm":
+                progress = this.gs.realmIndex || 0;
+                break;
+              case "spirit":
+                progress = this.gs.totalSpirit || 0;
+                break;
+              case "stone":
+                progress = this.gs.totalSpiritStones || 0;
+                break;
+              case "battle":
+                progress = this.gs.battleCount || 0;
+                break;
+              case "quest":
+                progress = this.gs.questCount || 0;
+                break;
+              case "signin":
+                progress = this.gs.signinV6 ? this.gs.signinV6.totalCheckins : 0;
+                break;
+            }
+            ach2.progress = progress;
+            const target = ach2.requirement.count || ach2.requirement.amount || ach2.requirement.level || 1;
+            if (progress >= target) {
+              ach2.completed = true;
+              ach2.completedAt = now;
+              unlockedAny = true;
+            }
+          }
+          const completedCount2 = achV6.achievements.filter((a) => a.completed).length;
+          return { success: true, unlockedAny, completedCount: completedCount2 };
+        }
+        const ach = achV6.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        if (ach.completed) return { error: "\u6210\u5C31\u5DF2\u5B8C\u6210\uFF0C\u65E0\u9700\u91CD\u590D\u89E3\u9501" };
+        ach.completed = true;
+        ach.completedAt = now;
+        const completedCount = achV6.achievements.filter((a) => a.completed).length;
+        return { success: true, achievementId, completedCount };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 领取成就奖励 (V195/V203)
+     */
+    mcpAchievementRewardV6(achievementId) {
+      try {
+        const achV6 = this._initAchievementStateV6();
+        if (!achievementId) return { error: "\u8BF7\u6307\u5B9A\u6210\u5C31ID" };
+        const ach = achV6.achievements.find((a) => a.id === achievementId);
+        if (!ach) return { error: "\u6210\u5C31\u4E0D\u5B58\u5728" };
+        if (!ach.completed) return { error: "\u6210\u5C31\u672A\u5B8C\u6210\uFF0C\u65E0\u6CD5\u9886\u53D6\u5956\u52B1" };
+        if (ach.rewardClaimed) return { error: "\u5956\u52B1\u5DF2\u9886\u53D6" };
+        let rewardMessage = "";
+        switch (ach.reward.type) {
+          case "spiritStone":
+            this.gs.spiritStones = (this.gs.spiritStones || 0) + ach.reward.amount;
+            rewardMessage = "\u7075\u77F3x" + ach.reward.amount;
+            break;
+          case "reputation":
+            this.gs.reputation = (this.gs.reputation || 0) + ach.reward.amount;
+            rewardMessage = "\u58F0\u671Bx" + ach.reward.amount;
+            break;
+        }
+        ach.rewardClaimed = true;
+        return { success: true, achievementId, reward: ach.reward, rewardMessage };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取成就统计信息
+     */
+    getAchievementStats() {
+      const achV6 = this._initAchievementStateV6();
+      const achievements = achV6.achievements;
+      const stats = {
+        total: achievements.length,
+        completed: achievements.filter((a) => a.completed).length,
+        inProgress: achievements.filter((a) => !a.completed && a.progress > 0).length,
+        notStarted: achievements.filter((a) => !a.completed && a.progress === 0).length,
+        rewardsClaimed: achievements.filter((a) => a.rewardClaimed).length,
+        byCategory: {}
+      };
+      const categories = [...new Set(achievements.map((a) => a.category))];
+      for (const cat of categories) {
+        const catAchievements = achievements.filter((a) => a.category === cat);
+        stats.byCategory[cat] = {
+          total: catAchievements.length,
+          completed: catAchievements.filter((a) => a.completed).length
+        };
+      }
+      return stats;
+    }
+  };
+
+  // src/domains/achievement/services/BadgeService.js
+  var { Badge: Badge2, BadgeRarity: BadgeRarity2, BadgeType: BadgeType2, BADGE_POOL: BADGE_POOL2, RARITY_ORDER: RARITY_ORDER2 } = (init_Badge(), __toCommonJS(Badge_exports));
+  var MAX_EQUIPPED_BADGES2 = 3;
+  var BadgeService = class {
+    constructor(gameState3) {
+      this.gs = gameState3;
+    }
+    /**
+     * 初始化徽章状态 (V114/V137基础版)
+     */
+    _initBadgeState() {
+      if (!this.gs.badge) {
+        this.gs.badge = {
+          badges: [...BADGE_POOL2].map((b) => ({ ...b, obtained: false, equipped: false, obtainedAt: null })),
+          equippedBadges: []
+        };
+      }
+      return this.gs.badge;
+    }
+    /**
+     * 初始化徽章状态V2 (V155)
+     */
+    _initBadgeStateV2() {
+      if (!this.gs.badgeV2) {
+        this.gs.badgeV2 = {
+          badges: [...BADGE_POOL2].map((b) => ({ ...b, obtained: false, equipped: false, obtainedAt: null })),
+          totalBadges: 0,
+          equippedBadges: []
+        };
+        this.gs.badgeV2.totalBadges = this.gs.badgeV2.badges.length;
+      }
+      return this.gs.badgeV2;
+    }
+    /**
+     * 初始化徽章状态V3 (V165)
+     */
+    _initBadgeStateV3() {
+      if (!this.gs.badgeV3) {
+        this.gs.badgeV3 = {
+          badges: [...BADGE_POOL2].map((b) => ({
+            ...b,
+            obtained: false,
+            equipped: false,
+            obtainedAt: null
+          })),
+          totalBadges: 0,
+          equippedBadges: []
+        };
+        this.gs.badgeV3.totalBadges = this.gs.badgeV3.badges.length;
+      }
+      return this.gs.badgeV3;
+    }
+    /**
+     * 初始化徽章状态V6 (V195)
+     */
+    _initBadgeStateV6() {
+      if (!this.gs.badgeV6) {
+        this.gs.badgeV6 = {
+          badges: [
+            { id: "badge_first_login_v6", name: "\u521D\u5165\u4ED9\u9014v6", description: "\u9996\u6B21\u767B\u5F55\u6E38\u620F", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_realm_qi_v6", name: "\u70BC\u6C14\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u70BC\u6C14\u671F", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_realm_zhu_v6", name: "\u7B51\u57FA\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u7B51\u57FA\u671F", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_realm_jin_v6", name: "\u91D1\u4E39\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u91D1\u4E39\u671F", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_realm_yuan_v6", name: "\u5143\u5A74\u671F\u4FEE\u58EBv6", description: "\u5883\u754C\u8FBE\u5230\u5143\u5A74\u671F", rarity: "epic", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_spirit_rich_v6", name: "\u7075\u6C14\u5145\u88D5v6", description: "\u7D2F\u8BA1\u83B7\u5F971000\u7075\u6C14", rarity: "common", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_battle_master_v6", name: "\u6218\u6597\u8FBE\u4EBAv6", description: "\u5B8C\u6210100\u6B21\u6218\u6597", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_quest_master_v6", name: "\u4EFB\u52A1\u8FBE\u4EBAv6", description: "\u5B8C\u621050\u4E2A\u4EFB\u52A1", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_signin_30_v6", name: "\u7B7E\u5230\u4E4B\u661Fv6", description: "\u7D2F\u8BA1\u7B7E\u523030\u5929", rarity: "epic", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_wealth_v6", name: "\u5BCC\u7532\u4E00\u65B9v6", description: "\u7D2F\u8BA1\u83B7\u5F9710000\u7075\u77F3", rarity: "rare", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_legend_v6", name: "\u4F20\u8BF4\u4FEE\u58EBv6", description: "\u7D2F\u8BA1\u83B7\u5F9750000\u7075\u77F3", rarity: "legendary", obtained: false, equipped: false, obtainedAt: null },
+            { id: "badge_rare_collector_v6", name: "\u7A00\u6709\u6536\u85CF\u5BB6v6", description: "\u6536\u96C65\u4E2A\u7A00\u6709\u5FBD\u7AE0", rarity: "epic", obtained: false, equipped: false, obtainedAt: null }
+          ],
+          totalBadges: 0,
+          equippedBadges: []
+        };
+        this.gs.badgeV6.totalBadges = this.gs.badgeV6.badges.length;
+      }
+      return this.gs.badgeV6;
+    }
+    /**
+     * 获取徽章列表 (V114/V137基础版)
+     */
+    mcpBadgeList() {
+      try {
+        const badge = this._initBadgeState();
+        return {
+          success: true,
+          badges: badge.badges,
+          total: badge.badges.length,
+          equippedCount: badge.equippedBadges.length
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 装备徽章 (V114/V137基础版)
+     */
+    mcpBadgeEquip(badgeId) {
+      try {
+        const badge = this._initBadgeState();
+        const b = badge.badges.find((b2) => b2.id === badgeId);
+        if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+        if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
+        if (b.equipped) {
+          b.equipped = false;
+          badge.equippedBadges = badge.equippedBadges.filter((id) => id !== badgeId);
+          return { success: true, badgeId, equipped: false };
+        }
+        if (badge.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
+          return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0" };
+        }
+        b.equipped = true;
+        badge.equippedBadges.push(badgeId);
+        return { success: true, badgeId, equipped: true };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 卸下徽章 (V114/V137基础版)
+     */
+    mcpBadgeUnequip() {
+      try {
+        const badge = this._initBadgeState();
+        const equipped = badge.badges.find((b) => b.equipped);
+        if (!equipped) return { error: "\u6CA1\u6709\u88C5\u5907\u7684\u5FBD\u7AE0" };
+        equipped.equipped = false;
+        badge.equippedBadges = badge.equippedBadges.filter((id) => id !== equipped.id);
+        return { success: true, badgeId: equipped.id };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取徽章列表V2 (V155)
+     */
+    mcpBadgeListV2() {
+      try {
+        const badgeV2 = this._initBadgeStateV2();
+        return {
+          success: true,
+          badges: badgeV2.badges.map((b) => ({
+            id: b.id,
+            name: b.name,
+            description: b.description,
+            rarity: b.rarity,
+            effect: b.effect,
+            obtained: b.obtained,
+            equipped: b.equipped
+          })),
+          totalBadges: badgeV2.totalBadges,
+          equippedCount: badgeV2.equippedBadges.length
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 装备徽章V2 (V155)
+     */
+    mcpBadgeEquipV2(badgeId) {
+      try {
+        const badgeV2 = this._initBadgeStateV2();
+        const b = badgeV2.badges.find((b2) => b2.id === badgeId);
+        if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+        if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
+        if (b.equipped) {
+          b.equipped = false;
+          badgeV2.equippedBadges = badgeV2.equippedBadges.filter((id) => id !== badgeId);
+          return { success: true, badgeId, equipped: false };
+        }
+        if (badgeV2.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
+          return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0" };
+        }
+        b.equipped = true;
+        badgeV2.equippedBadges.push(badgeId);
+        return { success: true, badgeId, equipped: true };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 卸下徽章V2 (V155)
+     */
+    mcpBadgeUnequipV2(badgeId) {
+      try {
+        const badgeV2 = this._initBadgeStateV2();
+        if (badgeId) {
+          const b = badgeV2.badges.find((b2) => b2.id === badgeId);
+          if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+          b.equipped = false;
+          badgeV2.equippedBadges = badgeV2.equippedBadges.filter((id) => id !== badgeId);
+          return { success: true, badgeId };
+        }
+        for (const b of badgeV2.badges) {
+          if (b.equipped) b.equipped = false;
+        }
+        badgeV2.equippedBadges = [];
+        return { success: true };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取徽章列表V3 (V165)
+     */
+    mcpBadgeListV3() {
+      try {
+        const badgeV3 = this._initBadgeStateV3();
+        return {
+          success: true,
+          badges: badgeV3.badges.map((b) => ({
+            id: b.id,
+            name: b.name,
+            description: b.description,
+            rarity: b.rarity,
+            effect: b.effect,
+            obtained: b.obtained,
+            equipped: b.equipped,
+            obtainedAt: b.obtainedAt
+          })),
+          totalBadges: badgeV3.totalBadges,
+          obtainedCount: badgeV3.badges.filter((b) => b.obtained).length,
+          equippedCount: badgeV3.equippedBadges.length
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 装备徽章V3 (V165)
+     */
+    mcpBadgeEquipV3(badgeId) {
+      try {
+        const badgeV3 = this._initBadgeStateV3();
+        const b = badgeV3.badges.find((b2) => b2.id === badgeId);
+        if (!b) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+        if (!b.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
+        if (b.equipped) {
+          b.equipped = false;
+          badgeV3.equippedBadges = badgeV3.equippedBadges.filter((id) => id !== badgeId);
+          return { success: true, badgeId, equipped: false, equippedBadges: badgeV3.equippedBadges };
+        }
+        if (badgeV3.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
+          return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0\uFF0C\u8BF7\u5148\u5378\u4E0B\u4E00\u4E2A" };
+        }
+        b.equipped = true;
+        badgeV3.equippedBadges.push(badgeId);
+        return { success: true, badgeId, equipped: true, equippedBadges: badgeV3.equippedBadges };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 获取徽章列表V6 (V195/V203)
+     */
+    mcpBadgeListV6(filter = "all") {
+      try {
+        const badgeV6 = this._initBadgeStateV6();
+        let badges = badgeV6.badges;
+        if (filter === "obtained") {
+          badges = badges.filter((b) => b.obtained);
+        } else if (filter === "equipped") {
+          badges = badges.filter((b) => b.equipped);
+        }
+        const obtainedCount = badgeV6.badges.filter((b) => b.obtained).length;
+        const equippedCount = badgeV6.badges.filter((b) => b.equipped).length;
+        return {
+          success: true,
+          badges: badges.map((b) => ({
+            id: b.id,
+            name: b.name,
+            description: b.description,
+            rarity: b.rarity,
+            obtained: b.obtained,
+            equipped: b.equipped,
+            obtainedAt: b.obtainedAt
+          })),
+          totalBadges: badgeV6.totalBadges,
+          obtainedCount,
+          equippedCount
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 装备徽章V6 (V195/V203)
+     */
+    mcpBadgeEquipV6(badgeId) {
+      try {
+        const badgeV6 = this._initBadgeStateV6();
+        if (!badgeId) return { error: "\u8BF7\u6307\u5B9A\u5FBD\u7AE0ID" };
+        const badge = badgeV6.badges.find((b) => b.id === badgeId);
+        if (!badge) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+        if (!badge.obtained) return { error: "\u5FBD\u7AE0\u672A\u83B7\u53D6\uFF0C\u65E0\u6CD5\u88C5\u5907" };
+        if (badge.equipped) {
+          badge.equipped = false;
+          badgeV6.equippedBadges = badgeV6.equippedBadges.filter((id) => id !== badgeId);
+          return { success: true, badgeId, equipped: false, equippedBadges: badgeV6.equippedBadges };
+        }
+        if (badgeV6.equippedBadges.length >= MAX_EQUIPPED_BADGES2) {
+          return { error: "\u6700\u591A\u53EA\u80FD\u88C5\u5907" + MAX_EQUIPPED_BADGES2 + "\u4E2A\u5FBD\u7AE0\uFF0C\u8BF7\u5148\u5378\u4E0B\u4E00\u4E2A" };
+        }
+        badge.equipped = true;
+        badgeV6.equippedBadges.push(badgeId);
+        return { success: true, badgeId, equipped: true, equippedBadges: badgeV6.equippedBadges };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 徽章展示V8 (V213)
+     */
+    mcpBadgeShowV8(badgeId) {
+      try {
+        const badgeV6 = this._initBadgeStateV6();
+        if (!badgeId) return { error: "\u8BF7\u6307\u5B9A\u5FBD\u7AE0ID" };
+        const badge = badgeV6.badges.find((b) => b.id === badgeId);
+        if (!badge) return { error: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+        return {
+          success: true,
+          badge: {
+            id: badge.id,
+            name: badge.name,
+            description: badge.description,
+            rarity: badge.rarity,
+            effect: badge.effect,
+            obtained: badge.obtained,
+            equipped: badge.equipped
+          },
+          message: badge.obtained ? badge.name + " - " + badge.effect : "\u5FBD\u7AE0\u672A\u83B7\u53D6"
+        };
+      } catch (e) {
+        return { error: e.message };
+      }
+    }
+    /**
+     * 授予徽章（内部方法，用于成就奖励等）
+     */
+    grantBadge(badgeId) {
+      const badgeV6 = this._initBadgeStateV6();
+      const badge = badgeV6.badges.find((b) => b.id === badgeId);
+      if (!badge) return { success: false, message: "\u5FBD\u7AE0\u4E0D\u5B58\u5728" };
+      if (badge.obtained) return { success: false, message: "\u5FBD\u7AE0\u5DF2\u83B7\u53D6" };
+      badge.obtained = true;
+      badge.obtainedAt = (/* @__PURE__ */ new Date()).toISOString();
+      return { success: true, badgeId, message: "\u83B7\u5F97\u5FBD\u7AE0: " + badge.name };
+    }
+    /**
+     * 获取已装备徽章的效果加成
+     */
+    getEquippedBadgeEffects() {
+      const badgeV6 = this._initBadgeStateV6();
+      const equippedBadges = badgeV6.badges.filter((b) => b.equipped);
+      const effects = {
+        statBonus: {},
+        spiritBonus: 0,
+        stoneBonus: 0,
+        battleStatBonus: 0,
+        critRateBonus: 0,
+        cultivationSpeedBonus: 0
+      };
+      for (const badge of equippedBadges) {
+        if (badge.effectType === "stat_bonus" && badge.stats) {
+          for (const [stat, value] of Object.entries(badge.stats)) {
+            effects.statBonus[stat] = (effects.statBonus[stat] || 0) + value;
+          }
+        }
+        if (badge.effectType === "spirit_rate") effects.spiritBonus += badge.effectValue || 0;
+        if (badge.effectType === "stone_rate") effects.stoneBonus += badge.effectValue || 0;
+        if (badge.effectType === "battle_stat") effects.battleStatBonus += badge.effectValue || 0;
+        if (badge.effectType === "crit_rate") effects.critRateBonus += badge.effectValue || 0;
+        if (badge.effectType === "cultivation_speed") effects.cultivationSpeedBonus += badge.effectValue || 0;
+      }
+      return effects;
+    }
+    /**
+     * 获取徽章统计信息
+     */
+    getBadgeStats() {
+      const badgeV6 = this._initBadgeStateV6();
+      const badges = badgeV6.badges;
+      const stats = {
+        total: badges.length,
+        obtained: badges.filter((b) => b.obtained).length,
+        equipped: badges.filter((b) => b.equipped).length,
+        byRarity: {}
+      };
+      const rarities = Object.values(BadgeRarity2);
+      for (const rarity of rarities) {
+        const rarityBadges = badges.filter((b) => b.rarity === rarity);
+        stats.byRarity[rarity] = {
+          total: rarityBadges.length,
+          obtained: rarityBadges.filter((b) => b.obtained).length
+        };
+      }
+      return stats;
+    }
+    /**
+     * 检查是否满足稀有收藏家成就条件
+     */
+    checkRareCollectorAchievement() {
+      const badgeV6 = this._initBadgeStateV6();
+      const rareObtained = badgeV6.badges.filter((b) => b.rarity === "rare" && b.obtained).length;
+      return rareObtained >= 5;
+    }
+  };
+
+  // src/domains/achievement/AchievementModule.js
+  var ACHIEVEMENT_STATE_INITIALIZERS = {
     V114: "_initAchievementState",
     V124: "_initAchievementState",
     V137: "_initAchievementState",
@@ -3102,7 +3027,7 @@ var CultivationSimulator = (() => {
     V195: "_initAchievementStateV6",
     V203: "_initAchievementStateV7"
   };
-  var BADGE_STATE_INITIALIZERS2 = {
+  var BADGE_STATE_INITIALIZERS = {
     V114: "_initBadgeState",
     V137: "_initBadgeState",
     V155: "_initBadgeStateV2",
@@ -3120,6 +3045,7 @@ var CultivationSimulator = (() => {
     "mcpAchievementListV2",
     "mcpAchievementViewV2",
     "mcpAchievementUnlockV2",
+    "mcpAchievementRewardV2",
     "mcpAchievementListV3",
     "mcpAchievementViewV3",
     "mcpAchievementUnlockV3",
@@ -3158,25 +3084,29 @@ var CultivationSimulator = (() => {
     "mcpBadgeEquipV6",
     "mcpBadgeShowV8"
   ];
-  module.exports = {
-    // 实体
-    Achievement: Achievement3,
-    Badge: Badge3,
-    // 服务
-    AchievementService: AchievementService2,
-    BadgeService: BadgeService2,
-    // 配置
-    ACHIEVEMENT_STATE_INITIALIZERS: ACHIEVEMENT_STATE_INITIALIZERS2,
-    BADGE_STATE_INITIALIZERS: BADGE_STATE_INITIALIZERS2,
-    MAX_EQUIPPED_BADGES: MAX_EQUIPPED_BADGES3,
-    // API方法列表
-    ACHIEVEMENT_API_METHODS,
-    BADGE_API_METHODS,
-    // 模块信息
-    moduleName: "achievement",
-    moduleVersion: "V195",
-    moduleDescription: "\u6210\u5C31\u7CFB\u7EDF - \u5305\u542B\u6210\u5C31\u3001\u5FBD\u7AE0\u3001\u5956\u52B1\u7B49\u529F\u80FD"
-  };
+  function createAchievementModule(gameState3) {
+    const achievementService = new AchievementService(gameState3);
+    const badgeService = new BadgeService(gameState3);
+    return {
+      // 实体
+      Achievement,
+      Badge,
+      // 服务
+      achievementService,
+      badgeService,
+      // 配置
+      ACHIEVEMENT_STATE_INITIALIZERS,
+      BADGE_STATE_INITIALIZERS,
+      MAX_EQUIPPED_BADGES,
+      // API方法列表
+      ACHIEVEMENT_API_METHODS,
+      BADGE_API_METHODS,
+      // 模块信息
+      moduleName: "achievement",
+      moduleVersion: "V195",
+      moduleDescription: "\u6210\u5C31\u7CFB\u7EDF - \u5305\u542B\u6210\u5C31\u3001\u5FBD\u7AE0\u3001\u5956\u52B1\u7B49\u529F\u80FD"
+    };
+  }
 
   // src/domains/inventory/entities/Item.js
   var Item = class _Item {
@@ -3334,9 +3264,6 @@ var CultivationSimulator = (() => {
     LEGENDARY: "legendary",
     ULTIMATE: "ultimate"
   };
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = { Item, ITEM_TYPES, ITEM_QUALITIES };
-  }
 
   // src/domains/inventory/entities/Equipment.js
   var Equipment = class _Equipment {
@@ -3575,15 +3502,6 @@ var CultivationSimulator = (() => {
     maxLevel: 5,
     stoneTypes: { common: 50, rare: 200, precious: 1e3, legendary: 5e3 }
   };
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = {
-      Equipment,
-      EQUIPMENT_TYPES,
-      EQUIPMENT_SLOTS,
-      HEAVENLY_DAO_SET_BONUSES,
-      ENHANCE_CONFIG
-    };
-  }
 
   // src/domains/inventory/services/InventoryService.js
   var InventoryService = class {
@@ -3906,9 +3824,6 @@ var CultivationSimulator = (() => {
     }
   };
   var inventoryService2 = new InventoryService();
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = { InventoryService, inventoryService: inventoryService2 };
-  }
 
   // src/domains/inventory/services/CraftService.js
   var CraftService = class {
@@ -3963,17 +3878,17 @@ var CultivationSimulator = (() => {
      * 计算实际成功率
      */
     calculateSuccessRate(recipe, currentLevel) {
-      const FURNACES3 = {
+      const FURNACES2 = {
         "\u571F\u70BC\u4E39\u7089": { level: 1, successBonus: 0 },
         "\u7384\u94C1\u7194\u7089": { level: 2, successBonus: 0.15 },
         "\u5929\u5DE5\u795E\u7089": { level: 3, successBonus: 0.3 }
       };
-      const ANVILS3 = {
+      const ANVILS2 = {
         "\u571F\u70BC\u5668\u53F0": { level: 1, successBonus: 0 },
         "\u7384\u94C1\u7194\u7089": { level: 2, successBonus: 0.15 },
         "\u5929\u5DE5\u795E\u7089": { level: 3, successBonus: 0.3 }
       };
-      const furnace = this.selectedCraftType === "alchemy" ? FURNACES3 : ANVILS3;
+      const furnace = this.selectedCraftType === "alchemy" ? FURNACES2 : ANVILS2;
       const furnaceData = Object.values(furnace).find((f) => f.level === currentLevel);
       const furnaceBonus = furnaceData ? furnaceData.successBonus : 0;
       return Math.min(0.95, recipe.successRate + furnaceBonus);
@@ -4235,73 +4150,61 @@ var CultivationSimulator = (() => {
     "\u5996\u517D\u9AA8": { type: "beast", basePrice: 220, icon: "\u{1F9B4}", desc: "\u5996\u517D\u9AA8\u9ABC\uFF0C\u70BC\u5668\u6750\u6599" }
   };
   var craftService = new CraftService();
-  if (typeof module !== "undefined" && module.exports) {
-    module.exports = {
-      CraftService,
-      craftService,
-      ALCHEMY_RECIPES,
-      FORGE_RECIPES,
-      ADVANCED_FORGE_RECIPES,
-      FURNACES,
-      ANVILS,
-      MATERIALS
-    };
-  }
 
   // src/domains/inventory/InventoryModule.js
   function createItem(config) {
-    return new (void 0)(config);
+    return new Item(config);
   }
   function createEquipment(config) {
-    return new (void 0)(config);
+    return new Equipment(config);
   }
   function initInventory(gameState3) {
-    return (void 0).init(gameState3);
+    return inventoryService2.init(gameState3);
   }
   function addItemToInventory(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel) {
-    return (void 0).addItem(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel);
+    return inventoryService2.addItem(gameState3, type, name, quantity, quality, effect, desc, icon, star, grade, level, maxLevel);
   }
   function useItem(gameState3, name) {
-    return (void 0).useItem(gameState3, name);
+    return inventoryService2.useItem(gameState3, name);
   }
   function getInventoryStats(gameState3) {
-    return (void 0).getInventoryStats(gameState3);
+    return inventoryService2.getInventoryStats(gameState3);
   }
   function doCraft(gameState3, recipeName, craftType = "alchemy") {
-    (void 0).selectCraftType(craftType);
-    return (void 0).doCraft(gameState3, recipeName);
+    craftService.selectCraftType(craftType);
+    return craftService.doCraft(gameState3, recipeName);
   }
   function getAllRecipes() {
-    return (void 0).getRecipes();
+    return craftService.getRecipes();
   }
   function equipTreasure(gameState3, item, idx) {
-    return (void 0).equipTreasure(gameState3, item, idx);
+    return inventoryService2.equipTreasure(gameState3, item, idx);
   }
   function expandInventorySlots(gameState3, slots, cost) {
-    return (void 0).expandSlots(gameState3, slots, cost);
+    return inventoryService2.expandSlots(gameState3, slots, cost);
   }
   var InventoryModule_default = {
     // Entities
-    Item: void 0,
-    ITEM_TYPES: void 0,
-    ITEM_QUALITIES: void 0,
-    Equipment: void 0,
-    EQUIPMENT_TYPES: void 0,
-    EQUIPMENT_SLOTS: void 0,
-    HEAVENLY_DAO_SET_BONUSES: void 0,
-    ENHANCE_CONFIG: void 0,
+    Item,
+    ITEM_TYPES,
+    ITEM_QUALITIES,
+    Equipment,
+    EQUIPMENT_TYPES,
+    EQUIPMENT_SLOTS,
+    HEAVENLY_DAO_SET_BONUSES,
+    ENHANCE_CONFIG,
     // Services
-    InventoryService: void 0,
-    inventoryService: void 0,
-    CraftService: void 0,
-    craftService: void 0,
+    InventoryService,
+    inventoryService: inventoryService2,
+    CraftService,
+    craftService,
     // Recipes
-    ALCHEMY_RECIPES: void 0,
-    FORGE_RECIPES: void 0,
-    ADVANCED_FORGE_RECIPES: void 0,
-    FURNACES: void 0,
-    ANVILS: void 0,
-    MATERIALS: void 0,
+    ALCHEMY_RECIPES,
+    FORGE_RECIPES,
+    ADVANCED_FORGE_RECIPES,
+    FURNACES,
+    ANVILS,
+    MATERIALS,
     // Helper functions
     createItem,
     createEquipment,
@@ -4320,41 +4223,6 @@ var CultivationSimulator = (() => {
 
   // src/domains/pet/services/PetService.js
   var { Pet: Pet2, PET_TYPES: PET_TYPES2, PET_RARITY: PET_RARITY2, RARITY_COLORS: RARITY_COLORS3 } = (init_Pet(), __toCommonJS(Pet_exports));
-  var PET_CONFIG = {
-    maxPets: 10,
-    petSlots: 3,
-    evolveCostBase: 500,
-    evolveCostMultiplier: 1.5,
-    captureCost: 200,
-    petTypes: ["\u5996\u517D", "\u7075\u517D", "\u795E\u517D", "\u4ED9\u517D"]
-  };
-  var PET_CONFIG_V4 = {
-    maxPets: 5,
-    petSlots: 1,
-    evolveCostBase: 500
-  };
-  var PET_CONFIG_V5 = {
-    maxPets: 10,
-    petSlots: 3,
-    evolveCostBase: 500,
-    evolveCostMultiplier: 1.5,
-    petTypes: ["\u5996\u517D", "\u7075\u517D", "\u795E\u517D", "\u4ED9\u517D"],
-    rarityColors: { common: "#999", rare: "#00f", epic: "#f0f", legend: "#f80" }
-  };
-  var PET_CONFIG_V6 = {
-    maxPets: 15,
-    petSlots: 5,
-    evolveCostBase: 800,
-    evolveCostMultiplier: 1.8,
-    petTypes: ["\u5996\u517D", "\u7075\u517D", "\u795E\u517D", "\u4ED9\u517D", "\u5723\u517D"],
-    rarityColors: { common: "#999", rare: "#00f", epic: "#f0f", legend: "#f80", mythic: "#ff0" }
-  };
-  var FOOD_CONFIG = {
-    basic: { cost: 20, intimacy: 5 },
-    normal: { cost: 30, intimacy: 8 },
-    premium: { cost: 80, intimacy: 15 },
-    super: { cost: 200, intimacy: 30 }
-  };
   var TIER_POWER = {
     wolf: 15,
     tiger: 20,
@@ -4795,57 +4663,8 @@ var CultivationSimulator = (() => {
       }
     }
   };
-  module.exports = {
-    PetService,
-    PET_CONFIG,
-    PET_CONFIG_V4,
-    PET_CONFIG_V5,
-    PET_CONFIG_V6,
-    FOOD_CONFIG,
-    TIER_POWER
-  };
 
   // src/domains/pet/services/PetEvolveService.js
-  var EVOLUTION_STAGES = {
-    INFANT: 1,
-    // 幼生期
-    JUVENILE: 2,
-    // 幼年期
-    MATURE: 3,
-    // 成熟期
-    ANCIENT: 4,
-    // 远古期
-    DIVINE: 5
-    // 神化期
-  };
-  var EVOLUTION_FORMS = {
-    CHILD: "child",
-    // 幼体
-    YOUNG: "young",
-    // 青年
-    ADULT: "adult",
-    // 成体
-    ELDER: "elder",
-    // 老年
-    DIVINE: "divine",
-    // 神体
-    MUTANT: "mutant"
-    // 变异体
-  };
-  var EVOLVE_COST_CONFIG = {
-    base: 500,
-    multiplier: 1.5,
-    stageMultipliers: {
-      1: 1,
-      // 幼生期进化
-      2: 1.5,
-      // 幼年期进化
-      3: 2,
-      // 成熟期进化
-      4: 3
-      // 远古期进化
-    }
-  };
   var EVOLVE_INTIMACY_REQUIREMENTS = {
     2: 20,
     // 进化到幼年需要20亲密度
@@ -4882,12 +4701,6 @@ var CultivationSimulator = (() => {
     // 进化到远古 5分钟
     5: 6e5
     // 进化到神化 10分钟
-  };
-  var EVOLVE_SUCCESS_RATE = {
-    2: 0.95,
-    3: 0.85,
-    4: 0.7,
-    5: 0.5
   };
   var EVOLVE_MATERIALS = {
     stage2: [{ id: "spirit_grass", count: 5, name: "\u7075\u8349" }],
@@ -5273,26 +5086,6 @@ var CultivationSimulator = (() => {
       };
     }
   };
-  var EVOLUTION_STAGE_NAMES = {
-    1: "\u5E7C\u751F\u671F",
-    2: "\u5E7C\u5E74\u671F",
-    3: "\u6210\u719F\u671F",
-    4: "\u8FDC\u53E4\u671F",
-    5: "\u795E\u5316\u671F"
-  };
-  module.exports = {
-    PetEvolveService,
-    EVOLUTION_STAGES,
-    EVOLUTION_FORMS,
-    EVOLVE_COST_CONFIG,
-    EVOLVE_INTIMACY_REQUIREMENTS,
-    EVOLVE_STATS_MULTIPLIER,
-    EVOLVE_LEVEL_REQUIREMENTS,
-    EVOLVE_DURATION,
-    EVOLVE_SUCCESS_RATE,
-    EVOLVE_MATERIALS,
-    EVOLUTION_STAGE_NAMES
-  };
 
   // src/domains/pet/PetModule.js
   var PET_STATE_INITIALIZERS = {
@@ -5335,10 +5128,10 @@ var CultivationSimulator = (() => {
   ];
   var PetModule_default = {
     // 实体
-    Pet: void 0,
+    Pet,
     // 服务
-    PetService: void 0,
-    PetEvolveService: void 0,
+    PetService,
+    PetEvolveService,
     // 配置
     PET_STATE_INITIALIZERS,
     PET_CONFIGS,
@@ -6184,12 +5977,12 @@ var CultivationSimulator = (() => {
   }
   function initializeDomainModules() {
     console.log("[Main] \u521D\u59CB\u5316\u9886\u57DF\u6A21\u5757...");
-    domainModules.player = (void 0)(() => gameState2);
-    domainModules.cultivation = (void 0)(() => gameState2);
+    domainModules.player = createPlayerModule(() => gameState2);
+    domainModules.cultivation = createCultivationModule(() => gameState2);
     domainModules.inventory = InventoryModule_default;
     domainModules.inventory.initInventory(gameState2);
     domainModules.pet = PetModule_default;
-    domainModules.achievement = (void 0)();
+    domainModules.achievement = createAchievementModule();
     domainModules.combat = CombatModule;
     domainModules.sect = SectModule;
     domainModules.ranking = { createRankingService, createArenaService };
