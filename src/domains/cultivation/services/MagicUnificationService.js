@@ -138,5 +138,4 @@ const MAGIC_MCP_TOOLS = [
   { name: 'magic.forget', description: '遗忘法术', params: { magicId: 'string' } }
 ];
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { MagicUnificationService: { queryMagicStatus, analyzeEntityMagic, balanceMagic, unifyMagics, forgetMagic, MAGIC_TYPES, MAGIC_LIST, MAGIC_MCP_TOOLS } };
-else if (typeof GameGlobal !== 'undefined') GameGlobal.MagicUnificationService = { queryMagicStatus, analyzeEntityMagic, balanceMagic, unifyMagics, forgetMagic, MAGIC_TYPES, MAGIC_LIST, MAGIC_MCP_TOOLS };
+export { queryMagicStatus, analyzeEntityMagic, balanceMagic, unifyMagics, forgetMagic, MAGIC_TYPES, MAGIC_LIST, MAGIC_MCP_TOOLS };

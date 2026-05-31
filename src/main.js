@@ -58,6 +58,9 @@ import { ThunderTribulationService, THUNDER_TRIBULATION_TOOLS } from './domains/
 // 万法归一系统 (V243 Direction P: 万法归一系统 - ruflo/thunderbolt)
 import { getLawUnificationService, LAW_UNIFICATION_TOOLS, listLaws, comprehendLaw, fuseLaws, unifyLaws, listUltimateTechniques, evolveTechnique, verifyUnification } from './domains/cultivation/services/LawUnificationService.js';
 
+// 万法归一系统 (V250: MagicUnificationService MCP工具注册)
+import { queryMagicStatus, analyzeEntityMagic, balanceMagic, unifyMagics, forgetMagic, MAGIC_MCP_TOOLS } from './domains/cultivation/services/MagicUnificationService.js';
+
 // 仙府洞天系统 (V245: 仙府洞天+洞府经营)
 import { createCaveHeavenService, CAVE_HEAVEN_MCP_TOOLS, createCaveHeaven, upgradeCaveHeavenById, collectFromCave, buildCaveFacility, queryCaveHeaven, listCaveHeavens, upgradeCaveFacility, demolishCaveFacility } from './domains/cultivation/services/CaveHeavenService.js';
 
@@ -314,7 +317,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V249',
+        gameVersion: 'V250',
         
         // 设置
         settings: {
@@ -580,6 +583,18 @@ function initializeDomainModules() {
         (params) => evolveTechnique(gameState, params.techniqueId));
     mcpRegistry.registerTool('law.verify', LAW_UNIFICATION_TOOLS[6], 
         () => verifyUnification(gameState));
+
+    // 万法归一系统MCP工具 (V250: MagicUnificationService)
+    mcpRegistry.registerTool('magic.query', MAGIC_MCP_TOOLS[0], 
+        () => queryMagicStatus());
+    mcpRegistry.registerTool('magic.analyze', MAGIC_MCP_TOOLS[1], 
+        (params) => analyzeEntityMagic(params.entityId));
+    mcpRegistry.registerTool('magic.unify', MAGIC_MCP_TOOLS[2], 
+        (params) => unifyMagics(params.sourceMagicId, params.targetMagicId));
+    mcpRegistry.registerTool('magic.balance', MAGIC_MCP_TOOLS[3], 
+        () => balanceMagic());
+    mcpRegistry.registerTool('magic.forget', MAGIC_MCP_TOOLS[4], 
+        (params) => forgetMagic(params.magicId));
 
     // 仙府洞天系统MCP工具 (V245: 仙府洞天+洞府经营)
     mcpRegistry.registerTool('caveheaven.create', CAVE_HEAVEN_MCP_TOOLS[0], 

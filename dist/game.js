@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-9af3fac-2026-05-31T15-45-40-390Z */
+/* Cultivation Simulator DDD-v1.0.0-af9d996-2026-05-31T15-47-22-285Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13292,6 +13292,135 @@ var CultivationSimulator = (() => {
   ];
   var LAW_BONUS_SUCCESS_SUCCESS_RATE = 0.08;
 
+  // src/domains/cultivation/services/MagicUnificationService.js
+  var MAGIC_TYPES = {
+    ELEMENTAL: "ELEMENTAL",
+    // 元素系
+    SPIRITUAL: "SPIRITUAL",
+    // 灵魂系
+    PHYSICAL: "PHYSICAL",
+    // 肉体系
+    CELESTIAL: "CELESTIAL",
+    // 天系
+    DEMONIC: "DEMONIC"
+    // 魔系
+  };
+  var MAGIC_DB_KEY = "_magic_db";
+  var _magicDB = null;
+  function _initDB() {
+    const existing = GameGlobal.getDB ? GameGlobal.getDB(MAGIC_DB_KEY) : null;
+    if (existing) {
+      _magicDB = existing;
+    } else {
+      _magicDB = {
+        unifiedLevel: 0,
+        masteredMagics: [],
+        magicPower: 100,
+        balanceScore: 50,
+        fusionHistory: []
+      };
+      if (GameGlobal.setDB) GameGlobal.setDB(MAGIC_DB_KEY, _magicDB);
+    }
+  }
+  function _saveDB() {
+    if (GameGlobal.setDB) GameGlobal.setDB(MAGIC_DB_KEY, _magicDB);
+  }
+  var MAGIC_LIST = {
+    "fireball": { name: "\u706B\u7403\u672F", type: "ELEMENTAL", power: 20, cost: 10 },
+    "iceLance": { name: "\u51B0\u523A\u672F", type: "ELEMENTAL", power: 18, cost: 10 },
+    "lightning": { name: "\u96F7\u51FB\u672F", type: "ELEMENTAL", power: 25, cost: 15 },
+    "earthShield": { name: "\u571F\u76FE\u672F", type: "ELEMENTAL", power: 15, cost: 8 },
+    "water Healing": { name: "\u6C34\u7597\u672F", type: "SPIRITUAL", power: 30, cost: 20 },
+    "soulStrike": { name: "\u9B42\u51FB\u672F", type: "SPIRITUAL", power: 35, cost: 25 },
+    "bodyHardening": { name: "\u91D1\u8EAB\u672F", type: "PHYSICAL", power: 20, cost: 12 },
+    "tigerFist": { name: "\u864E\u62F3\u672F", type: "PHYSICAL", power: 28, cost: 18 },
+    "starArrow": { name: "\u661F\u7BAD\u672F", type: "CELESTIAL", power: 40, cost: 30 },
+    "moonBeam": { name: "\u6708\u5149\u672F", type: "CELESTIAL", power: 35, cost: 25 },
+    "demonFire": { name: "\u9B54\u7130\u672F", type: "DEMONIC", power: 45, cost: 35 },
+    "darkBlade": { name: "\u6697\u5203\u672F", type: "DEMONIC", power: 42, cost: 32 }
+  };
+  function _calcFusionPower(m1, m2) {
+    const p1 = m1.power * (1 + _magicDB.unifiedLevel * 0.1);
+    const p2 = m2.power * (1 + _magicDB.unifiedLevel * 0.1);
+    const synergy = m1.type === m2.type ? 1.5 : 1;
+    return Math.floor((p1 + p2) * synergy);
+  }
+  function _updateBalance(type) {
+    const typeWeights = { ELEMENTAL: 20, SPIRITUAL: 20, PHYSICAL: 20, CELESTIAL: 20, DEMONIC: 20 };
+    const weight = typeWeights[type] || 10;
+    _magicDB.balanceScore = Math.min(100, Math.max(0, _magicDB.balanceScore + (Math.random() > 0.5 ? weight : -weight)));
+  }
+  function queryMagicStatus() {
+    _initDB();
+    const playerLevel = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("level") : 1;
+    return {
+      success: true,
+      status: { unifiedLevel: _magicDB.unifiedLevel, magicPower: _magicDB.magicPower, balanceScore: _magicDB.balanceScore, masteredCount: _magicDB.masteredMagics.length },
+      masteredMagics: _magicDB.masteredMagics.map((m) => ({ ...m, currentPower: Math.floor(m.basePower * (1 + _magicDB.unifiedLevel * 0.1)) })),
+      availableMagics: Object.entries(MAGIC_LIST).map(([id, cfg]) => ({ id, ...cfg })),
+      typeDistribution: Object.keys(MAGIC_TYPES).map((t) => ({ type: t, count: _magicDB.masteredMagics.filter((m) => m.type === t).length }))
+    };
+  }
+  function analyzeEntityMagic(entityId) {
+    _initDB();
+    const entity = entityId === "player" ? GameGlobal.getPlayerAttribute ? { level: GameGlobal.getPlayerAttribute("level"), spiritRoot: GameGlobal.getPlayerAttribute("spiritRoot") || 1 } : { level: 1, spiritRoot: 1 } : null;
+    if (!entity) return { success: false, error: `\u5B9E\u4F53 ${entityId} \u4E0D\u5B58\u5728` };
+    const potential = Math.floor(entity.level * 5 + entity.spiritRoot * 10);
+    const affinity = Object.keys(MAGIC_TYPES).map((t) => ({ type: t, score: Math.floor(Math.random() * 40 + 60) }));
+    return { success: true, entity: { id: entityId, level: entity.level, spiritRoot: entity.spiritRoot, potential, affinity } };
+  }
+  function balanceMagic() {
+    _initDB();
+    if (_magicDB.magicPower < 50) return { success: false, error: "\u6CD5\u529B\u4E0D\u8DB3\uFF08\u9700\u898150\uFF09" };
+    _magicDB.magicPower -= 50;
+    const before = _magicDB.balanceScore;
+    _magicDB.balanceScore = 50;
+    const magicsToBoost = _magicDB.masteredMagics.filter((m) => m.type === Object.keys(MAGIC_TYPES)[Math.floor(Math.random() * 5)]);
+    magicsToBoost.forEach((m) => m.basePower = Math.floor(m.basePower * 1.1));
+    _saveDB();
+    return { success: true, message: "\u6CD5\u529B\u5E73\u8861\u5B8C\u6210", balanceScore: 50, magicPower: _magicDB.magicPower, boosted: magicsToBoost.length };
+  }
+  function unifyMagics(sourceMagicId, targetMagicId) {
+    _initDB();
+    const source = MAGIC_LIST[sourceMagicId];
+    const target = MAGIC_LIST[targetMagicId];
+    if (!source) return { success: false, error: `\u6CD5\u672F ${sourceMagicId} \u4E0D\u5B58\u5728` };
+    if (!target) return { success: false, error: `\u6CD5\u672F ${targetMagicId} \u4E0D\u5B58\u5728` };
+    if (_magicDB.magicPower < source.cost + target.cost) return { success: false, error: "\u6CD5\u529B\u4E0D\u8DB3" };
+    if (_magicDB.masteredMagics.length >= 10 && !_magicDB.masteredMagics.find((m) => m.id === sourceMagicId)) return { success: false, error: "\u5DF2\u8FBE\u4E0A\u9650\uFF0810\u4E2A\u6CD5\u672F\uFF09\uFF0C\u9700\u9057\u5FD8\u65E7\u6CD5\u672F" };
+    _magicDB.magicPower -= source.cost + target.cost;
+    const newPower = _calcFusionPower(source, target);
+    const resultId = `${sourceMagicId}_${targetMagicId}`;
+    const resultName = `${source.name}+${target.name}`;
+    const existing = _magicDB.masteredMagics.find((m) => m.id === resultId);
+    if (existing) {
+      existing.basePower = newPower;
+      existing.fusionCount++;
+    } else {
+      _magicDB.masteredMagics.push({ id: resultId, name: resultName, type: source.type, basePower: newPower, cost: Math.floor((source.cost + target.cost) * 0.7), fusionCount: 1, masteredAt: Date.now() });
+    }
+    _magicDB.unifiedLevel++;
+    _updateBalance(source.type);
+    _magicDB.fusionHistory.push({ source: sourceMagicId, target: targetMagicId, power: newPower, at: Date.now() });
+    _saveDB();
+    return { success: true, message: `\u878D\u5408\u6210\u529F\uFF1A${resultName}\uFF0C\u5A01\u529B ${newPower}`, unifiedLevel: _magicDB.unifiedLevel, newMagic: { id: resultId, name: resultName, power: newPower, type: source.type } };
+  }
+  function forgetMagic(magicId) {
+    _initDB();
+    const idx = _magicDB.masteredMagics.findIndex((m) => m.id === magicId);
+    if (idx === -1) return { success: false, error: `\u672A\u5B66\u4F1A\u6B64\u6CD5\u672F ${magicId}` };
+    _magicDB.masteredMagics.splice(idx, 1);
+    _saveDB();
+    return { success: true, message: `\u5DF2\u9057\u5FD8 ${magicId}` };
+  }
+  var MAGIC_MCP_TOOLS = [
+    { name: "magic.query", description: "\u67E5\u8BE2\u6CD5\u529B\u72B6\u6001", params: {} },
+    { name: "magic.analyze", description: "\u5206\u6790\u5B9E\u4F53\u6CD5\u529B", params: { entityId: "string" } },
+    { name: "magic.unify", description: "\u878D\u5408\u4E24\u4E2A\u6CD5\u672F", params: { sourceMagicId: "string", targetMagicId: "string" } },
+    { name: "magic.balance", description: "\u5E73\u8861\u6CD5\u529B", params: {} },
+    { name: "magic.forget", description: "\u9057\u5FD8\u6CD5\u672F", params: { magicId: "string" } }
+  ];
+
   // src/domains/cultivation/services/CaveHeavenService.js
   var CAVE_HEAVEN_LEVELS = {
     "\u5C0F\u6D1E\u5929": { minLevel: 1, \u7075\u6C14\u52A0\u6210: 1, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 100, tierIndex: 0 },
@@ -14786,7 +14915,7 @@ var CultivationSimulator = (() => {
   };
   var TRADE_DB_KEY = "_trade_db";
   var _tradeDB = null;
-  function _initDB() {
+  function _initDB2() {
     const existing = GameGlobal.getDB ? GameGlobal.getDB(TRADE_DB_KEY) : null;
     if (existing) {
       _tradeDB = existing;
@@ -14802,7 +14931,7 @@ var CultivationSimulator = (() => {
       if (GameGlobal.setDB) GameGlobal.setDB(TRADE_DB_KEY, _tradeDB);
     }
   }
-  function _saveDB() {
+  function _saveDB2() {
     if (GameGlobal.setDB) GameGlobal.setDB(TRADE_DB_KEY, _tradeDB);
   }
   var GOODS = {
@@ -14835,7 +14964,7 @@ var CultivationSimulator = (() => {
     return Math.max(1, price);
   }
   function listMarketGoods(marketId) {
-    _initDB();
+    _initDB2();
     if (!MARKETS[marketId]) {
       return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
     }
@@ -14863,7 +14992,7 @@ var CultivationSimulator = (() => {
     };
   }
   function buyGoods(marketId, goodId, quantity) {
-    _initDB();
+    _initDB2();
     if (!MARKETS[marketId]) {
       return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
     }
@@ -14902,7 +15031,7 @@ var CultivationSimulator = (() => {
       marketId,
       timestamp: Date.now()
     });
-    _saveDB();
+    _saveDB2();
     return {
       success: true,
       message: `\u8D2D\u4E70\u6210\u529F\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C\u82B1\u8D39 ${totalCost} \u7075\u77F3`,
@@ -14911,7 +15040,7 @@ var CultivationSimulator = (() => {
     };
   }
   function sellGoods(marketId, goodId, quantity) {
-    _initDB();
+    _initDB2();
     if (!MARKETS[marketId]) {
       return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
     }
@@ -14939,7 +15068,7 @@ var CultivationSimulator = (() => {
       marketId,
       timestamp: Date.now()
     });
-    _saveDB();
+    _saveDB2();
     return {
       success: true,
       message: `\u51FA\u552E\u6210\u529F\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C\u83B7\u5F97 ${revenue} \u7075\u77F3`,
@@ -14948,7 +15077,7 @@ var CultivationSimulator = (() => {
     };
   }
   function transportGoods(routeId, goodId, quantity) {
-    _initDB();
+    _initDB2();
     if (!ROUTES[routeId]) {
       return { success: false, error: `\u8DEF\u7EBF ${routeId} \u4E0D\u5B58\u5728` };
     }
@@ -14969,7 +15098,7 @@ var CultivationSimulator = (() => {
       cost: route.cost
     };
     _tradeDB.state = TRADE_STATES.TRANSPORTING;
-    _saveDB();
+    _saveDB2();
     return {
       success: true,
       message: `\u8FD0\u8F93\u5F00\u59CB\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C${routeId}\uFF0C\u8D39\u7528 ${route.cost} \u7075\u77F3`,
@@ -14978,7 +15107,7 @@ var CultivationSimulator = (() => {
     };
   }
   function queryTradeStatus() {
-    _initDB();
+    _initDB2();
     const playerLevel = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("level") : 1;
     const playerResources = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("spiritStones") : 0;
     return {
@@ -22761,7 +22890,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V249",
+      gameVersion: "V250",
       // 设置
       settings: {
         soundEnabled: true,
@@ -23075,6 +23204,31 @@ var CultivationSimulator = (() => {
       "law.verify",
       LAW_UNIFICATION_TOOLS[6],
       () => verifyUnification(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "magic.query",
+      MAGIC_MCP_TOOLS[0],
+      () => queryMagicStatus()
+    );
+    mcpRegistry.registerTool(
+      "magic.analyze",
+      MAGIC_MCP_TOOLS[1],
+      (params) => analyzeEntityMagic(params.entityId)
+    );
+    mcpRegistry.registerTool(
+      "magic.unify",
+      MAGIC_MCP_TOOLS[2],
+      (params) => unifyMagics(params.sourceMagicId, params.targetMagicId)
+    );
+    mcpRegistry.registerTool(
+      "magic.balance",
+      MAGIC_MCP_TOOLS[3],
+      () => balanceMagic()
+    );
+    mcpRegistry.registerTool(
+      "magic.forget",
+      MAGIC_MCP_TOOLS[4],
+      (params) => forgetMagic(params.magicId)
     );
     mcpRegistry.registerTool(
       "caveheaven.create",
@@ -24773,4 +24927,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-9af3fac-2026-05-31T15-45-40-390Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-af9d996-2026-05-31T15-47-22-285Z";
