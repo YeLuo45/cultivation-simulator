@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-98504d0-2026-05-31T07-00-22-079Z */
+/* Cultivation Simulator DDD-v1.0.0-15fef94-2026-05-31T07-54-04-312Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -20337,7 +20337,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V242",
+      gameVersion: "V244",
       // 设置
       settings: {
         soundEnabled: true,
@@ -21966,6 +21966,79 @@ var CultivationSimulator = (() => {
       sect: gameState2.sect ? "\u5DF2\u52A0\u5165\u5B97\u95E8" : "\u65E0"
     };
   }
+  function getVersionInfo() {
+    const versionStr = typeof window !== "undefined" && window.__GAME_VERSION__ ? window.__GAME_VERSION__ : "V242-dev";
+    const parts = versionStr.split("-");
+    const version = parts[1] || "unknown";
+    const commitId = parts[2] || "unknown";
+    const buildTime = parts.slice(3).join("-") || "unknown";
+    const deployBranch = "gh-pages";
+    return {
+      version,
+      // e.g., V242
+      commitId,
+      // e.g., 69f8864
+      deployBranch,
+      buildTime,
+      // e.g., 2026-05-31T06-59-45-881Z
+      fullVersion: versionStr
+    };
+  }
+  function showVersionModal() {
+    const info = getVersionInfo();
+    const existing = document.getElementById("version-modal");
+    if (existing) existing.remove();
+    const modal = document.createElement("div");
+    modal.id = "version-modal";
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7); z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    modal.innerHTML = `
+    <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 1px solid #4a9eff;
+        border-radius: 16px;
+        padding: 32px 40px;
+        color: #e0e0e0;
+        font-family: 'Courier New', monospace;
+        min-width: 400px;
+        box-shadow: 0 0 60px rgba(74,158,255,0.3);
+    ">
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:28px; color:#4a9eff; margin-bottom:8px;">\u{1F31F} \u4FEE\u4ED9\u6A21\u62DF\u5668</div>
+            <div style="font-size:14px; color:#888;">${info.version}</div>
+        </div>
+        <div style="display:grid; grid-template-columns:120px 1fr; gap:12px 16px; font-size:14px;">
+            <span style="color:#888;">\u7248\u672C</span><span style="color:#4a9eff;">${info.version}</span>
+            <span style="color:#888;">Commit</span><span style="color:#fff;">${info.commitId}</span>
+            <span style="color:#888;">\u90E8\u7F72\u5206\u652F</span><span style="color:#fff;">${info.deployBranch}</span>
+            <span style="color:#888;">\u6784\u5EFA\u65F6\u95F4</span><span style="color:#888;">${info.buildTime.replace("T", " ").replace(/-/g, "/")}</span>
+        </div>
+        <div style="margin-top:24px; text-align:center;">
+            <button onclick="document.getElementById('version-modal').remove()" style="
+                background: #4a9eff; color: #000; border: none;
+                padding: 8px 24px; border-radius: 8px; cursor: pointer;
+                font-size: 14px;
+            ">\u5173\u95ED</button>
+        </div>
+    </div>
+    `;
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    document.body.appendChild(modal);
+    return modal;
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", (e) => {
+      if (e.shiftKey && e.ctrlKey && e.key === "V") {
+        e.preventDefault();
+        showVersionModal();
+      }
+    });
+  }
   if (typeof window !== "undefined") {
     window.init = init;
     window.startNewGame = startNewGame;
@@ -21989,9 +22062,11 @@ var CultivationSimulator = (() => {
     window.getGameStats = getGameStats;
     window.gameState = gameState2;
     window.saveAndExit = saveAndExit;
+    window.getVersionInfo = getVersionInfo;
+    window.showVersionModal = showVersionModal;
   }
   console.log("[Main] main.js \u6A21\u5757\u52A0\u8F7D\u5B8C\u6210");
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-98504d0-2026-05-31T07-00-22-079Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-15fef94-2026-05-31T07-54-04-312Z";

@@ -290,7 +290,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V242',
+        gameVersion: 'V244',
         
         // 设置
         settings: {
@@ -2284,6 +2284,99 @@ export {
     GAME_LOOP_CONFIG
 };
 
+// ===== 版本信息 =====
+
+// 从构建时注入的全局变量获取版本信息
+function getVersionInfo() {
+    const versionStr = typeof window !== 'undefined' && window.__GAME_VERSION__ 
+        ? window.__GAME_VERSION__ 
+        : 'V242-dev';
+    
+    // 解析版本字符串: DDD-v1.0.0-COMMIT-DATE
+    const parts = versionStr.split('-');
+    const version = parts[1] || 'unknown';
+    const commitId = parts[2] || 'unknown';
+    const buildTime = parts.slice(3).join('-') || 'unknown';
+    
+    // 部署分支
+    const deployBranch = 'gh-pages';
+    
+    return {
+        version: version,      // e.g., V242
+        commitId: commitId,    // e.g., 69f8864
+        deployBranch: deployBranch,
+        buildTime: buildTime,  // e.g., 2026-05-31T06-59-45-881Z
+        fullVersion: versionStr
+    };
+}
+
+// 显示版本信息的模态框
+function showVersionModal() {
+    const info = getVersionInfo();
+    
+    // 如果已存在模态框，先移除
+    const existing = document.getElementById('version-modal');
+    if (existing) existing.remove();
+    
+    // 创建模态框
+    const modal = document.createElement('div');
+    modal.id = 'version-modal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7); z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    modal.innerHTML = `
+    <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 1px solid #4a9eff;
+        border-radius: 16px;
+        padding: 32px 40px;
+        color: #e0e0e0;
+        font-family: 'Courier New', monospace;
+        min-width: 400px;
+        box-shadow: 0 0 60px rgba(74,158,255,0.3);
+    ">
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:28px; color:#4a9eff; margin-bottom:8px;">🌟 修仙模拟器</div>
+            <div style="font-size:14px; color:#888;">${info.version}</div>
+        </div>
+        <div style="display:grid; grid-template-columns:120px 1fr; gap:12px 16px; font-size:14px;">
+            <span style="color:#888;">版本</span><span style="color:#4a9eff;">${info.version}</span>
+            <span style="color:#888;">Commit</span><span style="color:#fff;">${info.commitId}</span>
+            <span style="color:#888;">部署分支</span><span style="color:#fff;">${info.deployBranch}</span>
+            <span style="color:#888;">构建时间</span><span style="color:#888;">${info.buildTime.replace('T', ' ').replace(/-/g, '/')}</span>
+        </div>
+        <div style="margin-top:24px; text-align:center;">
+            <button onclick="document.getElementById('version-modal').remove()" style="
+                background: #4a9eff; color: #000; border: none;
+                padding: 8px 24px; border-radius: 8px; cursor: pointer;
+                font-size: 14px;
+            ">关闭</button>
+        </div>
+    </div>
+    `;
+    
+    // 点击背景关闭
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// 注册Shift+Ctrl+V快捷键
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => {
+        if (e.shiftKey && e.ctrlKey && e.key === 'V') {
+            e.preventDefault();
+            showVersionModal();
+        }
+    });
+}
+
 // 浏览器环境全局暴露
 if (typeof window !== 'undefined') {
     window.init = init;
@@ -2308,6 +2401,8 @@ if (typeof window !== 'undefined') {
     window.getGameStats = getGameStats;
     window.gameState = gameState;
     window.saveAndExit = saveAndExit;
+    window.getVersionInfo = getVersionInfo;
+    window.showVersionModal = showVersionModal;
 }
 
 console.log('[Main] main.js 模块加载完成');
