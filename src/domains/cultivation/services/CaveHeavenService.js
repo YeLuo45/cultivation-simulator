@@ -49,7 +49,41 @@ export const BUILDING_LEVEL_MULTIPLIERS = {
 };
 
 /**
- * 洞天升级所需建设度
+ * 设施类型定义 (灵界洞府专用)
+ */
+export const CAVE_FACILITIES = {
+  '灵池': { 
+    cost: 200, 
+    resourceType: '灵气', 
+    output: 50, 
+    buildTime: 180,
+    description: '聚集天地灵气，提升修炼效率'
+  },
+  '药园': { 
+    cost: 150, 
+    resourceType: '灵草', 
+    output: 30, 
+    buildTime: 120,
+    description: '种植灵草，可产出炼丹材料'
+  },
+  '矿脉': { 
+    cost: 300, 
+    resourceType: '矿石', 
+    output: 20, 
+    buildTime: 240,
+    description: '开采灵矿，产出炼器材料'
+  },
+  '阵法': { 
+    cost: 250, 
+    resourceType: '阵法经验', 
+    output: 15, 
+    buildTime: 200,
+    description: '布置阵法，可提升洞府防护和产出'
+  }
+};
+
+/**
+ * 洞府等级升级消耗
  */
 const CAVE_UPGRADE_COSTS = {
   '小洞天': 0,
@@ -58,6 +92,11 @@ const CAVE_UPGRADE_COSTS = {
   '洞天福地': 2000,
   '天府': 10000
 };
+
+// ===== MCP工具新增洞府存储 =====
+// 用于管理多个灵界洞府
+const _caveHeavenDatabase = new Map();
+let _caveIdCounter = 0;
 
 // ===== 服务类 =====
 
@@ -307,6 +346,302 @@ class CaveHeavenService {
       建设度上限: levelInfo.建设度上限
     };
   }
+
+  // ===== 灵界洞府系统 (MCP工具) =====
+
+  /**
+   * 创建灵界洞府
+   * @param {string} name - 洞府名称
+   */
+  createCaveHeaven(name) {
+    const id = `cave_${++_caveIdCounter}_${Date.now()}`;
+    const caveData = {
+      id,
+      name,
+      level: '小洞天',
+      constructionPoints: 0,
+      spiritConcentration: 1.0,
+      facilities: {},
+      facilityHistory: [],
+      createdAt: Date.now(),
+      lastCollectedAt: Date.now()
+    };
+    
+    _caveHeavenDatabase.set(id, caveData);
+    
+    return {
+      success: true,
+      message: `灵界洞府「${name}」创建成功`,
+      id,
+      name,
+      level: '小洞天'
+    };
+  }
+
+  /**
+   * 升级洞府等级 (按ID)
+   * @param {string} id - 洞府ID
+   * @param {number} targetLevel - 目标等级
+   */
+  upgradeCaveHeavenById(id, targetLevel) {
+    const cave = _caveHeavenDatabase.get(id);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    const currentIndex = CAVE_LEVEL_ORDER.indexOf(cave.level);
+    const levelNum = typeof targetLevel === 'string' 
+      ? CAVE_LEVEL_ORDER.indexOf(targetLevel) + 1 
+      : targetLevel;
+    
+    if (levelNum <= currentIndex) {
+      return { success: false, message: '目标等级不能低于当前等级' };
+    }
+
+    // 检查建设度是否足够
+    const nextLevelName = CAVE_LEVEL_ORDER[levelNum - 1];
+    const upgradeCost = CAVE_UPGRADE_COSTS[nextLevelName] || 0;
+    
+    if (cave.constructionPoints < upgradeCost) {
+      return {
+        success: false,
+        message: `建设度不足，需要${upgradeCost}点，当前${cave.constructionPoints}点`
+      };
+    }
+
+    // 执行升级
+    cave.level = nextLevelName;
+    cave.spiritConcentration = CAVE_HEAVEN_LEVELS[nextLevelName].灵气加成;
+    cave.constructionPoints -= upgradeCost;
+
+    return {
+      success: true,
+      message: `洞府升级成功：${cave.level} → ${nextLevelName}`,
+      newLevel: nextLevelName,
+      spiritConcentration: cave.spiritConcentration,
+      remainingConstructionPoints: cave.constructionPoints
+    };
+  }
+
+  /**
+   * 采集洞府产出
+   * @param {string} id - 洞府ID
+   */
+  collectFromCave(id) {
+    const cave = _caveHeavenDatabase.get(id);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    const now = Date.now();
+    const timePassed = (now - cave.lastCollectedAt) / 1000; // 秒
+    const facilities = Object.values(cave.facilities);
+    
+    if (facilities.length === 0) {
+      return { success: false, message: '洞府内没有设施，请先建造设施' };
+    }
+
+    // 计算产出
+    const output = {};
+    let totalOutputValue = 0;
+    
+    for (const facility of facilities) {
+      const def = CAVE_FACILITIES[facility.type];
+      if (def) {
+        // 基础产出 * 等级加成 * 时间因子 (每分钟产出)
+        const timeMultiplier = Math.max(1, Math.floor(timePassed / 60));
+        const levelMultiplier = BUILDING_LEVEL_MULTIPLIERS[facility.level] || 1;
+        const amount = Math.floor(def.output * levelMultiplier * timeMultiplier);
+        
+        if (!output[def.resourceType]) {
+          output[def.resourceType] = 0;
+        }
+        output[def.resourceType] += amount;
+        totalOutputValue += amount;
+        
+        // 更新设施总产出
+        facility.totalOutput = (facility.totalOutput || 0) + amount;
+      }
+    }
+
+    cave.lastCollectedAt = now;
+
+    return {
+      success: true,
+      message: `采集成功，获得${totalOutputValue}点资源`,
+      output,
+      totalOutput: totalOutputValue,
+      timePassed,
+      facilitiesCount: facilities.length
+    };
+  }
+
+  /**
+   * 建造设施
+   * @param {string} id - 洞府ID
+   * @param {string} facilityType - 设施类型
+   */
+  buildFacility(id, facilityType) {
+    const cave = _caveHeavenDatabase.get(id);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    if (!CAVE_FACILITIES[facilityType]) {
+      return { success: false, message: `未知设施类型: ${facilityType}` };
+    }
+
+    const def = CAVE_FACILITIES[facilityType];
+    
+    // 检查灵石是否足够
+    if ((this.gameState.player?.spiritStones || 0) < def.cost) {
+      return { success: false, message: '灵石不足' };
+    }
+
+    // 消耗灵石
+    this.gameState.player.spiritStones -= def.cost;
+
+    // 创建设施
+    const facilityId = `facility_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    cave.facilities[facilityId] = {
+      id: facilityId,
+      type: facilityType,
+      level: 1,
+      builtAt: Date.now(),
+      totalOutput: 0
+    };
+
+    // 添加建设度
+    cave.constructionPoints += Math.floor(def.cost / 2);
+
+    return {
+      success: true,
+      message: `${facilityType}建造成功`,
+      facilityId,
+      remainingSpiritStones: this.gameState.player.spiritStones,
+      constructionPointsGained: Math.floor(def.cost / 2)
+    };
+  }
+
+  /**
+   * 查询洞府状态
+   * @param {string} id - 洞府ID
+   */
+  queryCaveHeaven(id) {
+    const cave = _caveHeavenDatabase.get(id);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    const levelInfo = CAVE_HEAVEN_LEVELS[cave.level];
+    const facilities = Object.values(cave.facilities).map(f => ({
+      id: f.id,
+      type: f.type,
+      level: f.level,
+      totalOutput: f.totalOutput,
+      outputPerMinute: (CAVE_FACILITIES[f.type]?.output || 0) * (BUILDING_LEVEL_MULTIPLIERS[f.level] || 1)
+    }));
+
+    // 计算距下次采集的时间
+    const now = Date.now();
+    const timeSinceLastCollect = Math.floor((now - cave.lastCollectedAt) / 1000);
+
+    return {
+      success: true,
+      id: cave.id,
+      name: cave.name,
+      level: cave.level,
+      levelInfo: {
+        constructionLimit: levelInfo.建设度上限,
+        spiritBonus: levelInfo.灵气加成
+      },
+      constructionPoints: cave.constructionPoints,
+      spiritConcentration: cave.spiritConcentration,
+      facilities,
+      totalFacilities: facilities.length,
+      createdAt: cave.createdAt,
+      lastCollectedAt: cave.lastCollectedAt,
+      timeSinceLastCollect
+    };
+  }
+
+  /**
+   * 获取玩家所有洞府列表
+   */
+  listAllCaves() {
+    return Array.from(_caveHeavenDatabase.values()).map(cave => ({
+      id: cave.id,
+      name: cave.name,
+      level: cave.level,
+      facilitiesCount: Object.keys(cave.facilities).length,
+      constructionPoints: cave.constructionPoints
+    }));
+  }
+
+  /**
+   * 升级设施
+   * @param {string} caveId - 洞府ID
+   * @param {string} facilityId - 设施ID
+   */
+  upgradeFacility(caveId, facilityId) {
+    const cave = _caveHeavenDatabase.get(caveId);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    const facility = cave.facilities[facilityId];
+    if (!facility) {
+      return { success: false, message: '设施不存在' };
+    }
+
+    if (facility.level >= 5) {
+      return { success: false, message: '设施已达最高等级' };
+    }
+
+    const def = CAVE_FACILITIES[facility.type];
+    const upgradeCost = def.cost * facility.level;
+
+    if ((this.gameState.player?.spiritStones || 0) < upgradeCost) {
+      return { success: false, message: '灵石不足' };
+    }
+
+    this.gameState.player.spiritStones -= upgradeCost;
+    facility.level += 1;
+    facility.upgradedAt = Date.now();
+
+    return {
+      success: true,
+      message: `${facility.type}升级至${facility.level}级`,
+      facilityId,
+      newLevel: facility.level,
+      remainingSpiritStones: this.gameState.player.spiritStones
+    };
+  }
+
+  /**
+   * 销毁设施
+   * @param {string} caveId - 洞府ID
+   * @param {string} facilityId - 设施ID
+   */
+  demolishFacility(caveId, facilityId) {
+    const cave = _caveHeavenDatabase.get(caveId);
+    if (!cave) {
+      return { success: false, message: '洞府不存在' };
+    }
+
+    if (!cave.facilities[facilityId]) {
+      return { success: false, message: '设施不存在' };
+    }
+
+    const facility = cave.facilities[facilityId];
+    delete cave.facilities[facilityId];
+
+    return {
+      success: true,
+      message: `${facility.type}已拆除`,
+      demolitionRefund: Math.floor(CAVE_FACILITIES[facility.type].cost * 0.3)
+    };
+  }
 }
 
 // ===== MCP工具 =====
@@ -377,4 +712,91 @@ export const CAVE_HEAVEN_TOOLS = [
   { name: 'cave.list_buildings', description: '获取建筑列表', params: [] },
   { name: 'cave.output', description: '获取洞天产出', params: [] },
   { name: 'cave.add_construction', description: '添加建设度', params: ['points'] }
+];
+
+// ===== 灵界洞府 MCP工具 =====
+
+/**
+ * 创建灵界洞府 MCP工具
+ * @param {string} name - 洞府名称
+ */
+export function createCaveHeaven(gameState, name) {
+  const service = createCaveHeavenService(gameState);
+  return service.createCaveHeaven(name);
+}
+
+/**
+ * 升级洞府等级 MCP工具
+ * @param {string} id - 洞府ID
+ * @param {number} targetLevel - 目标等级
+ */
+export function upgradeCaveHeavenById(gameState, id, targetLevel) {
+  const service = createCaveHeavenService(gameState);
+  return service.upgradeCaveHeavenById(id, targetLevel);
+}
+
+/**
+ * 采集洞府产出 MCP工具
+ * @param {string} id - 洞府ID
+ */
+export function collectFromCave(gameState, id) {
+  const service = createCaveHeavenService(gameState);
+  return service.collectFromCave(id);
+}
+
+/**
+ * 建造设施 MCP工具
+ * @param {string} id - 洞府ID
+ * @param {string} facility - 设施类型
+ */
+export function buildCaveFacility(gameState, id, facility) {
+  const service = createCaveHeavenService(gameState);
+  return service.buildFacility(id, facility);
+}
+
+/**
+ * 查询洞府状态 MCP工具
+ * @param {string} id - 洞府ID
+ */
+export function queryCaveHeaven(gameState, id) {
+  const service = createCaveHeavenService(gameState);
+  return service.queryCaveHeaven(id);
+}
+
+/**
+ * 获取所有洞府列表 MCP工具
+ */
+export function listCaveHeavens(gameState) {
+  const service = createCaveHeavenService(gameState);
+  return service.listAllCaves();
+}
+
+/**
+ * 升级设施 MCP工具
+ * @param {string} caveId - 洞府ID
+ * @param {string} facilityId - 设施ID
+ */
+export function upgradeCaveFacility(gameState, caveId, facilityId) {
+  const service = createCaveHeavenService(gameState);
+  return service.upgradeFacility(caveId, facilityId);
+}
+
+/**
+ * 销毁设施 MCP工具
+ * @param {string} caveId - 洞府ID
+ * @param {string} facilityId - 设施ID
+ */
+export function demolishCaveFacility(gameState, caveId, facilityId) {
+  const service = createCaveHeavenService(gameState);
+  return service.demolishFacility(caveId, facilityId);
+}
+
+// ===== 导出灵界洞府工具定义 =====
+
+export const CAVE_HEAVEN_MCP_TOOLS = [
+  { name: 'caveheaven.create', description: '创建灵界洞府', params: ['name'] },
+  { name: 'caveheaven.upgrade', description: '升级洞府等级', params: ['id', 'targetLevel'] },
+  { name: 'caveheaven.collect', description: '采集洞府产出', params: ['id'] },
+  { name: 'caveheaven.build', description: '建造设施', params: ['id', 'facility'] },
+  { name: 'caveheaven.query', description: '查询洞府状态', params: ['id'] }
 ];
