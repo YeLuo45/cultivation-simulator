@@ -55,6 +55,12 @@ import { YinYangWuXingService, getYinYangWuXingService, YIN_YANG_WUXING_TOOLS } 
 // 天雷劫数系统 (V241 Direction C: 天雷劫数系统 - thunderbolt/claude-code)
 import { ThunderTribulationService, THUNDER_TRIBULATION_TOOLS } from './domains/cultivation/services/ThunderTribulationService.js';
 
+// 万法归一系统 (V243 Direction P: 万法归一系统 - ruflo/thunderbolt)
+import { getLawUnificationService, LAW_UNIFICATION_TOOLS, listLaws, comprehendLaw, fuseLaws, unifyLaws, listUltimateTechniques, evolveTechnique, verifyUnification } from './domains/cultivation/services/LawUnificationService.js';
+
+// 仙府洞天系统 (V245: 仙府洞天+洞府经营)
+import { createCaveHeavenService, CAVE_HEAVEN_MCP_TOOLS, createCaveHeaven, upgradeCaveHeavenById, collectFromCave, buildCaveFacility, queryCaveHeaven, listCaveHeavens, upgradeCaveFacility, demolishCaveFacility } from './domains/cultivation/services/CaveHeavenService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -540,6 +546,34 @@ function initializeDomainModules() {
         (params) => caveRealmHandlers['cave.spirit'](params));
     mcpRegistry.registerTool('cave.harvest', CaveRealmService.TOOLS['cave.harvest'], 
         (params) => caveRealmHandlers['cave.harvest'](params));
+
+    // 万法归一系统MCP工具 (V243 Direction P: 万法归一系统)
+    mcpRegistry.registerTool('law.list', LAW_UNIFICATION_TOOLS[0], 
+        () => listLaws(gameState));
+    mcpRegistry.registerTool('law.comprehend', LAW_UNIFICATION_TOOLS[1], 
+        (params) => comprehendLaw(gameState, params.lawId));
+    mcpRegistry.registerTool('law.fuse', LAW_UNIFICATION_TOOLS[2], 
+        (params) => fuseLaws(gameState, params.lawIds, params.targetTechnique));
+    mcpRegistry.registerTool('law.unify', LAW_UNIFICATION_TOOLS[3], 
+        () => unifyLaws(gameState));
+    mcpRegistry.registerTool('law.technique', LAW_UNIFICATION_TOOLS[4], 
+        () => listUltimateTechniques(gameState));
+    mcpRegistry.registerTool('law.evolve', LAW_UNIFICATION_TOOLS[5], 
+        (params) => evolveTechnique(gameState, params.techniqueId));
+    mcpRegistry.registerTool('law.verify', LAW_UNIFICATION_TOOLS[6], 
+        () => verifyUnification(gameState));
+
+    // 仙府洞天系统MCP工具 (V245: 仙府洞天+洞府经营)
+    mcpRegistry.registerTool('caveheaven.create', CAVE_HEAVEN_MCP_TOOLS[0], 
+        (params) => createCaveHeaven(gameState, params.name));
+    mcpRegistry.registerTool('caveheaven.upgrade', CAVE_HEAVEN_MCP_TOOLS[1], 
+        (params) => upgradeCaveHeavenById(gameState, params.id, params.targetLevel));
+    mcpRegistry.registerTool('caveheaven.collect', CAVE_HEAVEN_MCP_TOOLS[2], 
+        (params) => collectFromCave(gameState, params.id));
+    mcpRegistry.registerTool('caveheaven.build', CAVE_HEAVEN_MCP_TOOLS[3], 
+        (params) => buildCaveFacility(gameState, params.id, params.facility));
+    mcpRegistry.registerTool('caveheaven.query', CAVE_HEAVEN_MCP_TOOLS[4], 
+        (params) => queryCaveHeaven(gameState, params.id));
 
     console.log('[Main] 领域模块初始化完成');
 }

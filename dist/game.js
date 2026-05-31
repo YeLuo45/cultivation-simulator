@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-7dcb956-2026-05-31T15-25-52-505Z */
+/* Cultivation Simulator DDD-v1.0.0-ea1e12d-2026-05-31T15-32-03-696Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13011,6 +13011,823 @@ var CultivationSimulator = (() => {
     }
   };
 
+  // src/domains/cultivation/services/LawUnificationService.js
+  var LAWS = {
+    METAL: { id: "metal", name: "\u91D1\u4E4B\u6CD5\u5219", element: "metal", power: 10 },
+    WOOD: { id: "wood", name: "\u6728\u4E4B\u6CD5\u5219", element: "wood", power: 10 },
+    WATER: { id: "water", name: "\u6C34\u4E4B\u6CD5\u5219", element: "water", power: 10 },
+    FIRE: { id: "fire", name: "\u706B\u4E4B\u6CD5\u5219", element: "fire", power: 10 },
+    EARTH: { id: "earth", name: "\u571F\u4E4B\u6CD5\u5219", element: "earth", power: 10 },
+    YIN: { id: "yin", name: "\u9634\u4E4B\u9053", element: "yin", power: 12 },
+    YANG: { id: "yang", name: "\u9633\u4E4B\u9053", element: "yang", power: 12 },
+    SWORD: { id: "sword", name: "\u5251\u9053", element: "sword", power: 15 },
+    FORMATION: { id: "formation", name: "\u9635\u6CD5\u4E4B\u9053", element: "formation", power: 14 },
+    ALCHEMY: { id: "alchemy", name: "\u4E39\u9053", element: "alchemy", power: 13 },
+    SEAL: { id: "seal", name: "\u5C01\u5370\u4E4B\u9053", element: "seal", power: 11 },
+    SPACE: { id: "space", name: "\u7A7A\u95F4\u6CD5\u5219", element: "space", power: 16 },
+    TIME: { id: "time", name: "\u65F6\u95F4\u6CD5\u5219", element: "time", power: 18 },
+    DESTINY: { id: "destiny", name: "\u547D\u8FD0\u6CD5\u5219", element: "destiny", power: 17 },
+    KARMA: { id: "karma", name: "\u56E0\u679C\u6CD5\u5219", element: "karma", power: 15 },
+    THUNDER: { id: "thunder", name: "\u96F7\u6CD5", element: "thunder", power: 14 },
+    WIND: { id: "wind", name: "\u98CE\u4E4B\u9053", element: "wind", power: 11 },
+    ICE: { id: "ice", name: "\u51B0\u4E4B\u9053", element: "ice", power: 12 },
+    POISON: { id: "poison", name: "\u6BD2\u4E4B\u9053", element: "poison", power: 10 },
+    BODY: { id: "body", name: "\u8089\u8EAB\u6CD5\u5219", element: "body", power: 13 }
+  };
+  var LAW_FUSION_RECIPES = {
+    "metal+wood+water+fire+earth": { id: "wuxing", name: "\u4E94\u884C\u5F52\u4E00", power: 50, effect: "\u4E94\u884C\u8F6E\u8F6C\uFF0C\u4E07\u6CD5\u76F8\u751F" },
+    "yin+yang": { id: "yinyang", name: "\u9634\u9633\u8C03\u548C", power: 35, effect: "\u9634\u9633\u5E73\u8861\uFF0C\u5927\u9053\u521D\u6210" },
+    "sword+thunder": { id: "thundersword", name: "\u96F7\u5251\u5408\u4E00", power: 40, effect: "\u96F7\u9E23\u5251\u5578\uFF0C\u65A9\u65AD\u82CD\u7A79" },
+    "space+time": { id: "spacetime", name: "\u65F6\u7A7A\u6CD5\u5219", power: 60, effect: "\u65F6\u7A7A\u5728\u624B\uFF0C\u9006\u8F6C\u4E7E\u5764" },
+    "destiny+karma": { id: "destinykarma", name: "\u547D\u56E0\u679C\u62A5", power: 45, effect: "\u547D\u8FD0\u56E0\u679C\uFF0C\u65E0\u4EBA\u80FD\u9003" },
+    "formation+seal": { id: "formationseal", name: "\u9635\u5C01\u5408\u4E00", power: 38, effect: "\u9635\u6CD5\u5C01\u5370\uFF0C\u56F0\u9501\u5929\u5730" },
+    "alchemy+body": { id: "alchemybody", name: "\u8089\u8EAB\u70BC\u4E39", power: 42, effect: "\u4EE5\u8EAB\u4E3A\u7089\uFF0C\u70BC\u4F53\u6210\u4E39" },
+    "wind+ice+thunder": { id: "trinity", name: "\u4E09\u5143\u5F52\u4E00", power: 48, effect: "\u98CE\u51B0\u96F7\u4E09\u7EDD\uFF0C\u878D\u5408\u5F52\u4E00" },
+    "metal+space": { id: "metalspace", name: "\u91D1\u7A7A\u95F4\u65A9", power: 44, effect: "\u91D1\u5C5E\u6027\u7A7A\u95F4\uFF0C\u65A9\u88C2\u865A\u7A7A" },
+    "water+poison": { id: "waterpoison", name: "\u6BD2\u6C34\u4EA4\u878D", power: 36, effect: "\u6BD2\u6C34\u76F8\u878D\uFF0C\u4FB5\u8680\u4E07\u7269" }
+  };
+  var MIN_LAWS_FOR_UNIFICATION = 3;
+  var BASE_FUSION_SUCCESS_RATE = 0.6;
+  var COMPREHENSION_BONUS_RATE = 0.05;
+  var _serviceInstance = null;
+  function createLawUnificationService(gameState3) {
+    if (_serviceInstance) return _serviceInstance;
+    _serviceInstance = {
+      // 玩家已领悟的法则
+      playerLaws: [],
+      // 融合记录
+      fusionRecords: [],
+      // 归一状态
+      unification: null,
+      // 终极神通列表
+      ultimateTechniques: [],
+      // 归一日志
+      journal: []
+    };
+    return _serviceInstance;
+  }
+  function getLawUnificationService(gameState3) {
+    return createLawUnificationService(gameState3);
+  }
+  function listLaws(gameState3) {
+    const service = getLawUnificationService(gameState3);
+    const playerLaws = service.playerLaws || [];
+    const allLaws = Object.values(LAWS);
+    const unlockedIds = new Set(playerLaws.map((l) => l.id));
+    return {
+      all_laws: allLaws,
+      unlocked_laws: playerLaws,
+      count: playerLaws.length,
+      unlocked_ids: Array.from(unlockedIds)
+    };
+  }
+  function comprehendLaw(gameState3, lawId) {
+    const law = LAWS[lawId == null ? void 0 : lawId.toUpperCase()];
+    if (!law) {
+      throw new Error(`\u672A\u77E5\u6CD5\u5219: ${lawId}`);
+    }
+    const service = getLawUnificationService(gameState3);
+    if (!service.playerLaws) service.playerLaws = [];
+    const exists = service.playerLaws.find((l) => l.id === law.id);
+    if (exists) {
+      return { success: false, message: `\u5DF2\u9886\u609F${law.name}`, law };
+    }
+    service.playerLaws.push({ ...law, comprehendedAt: Date.now() });
+    return {
+      success: true,
+      message: `\u6210\u529F\u9886\u609F${law.name}`,
+      law,
+      totalLaws: service.playerLaws.length
+    };
+  }
+  function fuseLaws(gameState3, lawIds, targetTechnique = null) {
+    var _a;
+    if (!lawIds || lawIds.length < 2) {
+      throw new Error("\u878D\u5408\u9700\u8981\u81F3\u5C112\u79CD\u6CD5\u5219");
+    }
+    const service = getLawUnificationService(gameState3);
+    if (!service.playerLaws) service.playerLaws = [];
+    const playerLawIds = new Set(service.playerLaws.map((l) => l.id));
+    const invalidLaws = lawIds.filter((id) => !playerLawIds.has(id));
+    if (invalidLaws.length > 0) {
+      throw new Error(`\u672A\u9886\u609F\u7684\u6CD5\u5219: ${invalidLaws.join(", ")}`);
+    }
+    const sortedKey = [...lawIds].sort().join("+");
+    const recipe = LAW_FUSION_RECIPES[sortedKey];
+    const comprehension = ((_a = gameState3.player) == null ? void 0 : _a.comprehension) || 50;
+    let successRate = BASE_FUSION_SUCCESS_RATE + (lawIds.length - 2) * LAW_BONUS_SUCCESS_SUCCESS_RATE + comprehension * COMPREHENSION_BONUS_RATE / 100;
+    successRate = Math.min(successRate, 0.95);
+    const roll = Math.random();
+    const success = roll < successRate;
+    if (!service.fusionRecords) service.fusionRecords = [];
+    const record = {
+      laws: [...lawIds],
+      recipe,
+      success,
+      successRate,
+      roll,
+      timestamp: Date.now(),
+      technique: targetTechnique
+    };
+    service.fusionRecords.push(record);
+    if (success) {
+      const technique = {
+        id: recipe.id,
+        name: recipe.name,
+        power: recipe.power,
+        effect: recipe.effect,
+        laws: [...lawIds],
+        masteredAt: Date.now()
+      };
+      if (!service.ultimateTechniques) service.ultimateTechniques = [];
+      service.ultimateTechniques.push(technique);
+      return {
+        success: true,
+        message: `\u878D\u5408\u6210\u529F! \u83B7\u5F97${recipe.name}`,
+        recipe,
+        technique,
+        successRate
+      };
+    } else {
+      return {
+        success: false,
+        message: `\u878D\u5408\u5931\u8D25(${Math.round(successRate * 100)}%\u6210\u529F\u7387)`,
+        recipe,
+        successRate
+      };
+    }
+  }
+  function unifyLaws(gameState3) {
+    const service = getLawUnificationService(gameState3);
+    if (!service.playerLaws) service.playerLaws = [];
+    if (service.unification) {
+      return {
+        success: false,
+        message: "\u5DF2\u5B8C\u6210\u4E07\u6CD5\u5F52\u4E00\uFF0C\u65E0\u6CD5\u518D\u6B21\u5F52\u4E00",
+        unification: service.unification
+      };
+    }
+    if (service.playerLaws.length < MIN_LAWS_FOR_UNIFICATION) {
+      return {
+        success: false,
+        message: `\u9700\u8981\u81F3\u5C11${MIN_LAWS_FOR_UNIFICATION}\u79CD\u6CD5\u5219\u624D\u80FD\u5F52\u4E00\uFF0C\u5F53\u524D\u53EA\u6709${service.playerLaws.length}\u79CD`,
+        required: MIN_LAWS_FOR_UNIFICATION,
+        current: service.playerLaws.length
+      };
+    }
+    const totalPower = service.playerLaws.reduce((sum, law) => sum + law.power, 0);
+    const unifiedPower = totalPower + service.playerLaws.length * 5;
+    service.unification = {
+      achieved: true,
+      achievedAt: Date.now(),
+      lawsCount: service.playerLaws.length,
+      totalPower,
+      unifiedPower,
+      bonuses: {
+        cultivationSpeed: service.playerLaws.length * 10,
+        breakthroughChance: service.playerLaws.length * 5,
+        spiritualPower: service.playerLaws.length * 8
+      }
+    };
+    if (!service.journal) service.journal = [];
+    service.journal.push({
+      type: "unification",
+      message: `\u4E07\u6CD5\u5F52\u4E00\u5B8C\u6210\uFF0C\u878D\u5408${service.playerLaws.length}\u79CD\u6CD5\u5219`,
+      timestamp: Date.now()
+    });
+    return {
+      success: true,
+      message: `\u4E07\u6CD5\u5F52\u4E00\u5B8C\u6210! \u878D\u5408${service.playerLaws.length}\u79CD\u6CD5\u5219`,
+      unification: service.unification,
+      bonuses: service.unification.bonuses
+    };
+  }
+  function listUltimateTechniques(gameState3) {
+    var _a;
+    const service = getLawUnificationService(gameState3);
+    const techniques = service.ultimateTechniques || [];
+    return {
+      techniques,
+      count: techniques.length,
+      hasUnification: !!service.unification,
+      unificationPower: ((_a = service.unification) == null ? void 0 : _a.unifiedPower) || 0
+    };
+  }
+  function evolveTechnique(gameState3, techniqueId) {
+    var _a;
+    const service = getLawUnificationService(gameState3);
+    if (!service.ultimateTechniques) service.ultimateTechniques = [];
+    const technique = service.ultimateTechniques.find((t) => t.id === techniqueId);
+    if (!technique) {
+      throw new Error(`\u672A\u627E\u5230\u795E\u901A: ${techniqueId}`);
+    }
+    const comprehension = ((_a = gameState3.player) == null ? void 0 : _a.comprehension) || 50;
+    const evolveChance = 0.3 + comprehension * 2e-3;
+    const success = Math.random() < evolveChance;
+    if (!service.journal) service.journal = [];
+    if (success) {
+      const powerGain = Math.round(technique.power * 0.1);
+      technique.power += powerGain;
+      technique.evolvedAt = Date.now();
+      service.journal.push({
+        type: "evolve",
+        message: `${technique.name}\u7CBE\u8FDB\u6210\u529F\uFF0C\u5A01\u529B+${powerGain}`,
+        timestamp: Date.now()
+      });
+      return {
+        success: true,
+        message: `${technique.name}\u7CBE\u8FDB\u6210\u529F\uFF0C\u5A01\u529B+${powerGain}`,
+        technique,
+        newPower: technique.power
+      };
+    } else {
+      service.journal.push({
+        type: "evolve_fail",
+        message: `${technique.name}\u7CBE\u8FDB\u5931\u8D25`,
+        timestamp: Date.now()
+      });
+      return {
+        success: false,
+        message: `${technique.name}\u7CBE\u8FDB\u5931\u8D25`,
+        technique
+      };
+    }
+  }
+  function verifyUnification(gameState3) {
+    var _a, _b, _c, _d;
+    const service = getLawUnificationService(gameState3);
+    const status = {
+      hasUnification: !!service.unification,
+      lawsCount: ((_a = service.playerLaws) == null ? void 0 : _a.length) || 0,
+      techniquesCount: ((_b = service.ultimateTechniques) == null ? void 0 : _b.length) || 0,
+      fusionRecordsCount: ((_c = service.fusionRecords) == null ? void 0 : _c.length) || 0,
+      journalCount: ((_d = service.journal) == null ? void 0 : _d.length) || 0
+    };
+    if (service.unification) {
+      status.unification = service.unification;
+      status.canEvolve = service.ultimateTechniques.length > 0;
+      status.totalPower = service.unification.unifiedPower;
+    }
+    return status;
+  }
+  LawUnificationService.getMCPHandlers = function(gameState3) {
+    return {
+      "law.list": () => listLaws(gameState3),
+      "law.comprehend": (params) => comprehendLaw(gameState3, params.lawId),
+      "law.fuse": (params) => fuseLaws(gameState3, params.lawIds, params.targetTechnique),
+      "law.unify": () => unifyLaws(gameState3),
+      "law.technique": () => listUltimateTechniques(gameState3),
+      "law.evolve": (params) => evolveTechnique(gameState3, params.techniqueId),
+      "law.verify": () => verifyUnification(gameState3)
+    };
+  };
+  var LAW_UNIFICATION_TOOLS = [
+    { name: "law.list", description: "\u67E5\u770B\u6240\u6709\u53EF\u7528\u6CD5\u5219\u548C\u5DF2\u9886\u609F\u6CD5\u5219" },
+    { name: "law.comprehend", description: "\u9886\u609F\u6307\u5B9A\u6CD5\u5219", params: ["lawId"] },
+    { name: "law.fuse", description: "\u878D\u5408\u591A\u79CD\u6CD5\u5219\u521B\u9020\u7EC8\u6781\u795E\u901A", params: ["lawIds", "targetTechnique?"] },
+    { name: "law.unify", description: "\u4E07\u6CD5\u5F52\u4E00\uFF08\u9700\u8981\u81F3\u5C113\u79CD\u6CD5\u5219\uFF09", params: [] },
+    { name: "law.technique", description: "\u67E5\u770B\u7EC8\u6781\u795E\u901A\u5217\u8868", params: [] },
+    { name: "law.evolve", description: "\u7CBE\u8FDB\u7EC8\u6781\u795E\u901A", params: ["techniqueId"] },
+    { name: "law.verify", description: "\u9A8C\u8BC1\u4E07\u6CD5\u5F52\u4E00\u72B6\u6001", params: [] }
+  ];
+  var LAW_BONUS_SUCCESS_SUCCESS_RATE = 0.08;
+
+  // src/domains/cultivation/services/CaveHeavenService.js
+  var CAVE_HEAVEN_LEVELS = {
+    "\u5C0F\u6D1E\u5929": { minLevel: 1, \u7075\u6C14\u52A0\u6210: 1, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 100, tierIndex: 0 },
+    "\u4E2D\u6D1E\u5929": { minLevel: 10, \u7075\u6C14\u52A0\u6210: 1.5, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 500, tierIndex: 1 },
+    "\u5927\u6D1E\u5929": { minLevel: 30, \u7075\u6C14\u52A0\u6210: 2, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 2e3, tierIndex: 2 },
+    "\u6D1E\u5929\u798F\u5730": { minLevel: 60, \u7075\u6C14\u52A0\u6210: 3, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 1e4, tierIndex: 3 },
+    "\u5929\u5E9C": { minLevel: 100, \u7075\u6C14\u52A0\u6210: 5, \u5EFA\u8BBE\u5EA6\u4E0A\u9650: 99999, tierIndex: 4 }
+  };
+  var CAVE_LEVEL_ORDER = ["\u5C0F\u6D1E\u5929", "\u4E2D\u6D1E\u5929", "\u5927\u6D1E\u5929", "\u6D1E\u5929\u798F\u5730", "\u5929\u5E9C"];
+  var CAVE_BUILDINGS = {
+    "\u4FEE\u70BC\u5BA4": { cost: 50, \u8D44\u6E90\u7C7B\u578B: "\u7075\u6C14", \u4EA7\u51FA\u91CF: 10, \u5EFA\u8BBE\u65F6\u95F4: 60 },
+    "\u4E39\u623F": { cost: 100, \u8D44\u6E90\u7C7B\u578B: "\u4E39\u836F", \u4EA7\u51FA\u91CF: 5, \u5EFA\u8BBE\u65F6\u95F4: 120 },
+    "\u70BC\u5668\u5BA4": { cost: 100, \u8D44\u6E90\u7C7B\u578B: "\u6CD5\u5668", \u4EA7\u51FA\u91CF: 3, \u5EFA\u8BBE\u65F6\u95F4: 120 },
+    "\u7075\u8349\u56ED": { cost: 80, \u8D44\u6E90\u7C7B\u578B: "\u7075\u8349", \u4EA7\u51FA\u91CF: 15, \u5EFA\u8BBE\u65F6\u95F4: 90 },
+    "\u85CF\u7ECF\u9601": { cost: 200, \u8D44\u6E90\u7C7B\u578B: "\u529F\u6CD5", \u4EA7\u51FA\u91CF: 2, \u5EFA\u8BBE\u65F6\u95F4: 180 }
+  };
+  var BUILDING_LEVEL_MULTIPLIERS = {
+    1: 1,
+    2: 1.5,
+    3: 2,
+    4: 3,
+    5: 5
+  };
+  var CAVE_FACILITIES = {
+    "\u7075\u6C60": {
+      cost: 200,
+      resourceType: "\u7075\u6C14",
+      output: 50,
+      buildTime: 180,
+      description: "\u805A\u96C6\u5929\u5730\u7075\u6C14\uFF0C\u63D0\u5347\u4FEE\u70BC\u6548\u7387"
+    },
+    "\u836F\u56ED": {
+      cost: 150,
+      resourceType: "\u7075\u8349",
+      output: 30,
+      buildTime: 120,
+      description: "\u79CD\u690D\u7075\u8349\uFF0C\u53EF\u4EA7\u51FA\u70BC\u4E39\u6750\u6599"
+    },
+    "\u77FF\u8109": {
+      cost: 300,
+      resourceType: "\u77FF\u77F3",
+      output: 20,
+      buildTime: 240,
+      description: "\u5F00\u91C7\u7075\u77FF\uFF0C\u4EA7\u51FA\u70BC\u5668\u6750\u6599"
+    },
+    "\u9635\u6CD5": {
+      cost: 250,
+      resourceType: "\u9635\u6CD5\u7ECF\u9A8C",
+      output: 15,
+      buildTime: 200,
+      description: "\u5E03\u7F6E\u9635\u6CD5\uFF0C\u53EF\u63D0\u5347\u6D1E\u5E9C\u9632\u62A4\u548C\u4EA7\u51FA"
+    }
+  };
+  var CAVE_UPGRADE_COSTS = {
+    "\u5C0F\u6D1E\u5929": 0,
+    "\u4E2D\u6D1E\u5929": 100,
+    "\u5927\u6D1E\u5929": 500,
+    "\u6D1E\u5929\u798F\u5730": 2e3,
+    "\u5929\u5E9C": 1e4
+  };
+  var _caveHeavenDatabase = /* @__PURE__ */ new Map();
+  var _caveIdCounter = 0;
+  function createCaveHeavenService(gameState3) {
+    return new CaveHeavenService(gameState3);
+  }
+  var CaveHeavenService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this._ensureCaveData();
+    }
+    _ensureCaveData() {
+      if (!this.gameState.caveHeaven) {
+        this.gameState.caveHeaven = {
+          \u7B49\u7EA7: "\u5C0F\u6D1E\u5929",
+          \u5EFA\u8BBE\u5EA6: 0,
+          \u7075\u6C14\u6D53\u5EA6: 1,
+          \u5EFA\u7B51: {},
+          \u5347\u7EA7\u5386\u53F2: []
+        };
+      }
+      if (!this.gameState.caveHeaven.\u5EFA\u7B51) {
+        this.gameState.caveHeaven.\u5EFA\u7B51 = {};
+      }
+    }
+    // ===== 洞天等级系统 =====
+    /**
+     * 获取当前洞天等级
+     */
+    getCaveLevel() {
+      return this.gameState.caveHeaven.\u7B49\u7EA7;
+    }
+    /**
+     * 获取洞天信息
+     */
+    getCaveInfo() {
+      const cave = this.gameState.caveHeaven;
+      const levelInfo = CAVE_HEAVEN_LEVELS[cave.\u7B49\u7EA7];
+      return {
+        \u7B49\u7EA7: cave.\u7B49\u7EA7,
+        \u5EFA\u8BBE\u5EA6: cave.\u5EFA\u8BBE\u5EA6,
+        \u7075\u6C14\u6D53\u5EA6: cave.\u7075\u6C14\u6D53\u5EA6,
+        \u5EFA\u8BBE\u5EA6\u4E0A\u9650: levelInfo.\u5EFA\u8BBE\u5EA6\u4E0A\u9650,
+        \u7075\u6C14\u52A0\u6210: levelInfo.\u7075\u6C14\u52A0\u6210,
+        \u5EFA\u7B51\u6570\u91CF: Object.keys(cave.\u5EFA\u7B51).length
+      };
+    }
+    /**
+     * 升级洞天
+     */
+    upgradeCaveHeaven() {
+      const cave = this.gameState.caveHeaven;
+      const currentLevel = cave.\u7B49\u7EA7;
+      const currentIndex = CAVE_LEVEL_ORDER.indexOf(currentLevel);
+      if (currentIndex >= CAVE_LEVEL_ORDER.length - 1) {
+        return { success: false, message: "\u5DF2\u8FBE\u6700\u9AD8\u6D1E\u5929\u7B49\u7EA7" };
+      }
+      const nextLevel = CAVE_LEVEL_ORDER[currentIndex + 1];
+      const requiredConstruction = CAVE_UPGRADE_COSTS[nextLevel];
+      if (cave.\u5EFA\u8BBE\u5EA6 < requiredConstruction) {
+        return {
+          success: false,
+          message: `\u5EFA\u8BBE\u5EA6\u4E0D\u8DB3\uFF0C\u9700\u8981${requiredConstruction}\u70B9\uFF0C\u5F53\u524D${cave.\u5EFA\u8BBE\u5EA6}\u70B9`
+        };
+      }
+      cave.\u7B49\u7EA7 = nextLevel;
+      cave.\u7075\u6C14\u6D53\u5EA6 = CAVE_HEAVEN_LEVELS[nextLevel].\u7075\u6C14\u52A0\u6210;
+      this.gameState.caveHeaven.\u5347\u7EA7\u5386\u53F2.push({
+        from: currentLevel,
+        to: nextLevel,
+        timestamp: Date.now()
+      });
+      return {
+        success: true,
+        message: `\u6D1E\u5929\u5347\u7EA7\u6210\u529F\uFF1A${currentLevel} \u2192 ${nextLevel}`,
+        newLevel: nextLevel,
+        \u7075\u6C14\u52A0\u6210: cave.\u7075\u6C14\u6D53\u5EA6
+      };
+    }
+    /**
+     * 检查洞天升级条件
+     */
+    canUpgradeCaveHeaven() {
+      const cave = this.gameState.caveHeaven;
+      const currentLevel = cave.\u7B49\u7EA7;
+      const currentIndex = CAVE_LEVEL_ORDER.indexOf(currentLevel);
+      if (currentIndex >= CAVE_LEVEL_ORDER.length - 1) {
+        return { canUpgrade: false, reason: "\u5DF2\u8FBE\u6700\u9AD8\u7B49\u7EA7" };
+      }
+      const nextLevel = CAVE_LEVEL_ORDER[currentIndex + 1];
+      const requiredConstruction = CAVE_UPGRADE_COSTS[nextLevel];
+      if (cave.\u5EFA\u8BBE\u5EA6 < requiredConstruction) {
+        return {
+          canUpgrade: false,
+          required: requiredConstruction,
+          current: cave.\u5EFA\u8BBE\u5EA6,
+          reason: `\u5EFA\u8BBE\u5EA6\u4E0D\u8DB3`
+        };
+      }
+      return { canUpgrade: true, nextLevel };
+    }
+    // ===== 建筑系统 =====
+    /**
+     * 建造建筑
+     */
+    buildBuilding(buildingType, position = null) {
+      var _a;
+      if (!CAVE_BUILDINGS[buildingType]) {
+        throw new Error(`\u672A\u77E5\u5EFA\u7B51\u7C7B\u578B: ${buildingType}`);
+      }
+      const cave = this.gameState.caveHeaven;
+      const buildingDef = CAVE_BUILDINGS[buildingType];
+      if ((((_a = this.gameState.player) == null ? void 0 : _a.spiritStones) || 0) < buildingDef.cost) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      this.gameState.player.spiritStones = (this.gameState.player.spiritStones || 0) - buildingDef.cost;
+      const buildingId = `${buildingType}_${Date.now()}`;
+      cave.\u5EFA\u7B51[buildingId] = {
+        \u7C7B\u578B: buildingType,
+        \u7B49\u7EA7: 1,
+        \u4F4D\u7F6E: position,
+        \u5EFA\u9020\u65F6\u95F4: Date.now(),
+        \u603B\u4EA7\u51FA: 0
+      };
+      return {
+        success: true,
+        message: `${buildingType}\u5EFA\u9020\u6210\u529F`,
+        buildingId,
+        \u5269\u4F59\u7075\u77F3: this.gameState.player.spiritStones
+      };
+    }
+    /**
+     * 升级建筑
+     */
+    upgradeBuilding(buildingId) {
+      var _a;
+      const cave = this.gameState.caveHeaven;
+      const building = cave.\u5EFA\u7B51[buildingId];
+      if (!building) {
+        return { success: false, message: "\u5EFA\u7B51\u4E0D\u5B58\u5728" };
+      }
+      const buildingDef = CAVE_BUILDINGS[building.\u7C7B\u578B];
+      const upgradeCost = buildingDef.cost * building.\u7B49\u7EA7;
+      if ((((_a = this.gameState.player) == null ? void 0 : _a.spiritStones) || 0) < upgradeCost) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      if (building.\u7B49\u7EA7 >= 5) {
+        return { success: false, message: "\u5DF2\u8FBE\u5EFA\u7B51\u6700\u9AD8\u7B49\u7EA7" };
+      }
+      this.gameState.player.spiritStones = (this.gameState.player.spiritStones || 0) - upgradeCost;
+      building.\u7B49\u7EA7 += 1;
+      building.\u4E0A\u6B21\u5347\u7EA7\u65F6\u95F4 = Date.now();
+      return {
+        success: true,
+        message: `${building.\u7C7B\u578B}\u5347\u7EA7\u81F3${building.\u7B49\u7EA7}\u7EA7`,
+        newLevel: building.\u7B49\u7EA7,
+        \u5269\u4F59\u7075\u77F3: this.gameState.player.spiritStones
+      };
+    }
+    /**
+     * 获取建筑列表
+     */
+    listBuildings() {
+      const cave = this.gameState.caveHeaven;
+      return Object.entries(cave.\u5EFA\u7B51).map(([id, b]) => ({
+        id,
+        \u7C7B\u578B: b.\u7C7B\u578B,
+        \u7B49\u7EA7: b.\u7B49\u7EA7,
+        \u4F4D\u7F6E: b.\u4F4D\u7F6E,
+        \u4EA7\u51FA\u91CF: CAVE_BUILDINGS[b.\u7C7B\u578B].\u4EA7\u51FA\u91CF * (BUILDING_LEVEL_MULTIPLIERS[b.\u7B49\u7EA7] || 1)
+      }));
+    }
+    /**
+     * 计算总产出
+     */
+    calculateTotalOutput() {
+      const buildings = this.listBuildings();
+      const output = {};
+      for (const b of buildings) {
+        const def = CAVE_BUILDINGS[b.\u7C7B\u578B];
+        if (!output[def.\u8D44\u6E90\u7C7B\u578B]) {
+          output[def.\u8D44\u6E90\u7C7B\u578B] = 0;
+        }
+        output[def.\u8D44\u6E90\u7C7B\u578B] += b.\u4EA7\u51FA\u91CF;
+      }
+      return output;
+    }
+    /**
+     * 添加建设度
+     */
+    addConstruction(points) {
+      const cave = this.gameState.caveHeaven;
+      cave.\u5EFA\u8BBE\u5EA6 += points;
+      const levelInfo = CAVE_HEAVEN_LEVELS[cave.\u7B49\u7EA7];
+      if (cave.\u5EFA\u8BBE\u5EA6 > levelInfo.\u5EFA\u8BBE\u5EA6\u4E0A\u9650) {
+        cave.\u5EFA\u8BBE\u5EA6 = levelInfo.\u5EFA\u8BBE\u5EA6\u4E0A\u9650;
+      }
+      return {
+        success: true,
+        \u5EFA\u8BBE\u5EA6: cave.\u5EFA\u8BBE\u5EA6,
+        \u5EFA\u8BBE\u5EA6\u4E0A\u9650: levelInfo.\u5EFA\u8BBE\u5EA6\u4E0A\u9650
+      };
+    }
+    // ===== 灵界洞府系统 (MCP工具) =====
+    /**
+     * 创建灵界洞府
+     * @param {string} name - 洞府名称
+     */
+    createCaveHeaven(name) {
+      const id = `cave_${++_caveIdCounter}_${Date.now()}`;
+      const caveData = {
+        id,
+        name,
+        level: "\u5C0F\u6D1E\u5929",
+        constructionPoints: 0,
+        spiritConcentration: 1,
+        facilities: {},
+        facilityHistory: [],
+        createdAt: Date.now(),
+        lastCollectedAt: Date.now()
+      };
+      _caveHeavenDatabase.set(id, caveData);
+      return {
+        success: true,
+        message: `\u7075\u754C\u6D1E\u5E9C\u300C${name}\u300D\u521B\u5EFA\u6210\u529F`,
+        id,
+        name,
+        level: "\u5C0F\u6D1E\u5929"
+      };
+    }
+    /**
+     * 升级洞府等级 (按ID)
+     * @param {string} id - 洞府ID
+     * @param {number} targetLevel - 目标等级
+     */
+    upgradeCaveHeavenById(id, targetLevel) {
+      const cave = _caveHeavenDatabase.get(id);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      const currentIndex = CAVE_LEVEL_ORDER.indexOf(cave.level);
+      const levelNum = typeof targetLevel === "string" ? CAVE_LEVEL_ORDER.indexOf(targetLevel) + 1 : targetLevel;
+      if (levelNum <= currentIndex) {
+        return { success: false, message: "\u76EE\u6807\u7B49\u7EA7\u4E0D\u80FD\u4F4E\u4E8E\u5F53\u524D\u7B49\u7EA7" };
+      }
+      const nextLevelName = CAVE_LEVEL_ORDER[levelNum - 1];
+      const upgradeCost = CAVE_UPGRADE_COSTS[nextLevelName] || 0;
+      if (cave.constructionPoints < upgradeCost) {
+        return {
+          success: false,
+          message: `\u5EFA\u8BBE\u5EA6\u4E0D\u8DB3\uFF0C\u9700\u8981${upgradeCost}\u70B9\uFF0C\u5F53\u524D${cave.constructionPoints}\u70B9`
+        };
+      }
+      cave.level = nextLevelName;
+      cave.spiritConcentration = CAVE_HEAVEN_LEVELS[nextLevelName].\u7075\u6C14\u52A0\u6210;
+      cave.constructionPoints -= upgradeCost;
+      return {
+        success: true,
+        message: `\u6D1E\u5E9C\u5347\u7EA7\u6210\u529F\uFF1A${cave.level} \u2192 ${nextLevelName}`,
+        newLevel: nextLevelName,
+        spiritConcentration: cave.spiritConcentration,
+        remainingConstructionPoints: cave.constructionPoints
+      };
+    }
+    /**
+     * 采集洞府产出
+     * @param {string} id - 洞府ID
+     */
+    collectFromCave(id) {
+      const cave = _caveHeavenDatabase.get(id);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      const now = Date.now();
+      const timePassed = (now - cave.lastCollectedAt) / 1e3;
+      const facilities = Object.values(cave.facilities);
+      if (facilities.length === 0) {
+        return { success: false, message: "\u6D1E\u5E9C\u5185\u6CA1\u6709\u8BBE\u65BD\uFF0C\u8BF7\u5148\u5EFA\u9020\u8BBE\u65BD" };
+      }
+      const output = {};
+      let totalOutputValue = 0;
+      for (const facility of facilities) {
+        const def = CAVE_FACILITIES[facility.type];
+        if (def) {
+          const timeMultiplier = Math.max(1, Math.floor(timePassed / 60));
+          const levelMultiplier = BUILDING_LEVEL_MULTIPLIERS[facility.level] || 1;
+          const amount = Math.floor(def.output * levelMultiplier * timeMultiplier);
+          if (!output[def.resourceType]) {
+            output[def.resourceType] = 0;
+          }
+          output[def.resourceType] += amount;
+          totalOutputValue += amount;
+          facility.totalOutput = (facility.totalOutput || 0) + amount;
+        }
+      }
+      cave.lastCollectedAt = now;
+      return {
+        success: true,
+        message: `\u91C7\u96C6\u6210\u529F\uFF0C\u83B7\u5F97${totalOutputValue}\u70B9\u8D44\u6E90`,
+        output,
+        totalOutput: totalOutputValue,
+        timePassed,
+        facilitiesCount: facilities.length
+      };
+    }
+    /**
+     * 建造设施
+     * @param {string} id - 洞府ID
+     * @param {string} facilityType - 设施类型
+     */
+    buildFacility(id, facilityType) {
+      var _a;
+      const cave = _caveHeavenDatabase.get(id);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      if (!CAVE_FACILITIES[facilityType]) {
+        return { success: false, message: `\u672A\u77E5\u8BBE\u65BD\u7C7B\u578B: ${facilityType}` };
+      }
+      const def = CAVE_FACILITIES[facilityType];
+      if ((((_a = this.gameState.player) == null ? void 0 : _a.spiritStones) || 0) < def.cost) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      this.gameState.player.spiritStones -= def.cost;
+      const facilityId = `facility_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      cave.facilities[facilityId] = {
+        id: facilityId,
+        type: facilityType,
+        level: 1,
+        builtAt: Date.now(),
+        totalOutput: 0
+      };
+      cave.constructionPoints += Math.floor(def.cost / 2);
+      return {
+        success: true,
+        message: `${facilityType}\u5EFA\u9020\u6210\u529F`,
+        facilityId,
+        remainingSpiritStones: this.gameState.player.spiritStones,
+        constructionPointsGained: Math.floor(def.cost / 2)
+      };
+    }
+    /**
+     * 查询洞府状态
+     * @param {string} id - 洞府ID
+     */
+    queryCaveHeaven(id) {
+      const cave = _caveHeavenDatabase.get(id);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      const levelInfo = CAVE_HEAVEN_LEVELS[cave.level];
+      const facilities = Object.values(cave.facilities).map((f) => {
+        var _a;
+        return {
+          id: f.id,
+          type: f.type,
+          level: f.level,
+          totalOutput: f.totalOutput,
+          outputPerMinute: (((_a = CAVE_FACILITIES[f.type]) == null ? void 0 : _a.output) || 0) * (BUILDING_LEVEL_MULTIPLIERS[f.level] || 1)
+        };
+      });
+      const now = Date.now();
+      const timeSinceLastCollect = Math.floor((now - cave.lastCollectedAt) / 1e3);
+      return {
+        success: true,
+        id: cave.id,
+        name: cave.name,
+        level: cave.level,
+        levelInfo: {
+          constructionLimit: levelInfo.\u5EFA\u8BBE\u5EA6\u4E0A\u9650,
+          spiritBonus: levelInfo.\u7075\u6C14\u52A0\u6210
+        },
+        constructionPoints: cave.constructionPoints,
+        spiritConcentration: cave.spiritConcentration,
+        facilities,
+        totalFacilities: facilities.length,
+        createdAt: cave.createdAt,
+        lastCollectedAt: cave.lastCollectedAt,
+        timeSinceLastCollect
+      };
+    }
+    /**
+     * 获取玩家所有洞府列表
+     */
+    listAllCaves() {
+      return Array.from(_caveHeavenDatabase.values()).map((cave) => ({
+        id: cave.id,
+        name: cave.name,
+        level: cave.level,
+        facilitiesCount: Object.keys(cave.facilities).length,
+        constructionPoints: cave.constructionPoints
+      }));
+    }
+    /**
+     * 升级设施
+     * @param {string} caveId - 洞府ID
+     * @param {string} facilityId - 设施ID
+     */
+    upgradeFacility(caveId, facilityId) {
+      var _a;
+      const cave = _caveHeavenDatabase.get(caveId);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      const facility = cave.facilities[facilityId];
+      if (!facility) {
+        return { success: false, message: "\u8BBE\u65BD\u4E0D\u5B58\u5728" };
+      }
+      if (facility.level >= 5) {
+        return { success: false, message: "\u8BBE\u65BD\u5DF2\u8FBE\u6700\u9AD8\u7B49\u7EA7" };
+      }
+      const def = CAVE_FACILITIES[facility.type];
+      const upgradeCost = def.cost * facility.level;
+      if ((((_a = this.gameState.player) == null ? void 0 : _a.spiritStones) || 0) < upgradeCost) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      this.gameState.player.spiritStones -= upgradeCost;
+      facility.level += 1;
+      facility.upgradedAt = Date.now();
+      return {
+        success: true,
+        message: `${facility.type}\u5347\u7EA7\u81F3${facility.level}\u7EA7`,
+        facilityId,
+        newLevel: facility.level,
+        remainingSpiritStones: this.gameState.player.spiritStones
+      };
+    }
+    /**
+     * 销毁设施
+     * @param {string} caveId - 洞府ID
+     * @param {string} facilityId - 设施ID
+     */
+    demolishFacility(caveId, facilityId) {
+      const cave = _caveHeavenDatabase.get(caveId);
+      if (!cave) {
+        return { success: false, message: "\u6D1E\u5E9C\u4E0D\u5B58\u5728" };
+      }
+      if (!cave.facilities[facilityId]) {
+        return { success: false, message: "\u8BBE\u65BD\u4E0D\u5B58\u5728" };
+      }
+      const facility = cave.facilities[facilityId];
+      delete cave.facilities[facilityId];
+      return {
+        success: true,
+        message: `${facility.type}\u5DF2\u62C6\u9664`,
+        demolitionRefund: Math.floor(CAVE_FACILITIES[facility.type].cost * 0.3)
+      };
+    }
+  };
+  function createCaveHeaven(gameState3, name) {
+    const service = createCaveHeavenService(gameState3);
+    return service.createCaveHeaven(name);
+  }
+  function upgradeCaveHeavenById(gameState3, id, targetLevel) {
+    const service = createCaveHeavenService(gameState3);
+    return service.upgradeCaveHeavenById(id, targetLevel);
+  }
+  function collectFromCave(gameState3, id) {
+    const service = createCaveHeavenService(gameState3);
+    return service.collectFromCave(id);
+  }
+  function buildCaveFacility(gameState3, id, facility) {
+    const service = createCaveHeavenService(gameState3);
+    return service.buildFacility(id, facility);
+  }
+  function queryCaveHeaven(gameState3, id) {
+    const service = createCaveHeavenService(gameState3);
+    return service.queryCaveHeaven(id);
+  }
+  var CAVE_HEAVEN_MCP_TOOLS = [
+    { name: "caveheaven.create", description: "\u521B\u5EFA\u7075\u754C\u6D1E\u5E9C", params: ["name"] },
+    { name: "caveheaven.upgrade", description: "\u5347\u7EA7\u6D1E\u5E9C\u7B49\u7EA7", params: ["id", "targetLevel"] },
+    { name: "caveheaven.collect", description: "\u91C7\u96C6\u6D1E\u5E9C\u4EA7\u51FA", params: ["id"] },
+    { name: "caveheaven.build", description: "\u5EFA\u9020\u8BBE\u65BD", params: ["id", "facility"] },
+    { name: "caveheaven.query", description: "\u67E5\u8BE2\u6D1E\u5E9C\u72B6\u6001", params: ["id"] }
+  ];
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -20617,6 +21434,66 @@ var CultivationSimulator = (() => {
       CaveRealmService.TOOLS["cave.harvest"],
       (params) => caveRealmHandlers["cave.harvest"](params)
     );
+    mcpRegistry.registerTool(
+      "law.list",
+      LAW_UNIFICATION_TOOLS[0],
+      () => listLaws(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "law.comprehend",
+      LAW_UNIFICATION_TOOLS[1],
+      (params) => comprehendLaw(gameState2, params.lawId)
+    );
+    mcpRegistry.registerTool(
+      "law.fuse",
+      LAW_UNIFICATION_TOOLS[2],
+      (params) => fuseLaws(gameState2, params.lawIds, params.targetTechnique)
+    );
+    mcpRegistry.registerTool(
+      "law.unify",
+      LAW_UNIFICATION_TOOLS[3],
+      () => unifyLaws(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "law.technique",
+      LAW_UNIFICATION_TOOLS[4],
+      () => listUltimateTechniques(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "law.evolve",
+      LAW_UNIFICATION_TOOLS[5],
+      (params) => evolveTechnique(gameState2, params.techniqueId)
+    );
+    mcpRegistry.registerTool(
+      "law.verify",
+      LAW_UNIFICATION_TOOLS[6],
+      () => verifyUnification(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "caveheaven.create",
+      CAVE_HEAVEN_MCP_TOOLS[0],
+      (params) => createCaveHeaven(gameState2, params.name)
+    );
+    mcpRegistry.registerTool(
+      "caveheaven.upgrade",
+      CAVE_HEAVEN_MCP_TOOLS[1],
+      (params) => upgradeCaveHeavenById(gameState2, params.id, params.targetLevel)
+    );
+    mcpRegistry.registerTool(
+      "caveheaven.collect",
+      CAVE_HEAVEN_MCP_TOOLS[2],
+      (params) => collectFromCave(gameState2, params.id)
+    );
+    mcpRegistry.registerTool(
+      "caveheaven.build",
+      CAVE_HEAVEN_MCP_TOOLS[3],
+      (params) => buildCaveFacility(gameState2, params.id, params.facility)
+    );
+    mcpRegistry.registerTool(
+      "caveheaven.query",
+      CAVE_HEAVEN_MCP_TOOLS[4],
+      (params) => queryCaveHeaven(gameState2, params.id)
+    );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
   function getDomainModule(name) {
@@ -22069,4 +22946,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-7dcb956-2026-05-31T15-25-52-505Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-ea1e12d-2026-05-31T15-32-03-696Z";
