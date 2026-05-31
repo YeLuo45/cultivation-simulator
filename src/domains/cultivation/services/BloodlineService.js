@@ -558,13 +558,66 @@ class BloodlineService {
 
     /**
      * 反序列化数据
-     * @param {object} data - 序列化数据
+     * 反序列化数据
      */
     deserialize(data) {
         if (data.bloodlineData) {
             this.gameState.bloodlineData = data.bloodlineData;
         }
     }
+}
+
+// ===== MCP工具定义 =====
+
+export const BLOODLINE_MCP_TOOLS = [
+    { name: 'bloodline.essence.gain', description: '获得血脉精华', params: ['amount', 'reason'] },
+    { name: 'bloodline.awaken', description: '觉醒仙宠血脉', params: ['beastId', 'bloodlineType'] },
+    { name: 'bloodline.progress', description: '增加血脉进度', params: ['beastId', 'amount'] },
+    { name: 'bloodline.info', description: '获取血脉信息', params: ['beastId'] },
+    { name: 'bloodline.resonance.check', description: '检查血脉共鸣', params: ['beastId1', 'beastId2'] },
+    { name: 'bloodline.resonance.create', description: '建立血脉共鸣配对', params: ['beastId1', 'beastId2'] },
+    { name: 'bloodline.resonance.remove', description: '移除血脉共鸣配对', params: ['pairId'] }
+];
+
+// 创建服务实例的工厂函数
+function createBloodlineServiceInstance(gameState) {
+    return new BloodlineService(gameState);
+}
+
+// MCP工具处理函数
+export function gainBloodlineEssence(gameState, amount, reason = 'reward') {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.gainBloodlineEssence(amount, reason);
+}
+
+export function awakenBloodline(gameState, beastId, bloodlineType = null) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.awakenBloodline(beastId, bloodlineType);
+}
+
+export function addBloodlineProgress(gameState, beastId, amount) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.addBloodlineProgress(beastId, amount);
+}
+
+export function getBeastBloodlineInfo(gameState, beastId) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.getBeastBloodlineInfo(beastId);
+}
+
+export function checkBloodlineResonance(gameState, beastId1, beastId2) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.checkResonance(beastId1, beastId2);
+}
+
+export function createBloodlineResonancePair(gameState, beastId1, beastId2) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.createResonancePair(beastId1, beastId2);
+}
+
+export function removeBloodlineResonancePair(gameState, pairId) {
+    const service = createBloodlineServiceInstance(gameState);
+    return service.removeResonancePair(pairId);
 }
 
 export default BloodlineService;

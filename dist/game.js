@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-ea1e12d-2026-05-31T15-32-03-696Z */
+/* Cultivation Simulator DDD-v1.0.0-a785dbb-2026-05-31T15-41-01-659Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -13828,6 +13828,956 @@ var CultivationSimulator = (() => {
     { name: "caveheaven.query", description: "\u67E5\u8BE2\u6D1E\u5E9C\u72B6\u6001", params: ["id"] }
   ];
 
+  // src/domains/cultivation/services/SpiritBeastService.js
+  var SPIRIT_BEAST_TIERS = {
+    "\u5E7C\u5E74\u671F": { minLevel: 1, maxLevel: 10, evolutionItems: ["\u7075\u517D\u86CB"], tierIndex: 0 },
+    "\u6210\u957F\u671F": { minLevel: 11, maxLevel: 30, evolutionItems: ["\u8FDB\u5316\u4E39", "\u7075\u8349"], tierIndex: 1 },
+    "\u6210\u719F\u671F": { minLevel: 31, maxLevel: 60, evolutionItems: ["\u4ED9\u9732", "\u795E\u8BC6\u679C"], tierIndex: 2 },
+    "\u5316\u5F62\u671F": { minLevel: 61, maxLevel: 90, evolutionItems: ["\u5316\u5F62\u8349", "\u5929\u96F7\u73E0"], tierIndex: 3 },
+    "\u795E\u517D\u671F": { minLevel: 91, maxLevel: 999, evolutionItems: ["\u795E\u517D\u7CBE\u8840", "\u5929\u9053\u6CD5\u5219"], tierIndex: 4 }
+  };
+  var TIER_ORDER = ["\u5E7C\u5E74\u671F", "\u6210\u957F\u671F", "\u6210\u719F\u671F", "\u5316\u5F62\u671F", "\u795E\u517D\u671F"];
+  var TIER_SKILLS = {
+    "\u5E7C\u5E74\u671F": [],
+    "\u6210\u957F\u671F": ["\u7075\u89C6", "\u611F\u77E5"],
+    "\u6210\u719F\u671F": ["\u7075\u89C6", "\u611F\u77E5", "\u7075\u98CE"],
+    "\u5316\u5F62\u671F": ["\u7075\u89C6", "\u611F\u77E5", "\u7075\u98CE", "\u4ED9\u98CE"],
+    "\u795E\u517D\u671F": ["\u7075\u89C6", "\u611F\u77E5", "\u7075\u98CE", "\u4ED9\u98CE", "\u795E\u4F51"]
+  };
+  var EVOLUTION_BRANCHES = {
+    "\u5E7C\u5E74\u671F": [
+      { id: "beast_type_a", name: "\u7075\u72D0", description: "\u7075\u5DE7\u578B\u4ED9\u5BA0", statBonus: { agility: 10 } },
+      { id: "beast_type_b", name: "\u7075\u718A", description: "\u529B\u91CF\u578B\u4ED9\u5BA0", statBonus: { strength: 10 } },
+      { id: "beast_type_c", name: "\u7075\u9E64", description: "\u667A\u6167\u578B\u4ED9\u5BA0", statBonus: { wisdom: 10 } }
+    ],
+    "\u6210\u957F\u671F": [
+      { id: "fierce", name: "\u731B\u517D\u7CFB", description: "\u5F3A\u5316\u653B\u51FB", statBonus: { attack: 15 } },
+      { id: "guard", name: "\u5B88\u62A4\u7CFB", description: "\u5F3A\u5316\u9632\u5FA1", statBonus: { defense: 15 } }
+    ],
+    "\u6210\u719F\u671F": [
+      { id: "celestial", name: "\u4ED9\u9053\u7CFB", description: "\u589E\u52A0\u7075\u529B", statBonus: { spiritual: 20 } },
+      { id: "demon", name: "\u5996\u9053\u7CFB", description: "\u589E\u52A0\u66B4\u51FB", statBonus: { critRate: 5 } },
+      { id: "balance", name: "\u5E73\u8861\u7CFB", description: "\u5C5E\u6027\u5747\u8861", statBonus: { attack: 10, defense: 10 } }
+    ],
+    "\u5316\u5F62\u671F": [
+      { id: "divine", name: "\u795E\u9053\u7CFB", description: "\u589E\u52A0\u795E\u8BC6", statBonus: { divine: 25 } },
+      { id: "dragon", name: "\u9F99\u7CFB", description: "\u589E\u52A0\u751F\u547D", statBonus: { health: 30 } }
+    ],
+    "\u795E\u517D\u671F": [
+      { id: "phoenix", name: "\u51E4\u51F0\u7CFB", description: "\u6D85\u69C3\u91CD\u751F", statBonus: { rebirth: 1 } },
+      { id: "titan", name: "\u6CF0\u5766\u7CFB", description: "\u7EDD\u5BF9\u529B\u91CF", statBonus: { power: 50 } }
+    ]
+  };
+  var EVOLUTION_ITEM_COSTS = {
+    "\u5E7C\u5E74\u671F": { "\u7075\u517D\u86CB": 1 },
+    "\u6210\u957F\u671F": { "\u8FDB\u5316\u4E39": 1, "\u7075\u8349": 2 },
+    "\u6210\u719F\u671F": { "\u4ED9\u9732": 1, "\u795E\u8BC6\u679C": 1 },
+    "\u5316\u5F62\u671F": { "\u5316\u5F62\u8349": 1, "\u5929\u96F7\u73E0": 1 },
+    "\u795E\u517D\u671F": { "\u795E\u517D\u7CBE\u8840": 1, "\u5929\u9053\u6CD5\u5219": 1 }
+  };
+  var SPIRIT_BEAST_BASE_STATS = {
+    attack: 5,
+    defense: 5,
+    health: 50,
+    spiritual: 10,
+    agility: 8,
+    critRate: 1
+  };
+  function createInitialSpiritBeastData() {
+    return {
+      beasts: [],
+      // 拥有的仙宠列表
+      selectedBeastId: null,
+      // 当前选中的仙宠ID
+      totalBeastsOwned: 0
+      // 累计拥有的仙宠数量
+    };
+  }
+  function createSpiritBeast(name, type = "beast_type_a", tier = "\u5E7C\u5E74\u671F") {
+    const id = `beast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return {
+      id,
+      name,
+      type,
+      tier,
+      level: 1,
+      exp: 0,
+      expToNextLevel: 100,
+      skills: [],
+      bloodlineRank: "\u51E1\u517D",
+      bloodlineAwakened: false,
+      bloodlineProgress: 0,
+      stats: { ...SPIRIT_BEAST_BASE_STATS },
+      evolutionBranch: null,
+      isSelected: false,
+      createdAt: Date.now()
+    };
+  }
+  var SpiritBeastService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.hooks = /* @__PURE__ */ new Map();
+      this.hookIdCounter = 0;
+      this.initializeData();
+    }
+    /**
+     * 初始化仙宠数据
+     */
+    initializeData() {
+      if (!this.gameState.spiritBeastData) {
+        this.gameState.spiritBeastData = createInitialSpiritBeastData();
+      }
+    }
+    /**
+     * 获取仙宠数据
+     */
+    getSpiritBeastData() {
+      return this.gameState.spiritBeastData;
+    }
+    /**
+     * 获取所有仙宠
+     */
+    getAllBeasts() {
+      return this.gameState.spiritBeastData.beasts;
+    }
+    /**
+     * 获取选中的仙宠
+     */
+    getSelectedBeast() {
+      const data = this.getSpiritBeastData();
+      if (!data.selectedBeastId) return null;
+      return data.beasts.find((b) => b.id === data.selectedBeastId) || null;
+    }
+    /**
+     * 选择仙宠
+     * @param {string} beastId - 仙宠ID
+     */
+    selectBeast(beastId) {
+      const data = this.getSpiritBeastData();
+      const beast = data.beasts.find((b) => b.id === beastId);
+      if (!beast) {
+        return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      }
+      if (data.selectedBeastId) {
+        const prevBeast = data.beasts.find((b) => b.id === data.selectedBeastId);
+        if (prevBeast) prevBeast.isSelected = false;
+      }
+      data.selectedBeastId = beastId;
+      beast.isSelected = true;
+      return { success: true, beast };
+    }
+    /**
+     * 获得新仙宠
+     * @param {string} name - 仙宠名称
+     * @param {string} type - 仙宠类型
+     */
+    acquireBeast(name, type = "beast_type_a") {
+      const data = this.getSpiritBeastData();
+      const beast = createSpiritBeast(name, type, "\u5E7C\u5E74\u671F");
+      if (data.beasts.length === 0) {
+        data.selectedBeastId = beast.id;
+        beast.isSelected = true;
+      }
+      data.beasts.push(beast);
+      data.totalBeastsOwned++;
+      this.triggerHook("beastAcquired", { beast });
+      return { success: true, beast };
+    }
+    /**
+     * 检查是否可以进化
+     * @param {string} beastId - 仙宠ID
+     * @param {string} branchId - 进化分支ID (可选)
+     */
+    canEvolve(beastId, branchId = null) {
+      var _a;
+      const beast = this.getBeastById(beastId);
+      if (!beast) {
+        return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      }
+      const currentTierIndex = TIER_ORDER.indexOf(beast.tier);
+      if (currentTierIndex >= TIER_ORDER.length - 1) {
+        return { success: false, error: "\u5DF2\u8FBE\u6700\u9AD8\u8FDB\u5316\u9636\u6BB5" };
+      }
+      const tierConfig = SPIRIT_BEAST_TIERS[beast.tier];
+      if (beast.level < tierConfig.maxLevel) {
+        return {
+          success: false,
+          error: `\u7B49\u7EA7\u4E0D\u8DB3\uFF0C\u9700\u8981\u7B49\u7EA7 ${tierConfig.maxLevel}`,
+          currentLevel: beast.level,
+          requiredLevel: tierConfig.maxLevel
+        };
+      }
+      const requiredItems = EVOLUTION_ITEM_COSTS[beast.tier];
+      const inventory = ((_a = this.gameState.inventory) == null ? void 0 : _a.items) || [];
+      for (const [itemName, requiredCount] of Object.entries(requiredItems)) {
+        const ownedCount = inventory.filter((item) => item.name === itemName).length;
+        if (ownedCount < requiredCount) {
+          return {
+            success: false,
+            error: `\u6750\u6599\u4E0D\u8DB3: \u9700\u8981 ${itemName} x${requiredCount}`,
+            currentItem: itemName,
+            required: requiredCount,
+            owned: ownedCount
+          };
+        }
+      }
+      if (currentTierIndex >= 1 && !beast.evolutionBranch && !branchId) {
+        return {
+          success: false,
+          error: "\u9700\u8981\u9009\u62E9\u8FDB\u5316\u5206\u652F",
+          requiresBranch: true,
+          availableBranches: EVOLUTION_BRANCHES[beast.tier]
+        };
+      }
+      return { success: true };
+    }
+    /**
+     * 进化仙宠
+     * @param {string} beastId - 仙宠ID
+     * @param {string} branchId - 进化分支ID
+     */
+    evolveBeast(beastId, branchId = null) {
+      const canEvolveResult = this.canEvolve(beastId, branchId);
+      if (!canEvolveResult.success) {
+        return canEvolveResult;
+      }
+      const beast = this.getBeastById(beastId);
+      const currentTierIndex = TIER_ORDER.indexOf(beast.tier);
+      const nextTier = TIER_ORDER[currentTierIndex + 1];
+      const tierConfig = SPIRIT_BEAST_TIERS[beast.tier];
+      const requiredItems = EVOLUTION_ITEM_COSTS[beast.tier];
+      const inventory = this.gameState.inventory.items;
+      for (const [itemName, requiredCount] of Object.entries(requiredItems)) {
+        let remaining = requiredCount;
+        for (let i = inventory.length - 1; i >= 0 && remaining > 0; i--) {
+          if (inventory[i].name === itemName) {
+            inventory.splice(i, 1);
+            remaining--;
+          }
+        }
+      }
+      if (branchId) {
+        beast.evolutionBranch = branchId;
+        const branch = EVOLUTION_BRANCHES[beast.tier].find((b) => b.id === branchId);
+        if (branch) {
+          Object.assign(beast.stats, branch.statBonus);
+        }
+      }
+      const oldTier = beast.tier;
+      beast.tier = nextTier;
+      const newSkills = TIER_SKILLS[nextTier];
+      const unlockedSkills = newSkills.filter((skill) => !beast.skills.includes(skill));
+      beast.skills.push(...unlockedSkills);
+      const nextTierConfig = SPIRIT_BEAST_TIERS[nextTier];
+      beast.level = nextTierConfig.minLevel;
+      beast.exp = 0;
+      beast.expToNextLevel = nextTierConfig.minLevel * 10;
+      this.triggerHook("beastEvolved", {
+        beast,
+        oldTier,
+        newTier: nextTier,
+        unlockedSkills,
+        branchId
+      });
+      return {
+        success: true,
+        beast,
+        oldTier,
+        newTier: nextTier,
+        unlockedSkills,
+        newStats: beast.stats
+      };
+    }
+    /**
+     * 获取仙宠信息
+     * @param {string} beastId - 仙宠ID
+     */
+    getBeastById(beastId) {
+      return this.getSpiritBeastData().beasts.find((b) => b.id === beastId) || null;
+    }
+    /**
+     * 获取进化信息
+     * @param {string} beastId - 仙宠ID
+     */
+    getEvolutionInfo(beastId) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      const currentTierIndex = TIER_ORDER.indexOf(beast.tier);
+      const tierConfig = SPIRIT_BEAST_TIERS[beast.tier];
+      return {
+        success: true,
+        currentTier: beast.tier,
+        currentTierIndex,
+        nextTier: currentTierIndex < TIER_ORDER.length - 1 ? TIER_ORDER[currentTierIndex + 1] : null,
+        levelProgress: {
+          current: beast.level,
+          max: tierConfig.maxLevel,
+          percentage: Math.round(beast.level / tierConfig.maxLevel * 100)
+        },
+        evolutionItems: tierConfig.evolutionItems,
+        itemCosts: EVOLUTION_ITEM_COSTS[beast.tier],
+        availableBranches: currentTierIndex >= 1 ? EVOLUTION_BRANCHES[beast.tier] : null,
+        currentBranch: beast.evolutionBranch,
+        potentialSkills: currentTierIndex < TIER_ORDER.length - 1 ? TIER_SKILLS[TIER_ORDER[currentTierIndex + 1]] : []
+      };
+    }
+    /**
+     * 获取所有进化阶段
+     */
+    getAllTiers() {
+      return TIER_ORDER.map((tier) => ({
+        name: tier,
+        ...SPIRIT_BEAST_TIERS[tier]
+      }));
+    }
+    /**
+     * 仙宠获得经验
+     * @param {string} beastId - 仙宠ID
+     * @param {number} amount - 经验值
+     */
+    gainExp(beastId, amount) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      beast.exp += amount;
+      let leveledUp = false;
+      let totalLevelsGained = 0;
+      while (beast.exp >= beast.expToNextLevel) {
+        beast.exp -= beast.expToNextLevel;
+        beast.level++;
+        beast.expToNextLevel = Math.floor(beast.expToNextLevel * 1.2);
+        leveledUp = true;
+        totalLevelsGained++;
+        this.triggerHook("beastLevelUp", { beast, level: beast.level });
+      }
+      return {
+        success: true,
+        expGained: amount,
+        currentExp: beast.exp,
+        leveledUp,
+        totalLevelsGained,
+        currentLevel: beast.level
+      };
+    }
+    /**
+     * 获取仙宠战斗力
+     * @param {string} beastId - 仙宠ID
+     */
+    getBeastPower(beastId) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return 0;
+      const stats = beast.stats;
+      const tierMultiplier = SPIRIT_BEAST_TIERS[beast.tier].tierIndex + 1;
+      const levelBonus = beast.level * 0.5;
+      return Math.floor(
+        (stats.attack + stats.defense + stats.health * 0.1 + stats.spiritual * 0.5) * tierMultiplier + levelBonus
+      );
+    }
+    /**
+     * 获取所有仙宠战力排行榜
+     */
+    getBeastPowerRanking() {
+      return this.getAllBeasts().map((beast) => ({
+        beast,
+        power: this.getBeastPower(beast.id)
+      })).sort((a, b) => b.power - a.power);
+    }
+    // ===== Hook系统 =====
+    /**
+     * 注册钩子
+     * @param {string} type - 钩子类型
+     * @param {function} callback - 回调函数
+     */
+    registerHook(type, callback) {
+      const hookId = ++this.hookIdCounter;
+      this.hooks.set(hookId, { type, callback, enabled: true });
+      return { success: true, hookId, type };
+    }
+    /**
+     * 注销钩子
+     * @param {number} hookId - 钩子ID
+     */
+    unregisterHook(hookId) {
+      if (!this.hooks.has(hookId)) {
+        return { success: false, error: "\u94A9\u5B50\u4E0D\u5B58\u5728" };
+      }
+      this.hooks.delete(hookId);
+      return { success: true };
+    }
+    /**
+     * 触发钩子
+     * @param {string} type - 钩子类型
+     * @param {object} data - 数据
+     */
+    triggerHook(type, data) {
+      const triggeredIds = [];
+      for (const [hookId, hook] of this.hooks) {
+        if (hook.type === type && hook.enabled) {
+          hook.callback(data);
+          triggeredIds.push(hookId);
+        }
+      }
+      return triggeredIds;
+    }
+    /**
+     * 列出所有钩子
+     */
+    listHooks() {
+      return Array.from(this.hooks.entries()).map(([id, h]) => ({
+        id,
+        type: h.type,
+        enabled: h.enabled
+      }));
+    }
+    // ===== 序列化 =====
+    /**
+     * 序列化数据
+     */
+    serialize() {
+      return {
+        spiritBeastData: this.gameState.spiritBeastData
+      };
+    }
+    /**
+     * 反序列化数据
+     * @param {object} data - 序列化数据
+     */
+    deserialize(data) {
+      if (data.spiritBeastData) {
+        this.gameState.spiritBeastData = data.spiritBeastData;
+      }
+    }
+  };
+  var SPIRIT_BEAST_MCP_TOOLS = [
+    { name: "spiritbeast.acquire", description: "\u83B7\u5F97\u65B0\u4ED9\u5BA0", params: ["name", "type"] },
+    { name: "spiritbeast.list", description: "\u5217\u51FA\u6240\u6709\u4ED9\u5BA0", params: [] },
+    { name: "spiritbeast.select", description: "\u9009\u62E9\u4ED9\u5BA0", params: ["beastId"] },
+    { name: "spiritbeast.evolve", description: "\u8FDB\u5316\u4ED9\u5BA0", params: ["beastId", "branchId"] },
+    { name: "spiritbeast.info", description: "\u83B7\u53D6\u4ED9\u5BA0\u4FE1\u606F", params: ["beastId"] },
+    { name: "spiritbeast.evolution_info", description: "\u83B7\u53D6\u8FDB\u5316\u4FE1\u606F", params: ["beastId"] },
+    { name: "spiritbeast.power", description: "\u83B7\u53D6\u4ED9\u5BA0\u6218\u529B", params: ["beastId"] },
+    { name: "spiritbeast.tiers", description: "\u83B7\u53D6\u6240\u6709\u8FDB\u5316\u9636\u6BB5", params: [] }
+  ];
+  function createSpiritBeastServiceInstance(gameState3) {
+    return new SpiritBeastService(gameState3);
+  }
+  function acquireSpiritBeast(gameState3, name, type = "beast_type_a") {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.acquireBeast(name, type);
+  }
+  function listSpiritBeasts(gameState3) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.getAllBeasts();
+  }
+  function selectSpiritBeast(gameState3, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.selectBeast(beastId);
+  }
+  function evolveSpiritBeast(gameState3, beastId, branchId = null) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.evolveBeast(beastId, branchId);
+  }
+  function getSpiritBeastInfo(gameState3, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.getBeastById(beastId);
+  }
+  function getSpiritBeastEvolutionInfo(gameState3, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    return service.getEvolutionInfo(beastId);
+  }
+  function getSpiritBeastPower(gameState3, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState3);
+    const power = service.getBeastPower(beastId);
+    return { success: true, beastId, power };
+  }
+  function getAllSpiritBeastTiers() {
+    return SpiritBeastService.getAllTiers ? SpiritBeastService.getAllTiers() : [];
+  }
+
+  // src/domains/cultivation/services/BloodlineService.js
+  var BLOODLINE_RANKS = {
+    "\u51E1\u517D": {
+      multiplier: 1,
+      bonusSkills: [],
+      awakeningCost: 0,
+      requiredProgress: 0,
+      rankIndex: 0
+    },
+    "\u7075\u517D": {
+      multiplier: 1.5,
+      bonusSkills: ["\u7075\u89C6"],
+      awakeningCost: 50,
+      requiredProgress: 100,
+      rankIndex: 1
+    },
+    "\u4ED9\u517D": {
+      multiplier: 2,
+      bonusSkills: ["\u7075\u89C6", "\u4ED9\u98CE"],
+      awakeningCost: 200,
+      requiredProgress: 500,
+      rankIndex: 2
+    },
+    "\u795E\u517D": {
+      multiplier: 3,
+      bonusSkills: ["\u7075\u89C6", "\u4ED9\u98CE", "\u795E\u4F51"],
+      awakeningCost: 1e3,
+      requiredProgress: 2e3,
+      rankIndex: 3
+    }
+  };
+  var BLOODLINE_ORDER = ["\u51E1\u517D", "\u7075\u517D", "\u4ED9\u517D", "\u795E\u517D"];
+  var BLOODLINE_TYPES = {
+    "\u706B\u7130\u8840\u8109": { element: "fire", bonus: { attack: 15, critRate: 2 } },
+    "\u5BD2\u51B0\u8840\u8109": { element: "water", bonus: { defense: 15, health: 20 } },
+    "\u96F7\u9706\u8840\u8109": { element: "thunder", bonus: { attack: 10, agility: 10 } },
+    "\u5927\u5730\u8840\u8109": { element: "earth", bonus: { health: 30, defense: 10 } },
+    "\u98CE\u7075\u8840\u8109": { element: "wind", bonus: { agility: 15, critRate: 3 } },
+    "\u81EA\u7136\u8840\u8109": { element: "wood", bonus: { spiritual: 20, health: 15 } }
+  };
+  var BloodlineService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.hooks = /* @__PURE__ */ new Map();
+      this.hookIdCounter = 0;
+      this.initializeData();
+    }
+    /**
+     * 初始化血脉数据
+     */
+    initializeData() {
+      if (!this.gameState.bloodlineData) {
+        this.gameState.bloodlineData = {
+          bloodlineEssence: 0,
+          // 血脉精华数量
+          totalEssenceEarned: 0,
+          // 累计获得血脉精华
+          resonancePairs: []
+          // 共鸣配对
+        };
+      }
+    }
+    /**
+     * 获取血脉数据
+     */
+    getBloodlineData() {
+      return this.gameState.bloodlineData;
+    }
+    /**
+     * 获得血脉精华
+     * @param {number} amount - 数量
+     * @param {string} reason - 原因
+     */
+    gainBloodlineEssence(amount, reason = "reward") {
+      const data = this.getBloodlineData();
+      data.bloodlineEssence += amount;
+      data.totalEssenceEarned += amount;
+      this.triggerHook("bloodlineEssenceGained", {
+        amount,
+        reason,
+        totalEssence: data.bloodlineEssence,
+        totalEarned: data.totalEssenceEarned
+      });
+      return {
+        success: true,
+        gained: amount,
+        reason,
+        totalEssence: data.bloodlineEssence,
+        totalEarned: data.totalEssenceEarned
+      };
+    }
+    /**
+     * 消耗血脉精华
+     * @param {number} amount - 数量
+     */
+    consumeBloodlineEssence(amount) {
+      const data = this.getBloodlineData();
+      if (data.bloodlineEssence < amount) {
+        return {
+          success: false,
+          error: "\u8840\u8109\u7CBE\u534E\u4E0D\u8DB3",
+          required: amount,
+          available: data.bloodlineEssence
+        };
+      }
+      data.bloodlineEssence -= amount;
+      return { success: true, consumed: amount, remaining: data.bloodlineEssence };
+    }
+    /**
+     * 检查仙宠是否可以觉醒
+     * @param {string} beastId - 仙宠ID
+     */
+    canAwaken(beastId) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) {
+        return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      }
+      if (beast.bloodlineAwakened) {
+        return { success: false, error: "\u8840\u8109\u5DF2\u89C9\u9192" };
+      }
+      const currentRank = BLOODLINE_RANKS[beast.bloodlineRank];
+      if (currentRank.rankIndex >= BLOODLINE_ORDER.length - 1) {
+        return { success: false, error: "\u5DF2\u8FBE\u6700\u9AD8\u8840\u8109\u7B49\u7EA7" };
+      }
+      if (beast.bloodlineProgress < currentRank.requiredProgress) {
+        return {
+          success: false,
+          error: "\u8840\u8109\u8FDB\u5EA6\u4E0D\u8DB3",
+          required: currentRank.requiredProgress,
+          current: beast.bloodlineProgress
+        };
+      }
+      const data = this.getBloodlineData();
+      if (data.bloodlineEssence < currentRank.awakeningCost) {
+        return {
+          success: false,
+          error: "\u8840\u8109\u7CBE\u534E\u4E0D\u8DB3",
+          required: currentRank.awakeningCost,
+          available: data.bloodlineEssence
+        };
+      }
+      return { success: true };
+    }
+    /**
+     * 觉醒仙宠血脉
+     * @param {string} beastId - 仙宠ID
+     * @param {string} bloodlineType - 血脉类型 (可选)
+     */
+    awakenBloodline(beastId, bloodlineType = null) {
+      const canResult = this.canAwaken(beastId);
+      if (!canResult.success) {
+        return canResult;
+      }
+      const beast = this.getBeastById(beastId);
+      const currentRank = BLOODLINE_RANKS[beast.bloodlineRank];
+      const nextRankName = BLOODLINE_ORDER[currentRank.rankIndex + 1];
+      const nextRank = BLOODLINE_RANKS[nextRankName];
+      const consumeResult = this.consumeBloodlineEssence(currentRank.awakeningCost);
+      if (!consumeResult.success) {
+        return consumeResult;
+      }
+      const oldRank = beast.bloodlineRank;
+      beast.bloodlineRank = nextRankName;
+      beast.bloodlineAwakened = true;
+      beast.bloodlineProgress = 0;
+      if (bloodlineType && BLOODLINE_TYPES[bloodlineType]) {
+        beast.bloodlineType = bloodlineType;
+        Object.assign(beast.stats, BLOODLINE_TYPES[bloodlineType].bonus);
+      } else if (!beast.bloodlineType) {
+        beast.bloodlineType = Object.keys(BLOODLINE_TYPES)[0];
+        Object.assign(beast.stats, BLOODLINE_TYPES[beast.bloodlineType].bonus);
+      }
+      const newSkills = nextRank.bonusSkills;
+      const unlockedSkills = newSkills.filter((skill) => !beast.skills.includes(skill));
+      beast.skills.push(...unlockedSkills);
+      this.triggerHook("bloodlineAwakened", {
+        beast,
+        oldRank,
+        newRank: nextRankName,
+        unlockedSkills,
+        bloodlineType: beast.bloodlineType
+      });
+      return {
+        success: true,
+        beast,
+        oldRank,
+        newRank: nextRankName,
+        unlockedSkills,
+        bloodlineType: beast.bloodlineType,
+        newMultiplier: nextRank.multiplier
+      };
+    }
+    /**
+     * 增加血脉进度
+     * @param {string} beastId - 仙宠ID
+     * @param {number} amount - 进度值
+     */
+    addBloodlineProgress(beastId, amount) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      const currentRank = BLOODLINE_RANKS[beast.bloodlineRank];
+      const maxProgress = currentRank.requiredProgress;
+      const oldProgress = beast.bloodlineProgress;
+      beast.bloodlineProgress = Math.min(beast.bloodlineProgress + amount, maxProgress);
+      const actualAdded = beast.bloodlineProgress - oldProgress;
+      return {
+        success: true,
+        added: actualAdded,
+        currentProgress: beast.bloodlineProgress,
+        maxProgress,
+        percentage: Math.round(beast.bloodlineProgress / maxProgress * 100)
+      };
+    }
+    /**
+     * 获取仙宠血脉信息
+     * @param {string} beastId - 仙宠ID
+     */
+    getBeastBloodlineInfo(beastId) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      const currentRank = BLOODLINE_RANKS[beast.bloodlineRank];
+      const currentRankIndex = currentRank.rankIndex;
+      const nextRankName = currentRankIndex < BLOODLINE_ORDER.length - 1 ? BLOODLINE_ORDER[currentRankIndex + 1] : null;
+      return {
+        success: true,
+        beastId,
+        bloodlineRank: beast.bloodlineRank,
+        bloodlineType: beast.bloodlineType || null,
+        bloodlineAwakened: beast.bloodlineAwakened,
+        bloodlineProgress: beast.bloodlineProgress,
+        maxProgress: currentRank.requiredProgress,
+        progressPercentage: Math.round(beast.bloodlineProgress / currentRank.requiredProgress * 100),
+        multiplier: currentRank.multiplier,
+        bonusSkills: currentRank.bonusSkills,
+        nextRank: nextRankName,
+        nextRankMultiplier: nextRankName ? BLOODLINE_RANKS[nextRankName].multiplier : null,
+        nextRankSkills: nextRankName ? BLOODLINE_RANKS[nextRankName].bonusSkills : [],
+        awakeningCost: nextRankName ? BLOODLINE_RANKS[nextRankName].awakeningCost : null,
+        availableBloodlineTypes: Object.keys(BLOODLINE_TYPES)
+      };
+    }
+    /**
+     * 检查血脉共鸣
+     * @param {string} beastId1 - 仙宠ID1
+     * @param {string} beastId2 - 仙宠ID2
+     */
+    checkResonance(beastId1, beastId2) {
+      const beast1 = this.getBeastById(beastId1);
+      const beast2 = this.getBeastById(beastId2);
+      if (!beast1 || !beast2) {
+        return { success: false, error: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      }
+      if (beast1.bloodlineType !== beast2.bloodlineType) {
+        return {
+          success: true,
+          hasResonance: false,
+          reason: "\u8840\u8109\u7C7B\u578B\u4E0D\u540C"
+        };
+      }
+      if (!beast1.bloodlineAwakened || !beast2.bloodlineAwakened) {
+        return {
+          success: true,
+          hasResonance: false,
+          reason: "\u6709\u4ED9\u5BA0\u8840\u8109\u672A\u89C9\u9192"
+        };
+      }
+      const rank1 = BLOODLINE_RANKS[beast1.bloodlineRank].rankIndex;
+      const rank2 = BLOODLINE_RANKS[beast2.bloodlineRank].rankIndex;
+      const resonanceBonus = (rank1 + 1) * (rank2 + 1) * 0.1;
+      return {
+        success: true,
+        hasResonance: true,
+        bloodlineType: beast1.bloodlineType,
+        resonanceBonus,
+        resonanceDescription: `${beast1.bloodlineType}\u5171\u9E23: \u5168\u5C5E\u6027+${Math.round(resonanceBonus * 100)}%`
+      };
+    }
+    /**
+     * 建立血脉共鸣配对
+     * @param {string} beastId1 - 仙宠ID1
+     * @param {string} beastId2 - 仙宠ID2
+     */
+    createResonancePair(beastId1, beastId2) {
+      const checkResult = this.checkResonance(beastId1, beastId2);
+      if (!checkResult.success) {
+        return checkResult;
+      }
+      if (!checkResult.hasResonance) {
+        return {
+          success: false,
+          error: checkResult.reason
+        };
+      }
+      const data = this.getBloodlineData();
+      const existingPair = data.resonancePairs.find(
+        (p) => p.beastId1 === beastId1 && p.beastId2 === beastId2 || p.beastId1 === beastId2 && p.beastId2 === beastId1
+      );
+      if (existingPair) {
+        return { success: false, error: "\u5171\u9E23\u914D\u5BF9\u5DF2\u5B58\u5728" };
+      }
+      const pairId = `resonance_${Date.now()}`;
+      data.resonancePairs.push({
+        pairId,
+        beastId1,
+        beastId2,
+        bloodlineType: checkResult.bloodlineType,
+        bonus: checkResult.resonanceBonus,
+        createdAt: Date.now()
+      });
+      this.triggerHook("resonanceCreated", {
+        pairId,
+        beastId1,
+        beastId2,
+        bloodlineType: checkResult.bloodlineType,
+        bonus: checkResult.resonanceBonus
+      });
+      return {
+        success: true,
+        pairId,
+        bonus: checkResult.resonanceBonus,
+        description: checkResult.resonanceDescription
+      };
+    }
+    /**
+     * 移除血脉共鸣配对
+     * @param {string} pairId - 配对ID
+     */
+    removeResonancePair(pairId) {
+      const data = this.getBloodlineData();
+      const pairIndex = data.resonancePairs.findIndex((p) => p.pairId === pairId);
+      if (pairIndex === -1) {
+        return { success: false, error: "\u5171\u9E23\u914D\u5BF9\u4E0D\u5B58\u5728" };
+      }
+      const removedPair = data.resonancePairs.splice(pairIndex, 1)[0];
+      this.triggerHook("resonanceRemoved", removedPair);
+      return { success: true, removedPair };
+    }
+    /**
+     * 获取所有共鸣配对
+     */
+    getAllResonancePairs() {
+      return this.getBloodlineData().resonancePairs;
+    }
+    /**
+     * 计算共鸣总加成
+     */
+    calculateTotalResonanceBonus() {
+      const pairs = this.getAllResonancePairs();
+      return pairs.reduce((total, pair) => total + pair.bonus, 0);
+    }
+    /**
+     * 获取仙宠属性 (带血脉加成)
+     * @param {string} beastId - 仙宠ID
+     */
+    getBeastStatsWithBloodline(beastId) {
+      const beast = this.getBeastById(beastId);
+      if (!beast) return null;
+      const baseStats = { ...beast.stats };
+      const rank = BLOODLINE_RANKS[beast.bloodlineRank];
+      const resonanceBonus = this.calculateTotalResonanceBonus();
+      const multiplier = rank.multiplier * (1 + resonanceBonus);
+      const enhancedStats = {};
+      for (const [stat, value] of Object.entries(baseStats)) {
+        enhancedStats[stat] = Math.floor(value * multiplier);
+      }
+      enhancedStats._multiplier = multiplier;
+      enhancedStats._bloodlineRank = beast.bloodlineRank;
+      enhancedStats._resonanceBonus = resonanceBonus;
+      return enhancedStats;
+    }
+    /**
+     * 辅助方法：获取仙宠
+     * @param {string} beastId - 仙宠ID
+     */
+    getBeastById(beastId) {
+      var _a;
+      return ((_a = this.gameState.spiritBeastData) == null ? void 0 : _a.beasts.find((b) => b.id === beastId)) || null;
+    }
+    // ===== Hook系统 =====
+    /**
+     * 注册钩子
+     * @param {string} type - 钩子类型
+     * @param {function} callback - 回调函数
+     */
+    registerHook(type, callback) {
+      const hookId = ++this.hookIdCounter;
+      this.hooks.set(hookId, { type, callback, enabled: true });
+      return { success: true, hookId, type };
+    }
+    /**
+     * 注销钩子
+     * @param {number} hookId - 钩子ID
+     */
+    unregisterHook(hookId) {
+      if (!this.hooks.has(hookId)) {
+        return { success: false, error: "\u94A9\u5B50\u4E0D\u5B58\u5728" };
+      }
+      this.hooks.delete(hookId);
+      return { success: true };
+    }
+    /**
+     * 触发钩子
+     * @param {string} type - 钩子类型
+     * @param {object} data - 数据
+     */
+    triggerHook(type, data) {
+      const triggeredIds = [];
+      for (const [hookId, hook] of this.hooks) {
+        if (hook.type === type && hook.enabled) {
+          hook.callback(data);
+          triggeredIds.push(hookId);
+        }
+      }
+      return triggeredIds;
+    }
+    /**
+     * 列出所有钩子
+     */
+    listHooks() {
+      return Array.from(this.hooks.entries()).map(([id, h]) => ({
+        id,
+        type: h.type,
+        enabled: h.enabled
+      }));
+    }
+    // ===== 序列化 =====
+    /**
+     * 序列化数据
+     */
+    serialize() {
+      return {
+        bloodlineData: this.gameState.bloodlineData
+      };
+    }
+    /**
+     * 反序列化数据
+     * 反序列化数据
+     */
+    deserialize(data) {
+      if (data.bloodlineData) {
+        this.gameState.bloodlineData = data.bloodlineData;
+      }
+    }
+  };
+  var BLOODLINE_MCP_TOOLS = [
+    { name: "bloodline.essence.gain", description: "\u83B7\u5F97\u8840\u8109\u7CBE\u534E", params: ["amount", "reason"] },
+    { name: "bloodline.awaken", description: "\u89C9\u9192\u4ED9\u5BA0\u8840\u8109", params: ["beastId", "bloodlineType"] },
+    { name: "bloodline.progress", description: "\u589E\u52A0\u8840\u8109\u8FDB\u5EA6", params: ["beastId", "amount"] },
+    { name: "bloodline.info", description: "\u83B7\u53D6\u8840\u8109\u4FE1\u606F", params: ["beastId"] },
+    { name: "bloodline.resonance.check", description: "\u68C0\u67E5\u8840\u8109\u5171\u9E23", params: ["beastId1", "beastId2"] },
+    { name: "bloodline.resonance.create", description: "\u5EFA\u7ACB\u8840\u8109\u5171\u9E23\u914D\u5BF9", params: ["beastId1", "beastId2"] },
+    { name: "bloodline.resonance.remove", description: "\u79FB\u9664\u8840\u8109\u5171\u9E23\u914D\u5BF9", params: ["pairId"] }
+  ];
+  function createBloodlineServiceInstance(gameState3) {
+    return new BloodlineService(gameState3);
+  }
+  function gainBloodlineEssence(gameState3, amount, reason = "reward") {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.gainBloodlineEssence(amount, reason);
+  }
+  function awakenBloodline(gameState3, beastId, bloodlineType = null) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.awakenBloodline(beastId, bloodlineType);
+  }
+  function addBloodlineProgress(gameState3, beastId, amount) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.addBloodlineProgress(beastId, amount);
+  }
+  function getBeastBloodlineInfo(gameState3, beastId) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.getBeastBloodlineInfo(beastId);
+  }
+  function checkBloodlineResonance(gameState3, beastId1, beastId2) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.checkResonance(beastId1, beastId2);
+  }
+  function createBloodlineResonancePair(gameState3, beastId1, beastId2) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.createResonancePair(beastId1, beastId2);
+  }
+  function removeBloodlineResonancePair(gameState3, pairId) {
+    const service = createBloodlineServiceInstance(gameState3);
+    return service.removeResonancePair(pairId);
+  }
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -21154,7 +22104,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V246",
+      gameVersion: "V247",
       // 设置
       settings: {
         soundEnabled: true,
@@ -21493,6 +22443,81 @@ var CultivationSimulator = (() => {
       "caveheaven.query",
       CAVE_HEAVEN_MCP_TOOLS[4],
       (params) => queryCaveHeaven(gameState2, params.id)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.acquire",
+      SPIRIT_BEAST_MCP_TOOLS[0],
+      (params) => acquireSpiritBeast(gameState2, params.name, params.type)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.list",
+      SPIRIT_BEAST_MCP_TOOLS[1],
+      () => listSpiritBeasts(gameState2)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.select",
+      SPIRIT_BEAST_MCP_TOOLS[2],
+      (params) => selectSpiritBeast(gameState2, params.beastId)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.evolve",
+      SPIRIT_BEAST_MCP_TOOLS[3],
+      (params) => evolveSpiritBeast(gameState2, params.beastId, params.branchId)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.info",
+      SPIRIT_BEAST_MCP_TOOLS[4],
+      (params) => getSpiritBeastInfo(gameState2, params.beastId)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.evolution_info",
+      SPIRIT_BEAST_MCP_TOOLS[5],
+      (params) => getSpiritBeastEvolutionInfo(gameState2, params.beastId)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.power",
+      SPIRIT_BEAST_MCP_TOOLS[6],
+      (params) => getSpiritBeastPower(gameState2, params.beastId)
+    );
+    mcpRegistry.registerTool(
+      "spiritbeast.tiers",
+      SPIRIT_BEAST_MCP_TOOLS[7],
+      () => getAllSpiritBeastTiers()
+    );
+    mcpRegistry.registerTool(
+      "bloodline.essence.gain",
+      BLOODLINE_MCP_TOOLS[0],
+      (params) => gainBloodlineEssence(gameState2, params.amount, params.reason)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.awaken",
+      BLOODLINE_MCP_TOOLS[1],
+      (params) => awakenBloodline(gameState2, params.beastId, params.bloodlineType)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.progress",
+      BLOODLINE_MCP_TOOLS[2],
+      (params) => addBloodlineProgress(gameState2, params.beastId, params.amount)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.info",
+      BLOODLINE_MCP_TOOLS[3],
+      (params) => getBeastBloodlineInfo(gameState2, params.beastId)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.resonance.check",
+      BLOODLINE_MCP_TOOLS[4],
+      (params) => checkBloodlineResonance(gameState2, params.beastId1, params.beastId2)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.resonance.create",
+      BLOODLINE_MCP_TOOLS[5],
+      (params) => createBloodlineResonancePair(gameState2, params.beastId1, params.beastId2)
+    );
+    mcpRegistry.registerTool(
+      "bloodline.resonance.remove",
+      BLOODLINE_MCP_TOOLS[6],
+      (params) => removeBloodlineResonancePair(gameState2, params.pairId)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -22946,4 +23971,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-ea1e12d-2026-05-31T15-32-03-696Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-a785dbb-2026-05-31T15-41-01-659Z";

@@ -553,5 +553,64 @@ class SpiritBeastService {
     }
 }
 
+// ===== MCP工具定义 =====
+
+export const SPIRIT_BEAST_MCP_TOOLS = [
+    { name: 'spiritbeast.acquire', description: '获得新仙宠', params: ['name', 'type'] },
+    { name: 'spiritbeast.list', description: '列出所有仙宠', params: [] },
+    { name: 'spiritbeast.select', description: '选择仙宠', params: ['beastId'] },
+    { name: 'spiritbeast.evolve', description: '进化仙宠', params: ['beastId', 'branchId'] },
+    { name: 'spiritbeast.info', description: '获取仙宠信息', params: ['beastId'] },
+    { name: 'spiritbeast.evolution_info', description: '获取进化信息', params: ['beastId'] },
+    { name: 'spiritbeast.power', description: '获取仙宠战力', params: ['beastId'] },
+    { name: 'spiritbeast.tiers', description: '获取所有进化阶段', params: [] }
+];
+
+// 创建服务实例的工厂函数
+function createSpiritBeastServiceInstance(gameState) {
+    return new SpiritBeastService(gameState);
+}
+
+// MCP工具处理函数
+export function acquireSpiritBeast(gameState, name, type = 'beast_type_a') {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.acquireBeast(name, type);
+}
+
+export function listSpiritBeasts(gameState) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.getAllBeasts();
+}
+
+export function selectSpiritBeast(gameState, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.selectBeast(beastId);
+}
+
+export function evolveSpiritBeast(gameState, beastId, branchId = null) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.evolveBeast(beastId, branchId);
+}
+
+export function getSpiritBeastInfo(gameState, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.getBeastById(beastId);
+}
+
+export function getSpiritBeastEvolutionInfo(gameState, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    return service.getEvolutionInfo(beastId);
+}
+
+export function getSpiritBeastPower(gameState, beastId) {
+    const service = createSpiritBeastServiceInstance(gameState);
+    const power = service.getBeastPower(beastId);
+    return { success: true, beastId, power };
+}
+
+export function getAllSpiritBeastTiers() {
+    return SpiritBeastService.getAllTiers ? SpiritBeastService.getAllTiers() : [];
+}
+
 export default SpiritBeastService;
 export { SpiritBeastService };

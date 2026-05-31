@@ -61,6 +61,12 @@ import { getLawUnificationService, LAW_UNIFICATION_TOOLS, listLaws, comprehendLa
 // 仙府洞天系统 (V245: 仙府洞天+洞府经营)
 import { createCaveHeavenService, CAVE_HEAVEN_MCP_TOOLS, createCaveHeaven, upgradeCaveHeavenById, collectFromCave, buildCaveFacility, queryCaveHeaven, listCaveHeavens, upgradeCaveFacility, demolishCaveFacility } from './domains/cultivation/services/CaveHeavenService.js';
 
+// 仙宠进化系统 (V244: 仙宠进化+血脉系统)
+import { SpiritBeastService, SPIRIT_BEAST_MCP_TOOLS, acquireSpiritBeast, listSpiritBeasts, selectSpiritBeast, evolveSpiritBeast, getSpiritBeastInfo, getSpiritBeastEvolutionInfo, getSpiritBeastPower, getAllSpiritBeastTiers } from './domains/cultivation/services/SpiritBeastService.js';
+
+// 血脉天赋系统 (V244: 仙宠进化+血脉系统)
+import { BloodlineService, BLOODLINE_MCP_TOOLS, gainBloodlineEssence, awakenBloodline, addBloodlineProgress, getBeastBloodlineInfo, checkBloodlineResonance, createBloodlineResonancePair, removeBloodlineResonancePair } from './domains/cultivation/services/BloodlineService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -296,7 +302,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V246',
+        gameVersion: 'V247',
         
         // 设置
         settings: {
@@ -574,6 +580,40 @@ function initializeDomainModules() {
         (params) => buildCaveFacility(gameState, params.id, params.facility));
     mcpRegistry.registerTool('caveheaven.query', CAVE_HEAVEN_MCP_TOOLS[4], 
         (params) => queryCaveHeaven(gameState, params.id));
+
+    // 仙宠进化系统MCP工具 (V244: 仙宠进化+血脉系统)
+    mcpRegistry.registerTool('spiritbeast.acquire', SPIRIT_BEAST_MCP_TOOLS[0], 
+        (params) => acquireSpiritBeast(gameState, params.name, params.type));
+    mcpRegistry.registerTool('spiritbeast.list', SPIRIT_BEAST_MCP_TOOLS[1], 
+        () => listSpiritBeasts(gameState));
+    mcpRegistry.registerTool('spiritbeast.select', SPIRIT_BEAST_MCP_TOOLS[2], 
+        (params) => selectSpiritBeast(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.evolve', SPIRIT_BEAST_MCP_TOOLS[3], 
+        (params) => evolveSpiritBeast(gameState, params.beastId, params.branchId));
+    mcpRegistry.registerTool('spiritbeast.info', SPIRIT_BEAST_MCP_TOOLS[4], 
+        (params) => getSpiritBeastInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.evolution_info', SPIRIT_BEAST_MCP_TOOLS[5], 
+        (params) => getSpiritBeastEvolutionInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.power', SPIRIT_BEAST_MCP_TOOLS[6], 
+        (params) => getSpiritBeastPower(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.tiers', SPIRIT_BEAST_MCP_TOOLS[7], 
+        () => getAllSpiritBeastTiers());
+
+    // 血脉天赋系统MCP工具 (V244: 仙宠进化+血脉系统)
+    mcpRegistry.registerTool('bloodline.essence.gain', BLOODLINE_MCP_TOOLS[0], 
+        (params) => gainBloodlineEssence(gameState, params.amount, params.reason));
+    mcpRegistry.registerTool('bloodline.awaken', BLOODLINE_MCP_TOOLS[1], 
+        (params) => awakenBloodline(gameState, params.beastId, params.bloodlineType));
+    mcpRegistry.registerTool('bloodline.progress', BLOODLINE_MCP_TOOLS[2], 
+        (params) => addBloodlineProgress(gameState, params.beastId, params.amount));
+    mcpRegistry.registerTool('bloodline.info', BLOODLINE_MCP_TOOLS[3], 
+        (params) => getBeastBloodlineInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('bloodline.resonance.check', BLOODLINE_MCP_TOOLS[4], 
+        (params) => checkBloodlineResonance(gameState, params.beastId1, params.beastId2));
+    mcpRegistry.registerTool('bloodline.resonance.create', BLOODLINE_MCP_TOOLS[5], 
+        (params) => createBloodlineResonancePair(gameState, params.beastId1, params.beastId2));
+    mcpRegistry.registerTool('bloodline.resonance.remove', BLOODLINE_MCP_TOOLS[6], 
+        (params) => removeBloodlineResonancePair(gameState, params.pairId));
 
     console.log('[Main] 领域模块初始化完成');
 }
