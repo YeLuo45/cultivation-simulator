@@ -67,6 +67,9 @@ import { SpiritBeastService, SPIRIT_BEAST_MCP_TOOLS, acquireSpiritBeast, listSpi
 // 血脉天赋系统 (V244: 仙宠进化+血脉系统)
 import { BloodlineService, BLOODLINE_MCP_TOOLS, gainBloodlineEssence, awakenBloodline, addBloodlineProgress, getBeastBloodlineInfo, checkBloodlineResonance, createBloodlineResonancePair, removeBloodlineResonancePair } from './domains/cultivation/services/BloodlineService.js';
 
+// 仙界贸易系统 (V249: 仙界贸易系统 - 贸易服务)
+import { TradeService, TRADE_MCP_TOOLS, listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus } from './domains/cultivation/services/TradeService.js';
+
 // 仙宠羁绊系统 (V261: 仙宠羁绊+合体技能)
 import { createBeastBondService, BEAST_BOND_TOOLS } from './domains/cultivation/services/BeastBondService.js';
 
@@ -311,7 +314,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V248',
+        gameVersion: 'V249',
         
         // 设置
         settings: {
@@ -704,6 +707,18 @@ function initializeDomainModules() {
             const svc = createTournamentService(gameState);
             return svc.getHistory(params.limit);
         });
+
+    // 仙界贸易系统MCP工具 (V249: 仙界贸易系统 - 贸易服务)
+    mcpRegistry.registerTool('trade.list', TRADE_MCP_TOOLS[0], 
+        (params) => listMarketGoods(params.marketId));
+    mcpRegistry.registerTool('trade.buy', TRADE_MCP_TOOLS[1], 
+        (params) => buyGoods(params.marketId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.sell', TRADE_MCP_TOOLS[2], 
+        (params) => sellGoods(params.marketId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.transport', TRADE_MCP_TOOLS[3], 
+        (params) => transportGoods(params.routeId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.query', TRADE_MCP_TOOLS[4], 
+        () => queryTradeStatus());
 
     console.log('[Main] 领域模块初始化完成');
 }

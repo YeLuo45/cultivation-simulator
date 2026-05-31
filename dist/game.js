@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-681c75d-2026-05-31T15-42-42-538Z */
+/* Cultivation Simulator DDD-v1.0.0-9af3fac-2026-05-31T15-45-40-390Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -14778,6 +14778,246 @@ var CultivationSimulator = (() => {
     return service.removeResonancePair(pairId);
   }
 
+  // src/domains/cultivation/services/TradeService.js
+  var TRADE_STATES = {
+    IDLE: "IDLE",
+    TRADING: "TRADING",
+    TRANSPORTING: "TRANSPORTING"
+  };
+  var TRADE_DB_KEY = "_trade_db";
+  var _tradeDB = null;
+  function _initDB() {
+    const existing = GameGlobal.getDB ? GameGlobal.getDB(TRADE_DB_KEY) : null;
+    if (existing) {
+      _tradeDB = existing;
+    } else {
+      _tradeDB = {
+        state: TRADE_STATES.IDLE,
+        playerMoney: 1e4,
+        inventory: [],
+        transactions: [],
+        routes: [],
+        transportInProgress: null
+      };
+      if (GameGlobal.setDB) GameGlobal.setDB(TRADE_DB_KEY, _tradeDB);
+    }
+  }
+  function _saveDB() {
+    if (GameGlobal.setDB) GameGlobal.setDB(TRADE_DB_KEY, _tradeDB);
+  }
+  var GOODS = {
+    SPIRIT_STONE: { name: "\u7075\u77F3", basePrice: 1, volatility: 0.1 },
+    ELIXIR: { name: "\u4E39\u836F", basePrice: 50, volatility: 0.3 },
+    MANUAL: { name: "\u529F\u6CD5", basePrice: 200, volatility: 0.2 },
+    WEAPON: { name: "\u6CD5\u5B9D", basePrice: 500, volatility: 0.4 },
+    MATERIAL: { name: "\u7075\u6750", basePrice: 30, volatility: 0.25 },
+    BEAST_CORE: { name: "\u517D\u6838", basePrice: 100, volatility: 0.35 }
+  };
+  var MARKETS = {
+    "\u51E1\u754C\u5E02\u573A": { level: 1, fee: 0.05, location: "\u51E1\u754C" },
+    "\u7075\u754C\u5E02\u573A": { level: 10, fee: 0.08, location: "\u7075\u754C" },
+    "\u4ED9\u754C\u5E02\u573A": { level: 30, fee: 0.1, location: "\u4ED9\u754C" },
+    "\u795E\u754C\u5E02\u573A": { level: 60, fee: 0.12, location: "\u795E\u754C" }
+  };
+  var ROUTES = {
+    "\u51E1\u754C-\u7075\u754C": { markets: ["\u51E1\u754C\u5E02\u573A", "\u7075\u754C\u5E02\u573A"], cost: 100, risk: 0.1 },
+    "\u7075\u754C-\u4ED9\u754C": { markets: ["\u7075\u754C\u5E02\u573A", "\u4ED9\u754C\u5E02\u573A"], cost: 500, risk: 0.2 },
+    "\u4ED9\u754C-\u795E\u754C": { markets: ["\u4ED9\u754C\u5E02\u573A", "\u795E\u754C\u5E02\u573A"], cost: 2e3, risk: 0.35 }
+  };
+  function _calculatePrice(goodId, marketId) {
+    const good = GOODS[goodId];
+    if (!good) return null;
+    const market = MARKETS[marketId];
+    if (!market) return null;
+    const levelMultiplier = 1 + market.level * 0.05;
+    const volatility = good.volatility * (Math.random() * 2 - 1);
+    const price = Math.floor(good.basePrice * levelMultiplier * (1 + volatility));
+    return Math.max(1, price);
+  }
+  function listMarketGoods(marketId) {
+    _initDB();
+    if (!MARKETS[marketId]) {
+      return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
+    }
+    const market = MARKETS[marketId];
+    const playerLevel = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("level") : 1;
+    if (playerLevel < market.level) {
+      return { success: false, error: `\u9700\u8981\u8FBE\u5230 ${market.level} \u7EA7\u624D\u80FD\u8FDB\u5165\u6B64\u5E02\u573A` };
+    }
+    const goodsList = Object.entries(GOODS).map(([id, config]) => {
+      const price = _calculatePrice(id, marketId);
+      const trend = Math.random() > 0.5 ? "\u6DA8" : "\u8DCC";
+      return {
+        id,
+        name: config.name,
+        price,
+        trend,
+        marketFee: (market.fee * 100).toFixed(0) + "%",
+        stock: Math.floor(Math.random() * 100) + 10
+      };
+    });
+    return {
+      success: true,
+      market: { id: marketId, name: marketId, fee: market.fee, location: market.location },
+      goods: goodsList
+    };
+  }
+  function buyGoods(marketId, goodId, quantity) {
+    _initDB();
+    if (!MARKETS[marketId]) {
+      return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
+    }
+    if (!GOODS[goodId]) {
+      return { success: false, error: `\u5546\u54C1 ${goodId} \u4E0D\u5B58\u5728` };
+    }
+    if (!quantity || quantity <= 0) {
+      return { success: false, error: "\u8D2D\u4E70\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0" };
+    }
+    const price = _calculatePrice(goodId, marketId);
+    const market = MARKETS[marketId];
+    const totalCost = price * quantity * (1 + market.fee);
+    if (_tradeDB.playerMoney < totalCost) {
+      return { success: false, error: `\u7075\u77F3\u4E0D\u8DB3\uFF08\u9700\u8981 ${totalCost}\uFF0C\u62E5\u6709 ${_tradeDB.playerMoney}\uFF09` };
+    }
+    _tradeDB.playerMoney -= totalCost;
+    const existingItem = _tradeDB.inventory.find((i) => i.goodId === goodId);
+    if (existingItem) {
+      existingItem.quantity += quantity;
+      existingItem.avgPrice = (existingItem.avgPrice * (existingItem.quantity - quantity) + price * quantity) / existingItem.quantity;
+    } else {
+      _tradeDB.inventory.push({
+        goodId,
+        name: GOODS[goodId].name,
+        quantity,
+        avgPrice: price,
+        purchasedAt: Date.now()
+      });
+    }
+    _tradeDB.transactions.push({
+      type: "BUY",
+      goodId,
+      quantity,
+      price,
+      totalCost,
+      marketId,
+      timestamp: Date.now()
+    });
+    _saveDB();
+    return {
+      success: true,
+      message: `\u8D2D\u4E70\u6210\u529F\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C\u82B1\u8D39 ${totalCost} \u7075\u77F3`,
+      purchase: { goodId, name: GOODS[goodId].name, quantity, unitPrice: price, totalCost, marketFee: market.fee },
+      remainingMoney: _tradeDB.playerMoney
+    };
+  }
+  function sellGoods(marketId, goodId, quantity) {
+    _initDB();
+    if (!MARKETS[marketId]) {
+      return { success: false, error: `\u5E02\u573A ${marketId} \u4E0D\u5B58\u5728` };
+    }
+    if (!GOODS[goodId]) {
+      return { success: false, error: `\u5546\u54C1 ${goodId} \u4E0D\u5B58\u5728` };
+    }
+    const item = _tradeDB.inventory.find((i) => i.goodId === goodId);
+    if (!item || item.quantity < quantity) {
+      return { success: false, error: `\u5E93\u5B58\u4E0D\u8DB3\uFF08\u62E5\u6709 ${item ? item.quantity : 0}\uFF0C\u9700\u8981 ${quantity}\uFF09` };
+    }
+    const price = _calculatePrice(goodId, marketId);
+    const market = MARKETS[marketId];
+    const revenue = Math.floor(price * quantity * (1 - market.fee));
+    _tradeDB.playerMoney += revenue;
+    item.quantity -= quantity;
+    if (item.quantity <= 0) {
+      _tradeDB.inventory.splice(_tradeDB.inventory.indexOf(item), 1);
+    }
+    _tradeDB.transactions.push({
+      type: "SELL",
+      goodId,
+      quantity,
+      price,
+      revenue,
+      marketId,
+      timestamp: Date.now()
+    });
+    _saveDB();
+    return {
+      success: true,
+      message: `\u51FA\u552E\u6210\u529F\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C\u83B7\u5F97 ${revenue} \u7075\u77F3`,
+      sale: { goodId, name: GOODS[goodId].name, quantity, unitPrice: price, revenue, marketFee: market.fee },
+      totalMoney: _tradeDB.playerMoney
+    };
+  }
+  function transportGoods(routeId, goodId, quantity) {
+    _initDB();
+    if (!ROUTES[routeId]) {
+      return { success: false, error: `\u8DEF\u7EBF ${routeId} \u4E0D\u5B58\u5728` };
+    }
+    const item = _tradeDB.inventory.find((i) => i.goodId === goodId);
+    if (!item || item.quantity < quantity) {
+      return { success: false, error: `\u5E93\u5B58\u4E0D\u8DB3` };
+    }
+    const route = ROUTES[routeId];
+    if (_tradeDB.playerMoney < route.cost) {
+      return { success: false, error: `\u8FD0\u8F93\u8D39\u7528\u4E0D\u8DB3\uFF08\u9700\u8981 ${route.cost}\uFF0C\u62E5\u6709 ${_tradeDB.playerMoney}\uFF09` };
+    }
+    _tradeDB.playerMoney -= route.cost;
+    _tradeDB.transportInProgress = {
+      routeId,
+      goodId,
+      quantity,
+      startTime: Date.now(),
+      cost: route.cost
+    };
+    _tradeDB.state = TRADE_STATES.TRANSPORTING;
+    _saveDB();
+    return {
+      success: true,
+      message: `\u8FD0\u8F93\u5F00\u59CB\uFF1A${GOODS[goodId].name} x${quantity}\uFF0C${routeId}\uFF0C\u8D39\u7528 ${route.cost} \u7075\u77F3`,
+      transport: { routeId, goodId, name: GOODS[goodId].name, quantity, cost: route.cost, risk: (route.risk * 100).toFixed(0) + "%" },
+      estimatedArrival: "\u4E0B\u6B21\u67E5\u8BE2\u65F6\u81EA\u52A8\u5230\u8FBE"
+    };
+  }
+  function queryTradeStatus() {
+    _initDB();
+    const playerLevel = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("level") : 1;
+    const playerResources = GameGlobal.getPlayerAttribute ? GameGlobal.getPlayerAttribute("spiritStones") : 0;
+    return {
+      success: true,
+      status: {
+        state: _tradeDB.state,
+        totalMoney: _tradeDB.playerMoney + playerResources,
+        transactionCount: _tradeDB.transactions.length,
+        inventoryCount: _tradeDB.inventory.length
+      },
+      inventory: _tradeDB.inventory.map((i) => ({
+        ...i,
+        currentValue: Math.floor(i.avgPrice * (1 + Math.random() * 0.4 - 0.2))
+      })),
+      markets: Object.entries(MARKETS).map(([id, config]) => ({
+        id,
+        name: id,
+        level: config.level,
+        location: config.location,
+        fee: (config.fee * 100).toFixed(0) + "%"
+      })),
+      routes: Object.entries(ROUTES).map(([id, config]) => ({
+        id,
+        name: id,
+        markets: config.markets,
+        cost: config.cost,
+        risk: (config.risk * 100).toFixed(0) + "%"
+      })),
+      recentTransactions: _tradeDB.transactions.slice(-10).reverse()
+    };
+  }
+  var TRADE_MCP_TOOLS = [
+    { name: "trade.list", description: "\u67E5\u770B\u5E02\u573A\u5546\u54C1", params: { marketId: "string" } },
+    { name: "trade.buy", description: "\u8D2D\u4E70\u5546\u54C1", params: { marketId: "string", goodId: "string", quantity: "number" } },
+    { name: "trade.sell", description: "\u51FA\u552E\u5546\u54C1", params: { marketId: "string", goodId: "string", quantity: "number" } },
+    { name: "trade.transport", description: "\u8FD0\u8F93\u5546\u54C1\u5230\u5176\u4ED6\u5E02\u573A", params: { routeId: "string", goodId: "string", quantity: "number" } },
+    { name: "trade.query", description: "\u67E5\u8BE2\u8D38\u6613\u72B6\u6001", params: {} }
+  ];
+
   // src/domains/cultivation/services/BeastBondService.js
   var BOND_TYPES = {
     "\u5FC3\u7075\u611F\u5E94": { bonus: { luck: 5 }, skill: "\u5FC3\u6709\u7075\u7280" },
@@ -22521,7 +22761,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V248",
+      gameVersion: "V249",
       // 设置
       settings: {
         soundEnabled: true,
@@ -23055,6 +23295,31 @@ var CultivationSimulator = (() => {
         const svc = createTournamentService(gameState2);
         return svc.getHistory(params.limit);
       }
+    );
+    mcpRegistry.registerTool(
+      "trade.list",
+      TRADE_MCP_TOOLS[0],
+      (params) => listMarketGoods(params.marketId)
+    );
+    mcpRegistry.registerTool(
+      "trade.buy",
+      TRADE_MCP_TOOLS[1],
+      (params) => buyGoods(params.marketId, params.goodId, params.quantity)
+    );
+    mcpRegistry.registerTool(
+      "trade.sell",
+      TRADE_MCP_TOOLS[2],
+      (params) => sellGoods(params.marketId, params.goodId, params.quantity)
+    );
+    mcpRegistry.registerTool(
+      "trade.transport",
+      TRADE_MCP_TOOLS[3],
+      (params) => transportGoods(params.routeId, params.goodId, params.quantity)
+    );
+    mcpRegistry.registerTool(
+      "trade.query",
+      TRADE_MCP_TOOLS[4],
+      () => queryTradeStatus()
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -24508,4 +24773,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-681c75d-2026-05-31T15-42-42-538Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-9af3fac-2026-05-31T15-45-40-390Z";

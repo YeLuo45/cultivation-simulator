@@ -301,9 +301,6 @@ const TRADE_MCP_TOOLS = [
   { name: 'trade.query', description: '查询贸易状态', params: {} }
 ];
 
-// 导出
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { TradeService: { listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus, TRADE_STATES, GOODS, MARKETS, ROUTES, TRADE_MCP_TOOLS } };
-} else if (typeof GameGlobal !== 'undefined') {
-  GameGlobal.TradeService = { listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus, TRADE_STATES, GOODS, MARKETS, ROUTES, TRADE_MCP_TOOLS };
-}
+// ES Module导出
+export const TradeService = { listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus, TRADE_STATES, GOODS, MARKETS, ROUTES, TRADE_MCP_TOOLS };
+export { listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus, TRADE_STATES, GOODS, MARKETS, ROUTES, TRADE_MCP_TOOLS };
