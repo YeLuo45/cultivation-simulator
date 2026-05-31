@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-a785dbb-2026-05-31T15-41-01-659Z */
+/* Cultivation Simulator DDD-v1.0.0-681c75d-2026-05-31T15-42-42-538Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -14778,6 +14778,423 @@ var CultivationSimulator = (() => {
     return service.removeResonancePair(pairId);
   }
 
+  // src/domains/cultivation/services/BeastBondService.js
+  var BOND_TYPES = {
+    "\u5FC3\u7075\u611F\u5E94": { bonus: { luck: 5 }, skill: "\u5FC3\u6709\u7075\u7280" },
+    "\u5E76\u80A9\u4F5C\u6218": { bonus: { attack: 30 }, skill: "\u53CC\u5BA0\u51FA\u51FB" },
+    "\u751F\u6B7B\u4E0E\u5171": { bonus: { defense: 30 }, skill: "\u5171\u8D74\u751F\u6B7B" },
+    "\u5FC3\u610F\u76F8\u901A": { bonus: { cultivation: 0.1 }, skill: "\u5FC3\u610F\u76F8\u901A" }
+  };
+  var _instance = null;
+  function createBeastBondService(gameState3) {
+    if (_instance) return _instance;
+    _instance = new BeastBondService(gameState3);
+    return _instance;
+  }
+  var BeastBondService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this._ensure();
+    }
+    _ensure() {
+      if (!this.gameState.beastBonds) {
+        this.gameState.beastBonds = {
+          bonds: {},
+          fusionSkills: {},
+          totalBonds: 0
+        };
+      }
+    }
+    /**
+     * 建立羁绊
+     */
+    createBond(beastId1, beastId2, bondType) {
+      var _a;
+      if (!BOND_TYPES[bondType]) return { success: false, message: "\u65E0\u6548\u7F81\u7ECA\u7C7B\u578B" };
+      const catalogue = (_a = this.gameState.beastCatalogue) == null ? void 0 : _a.owned;
+      if (!(catalogue == null ? void 0 : catalogue[beastId1]) || !(catalogue == null ? void 0 : catalogue[beastId2])) {
+        return { success: false, message: "\u4ED9\u5BA0\u4E0D\u5B58\u5728" };
+      }
+      if (beastId1 === beastId2) return { success: false, message: "\u4E0D\u80FD\u4E0E\u81EA\u8EAB\u5EFA\u7ACB\u7F81\u7ECA" };
+      const bondKey = [beastId1, beastId2].sort().join("_");
+      if (this.gameState.beastBonds.bonds[bondKey]) {
+        return { success: false, message: "\u5DF2\u6709\u7F81\u7ECA" };
+      }
+      const bondData = BOND_TYPES[bondType];
+      this.gameState.beastBonds.bonds[bondKey] = {
+        beasts: [beastId1, beastId2],
+        type: bondType,
+        level: 1,
+        exp: 0,
+        skill: bondData.skill,
+        bonus: { ...bondData.bonus },
+        createdAt: Date.now()
+      };
+      this.gameState.beastBonds.totalBonds++;
+      return {
+        success: true,
+        message: `\u300C${catalogue[beastId1].name}\u300D\u4E0E\u300C${catalogue[beastId2].name}\u300D\u5EFA\u7ACB${bondType}\u7F81\u7ECA`,
+        bondKey,
+        skill: bondData.skill
+      };
+    }
+    /**
+     * 触发合体技能
+     */
+    triggerFusionSkill(beastId1, beastId2) {
+      const bondKey = [beastId1, beastId2].sort().join("_");
+      const bond = this.gameState.beastBonds.bonds[bondKey];
+      if (!bond) return { success: false, message: "\u65E0\u7F81\u7ECA\u5173\u7CFB" };
+      const player = this.gameState.player;
+      const luckBonus = (bond.bonus.luck || 0) * bond.level;
+      const attackBonus = (bond.bonus.attack || 0) * bond.level;
+      const defenseBonus = (bond.bonus.defense || 0) * bond.level;
+      const cultivationBonus = (bond.bonus.cultivation || 0) * bond.level;
+      player.luck = (player.luck || 0) + luckBonus;
+      player.attack = (player.attack || 0) + attackBonus;
+      player.defense = (player.defense || 0) + defenseBonus;
+      player.cultivationSpeed = (player.cultivationSpeed || 1) + cultivationBonus;
+      bond.exp += 10;
+      if (bond.exp >= bond.level * 100) {
+        bond.level++;
+        bond.exp = 0;
+      }
+      return {
+        success: true,
+        message: `\u89E6\u53D1\u5408\u4F53\u6280\u80FD\u300C${bond.skill}\u300D\uFF01`,
+        level: bond.level,
+        bonuses: { luck: luckBonus, attack: attackBonus, defense: defenseBonus, cultivation: cultivationBonus }
+      };
+    }
+    /**
+     * 获取所有羁绊
+     */
+    listBonds() {
+      const bonds = Object.entries(this.gameState.beastBonds.bonds).map(([key, data]) => {
+        var _a, _b, _c;
+        const cat = (_a = this.gameState.beastCatalogue) == null ? void 0 : _a.owned;
+        return {
+          bondKey: key,
+          beast1: ((_b = cat == null ? void 0 : cat[data.beasts[0]]) == null ? void 0 : _b.name) || data.beasts[0],
+          beast2: ((_c = cat == null ? void 0 : cat[data.beasts[1]]) == null ? void 0 : _c.name) || data.beasts[1],
+          type: data.type,
+          level: data.level,
+          skill: data.skill
+        };
+      });
+      return { success: true, bonds, total: this.gameState.beastBonds.totalBonds };
+    }
+    /**
+     * 解散羁绊
+     */
+    dissolveBond(beastId1, beastId2) {
+      const bondKey = [beastId1, beastId2].sort().join("_");
+      if (!this.gameState.beastBonds.bonds[bondKey]) {
+        return { success: false, message: "\u65E0\u7F81\u7ECA\u5173\u7CFB" };
+      }
+      delete this.gameState.beastBonds.bonds[bondKey];
+      this.gameState.beastBonds.totalBonds--;
+      return { success: true, message: "\u7F81\u7ECA\u5DF2\u89E3\u9664" };
+    }
+  };
+  var BEAST_BOND_TOOLS = [
+    { name: "bond.create", description: "\u5EFA\u7ACB\u7F81\u7ECA", params: ["beastId1", "beastId2", "bondType"] },
+    { name: "bond.trigger", description: "\u89E6\u53D1\u5408\u4F53", params: ["beastId1", "beastId2"] },
+    { name: "bond.list", description: "\u7F81\u7ECA\u5217\u8868", params: [] },
+    { name: "bond.dissolve", description: "\u89E3\u6563\u7F81\u7ECA", params: ["beastId1", "beastId2"] }
+  ];
+
+  // src/domains/cultivation/services/AuctionHouseService.js
+  var ITEM_QUALITIES2 = { \u767D\u677F: 1, \u4F18\u79C0: 2, \u7CBE\u826F: 3, \u53F2\u8BD7: 4, \u4F20\u8BF4: 5, \u795E\u5668: 6 };
+  var AUCTION_DURATIONS = { "1h": 36e5, "6h": 216e5, "12h": 432e5, "24h": 864e5 };
+  var _instance2 = null;
+  function createAuctionHouseService(gameState3) {
+    if (_instance2) return _instance2;
+    _instance2 = new AuctionHouseService(gameState3);
+    return _instance2;
+  }
+  var AuctionHouseService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this._ensure();
+    }
+    _ensure() {
+      if (!this.gameState.auctionHouse) {
+        this.gameState.auctionHouse = {
+          listings: {},
+          bidHistory: [],
+          myListings: {},
+          totalSales: 0
+        };
+      }
+    }
+    /**
+     * 挂售物品
+     */
+    listItem(itemId, itemName, quality, startingPrice, duration) {
+      if (!ITEM_QUALITIES2[quality]) return { success: false, message: "\u65E0\u6548\u54C1\u8D28" };
+      if (!AUCTION_DURATIONS[duration]) return { success: false, message: "\u65E0\u6548\u65F6\u957F" };
+      const listingId = `listing_${Date.now()}`;
+      const endTime = Date.now() + AUCTION_DURATIONS[duration];
+      this.gameState.auctionHouse.listings[listingId] = {
+        listingId,
+        itemId,
+        itemName,
+        quality,
+        startingPrice,
+        currentBid: startingPrice,
+        currentBidder: null,
+        bids: [],
+        endTime,
+        seller: this.gameState.player.id || this.gameState.player.name,
+        createdAt: Date.now()
+      };
+      return { success: true, listingId, endTime, message: `\u300C${itemName}\u300D\u5DF2\u6302\u552E` };
+    }
+    /**
+     * 出价
+     */
+    placeBid(listingId, amount) {
+      const listing = this.gameState.auctionHouse.listings[listingId];
+      if (!listing) return { success: false, message: "\u62CD\u5356\u4E0D\u5B58\u5728" };
+      if (Date.now() >= listing.endTime) return { success: false, message: "\u62CD\u5356\u5DF2\u7ED3\u675F" };
+      const minBid = Math.floor(listing.currentBid * 1.1);
+      if (amount < minBid) return { success: false, message: `\u6700\u4F4E\u51FA\u4EF7${minBid}` };
+      if (listing.currentBidder) {
+        const prev = listing.currentBidder;
+      }
+      listing.currentBid = amount;
+      listing.currentBidder = this.gameState.player.id || this.gameState.player.name;
+      listing.bids.push({ bidder: listing.currentBidder, amount, time: Date.now() });
+      this.gameState.auctionHouse.bidHistory.push({ listingId, bidder: listing.currentBidder, amount });
+      return {
+        success: true,
+        message: `\u51FA\u4EF7${amount}\u7075\u77F3\u6210\u529F`,
+        currentBid: listing.currentBid
+      };
+    }
+    /**
+     * 领取拍卖结算
+     */
+    claimSale(listingId) {
+      const listing = this.gameState.auctionHouse.listings[listingId];
+      if (!listing) return { success: false, message: "\u62CD\u5356\u4E0D\u5B58\u5728" };
+      if (Date.now() < listing.endTime) return { success: false, message: "\u62CD\u5356\u8FDB\u884C\u4E2D" };
+      if (listing.seller !== (this.gameState.player.id || this.gameState.player.name)) {
+        return { success: false, message: "\u65E0\u6743\u64CD\u4F5C" };
+      }
+      const seller = this.gameState.player;
+      const fee = Math.floor(listing.currentBid * 0.05);
+      const net = listing.currentBid - fee;
+      seller.spiritStones = (seller.spiritStones || 0) + net;
+      this.gameState.auctionHouse.totalSales += listing.currentBid;
+      delete this.gameState.auctionHouse.listings[listingId];
+      return {
+        success: true,
+        message: `\u62CD\u5356\u5B8C\u6210\uFF0C\u83B7\u5F97${net}\u7075\u77F3\uFF08\u6263\u9664${fee}\u624B\u7EED\u8D39\uFF09`,
+        net,
+        fee
+      };
+    }
+    /**
+     * 领取拍品
+     */
+    claimAuctionWin(listingId) {
+      const listing = this.gameState.auctionHouse.listings[listingId];
+      if (!listing) return { success: false, message: "\u62CD\u5356\u4E0D\u5B58\u5728" };
+      if (Date.now() < listing.endTime) return { success: false, message: "\u62CD\u5356\u8FDB\u884C\u4E2D" };
+      if (listing.currentBidder !== (this.gameState.player.id || this.gameState.player.name)) {
+        return { success: false, message: "\u4E0D\u662F\u6700\u9AD8\u51FA\u4EF7\u8005" };
+      }
+      const player = this.gameState.player;
+      if ((player.spiritStones || 0) < listing.currentBid) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      player.spiritStones -= listing.currentBid;
+      delete this.gameState.auctionHouse.listings[listingId];
+      return {
+        success: true,
+        message: `\u62CD\u5F97\u300C${listing.itemName}\u300D\uFF0C\u82B1\u8D39${listing.currentBid}\u7075\u77F3`
+      };
+    }
+    /**
+     * 获取活跃拍卖
+     */
+    getActiveListings(filter = {}) {
+      const now = Date.now();
+      let listings = Object.values(this.gameState.auctionHouse.listings).filter((l) => l.endTime > now);
+      if (filter.quality) {
+        listings = listings.filter((l) => l.quality === filter.quality);
+      }
+      return {
+        success: true,
+        listings: listings.sort((a, b) => a.endTime - b.endTime),
+        count: listings.length
+      };
+    }
+    /**
+     * 获取我的拍卖
+     */
+    getMyListings() {
+      const playerId = this.gameState.player.id || this.gameState.player.name;
+      const mine = Object.values(this.gameState.auctionHouse.listings).filter((l) => l.seller === playerId);
+      return { success: true, listings: mine };
+    }
+  };
+  var AUCTION_TOOLS = [
+    { name: "auction.list", description: "\u6302\u552E\u7269\u54C1", params: ["itemId", "itemName", "quality", "startingPrice", "duration"] },
+    { name: "auction.bid", description: "\u51FA\u4EF7", params: ["listingId", "amount"] },
+    { name: "auction.claimSale", description: "\u9886\u53D6\u62CD\u5356\u6B3E", params: ["listingId"] },
+    { name: "auction.claimWin", description: "\u9886\u53D6\u62CD\u54C1", params: ["listingId"] },
+    { name: "auction.active", description: "\u6D3B\u8DC3\u62CD\u5356", params: ["filter"] },
+    { name: "auction.mine", description: "\u6211\u7684\u62CD\u5356", params: [] }
+  ];
+
+  // src/domains/cultivation/services/TournamentService.js
+  var TOURNAMENT_TIERS = { \u51E1: 1, \u7075: 2, \u4ED9: 3, \u795E: 4, \u5929: 5 };
+  var MATCH_RESULT = { WIN: "win", LOSE: "lose", DRAW: "draw" };
+  var _instance3 = null;
+  function createTournamentService(gameState3) {
+    if (_instance3) return _instance3;
+    _instance3 = new TournamentService(gameState3);
+    return _instance3;
+  }
+  var TournamentService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this._ensure();
+    }
+    _ensure() {
+      if (!this.gameState.tournaments) {
+        this.gameState.tournaments = {
+          history: [],
+          registered: {},
+          currentSeason: 1,
+          rankings: {}
+        };
+      }
+    }
+    /**
+     * 报名参赛
+     */
+    register(tier = "\u51E1") {
+      if (!TOURNAMENT_TIERS[tier]) return { success: false, message: "\u65E0\u6548\u7EA7\u522B" };
+      const playerId = this.gameState.player.id || this.gameState.player.name;
+      if (this.gameState.tournaments.registered[playerId]) {
+        return { success: false, message: "\u5DF2\u62A5\u540D" };
+      }
+      const entryFee = TOURNAMENT_TIERS[tier] * 500;
+      const player = this.gameState.player;
+      if ((player.spiritStones || 0) < entryFee) {
+        return { success: false, message: "\u7075\u77F3\u4E0D\u8DB3" };
+      }
+      player.spiritStones -= entryFee;
+      const matchId = `match_${Date.now()}`;
+      this.gameState.tournaments.registered[playerId] = {
+        tier,
+        matchId,
+        registeredAt: Date.now(),
+        wins: 0,
+        losses: 0,
+        draws: 0
+      };
+      return { success: true, message: `\u62A5\u540D${tier}\u7EA7\u4ED9\u9053\u5927\u4F1A`, entryFee, matchId };
+    }
+    /**
+     * 开始匹配
+     */
+    startMatch() {
+      const playerId = this.gameState.player.id || this.gameState.player.name;
+      const reg = this.gameState.tournaments.registered[playerId];
+      if (!reg) return { success: false, message: "\u672A\u62A5\u540D" };
+      const playerPower = (this.gameState.player.attack || 0) + (this.gameState.player.defense || 0) + (this.gameState.player.cultivationLevel || 1) * 100;
+      const enemyPower = Math.floor(playerPower * (0.8 + Math.random() * 0.4));
+      const playerScore = playerPower + Math.random() * 100;
+      const enemyScore = enemyPower + Math.random() * 100;
+      let result, rewards;
+      if (playerScore > enemyScore * 1.1) {
+        result = MATCH_RESULT.WIN;
+        const tierMult = TOURNAMENT_TIERS[reg.tier];
+        rewards = { exp: 1e3 * tierMult, spiritStones: 500 * tierMult, fame: 10 * tierMult };
+      } else if (playerScore < enemyScore * 0.9) {
+        result = MATCH_RESULT.LOSE;
+        rewards = { exp: 100, spiritStones: 50 };
+      } else {
+        result = MATCH_RESULT.DRAW;
+        rewards = { exp: 300, spiritStones: 150, fame: 2 };
+      }
+      if (result === MATCH_RESULT.WIN) reg.wins++;
+      else if (result === MATCH_RESULT.LOSE) reg.losses++;
+      else reg.draws++;
+      const player = this.gameState.player;
+      player.exp = (player.exp || 0) + rewards.exp;
+      player.spiritStones = (player.spiritStones || 0) + rewards.spiritStones;
+      if (rewards.fame) {
+        player.fame = (player.fame || 0) + rewards.fame;
+      }
+      this.gameState.tournaments.history.push({
+        playerId,
+        tier: reg.tier,
+        result,
+        enemyPower,
+        playerPower,
+        rewards,
+        timestamp: Date.now()
+      });
+      return { success: true, result, enemyPower, playerPower, rewards };
+    }
+    /**
+     * 取消报名
+     */
+    unregister() {
+      const playerId = this.gameState.player.id || this.gameState.player.name;
+      if (!this.gameState.tournaments.registered[playerId]) {
+        return { success: false, message: "\u672A\u62A5\u540D" };
+      }
+      delete this.gameState.tournaments.registered[playerId];
+      return { success: true, message: "\u5DF2\u53D6\u6D88\u62A5\u540D" };
+    }
+    /**
+     * 获取排名
+     */
+    getRankings(tier = "\u51E1") {
+      const history = this.gameState.tournaments.history;
+      const scores = {};
+      for (const h of history) {
+        if (h.tier !== tier) continue;
+        if (!scores[h.playerId]) scores[h.playerId] = { wins: 0, losses: 0, draws: 0, score: 0 };
+        const s = scores[h.playerId];
+        if (h.result === MATCH_RESULT.WIN) {
+          s.wins++;
+          s.score += 3;
+        } else if (h.result === MATCH_RESULT.LOSE) {
+          s.losses++;
+        } else {
+          s.draws++;
+          s.score += 1;
+        }
+      }
+      const rankings = Object.entries(scores).map(([playerId, data]) => ({ playerId, ...data })).sort((a, b) => b.score - a.score);
+      return { success: true, tier, rankings };
+    }
+    /**
+     * 获取赛事历史
+     */
+    getHistory(limit = 20) {
+      return {
+        success: true,
+        history: this.gameState.tournaments.history.slice(-limit)
+      };
+    }
+  };
+  var TOURNAMENT_TOOLS = [
+    { name: "tournament.register", description: "\u62A5\u540D\u53C2\u8D5B", params: ["tier"] },
+    { name: "tournament.match", description: "\u5F00\u59CB\u5339\u914D", params: [] },
+    { name: "tournament.unregister", description: "\u53D6\u6D88\u62A5\u540D", params: [] },
+    { name: "tournament.rankings", description: "\u6392\u884C\u699C", params: ["tier"] },
+    { name: "tournament.history", description: "\u8D5B\u4E8B\u5386\u53F2", params: ["limit"] }
+  ];
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -22104,7 +22521,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V247",
+      gameVersion: "V248",
       // 设置
       settings: {
         soundEnabled: true,
@@ -22518,6 +22935,126 @@ var CultivationSimulator = (() => {
       "bloodline.resonance.remove",
       BLOODLINE_MCP_TOOLS[6],
       (params) => removeBloodlineResonancePair(gameState2, params.pairId)
+    );
+    mcpRegistry.registerTool(
+      "bond.create",
+      BEAST_BOND_TOOLS[0],
+      (params) => {
+        const svc = createBeastBondService(gameState2);
+        return svc.createBond(params.beastId1, params.beastId2, params.bondType);
+      }
+    );
+    mcpRegistry.registerTool(
+      "bond.trigger",
+      BEAST_BOND_TOOLS[1],
+      (params) => {
+        const svc = createBeastBondService(gameState2);
+        return svc.triggerFusionSkill(params.beastId1, params.beastId2);
+      }
+    );
+    mcpRegistry.registerTool(
+      "bond.list",
+      BEAST_BOND_TOOLS[2],
+      () => {
+        const svc = createBeastBondService(gameState2);
+        return svc.listBonds();
+      }
+    );
+    mcpRegistry.registerTool(
+      "bond.dissolve",
+      BEAST_BOND_TOOLS[3],
+      (params) => {
+        const svc = createBeastBondService(gameState2);
+        return svc.dissolveBond(params.beastId1, params.beastId2);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.list",
+      AUCTION_TOOLS[0],
+      (params) => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.listItem(params.itemId, params.itemName, params.quality, params.startingPrice, params.duration);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.bid",
+      AUCTION_TOOLS[1],
+      (params) => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.placeBid(params.listingId, params.amount);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.claimSale",
+      AUCTION_TOOLS[2],
+      (params) => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.claimSale(params.listingId);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.claimWin",
+      AUCTION_TOOLS[3],
+      (params) => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.claimAuctionWin(params.listingId);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.active",
+      AUCTION_TOOLS[4],
+      (params) => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.getActiveListings(params.filter);
+      }
+    );
+    mcpRegistry.registerTool(
+      "auction.mine",
+      AUCTION_TOOLS[5],
+      () => {
+        const svc = createAuctionHouseService(gameState2);
+        return svc.getMyListings();
+      }
+    );
+    mcpRegistry.registerTool(
+      "tournament.register",
+      TOURNAMENT_TOOLS[0],
+      (params) => {
+        const svc = createTournamentService(gameState2);
+        return svc.register(params.tier);
+      }
+    );
+    mcpRegistry.registerTool(
+      "tournament.match",
+      TOURNAMENT_TOOLS[1],
+      () => {
+        const svc = createTournamentService(gameState2);
+        return svc.startMatch();
+      }
+    );
+    mcpRegistry.registerTool(
+      "tournament.unregister",
+      TOURNAMENT_TOOLS[2],
+      () => {
+        const svc = createTournamentService(gameState2);
+        return svc.unregister();
+      }
+    );
+    mcpRegistry.registerTool(
+      "tournament.rankings",
+      TOURNAMENT_TOOLS[3],
+      (params) => {
+        const svc = createTournamentService(gameState2);
+        return svc.getRankings(params.tier);
+      }
+    );
+    mcpRegistry.registerTool(
+      "tournament.history",
+      TOURNAMENT_TOOLS[4],
+      (params) => {
+        const svc = createTournamentService(gameState2);
+        return svc.getHistory(params.limit);
+      }
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -23971,4 +24508,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-a785dbb-2026-05-31T15-41-01-659Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-681c75d-2026-05-31T15-42-42-538Z";

@@ -67,6 +67,15 @@ import { SpiritBeastService, SPIRIT_BEAST_MCP_TOOLS, acquireSpiritBeast, listSpi
 // 血脉天赋系统 (V244: 仙宠进化+血脉系统)
 import { BloodlineService, BLOODLINE_MCP_TOOLS, gainBloodlineEssence, awakenBloodline, addBloodlineProgress, getBeastBloodlineInfo, checkBloodlineResonance, createBloodlineResonancePair, removeBloodlineResonancePair } from './domains/cultivation/services/BloodlineService.js';
 
+// 仙宠羁绊系统 (V261: 仙宠羁绊+合体技能)
+import { createBeastBondService, BEAST_BOND_TOOLS } from './domains/cultivation/services/BeastBondService.js';
+
+// 仙界拍卖行系统 (V261: 仙界拍卖行+交易系统)
+import { createAuctionHouseService, AUCTION_TOOLS } from './domains/cultivation/services/AuctionHouseService.js';
+
+// 仙道大会系统 (V261: 仙道大会+竞技赛事)
+import { createTournamentService, TOURNAMENT_TOOLS } from './domains/cultivation/services/TournamentService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -302,7 +311,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V247',
+        gameVersion: 'V248',
         
         // 设置
         settings: {
@@ -614,6 +623,87 @@ function initializeDomainModules() {
         (params) => createBloodlineResonancePair(gameState, params.beastId1, params.beastId2));
     mcpRegistry.registerTool('bloodline.resonance.remove', BLOODLINE_MCP_TOOLS[6], 
         (params) => removeBloodlineResonancePair(gameState, params.pairId));
+
+    // 仙宠羁绊系统MCP工具 (V261: 仙宠羁绊+合体技能)
+    mcpRegistry.registerTool('bond.create', BEAST_BOND_TOOLS[0], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.createBond(params.beastId1, params.beastId2, params.bondType);
+        });
+    mcpRegistry.registerTool('bond.trigger', BEAST_BOND_TOOLS[1], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.triggerFusionSkill(params.beastId1, params.beastId2);
+        });
+    mcpRegistry.registerTool('bond.list', BEAST_BOND_TOOLS[2], 
+        () => {
+            const svc = createBeastBondService(gameState);
+            return svc.listBonds();
+        });
+    mcpRegistry.registerTool('bond.dissolve', BEAST_BOND_TOOLS[3], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.dissolveBond(params.beastId1, params.beastId2);
+        });
+
+    // 仙界拍卖行MCP工具 (V261: 仙界拍卖行+交易系统)
+    mcpRegistry.registerTool('auction.list', AUCTION_TOOLS[0], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.listItem(params.itemId, params.itemName, params.quality, params.startingPrice, params.duration);
+        });
+    mcpRegistry.registerTool('auction.bid', AUCTION_TOOLS[1], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.placeBid(params.listingId, params.amount);
+        });
+    mcpRegistry.registerTool('auction.claimSale', AUCTION_TOOLS[2], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.claimSale(params.listingId);
+        });
+    mcpRegistry.registerTool('auction.claimWin', AUCTION_TOOLS[3], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.claimAuctionWin(params.listingId);
+        });
+    mcpRegistry.registerTool('auction.active', AUCTION_TOOLS[4], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.getActiveListings(params.filter);
+        });
+    mcpRegistry.registerTool('auction.mine', AUCTION_TOOLS[5], 
+        () => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.getMyListings();
+        });
+
+    // 仙道大会MCP工具 (V261: 仙道大会+竞技赛事)
+    mcpRegistry.registerTool('tournament.register', TOURNAMENT_TOOLS[0], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.register(params.tier);
+        });
+    mcpRegistry.registerTool('tournament.match', TOURNAMENT_TOOLS[1], 
+        () => {
+            const svc = createTournamentService(gameState);
+            return svc.startMatch();
+        });
+    mcpRegistry.registerTool('tournament.unregister', TOURNAMENT_TOOLS[2], 
+        () => {
+            const svc = createTournamentService(gameState);
+            return svc.unregister();
+        });
+    mcpRegistry.registerTool('tournament.rankings', TOURNAMENT_TOOLS[3], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.getRankings(params.tier);
+        });
+    mcpRegistry.registerTool('tournament.history', TOURNAMENT_TOOLS[4], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.getHistory(params.limit);
+        });
 
     console.log('[Main] 领域模块初始化完成');
 }
