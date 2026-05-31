@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-8eafe05-2026-05-30T16-58-23-422Z */
+/* Cultivation Simulator DDD-v1.0.0-7f3e81e-2026-05-31T05-05-31-796Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -10871,6 +10871,2146 @@ var CultivationSimulator = (() => {
   // src/domains/cultivation/services/AscensionService.js
   init_CultivationService();
 
+  // src/domains/cultivation/services/YuanInfantService.js
+  init_CultivationService();
+  var YUAN_INFANT_REQUIREMENTS = {
+    minRealm: 5,
+    // 化神境 (realm=5)
+    minSpiritEnergy: 500,
+    // 最低灵力要求
+    formCost: 1e3,
+    // 凝聚元婴消耗
+    separationDuration: 36e5,
+    // 分离持续时间 (1小时)
+    projectionRange: 1e3,
+    // 投射范围 (里)
+    projectionCost: 200
+    // 投射消耗灵力
+  };
+  var YUAN_INFANT_STATES = {
+    NONE: "none",
+    // 未形成
+    FORMING: "forming",
+    // 凝聚中
+    FORMED: "formed",
+    // 已形成
+    SEPARATED: "separated",
+    // 已分离
+    PROJECTING: "projecting",
+    // 星体投射中
+    SYNCHRONIZING: "synchronizing"
+    // 同步中
+  };
+  var YUAN_INFANT_ATTRIBUTES = {
+    spiritualPower: { name: "\u7CBE\u795E\u529B", base: 100, growth: 20 },
+    perceptionRange: { name: "\u611F\u77E5\u8303\u56F4", base: 50, growth: 10 },
+    syncRate: { name: "\u540C\u6B65\u7387", base: 100, growth: 0 }
+  };
+  var YuanInfantService = class _YuanInfantService {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.yuanInfantState = null;
+    }
+    /**
+     * 初始化元婴系统
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 初始化后的游戏状态
+     */
+    init(gameState3) {
+      if (!gameState3.yuanInfant) {
+        gameState3.yuanInfant = {
+          state: YUAN_INFANT_STATES.NONE,
+          spiritualPower: 0,
+          perceptionRange: 0,
+          syncRate: 100,
+          formationTime: null,
+          separationTime: null,
+          separationEndTime: null,
+          projectionTarget: null,
+          projectionInfo: [],
+          lastSyncTime: null,
+          history: []
+        };
+      }
+      this.yuanInfantState = gameState3.yuanInfant;
+      return gameState3;
+    }
+    /**
+     * 记录历史事件
+     */
+    recordHistory(action, details) {
+      if (!this.yuanInfantState.history) {
+        this.yuanInfantState.history = [];
+      }
+      this.yuanInfantState.history.push({
+        action,
+        details,
+        timestamp: Date.now()
+      });
+      if (this.yuanInfantState.history.length > 50) {
+        this.yuanInfantState.history = this.yuanInfantState.history.slice(-50);
+      }
+    }
+    /**
+     * 检查是否满足凝聚元婴条件
+     * @returns {Object} 条件检查结果
+     */
+    checkFormationRequirements() {
+      const gs = this.gameState;
+      const requirements = [];
+      const realmMet = (gs.realm || 0) >= YUAN_INFANT_REQUIREMENTS.minRealm;
+      requirements.push({
+        type: "realm",
+        desc: `\u5883\u754C\u8FBE\u5230\u5316\u795E\u5883 (realm\u2265${YUAN_INFANT_REQUIREMENTS.minRealm})`,
+        met: realmMet,
+        current: gs.realm || 0,
+        required: YUAN_INFANT_REQUIREMENTS.minRealm
+      });
+      const spiritEnergyMet = (gs.spiritEnergy || 0) >= YUAN_INFANT_REQUIREMENTS.minSpiritEnergy;
+      requirements.push({
+        type: "spiritEnergy",
+        desc: `\u7075\u529B\u8FBE\u5230${YUAN_INFANT_REQUIREMENTS.minSpiritEnergy}`,
+        met: spiritEnergyMet,
+        current: gs.spiritEnergy || 0,
+        required: YUAN_INFANT_REQUIREMENTS.minSpiritEnergy
+      });
+      const spiritStonesMet = (gs.spiritStones || 0) >= YUAN_INFANT_REQUIREMENTS.formCost;
+      requirements.push({
+        type: "spiritStones",
+        desc: `\u62E5\u6709\u81F3\u5C11${YUAN_INFANT_REQUIREMENTS.formCost}\u7075\u77F3`,
+        met: spiritStonesMet,
+        current: gs.spiritStones || 0,
+        required: YUAN_INFANT_REQUIREMENTS.formCost
+      });
+      const notFormed = this.yuanInfantState.state === YUAN_INFANT_STATES.NONE;
+      requirements.push({
+        type: "notFormed",
+        desc: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210",
+        met: notFormed,
+        current: this.yuanInfantState.state,
+        required: YUAN_INFANT_STATES.NONE
+      });
+      const metCount = requirements.filter((r) => r.met).length;
+      const allMet = metCount === requirements.length;
+      return {
+        success: true,
+        canForm: allMet,
+        requirementsMet: metCount,
+        requirementsTotal: requirements.length,
+        requirements
+      };
+    }
+    /**
+     * 凝聚元婴 (yuaninfant.form)
+     * @param {Object} params - 可选参数
+     * @returns {Object} 凝聚结果
+     */
+    formYuanInfant(params = {}) {
+      var _a;
+      if (this.yuanInfantState.state !== YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u7ECF\u5F62\u6210\uFF0C\u65E0\u6CD5\u518D\u6B21\u51DD\u805A",
+          currentState: this.yuanInfantState.state
+        };
+      }
+      const reqCheck = this.checkFormationRequirements();
+      if (!reqCheck.canForm) {
+        const unmet = reqCheck.requirements.filter((r) => !r.met).map((r) => r.desc);
+        return {
+          success: false,
+          error: "\u51DD\u805A\u5143\u5A74\u6761\u4EF6\u672A\u6EE1\u8DB3",
+          unmetRequirements: unmet,
+          requirementsCheck: reqCheck
+        };
+      }
+      const cost = YUAN_INFANT_REQUIREMENTS.formCost;
+      this.gameState.spiritStones -= cost;
+      this.yuanInfantState.state = YUAN_INFANT_STATES.FORMING;
+      const realm = this.gameState.realm || 5;
+      const spiritRootTier = ((_a = this.gameState.spiritRoot) == null ? void 0 : _a.tier) || 1;
+      const baseSp = YUAN_INFANT_ATTRIBUTES.spiritualPower.base + realm * YUAN_INFANT_ATTRIBUTES.spiritualPower.growth;
+      const basePr = YUAN_INFANT_ATTRIBUTES.perceptionRange.base + realm * YUAN_INFANT_ATTRIBUTES.perceptionRange.growth;
+      this.yuanInfantState.spiritualPower = Math.floor(baseSp * (1 + spiritRootTier * 0.1));
+      this.yuanInfantState.perceptionRange = Math.floor(basePr * (1 + spiritRootTier * 0.1));
+      this.yuanInfantState.syncRate = YUAN_INFANT_ATTRIBUTES.syncRate.base;
+      this.yuanInfantState.formationTime = Date.now();
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - YUAN_INFANT_REQUIREMENTS.minSpiritEnergy);
+      this.recordHistory("form", {
+        spiritualPower: this.yuanInfantState.spiritualPower,
+        perceptionRange: this.yuanInfantState.perceptionRange,
+        cost
+      });
+      return {
+        success: true,
+        message: "\u5143\u5A74\u51DD\u805A\u6210\u529F\uFF01\u606D\u559C\u8E0F\u5165\u5143\u5A74\u5883\uFF01",
+        yuanInfant: {
+          state: YUAN_INFANT_STATES.FORMED,
+          spiritualPower: this.yuanInfantState.spiritualPower,
+          perceptionRange: this.yuanInfantState.perceptionRange,
+          syncRate: this.yuanInfantState.syncRate,
+          formationTime: this.yuanInfantState.formationTime
+        },
+        costDeducted: cost
+      };
+    }
+    /**
+     * 灵魂分离 (yuaninfant.separate)
+     * @param {Object} params - { duration?: number } 分离持续时间(ms)
+     * @returns {Object} 分离结果
+     */
+    separateSoul(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u7075\u9B42\u5206\u79BB"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.SEPARATED) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u7ECF\u5206\u79BB\uFF0C\u8BF7\u5148\u53EC\u56DE"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.PROJECTING) {
+        return {
+          success: false,
+          error: "\u6B63\u5728\u8FDB\u884C\u661F\u4F53\u6295\u5C04\uFF0C\u8BF7\u5148\u7ED3\u675F\u6295\u5C04"
+        };
+      }
+      const duration = params.duration || YUAN_INFANT_REQUIREMENTS.separationDuration;
+      const now = Date.now();
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const baseSuccessRate = 0.7 + spiritualPower / 1e3;
+      const syncRate = (this.yuanInfantState.syncRate || 100) / 100;
+      const successRate = Math.min(0.95, baseSuccessRate * syncRate);
+      const roll = Math.random();
+      const success = roll < successRate;
+      if (!success) {
+        this.recordHistory("separate_failed", {
+          successRate: (successRate * 100).toFixed(1) + "%",
+          roll: (roll * 100).toFixed(1) + "%"
+        });
+        return {
+          success: true,
+          result: "failed",
+          message: "\u7075\u9B42\u5206\u79BB\u5931\u8D25\uFF01\u7CBE\u795E\u529B\u4E0D\u8DB3\u4EE5\u652F\u6491\u5206\u79BB",
+          successRate: (successRate * 100).toFixed(1) + "%",
+          tip: "\u63D0\u5347\u7CBE\u795E\u529B\u6216\u540C\u6B65\u7387\u540E\u53EF\u518D\u6B21\u5C1D\u8BD5"
+        };
+      }
+      this.yuanInfantState.state = YUAN_INFANT_STATES.SEPARATED;
+      this.yuanInfantState.separationTime = now;
+      this.yuanInfantState.separationEndTime = now + duration;
+      this.gameState.playerStatus = this.gameState.playerStatus || {};
+      this.gameState.playerStatus.dormant = true;
+      this.gameState.playerStatus.dormantUntil = now + duration;
+      this.recordHistory("separate", {
+        duration,
+        spiritualPower,
+        syncRate: this.yuanInfantState.syncRate
+      });
+      return {
+        success: true,
+        result: "success",
+        message: "\u7075\u9B42\u5206\u79BB\u6210\u529F\uFF01\u5143\u5A74\u5DF2\u51FA\u7A8D",
+        separation: {
+          startTime: now,
+          endTime: now + duration,
+          duration,
+          spiritualPower,
+          syncRate: this.yuanInfantState.syncRate
+        },
+        warning: "\u672C\u4F53\u8FDB\u5165\u4F11\u7720\u72B6\u6001\uFF0C\u8BF7\u53CA\u65F6\u53EC\u56DE\u5143\u5A74"
+      };
+    }
+    /**
+     * 星体投射 (yuaninfant.project)
+     * @param {Object} params - { target?: string, range?: number }
+     * @returns {Object} 投射结果
+     */
+    projectAstral(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.PROJECTING) {
+        return {
+          success: false,
+          error: "\u661F\u4F53\u6295\u5C04\u5DF2\u5728\u8FDB\u884C\u4E2D"
+        };
+      }
+      if (this.yuanInfantState.state !== YUAN_INFANT_STATES.SEPARATED) {
+        return {
+          success: false,
+          error: "\u9700\u8981\u5148\u8FDB\u884C\u7075\u9B42\u5206\u79BB\u624D\u80FD\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      const cost = YUAN_INFANT_REQUIREMENTS.projectionCost;
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u8FDB\u884C\u661F\u4F53\u6295\u5C04"
+        };
+      }
+      const target = params.target || "unknown";
+      const range = params.range || YUAN_INFANT_REQUIREMENTS.projectionRange;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const actualRange = Math.floor(range * (spiritualPower / 100));
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - cost);
+      const projectionInfo = {
+        target,
+        range: actualRange,
+        spiritualPower,
+        timestamp: Date.now()
+      };
+      this.yuanInfantState.projectionTarget = target;
+      this.yuanInfantState.projectionInfo.push(projectionInfo);
+      if (this.yuanInfantState.projectionInfo.length > 20) {
+        this.yuanInfantState.projectionInfo = this.yuanInfantState.projectionInfo.slice(-20);
+      }
+      this.recordHistory("project", projectionInfo);
+      const infoTypes = this.getProjectionInfoTypes(actualRange);
+      return {
+        success: true,
+        message: `\u661F\u4F53\u6295\u5C04\u6210\u529F\uFF01\u611F\u77E5\u8303\u56F4${actualRange}\u91CC`,
+        projection: {
+          target,
+          range: actualRange,
+          spiritualPower,
+          infoTypes,
+          timestamp: projectionInfo.timestamp
+        },
+        infoTypes
+      };
+    }
+    /**
+     * 根据投射范围获取可感知的信息类型
+     */
+    getProjectionInfoTypes(range) {
+      const types = [];
+      if (range >= 100) types.push({ type: "basic", desc: "\u57FA\u7840\u73AF\u5883\u611F\u77E5" });
+      if (range >= 300) types.push({ type: "spiritual", desc: "\u7075\u529B\u6CE2\u52A8\u611F\u77E5" });
+      if (range >= 500) types.push({ type: "creatures", desc: "\u751F\u7269\u6C14\u606F\u611F\u77E5" });
+      if (range >= 800) types.push({ type: "treasures", desc: "\u7075\u5B9D\u836F\u6750\u611F\u77E5" });
+      if (range >= 1e3) types.push({ type: "secrets", desc: "\u9690\u85CF\u4FE1\u606F\u611F\u77E5" });
+      return types;
+    }
+    /**
+     * 同步元婴 (yuaninfant.sync)
+     * @param {Object} params - { force?: boolean }
+     * @returns {Object} 同步结果
+     */
+    syncYuanInfant(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u8FDB\u884C\u540C\u6B65"
+        };
+      }
+      const force = params.force || false;
+      const currentSyncRate = this.yuanInfantState.syncRate || 100;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const baseGain = 5 + Math.floor(spiritualPower / 50);
+      const newSyncRate = force ? 100 : Math.min(100, currentSyncRate + baseGain);
+      const oldSyncRate = this.yuanInfantState.syncRate;
+      this.yuanInfantState.syncRate = newSyncRate;
+      this.yuanInfantState.lastSyncTime = Date.now();
+      this.recordHistory("sync", {
+        oldSyncRate,
+        newSyncRate,
+        force,
+        spiritualPower
+      });
+      return {
+        success: true,
+        message: force ? "\u5F3A\u5236\u540C\u6B65\u5B8C\u6210\uFF0C\u5143\u5A74\u4E0E\u672C\u4F53\u5B8C\u5168\u540C\u6B65" : "\u540C\u6B65\u5B8C\u6210\uFF0C\u540C\u6B65\u7387\u63D0\u5347",
+        sync: {
+          oldSyncRate,
+          newSyncRate,
+          gain: newSyncRate - oldSyncRate,
+          force,
+          spiritualPower
+        }
+      };
+    }
+    /**
+     * 召回元婴 (yuaninfant.recall)
+     * @param {Object} params - { emergency?: boolean }
+     * @returns {Object} 召回结果
+     */
+    recallYuanInfant(params = {}) {
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.NONE) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5C1A\u672A\u5F62\u6210\uFF0C\u65E0\u6CD5\u53EC\u56DE"
+        };
+      }
+      if (this.yuanInfantState.state === YUAN_INFANT_STATES.FORMED) {
+        return {
+          success: false,
+          error: "\u5143\u5A74\u5DF2\u5728\u672C\u4F53\u4E2D\uFF0C\u65E0\u9700\u53EC\u56DE"
+        };
+      }
+      const emergency = params.emergency || false;
+      const previousState = this.yuanInfantState.state;
+      const syncRate = this.yuanInfantState.syncRate || 100;
+      const spiritualPower = this.yuanInfantState.spiritualPower || 100;
+      const recallCost = emergency ? Math.floor(spiritualPower * 0.3) : Math.floor(spiritualPower * 0.1);
+      if ((this.gameState.spiritEnergy || 0) < recallCost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u53EC\u56DE\u5143\u5A74",
+          required: recallCost,
+          current: this.gameState.spiritEnergy || 0
+        };
+      }
+      this.gameState.spiritEnergy = Math.max(0, (this.gameState.spiritEnergy || 0) - recallCost);
+      if (this.gameState.playerStatus) {
+        this.gameState.playerStatus.dormant = false;
+        this.gameState.playerStatus.dormantUntil = null;
+      }
+      this.yuanInfantState.state = YUAN_INFANT_STATES.FORMED;
+      this.yuanInfantState.separationTime = null;
+      this.yuanInfantState.separationEndTime = null;
+      this.yuanInfantState.projectionTarget = null;
+      if (emergency) {
+        const penalty = Math.floor(syncRate * 0.1);
+        this.yuanInfantState.syncRate = Math.max(50, this.yuanInfantState.syncRate - penalty);
+      }
+      this.recordHistory("recall", {
+        previousState,
+        emergency,
+        cost: recallCost,
+        syncRateAfter: this.yuanInfantState.syncRate
+      });
+      return {
+        success: true,
+        message: emergency ? "\u7D27\u6025\u53EC\u56DE\u5B8C\u6210\uFF01\u5143\u5A74\u5DF2\u8FD4\u56DE\u672C\u4F53" : "\u5143\u5A74\u53EC\u56DE\u6210\u529F\uFF0C\u5DF2\u8FD4\u56DE\u672C\u4F53",
+        recall: {
+          previousState,
+          emergency,
+          cost: recallCost,
+          syncRate: this.yuanInfantState.syncRate,
+          penalty: emergency ? "\u540C\u6B65\u7387\u4E0B\u964D" : "\u65E0"
+        }
+      };
+    }
+    /**
+     * 查询元婴状态 (yuaninfant.status)
+     * @param {Object} params - { detailed?: boolean }
+     * @returns {Object} 状态信息
+     */
+    getYuanInfantStatus(params = {}) {
+      var _a, _b;
+      const detailed = params.detailed || false;
+      const state = this.yuanInfantState;
+      const result = {
+        success: true,
+        state: state.state,
+        stateName: this.getStateName(state.state),
+        spiritualPower: state.spiritualPower || 0,
+        perceptionRange: state.perceptionRange || 0,
+        syncRate: state.syncRate || 100,
+        isSeparated: state.state === YUAN_INFANT_STATES.SEPARATED,
+        isProjecting: state.state === YUAN_INFANT_STATES.PROJECTING,
+        isFormed: state.state !== YUAN_INFANT_STATES.NONE
+      };
+      if (detailed) {
+        result.detailed = {
+          formationTime: state.formationTime,
+          separationTime: state.separationTime,
+          separationEndTime: state.separationEndTime,
+          lastSyncTime: state.lastSyncTime,
+          projectionTarget: state.projectionTarget,
+          projectionInfoCount: (state.projectionInfo || []).length,
+          historyCount: (state.history || []).length,
+          history: ((_a = state.history) == null ? void 0 : _a.slice(-10)) || []
+        };
+      }
+      if (state.state === YUAN_INFANT_STATES.SEPARATED && state.separationEndTime) {
+        const remaining = Math.max(0, state.separationEndTime - Date.now());
+        result.separationRemaining = remaining;
+        result.separationRemainingStr = this.formatDuration(remaining);
+      }
+      if ((_b = this.gameState.playerStatus) == null ? void 0 : _b.dormant) {
+        result.bodyStatus = "dormant";
+        result.bodyDormantUntil = this.gameState.playerStatus.dormantUntil;
+      } else {
+        result.bodyStatus = "normal";
+      }
+      return result;
+    }
+    /**
+     * 获取状态名称
+     */
+    getStateName(state) {
+      const names = {
+        [YUAN_INFANT_STATES.NONE]: "\u672A\u5F62\u6210",
+        [YUAN_INFANT_STATES.FORMING]: "\u51DD\u805A\u4E2D",
+        [YUAN_INFANT_STATES.FORMED]: "\u5DF2\u5F62\u6210",
+        [YUAN_INFANT_STATES.SEPARATED]: "\u5DF2\u5206\u79BB",
+        [YUAN_INFANT_STATES.PROJECTING]: "\u6295\u5C04\u4E2D",
+        [YUAN_INFANT_STATES.SYNCHRONIZING]: "\u540C\u6B65\u4E2D"
+      };
+      return names[state] || "\u672A\u77E5";
+    }
+    /**
+     * 格式化时长
+     */
+    formatDuration(ms) {
+      if (ms <= 0) return "\u5DF2\u7ED3\u675F";
+      const seconds = Math.floor(ms / 1e3);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      if (hours > 0) {
+        return `${hours}\u5C0F\u65F6${minutes % 60}\u5206\u949F`;
+      }
+      if (minutes > 0) {
+        return `${minutes}\u5206\u949F${seconds % 60}\u79D2`;
+      }
+      return `${seconds}\u79D2`;
+    }
+    /**
+     * 获取MCP工具处理器
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} MCP工具处理器映射
+     */
+    static getMCPHandlers(gameState3) {
+      const service = new _YuanInfantService(gameState3);
+      service.init(gameState3);
+      return {
+        "yuaninfant.form": (params) => service.formYuanInfant(params),
+        "yuaninfant.separate": (params) => service.separateSoul(params),
+        "yuaninfant.project": (params) => service.projectAstral(params),
+        "yuaninfant.sync": (params) => service.syncYuanInfant(params),
+        "yuaninfant.recall": (params) => service.recallYuanInfant(params),
+        "yuaninfant.status": (params) => service.getYuanInfantStatus(params)
+      };
+    }
+  };
+  var YUAN_INFANT_TOOLS = {
+    "yuaninfant.form": {
+      name: "yuaninfant.form",
+      description: "\u51DD\u805A\u5143\u5A74 - \u5C06\u7075\u9B42\u51DD\u805A\u6210\u5143\u5A74\u5F62\u6001 (\u9700\u8981\u8FBE\u5230\u5316\u795E\u5883)",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        description: "\u65E0\u53C2\u6570"
+      }
+    },
+    "yuaninfant.separate": {
+      name: "yuaninfant.separate",
+      description: "\u7075\u9B42\u5206\u79BB - \u5C06\u5143\u5A74\u4ECE\u672C\u4F53\u4E2D\u5206\u79BB\u51FA\u53BB\u8FDB\u884C\u63A2\u7D22",
+      inputSchema: {
+        type: "object",
+        properties: {
+          duration: {
+            type: "number",
+            description: "\u5206\u79BB\u6301\u7EED\u65F6\u95F4(\u6BEB\u79D2)\uFF0C\u9ED8\u8BA41\u5C0F\u65F6"
+          }
+        }
+      }
+    },
+    "yuaninfant.project": {
+      name: "yuaninfant.project",
+      description: "\u661F\u4F53\u6295\u5C04 - \u5143\u5A74\u51FA\u7A8D\u540E\u8FDB\u884C\u8FDC\u7A0B\u611F\u77E5\u6295\u5C04",
+      inputSchema: {
+        type: "object",
+        properties: {
+          target: {
+            type: "string",
+            description: "\u6295\u5C04\u76EE\u6807\u533A\u57DF\u63CF\u8FF0"
+          },
+          range: {
+            type: "number",
+            description: "\u6295\u5C04\u8303\u56F4(\u91CC)\uFF0C\u9ED8\u8BA41000"
+          }
+        }
+      }
+    },
+    "yuaninfant.sync": {
+      name: "yuaninfant.sync",
+      description: "\u540C\u6B65\u5143\u5A74 - \u63D0\u5347\u5143\u5A74\u4E0E\u672C\u4F53\u7684\u540C\u6B65\u7387",
+      inputSchema: {
+        type: "object",
+        properties: {
+          force: {
+            type: "boolean",
+            description: "\u5F3A\u5236\u540C\u6B65\u5230100%"
+          }
+        }
+      }
+    },
+    "yuaninfant.recall": {
+      name: "yuaninfant.recall",
+      description: "\u53EC\u56DE\u5143\u5A74 - \u5C06\u5206\u79BB\u7684\u5143\u5A74\u53EC\u56DE\u672C\u4F53",
+      inputSchema: {
+        type: "object",
+        properties: {
+          emergency: {
+            type: "boolean",
+            description: "\u7D27\u6025\u53EC\u56DE(\u6D88\u8017\u66F4\u591A\u7075\u529B\u4F46\u66F4\u5FEB)"
+          }
+        }
+      }
+    },
+    "yuaninfant.status": {
+      name: "yuaninfant.status",
+      description: "\u67E5\u8BE2\u5143\u5A74\u72B6\u6001 - \u83B7\u53D6\u5143\u5A74\u5F53\u524D\u72B6\u6001\u8BE6\u60C5",
+      inputSchema: {
+        type: "object",
+        properties: {
+          detailed: {
+            type: "boolean",
+            description: "\u8FD4\u56DE\u8BE6\u7EC6\u4FE1\u606F"
+          }
+        }
+      }
+    }
+  };
+  var _yuanInfantServiceInstance = null;
+  function getYuanInfantService(gameState3) {
+    if (!_yuanInfantServiceInstance) {
+      _yuanInfantServiceInstance = new YuanInfantService(gameState3);
+    } else {
+      _yuanInfantServiceInstance.gameState = gameState3;
+    }
+    return _yuanInfantServiceInstance;
+  }
+
+  // src/domains/cultivation/services/YinYangWuXingService.js
+  init_CultivationService();
+  var FIVE_ELEMENTS = {
+    METAL: "metal",
+    // 金
+    WOOD: "wood",
+    // 木
+    WATER: "water",
+    // 水
+    FIRE: "fire",
+    // 火
+    EARTH: "earth"
+    // 土
+  };
+  var WUXING_GENERATION = {
+    [FIVE_ELEMENTS.METAL]: FIVE_ELEMENTS.WATER,
+    [FIVE_ELEMENTS.WATER]: FIVE_ELEMENTS.WOOD,
+    [FIVE_ELEMENTS.WOOD]: FIVE_ELEMENTS.FIRE,
+    [FIVE_ELEMENTS.FIRE]: FIVE_ELEMENTS.EARTH,
+    [FIVE_ELEMENTS.EARTH]: FIVE_ELEMENTS.METAL
+  };
+  var WUXING_CONQUEST = {
+    [FIVE_ELEMENTS.METAL]: FIVE_ELEMENTS.WOOD,
+    [FIVE_ELEMENTS.WOOD]: FIVE_ELEMENTS.EARTH,
+    [FIVE_ELEMENTS.EARTH]: FIVE_ELEMENTS.WATER,
+    [FIVE_ELEMENTS.WATER]: FIVE_ELEMENTS.FIRE,
+    [FIVE_ELEMENTS.FIRE]: FIVE_ELEMENTS.METAL
+  };
+  var YIN_YANG_STATES = {
+    BALANCED: "balanced",
+    // 平衡
+    YIN_EXCESS: "yin_excess",
+    // 阴盛
+    YANG_EXCESS: "yang_excess",
+    // 阳盛
+    DISORDERED: "disordered"
+    // 紊乱
+  };
+  var YIN_YANG_WUXING_CONFIG = {
+    // 阴阳范围
+    yinYangRange: { min: 0, max: 100 },
+    // 失衡阈值 (阴阳差值超过此值视为失衡)
+    imbalanceThreshold: 30,
+    // 五行亲和等级范围
+    affinityRange: { min: 0, max: 9 },
+    // 共鸣消耗灵力
+    resonateCost: 100,
+    // 轮转消耗灵力
+    cycleCost: 150,
+    // 灌注基础消耗
+    imbueBaseCost: 50,
+    // 调和阴阳基础消耗
+    balanceBaseCost: 80
+  };
+  var YIN_YANG_WUXING_TOOLS = {
+    "wuxing.analyze": {
+      name: "wuxing.analyze",
+      description: "\u5206\u6790\u4E94\u884C\u5C5E\u6027\uFF0C\u8FD4\u56DE\u9634\u9633\u4E94\u884C\u72B6\u6001\u3001\u4E94\u884C\u5F3A\u5EA6\u5BF9\u6BD4\u3001\u76F8\u751F\u76F8\u514B\u5206\u6790",
+      parameters: {
+        type: "object",
+        properties: {
+          detail: {
+            type: "boolean",
+            description: "\u662F\u5426\u663E\u793A\u8BE6\u7EC6\u4FE1\u606F"
+          }
+        }
+      }
+    },
+    "wuxing.balance": {
+      name: "wuxing.balance",
+      description: "\u8C03\u548C\u9634\u9633\uFF0C\u5E73\u8861\u4F53\u5185\u9634\u9633\u4E4B\u6C14\uFF0C\u4FEE\u590D\u9634\u9633\u5931\u8861\u72B6\u6001",
+      parameters: {
+        type: "object",
+        properties: {
+          intensity: {
+            type: "number",
+            description: "\u8C03\u548C\u5F3A\u5EA6 (1-10)",
+            minimum: 1,
+            maximum: 10
+          }
+        }
+      }
+    },
+    "wuxing.imbue": {
+      name: "wuxing.imbue",
+      description: "\u704C\u6CE8\u5143\u7D20\uFF0C\u5C06\u7075\u529B\u8F6C\u5316\u4E3A\u7279\u5B9A\u4E94\u884C\u5143\u7D20",
+      parameters: {
+        type: "object",
+        properties: {
+          element: {
+            type: "string",
+            enum: ["metal", "wood", "water", "fire", "earth"],
+            description: "\u8981\u704C\u6CE8\u7684\u5143\u7D20\u7C7B\u578B"
+          },
+          amount: {
+            type: "number",
+            description: "\u704C\u6CE8\u7684\u91CF"
+          }
+        },
+        required: ["element"]
+      }
+    },
+    "wuxing.resonate": {
+      name: "wuxing.resonate",
+      description: "\u4E94\u884C\u5171\u9E23\uFF0C\u6FC0\u53D1\u4E94\u884C\u76F8\u751F\u94FE\uFF0C\u589E\u5F3A\u4FEE\u70BC\u6548\u7387",
+      parameters: {
+        type: "object",
+        properties: {
+          element: {
+            type: "string",
+            enum: ["metal", "wood", "water", "fire", "earth"],
+            description: "\u5171\u9E23\u8D77\u59CB\u5143\u7D20"
+          }
+        },
+        required: ["element"]
+      }
+    },
+    "wuxing.cycle": {
+      name: "wuxing.cycle",
+      description: "\u9A71\u52A8\u4E94\u884C\u8F6E\u8F6C\uFF0C\u5F15\u5BFC\u4E94\u884C\u76F8\u751F\u5FAA\u73AF\uFF0C\u51DD\u805A\u7075\u6C14",
+      parameters: {
+        type: "object",
+        properties: {
+          rounds: {
+            type: "number",
+            description: "\u8F6E\u8F6C\u5468\u6570 (1-5)",
+            minimum: 1,
+            maximum: 5
+          }
+        }
+      }
+    },
+    "wuxing.affinity": {
+      name: "wuxing.affinity",
+      description: "\u63D0\u5347\u5143\u7D20\u4EB2\u548C\uFF0C\u63D0\u9AD8\u5BF9\u7279\u5B9A\u4E94\u884C\u5143\u7D20\u7684\u611F\u5E94\u548C\u64CD\u63A7\u80FD\u529B",
+      parameters: {
+        type: "object",
+        properties: {
+          element: {
+            type: "string",
+            enum: ["metal", "wood", "water", "fire", "earth"],
+            description: "\u8981\u63D0\u5347\u4EB2\u548C\u7684\u5143\u7D20"
+          },
+          level: {
+            type: "number",
+            description: "\u63D0\u5347\u7B49\u7EA7\u6570 (1-3)",
+            minimum: 1,
+            maximum: 3
+          }
+        },
+        required: ["element"]
+      }
+    }
+  };
+  var YinYangWuXingService = class _YinYangWuXingService {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.yinYangState = null;
+    }
+    /**
+     * 初始化阴阳五行系统
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 初始化后的游戏状态
+     */
+    init(gameState3) {
+      if (!gameState3.yinYangWuXing) {
+        gameState3.yinYangWuXing = {
+          // 阴阳值 (0-100, 50为平衡)
+          yin: 50,
+          yang: 50,
+          // 五行属性强度
+          fiveElements: {
+            metal: 10,
+            wood: 10,
+            water: 10,
+            fire: 10,
+            earth: 10
+          },
+          // 五行亲和等级 (0-9)
+          affinity: {
+            metal: 0,
+            wood: 0,
+            water: 0,
+            fire: 0,
+            earth: 0
+          },
+          // 五行轮转状态
+          cycleState: {
+            active: false,
+            currentElement: null,
+            rounds: 0,
+            lastCycleTime: null
+          },
+          // 共鸣状态
+          resonateState: {
+            active: false,
+            chain: [],
+            bonus: 0
+          },
+          // 历史记录
+          history: []
+        };
+      }
+      this.yinYangState = gameState3.yinYangWuXing;
+      if (!gameState3.spiritRoot) {
+        gameState3.spiritRoot = {
+          type: "wood",
+          tier: 1,
+          attributes: {
+            metal: 0,
+            wood: 10,
+            fire: 0,
+            water: 0,
+            earth: 0
+          }
+        };
+      }
+      return gameState3;
+    }
+    /**
+     * 记录历史事件
+     */
+    recordHistory(action, details) {
+      if (!this.yinYangState.history) {
+        this.yinYangState.history = [];
+      }
+      this.yinYangState.history.push({
+        action,
+        details,
+        timestamp: Date.now()
+      });
+      if (this.yinYangState.history.length > 50) {
+        this.yinYangState.history = this.yinYangState.history.slice(-50);
+      }
+    }
+    /**
+     * 获取阴阳状态
+     */
+    getYinYangStatus() {
+      const yin = this.yinYangState.yin;
+      const yang = this.yinYangState.yang;
+      const diff = Math.abs(yin - yang);
+      let state;
+      if (diff <= 10) {
+        state = YIN_YANG_STATES.BALANCED;
+      } else if (yin > yang) {
+        state = YIN_YANG_STATES.YIN_EXCESS;
+      } else {
+        state = YIN_YANG_STATES.YANG_EXCESS;
+      }
+      return {
+        yin,
+        yang,
+        diff,
+        state,
+        stateDesc: this.getYinYangStateDesc(state)
+      };
+    }
+    /**
+     * 获取阴阳状态描述
+     */
+    getYinYangStateDesc(state) {
+      const descMap = {
+        [YIN_YANG_STATES.BALANCED]: "\u9634\u9633\u5E73\u8861",
+        [YIN_YANG_STATES.YIN_EXCESS]: "\u9634\u76DB\u9633\u8870",
+        [YIN_YANG_STATES.YANG_EXCESS]: "\u9633\u76DB\u9634\u8870",
+        [YIN_YANG_STATES.DISORDERED]: "\u9634\u9633\u7D0A\u4E71"
+      };
+      return descMap[state] || "\u672A\u77E5\u72B6\u6001";
+    }
+    /**
+     * 获取五行状态
+     */
+    getFiveElementsStatus() {
+      const elements = this.yinYangState.fiveElements;
+      const total = Object.values(elements).reduce((sum, val) => sum + val, 0);
+      const avg = total / 5;
+      let strongest = { element: null, value: 0 };
+      let weakest = { element: null, value: Infinity };
+      for (const [element, value] of Object.entries(elements)) {
+        if (value > strongest.value) {
+          strongest = { element, value };
+        }
+        if (value < weakest.value) {
+          weakest = { element, value };
+        }
+      }
+      return {
+        elements,
+        total,
+        average: avg.toFixed(1),
+        strongest,
+        weakest,
+        balance: this.calculateFiveElementsBalance(elements)
+      };
+    }
+    /**
+     * 计算五行平衡度
+     */
+    calculateFiveElementsBalance(elements) {
+      const values = Object.values(elements);
+      const avg = values.reduce((a, b) => a + b, 0) / 5;
+      const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / 5;
+      const stdDev = Math.sqrt(variance);
+      if (stdDev <= 5) return "balanced";
+      if (stdDev <= 15) return "slight_imbalance";
+      if (stdDev <= 30) return "imbalance";
+      return "severe_imbalance";
+    }
+    /**
+     * 分析五行属性 (wuxing.analyze)
+     * @param {Object} params - 参数 { detail: boolean }
+     * @returns {Object} 五行分析结果
+     */
+    analyze(params = {}) {
+      const yinYangStatus = this.getYinYangStatus();
+      const fiveElementsStatus = this.getFiveElementsStatus();
+      const generationAnalysis = this.analyzeGeneration(fiveElementsStatus.elements);
+      const conquestAnalysis = this.analyzeConquest(fiveElementsStatus.elements);
+      const result = {
+        success: true,
+        action: "wuxing.analyze",
+        yinYang: yinYangStatus,
+        fiveElements: {
+          status: fiveElementsStatus,
+          affinity: this.yinYangState.affinity
+        },
+        generation: generationAnalysis,
+        conquest: conquestAnalysis,
+        cultivationBonus: this.calculateCultivationBonus()
+      };
+      if (params.detail) {
+        result.detailedAnalysis = {
+          spiritRootInfluence: this.getSpiritRootInfluence(),
+          recommendedElements: this.getRecommendedElements(),
+          warning: this.getWarning()
+        };
+      }
+      this.recordHistory("analyze", { yinYang: yinYangStatus.state, fiveElementsBalance: fiveElementsStatus.balance });
+      return result;
+    }
+    /**
+     * 分析相生关系
+     */
+    analyzeGeneration(elements) {
+      const chains = [];
+      for (const [element, value] of Object.entries(elements)) {
+        const generated = WUXING_GENERATION[element];
+        if (generated) {
+          const generatedValue = elements[generated] || 0;
+          const ratio = value > 0 ? (generatedValue / value).toFixed(2) : "0";
+          chains.push({
+            from: element,
+            to: generated,
+            fromValue: value,
+            toValue: generatedValue,
+            ratio,
+            healthy: ratio >= 0.5 && ratio <= 2
+          });
+        }
+      }
+      return {
+        chains,
+        healthyChainCount: chains.filter((c) => c.healthy).length,
+        totalChainCount: chains.length
+      };
+    }
+    /**
+     * 分析相克关系
+     */
+    analyzeConquest(elements) {
+      const conflicts = [];
+      for (const [element, value] of Object.entries(elements)) {
+        const conquered = WUXING_CONQUEST[element];
+        if (conquered) {
+          const conqueredValue = elements[conquered] || 0;
+          const ratio = conqueredValue > 0 ? (value / conqueredValue).toFixed(2) : "inf";
+          conflicts.push({
+            from: element,
+            to: conquered,
+            fromValue: value,
+            toValue: conqueredValue,
+            ratio,
+            overwhelming: parseFloat(ratio) > 2,
+            suppressed: parseFloat(ratio) < 0.5
+          });
+        }
+      }
+      return {
+        conflicts,
+        conflictCount: conflicts.filter((c) => c.overwhelming || c.suppressed).length,
+        totalConflictCount: conflicts.length
+      };
+    }
+    /**
+     * 计算修炼加成
+     */
+    calculateCultivationBonus() {
+      const yinYangStatus = this.getYinYangStatus();
+      const fiveElementsStatus = this.getFiveElementsStatus();
+      let bonus = 0;
+      if (yinYangStatus.state === YIN_YANG_STATES.BALANCED) {
+        bonus += 20;
+      } else if (yinYangStatus.diff > 50) {
+        bonus -= 10;
+      }
+      if (fiveElementsStatus.balance === "balanced") {
+        bonus += 15;
+      }
+      const totalAffinity = Object.values(this.yinYangState.affinity).reduce((a, b) => a + b, 0);
+      bonus += totalAffinity * 2;
+      return {
+        value: bonus,
+        description: bonus > 10 ? "\u5927\u5409" : bonus > 0 ? "\u5409" : bonus > -5 ? "\u5E73" : "\u51F6"
+      };
+    }
+    /**
+     * 获取灵根影响
+     */
+    getSpiritRootInfluence() {
+      const spiritRoot = this.gameState.spiritRoot;
+      if (!spiritRoot) return null;
+      return {
+        type: spiritRoot.type,
+        tier: spiritRoot.tier,
+        attributes: spiritRoot.attributes || {},
+        influence: {
+          element: spiritRoot.type,
+          bonus: spiritRoot.tier * 5
+        }
+      };
+    }
+    /**
+     * 获取推荐元素
+     */
+    getRecommendedElements() {
+      const fiveElements = this.yinYangState.fiveElements;
+      const affinity = this.yinYangState.affinity;
+      const recommendations = [];
+      for (const element of Object.keys(fiveElements)) {
+        const currentStrength = fiveElements[element];
+        const affinityLevel = affinity[element];
+        if (affinityLevel >= 5) {
+          recommendations.push({ element, reason: "\u9AD8\u4EB2\u548C", priority: "high" });
+        } else if (currentStrength < 15) {
+          recommendations.push({ element, reason: "\u5C5E\u6027\u504F\u5F31", priority: "medium" });
+        }
+      }
+      return recommendations;
+    }
+    /**
+     * 获取警告信息
+     */
+    getWarning() {
+      const warnings = [];
+      const yinYangStatus = this.getYinYangStatus();
+      if (yinYangStatus.diff > 40) {
+        warnings.push("\u9634\u9633\u4E25\u91CD\u5931\u8861\uFF0C\u5EFA\u8BAE\u7ACB\u5373\u8C03\u548C");
+      }
+      const fiveElementsStatus = this.getFiveElementsStatus();
+      if (fiveElementsStatus.balance === "severe_imbalance") {
+        warnings.push("\u4E94\u884C\u4E25\u91CD\u5931\u8861\uFF0C\u4FEE\u70BC\u6548\u7387\u5927\u5E45\u4E0B\u964D");
+      }
+      const conquest = this.analyzeConquest(fiveElementsStatus.elements);
+      const suppressed = conquest.conflicts.filter((c) => c.suppressed);
+      if (suppressed.length > 0) {
+        const elements = suppressed.map((c) => c.to);
+        warnings.push(`${elements.join(", ")}\u5C5E\u6027\u88AB\u4E25\u91CD\u538B\u5236`);
+      }
+      return warnings;
+    }
+    /**
+     * 调和阴阳 (wuxing.balance)
+     * @param {Object} params - 参数 { intensity: 1-10 }
+     * @returns {Object} 调和结果
+     */
+    balance(params = {}) {
+      const intensity = params.intensity || 5;
+      const cost = YIN_YANG_WUXING_CONFIG.balanceBaseCost * intensity;
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u8C03\u548C\u9634\u9633",
+          required: cost,
+          available: this.gameState.spiritEnergy || 0
+        };
+      }
+      const yin = this.yinYangState.yin;
+      const yang = this.yinYangState.yang;
+      const diff = Math.abs(yin - yang);
+      const adjustment = Math.min(diff, intensity * 5);
+      let newYin, newYang;
+      if (yin > yang) {
+        newYin = Math.max(50, yin - adjustment / 2);
+        newYang = Math.min(100, yang + adjustment / 2);
+      } else {
+        newYang = Math.max(50, yang - adjustment / 2);
+        newYin = Math.min(100, yin + adjustment / 2);
+      }
+      this.gameState.spiritEnergy -= cost;
+      this.yinYangState.yin = Math.round(newYin);
+      this.yinYangState.yang = Math.round(newYang);
+      const newStatus = this.getYinYangStatus();
+      this.recordHistory("balance", {
+        before: { yin, yang },
+        after: { yin: this.yinYangState.yin, yang: this.yinYangState.yang },
+        cost
+      });
+      return {
+        success: true,
+        action: "wuxing.balance",
+        result: "balance_restored",
+        before: { yin, yang, diff },
+        after: {
+          yin: this.yinYangState.yin,
+          yang: this.yinYangState.yang,
+          diff: Math.abs(this.yinYangState.yin - this.yinYangState.yang)
+        },
+        cost,
+        spiritEnergy: this.gameState.spiritEnergy,
+        newState: newStatus.state,
+        message: this.getBalanceResultMessage(newStatus)
+      };
+    }
+    /**
+     * 获取调和结果消息
+     */
+    getBalanceResultMessage(status) {
+      if (status.state === YIN_YANG_STATES.BALANCED) {
+        return "\u9634\u9633\u8C03\u548C\u5B8C\u6210\uFF0C\u72B6\u6001\u5927\u5409";
+      } else if (status.diff < 20) {
+        return "\u9634\u9633\u8D8B\u4E8E\u5E73\u8861\uFF0C\u72B6\u6001\u6539\u5584";
+      } else {
+        return "\u9634\u9633\u4ECD\u6709\u4E00\u5B9A\u504F\u5DEE\uFF0C\u5EFA\u8BAE\u7EE7\u7EED\u8C03\u548C";
+      }
+    }
+    /**
+     * 灌注元素 (wuxing.imbue)
+     * @param {Object} params - 参数 { element, amount }
+     * @returns {Object} 灌注结果
+     */
+    imbue(params = {}) {
+      const element = params.element;
+      const amount = params.amount || 10;
+      if (!Object.values(FIVE_ELEMENTS).includes(element)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5143\u7D20\u7C7B\u578B",
+          validElements: Object.values(FIVE_ELEMENTS)
+        };
+      }
+      const affinityLevel = this.yinYangState.affinity[element] || 0;
+      const costMultiplier = 1 - affinityLevel * 0.05;
+      const cost = Math.floor(YIN_YANG_WUXING_CONFIG.imbueBaseCost * amount * costMultiplier);
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3",
+          required: cost,
+          available: this.gameState.spiritEnergy || 0
+        };
+      }
+      this.gameState.spiritEnergy -= cost;
+      const oldValue = this.yinYangState.fiveElements[element];
+      this.yinYangState.fiveElements[element] = Math.min(100, oldValue + amount);
+      const generatedElement = WUXING_GENERATION[element];
+      if (generatedElement && Math.random() > 0.3) {
+        const generatedAmount = Math.floor(amount * 0.3);
+        this.yinYangState.fiveElements[generatedElement] = Math.min(
+          100,
+          this.yinYangState.fiveElements[generatedElement] + generatedAmount
+        );
+      }
+      this.recordHistory("imbue", { element, amount, cost, generated: generatedElement ? { element: generatedElement, amount: Math.floor(amount * 0.3) } : null });
+      return {
+        success: true,
+        action: "wuxing.imbue",
+        element,
+        amount,
+        cost,
+        oldValue,
+        newValue: this.yinYangState.fiveElements[element],
+        affinityBonus: affinityLevel > 0 ? `\u4EB2\u548C\u7B49\u7EA7${affinityLevel}\uFF0C\u6D88\u8017\u51CF\u5C11${affinityLevel * 5}%` : null,
+        generation: generatedElement ? {
+          triggered: true,
+          element: generatedElement,
+          amount: Math.floor(amount * 0.3)
+        } : {
+          triggered: false
+        },
+        spiritEnergy: this.gameState.spiritEnergy
+      };
+    }
+    /**
+     * 五行共鸣 (wuxing.resonate)
+     * @param {Object} params - 参数 { element }
+     * @returns {Object} 共鸣结果
+     */
+    resonate(params = {}) {
+      const element = params.element;
+      if (!Object.values(FIVE_ELEMENTS).includes(element)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5143\u7D20\u7C7B\u578B",
+          validElements: Object.values(FIVE_ELEMENTS)
+        };
+      }
+      const cost = YIN_YANG_WUXING_CONFIG.resonateCost;
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u6FC0\u53D1\u5171\u9E23",
+          required: cost,
+          available: this.gameState.spiritEnergy || 0
+        };
+      }
+      const chain = this.calculateResonanceChain(element);
+      this.gameState.spiritEnergy -= cost;
+      let totalBonus = 0;
+      for (const ele of chain) {
+        const strength = this.yinYangState.fiveElements[ele];
+        totalBonus += strength * (1 + this.yinYangState.affinity[ele] * 0.1);
+      }
+      const averageBonus = Math.round(totalBonus / chain.length);
+      const cultivationBonus = Math.floor(averageBonus * 0.5);
+      this.gameState.cultivationProgress = (this.gameState.cultivationProgress || 0) + cultivationBonus;
+      this.yinYangState.resonateState = {
+        active: true,
+        chain,
+        bonus: cultivationBonus,
+        startTime: Date.now()
+      };
+      this.recordHistory("resonate", { element, chain, bonus: cultivationBonus });
+      return {
+        success: true,
+        action: "wuxing.resonate",
+        element,
+        chain,
+        chainDescription: this.getChainDescription(chain),
+        bonus: cultivationBonus,
+        cost,
+        spiritEnergy: this.gameState.spiritEnergy,
+        cultivationProgress: this.gameState.cultivationProgress,
+        message: `\u4E94\u884C\u5171\u9E23\u6FC0\u53D1\uFF0C${chain.join("\u2192")}\uFF0C\u4FEE\u70BC\u6548\u7387\u63D0\u5347${cultivationBonus}`
+      };
+    }
+    /**
+     * 计算共鸣链
+     */
+    calculateResonanceChain(startElement) {
+      const chain = [startElement];
+      let current = startElement;
+      for (let i = 0; i < 4; i++) {
+        const next = WUXING_GENERATION[current];
+        if (next && chain.length < 5) {
+          chain.push(next);
+          current = next;
+        } else {
+          break;
+        }
+      }
+      return chain;
+    }
+    /**
+     * 获取共鸣链描述
+     */
+    getChainDescription(chain) {
+      const elementNames = {
+        metal: "\u91D1",
+        wood: "\u6728",
+        water: "\u6C34",
+        fire: "\u706B",
+        earth: "\u571F"
+      };
+      return chain.map((e) => elementNames[e]).join(" \u2192 ");
+    }
+    /**
+     * 驱动五行轮转 (wuxing.cycle)
+     * @param {Object} params - 参数 { rounds: 1-5 }
+     * @returns {Object} 轮转结果
+     */
+    cycle(params = {}) {
+      const rounds = params.rounds || 1;
+      if (rounds < 1 || rounds > 5) {
+        return {
+          success: false,
+          error: "\u8F6E\u8F6C\u5468\u6570\u5FC5\u987B\u57281-5\u4E4B\u95F4"
+        };
+      }
+      const cost = YIN_YANG_WUXING_CONFIG.cycleCost * rounds;
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u9A71\u52A8\u8F6E\u8F6C",
+          required: cost,
+          available: this.gameState.spiritEnergy || 0
+        };
+      }
+      const elements = this.yinYangState.fiveElements;
+      let startElement = Object.entries(elements).reduce(
+        (min, [ele, val]) => val < min.value ? { element: ele, value: val } : min,
+        { element: "wood", value: Infinity }
+      ).element;
+      const cycleResults = [];
+      const chain = [];
+      let currentElement = startElement;
+      for (let i = 0; i < rounds; i++) {
+        const strength = elements[currentElement];
+        const consumed = Math.floor(strength * 0.1);
+        const generated = Math.floor(consumed * 1.5);
+        elements[currentElement] = Math.max(1, strength - consumed);
+        const nextElement = WUXING_GENERATION[currentElement];
+        if (nextElement) {
+          elements[nextElement] = Math.min(100, elements[nextElement] + generated);
+          chain.push({ from: currentElement, to: nextElement, consumed, generated });
+        }
+        cycleResults.push({
+          round: i + 1,
+          element: currentElement,
+          consumed,
+          generated,
+          nextElement
+        });
+        currentElement = nextElement || currentElement;
+      }
+      this.gameState.spiritEnergy -= cost;
+      const totalConsumed = cycleResults.reduce((sum, r) => sum + r.consumed, 0);
+      const totalGenerated = cycleResults.reduce((sum, r) => sum + r.generated, 0);
+      const qiGained = Math.floor(totalGenerated * 0.8);
+      this.gameState.qi = (this.gameState.qi || 0) + qiGained;
+      this.yinYangState.cycleState = {
+        active: true,
+        currentElement: startElement,
+        rounds,
+        lastCycleTime: Date.now()
+      };
+      this.recordHistory("cycle", { startElement, rounds, qiGained, chain });
+      return {
+        success: true,
+        action: "wuxing.cycle",
+        startElement,
+        rounds,
+        chain: chain.map((c) => `${c.from}\u2192${c.to}`),
+        cycleResults,
+        totalConsumed,
+        totalGenerated,
+        qiGained,
+        cost,
+        spiritEnergy: this.gameState.spiritEnergy,
+        qi: this.gameState.qi,
+        message: `\u4E94\u884C\u8F6E\u8F6C\u5B8C\u6210\uFF0C\u51DD\u805A\u7075\u6C14+${qiGained}`
+      };
+    }
+    /**
+     * 提升元素亲和 (wuxing.affinity)
+     * @param {Object} params - 参数 { element, level }
+     * @returns {Object} 亲和提升结果
+     */
+    affinity(params = {}) {
+      const element = params.element;
+      const level = params.level || 1;
+      if (!Object.values(FIVE_ELEMENTS).includes(element)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u5143\u7D20\u7C7B\u578B",
+          validElements: Object.values(FIVE_ELEMENTS)
+        };
+      }
+      if (level < 1 || level > 3) {
+        return {
+          success: false,
+          error: "\u63D0\u5347\u7B49\u7EA7\u5FC5\u987B\u57281-3\u4E4B\u95F4"
+        };
+      }
+      const currentAffinity = this.yinYangState.affinity[element] || 0;
+      if (currentAffinity >= YIN_YANG_WUXING_CONFIG.affinityRange.max) {
+        return {
+          success: false,
+          error: `${element}\u4EB2\u548C\u5DF2\u8FBE\u4E0A\u9650`,
+          currentAffinity,
+          maxAffinity: YIN_YANG_WUXING_CONFIG.affinityRange.max
+        };
+      }
+      const cost = level * 200 * (1 + currentAffinity * 0.2);
+      if ((this.gameState.spiritEnergy || 0) < cost) {
+        return {
+          success: false,
+          error: "\u7075\u529B\u4E0D\u8DB3",
+          required: Math.floor(cost),
+          available: this.gameState.spiritEnergy || 0
+        };
+      }
+      const stoneCost = level * 100;
+      if ((this.gameState.spiritStones || 0) < stoneCost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: stoneCost,
+          available: this.gameState.spiritStones || 0
+        };
+      }
+      this.gameState.spiritEnergy -= Math.floor(cost);
+      this.gameState.spiritStones -= stoneCost;
+      const oldAffinity = this.yinYangState.affinity[element];
+      this.yinYangState.affinity[element] = Math.min(
+        YIN_YANG_WUXING_CONFIG.affinityRange.max,
+        currentAffinity + level
+      );
+      const newAffinity = this.yinYangState.affinity[element];
+      this.recordHistory("affinity", { element, level, oldAffinity, newAffinity });
+      return {
+        success: true,
+        action: "wuxing.affinity",
+        element,
+        level,
+        oldAffinity,
+        newAffinity,
+        spiritEnergyCost: Math.floor(cost),
+        stoneCost,
+        spiritStones: this.gameState.spiritStones,
+        spiritEnergy: this.gameState.spiritEnergy,
+        message: `${element}\u4EB2\u548C\u63D0\u5347\u81F3${newAffinity}\u7EA7\uFF0C\u7075\u529B\u6D88\u8017${Math.floor(cost)}\uFF0C\u7075\u77F3\u6D88\u8017${stoneCost}`
+      };
+    }
+    /**
+     * 获取MCP工具处理器
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} MCP工具处理器映射
+     */
+    static getMCPHandlers(gameState3) {
+      const service = new _YinYangWuXingService(gameState3);
+      service.init(gameState3);
+      return {
+        "wuxing.analyze": (params) => service.analyze(params || {}),
+        "wuxing.balance": (params) => service.balance(params || {}),
+        "wuxing.imbue": (params) => service.imbue(params || {}),
+        "wuxing.resonate": (params) => service.resonate(params || {}),
+        "wuxing.cycle": (params) => service.cycle(params || {}),
+        "wuxing.affinity": (params) => service.affinity(params || {})
+      };
+    }
+  };
+
+  // src/domains/cultivation/services/ThunderTribulationService.js
+  init_CultivationService();
+  var TRIBULATION_STATES = {
+    NONE: "none",
+    // 未渡劫
+    PREPARING: "preparing",
+    // 准备中
+    IN_PROGRESS: "in_progress",
+    // 渡劫中
+    SUCCESS: "success",
+    // 渡劫成功
+    FAILED: "failed",
+    // 渡劫失败
+    BLESSED: "blessed"
+    // 已获赐福
+  };
+  var THUNDER_TRIBULATION_CONFIG = {
+    // 劫数等级与境界对应关系
+    realmToTribulationLevel: {
+      0: 1,
+      // 炼气→筑基需要1重劫
+      1: 2,
+      // 筑基→金丹需要2重劫
+      2: 3,
+      // 金丹→元婴需要3重劫
+      3: 4,
+      // 元婴→化神需要4重劫
+      4: 5,
+      // 化神→飞升需要5重劫
+      5: 9
+      // 飞升后大圆满需要9重劫
+    },
+    // 渡劫基础成功率
+    baseSuccessRate: 0.5,
+    // 每重劫数增加的基础强度
+    baseIntensityPerLevel: 100,
+    // 功德抵消天罚系数
+    meritOffsetFactor: 0.1,
+    // 天雷赐福基础增益
+    blessingBaseBonus: 0.1,
+    // 雷法精通最大等级
+    maxMasteryLevel: 9,
+    // 吸收雷劫恢复比例
+    absorbRecoveryRate: 0.3,
+    // 渡劫消耗灵石基数
+    tribulationStoneCost: 500
+  };
+  var THUNDER_TRIBULATION_TOOLS = {
+    "thunder.prepare": {
+      name: "thunder.prepare",
+      description: "\u51C6\u5907\u6E21\u52AB\uFF0C\u68C0\u6D4B\u6E21\u52AB\u6761\u4EF6\u5E76\u8BBE\u7F6E\u6E21\u52AB\u76EE\u6807",
+      parameters: {
+        type: "object",
+        properties: {
+          targetRealm: {
+            type: "number",
+            description: "\u76EE\u6807\u5883\u754C (0-5: \u70BC\u6C14\u3001\u7B51\u57FA\u3001\u91D1\u4E39\u3001\u5143\u5A74\u3001\u5316\u795E\u3001\u98DE\u5347)"
+          }
+        }
+      }
+    },
+    "thunder.execute": {
+      name: "thunder.execute",
+      description: "\u6267\u884C\u6E21\u52AB\uFF0C\u8FDB\u884C\u5929\u96F7\u6D17\u793C",
+      parameters: {
+        type: "object",
+        properties: {
+          useItems: {
+            type: "boolean",
+            description: "\u662F\u5426\u4F7F\u7528\u9053\u5177\u8F85\u52A9\u6E21\u52AB"
+          }
+        }
+      }
+    },
+    "thunder.bless": {
+      name: "thunder.bless",
+      description: "\u5929\u96F7\u8D50\u798F\uFF0C\u5C06\u96F7\u52AB\u4E4B\u529B\u8F6C\u5316\u4E3A\u4FEE\u70BC\u589E\u76CA",
+      parameters: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["cultivation", "attribute", "skill"],
+            description: "\u8D50\u798F\u7C7B\u578B"
+          }
+        }
+      }
+    },
+    "thunder.mastery": {
+      name: "thunder.mastery",
+      description: "\u96F7\u6CD5\u7CBE\u901A\uFF0C\u63D0\u5347\u96F7\u6CD5\u795E\u901A\u7B49\u7EA7",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["query", "upgrade", "use"],
+            description: "\u96F7\u6CD5\u64CD\u4F5C\u7C7B\u578B"
+          }
+        }
+      }
+    },
+    "thunder.absorb": {
+      name: "thunder.absorb",
+      description: "\u5438\u6536\u96F7\u52AB\uFF0C\u5C06\u5929\u96F7\u4E4B\u529B\u8F6C\u5316\u4E3A\u81EA\u8EAB\u7075\u529B",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: {
+            type: "number",
+            description: "\u5438\u6536\u91CF (1-100)"
+          }
+        }
+      }
+    },
+    "thunder.journal": {
+      name: "thunder.journal",
+      description: "\u6E21\u52AB\u65E5\u5FD7\uFF0C\u67E5\u770B\u5386\u53F2\u6E21\u52AB\u8BB0\u5F55",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "\u8FD4\u56DE\u8BB0\u5F55\u6570\u91CF"
+          }
+        }
+      }
+    }
+  };
+  var ThunderTribulationService = class _ThunderTribulationService {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.tribulationState = null;
+    }
+    /**
+     * 初始化天雷劫数系统
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} 初始化后的游戏状态
+     */
+    init(gameState3) {
+      if (!gameState3.thunderTribulation) {
+        gameState3.thunderTribulation = {
+          // 渡劫状态
+          state: TRIBULATION_STATES.NONE,
+          // 当前劫数等级 (1-9)
+          currentLevel: 0,
+          // 目标境界
+          targetRealm: null,
+          // 天雷强度
+          lightningIntensity: 0,
+          // 雷击次数
+          lightningCount: 0,
+          // 渡劫进度 (0-100)
+          progress: 0,
+          // 历史记录
+          history: [],
+          // 雷法精通等级 (0-9)
+          lightningMastery: 0,
+          // 雷法神通列表
+          lightningSkills: [],
+          // 天雷赐福效果
+          blessingEffects: [],
+          // 累积天罚值
+          divinePunishment: 0,
+          // 功德值
+          meritPoints: 0,
+          // 最后渡劫时间
+          lastTribulationTime: null,
+          // 渡劫成功率加成
+          successRateBonus: 0,
+          // 已吸收雷劫能量
+          absorbedEnergy: 0
+        };
+      }
+      this.tribulationState = gameState3.thunderTribulation;
+      if (this.gameState.player && this.gameState.player.karmaPoints === void 0) {
+        this.gameState.player.karmaPoints = 0;
+      }
+      return gameState3;
+    }
+    /**
+     * 记录历史事件
+     */
+    recordHistory(action, details) {
+      if (!this.tribulationState.history) {
+        this.tribulationState.history = [];
+      }
+      this.tribulationState.history.push({
+        action,
+        details,
+        timestamp: Date.now()
+      });
+      if (this.tribulationState.history.length > 50) {
+        this.tribulationState.history = this.tribulationState.history.slice(-50);
+      }
+    }
+    /**
+     * 获取当前境界所需劫数等级
+     */
+    getRequiredTribulationLevel(targetRealm) {
+      const realm = targetRealm !== void 0 ? targetRealm : this.gameState.realm || 0;
+      return THUNDER_TRIBULATION_CONFIG.realmToTribulationLevel[realm] || 1;
+    }
+    /**
+     * 计算渡劫成功率
+     * 成功率 = (实力 + 功德) / (劫数 × 20)
+     */
+    calculateSuccessRate(params = {}) {
+      var _a;
+      const gs = this.gameState;
+      const level = this.tribulationState.currentLevel || this.getRequiredTribulationLevel();
+      const realmPower = (gs.realm || 0) * 100;
+      const cultivationPower = gs.cultivationProgress || 0;
+      const basePower = realmPower + cultivationPower;
+      const merit = this.tribulationState.meritPoints || (((_a = gs.player) == null ? void 0 : _a.karmaPoints) || 0);
+      const divinePunishment = this.tribulationState.divinePunishment || 0;
+      const effectiveMerit = Math.max(0, merit - divinePunishment * THUNDER_TRIBULATION_CONFIG.meritOffsetFactor);
+      const successRate = (basePower + effectiveMerit) / (level * 20);
+      return {
+        basePower,
+        merit: effectiveMerit,
+        level,
+        rawRate: successRate,
+        finalRate: Math.min(0.95, Math.max(0.05, successRate + (this.tribulationState.successRateBonus || 0)))
+      };
+    }
+    /**
+     * 准备渡劫 (thunder.prepare)
+     * @param {Object} params - 参数 { targetRealm: number }
+     * @returns {Object} 准备结果
+     */
+    prepare(params = {}) {
+      var _a, _b;
+      const gs = this.gameState;
+      if (this.tribulationState.state === TRIBULATION_STATES.IN_PROGRESS) {
+        return {
+          success: false,
+          error: "\u6E21\u52AB\u6B63\u5728\u8FDB\u884C\u4E2D\uFF0C\u65E0\u6CD5\u518D\u6B21\u51C6\u5907",
+          currentState: this.tribulationState.state
+        };
+      }
+      if (this.tribulationState.state === TRIBULATION_STATES.PREPARING) {
+        return {
+          success: false,
+          error: "\u6E21\u52AB\u5DF2\u51C6\u5907\u597D\uFF0C\u8BF7\u6267\u884C\u6E21\u52AB",
+          currentState: this.tribulationState.state
+        };
+      }
+      const targetRealm = params.targetRealm !== void 0 ? params.targetRealm : (gs.realm || 0) + 1;
+      if (targetRealm < 0 || targetRealm > 5) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u76EE\u6807\u5883\u754C"
+        };
+      }
+      if (targetRealm <= (gs.realm || 0)) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u5883\u754C\u5FC5\u987B\u9AD8\u4E8E\u5F53\u524D\u5883\u754C"
+        };
+      }
+      const requiredLevel = this.getRequiredTribulationLevel(targetRealm);
+      const stoneCost = THUNDER_TRIBULATION_CONFIG.tribulationStoneCost * requiredLevel;
+      if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < stoneCost) {
+        return {
+          success: false,
+          error: `\u7075\u77F3\u4E0D\u8DB3\uFF0C\u9700\u8981${stoneCost}\u7075\u77F3\u51C6\u5907\u6E21\u52AB`,
+          shortage: stoneCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+        };
+      }
+      this.tribulationState.state = TRIBULATION_STATES.PREPARING;
+      this.tribulationState.targetRealm = targetRealm;
+      this.tribulationState.currentLevel = requiredLevel;
+      this.tribulationState.lightningIntensity = THUNDER_TRIBULATION_CONFIG.baseIntensityPerLevel * requiredLevel;
+      const successRateInfo = this.calculateSuccessRate({ targetRealm });
+      this.recordHistory("prepare", {
+        targetRealm,
+        requiredLevel,
+        stoneCost,
+        successRate: successRateInfo.finalRate
+      });
+      return {
+        success: true,
+        action: "thunder.prepare",
+        state: TRIBULATION_STATES.PREPARING,
+        targetRealm,
+        requiredLevel,
+        lightningIntensity: this.tribulationState.lightningIntensity,
+        stoneCost,
+        successRate: successRateInfo.finalRate,
+        message: `\u51C6\u5907\u6E21\u52AB\uFF0C\u76EE\u6807\uFF1A${this.getRealmName(targetRealm)}\uFF0C\u9700\u8981${requiredLevel}\u91CD\u96F7\u52AB`
+      };
+    }
+    /**
+     * 执行渡劫 (thunder.execute)
+     * @param {Object} params - 参数 { useItems: boolean }
+     * @returns {Object} 渡劫结果
+     */
+    execute(params = {}) {
+      var _a, _b;
+      const gs = this.gameState;
+      if (this.tribulationState.state !== TRIBULATION_STATES.PREPARING) {
+        if (this.tribulationState.state === TRIBULATION_STATES.NONE) {
+          const prepResult = this.prepare(params);
+          if (!prepResult.success) {
+            return prepResult;
+          }
+        } else {
+          return {
+            success: false,
+            error: "\u8BF7\u5148\u51C6\u5907\u6E21\u52AB",
+            currentState: this.tribulationState.state
+          };
+        }
+      }
+      const stoneCost = THUNDER_TRIBULATION_CONFIG.tribulationStoneCost * this.tribulationState.currentLevel;
+      if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < stoneCost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3\uFF0C\u6E21\u52AB\u5931\u8D25",
+          shortage: stoneCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+        };
+      }
+      gs.player.spiritStones -= stoneCost;
+      this.tribulationState.state = TRIBULATION_STATES.IN_PROGRESS;
+      this.tribulationState.lightningCount = 0;
+      this.tribulationState.progress = 0;
+      const successRateInfo = this.calculateSuccessRate();
+      const maxLightning = this.tribulationState.currentLevel * 3;
+      const passedLightning = [];
+      for (let i = 0; i < maxLightning; i++) {
+        const lightningSuccess = Math.random() < successRateInfo.finalRate;
+        this.tribulationState.lightningCount++;
+        this.tribulationState.progress = (i + 1) / maxLightning * 100;
+        passedLightning.push({
+          index: i + 1,
+          intensity: this.tribulationState.lightningIntensity * (1 + i * 0.1),
+          passed: lightningSuccess
+        });
+        if (!lightningSuccess) {
+          this.tribulationState.state = TRIBULATION_STATES.FAILED;
+          this.tribulationState.lastTribulationTime = Date.now();
+          this.recordHistory("execute", {
+            targetRealm: this.tribulationState.targetRealm,
+            level: this.tribulationState.currentLevel,
+            lightningCount: this.tribulationState.lightningCount,
+            passedLightning: passedLightning.length,
+            result: "failed"
+          });
+          return {
+            success: false,
+            action: "thunder.execute",
+            state: TRIBULATION_STATES.FAILED,
+            message: `\u6E21\u52AB\u5931\u8D25\uFF01\u7B2C${i + 1}\u9053\u5929\u96F7\u672A\u80FD\u6E21\u8FC7`,
+            lightningCount: this.tribulationState.lightningCount,
+            progress: this.tribulationState.progress,
+            targetRealm: this.tribulationState.targetRealm,
+            failureReason: "\u5929\u96F7\u6D17\u793C\u5931\u8D25"
+          };
+        }
+      }
+      this.tribulationState.state = TRIBULATION_STATES.SUCCESS;
+      this.tribulationState.lastTribulationTime = Date.now();
+      const oldRealm = gs.realm || 0;
+      gs.realm = this.tribulationState.targetRealm;
+      gs.stage = 0;
+      gs.cultivationProgress = 0;
+      this.tribulationState.lightningMastery = Math.min(
+        this.tribulationState.lightningMastery + 1,
+        THUNDER_TRIBULATION_CONFIG.maxMasteryLevel
+      );
+      this.recordHistory("execute", {
+        targetRealm: this.tribulationState.targetRealm,
+        level: this.tribulationState.currentLevel,
+        lightningCount: this.tribulationState.lightningCount,
+        passedLightning: passedLightning.length,
+        result: "success"
+      });
+      return {
+        success: true,
+        action: "thunder.execute",
+        state: TRIBULATION_STATES.SUCCESS,
+        message: `\u6E21\u52AB\u6210\u529F\uFF01\u6210\u529F\u7A81\u7834\u81F3${this.getRealmName(gs.realm)}`,
+        realmProgress: {
+          from: oldRealm,
+          to: gs.realm,
+          realmName: this.getRealmName(gs.realm)
+        },
+        lightningMastery: this.tribulationState.lightningMastery,
+        lightningCount: this.tribulationState.lightningCount,
+        progress: this.tribulationState.progress
+      };
+    }
+    /**
+     * 天雷赐福 (thunder.bless)
+     * @param {Object} params - 参数 { type: 'cultivation'|'attribute'|'skill' }
+     * @returns {Object} 赐福结果
+     */
+    bless(params = {}) {
+      const gs = this.gameState;
+      if (this.tribulationState.state !== TRIBULATION_STATES.SUCCESS) {
+        return {
+          success: false,
+          error: "\u9700\u8981\u5148\u6210\u529F\u6E21\u52AB\u624D\u80FD\u83B7\u5F97\u8D50\u798F"
+        };
+      }
+      if (this.tribulationState.state === TRIBULATION_STATES.BLESSED) {
+        return {
+          success: false,
+          error: "\u672C\u6B21\u6E21\u52AB\u8D50\u798F\u5DF2\u9886\u53D6"
+        };
+      }
+      const type = params.type || "cultivation";
+      let blessingEffect;
+      const baseBonus = THUNDER_TRIBULATION_CONFIG.blessingBaseBonus;
+      const levelBonus = (this.tribulationState.currentLevel || 1) * 0.05;
+      switch (type) {
+        case "cultivation":
+          gs.cultivationProgress = (gs.cultivationProgress || 0) + 20 * (baseBonus + levelBonus);
+          blessingEffect = {
+            type: "cultivation",
+            name: "\u5929\u96F7\u6DEC\u4F53",
+            bonus: (baseBonus + levelBonus) * 100,
+            description: `\u4FEE\u70BC\u901F\u5EA6\u63D0\u5347${((baseBonus + levelBonus) * 100).toFixed(0)}%`
+          };
+          break;
+        case "attribute":
+          if (gs.player) {
+            gs.player.level = (gs.player.level || 1) + Math.floor(this.tribulationState.currentLevel || 1);
+          }
+          blessingEffect = {
+            type: "attribute",
+            name: "\u5929\u96F7\u953B\u4F53",
+            bonus: (baseBonus + levelBonus) * 100,
+            description: `\u7B49\u7EA7\u63D0\u5347${Math.floor(this.tribulationState.currentLevel || 1)}\u7EA7`
+          };
+          break;
+        case "skill":
+          const skillBonus = baseBonus + levelBonus;
+          blessingEffect = {
+            type: "skill",
+            name: "\u96F7\u6CD5\u795E\u901A",
+            bonus: skillBonus * 100,
+            description: `\u96F7\u6CD5\u5A01\u529B\u63D0\u5347${(skillBonus * 100).toFixed(0)}%`
+          };
+          break;
+        default:
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u8D50\u798F\u7C7B\u578B"
+          };
+      }
+      this.tribulationState.state = TRIBULATION_STATES.BLESSED;
+      this.tribulationState.blessingEffects.push(blessingEffect);
+      this.recordHistory("bless", {
+        type,
+        blessingEffect
+      });
+      return {
+        success: true,
+        action: "thunder.bless",
+        blessingEffect,
+        message: `\u83B7\u5F97${blessingEffect.name}\u6548\u679C\uFF1A${blessingEffect.description}`
+      };
+    }
+    /**
+     * 雷法精通 (thunder.mastery)
+     * @param {Object} params - 参数 { action: 'query'|'upgrade'|'use' }
+     * @returns {Object} 结果
+     */
+    mastery(params = {}) {
+      var _a, _b, _c, _d;
+      const gs = this.gameState;
+      const action = params.action || "query";
+      switch (action) {
+        case "query":
+          return {
+            success: true,
+            action: "thunder.mastery",
+            currentLevel: this.tribulationState.lightningMastery,
+            maxLevel: THUNDER_TRIBULATION_CONFIG.maxMasteryLevel,
+            skills: this.tribulationState.lightningSkills,
+            experienceProgress: this.getMasteryProgress()
+          };
+        case "upgrade":
+          if (this.tribulationState.state !== TRIBULATION_STATES.SUCCESS && this.tribulationState.state !== TRIBULATION_STATES.BLESSED) {
+            return {
+              success: false,
+              error: "\u9700\u8981\u5148\u6210\u529F\u6E21\u52AB\u624D\u80FD\u63D0\u5347\u96F7\u6CD5\u7CBE\u901A"
+            };
+          }
+          if (this.tribulationState.lightningMastery >= THUNDER_TRIBULATION_CONFIG.maxMasteryLevel) {
+            return {
+              success: false,
+              error: "\u96F7\u6CD5\u7CBE\u901A\u5DF2\u8FBE\u5230\u6700\u5927\u7B49\u7EA7"
+            };
+          }
+          const upgradeCost = 1e3 * (this.tribulationState.lightningMastery + 1);
+          if ((((_a = gs.player) == null ? void 0 : _a.spiritStones) || 0) < upgradeCost) {
+            return {
+              success: false,
+              error: `\u5347\u7EA7\u9700\u8981${upgradeCost}\u7075\u77F3`,
+              shortage: upgradeCost - (((_b = gs.player) == null ? void 0 : _b.spiritStones) || 0)
+            };
+          }
+          gs.player.spiritStones -= upgradeCost;
+          this.tribulationState.lightningMastery++;
+          this.recordHistory("mastery_upgrade", {
+            newLevel: this.tribulationState.lightningMastery,
+            cost: upgradeCost
+          });
+          return {
+            success: true,
+            action: "thunder.mastery",
+            newLevel: this.tribulationState.lightningMastery,
+            message: `\u96F7\u6CD5\u7CBE\u901A\u63D0\u5347\u81F3${this.tribulationState.lightningMastery}\u7EA7`
+          };
+        case "use":
+          if (this.tribulationState.lightningMastery < 1) {
+            return {
+              success: false,
+              error: "\u96F7\u6CD5\u7CBE\u901A\u7B49\u7EA7\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u4F7F\u7528\u96F7\u6CD5"
+            };
+          }
+          const useCost = 50 * this.tribulationState.lightningMastery;
+          if ((((_c = gs.player) == null ? void 0 : _c.qi) || 0) < useCost) {
+            return {
+              success: false,
+              error: `\u4F7F\u7528\u96F7\u6CD5\u9700\u8981${useCost}\u7075\u529B`,
+              shortage: useCost - (((_d = gs.player) == null ? void 0 : _d.qi) || 0)
+            };
+          }
+          gs.player.qi -= useCost;
+          const damage = 100 * this.tribulationState.lightningMastery;
+          this.recordHistory("mastery_use", {
+            damage,
+            qiCost: useCost
+          });
+          return {
+            success: true,
+            action: "thunder.mastery",
+            message: `\u65BD\u5C55\u96F7\u6CD5\uFF0C\u9020\u6210${damage}\u4F24\u5BB3`,
+            damage,
+            qiSpent: useCost,
+            masteryLevel: this.tribulationState.lightningMastery
+          };
+        default:
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u64CD\u4F5C\u7C7B\u578B"
+          };
+      }
+    }
+    /**
+     * 获取雷法精通进度
+     */
+    getMasteryProgress() {
+      const current = this.tribulationState.lightningMastery;
+      const max = THUNDER_TRIBULATION_CONFIG.maxMasteryLevel;
+      return {
+        current,
+        max,
+        percentage: current / max * 100
+      };
+    }
+    /**
+     * 吸收雷劫 (thunder.absorb)
+     * @param {Object} params - 参数 { amount: number }
+     * @returns {Object} 吸收结果
+     */
+    absorb(params = {}) {
+      var _a;
+      const gs = this.gameState;
+      if (this.tribulationState.absorbedEnergy <= 0 && this.tribulationState.state !== TRIBULATION_STATES.SUCCESS) {
+        return {
+          success: false,
+          error: "\u5F53\u524D\u6CA1\u6709\u53EF\u5438\u6536\u7684\u96F7\u52AB\u80FD\u91CF"
+        };
+      }
+      const amount = Math.min(params.amount || 50, 100);
+      const maxAbsorb = this.tribulationState.absorbedEnergy || THUNDER_TRIBULATION_CONFIG.absorbRecoveryRate * this.tribulationState.lightningIntensity;
+      const actualAbsorb = Math.min(amount, maxAbsorb);
+      const currentQi = ((_a = gs.player) == null ? void 0 : _a.qi) || 0;
+      const maxQi = 100 + (gs.realm || 0) * 50;
+      const qiRecovery = actualAbsorb * THUNDER_TRIBULATION_CONFIG.absorbRecoveryRate;
+      gs.player.qi = Math.min(currentQi + qiRecovery, maxQi);
+      this.tribulationState.absorbedEnergy = Math.max(0, (this.tribulationState.absorbedEnergy || 0) - actualAbsorb);
+      this.recordHistory("absorb", {
+        amount: actualAbsorb,
+        qiRecovered: qiRecovery
+      });
+      return {
+        success: true,
+        action: "thunder.absorb",
+        amount: actualAbsorb,
+        qiRecovered: qiRecovery,
+        currentQi: gs.player.qi,
+        maxQi,
+        message: `\u5438\u6536${actualAbsorb}\u96F7\u52AB\u80FD\u91CF\uFF0C\u56DE\u590D${qiRecovery.toFixed(1)}\u7075\u529B`
+      };
+    }
+    /**
+     * 渡劫日志 (thunder.journal)
+     * @param {Object} params - 参数 { limit: number }
+     * @returns {Object} 日志结果
+     */
+    journal(params = {}) {
+      const limit = params.limit || 10;
+      const history = this.tribulationState.history || [];
+      const recentHistory = history.slice(-limit).reverse();
+      const stats = {
+        totalTribulations: history.filter((h) => h.action === "execute").length,
+        successfulTribulations: history.filter((h) => {
+          var _a;
+          return h.action === "execute" && ((_a = h.details) == null ? void 0 : _a.result) === "success";
+        }).length,
+        failedTribulations: history.filter((h) => {
+          var _a;
+          return h.action === "execute" && ((_a = h.details) == null ? void 0 : _a.result) === "failed";
+        }).length,
+        totalLightningAbsorbed: history.filter((h) => h.action === "absorb").reduce((sum, h) => {
+          var _a;
+          return sum + (((_a = h.details) == null ? void 0 : _a.amount) || 0);
+        }, 0),
+        currentMastery: this.tribulationState.lightningMastery,
+        highestLevel: this.getHighestTribulationLevel(history)
+      };
+      return {
+        success: true,
+        action: "thunder.journal",
+        stats,
+        history: recentHistory.map((h) => ({
+          action: h.action,
+          details: h.details,
+          timestamp: h.timestamp,
+          timeDesc: this.formatTimestamp(h.timestamp)
+        }))
+      };
+    }
+    /**
+     * 获取最高渡劫等级
+     */
+    getHighestTribulationLevel(history) {
+      if (!history || history.length === 0) return 0;
+      return Math.max(...history.filter((h) => {
+        var _a;
+        return (_a = h.details) == null ? void 0 : _a.level;
+      }).map((h) => h.details.level));
+    }
+    /**
+     * 格式化时间戳
+     */
+    formatTimestamp(timestamp) {
+      if (!timestamp) return "";
+      const date = new Date(timestamp);
+      const now = /* @__PURE__ */ new Date();
+      const diff = now - date;
+      if (diff < 6e4) return "\u521A\u521A";
+      if (diff < 36e5) return `${Math.floor(diff / 6e4)}\u5206\u949F\u524D`;
+      if (diff < 864e5) return `${Math.floor(diff / 36e5)}\u5C0F\u65F6\u524D`;
+      return date.toLocaleDateString();
+    }
+    /**
+     * 获取境界名称
+     */
+    getRealmName(realm) {
+      const realms = ["\u70BC\u6C14", "\u7B51\u57FA", "\u91D1\u4E39", "\u5143\u5A74", "\u5316\u795E", "\u98DE\u5347"];
+      return realms[realm] || "\u672A\u77E5";
+    }
+    /**
+     * 获取MCP工具处理器
+     * @param {Object} gameState - 游戏状态
+     * @returns {Object} MCP处理器映射
+     */
+    static getMCPHandlers(gameState3) {
+      const service = new _ThunderTribulationService(gameState3);
+      return {
+        "thunder.prepare": (params) => service.prepare(params || {}),
+        "thunder.execute": (params) => service.execute(params || {}),
+        "thunder.bless": (params) => service.bless(params || {}),
+        "thunder.mastery": (params) => service.mastery(params || {}),
+        "thunder.absorb": (params) => service.absorb(params || {}),
+        "thunder.journal": (params) => service.journal(params || {})
+      };
+    }
+  };
+
   // src/domains/sect/services/ImmortalSectService.js
   var IMMORTAL_SECT_CONFIG = {
     createCost: 5e4,
@@ -11819,6 +13959,545 @@ var CultivationSimulator = (() => {
     const service = new CaveDwellingService(gameState3);
     service.init(gameState3);
     return service;
+  }
+
+  // src/domains/player/services/CaveRealmService.js
+  var CAVE_TIERS = ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"];
+  var CAVE_TIER_CONFIG = {
+    "\u5C0F\u578B": {
+      capacity: 2,
+      resourceSlots: 3,
+      spiritBonus: 1,
+      expandCost: 500,
+      createCost: 200
+    },
+    "\u4E2D\u578B": {
+      capacity: 5,
+      resourceSlots: 6,
+      spiritBonus: 1.3,
+      expandCost: 1500,
+      createCost: 0
+    },
+    "\u5927\u578B": {
+      capacity: 10,
+      resourceSlots: 10,
+      spiritBonus: 1.6,
+      expandCost: 5e3,
+      createCost: 0
+    },
+    "\u5DE8\u578B": {
+      capacity: 20,
+      resourceSlots: 20,
+      spiritBonus: 2,
+      expandCost: 2e4,
+      createCost: 0
+    }
+  };
+  var BLESSED_LAND_CONFIG = {
+    1: { name: "\u798F\u5730\u521D\u6210", qiRegenBonus: 1.2, cultivationBonus: 5, expandCost: 300 },
+    2: { name: "\u798F\u5730\u5C0F\u6210", qiRegenBonus: 1.5, cultivationBonus: 10, expandCost: 800 },
+    3: { name: "\u798F\u5730\u5927\u6210", qiRegenBonus: 1.8, cultivationBonus: 20, expandCost: 2e3 },
+    4: { name: "\u798F\u5730\u5706\u6EE1", qiRegenBonus: 2.2, cultivationBonus: 35, expandCost: 6e3 },
+    5: { name: "\u6D1E\u5929\u798F\u5730", qiRegenBonus: 3, cultivationBonus: 50, expandCost: 15e3 }
+  };
+  var RESOURCE_TYPES = {
+    "spiritStone": { name: "\u7075\u77F3", baseYield: 10, regenTime: 36e5 },
+    "qiCrystal": { name: "\u7075\u6C14\u7ED3\u6676", baseYield: 5, regenTime: 72e5 },
+    "essence": { name: "\u7CBE\u534E", baseYield: 2, regenTime: 108e5 },
+    "mysticHerb": { name: "\u7075\u8349", baseYield: 3, regenTime: 54e5 }
+  };
+  var CaveRealmService = class {
+    constructor(gameState3) {
+      this.gameState = gameState3;
+      this.realms = /* @__PURE__ */ new Map();
+      this.blessedLands = /* @__PURE__ */ new Map();
+      this.resourceTimers = /* @__PURE__ */ new Map();
+      this.harvestHistory = [];
+    }
+    /**
+     * 初始化洞天福地服务
+     */
+    init(gameState3) {
+      this.gameState = gameState3;
+      if (!gameState3.caveRealm) {
+        gameState3.caveRealm = {
+          hasCave: false,
+          cave: null,
+          blessedLands: [],
+          resources: [],
+          totalHarvests: 0,
+          spiritBalance: 0,
+          lastSpiritUpdate: Date.now()
+        };
+      }
+      if (!gameState3.caveRealm.realms) {
+        gameState3.caveRealm.realms = [];
+      }
+      if (!gameState3.caveRealm.blessedLands) {
+        gameState3.caveRealm.blessedLands = [];
+      }
+      if (!gameState3.caveRealm.resources) {
+        gameState3.caveRealm.resources = [];
+      }
+      console.log("[CaveRealm] \u6D1E\u5929\u798F\u5730\u7CFB\u7EDF\u521D\u59CB\u5316\u5B8C\u6210");
+      return this;
+    }
+    /**
+     * 获取MCP工具处理器
+     */
+    getMCPHandlers() {
+      return {
+        "cave.create": (params) => this.mcpCreate(params),
+        "cave.expand": (params) => this.mcpExpand(params),
+        "cave.resource": (params) => this.mcpResource(params),
+        "cave.blessed": (params) => this.mcpBlessed(params),
+        "cave.spirit": (params) => this.mcpSpirit(params),
+        "cave.harvest": (params) => this.mcpHarvest(params)
+      };
+    }
+    /**
+     * 获取所有工具定义
+     */
+    static get TOOLS() {
+      return {
+        "cave.create": {
+          name: "cave.create",
+          description: "\u521B\u5EFA\u6D1E\u5929 - \u5F00\u8F9F\u5C5E\u4E8E\u81EA\u5DF1\u7684\u79D8\u5883\u7A7A\u95F4",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "\u6D1E\u5929\u540D\u79F0" },
+              tier: { type: "string", enum: ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"], description: "\u6D1E\u5929\u89C4\u6A21" }
+            }
+          }
+        },
+        "cave.expand": {
+          name: "cave.expand",
+          description: "\u6269\u5C55\u6D1E\u5929 - \u63D0\u5347\u6D1E\u5929\u7B49\u7EA7\u548C\u5BB9\u91CF",
+          inputSchema: {
+            type: "object",
+            properties: {
+              targetTier: { type: "string", enum: ["\u5C0F\u578B", "\u4E2D\u578B", "\u5927\u578B", "\u5DE8\u578B"], description: "\u76EE\u6807\u89C4\u6A21" }
+            }
+          }
+        },
+        "cave.resource": {
+          name: "cave.resource",
+          description: "\u6D1E\u5929\u8D44\u6E90 - \u67E5\u770B\u6D1E\u5929\u5185\u8D44\u6E90\u72B6\u6001",
+          inputSchema: {
+            type: "object",
+            properties: {
+              resourceType: { type: "string", description: "\u8D44\u6E90\u7C7B\u578B\uFF08\u53EF\u9009\uFF09" }
+            }
+          }
+        },
+        "cave.blessed": {
+          name: "cave.blessed",
+          description: "\u798F\u5730\u589E\u76CA - \u83B7\u53D6\u798F\u5730\u63D0\u4F9B\u7684\u52A0\u6210",
+          inputSchema: {
+            type: "object",
+            properties: {
+              blessedLandId: { type: "string", description: "\u798F\u5730ID\uFF08\u53EF\u9009\uFF09" }
+            }
+          }
+        },
+        "cave.spirit": {
+          name: "cave.spirit",
+          description: "\u7075\u6C14\u5145\u76C8 - \u5145\u76C8\u6D1E\u5929\u7075\u6C14",
+          inputSchema: {
+            type: "object",
+            properties: {
+              amount: { type: "number", description: "\u7075\u6C14\u6570\u91CF" }
+            }
+          }
+        },
+        "cave.harvest": {
+          name: "cave.harvest",
+          description: "\u6536\u83B7\u8D44\u6E90 - \u6536\u83B7\u6D1E\u5929\u5185\u5DF2\u6210\u719F\u7684\u8D44\u6E90",
+          inputSchema: {
+            type: "object",
+            properties: {
+              resourceId: { type: "string", description: "\u8D44\u6E90ID\uFF08\u53EF\u9009\uFF0C\u6536\u83B7\u5168\u90E8\uFF09" }
+            }
+          }
+        }
+      };
+    }
+    // ===== cave.create - 创建洞天 =====
+    /**
+     * MCP工具: 创建洞天
+     */
+    mcpCreate(params = {}) {
+      const { name, tier = "\u5C0F\u578B" } = params;
+      if (!CAVE_TIERS.includes(tier)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u6D1E\u5929\u89C4\u6A21",
+          validTiers: CAVE_TIERS
+        };
+      }
+      if (this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5DF2\u5B58\u5728\u6D1E\u5929\uFF0C\u8BF7\u4F7F\u7528 cave.expand \u6269\u5C55"
+        };
+      }
+      const tierConfig = CAVE_TIER_CONFIG[tier];
+      const cost = tierConfig.createCost || CAVE_TIER_CONFIG["\u5C0F\u578B"].expandCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: cost,
+          available: currentStones
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const cave = {
+        id: `cave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name || `${tier}\u6D1E\u5929`,
+        tier,
+        capacity: tierConfig.capacity,
+        resourceSlots: tierConfig.resourceSlots,
+        spiritBonus: tierConfig.spiritBonus,
+        createdAt: Date.now(),
+        lastExpandAt: Date.now(),
+        resourceSlotsUsed: 0,
+        totalResourcesProduced: 0
+      };
+      this.gameState.caveRealm.hasCave = true;
+      this.gameState.caveRealm.cave = cave;
+      this.gameState.caveRealm.realms.push(cave);
+      this.realms.set(cave.id, cave);
+      return {
+        success: true,
+        message: `\u6D1E\u5929\u3010${cave.name}\u3011\u521B\u5EFA\u6210\u529F\uFF01`,
+        cave: {
+          id: cave.id,
+          name: cave.name,
+          tier: cave.tier,
+          capacity: cave.capacity,
+          resourceSlots: cave.resourceSlots,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== cave.expand - 扩展洞天 =====
+    /**
+     * MCP工具: 扩展洞天
+     */
+    mcpExpand(params = {}) {
+      const { targetTier } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929\uFF0C\u8BF7\u5148\u4F7F\u7528 cave.create"
+        };
+      }
+      const cave = this.gameState.caveRealm.cave;
+      const currentTierIndex = CAVE_TIERS.indexOf(cave.tier);
+      if (!targetTier || !CAVE_TIERS.includes(targetTier)) {
+        return {
+          success: false,
+          error: "\u65E0\u6548\u7684\u76EE\u6807\u89C4\u6A21",
+          validTiers: CAVE_TIERS
+        };
+      }
+      const targetTierIndex = CAVE_TIERS.indexOf(targetTier);
+      if (targetTierIndex <= currentTierIndex) {
+        return {
+          success: false,
+          error: "\u76EE\u6807\u89C4\u6A21\u5FC5\u987B\u5927\u4E8E\u5F53\u524D\u89C4\u6A21",
+          currentTier: cave.tier
+        };
+      }
+      const tierConfig = CAVE_TIER_CONFIG[targetTier];
+      const cost = tierConfig.expandCost;
+      const currentStones = this.gameState.spiritStones || 0;
+      if (currentStones < cost) {
+        return {
+          success: false,
+          error: "\u7075\u77F3\u4E0D\u8DB3",
+          required: cost,
+          available: currentStones,
+          shortfall: cost - currentStones
+        };
+      }
+      this.gameState.spiritStones -= cost;
+      const oldTier = cave.tier;
+      cave.tier = targetTier;
+      cave.capacity = tierConfig.capacity;
+      cave.resourceSlots = tierConfig.resourceSlots;
+      cave.spiritBonus = tierConfig.spiritBonus;
+      cave.lastExpandAt = Date.now();
+      return {
+        success: true,
+        message: `\u6D1E\u5929\u6269\u5C55\u6210\u529F\uFF01${oldTier} \u2192 ${targetTier}`,
+        expand: {
+          fromTier: oldTier,
+          toTier: targetTier,
+          newCapacity: cave.capacity,
+          newResourceSlots: cave.resourceSlots,
+          cost
+        },
+        remainingStones: this.gameState.spiritStones
+      };
+    }
+    // ===== cave.resource - 洞天资源 =====
+    /**
+     * MCP工具: 洞天资源
+     */
+    mcpResource(params = {}) {
+      const { resourceType } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const cave = this.gameState.caveRealm.cave;
+      const resources = this.gameState.caveRealm.resources;
+      if (resourceType) {
+        if (!RESOURCE_TYPES[resourceType]) {
+          return {
+            success: false,
+            error: "\u65E0\u6548\u7684\u8D44\u6E90\u7C7B\u578B",
+            validTypes: Object.keys(RESOURCE_TYPES)
+          };
+        }
+        const filtered = resources.filter((r) => r.type === resourceType);
+        return {
+          success: true,
+          resourceType,
+          resources: filtered,
+          count: filtered.length
+        };
+      }
+      return {
+        success: true,
+        cave: {
+          id: cave.id,
+          name: cave.name,
+          tier: cave.tier,
+          capacity: cave.capacity,
+          resourceSlots: cave.resourceSlots,
+          resourceSlotsUsed: resources.length,
+          resourceSlotsAvailable: cave.resourceSlots - resources.length
+        },
+        resources: resources.map((r) => {
+          var _a;
+          return {
+            id: r.id,
+            type: r.type,
+            name: ((_a = RESOURCE_TYPES[r.type]) == null ? void 0 : _a.name) || r.type,
+            amount: r.amount,
+            readyAt: r.readyAt,
+            isReady: Date.now() >= r.readyAt
+          };
+        }),
+        totalResources: resources.length,
+        availableTypes: Object.keys(RESOURCE_TYPES)
+      };
+    }
+    // ===== cave.blessed - 福地增益 =====
+    /**
+     * MCP工具: 福地增益
+     */
+    mcpBlessed(params = {}) {
+      const { blessedLandId } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const blessedLands = this.gameState.caveRealm.blessedLands;
+      if (blessedLandId) {
+        const land = blessedLands.find((l) => l.id === blessedLandId);
+        if (!land) {
+          return {
+            success: false,
+            error: "\u798F\u5730\u4E0D\u5B58\u5728",
+            validIds: blessedLands.map((l) => l.id)
+          };
+        }
+        const config = BLESSED_LAND_CONFIG[land.level];
+        return {
+          success: true,
+          blessedLand: {
+            id: land.id,
+            name: land.name,
+            level: land.level,
+            levelName: config.name,
+            qiRegenBonus: land.qiRegenBonus,
+            cultivationBonus: land.cultivationBonus,
+            createdAt: land.createdAt
+          }
+        };
+      }
+      let totalQiRegenBonus = 1;
+      let totalCultivationBonus = 0;
+      for (const land of blessedLands) {
+        totalQiRegenBonus *= land.qiRegenBonus;
+        totalCultivationBonus += land.cultivationBonus;
+      }
+      return {
+        success: true,
+        blessedLands: blessedLands.map((land) => {
+          const config = BLESSED_LAND_CONFIG[land.level];
+          return {
+            id: land.id,
+            name: land.name,
+            level: land.level,
+            levelName: config.name,
+            qiRegenBonus: land.qiRegenBonus,
+            cultivationBonus: land.cultivationBonus
+          };
+        }),
+        totalBlessedLands: blessedLands.length,
+        totalQiRegenBonus,
+        totalCultivationBonus
+      };
+    }
+    // ===== cave.spirit - 灵气充盈 =====
+    /**
+     * MCP工具: 灵气充盈
+     */
+    mcpSpirit(params = {}) {
+      const { amount = 100 } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      if (amount <= 0) {
+        return {
+          success: false,
+          error: "\u7075\u6C14\u6570\u91CF\u5FC5\u987B\u5927\u4E8E0"
+        };
+      }
+      const currentQi = this.gameState.qi || 0;
+      const cave = this.gameState.caveRealm.cave;
+      const bonusMultiplier = cave.spiritBonus;
+      const actualAdded = Math.floor(amount * bonusMultiplier);
+      this.gameState.caveRealm.spiritBalance = (this.gameState.caveRealm.spiritBalance || 0) + actualAdded;
+      this.gameState.caveRealm.lastSpiritUpdate = Date.now();
+      return {
+        success: true,
+        message: `\u7075\u6C14\u5145\u76C8\u6210\u529F\uFF01+${actualAdded}\u7075\u6C14\uFF08\u500D\u7387${bonusMultiplier}\uFF09`,
+        spirit: {
+          added: actualAdded,
+          bonusMultiplier,
+          totalBalance: this.gameState.caveRealm.spiritBalance,
+          currentQi
+        }
+      };
+    }
+    // ===== cave.harvest - 收获资源 =====
+    /**
+     * MCP工具: 收获资源
+     */
+    mcpHarvest(params = {}) {
+      const { resourceId } = params;
+      if (!this.gameState.caveRealm.hasCave) {
+        return {
+          success: false,
+          error: "\u5C1A\u672A\u521B\u5EFA\u6D1E\u5929"
+        };
+      }
+      const resources = this.gameState.caveRealm.resources;
+      const now = Date.now();
+      let toHarvest;
+      if (resourceId) {
+        toHarvest = resources.find((r) => r.id === resourceId);
+        if (!toHarvest) {
+          return {
+            success: false,
+            error: "\u8D44\u6E90\u4E0D\u5B58\u5728"
+          };
+        }
+        if (now < toHarvest.readyAt) {
+          return {
+            success: false,
+            error: "\u8D44\u6E90\u5C1A\u672A\u6210\u719F",
+            readyAt: toHarvest.readyAt,
+            remainingMs: toHarvest.readyAt - now
+          };
+        }
+        toHarvest = [toHarvest];
+      } else {
+        toHarvest = resources.filter((r) => now >= r.readyAt);
+      }
+      if (toHarvest.length === 0) {
+        return {
+          success: true,
+          message: "\u6682\u65E0\u53EF\u6536\u83B7\u7684\u8D44\u6E90",
+          harvested: [],
+          totalHarvested: 0
+        };
+      }
+      const harvested = toHarvest.map((r) => {
+        const resourceConfig = RESOURCE_TYPES[r.type];
+        return {
+          id: r.id,
+          type: r.type,
+          name: (resourceConfig == null ? void 0 : resourceConfig.name) || r.type,
+          amount: r.amount,
+          harvestedAt: now
+        };
+      });
+      this.gameState.caveRealm.totalHarvests += harvested.length;
+      this.harvestHistory.push(...harvested);
+      const harvestedIds = harvested.map((h) => h.id);
+      this.gameState.caveRealm.resources = resources.filter((r) => !harvestedIds.includes(r.id));
+      let totalSpiritStones = 0;
+      let totalQi = 0;
+      for (const h of harvested) {
+        if (h.type === "spiritStone") {
+          totalSpiritStones += h.amount;
+        } else if (h.type === "qiCrystal") {
+          totalQi += h.amount * 10;
+        }
+      }
+      if (totalSpiritStones > 0) {
+        this.gameState.spiritStones = (this.gameState.spiritStones || 0) + totalSpiritStones;
+      }
+      if (totalQi > 0) {
+        this.gameState.qi = (this.gameState.qi || 0) + totalQi;
+      }
+      return {
+        success: true,
+        message: `\u6536\u83B7\u6210\u529F\uFF01\u83B7\u5F97${harvested.length}\u4E2A\u8D44\u6E90`,
+        harvested,
+        rewards: {
+          spiritStones: totalSpiritStones,
+          qi: totalQi
+        },
+        totalHarvests: this.gameState.caveRealm.totalHarvests,
+        remainingResources: this.gameState.caveRealm.resources.length
+      };
+    }
+    // ===== 私有辅助方法 =====
+    /**
+     * 生成资源ID
+     */
+    generateResourceId() {
+      return `resource_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * 计算资源再生时间
+     */
+    calculateRegenTime(resourceType, tierMultiplier = 1) {
+      const config = RESOURCE_TYPES[resourceType];
+      if (!config) return 0;
+      return Math.floor(config.regenTime / tierMultiplier);
+    }
+  };
+  function createCaveRealmService(gameState3) {
+    return new CaveRealmService(gameState3);
   }
 
   // src/domains/combat/services/RealmWarfareService.js
@@ -17658,7 +20337,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V238",
+      gameVersion: "V242",
       // 设置
       settings: {
         soundEnabled: true,
@@ -17699,12 +20378,18 @@ var CultivationSimulator = (() => {
     domainModules.herbDiscovery = herbDiscoveryService;
     ascensionService.init(gameState2);
     domainModules.ascension = ascensionService;
+    const yuanInfantService = getYuanInfantService(gameState2);
+    yuanInfantService.init(gameState2);
+    domainModules.yuanInfant = yuanInfantService;
     const immortalSectService = createImmortalSectService(gameState2);
     immortalSectService.init(gameState2);
     domainModules.immortalSect = immortalSectService;
     const caveDwellingService = createCaveDwellingService(gameState2);
     caveDwellingService.init(gameState2);
     domainModules.caveDwelling = caveDwellingService;
+    const caveRealmService = createCaveRealmService(gameState2);
+    caveRealmService.init(gameState2);
+    domainModules.caveRealm = caveRealmService;
     const realmWarfareService = createRealmWarfareService(gameState2);
     realmWarfareService.init(gameState2);
     domainModules.realmWarfare = realmWarfareService;
@@ -17807,6 +20492,130 @@ var CultivationSimulator = (() => {
       "cosmic.legacy.inherit",
       COSMIC_CYCLE_TOOLS["cosmic.legacy.inherit"],
       (params) => cosmicCycleHandlers["cosmic.legacy.inherit"](params)
+    );
+    const yuanInfantHandlers = YuanInfantService.getMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "yuaninfant.form",
+      YUAN_INFANT_TOOLS["yuaninfant.form"],
+      (params) => yuanInfantHandlers["yuaninfant.form"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.separate",
+      YUAN_INFANT_TOOLS["yuaninfant.separate"],
+      (params) => yuanInfantHandlers["yuaninfant.separate"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.project",
+      YUAN_INFANT_TOOLS["yuaninfant.project"],
+      (params) => yuanInfantHandlers["yuaninfant.project"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.sync",
+      YUAN_INFANT_TOOLS["yuaninfant.sync"],
+      (params) => yuanInfantHandlers["yuaninfant.sync"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.recall",
+      YUAN_INFANT_TOOLS["yuaninfant.recall"],
+      (params) => yuanInfantHandlers["yuaninfant.recall"](params)
+    );
+    mcpRegistry.registerTool(
+      "yuaninfant.status",
+      YUAN_INFANT_TOOLS["yuaninfant.status"],
+      (params) => yuanInfantHandlers["yuaninfant.status"](params)
+    );
+    const yinYangWuXingHandlers = YinYangWuXingService.getMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "wuxing.analyze",
+      YIN_YANG_WUXING_TOOLS["wuxing.analyze"],
+      (params) => yinYangWuXingHandlers["wuxing.analyze"](params)
+    );
+    mcpRegistry.registerTool(
+      "wuxing.balance",
+      YIN_YANG_WUXING_TOOLS["wuxing.balance"],
+      (params) => yinYangWuXingHandlers["wuxing.balance"](params)
+    );
+    mcpRegistry.registerTool(
+      "wuxing.imbue",
+      YIN_YANG_WUXING_TOOLS["wuxing.imbue"],
+      (params) => yinYangWuXingHandlers["wuxing.imbue"](params)
+    );
+    mcpRegistry.registerTool(
+      "wuxing.resonate",
+      YIN_YANG_WUXING_TOOLS["wuxing.resonate"],
+      (params) => yinYangWuXingHandlers["wuxing.resonate"](params)
+    );
+    mcpRegistry.registerTool(
+      "wuxing.cycle",
+      YIN_YANG_WUXING_TOOLS["wuxing.cycle"],
+      (params) => yinYangWuXingHandlers["wuxing.cycle"](params)
+    );
+    mcpRegistry.registerTool(
+      "wuxing.affinity",
+      YIN_YANG_WUXING_TOOLS["wuxing.affinity"],
+      (params) => yinYangWuXingHandlers["wuxing.affinity"](params)
+    );
+    const thunderTribulationHandlers = ThunderTribulationService.getMCPHandlers(gameState2);
+    mcpRegistry.registerTool(
+      "thunder.prepare",
+      THUNDER_TRIBULATION_TOOLS["thunder.prepare"],
+      (params) => thunderTribulationHandlers["thunder.prepare"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.execute",
+      THUNDER_TRIBULATION_TOOLS["thunder.execute"],
+      (params) => thunderTribulationHandlers["thunder.execute"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.bless",
+      THUNDER_TRIBULATION_TOOLS["thunder.bless"],
+      (params) => thunderTribulationHandlers["thunder.bless"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.mastery",
+      THUNDER_TRIBULATION_TOOLS["thunder.mastery"],
+      (params) => thunderTribulationHandlers["thunder.mastery"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.absorb",
+      THUNDER_TRIBULATION_TOOLS["thunder.absorb"],
+      (params) => thunderTribulationHandlers["thunder.absorb"](params)
+    );
+    mcpRegistry.registerTool(
+      "thunder.journal",
+      THUNDER_TRIBULATION_TOOLS["thunder.journal"],
+      (params) => thunderTribulationHandlers["thunder.journal"](params)
+    );
+    const caveRealmHandlers = caveRealmService.getMCPHandlers();
+    mcpRegistry.registerTool(
+      "cave.create",
+      CaveRealmService.TOOLS["cave.create"],
+      (params) => caveRealmHandlers["cave.create"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.expand",
+      CaveRealmService.TOOLS["cave.expand"],
+      (params) => caveRealmHandlers["cave.expand"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.resource",
+      CaveRealmService.TOOLS["cave.resource"],
+      (params) => caveRealmHandlers["cave.resource"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.blessed",
+      CaveRealmService.TOOLS["cave.blessed"],
+      (params) => caveRealmHandlers["cave.blessed"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.spirit",
+      CaveRealmService.TOOLS["cave.spirit"],
+      (params) => caveRealmHandlers["cave.spirit"](params)
+    );
+    mcpRegistry.registerTool(
+      "cave.harvest",
+      CaveRealmService.TOOLS["cave.harvest"],
+      (params) => caveRealmHandlers["cave.harvest"](params)
     );
     console.log("[Main] \u9886\u57DF\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -19185,4 +21994,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-8eafe05-2026-05-30T16-58-23-422Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-7f3e81e-2026-05-31T05-05-31-796Z";
