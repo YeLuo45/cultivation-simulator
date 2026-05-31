@@ -68,9 +68,10 @@ const JOIN_SECT_COST = 100;
 // ===== 服务类 =====
 
 let _sectInstance = null;
+let _currentGameState = null;
 
 export function createSectService(gameState) {
-  if (_sectInstance) return _sectInstance;
+  _currentGameState = gameState;
   _sectInstance = new SectService(gameState);
   return _sectInstance;
 }
@@ -286,6 +287,10 @@ class SectService {
       return { success: false, message: '未加入仙盟' };
     }
 
+    if (amount <= 0) {
+      return { success: false, message: '捐献数量必须大于0' };
+    }
+
     if ((player.spiritStones || 0) < amount) {
       return { success: false, message: '灵石不足' };
     }
@@ -396,7 +401,7 @@ class SectService {
    */
   getSectInfo() {
     if (!this.gameState.sect.id) {
-      return { success: false, inSect: false };
+      return { success: true, inSect: false };
     }
 
     const levelInfo = SECT_LEVELS[this.gameState.sect.level];

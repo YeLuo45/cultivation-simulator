@@ -92,8 +92,27 @@ describe('SectService', () => {
 
   describe('加入/退出仙盟', () => {
     it('应能加入已有仙盟', () => {
+      // 先创建仙盟，让player1成为盟主
       service.createSect('测试仙盟');
+      
+      // 准备player2的数据，先重置sect.id表示还没有加入任何仙盟
+      // 但保留level等信息用于检查member limit
+      const sectLevel = gameState.sect.level;
+      const sectMembers = { ...gameState.sect.members };
+      const sectContrib = { ...gameState.sect.contribution };
+      
       gameState.player = { id: 'player2', name: '新玩家', spiritStones: 1000 };
+      gameState.sect = {
+        id: null, // player2还没加入仙盟
+        name: null,
+        level: sectLevel,
+        leaderId: 'player1',
+        members: sectMembers,
+        skills: {},
+        contribution: sectContrib,
+        contributionHistory: [],
+        resources: { spiritStones: 5000, contribution: 0 }
+      };
       
       const result = service.joinSect('sect_123', '测试仙盟');
       expect(result.success).toBe(true);
@@ -102,8 +121,26 @@ describe('SectService', () => {
     });
 
     it('加入仙盟应消耗灵石', () => {
+      // 先创建仙盟
       service.createSect('测试仙盟');
+      
+      const sectLevel = gameState.sect.level;
+      const sectMembers = { ...gameState.sect.members };
+      const sectContrib = { ...gameState.sect.contribution };
+      
+      // player2加入
       gameState.player = { id: 'player2', name: '新玩家', spiritStones: 500 };
+      gameState.sect = {
+        id: null,
+        name: null,
+        level: sectLevel,
+        leaderId: 'player1',
+        members: sectMembers,
+        skills: {},
+        contribution: sectContrib,
+        contributionHistory: [],
+        resources: { spiritStones: 5000, contribution: 0 }
+      };
       
       service.joinSect('sect_123', '测试仙盟');
       expect(gameState.player.spiritStones).toBe(400); // 500 - 100
@@ -118,13 +155,31 @@ describe('SectService', () => {
 
     it('仙盟人数已满时不应加入', () => {
       service.createSect('测试仙盟');
-      gameState.sect.level = 1; // 限制10人
-      for (let i = 0; i < 10; i++) {
-        gameState.sect.members[`member${i}`] = { id: `member${i}`, name: `成员${i}`, position: '弟子' };
-        gameState.sect.contribution[`member${i}`] = 0;
+      
+      // 模拟一个已满员的仙盟（新玩家未加入）
+      const sectLevel = gameState.sect.level;
+      const sectMembers = { ...gameState.sect.members };
+      const sectContrib = { ...gameState.sect.contribution };
+      
+      // 添加更多成员达到上限
+      for (let i = 0; i < 9; i++) {
+        sectMembers[`member${i}`] = { id: `member${i}`, name: `成员${i}`, position: '弟子' };
+        sectContrib[`member${i}`] = 0;
       }
       
       gameState.player = { id: 'newplayer', name: '新玩家', spiritStones: 1000 };
+      gameState.sect = {
+        id: null, // 新玩家没加入仙盟
+        name: null,
+        level: 1, // 限制10人，但加上player1已经有10人了
+        leaderId: 'player1',
+        members: sectMembers,
+        skills: {},
+        contribution: sectContrib,
+        contributionHistory: [],
+        resources: { spiritStones: 5000, contribution: 0 }
+      };
+      
       const result = service.joinSect('sect_123', '测试仙盟');
       expect(result.success).toBe(false);
       expect(result.message).toContain('人数已满');
@@ -406,18 +461,19 @@ describe('SectService', () => {
       expect(result.members.length).toBe(0);
     });
 
-    it('负数捐献应被忽略', () => {
+    it('负数捐献应返回错误', () => {
       service.createSect('测试仙盟');
       gameState.player.spiritStones = 1000;
-      service.donateContributions(-100);
-      expect(gameState.player.spiritStones).toBe(1000);
+      const result = service.donateContributions(-100);
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('大于0');
     });
 
-    it('零捐献应被忽略', () => {
+    it('零捐献应返回错误', () => {
       service.createSect('测试仙盟');
       const before = gameState.sect.contribution['player1'];
-      service.donateContributions(0);
-      expect(gameState.sect.contribution['player1']).toBe(before);
+      const result = service.donateContributions(0);
+      expect(result.success).toBe(false);
     });
 
     it('不存在的技能学习应失败', () => {
