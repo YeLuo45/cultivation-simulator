@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-15fef94-2026-05-31T07-54-04-312Z */
+/* Cultivation Simulator DDD-v1.0.0-0c0c2c7-2026-05-31T15-25-35-063Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -20337,7 +20337,7 @@ var CultivationSimulator = (() => {
       // 游戏进度
       days: 1,
       totalPlayTime: 0,
-      gameVersion: "V244",
+      gameVersion: "V246",
       // 设置
       settings: {
         soundEnabled: true,
@@ -22069,4 +22069,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-15fef94-2026-05-31T07-54-04-312Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-0c0c2c7-2026-05-31T15-25-35-063Z";

@@ -290,7 +290,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V244',
+        gameVersion: 'V246',
         
         // 设置
         settings: {
