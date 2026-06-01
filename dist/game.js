@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-af9d996-2026-05-31T15-47-22-285Z */
+/* Cultivation Simulator DDD-v1.0.0-c3acbae-2026-06-01T03-31-44-046Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -1611,418 +1611,6 @@ var CultivationSimulator = (() => {
         epic: 4,
         legendary: 5,
         mythic: 6
-      };
-    }
-  });
-
-  // src/domains/pet/entities/Pet.js
-  var Pet_exports = {};
-  __export(Pet_exports, {
-    EvolutionStages: () => EvolutionStages,
-    PET_RARITY: () => PET_RARITY,
-    PET_SPECIES_CONFIG: () => PET_SPECIES_CONFIG,
-    PET_TYPES: () => PET_TYPES,
-    Pet: () => Pet,
-    PetAttributes: () => PetAttributes,
-    PetBattleStats: () => PetBattleStats,
-    PetForms: () => PetForms,
-    RARITY_COLORS: () => RARITY_COLORS2,
-    RARITY_POWER_MULT: () => RARITY_POWER_MULT
-  });
-  var PetAttributes, PetBattleStats, EvolutionStages, PetForms, Pet, PET_TYPES, PET_RARITY, RARITY_COLORS2, RARITY_POWER_MULT, PET_SPECIES_CONFIG;
-  var init_Pet = __esm({
-    "src/domains/pet/entities/Pet.js"() {
-      PetAttributes = {
-        id: "",
-        // 唯一标识
-        name: "",
-        // 名称
-        species: "",
-        // 种类
-        level: 1,
-        // 等级
-        experience: 0,
-        // 经验值
-        loyalty: 50,
-        // 忠诚度
-        health: 100,
-        // 生命值
-        energy: 100,
-        // 能量值
-        hunger: 0,
-        // 饥饿度
-        happiness: 100,
-        // 快乐度
-        active: true,
-        // 是否活跃
-        capturedAt: null,
-        // 捕捉时间
-        lastFed: null,
-        // 最后喂食时间
-        lastPlayed: null
-        // 最后互动时间
-      };
-      PetBattleStats = {
-        attack: 10,
-        // 攻击力
-        defense: 5,
-        // 防御力
-        speed: 10,
-        // 速度
-        critRate: 0.05,
-        // 暴击率
-        critDamage: 1.5,
-        // 暴击伤害
-        accuracy: 0.9,
-        // 命中率
-        dodge: 0.1
-        // 闪避率
-      };
-      EvolutionStages = {
-        INFANT: 1,
-        // 幼生期
-        MATURE: 2,
-        // 成熟期
-        ANCIENT: 3,
-        // 远古期
-        DIVINE: 4
-        // 神化期
-      };
-      PetForms = {
-        CHILD: "child",
-        // 幼体
-        ADULT: "adult",
-        // 成体
-        MUTANT: "mutant",
-        // 变异体
-        DIVINE: "divine"
-        // 神体
-      };
-      Pet = class _Pet {
-        constructor(data = {}) {
-          this.id = data.id || `pet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          this.name = data.name || "\u7075\u5BA0";
-          this.species = data.species || "\u672A\u77E5";
-          this.type = data.type || "normal";
-          this.level = data.level || 1;
-          this.experience = data.experience || 0;
-          this.maxExperience = this.calcMaxExperience();
-          this.health = data.health || 100;
-          this.maxHealth = data.maxHealth || 100;
-          this.energy = data.energy || 100;
-          this.maxEnergy = data.maxEnergy || 100;
-          this.hunger = data.hunger || 0;
-          this.happiness = data.happiness || 100;
-          this.loyalty = data.loyalty || 50;
-          this.intimacy = data.intimacy || 0;
-          this.affinity = data.affinity || 0;
-          this.evolutionStage = data.evolutionStage || EvolutionStages.INFANT;
-          this.evolveStage = data.evolveStage || 1;
-          this.form = data.form || PetForms.CHILD;
-          this.attack = data.attack || PetBattleStats.attack;
-          this.defense = data.defense || PetBattleStats.defense;
-          this.speed = data.speed || PetBattleStats.speed;
-          this.power = data.power || 10;
-          this.potential = data.potential || Math.floor(Math.random() * 30) + 70;
-          this.skills = data.skills || [];
-          this.maxSkills = 4;
-          this.active = data.active !== void 0 ? data.active : true;
-          this.equipped = data.equipped || false;
-          this.favorite = data.favorite || false;
-          this.capturedAt = data.capturedAt || Date.now();
-          this.lastFed = data.lastFed || null;
-          this.lastPlayed = data.lastPlayed || null;
-          this.lastTrained = data.lastTrained || null;
-          this.captureCost = data.captureCost || 0;
-          this.rarity = data.rarity || "common";
-          this.color = data.color || "#999999";
-        }
-        /**
-         * 计算升级所需最大经验值
-         */
-        calcMaxExperience() {
-          return Math.floor(100 * Math.pow(1.5, this.level - 1));
-        }
-        /**
-         * 添加经验值
-         */
-        addExperience(exp) {
-          this.experience += exp;
-          let levelsGained = 0;
-          while (this.experience >= this.maxExperience) {
-            this.experience -= this.maxExperience;
-            this.levelUp();
-            levelsGained++;
-          }
-          this.maxExperience = this.calcMaxExperience();
-          return levelsGained;
-        }
-        /**
-         * 升级
-         */
-        levelUp() {
-          this.level++;
-          this.maxHealth += 5;
-          this.health = Math.min(this.health + 5, this.maxHealth);
-          this.attack += 2;
-          this.defense += 1;
-          this.speed += 1;
-        }
-        /**
-         * 喂食
-         */
-        feed(foodType = "normal") {
-          const FOOD_BONUS = {
-            normal: 5,
-            basic: 5,
-            premium: 15,
-            super: 50
-          };
-          const FOOD_HUNGER_REDUCTION = {
-            normal: 10,
-            basic: 10,
-            premium: 20,
-            super: 40
-          };
-          const bonus = FOOD_BONUS[foodType] || 5;
-          this.affinity = (this.affinity || 0) + bonus;
-          this.intimacy = Math.min(100, (this.intimacy || 0) + bonus);
-          this.hunger = Math.max(0, this.hunger - (FOOD_HUNGER_REDUCTION[foodType] || 10));
-          this.lastFed = Date.now();
-          return {
-            affinityGain: bonus,
-            hungerReduction: FOOD_HUNGER_REDUCTION[foodType] || 10
-          };
-        }
-        /**
-         * 互动/玩耍
-         */
-        play() {
-          this.happiness = Math.min(100, this.happiness + 10);
-          this.loyalty = Math.min(100, this.loyalty + 2);
-          this.intimacy = Math.min(100, (this.intimacy || 0) + 3);
-          this.energy = Math.max(0, this.energy - 5);
-          this.lastPlayed = Date.now();
-        }
-        /**
-         * 训练
-         */
-        train() {
-          if (this.energy < 20) {
-            return { success: false, message: "\u80FD\u91CF\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u8BAD\u7EC3" };
-          }
-          this.energy -= 20;
-          this.experience += 10;
-          this.attack += 1;
-          this.loyalty = Math.min(100, this.loyalty + 1);
-          this.lastTrained = Date.now();
-          return { success: true, experienceGained: 10 };
-        }
-        /**
-         * 学习技能
-         */
-        learnSkill(skillId, skillLevel = 1) {
-          if (this.skills.length >= this.maxSkills) {
-            return { success: false, message: "\u6280\u80FD\u680F\u5DF2\u6EE1\uFF0C\u6700\u591A" + this.maxSkills + "\u4E2A\u6280\u80FD" };
-          }
-          if (this.skills.some((s) => s.id === skillId)) {
-            return { success: false, message: "\u5DF2\u5B66\u4F1A\u8BE5\u6280\u80FD" };
-          }
-          this.skills.push({
-            id: skillId,
-            level: skillLevel,
-            learnedAt: Date.now()
-          });
-          return { success: true, skill: this.skills[this.skills.length - 1] };
-        }
-        /**
-         * 升级技能
-         */
-        upgradeSkill(skillId) {
-          const skill = this.skills.find((s) => s.id === skillId);
-          if (!skill) {
-            return { success: false, message: "\u6280\u80FD\u4E0D\u5B58\u5728" };
-          }
-          skill.level = (skill.level || 1) + 1;
-          return { success: true, skill };
-        }
-        /**
-         * 遗忘技能
-         */
-        forgetSkill(skillId) {
-          const idx = this.skills.findIndex((s) => s.id === skillId);
-          if (idx === -1) {
-            return { success: false, message: "\u6280\u80FD\u4E0D\u5B58\u5728" };
-          }
-          this.skills.splice(idx, 1);
-          return { success: true, remaining: this.skills.length };
-        }
-        /**
-         * 检查是否可以进化
-         */
-        canEvolve(targetStage = null) {
-          const nextStage = targetStage || this.evolutionStage + 1;
-          if (this.evolutionStage >= 3) {
-            return { canEvolve: false, reason: "\u5DF2\u8FBE\u6700\u9AD8\u8FDB\u5316\u9636\u6BB5" };
-          }
-          const levelRequired = 5;
-          if (this.level < levelRequired) {
-            return { canEvolve: false, reason: "\u7B49\u7EA7\u4E0D\u8DB3\uFF0C\u9700\u8981" + levelRequired + "\u7EA7", levelRequired, currentLevel: this.level };
-          }
-          const INTIMACY_REQUIRED = { 2: 30, 3: 60, 4: 90 };
-          const requiredIntimacy = INTIMACY_REQUIRED[nextStage] || 30;
-          if ((this.intimacy || 0) < requiredIntimacy) {
-            return { canEvolve: false, reason: "\u4EB2\u5BC6\u5EA6\u4E0D\u8DB3", requiredIntimacy, currentIntimacy: this.intimacy };
-          }
-          return { canEvolve: true };
-        }
-        /**
-         * 进化
-         */
-        evolve(targetStage = null) {
-          const check = this.canEvolve(targetStage);
-          if (!check.canEvolve) {
-            return { success: false, ...check };
-          }
-          const oldLevel = this.level;
-          const oldStage = this.evolutionStage;
-          const oldForm = this.form;
-          this.level += 2;
-          this.evolutionStage += 1;
-          this.evolveStage = (this.evolveStage || 1) + 1;
-          const FORM_ORDER = [PetForms.CHILD, PetForms.ADULT, PetForms.MUTANT, PetForms.DIVINE];
-          const currentIdx = FORM_ORDER.indexOf(this.form);
-          const targetIdx = Math.min(currentIdx + 1, FORM_ORDER.length - 1);
-          this.form = FORM_ORDER[targetIdx];
-          this.attack = Math.floor(this.attack * 1.3);
-          this.defense = Math.floor(this.defense * 1.3);
-          this.speed = Math.floor(this.speed * 1.3);
-          return {
-            success: true,
-            oldLevel,
-            newLevel: this.level,
-            oldStage,
-            newStage: this.evolutionStage,
-            oldForm,
-            newForm: this.form,
-            statsUpgrade: {
-              attack: this.attack,
-              defense: this.defense,
-              speed: this.speed
-            }
-          };
-        }
-        /**
-         * 设置是否活跃
-         */
-        setActive(isActive) {
-          this.active = isActive;
-          if (!isActive) {
-            this.releasedAt = Date.now();
-          }
-        }
-        /**
-         * 获取战斗力评估
-         */
-        getBattlePower() {
-          const basePower = this.attack * 1.2 + this.defense * 0.8 + this.speed * 0.5;
-          const levelBonus = this.level * 5;
-          const skillBonus = this.skills.reduce((sum, s) => sum + (s.level || 1) * 10, 0);
-          const loyaltyBonus = this.loyalty > 80 ? 1.2 : this.loyalty > 50 ? 1 : 0.8;
-          return Math.floor((basePower + levelBonus + skillBonus) * loyaltyBonus);
-        }
-        /**
-         * 转换为JSON对象
-         */
-        toJSON() {
-          return {
-            id: this.id,
-            name: this.name,
-            species: this.species,
-            type: this.type,
-            level: this.level,
-            experience: this.experience,
-            maxExperience: this.maxExperience,
-            health: this.health,
-            maxHealth: this.maxHealth,
-            energy: this.energy,
-            maxEnergy: this.maxEnergy,
-            hunger: this.hunger,
-            happiness: this.happiness,
-            loyalty: this.loyalty,
-            intimacy: this.intimacy,
-            affinity: this.affinity,
-            evolutionStage: this.evolutionStage,
-            evolveStage: this.evolveStage,
-            form: this.form,
-            attack: this.attack,
-            defense: this.defense,
-            speed: this.speed,
-            power: this.power,
-            potential: this.potential,
-            skills: this.skills,
-            active: this.active,
-            equipped: this.equipped,
-            favorite: this.favorite,
-            capturedAt: this.capturedAt,
-            lastFed: this.lastFed,
-            lastPlayed: this.lastPlayed,
-            lastTrained: this.lastTrained,
-            captureCost: this.captureCost,
-            rarity: this.rarity,
-            color: this.color
-          };
-        }
-        /**
-         * 从JSON创建实例
-         */
-        static fromJSON(json) {
-          return new _Pet(json);
-        }
-      };
-      PET_TYPES = {
-        WOLF: "wolf",
-        TIGER: "tiger",
-        FOX: "fox",
-        DRAGON: "dragon",
-        PHOENIX: "phoenix",
-        TURTLE: "turtle",
-        SPIRIT_FOX: "spirit_fox",
-        MYSTIC_BIRD: "mystic_bird"
-      };
-      PET_RARITY = {
-        COMMON: "common",
-        UNCOMMON: "uncommon",
-        RARE: "rare",
-        EPIC: "epic",
-        LEGENDARY: "legendary",
-        MYTHIC: "mythic"
-      };
-      RARITY_COLORS2 = {
-        common: "#999999",
-        uncommon: "#00ff00",
-        rare: "#0066ff",
-        epic: "#ff00ff",
-        legendary: "#ff8800",
-        mythic: "#ffff00"
-      };
-      RARITY_POWER_MULT = {
-        common: 1,
-        uncommon: 1.2,
-        rare: 1.5,
-        epic: 2,
-        legendary: 3,
-        mythic: 5
-      };
-      PET_SPECIES_CONFIG = {
-        "\u7075\u72D0": { attack: 12, defense: 8, speed: 15, rarity: "rare" },
-        "\u7384\u9F9F": { attack: 8, defense: 15, speed: 6, rarity: "uncommon" },
-        "\u706B\u9E64": { attack: 15, defense: 6, speed: 12, rarity: "rare" },
-        "\u7389\u5154": { attack: 10, defense: 10, speed: 10, rarity: "common" },
-        "\u94F6\u72FC": { attack: 14, defense: 10, speed: 12, rarity: "epic" },
-        "\u9752\u86C7": { attack: 16, defense: 5, speed: 14, rarity: "epic" },
-        "\u767D\u864E": { attack: 18, defense: 12, speed: 10, rarity: "legendary" },
-        "\u91D1\u9E4F": { attack: 20, defense: 8, speed: 18, rarity: "mythic" }
       };
     }
   });
@@ -6078,11 +5666,327 @@ var CultivationSimulator = (() => {
     expandInventorySlots
   };
 
-  // src/domains/pet/PetModule.js
-  init_Pet();
+  // src/domains/pet/entities/Pet.js
+  var PetBattleStats = {
+    attack: 10,
+    // 攻击力
+    defense: 5,
+    // 防御力
+    speed: 10,
+    // 速度
+    critRate: 0.05,
+    // 暴击率
+    critDamage: 1.5,
+    // 暴击伤害
+    accuracy: 0.9,
+    // 命中率
+    dodge: 0.1
+    // 闪避率
+  };
+  var EvolutionStages = {
+    INFANT: 1,
+    // 幼生期
+    MATURE: 2,
+    // 成熟期
+    ANCIENT: 3,
+    // 远古期
+    DIVINE: 4
+    // 神化期
+  };
+  var PetForms = {
+    CHILD: "child",
+    // 幼体
+    ADULT: "adult",
+    // 成体
+    MUTANT: "mutant",
+    // 变异体
+    DIVINE: "divine"
+    // 神体
+  };
+  var Pet = class _Pet {
+    constructor(data = {}) {
+      this.id = data.id || `pet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.name = data.name || "\u7075\u5BA0";
+      this.species = data.species || "\u672A\u77E5";
+      this.type = data.type || "normal";
+      this.level = data.level || 1;
+      this.experience = data.experience || 0;
+      this.maxExperience = this.calcMaxExperience();
+      this.health = data.health || 100;
+      this.maxHealth = data.maxHealth || 100;
+      this.energy = data.energy || 100;
+      this.maxEnergy = data.maxEnergy || 100;
+      this.hunger = data.hunger || 0;
+      this.happiness = data.happiness || 100;
+      this.loyalty = data.loyalty || 50;
+      this.intimacy = data.intimacy || 0;
+      this.affinity = data.affinity || 0;
+      this.evolutionStage = data.evolutionStage || EvolutionStages.INFANT;
+      this.evolveStage = data.evolveStage || 1;
+      this.form = data.form || PetForms.CHILD;
+      this.attack = data.attack || PetBattleStats.attack;
+      this.defense = data.defense || PetBattleStats.defense;
+      this.speed = data.speed || PetBattleStats.speed;
+      this.power = data.power || 10;
+      this.potential = data.potential || Math.floor(Math.random() * 30) + 70;
+      this.skills = data.skills || [];
+      this.maxSkills = 4;
+      this.active = data.active !== void 0 ? data.active : true;
+      this.equipped = data.equipped || false;
+      this.favorite = data.favorite || false;
+      this.capturedAt = data.capturedAt || Date.now();
+      this.lastFed = data.lastFed || null;
+      this.lastPlayed = data.lastPlayed || null;
+      this.lastTrained = data.lastTrained || null;
+      this.captureCost = data.captureCost || 0;
+      this.rarity = data.rarity || "common";
+      this.color = data.color || "#999999";
+    }
+    /**
+     * 计算升级所需最大经验值
+     */
+    calcMaxExperience() {
+      return Math.floor(100 * Math.pow(1.5, this.level - 1));
+    }
+    /**
+     * 添加经验值
+     */
+    addExperience(exp) {
+      this.experience += exp;
+      let levelsGained = 0;
+      while (this.experience >= this.maxExperience) {
+        this.experience -= this.maxExperience;
+        this.levelUp();
+        levelsGained++;
+      }
+      this.maxExperience = this.calcMaxExperience();
+      return levelsGained;
+    }
+    /**
+     * 升级
+     */
+    levelUp() {
+      this.level++;
+      this.maxHealth += 5;
+      this.health = Math.min(this.health + 5, this.maxHealth);
+      this.attack += 2;
+      this.defense += 1;
+      this.speed += 1;
+    }
+    /**
+     * 喂食
+     */
+    feed(foodType = "normal") {
+      const FOOD_BONUS = {
+        normal: 5,
+        basic: 5,
+        premium: 15,
+        super: 50
+      };
+      const FOOD_HUNGER_REDUCTION = {
+        normal: 10,
+        basic: 10,
+        premium: 20,
+        super: 40
+      };
+      const bonus = FOOD_BONUS[foodType] || 5;
+      this.affinity = (this.affinity || 0) + bonus;
+      this.intimacy = Math.min(100, (this.intimacy || 0) + bonus);
+      this.hunger = Math.max(0, this.hunger - (FOOD_HUNGER_REDUCTION[foodType] || 10));
+      this.lastFed = Date.now();
+      return {
+        affinityGain: bonus,
+        hungerReduction: FOOD_HUNGER_REDUCTION[foodType] || 10
+      };
+    }
+    /**
+     * 互动/玩耍
+     */
+    play() {
+      this.happiness = Math.min(100, this.happiness + 10);
+      this.loyalty = Math.min(100, this.loyalty + 2);
+      this.intimacy = Math.min(100, (this.intimacy || 0) + 3);
+      this.energy = Math.max(0, this.energy - 5);
+      this.lastPlayed = Date.now();
+    }
+    /**
+     * 训练
+     */
+    train() {
+      if (this.energy < 20) {
+        return { success: false, message: "\u80FD\u91CF\u4E0D\u8DB3\uFF0C\u65E0\u6CD5\u8BAD\u7EC3" };
+      }
+      this.energy -= 20;
+      this.experience += 10;
+      this.attack += 1;
+      this.loyalty = Math.min(100, this.loyalty + 1);
+      this.lastTrained = Date.now();
+      return { success: true, experienceGained: 10 };
+    }
+    /**
+     * 学习技能
+     */
+    learnSkill(skillId, skillLevel = 1) {
+      if (this.skills.length >= this.maxSkills) {
+        return { success: false, message: "\u6280\u80FD\u680F\u5DF2\u6EE1\uFF0C\u6700\u591A" + this.maxSkills + "\u4E2A\u6280\u80FD" };
+      }
+      if (this.skills.some((s) => s.id === skillId)) {
+        return { success: false, message: "\u5DF2\u5B66\u4F1A\u8BE5\u6280\u80FD" };
+      }
+      this.skills.push({
+        id: skillId,
+        level: skillLevel,
+        learnedAt: Date.now()
+      });
+      return { success: true, skill: this.skills[this.skills.length - 1] };
+    }
+    /**
+     * 升级技能
+     */
+    upgradeSkill(skillId) {
+      const skill = this.skills.find((s) => s.id === skillId);
+      if (!skill) {
+        return { success: false, message: "\u6280\u80FD\u4E0D\u5B58\u5728" };
+      }
+      skill.level = (skill.level || 1) + 1;
+      return { success: true, skill };
+    }
+    /**
+     * 遗忘技能
+     */
+    forgetSkill(skillId) {
+      const idx = this.skills.findIndex((s) => s.id === skillId);
+      if (idx === -1) {
+        return { success: false, message: "\u6280\u80FD\u4E0D\u5B58\u5728" };
+      }
+      this.skills.splice(idx, 1);
+      return { success: true, remaining: this.skills.length };
+    }
+    /**
+     * 检查是否可以进化
+     */
+    canEvolve(targetStage = null) {
+      const nextStage = targetStage || this.evolutionStage + 1;
+      if (this.evolutionStage >= 3) {
+        return { canEvolve: false, reason: "\u5DF2\u8FBE\u6700\u9AD8\u8FDB\u5316\u9636\u6BB5" };
+      }
+      const levelRequired = 5;
+      if (this.level < levelRequired) {
+        return { canEvolve: false, reason: "\u7B49\u7EA7\u4E0D\u8DB3\uFF0C\u9700\u8981" + levelRequired + "\u7EA7", levelRequired, currentLevel: this.level };
+      }
+      const INTIMACY_REQUIRED = { 2: 30, 3: 60, 4: 90 };
+      const requiredIntimacy = INTIMACY_REQUIRED[nextStage] || 30;
+      if ((this.intimacy || 0) < requiredIntimacy) {
+        return { canEvolve: false, reason: "\u4EB2\u5BC6\u5EA6\u4E0D\u8DB3", requiredIntimacy, currentIntimacy: this.intimacy };
+      }
+      return { canEvolve: true };
+    }
+    /**
+     * 进化
+     */
+    evolve(targetStage = null) {
+      const check = this.canEvolve(targetStage);
+      if (!check.canEvolve) {
+        return { success: false, ...check };
+      }
+      const oldLevel = this.level;
+      const oldStage = this.evolutionStage;
+      const oldForm = this.form;
+      this.level += 2;
+      this.evolutionStage += 1;
+      this.evolveStage = (this.evolveStage || 1) + 1;
+      const FORM_ORDER = [PetForms.CHILD, PetForms.ADULT, PetForms.MUTANT, PetForms.DIVINE];
+      const currentIdx = FORM_ORDER.indexOf(this.form);
+      const targetIdx = Math.min(currentIdx + 1, FORM_ORDER.length - 1);
+      this.form = FORM_ORDER[targetIdx];
+      this.attack = Math.floor(this.attack * 1.3);
+      this.defense = Math.floor(this.defense * 1.3);
+      this.speed = Math.floor(this.speed * 1.3);
+      return {
+        success: true,
+        oldLevel,
+        newLevel: this.level,
+        oldStage,
+        newStage: this.evolutionStage,
+        oldForm,
+        newForm: this.form,
+        statsUpgrade: {
+          attack: this.attack,
+          defense: this.defense,
+          speed: this.speed
+        }
+      };
+    }
+    /**
+     * 设置是否活跃
+     */
+    setActive(isActive) {
+      this.active = isActive;
+      if (!isActive) {
+        this.releasedAt = Date.now();
+      }
+    }
+    /**
+     * 获取战斗力评估
+     */
+    getBattlePower() {
+      const basePower = this.attack * 1.2 + this.defense * 0.8 + this.speed * 0.5;
+      const levelBonus = this.level * 5;
+      const skillBonus = this.skills.reduce((sum, s) => sum + (s.level || 1) * 10, 0);
+      const loyaltyBonus = this.loyalty > 80 ? 1.2 : this.loyalty > 50 ? 1 : 0.8;
+      return Math.floor((basePower + levelBonus + skillBonus) * loyaltyBonus);
+    }
+    /**
+     * 转换为JSON对象
+     */
+    toJSON() {
+      return {
+        id: this.id,
+        name: this.name,
+        species: this.species,
+        type: this.type,
+        level: this.level,
+        experience: this.experience,
+        maxExperience: this.maxExperience,
+        health: this.health,
+        maxHealth: this.maxHealth,
+        energy: this.energy,
+        maxEnergy: this.maxEnergy,
+        hunger: this.hunger,
+        happiness: this.happiness,
+        loyalty: this.loyalty,
+        intimacy: this.intimacy,
+        affinity: this.affinity,
+        evolutionStage: this.evolutionStage,
+        evolveStage: this.evolveStage,
+        form: this.form,
+        attack: this.attack,
+        defense: this.defense,
+        speed: this.speed,
+        power: this.power,
+        potential: this.potential,
+        skills: this.skills,
+        active: this.active,
+        equipped: this.equipped,
+        favorite: this.favorite,
+        capturedAt: this.capturedAt,
+        lastFed: this.lastFed,
+        lastPlayed: this.lastPlayed,
+        lastTrained: this.lastTrained,
+        captureCost: this.captureCost,
+        rarity: this.rarity,
+        color: this.color
+      };
+    }
+    /**
+     * 从JSON创建实例
+     */
+    static fromJSON(json) {
+      return new _Pet(json);
+    }
+  };
 
   // src/domains/pet/services/PetService.js
-  var { Pet: Pet2, PET_TYPES: PET_TYPES2, PET_RARITY: PET_RARITY2, RARITY_COLORS: RARITY_COLORS3 } = (init_Pet(), __toCommonJS(Pet_exports));
   var TIER_POWER = {
     wolf: 15,
     tiger: 20,
@@ -6230,7 +6134,7 @@ var CultivationSimulator = (() => {
         const baseLevel = Math.floor(Math.random() * 3) + 1;
         const names = ["\u5C0F\u4ED9", "\u7075\u513F", "\u5C0F\u767D", "\u963F\u798F", "\u6735\u6735", "\u5A01\u5A01", "\u5706\u5706", "\u58EE\u58EE"];
         const nameIndex = Math.floor(Math.random() * names.length);
-        const pet = new Pet2({
+        const pet = new Pet({
           id: "pet_" + petState.nextId++,
           name: names[nameIndex],
           species: species[speciesIndex],
@@ -24927,4 +24831,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-af9d996-2026-05-31T15-47-22-285Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-c3acbae-2026-06-01T03-31-44-046Z";
