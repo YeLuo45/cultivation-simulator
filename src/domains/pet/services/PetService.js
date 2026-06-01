@@ -3,7 +3,7 @@
  * 处理宠物相关的业务逻辑
  */
 
-const { Pet, PET_TYPES, PET_RARITY, RARITY_COLORS } = require('../entities/Pet');
+import { Pet, PET_TYPES, PET_RARITY, RARITY_COLORS } from '../entities/Pet.js';
 
 // 宠物配置常量
 const PET_CONFIG = {
