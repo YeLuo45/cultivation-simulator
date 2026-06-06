@@ -1,67 +1,51 @@
 /**
- * CultivationDuelist.js - 修真决斗者
- * V546 Iteration 9/20 Round 22
+ * CultivationDuelist.js - 修真剑客
+ * V659 Iteration 12/30 Round 27
  */
 export class CultivationDuelist {
     constructor(config = {}) {
-        this.config = { maxDuelists: config.maxDuelists || 100, baseSkill: config.baseSkill || 20, ...config };
+        this.config = { maxDuelists: config.maxDuelists || 30, baseElegance: config.baseElegance || 20, ...config };
         this.duelists = new Map();
         this.tools = new Map();
         this.hooks = new Map();
-        this.stats = { totalDuelists: 0, totalVictories: 0, evolutionCount: 0 };
+        this.stats = { totalDuelists: 0, evolutionCount: 0 };
         this._registerDefaultTools();
     }
 
     _registerDefaultTools() {
         this.registerTool('getDuelist', (ctx) => this.getDuelist(ctx.duelistId));
-        this.registerTool('registerDuelist', (ctx) => this.registerDuelist(ctx));
+        this.registerTool('recruitDuelist', (ctx) => this.recruitDuelist(ctx));
     }
 
-    registerDuelist(data) {
-        const id = data.duelistId || data.id || `due_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const duelist = {
-            duelistId: id,
-            cultivatorId: data.cultivatorId,
-            name: data.name || 'Unnamed Duelist',
-            type: data.type || 'sword',
-            skill: data.skill !== undefined ? data.skill : this.config.baseSkill,
-            victories: data.victories || [],
-            level: data.level || 1,
-            status: data.status || 'rookie',
-            createdAt: Date.now()
-        };
+    recruitDuelist(data) {
+        const id = data.id || `duel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const duelist = { duelistId: id, masterId: data.masterId || null, name: data.name || 'Anonymous', type: data.type || 'rapier', elegance: data.elegance || this.config.baseElegance, swords: data.swords || [], level: 1, status: 'novice', recruitedAt: Date.now() };
         this.duelists.set(id, duelist);
         this.stats.totalDuelists++;
-        this._triggerHook('duelistRegistered', { duelistId: id });
+        this._triggerHook('duelistRecruited', { duelistId: id });
         return { success: true, duelist };
     }
 
-    getDuelist(duelistId) { return this.duelists.get(duelistId) ? { ...this.duelists.get(duelistId) } : null; }
+    getDuelist(id) { return this.duelists.get(id) ? { ...this.duelists.get(id) } : null; }
     listDuelists() { return Array.from(this.duelists.values()).map(d => ({ ...d })); }
-    listByCultivator(cultivatorId) { return Array.from(this.duelists.values()).filter(d => d.cultivatorId === cultivatorId).map(d => ({ ...d })); }
-    listMasters() { return Array.from(this.duelists.values()).filter(d => d.status === 'master' || d.status === 'legend').map(d => ({ ...d })); }
+    listByMaster(masterId) { return Array.from(this.duelists.values()).filter(d => d.masterId === masterId).map(d => ({ ...d })); }
+    listLegendary() { return Array.from(this.duelists.values()).filter(d => d.status === 'legendary').map(d => ({ ...d })); }
 
-    addVictory(duelistId, victory) {
+    addSword(duelistId, sword) {
         const duelist = this.duelists.get(duelistId);
         if (!duelist) return { success: false, error: 'DUELIST_NOT_FOUND' };
-        const victoryEntry = {
-            victoryId: victory.victoryId || `v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            opponentId: victory.opponentId,
-            date: victory.date || Date.now(),
-            reward: victory.reward || 0
-        };
-        duelist.victories.push(victoryEntry);
-        this.stats.totalVictories++;
-        this._triggerHook('victoryAdded', { duelistId, victoryId: victoryEntry.victoryId });
-        return { success: true, victory: victoryEntry };
+        const swordName = (sword && typeof sword === 'object') ? (sword.name || 'sword') : sword;
+        duelist.swords.push({ name: swordName, addedAt: Date.now() });
+        this._triggerHook('swordAdded', { duelistId, sword: swordName });
+        return { success: true };
     }
 
-    increaseSkill(duelistId, amount = 5) {
+    raiseElegance(duelistId, amount = 5) {
         const duelist = this.duelists.get(duelistId);
         if (!duelist) return { success: false, error: 'DUELIST_NOT_FOUND' };
-        duelist.skill += amount;
-        this._triggerHook('skillIncreased', { duelistId, newSkill: duelist.skill });
-        return { success: true, newSkill: duelist.skill };
+        duelist.elegance += amount;
+        this._triggerHook('eleganceRaised', { duelistId, newElegance: duelist.elegance });
+        return { success: true };
     }
 
     levelUpDuelist(duelistId) {
@@ -69,21 +53,21 @@ export class CultivationDuelist {
         if (!duelist) return { success: false, error: 'DUELIST_NOT_FOUND' };
         duelist.level++;
         this._triggerHook('duelistLeveledUp', { duelistId, newLevel: duelist.level });
-        return { success: true, newLevel: duelist.level };
-    }
-
-    markLegend(duelistId) {
-        const duelist = this.duelists.get(duelistId);
-        if (!duelist) return { success: false, error: 'DUELIST_NOT_FOUND' };
-        duelist.status = 'legend';
-        this._triggerHook('duelistMarkedLegend', { duelistId });
         return { success: true };
     }
 
-    calculateDuelistPower(duelistId) {
+    legendDuelist(duelistId) {
+        const duelist = this.duelists.get(duelistId);
+        if (!duelist) return { success: false, error: 'DUELIST_NOT_FOUND' };
+        duelist.status = 'legendary';
+        this._triggerHook('duelistLegendized', { duelistId });
+        return { success: true };
+    }
+
+    calculateDuelistValue(duelistId) {
         const duelist = this.duelists.get(duelistId);
         if (!duelist) return 0;
-        return duelist.level * 100 + duelist.skill * 2 + duelist.victories.length * 30;
+        return duelist.level * 100 + duelist.elegance * 2 + duelist.swords.length * 30;
     }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }
@@ -109,7 +93,7 @@ export class CultivationDuelist {
     autoEvolve() {
         if (this.stats.totalDuelists < 5) return { evolved: false };
         if (this.stats.evolutionCount > 0) return { evolved: false, reason: 'ALREADY_EVOLVED' };
-        this.config.maxDuelists += 25;
+        this.config.maxDuelists += 15;
         this.stats.evolutionCount++;
         this._triggerHook('systemEvolved', { generation: this.stats.evolutionCount });
         return { evolved: true, generation: this.stats.evolutionCount };
