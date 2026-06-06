@@ -220,6 +220,13 @@ describe('CultivationTown', () => {
             expect(result.success).toBe(true);
             expect(result.result.town.name).toBe('ToolTown');
         });
+
+        it('should handle null context in tool', () => {
+            system.registerTool('nullctx', (ctx) => ctx);
+            const result = system.executeTool('nullctx', null);
+            expect(result.success).toBe(true);
+            expect(result.result).toEqual({});
+        });
     });
 
     describe('Hook System', () => {
