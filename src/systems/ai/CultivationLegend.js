@@ -1,10 +1,11 @@
 /**
- * CultivationLegend.js - 修真传说系统
- * V571 Iteration 14/20 Round 23
+ * CultivationLegend.js - 修真传奇系统
+ * V662 Iteration 15/30 Round 27 - Cultivation Legend
  */
+
 export class CultivationLegend {
     constructor(config = {}) {
-        this.config = { maxLegends: config.maxLegends || 50, baseNarrative: config.baseNarrative || 20, ...config };
+        this.config = { maxLegends: config.maxLegends || 10, baseFame: config.baseFame || 20, ...config };
         this.legends = new Map();
         this.tools = new Map();
         this.hooks = new Map();
@@ -14,47 +15,46 @@ export class CultivationLegend {
 
     _registerDefaultTools() {
         this.registerTool('getLegend', (ctx) => this.getLegend(ctx.legendId));
-        this.registerTool('tellLegend', (ctx) => this.tellLegend(ctx));
+        this.registerTool('recruitLegend', (ctx) => this.recruitLegend(ctx));
     }
 
-    tellLegend(data) {
-        if (this.legends.size >= this.config.maxLegends) return { success: false, error: 'STORAGE_FULL' };
+    recruitLegend(data) {
         const id = data.legendId || `lgn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const legend = {
             legendId: id,
-            narratorId: data.narratorId || 'unknown',
+            masterId: data.masterId,
             name: data.name || 'Untitled Legend',
-            type: data.type || 'hero',
-            narrative: data.narrative !== undefined ? data.narrative : this.config.baseNarrative,
-            heroes: Array.isArray(data.heroes) ? [...data.heroes] : [],
-            level: data.level || 1,
-            status: data.status || 'oral',
+            type: data.type || 'myth',
+            fame: data.fame !== undefined ? data.fame : this.config.baseFame,
+            tales: Array.isArray(data.tales) ? [...data.tales] : [],
+            level: 1,
+            status: 'novice',
             createdAt: Date.now()
         };
         this.legends.set(id, legend);
         this.stats.totalLegends++;
-        this._triggerHook('legendTold', { legendId: id });
+        this._triggerHook('legendRecruited', { legendId: id });
         return { success: true, legend };
     }
 
     getLegend(id) { return this.legends.get(id) ? { ...this.legends.get(id) } : null; }
     listLegends() { return Array.from(this.legends.values()).map(l => ({ ...l })); }
-    listByNarrator(narratorId) { return Array.from(this.legends.values()).filter(l => l.narratorId === narratorId).map(l => ({ ...l })); }
-    listImmortal() { return Array.from(this.legends.values()).filter(l => l.status === 'immortal').map(l => ({ ...l })); }
+    listByMaster(masterId) { return Array.from(this.legends.values()).filter(l => l.masterId === masterId).map(l => ({ ...l })); }
+    listLegendary() { return Array.from(this.legends.values()).filter(l => l.status === 'legendary').map(l => ({ ...l })); }
 
-    addHero(legendId, hero) {
+    addTale(legendId, tale) {
         const legend = this.legends.get(legendId);
         if (!legend) return { success: false, error: 'LEGEND_NOT_FOUND' };
-        legend.heroes.push(hero);
-        this._triggerHook('heroAdded', { legendId, heroCount: legend.heroes.length });
+        legend.tales.push(tale);
+        this._triggerHook('taleAdded', { legendId, tale });
         return { success: true };
     }
 
-    deepenNarrative(legendId, amount = 5) {
+    buildFame(legendId, amount = 5) {
         const legend = this.legends.get(legendId);
         if (!legend) return { success: false, error: 'LEGEND_NOT_FOUND' };
-        legend.narrative += amount;
-        this._triggerHook('narrativeDeepened', { legendId, newNarrative: legend.narrative });
+        legend.fame += amount;
+        this._triggerHook('fameBuilt', { legendId, newFame: legend.fame });
         return { success: true };
     }
 
@@ -66,18 +66,18 @@ export class CultivationLegend {
         return { success: true };
     }
 
-    immortalizeLegend(legendId) {
+    legendLegend(legendId) {
         const legend = this.legends.get(legendId);
         if (!legend) return { success: false, error: 'LEGEND_NOT_FOUND' };
-        legend.status = 'immortal';
-        this._triggerHook('legendImmortalized', { legendId });
+        legend.status = 'legendary';
+        this._triggerHook('legendLegendized', { legendId });
         return { success: true };
     }
 
     calculateLegendValue(legendId) {
         const legend = this.legends.get(legendId);
         if (!legend) return 0;
-        return legend.level * 100 + legend.narrative * 2 + legend.heroes.length * 30;
+        return legend.level * 100 + legend.fame * 2 + legend.tales.length * 30;
     }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }
