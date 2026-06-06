@@ -1,7 +1,7 @@
 // build_src.js - 使用 esbuild 打包 src/main.js 到 dist/game.js
 // DDD 重构后的构建脚本
 
-import { build } from '/home/hermes/projects/cultivation-simulator/node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js';
+import { build } from '/home/hermes/projects/cultivation-simulator/node_modules/esbuild/lib/main.js';
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
