@@ -1,10 +1,10 @@
 /**
- * CultivationDawn.js - 修真晨系统
- * V583 Iteration 6/20 Round 24
+ * CultivationDawn.js - 修真黎明系统
+ * V815 Iteration 18/30 Round 32
  */
 export class CultivationDawn {
     constructor(config = {}) {
-        this.config = { maxDawns: config.maxDawns || 30, baseLight: config.baseLight || 20, ...config };
+        this.config = { maxDawns: config.maxDawns || 20, baseLight: config.baseLight || 20, ...config };
         this.dawns = new Map();
         this.tools = new Map();
         this.hooks = new Map();
@@ -14,46 +14,46 @@ export class CultivationDawn {
 
     _registerDefaultTools() {
         this.registerTool('getDawn', (ctx) => this.getDawn(ctx.dawnId));
-        this.registerTool('openDawn', (ctx) => this.openDawn(ctx));
+        this.registerTool('recruitDawn', (ctx) => this.recruitDawn(ctx));
     }
 
-    openDawn(data) {
+    recruitDawn(data) {
         const id = data.dawnId || `dwn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const dawn = {
             dawnId: id,
-            witnessId: data.witnessId,
+            masterId: data.masterId,
             name: data.name || 'Unnamed Dawn',
-            type: data.type || 'radiant',
+            type: data.type || 'early',
             light: data.light || this.config.baseLight,
-            songs: data.songs || [],
+            visions: data.visions || [],
             level: 1,
-            status: 'preparing',
+            status: 'novice',
             createdAt: Date.now()
         };
         this.dawns.set(id, dawn);
         this.stats.totalDawns++;
-        this._triggerHook('dawnOpened', { dawnId: id });
+        this._triggerHook('dawnRecruited', { dawnId: id });
         return { success: true, dawn };
     }
 
     getDawn(id) { return this.dawns.get(id) ? { ...this.dawns.get(id) } : null; }
     listDawns() { return Array.from(this.dawns.values()).map(d => ({ ...d })); }
-    listByWitness(witnessId) { return Array.from(this.dawns.values()).filter(d => d.witnessId === witnessId).map(d => ({ ...d })); }
-    listRising() { return Array.from(this.dawns.values()).filter(d => d.status === 'rising' || d.status === 'eternal').map(d => ({ ...d })); }
+    listByMaster(masterId) { return Array.from(this.dawns.values()).filter(d => d.masterId === masterId).map(d => ({ ...d })); }
+    listLegendary() { return Array.from(this.dawns.values()).filter(d => d.status === 'legendary').map(d => ({ ...d })); }
 
-    addSong(dawnId, song) {
+    addVision(dawnId, vision) {
         const dawn = this.dawns.get(dawnId);
         if (!dawn) return { success: false, error: 'DAWN_NOT_FOUND' };
-        dawn.songs.push(song);
-        this._triggerHook('songAdded', { dawnId, song });
+        dawn.visions.push(vision);
+        this._triggerHook('visionAdded', { dawnId, vision });
         return { success: true };
     }
 
-    increaseLight(dawnId, amount = 5) {
+    raiseLight(dawnId, amount = 5) {
         const dawn = this.dawns.get(dawnId);
         if (!dawn) return { success: false, error: 'DAWN_NOT_FOUND' };
         dawn.light += amount;
-        this._triggerHook('lightIncreased', { dawnId, newLight: dawn.light });
+        this._triggerHook('lightRaised', { dawnId, newLight: dawn.light });
         return { success: true };
     }
 
@@ -65,18 +65,18 @@ export class CultivationDawn {
         return { success: true };
     }
 
-    eternalizeDawn(dawnId) {
+    legendDawn(dawnId) {
         const dawn = this.dawns.get(dawnId);
         if (!dawn) return { success: false, error: 'DAWN_NOT_FOUND' };
-        dawn.status = 'eternal';
-        this._triggerHook('dawnEternalized', { dawnId });
+        dawn.status = 'legendary';
+        this._triggerHook('dawnLegendized', { dawnId });
         return { success: true };
     }
 
     calculateDawnValue(dawnId) {
         const dawn = this.dawns.get(dawnId);
         if (!dawn) return 0;
-        return dawn.level * 100 + dawn.light * 2 + dawn.songs.length * 30;
+        return dawn.level * 100 + dawn.light * 2 + dawn.visions.length * 30;
     }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }
@@ -102,7 +102,7 @@ export class CultivationDawn {
     autoEvolve() {
         if (this.stats.totalDawns < 5) return { evolved: false };
         if (this.stats.evolutionCount > 0) return { evolved: false, reason: 'ALREADY_EVOLVED' };
-        this.config.maxDawns += 30;
+        this.config.maxDawns += 20;
         this.stats.evolutionCount++;
         this._triggerHook('systemEvolved', { generation: this.stats.evolutionCount });
         return { evolved: true, generation: this.stats.evolutionCount };

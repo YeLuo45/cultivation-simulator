@@ -1,6 +1,6 @@
 /**
- * CultivationDawn.test.js - 修真晨系统测试
- * V583 Iteration 6/20 Round 24 - 测试覆盖率目标: 99%+
+ * CultivationDawn.test.js - 修真黎明系统测试
+ * V815 Iteration 18/30 Round 32 - 测试覆盖率目标: 99%+
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -10,256 +10,380 @@ describe('CultivationDawn', () => {
     let system;
     beforeEach(() => { system = new CultivationDawn(); });
 
-    describe('openDawn', () => {
-        it('should open', () => {
-            const { dawn } = system.openDawn({ witnessId: 'w1', name: 'Sunrise' });
-            expect(dawn.witnessId).toBe('w1');
-            expect(dawn.name).toBe('Sunrise');
+    describe('recruitDawn', () => {
+        it('should recruit a dawn with masterId and name', () => {
+            const { dawn } = system.recruitDawn({ masterId: 'm1', name: 'First Light' });
+            expect(dawn.masterId).toBe('m1');
+            expect(dawn.name).toBe('First Light');
         });
 
         it('should default name to Unnamed Dawn', () => {
-            const { dawn } = system.openDawn({});
+            const { dawn } = system.recruitDawn({});
             expect(dawn.name).toBe('Unnamed Dawn');
         });
 
-        it('should default type to radiant', () => {
-            const { dawn } = system.openDawn({});
-            expect(dawn.type).toBe('radiant');
+        it('should default type to early', () => {
+            const { dawn } = system.recruitDawn({});
+            expect(dawn.type).toBe('early');
         });
 
-        it('should initialize level 1', () => {
-            const { dawn } = system.openDawn({});
+        it('should accept late type', () => {
+            const { dawn } = system.recruitDawn({ type: 'late' });
+            expect(dawn.type).toBe('late');
+        });
+
+        it('should accept divine type', () => {
+            const { dawn } = system.recruitDawn({ type: 'divine' });
+            expect(dawn.type).toBe('divine');
+        });
+
+        it('should default light to baseLight (20)', () => {
+            const { dawn } = system.recruitDawn({});
+            expect(dawn.light).toBe(20);
+        });
+
+        it('should default visions to empty array', () => {
+            const { dawn } = system.recruitDawn({});
+            expect(dawn.visions).toEqual([]);
+        });
+
+        it('should initialize level to 1', () => {
+            const { dawn } = system.recruitDawn({});
             expect(dawn.level).toBe(1);
         });
 
-        it('should initialize status preparing', () => {
-            const { dawn } = system.openDawn({});
-            expect(dawn.status).toBe('preparing');
+        it('should initialize status to novice', () => {
+            const { dawn } = system.recruitDawn({});
+            expect(dawn.status).toBe('novice');
         });
 
-        it('should trigger dawnOpened hook', () => {
+        it('should set createdAt timestamp', () => {
+            const { dawn } = system.recruitDawn({});
+            expect(typeof dawn.createdAt).toBe('number');
+        });
+
+        it('should generate unique dawnId when not provided', () => {
+            const { dawn: d1 } = system.recruitDawn({});
+            const { dawn: d2 } = system.recruitDawn({});
+            expect(d1.dawnId).not.toBe(d2.dawnId);
+        });
+
+        it('should respect provided dawnId', () => {
+            const { dawn } = system.recruitDawn({ dawnId: 'custom-dawn-1' });
+            expect(dawn.dawnId).toBe('custom-dawn-1');
+        });
+
+        it('should accept custom light value', () => {
+            const { dawn } = system.recruitDawn({ light: 100 });
+            expect(dawn.light).toBe(100);
+        });
+
+        it('should accept custom visions array', () => {
+            const { dawn } = system.recruitDawn({ visions: ['v1', 'v2'] });
+            expect(dawn.visions).toEqual(['v1', 'v2']);
+        });
+
+        it('should increment totalDawns stat', () => {
+            system.recruitDawn({});
+            system.recruitDawn({});
+            expect(system.stats.totalDawns).toBe(2);
+        });
+
+        it('should trigger dawnRecruited hook', () => {
             let called = false;
-            system.registerHook('dawnOpened', () => { called = true; });
-            system.openDawn({});
+            system.registerHook('dawnRecruited', () => { called = true; });
+            system.recruitDawn({});
             expect(called).toBe(true);
         });
     });
 
     describe('getDawn', () => {
-        it('should return', () => {
-            const { dawn } = system.openDawn({});
-            expect(system.getDawn(dawn.dawnId)).not.toBeNull();
+        it('should return the dawn when found', () => {
+            const { dawn } = system.recruitDawn({ name: 'Alpha' });
+            const fetched = system.getDawn(dawn.dawnId);
+            expect(fetched).not.toBeNull();
+            expect(fetched.name).toBe('Alpha');
         });
-        it('should return null for missing', () => { expect(system.getDawn('ghost')).toBeNull(); });
+
+        it('should return a copy of the dawn', () => {
+            const { dawn } = system.recruitDawn({});
+            const fetched = system.getDawn(dawn.dawnId);
+            expect(fetched).not.toBe(dawn);
+        });
+
+        it('should return null for missing dawn', () => {
+            expect(system.getDawn('ghost')).toBeNull();
+        });
     });
 
     describe('listDawns', () => {
-        it('should list all', () => {
-            system.openDawn({});
-            expect(system.listDawns().length).toBe(1);
+        it('should return empty array initially', () => {
+            expect(system.listDawns()).toEqual([]);
         });
 
-        it('should be empty initially', () => {
-            expect(system.listDawns().length).toBe(0);
-        });
-    });
-
-    describe('listByWitness', () => {
-        it('should filter', () => {
-            system.openDawn({ witnessId: 'w1' });
-            system.openDawn({ witnessId: 'w2' });
-            expect(system.listByWitness('w1').length).toBe(1);
+        it('should list all recruited dawns', () => {
+            system.recruitDawn({});
+            system.recruitDawn({});
+            system.recruitDawn({});
+            expect(system.listDawns().length).toBe(3);
         });
 
-        it('should return empty for unknown witness', () => {
-            system.openDawn({ witnessId: 'w1' });
-            expect(system.listByWitness('unknown').length).toBe(0);
+        it('should return copies of the dawns', () => {
+            const { dawn } = system.recruitDawn({});
+            const list = system.listDawns();
+            expect(list[0]).not.toBe(dawn);
         });
     });
 
-    describe('listRising', () => {
-        it('should list rising/eternal dawns', () => {
-            const { dawn: d1 } = system.openDawn({});
-            const { dawn: d2 } = system.openDawn({});
-            const { dawn: d3 } = system.openDawn({});
-            d1.status = 'rising';
-            d3.status = 'eternal';
-            expect(system.listRising().length).toBe(2);
+    describe('listByMaster', () => {
+        it('should filter by masterId', () => {
+            system.recruitDawn({ masterId: 'm1' });
+            system.recruitDawn({ masterId: 'm2' });
+            system.recruitDawn({ masterId: 'm1' });
+            expect(system.listByMaster('m1').length).toBe(2);
+            expect(system.listByMaster('m2').length).toBe(1);
         });
 
-        it('should return empty when no rising', () => {
-            system.openDawn({});
-            expect(system.listRising().length).toBe(0);
+        it('should return empty for unknown master', () => {
+            system.recruitDawn({ masterId: 'm1' });
+            expect(system.listByMaster('unknown')).toEqual([]);
         });
     });
 
-    describe('addSong', () => {
-        it('should add song', () => {
-            const { dawn } = system.openDawn({});
-            system.addSong(dawn.dawnId, 'chord-1');
-            expect(dawn.songs).toContain('chord-1');
+    describe('listLegendary', () => {
+        it('should return empty when no legendary dawns', () => {
+            system.recruitDawn({});
+            expect(system.listLegendary()).toEqual([]);
         });
 
-        it('should reject missing', () => {
-            const result = system.addSong('ghost', 's');
+        it('should list all legendary status dawns', () => {
+            const { dawn: d1 } = system.recruitDawn({});
+            system.recruitDawn({});
+            const { dawn: d3 } = system.recruitDawn({});
+            system.legendDawn(d1.dawnId);
+            system.legendDawn(d3.dawnId);
+            expect(system.listLegendary().length).toBe(2);
+        });
+
+        it('should not include novice or veteran dawns', () => {
+            const { dawn: d1 } = system.recruitDawn({});
+            const { dawn: d2 } = system.recruitDawn({});
+            system.legendDawn(d1.dawnId);
+            // d2 stays as novice
+            const list = system.listLegendary();
+            expect(list.length).toBe(1);
+            expect(list[0].dawnId).toBe(d1.dawnId);
+        });
+    });
+
+    describe('addVision', () => {
+        it('should add a vision to the dawn', () => {
+            const { dawn } = system.recruitDawn({});
+            system.addVision(dawn.dawnId, 'sunrise-vision');
+            expect(dawn.visions).toContain('sunrise-vision');
+        });
+
+        it('should append multiple visions', () => {
+            const { dawn } = system.recruitDawn({});
+            system.addVision(dawn.dawnId, 'v1');
+            system.addVision(dawn.dawnId, 'v2');
+            expect(dawn.visions.length).toBe(2);
+            expect(dawn.visions).toEqual(['v1', 'v2']);
+        });
+
+        it('should return error for missing dawn', () => {
+            const result = system.addVision('ghost', 'vision');
+            expect(result.success).toBe(false);
             expect(result.error).toBe('DAWN_NOT_FOUND');
         });
 
-        it('should trigger songAdded hook', () => {
-            const { dawn } = system.openDawn({});
-            let called = false;
-            system.registerHook('songAdded', () => { called = true; });
-            system.addSong(dawn.dawnId, 'note');
-            expect(called).toBe(true);
+        it('should trigger visionAdded hook', () => {
+            const { dawn } = system.recruitDawn({});
+            let payload = null;
+            system.registerHook('visionAdded', (d) => { payload = d; });
+            system.addVision(dawn.dawnId, 'epiphany');
+            expect(payload).not.toBeNull();
+            expect(payload.vision).toBe('epiphany');
+            expect(payload.dawnId).toBe(dawn.dawnId);
         });
     });
 
-    describe('increaseLight', () => {
-        it('should increase light by 5 default', () => {
-            const { dawn } = system.openDawn({});
-            system.increaseLight(dawn.dawnId);
+    describe('raiseLight', () => {
+        it('should raise light by default 5', () => {
+            const { dawn } = system.recruitDawn({});
+            system.raiseLight(dawn.dawnId);
             expect(dawn.light).toBe(25);
         });
 
-        it('should increase by custom amount', () => {
-            const { dawn } = system.openDawn({});
-            system.increaseLight(dawn.dawnId, 30);
+        it('should raise light by custom amount', () => {
+            const { dawn } = system.recruitDawn({});
+            system.raiseLight(dawn.dawnId, 30);
             expect(dawn.light).toBe(50);
         });
 
-        it('should reject missing', () => {
-            const result = system.increaseLight('ghost', 10);
+        it('should accumulate raises', () => {
+            const { dawn } = system.recruitDawn({});
+            system.raiseLight(dawn.dawnId, 10);
+            system.raiseLight(dawn.dawnId, 5);
+            expect(dawn.light).toBe(35);
+        });
+
+        it('should return error for missing dawn', () => {
+            const result = system.raiseLight('ghost', 10);
+            expect(result.success).toBe(false);
             expect(result.error).toBe('DAWN_NOT_FOUND');
         });
 
-        it('should trigger lightIncreased hook', () => {
-            const { dawn } = system.openDawn({});
-            let called = false;
-            system.registerHook('lightIncreased', () => { called = true; });
-            system.increaseLight(dawn.dawnId, 10);
-            expect(called).toBe(true);
+        it('should trigger lightRaised hook', () => {
+            const { dawn } = system.recruitDawn({});
+            let payload = null;
+            system.registerHook('lightRaised', (d) => { payload = d; });
+            system.raiseLight(dawn.dawnId, 15);
+            expect(payload).not.toBeNull();
+            expect(payload.dawnId).toBe(dawn.dawnId);
+            expect(payload.newLight).toBe(35);
         });
     });
 
     describe('levelUpDawn', () => {
-        it('should level up', () => {
-            const { dawn } = system.openDawn({});
+        it('should level up the dawn', () => {
+            const { dawn } = system.recruitDawn({});
             system.levelUpDawn(dawn.dawnId);
             expect(dawn.level).toBe(2);
         });
 
-        it('should reject missing', () => {
+        it('should accumulate levels', () => {
+            const { dawn } = system.recruitDawn({});
+            system.levelUpDawn(dawn.dawnId);
+            system.levelUpDawn(dawn.dawnId);
+            system.levelUpDawn(dawn.dawnId);
+            expect(dawn.level).toBe(4);
+        });
+
+        it('should return error for missing dawn', () => {
             const result = system.levelUpDawn('ghost');
+            expect(result.success).toBe(false);
             expect(result.error).toBe('DAWN_NOT_FOUND');
         });
 
         it('should trigger dawnLeveledUp hook', () => {
-            const { dawn } = system.openDawn({});
-            let called = false;
-            system.registerHook('dawnLeveledUp', () => { called = true; });
+            const { dawn } = system.recruitDawn({});
+            let payload = null;
+            system.registerHook('dawnLeveledUp', (d) => { payload = d; });
             system.levelUpDawn(dawn.dawnId);
-            expect(called).toBe(true);
+            expect(payload).not.toBeNull();
+            expect(payload.newLevel).toBe(2);
         });
     });
 
-    describe('eternalizeDawn', () => {
-        it('should set status eternal', () => {
-            const { dawn } = system.openDawn({});
-            system.eternalizeDawn(dawn.dawnId);
-            expect(dawn.status).toBe('eternal');
+    describe('legendDawn', () => {
+        it('should set status to legendary', () => {
+            const { dawn } = system.recruitDawn({});
+            system.legendDawn(dawn.dawnId);
+            expect(dawn.status).toBe('legendary');
         });
 
-        it('should reject missing', () => {
-            const result = system.eternalizeDawn('ghost');
+        it('should return error for missing dawn', () => {
+            const result = system.legendDawn('ghost');
+            expect(result.success).toBe(false);
             expect(result.error).toBe('DAWN_NOT_FOUND');
         });
 
-        it('should trigger dawnEternalized hook', () => {
-            const { dawn } = system.openDawn({});
+        it('should trigger dawnLegendized hook', () => {
+            const { dawn } = system.recruitDawn({});
             let called = false;
-            system.registerHook('dawnEternalized', () => { called = true; });
-            system.eternalizeDawn(dawn.dawnId);
+            system.registerHook('dawnLegendized', () => { called = true; });
+            system.legendDawn(dawn.dawnId);
             expect(called).toBe(true);
         });
     });
 
     describe('calculateDawnValue', () => {
-        it('should calculate', () => {
-            const { dawn } = system.openDawn({});
-            system.levelUpDawn(dawn.dawnId);
-            system.addSong(dawn.dawnId, 'a');
-            system.addSong(dawn.dawnId, 'b');
-            // level=2 => 200, light=20 => 40, songs=2 => 60, total=300
+        it('should calculate using formula: level*100 + light*2 + visions*30', () => {
+            const { dawn } = system.recruitDawn({});
+            system.levelUpDawn(dawn.dawnId); // level 2 => 200
+            system.addVision(dawn.dawnId, 'a');
+            system.addVision(dawn.dawnId, 'b'); // visions 2 => 60
+            // light stays at 20 => 40
+            // total = 200 + 40 + 60 = 300
             expect(system.calculateDawnValue(dawn.dawnId)).toBe(300);
         });
 
-        it('should return 0 for missing', () => {
+        it('should calculate with raised light', () => {
+            const { dawn } = system.recruitDawn({});
+            system.raiseLight(dawn.dawnId, 30); // light 50 => 100
+            // level 1 => 100, visions 0 => 0, total = 200
+            expect(system.calculateDawnValue(dawn.dawnId)).toBe(200);
+        });
+
+        it('should return 0 for missing dawn', () => {
             expect(system.calculateDawnValue('ghost')).toBe(0);
         });
     });
 
     describe('Tool System', () => {
-        it('should register tool', () => {
+        it('should register a tool', () => {
             system.registerTool('test', () => 'ok');
             expect(system.listTools()).toContain('test');
         });
 
-        it('should execute tool', () => {
-            system.registerTool('test', (ctx) => ctx.value);
-            const result = system.executeTool('test', { value: 42 });
+        it('should execute a tool and return result', () => {
+            system.registerTool('test', (ctx) => ctx.value * 2);
+            const result = system.executeTool('test', { value: 21 });
+            expect(result.success).toBe(true);
             expect(result.result).toBe(42);
         });
 
-        it('should reject missing tool', () => {
+        it('should return error for missing tool', () => {
             const result = system.executeTool('ghost', {});
+            expect(result.success).toBe(false);
             expect(result.error).toBe('TOOL_NOT_FOUND');
         });
 
-        it('should handle errors', () => {
-            system.registerTool('bad', () => { throw new Error('x'); });
+        it('should catch tool errors', () => {
+            system.registerTool('bad', () => { throw new Error('boom'); });
             const result = system.executeTool('bad', {});
-            expect(result.error).toBe('x');
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('boom');
         });
 
-        it('should execute default getDawn', () => {
+        it('should execute default getDawn tool', () => {
             const result = system.executeTool('getDawn', { dawnId: 'ghost' });
-            expect(result.result).toBeNull();
-        });
-
-        it('should execute default openDawn', () => {
-            const result = system.executeTool('openDawn', { witnessId: 'wX' });
             expect(result.success).toBe(true);
-            expect(result.result.dawn.witnessId).toBe('wX');
+            expect(result.result).toBeNull();
         });
     });
 
     describe('Hook System', () => {
-        it('should support unregister', () => {
+        it('should support unregistering handlers', () => {
             let count = 0;
-            const unregister = system.registerHook('dawnOpened', () => count++);
+            const unregister = system.registerHook('dawnRecruited', () => count++);
             unregister();
-            system.openDawn({});
+            system.recruitDawn({});
             expect(count).toBe(0);
         });
 
-        it('should handle errors silently', () => {
-            system.registerHook('dawnOpened', () => { throw new Error('x'); });
-            expect(() => system.openDawn({})).not.toThrow();
+        it('should silently swallow hook errors', () => {
+            system.registerHook('dawnRecruited', () => { throw new Error('hook-error'); });
+            expect(() => system.recruitDawn({})).not.toThrow();
         });
     });
 
     describe('autoEvolve', () => {
-        it('should not evolve with insufficient', () => {
+        it('should not evolve with insufficient dawns', () => {
             const result = system.autoEvolve();
             expect(result.evolved).toBe(false);
         });
-        it('should evolve', () => {
+
+        it('should evolve when threshold met', () => {
             system.stats.totalDawns = 10;
             const result = system.autoEvolve();
             expect(result.evolved).toBe(true);
-            expect(system.config.maxDawns).toBe(60);
+            expect(result.generation).toBe(1);
+            expect(system.config.maxDawns).toBe(40); // 20 + 20
         });
-        it('should not double evolve', () => {
+
+        it('should not evolve twice', () => {
             system.stats.totalDawns = 10;
             system.autoEvolve();
             const result = system.autoEvolve();
@@ -269,25 +393,32 @@ describe('CultivationDawn', () => {
     });
 
     describe('Persistence', () => {
-        it('should serialize', () => {
-            system.openDawn({});
+        it('should serialize to JSON', () => {
+            system.recruitDawn({ name: 'Test' });
             const json = system.toJSON();
             expect(json.dawns.length).toBe(1);
+            expect(json.stats.totalDawns).toBe(1);
+            expect(json.config.maxDawns).toBe(20);
         });
-        it('should deserialize', () => {
-            system.openDawn({});
+
+        it('should deserialize from JSON', () => {
+            system.recruitDawn({ name: 'Test' });
             const json = system.toJSON();
             const newSys = new CultivationDawn();
             newSys.fromJSON(json);
             expect(newSys.dawns.size).toBe(1);
+            expect(newSys.stats.totalDawns).toBe(1);
         });
     });
 
     describe('getStats', () => {
-        it('should return stats', () => {
+        it('should return stats with dawnCount', () => {
+            system.recruitDawn({});
+            system.recruitDawn({});
             const stats = system.getStats();
-            expect(stats.dawnCount).toBe(0);
-            expect(stats.totalDawns).toBe(0);
+            expect(stats.dawnCount).toBe(2);
+            expect(stats.totalDawns).toBe(2);
+            expect(stats.evolutionCount).toBe(0);
         });
     });
 });
