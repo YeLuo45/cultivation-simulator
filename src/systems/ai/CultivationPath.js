@@ -1,11 +1,10 @@
 /**
- * CultivationPath.js - 道路系统
- * V529 Iteration 11/20 Round 21 - Cultivation Path
+ * CultivationPath.js - 修真道
+ * V749 Iteration 12/30 Round 30
  */
-
 export class CultivationPath {
     constructor(config = {}) {
-        this.config = { maxPaths: config.maxPaths || 50, baseInsight: config.baseInsight || 20, ...config };
+        this.config = { maxPaths: config.maxPaths || 20, baseClarity: config.baseClarity || 20, ...config };
         this.paths = new Map();
         this.tools = new Map();
         this.hooks = new Map();
@@ -15,47 +14,47 @@ export class CultivationPath {
 
     _registerDefaultTools() {
         this.registerTool('getPath', (ctx) => this.getPath(ctx.pathId));
-        this.registerTool('openPath', (ctx) => this.openPath(ctx));
+        this.registerTool('recruitPath', (ctx) => this.recruitPath(ctx));
     }
 
-    openPath(data) {
-        const id = data.pathId || `path_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    recruitPath(data) {
+        const id = data.pathId || `pth_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const path = {
             pathId: id,
-            cultivatorId: data.cultivatorId,
-            name: data.name || 'Unnamed Path',
-            type: data.type || 'sage',
-            insight: data.insight || this.config.baseInsight,
-            trials: data.trials || [],
-            level: 1,
-            status: 'open',
+            masterId: data.masterId,
+            name: data.name,
+            type: data.type || 'neutral',
+            clarity: data.clarity || this.config.baseClarity,
+            waypoints: data.waypoints || [],
+            level: data.level || 1,
+            status: data.status || 'novice',
             createdAt: Date.now()
         };
         this.paths.set(id, path);
         this.stats.totalPaths++;
-        this._triggerHook('pathOpened', { pathId: id });
+        this._triggerHook('pathRecruited', { pathId: id });
         return { success: true, path };
     }
 
     getPath(id) { return this.paths.get(id) ? { ...this.paths.get(id) } : null; }
     listPaths() { return Array.from(this.paths.values()).map(p => ({ ...p })); }
-    listByCultivator(cultivatorId) { return Array.from(this.paths.values()).filter(p => p.cultivatorId === cultivatorId).map(p => ({ ...p })); }
-    listMastered() { return Array.from(this.paths.values()).filter(p => p.status === 'mastered').map(p => ({ ...p })); }
+    listByMaster(masterId) { return Array.from(this.paths.values()).filter(p => p.masterId === masterId).map(p => ({ ...p })); }
+    listLegendary() { return Array.from(this.paths.values()).filter(p => p.status === 'legendary').map(p => ({ ...p })); }
 
-    addTrial(pathId, trial) {
+    addWaypoint(pathId, waypoint) {
         const path = this.paths.get(pathId);
         if (!path) return { success: false, error: 'PATH_NOT_FOUND' };
-        path.trials.push(trial);
-        this._triggerHook('trialAdded', { pathId, trial });
+        path.waypoints.push(waypoint);
+        this._triggerHook('waypointAdded', { pathId, waypoint });
         return { success: true, path: { ...path } };
     }
 
-    increaseInsight(pathId, amount = 5) {
+    raiseClarity(pathId, amount = 5) {
         const path = this.paths.get(pathId);
         if (!path) return { success: false, error: 'PATH_NOT_FOUND' };
-        path.insight += amount;
-        this._triggerHook('insightIncreased', { pathId, newInsight: path.insight });
-        return { success: true };
+        path.clarity += amount;
+        this._triggerHook('clarityRaised', { pathId, newClarity: path.clarity });
+        return { success: true, path: { ...path } };
     }
 
     levelUpPath(pathId) {
@@ -63,25 +62,22 @@ export class CultivationPath {
         if (!path) return { success: false, error: 'PATH_NOT_FOUND' };
         path.level++;
         this._triggerHook('pathLeveledUp', { pathId, newLevel: path.level });
-        return { success: true };
+        return { success: true, path: { ...path } };
     }
 
-    masterPath(pathId) {
+    legendPath(pathId) {
         const path = this.paths.get(pathId);
         if (!path) return { success: false, error: 'PATH_NOT_FOUND' };
-        path.status = 'mastered';
-        this._triggerHook('pathMastered', { pathId });
-        return { success: true };
+        path.status = 'legendary';
+        this._triggerHook('pathLegendized', { pathId });
+        return { success: true, path: { ...path } };
     }
 
-    calculatePathPower(pathId) {
+    calculatePathValue(pathId) {
         const path = this.paths.get(pathId);
         if (!path) return 0;
-        return path.level * 100 + path.insight * 2 + path.trials.length * 30;
+        return path.level * 100 + path.clarity * 2 + path.waypoints.length * 30;
     }
-
-    listByType(type) { return Array.from(this.paths.values()).filter(p => p.type === type).map(p => ({ ...p })); }
-    listVisible() { return Array.from(this.paths.values()).filter(p => p.status === 'visible').map(p => ({ ...p })); }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }
     executeTool(name, context) {
@@ -106,7 +102,7 @@ export class CultivationPath {
     autoEvolve() {
         if (this.stats.totalPaths < 5) return { evolved: false };
         if (this.stats.evolutionCount > 0) return { evolved: false, reason: 'ALREADY_EVOLVED' };
-        this.config.maxPaths += 30;
+        this.config.maxPaths += 10;
         this.stats.evolutionCount++;
         this._triggerHook('systemEvolved', { generation: this.stats.evolutionCount });
         return { evolved: true, generation: this.stats.evolutionCount };
