@@ -1,4 +1,4 @@
-/* Cultivation Simulator DDD-v1.0.0-f89f584-2026-06-07T10-20-59-437Z */
+/* Cultivation Simulator DDD-v1.0.0-36d7217-2026-06-07T10-21-22-548Z */
 var CultivationSimulator = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -24831,4 +24831,4 @@ var CultivationSimulator = (() => {
   return __toCommonJS(main_exports);
 })();
 
-;window.__GAME_VERSION__="DDD-v1.0.0-f89f584-2026-06-07T10-20-59-437Z";
+;window.__GAME_VERSION__="DDD-v1.0.0-36d7217-2026-06-07T10-21-22-548Z";
