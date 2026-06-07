@@ -1,12 +1,11 @@
 /**
- * CultivationArt.js - 功法系统
- * V398 Iteration 5/15 Round 13
+ * CultivationArt.js - 修真艺术
+ * V697 Iteration 20/30 Round 28 - Cultivation Art
  */
 export class CultivationArt {
     constructor(config = {}) {
-        this.config = { maxArts: config.maxArts || 200, basePower: config.basePower || 10, ...config };
+        this.config = { maxArts: config.maxArts || 30, baseInspiration: config.baseInspiration || 20, ...config };
         this.arts = new Map();
-        this.practices = new Map();
         this.tools = new Map();
         this.hooks = new Map();
         this.stats = { totalArts: 0, evolutionCount: 0 };
@@ -15,46 +14,60 @@ export class CultivationArt {
 
     _registerDefaultTools() {
         this.registerTool('getArt', (ctx) => this.getArt(ctx.artId));
-        this.registerTool('createArt', (ctx) => this.createArt(ctx));
+        this.registerTool('recruitArt', (ctx) => this.recruitArt(ctx));
     }
 
-    createArt(data) {
+    recruitArt(data) {
         const id = data.id || `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const art = { artId: id, name: data.name || 'Cultivation Art', element: data.element || 'none', grade: data.grade || 'common', power: data.power || this.config.basePower, mastery: 0, createdAt: Date.now() };
+        const art = { artId: id, masterId: data.masterId, name: data.name || 'Untitled Art', type: data.type || 'sword', inspiration: data.inspiration || this.config.baseInspiration, works: data.works || [], level: 1, status: 'novice', recruitedAt: Date.now() };
         this.arts.set(id, art);
         this.stats.totalArts++;
-        this._triggerHook('artCreated', { artId: id });
+        this._triggerHook('artRecruited', { artId: id });
         return { success: true, art };
     }
 
-    getArt(id) { return this.arts.get(id) ? { ...this.arts.get(id) } : null; }
-    listArts() { return Array.from(this.arts.values()).map(a => ({ ...a })); }
-    listByElement(element) { return Array.from(this.arts.values()).filter(a => a.element === element).map(a => ({ ...a })); }
-    listByGrade(grade) { return Array.from(this.arts.values()).filter(a => a.grade === grade).map(a => ({ ...a })); }
+    getArt(id) { return this.arts.get(id) ? { ...this.arts.get(id), works: [...(this.arts.get(id).works || [])] } : null; }
+    listArts() { return Array.from(this.arts.values()).map(a => ({ ...a, works: [...(a.works || [])] })); }
+    listByMaster(masterId) { return Array.from(this.arts.values()).filter(a => a.masterId === masterId).map(a => ({ ...a, works: [...(a.works || [])] })); }
+    listLegendary() { return Array.from(this.arts.values()).filter(a => a.status === 'legendary').map(a => ({ ...a, works: [...(a.works || [])] })); }
 
-    practice(artId, cultivatorId, amount = 5) {
+    addWork(artId, work) {
         const art = this.arts.get(artId);
         if (!art) return { success: false, error: 'ART_NOT_FOUND' };
-        art.mastery += amount;
-        const id = `prc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const practice = { practiceId: id, artId, cultivatorId, amount, practicedAt: Date.now() };
-        this.practices.set(id, practice);
-        this._triggerHook('artPracticed', { artId, cultivatorId });
-        return { success: true, art: { ...art } };
+        art.works.push(work);
+        this._triggerHook('workAdded', { artId, work });
+        return { success: true };
     }
 
-    getPractice(id) { return this.practices.get(id) ? { ...this.practices.get(id) } : null; }
-    listPractices() { return Array.from(this.practices.values()).map(p => ({ ...p })); }
-    listPracticesByArt(artId) { return Array.from(this.practices.values()).filter(p => p.artId === artId).map(p => ({ ...p })); }
-    listPracticesByCultivator(cultivatorId) { return Array.from(this.practices.values()).filter(p => p.cultivatorId === cultivatorId).map(p => ({ ...p })); }
+    raiseInspiration(artId, amount = 5) {
+        const art = this.arts.get(artId);
+        if (!art) return { success: false, error: 'ART_NOT_FOUND' };
+        art.inspiration += amount;
+        this._triggerHook('inspirationRaised', { artId, newInspiration: art.inspiration });
+        return { success: true };
+    }
 
-    calculatePower(artId) {
+    levelUpArt(artId) {
+        const art = this.arts.get(artId);
+        if (!art) return { success: false, error: 'ART_NOT_FOUND' };
+        art.level++;
+        this._triggerHook('artLeveledUp', { artId, newLevel: art.level });
+        return { success: true };
+    }
+
+    legendArt(artId) {
+        const art = this.arts.get(artId);
+        if (!art) return { success: false, error: 'ART_NOT_FOUND' };
+        art.status = 'legendary';
+        this._triggerHook('artLegendized', { artId });
+        return { success: true };
+    }
+
+    calculateArtValue(artId) {
         const art = this.arts.get(artId);
         if (!art) return 0;
-        return art.power + art.mastery * 2;
+        return art.level * 100 + art.inspiration * 2 + art.works.length * 30;
     }
-
-    listMastered(threshold = 50) { return Array.from(this.arts.values()).filter(a => a.mastery >= threshold).map(a => ({ ...a })); }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }
     executeTool(name, context) {
@@ -79,16 +92,15 @@ export class CultivationArt {
     autoEvolve() {
         if (this.stats.totalArts < 5) return { evolved: false };
         if (this.stats.evolutionCount > 0) return { evolved: false, reason: 'ALREADY_EVOLVED' };
-        this.config.maxArts += 50;
+        this.config.maxArts += 30;
         this.stats.evolutionCount++;
         this._triggerHook('systemEvolved', { generation: this.stats.evolutionCount });
         return { evolved: true, generation: this.stats.evolutionCount };
     }
 
-    toJSON() { return { arts: Array.from(this.arts.entries()), practices: Array.from(this.practices.entries()), stats: this.stats, config: this.config }; }
+    toJSON() { return { arts: Array.from(this.arts.entries()), stats: this.stats, config: this.config }; }
     fromJSON(data) {
         if (data.arts) this.arts = new Map(data.arts);
-        if (data.practices) this.practices = new Map(data.practices);
         if (data.stats) this.stats = data.stats;
         if (data.config) this.config = { ...this.config, ...data.config };
         return { success: true };
