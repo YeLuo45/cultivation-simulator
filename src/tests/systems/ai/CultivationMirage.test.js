@@ -256,6 +256,12 @@ describe('CultivationMirage', () => {
             expect(result.success).toBe(true);
             expect(result.result.mirage.masterId).toBe('m1');
         });
+
+        it('should handle null context', () => {
+            system.registerTool('ctxTest', (ctx) => ctx);
+            const result = system.executeTool('ctxTest');
+            expect(result.success).toBe(true);
+        });
     });
 
     describe('Hook System', () => {
@@ -270,6 +276,21 @@ describe('CultivationMirage', () => {
         it('should handle errors silently in hooks', () => {
             system.registerHook('mirageRecruited', () => { throw new Error('x'); });
             expect(() => system.recruitMirage({})).not.toThrow();
+        });
+
+        it('should handle unregister for missing event', () => {
+            const unregister = system.registerHook('nonexistent', () => {});
+            unregister();
+            expect(true).toBe(true);
+        });
+
+        it('should handle double unregister', () => {
+            let count = 0;
+            const unregister = system.registerHook('mirageRecruited', () => count++);
+            unregister();
+            unregister();
+            system.recruitMirage({});
+            expect(count).toBe(0);
         });
     });
 
