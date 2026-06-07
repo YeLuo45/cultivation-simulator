@@ -1,10 +1,10 @@
 /**
- * CultivationDusk.js - 修真暮系统
- * V584 Iteration 7/20 Round 24
+ * CultivationDusk.js - 修真黄昏系统
+ * V816 Iteration 19/30 Round 32
  */
 export class CultivationDusk {
     constructor(config = {}) {
-        this.config = { maxDusks: config.maxDusks || 30, baseShadow: config.baseShadow || 20, ...config };
+        this.config = { maxDusks: config.maxDusks || 20, baseShadow: config.baseShadow || 20, ...config };
         this.dusks = new Map();
         this.tools = new Map();
         this.hooks = new Map();
@@ -14,46 +14,46 @@ export class CultivationDusk {
 
     _registerDefaultTools() {
         this.registerTool('getDusk', (ctx) => this.getDusk(ctx.duskId));
-        this.registerTool('openDusk', (ctx) => this.openDusk(ctx));
+        this.registerTool('recruitDusk', (ctx) => this.recruitDusk(ctx));
     }
 
-    openDusk(data) {
+    recruitDusk(data) {
         const id = data.duskId || `dsk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const dusk = {
             duskId: id,
-            observerId: data.observerId,
+            masterId: data.masterId,
             name: data.name || 'Unnamed Dusk',
-            type: data.type || 'golden',
+            type: data.type || 'early',
             shadow: data.shadow || this.config.baseShadow,
-            visions: data.visions || [],
+            afterglows: data.afterglows || [],
             level: 1,
-            status: 'approaching',
+            status: 'novice',
             createdAt: Date.now()
         };
         this.dusks.set(id, dusk);
         this.stats.totalDusks++;
-        this._triggerHook('duskOpened', { duskId: id });
+        this._triggerHook('duskRecruited', { duskId: id });
         return { success: true, dusk };
     }
 
     getDusk(id) { return this.dusks.get(id) ? { ...this.dusks.get(id) } : null; }
     listDusks() { return Array.from(this.dusks.values()).map(d => ({ ...d })); }
-    listByObserver(observerId) { return Array.from(this.dusks.values()).filter(d => d.observerId === observerId).map(d => ({ ...d })); }
-    listActive() { return Array.from(this.dusks.values()).filter(d => d.status === 'active' || d.status === 'eternal').map(d => ({ ...d })); }
+    listByMaster(masterId) { return Array.from(this.dusks.values()).filter(d => d.masterId === masterId).map(d => ({ ...d })); }
+    listLegendary() { return Array.from(this.dusks.values()).filter(d => d.status === 'legendary').map(d => ({ ...d })); }
 
-    addVision(duskId, vision) {
+    addAfterglow(duskId, afterglow) {
         const dusk = this.dusks.get(duskId);
         if (!dusk) return { success: false, error: 'DUSK_NOT_FOUND' };
-        dusk.visions.push(vision);
-        this._triggerHook('visionAdded', { duskId, vision });
+        dusk.afterglows.push(afterglow);
+        this._triggerHook('afterglowAdded', { duskId, afterglow });
         return { success: true };
     }
 
-    deepenShadow(duskId, amount = 5) {
+    raiseShadow(duskId, amount = 5) {
         const dusk = this.dusks.get(duskId);
         if (!dusk) return { success: false, error: 'DUSK_NOT_FOUND' };
         dusk.shadow += amount;
-        this._triggerHook('shadowDeepened', { duskId, newShadow: dusk.shadow });
+        this._triggerHook('shadowRaised', { duskId, newShadow: dusk.shadow });
         return { success: true };
     }
 
@@ -65,18 +65,18 @@ export class CultivationDusk {
         return { success: true };
     }
 
-    eternalizeDusk(duskId) {
+    legendDusk(duskId) {
         const dusk = this.dusks.get(duskId);
         if (!dusk) return { success: false, error: 'DUSK_NOT_FOUND' };
-        dusk.status = 'eternal';
-        this._triggerHook('duskEternalized', { duskId });
+        dusk.status = 'legendary';
+        this._triggerHook('duskLegendized', { duskId });
         return { success: true };
     }
 
     calculateDuskValue(duskId) {
         const dusk = this.dusks.get(duskId);
         if (!dusk) return 0;
-        return dusk.level * 100 + dusk.shadow * 2 + dusk.visions.length * 30;
+        return dusk.level * 100 + dusk.shadow * 2 + dusk.afterglows.length * 30;
     }
 
     registerTool(name, handler) { this.tools.set(name, { name, handler }); }

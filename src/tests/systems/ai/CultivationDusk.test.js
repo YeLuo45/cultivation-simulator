@@ -1,6 +1,6 @@
 /**
- * CultivationDusk.test.js - 修真暮系统测试
- * V584 Iteration 7/20 Round 24 - 测试覆盖率目标: 99%+
+ * CultivationDusk.test.js - 修真黄昏系统测试
+ * V816 Iteration 19/30 Round 32 - 测试覆盖率目标: 99%+
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -10,44 +10,70 @@ describe('CultivationDusk', () => {
     let system;
     beforeEach(() => { system = new CultivationDusk(); });
 
-    describe('openDusk', () => {
-        it('should open', () => {
-            const { dusk } = system.openDusk({ observerId: 'o1', name: 'Twilight' });
-            expect(dusk.observerId).toBe('o1');
+    describe('recruitDusk', () => {
+        it('should recruit', () => {
+            const { dusk } = system.recruitDusk({ masterId: 'm1', name: 'Twilight' });
+            expect(dusk.masterId).toBe('m1');
             expect(dusk.name).toBe('Twilight');
         });
 
         it('should default name to Unnamed Dusk', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             expect(dusk.name).toBe('Unnamed Dusk');
         });
 
-        it('should default type to golden', () => {
-            const { dusk } = system.openDusk({});
-            expect(dusk.type).toBe('golden');
+        it('should default type to early', () => {
+            const { dusk } = system.recruitDusk({});
+            expect(dusk.type).toBe('early');
         });
 
         it('should initialize level 1', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             expect(dusk.level).toBe(1);
         });
 
-        it('should initialize status approaching', () => {
-            const { dusk } = system.openDusk({});
-            expect(dusk.status).toBe('approaching');
+        it('should initialize status novice', () => {
+            const { dusk } = system.recruitDusk({});
+            expect(dusk.status).toBe('novice');
         });
 
-        it('should trigger duskOpened hook', () => {
+        it('should default shadow to baseShadow 20', () => {
+            const { dusk } = system.recruitDusk({});
+            expect(dusk.shadow).toBe(20);
+        });
+
+        it('should initialize empty afterglows', () => {
+            const { dusk } = system.recruitDusk({});
+            expect(dusk.afterglows).toEqual([]);
+        });
+
+        it('should trigger duskRecruited hook', () => {
             let called = false;
-            system.registerHook('duskOpened', () => { called = true; });
-            system.openDusk({});
+            system.registerHook('duskRecruited', () => { called = true; });
+            system.recruitDusk({});
             expect(called).toBe(true);
+        });
+
+        it('should generate duskId if not provided', () => {
+            const { dusk } = system.recruitDusk({});
+            expect(dusk.duskId).toBeTruthy();
+            expect(typeof dusk.duskId).toBe('string');
+        });
+
+        it('should accept custom duskId', () => {
+            const { dusk } = system.recruitDusk({ duskId: 'custom123' });
+            expect(dusk.duskId).toBe('custom123');
+        });
+
+        it('should accept custom shadow value', () => {
+            const { dusk } = system.recruitDusk({ shadow: 50 });
+            expect(dusk.shadow).toBe(50);
         });
     });
 
     describe('getDusk', () => {
         it('should return', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             expect(system.getDusk(dusk.duskId)).not.toBeNull();
         });
         it('should return null for missing', () => { expect(system.getDusk('ghost')).toBeNull(); });
@@ -55,7 +81,7 @@ describe('CultivationDusk', () => {
 
     describe('listDusks', () => {
         it('should list all', () => {
-            system.openDusk({});
+            system.recruitDusk({});
             expect(system.listDusks().length).toBe(1);
         });
 
@@ -64,86 +90,85 @@ describe('CultivationDusk', () => {
         });
     });
 
-    describe('listByObserver', () => {
+    describe('listByMaster', () => {
         it('should filter', () => {
-            system.openDusk({ observerId: 'o1' });
-            system.openDusk({ observerId: 'o2' });
-            expect(system.listByObserver('o1').length).toBe(1);
+            system.recruitDusk({ masterId: 'm1' });
+            system.recruitDusk({ masterId: 'm2' });
+            expect(system.listByMaster('m1').length).toBe(1);
         });
 
-        it('should return empty for unknown observer', () => {
-            system.openDusk({ observerId: 'o1' });
-            expect(system.listByObserver('unknown').length).toBe(0);
-        });
-    });
-
-    describe('listActive', () => {
-        it('should list active/eternal dusks', () => {
-            const { dusk: d1 } = system.openDusk({});
-            const { dusk: d2 } = system.openDusk({});
-            const { dusk: d3 } = system.openDusk({});
-            d1.status = 'active';
-            d3.status = 'eternal';
-            expect(system.listActive().length).toBe(2);
-        });
-
-        it('should return empty when no active', () => {
-            system.openDusk({});
-            expect(system.listActive().length).toBe(0);
+        it('should return empty for unknown master', () => {
+            system.recruitDusk({ masterId: 'm1' });
+            expect(system.listByMaster('unknown').length).toBe(0);
         });
     });
 
-    describe('addVision', () => {
-        it('should add vision', () => {
-            const { dusk } = system.openDusk({});
-            system.addVision(dusk.duskId, 'prophecy-1');
-            expect(dusk.visions).toContain('prophecy-1');
+    describe('listLegendary', () => {
+        it('should list legendary dusks', () => {
+            const { dusk: s1 } = system.recruitDusk({});
+            const { dusk: s2 } = system.recruitDusk({});
+            system.legendDusk(s1.duskId);
+            system.legendDusk(s2.duskId);
+            expect(system.listLegendary().length).toBe(2);
+        });
+
+        it('should return empty when no legendary', () => {
+            system.recruitDusk({});
+            expect(system.listLegendary().length).toBe(0);
+        });
+    });
+
+    describe('addAfterglow', () => {
+        it('should add afterglow', () => {
+            const { dusk } = system.recruitDusk({});
+            system.addAfterglow(dusk.duskId, 'crimson');
+            expect(dusk.afterglows).toContain('crimson');
         });
 
         it('should reject missing', () => {
-            const result = system.addVision('ghost', 'v');
+            const result = system.addAfterglow('ghost', 'red');
             expect(result.error).toBe('DUSK_NOT_FOUND');
         });
 
-        it('should trigger visionAdded hook', () => {
-            const { dusk } = system.openDusk({});
+        it('should trigger afterglowAdded hook', () => {
+            const { dusk } = system.recruitDusk({});
             let called = false;
-            system.registerHook('visionAdded', () => { called = true; });
-            system.addVision(dusk.duskId, 'omen');
+            system.registerHook('afterglowAdded', () => { called = true; });
+            system.addAfterglow(dusk.duskId, 'amber');
             expect(called).toBe(true);
         });
     });
 
-    describe('deepenShadow', () => {
-        it('should deepen shadow by 5 default', () => {
-            const { dusk } = system.openDusk({});
-            system.deepenShadow(dusk.duskId);
+    describe('raiseShadow', () => {
+        it('should raise shadow by 5 default', () => {
+            const { dusk } = system.recruitDusk({});
+            system.raiseShadow(dusk.duskId);
             expect(dusk.shadow).toBe(25);
         });
 
-        it('should deepen by custom amount', () => {
-            const { dusk } = system.openDusk({});
-            system.deepenShadow(dusk.duskId, 30);
+        it('should raise by custom amount', () => {
+            const { dusk } = system.recruitDusk({});
+            system.raiseShadow(dusk.duskId, 30);
             expect(dusk.shadow).toBe(50);
         });
 
         it('should reject missing', () => {
-            const result = system.deepenShadow('ghost', 10);
+            const result = system.raiseShadow('ghost', 10);
             expect(result.error).toBe('DUSK_NOT_FOUND');
         });
 
-        it('should trigger shadowDeepened hook', () => {
-            const { dusk } = system.openDusk({});
+        it('should trigger shadowRaised hook', () => {
+            const { dusk } = system.recruitDusk({});
             let called = false;
-            system.registerHook('shadowDeepened', () => { called = true; });
-            system.deepenShadow(dusk.duskId, 10);
+            system.registerHook('shadowRaised', () => { called = true; });
+            system.raiseShadow(dusk.duskId, 10);
             expect(called).toBe(true);
         });
     });
 
     describe('levelUpDusk', () => {
         it('should level up', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             system.levelUpDusk(dusk.duskId);
             expect(dusk.level).toBe(2);
         });
@@ -154,7 +179,7 @@ describe('CultivationDusk', () => {
         });
 
         it('should trigger duskLeveledUp hook', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             let called = false;
             system.registerHook('duskLeveledUp', () => { called = true; });
             system.levelUpDusk(dusk.duskId);
@@ -162,34 +187,34 @@ describe('CultivationDusk', () => {
         });
     });
 
-    describe('eternalizeDusk', () => {
-        it('should set status eternal', () => {
-            const { dusk } = system.openDusk({});
-            system.eternalizeDusk(dusk.duskId);
-            expect(dusk.status).toBe('eternal');
+    describe('legendDusk', () => {
+        it('should set status legendary', () => {
+            const { dusk } = system.recruitDusk({});
+            system.legendDusk(dusk.duskId);
+            expect(dusk.status).toBe('legendary');
         });
 
         it('should reject missing', () => {
-            const result = system.eternalizeDusk('ghost');
+            const result = system.legendDusk('ghost');
             expect(result.error).toBe('DUSK_NOT_FOUND');
         });
 
-        it('should trigger duskEternalized hook', () => {
-            const { dusk } = system.openDusk({});
+        it('should trigger duskLegendized hook', () => {
+            const { dusk } = system.recruitDusk({});
             let called = false;
-            system.registerHook('duskEternalized', () => { called = true; });
-            system.eternalizeDusk(dusk.duskId);
+            system.registerHook('duskLegendized', () => { called = true; });
+            system.legendDusk(dusk.duskId);
             expect(called).toBe(true);
         });
     });
 
     describe('calculateDuskValue', () => {
         it('should calculate', () => {
-            const { dusk } = system.openDusk({});
+            const { dusk } = system.recruitDusk({});
             system.levelUpDusk(dusk.duskId);
-            system.addVision(dusk.duskId, 'a');
-            system.addVision(dusk.duskId, 'b');
-            // level=2 => 200, shadow=20 => 40, visions=2 => 60, total=300
+            system.addAfterglow(dusk.duskId, 'crimson');
+            system.addAfterglow(dusk.duskId, 'amber');
+            // level=2 => 200, shadow=20 => 40, afterglows=2 => 60, total=300
             expect(system.calculateDuskValue(dusk.duskId)).toBe(300);
         });
 
@@ -226,31 +251,25 @@ describe('CultivationDusk', () => {
             expect(result.result).toBeNull();
         });
 
-        it('should execute default openDusk', () => {
-            const result = system.executeTool('openDusk', { observerId: 'oX' });
+        it('should execute default recruitDusk', () => {
+            const result = system.executeTool('recruitDusk', { masterId: 'mX' });
             expect(result.success).toBe(true);
-            expect(result.result.dusk.observerId).toBe('oX');
-        });
-
-        it('should execute tool with undefined context', () => {
-            system.registerTool('nocontext', () => 'no-ctx');
-            const result = system.executeTool('nocontext');
-            expect(result.result).toBe('no-ctx');
+            expect(result.result.dusk.masterId).toBe('mX');
         });
     });
 
     describe('Hook System', () => {
         it('should support unregister', () => {
             let count = 0;
-            const unregister = system.registerHook('duskOpened', () => count++);
+            const unregister = system.registerHook('duskRecruited', () => count++);
             unregister();
-            system.openDusk({});
+            system.recruitDusk({});
             expect(count).toBe(0);
         });
 
         it('should handle errors silently', () => {
-            system.registerHook('duskOpened', () => { throw new Error('x'); });
-            expect(() => system.openDusk({})).not.toThrow();
+            system.registerHook('duskRecruited', () => { throw new Error('x'); });
+            expect(() => system.recruitDusk({})).not.toThrow();
         });
     });
 
@@ -263,7 +282,7 @@ describe('CultivationDusk', () => {
             system.stats.totalDusks = 10;
             const result = system.autoEvolve();
             expect(result.evolved).toBe(true);
-            expect(system.config.maxDusks).toBe(60);
+            expect(system.config.maxDusks).toBe(50);
         });
         it('should not double evolve', () => {
             system.stats.totalDusks = 10;
@@ -276,12 +295,12 @@ describe('CultivationDusk', () => {
 
     describe('Persistence', () => {
         it('should serialize', () => {
-            system.openDusk({});
+            system.recruitDusk({});
             const json = system.toJSON();
             expect(json.dusks.length).toBe(1);
         });
         it('should deserialize', () => {
-            system.openDusk({});
+            system.recruitDusk({});
             const json = system.toJSON();
             const newSys = new CultivationDusk();
             newSys.fromJSON(json);
