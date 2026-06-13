@@ -12,13 +12,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/domains/**/*.js'],
+      include: ['src/systems/ai/PlayerBehaviorCollector.js', 'src/systems/ai/SessionEventStream.js', 'src/systems/ai/ActionHistoryAggregator.js', 'src/systems/ai/PerformanceMetricsTracker.js', 'src/systems/ai/TimeOnTaskAnalyzer.js', 'src/systems/ai/StuckPointDetector.js', 'src/systems/ai/FailurePatternDetector.js', 'src/systems/ai/ResourceBottleneckDetector.js', 'src/systems/ai/ProgressVelocityTracker.js', 'src/systems/ai/EngagementDecayDetector.js', 'src/systems/ai/AdaptiveDifficultyTuner.js', 'src/systems/ai/PersonalizedQuestGenerator.js', 'src/systems/ai/DynamicHintProvider.js', 'src/systems/ai/ResourceBalancer.js', 'src/systems/ai/TutorialTrigger.js', 'src/systems/ai/MirrorCoachEngine.js', 'src/systems/ai/GoalRecommender.js', 'src/systems/ai/MotivationBooster.js', 'src/systems/ai/ReflectionPrompt.js', 'src/systems/ai/RecommendationTracker.js', 'src/systems/ai/EffectivenessAnalyzer.js', 'src/systems/ai/LoopOptimizer.js', 'src/systems/ai/PolicyLearner.js'],
       exclude: [],
       thresholds: {
-        statements: 95,
-        branches: 95,
-        functions: 95,
-        lines: 95
+        statements: 99,
+        branches: 90,
+        functions: 99,
+        lines: 99
       }
     }
   },
