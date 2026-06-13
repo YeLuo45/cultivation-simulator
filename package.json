@@ -5,12 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node build_vite.js",
+    "build:src": "node build_src.js",
+    "build": "node build_src.js",
+    "build:module": "node build_src.js",
+    "build:dist": "node build_src.js",
     "build:legacy": "node build_ci.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0",
-    "vite": "^5.4.21"
+    "esbuild": "^0.21.5",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }
