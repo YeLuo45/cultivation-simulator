@@ -234,10 +234,22 @@ export class CultivationMCPServer {
             return { error: { code: ERROR_CODES.HOOK_REJECTED, message: 'Request rejected by hook' } };
         }
         try {
-            const result = method.handler(request.params || {});
+            const resultOrPromise = method.handler(request.params || {});
+            if (resultOrPromise && typeof resultOrPromise.then === 'function') {
+                return resultOrPromise
+                    .then(result => {
+                        this.stats.methodCalls++;
+                        this._triggerHook('afterMethodCall', { method: request.method, success: true });
+                        return { result };
+                    })
+                    .catch(e => {
+                        this._triggerHook('afterMethodCall', { method: request.method, success: false, error: e.message });
+                        return { error: { code: ERROR_CODES.INTERNAL_ERROR, message: e.message, data: e.stack || null } };
+                    });
+            }
             this.stats.methodCalls++;
             this._triggerHook('afterMethodCall', { method: request.method, success: true });
-            return { result };
+            return { result: resultOrPromise };
         } catch (e) {
             this._triggerHook('afterMethodCall', { method: request.method, success: false, error: e.message });
             return { error: { code: ERROR_CODES.INTERNAL_ERROR, message: e.message, data: e.stack || null } };
@@ -259,11 +271,22 @@ export class CultivationMCPServer {
         const request = new McpRequest(rawRequest);
         if (request.isNotification()) {
             this.stats.notifications++;
-            this._dispatch(request);
+            const dispatch = this._dispatch(request);
+            if (dispatch && typeof dispatch.then === 'function') return null;
             return null;
         }
 
         const dispatch = this._dispatch(request);
+        if (dispatch && typeof dispatch.then === 'function') {
+            return dispatch.then(d => {
+                if (d.error) {
+                    this.stats.failedRequests++;
+                    return new McpResponse(request.id, null, d.error).toJSON();
+                }
+                this.stats.successfulRequests++;
+                return new McpResponse(request.id, d.result).toJSON();
+            });
+        }
         if (dispatch.error) {
             this.stats.failedRequests++;
             return new McpResponse(request.id, null, dispatch.error).toJSON();
