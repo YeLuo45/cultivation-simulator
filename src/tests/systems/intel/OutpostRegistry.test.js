@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { OutpostRegistry, OUTPOST_TYPES } from '../../../systems/intel/OutpostRegistry.js';
+
+describe('OutpostRegistry', () => {
+    let r;
+    beforeEach(() => { r = new OutpostRegistry(); });
+    it('initializes with defaults', () => { expect(r.stats.total).toBe(0); });
+    it('register', () => { expect(r.register('A', 'listening', 'Beijing')).not.toBeNull(); });
+    it('register rejects missing', () => { expect(r.register('', 'listening', 'B')).toBeNull(); });
+    it('register normalizes invalid type', () => { const x = r.register('A', 'invalid', 'B'); expect(x.type).toBe('listening'); });
+    it('get returns null for unknown', () => { expect(r.get('ghost')).toBeNull(); });
+    it('listAll and listByType and listByStatus and listByLocation and listActive', () => {
+        r.register('A', 'listening', 'Beijing');
+        r.register('B', 'safe_house', 'Shanghai');
+        expect(r.listAll().length).toBe(2);
+        expect(r.listByType('safe_house').length).toBe(1);
+        expect(r.listByStatus('active').length).toBe(2);
+        expect(r.listByLocation('Beijing').length).toBe(1);
+    });
+    it('setStatus', () => { const x = r.register('A', 'listening', 'B'); expect(r.setStatus(x.id, 'dormant')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = r.register('A', 'listening', 'B'); expect(r.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(r.setStatus('ghost', 'active')).toBe(false); });
+    it('assignAgent and removeAgent', () => { const x = r.register('A', 'listening', 'B', 3); r.assignAgent(x.id, 'a1'); r.assignAgent(x.id, 'a2'); r.removeAgent(x.id, 'a1'); expect(r.agentCount(x.id)).toBe(1); });
+    it('assignAgent rejects full', () => { const x = r.register('A', 'listening', 'B', 1); r.assignAgent(x.id, 'a1'); expect(r.assignAgent(x.id, 'a2')).toBe(false); });
+    it('assignAgent returns false for unknown', () => { expect(r.assignAgent('ghost', 'a1')).toBe(false); });
+    it('removeAgent returns false for unknown', () => { expect(r.removeAgent('ghost', 'a1')).toBe(false); });
+    it('compromise and abandon', () => { const x = r.register('A', 'listening', 'B'); r.compromise(x.id); expect(r.isCompromised(x.id)).toBe(true); const y = r.register('C', 'listening', 'D'); r.abandon(y.id); expect(y.status).toBe('abandoned'); });
+    it('compromise returns false for unknown', () => { expect(r.compromise('ghost')).toBe(false); });
+    it('abandon returns false for unknown', () => { expect(r.abandon('ghost')).toBe(false); });
+    it('isActive and isCompromised', () => { const x = r.register('A', 'listening', 'B'); expect(r.isActive(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(r.isActive('ghost')).toBe(false); });
+    it('isFull and agentCount and capacityOf and listAgents and hasAgent', () => { const x = r.register('A', 'listening', 'B', 2); r.assignAgent(x.id, 'a1'); r.assignAgent(x.id, 'a2'); expect(r.isFull(x.id)).toBe(true); expect(r.agentCount(x.id)).toBe(2); expect(r.listAgents(x.id)).toContain('a1'); expect(r.hasAgent(x.id, 'a1')).toBe(true); });
+    it('isFull for unknown', () => { expect(r.isFull('ghost')).toBe(false); });
+    it('agentCount and capacityOf for unknown', () => { expect(r.agentCount('ghost')).toBe(0); expect(r.capacityOf('ghost')).toBe(0); });
+    it('hasAgent for unknown', () => { expect(r.hasAgent('ghost', 'a1')).toBe(false); });
+    it('averageFill', () => { r.register('A', 'listening', 'B', 2); expect(r.averageFill()).toBe(0); });
+    it('report aggregates', () => { r.register('A', 'listening', 'B'); expect(r.report().total).toBe(1); });
+    it('reset clears', () => { r.register('A', 'listening', 'B'); r.reset(); expect(r.stats.total).toBe(0); });
+    it('exposes OUTPOST_TYPES', () => { expect(OUTPOST_TYPES).toContain('listening'); });
+});

@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SurveillanceManager, SURVEILLANCE_METHODS } from '../../../systems/intel/SurveillanceManager.js';
+
+describe('SurveillanceManager', () => {
+    let m;
+    beforeEach(() => { m = new SurveillanceManager(); });
+    it('initializes with defaults', () => { expect(m.stats.total).toBe(0); });
+    it('start', () => { expect(m.start('Target1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(m.start('')).toBeNull(); });
+    it('start normalizes invalid method', () => { const x = m.start('A', 'invalid'); expect(x.method).toBe('visual'); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByMethod and listByTarget and listActive', () => {
+        m.start('A', 'audio');
+        m.start('B', 'spiritual');
+        expect(m.listAll().length).toBe(2);
+        expect(m.listByStatus('planning').length).toBe(2);
+        expect(m.listByMethod('audio').length).toBe(1);
+        expect(m.listByTarget('A').length).toBe(1);
+    });
+    it('activate', () => { const x = m.start('A'); expect(m.activate(x.id)).toBe(true); });
+    it('activate fails for non-planning', () => { const x = m.start('A'); m.activate(x.id); expect(m.activate(x.id)).toBe(false); });
+    it('activate returns false for unknown', () => { expect(m.activate('ghost')).toBe(false); });
+    it('pause', () => { const x = m.start('A'); m.activate(x.id); m.pause(x.id); expect(m.get(x.id).status).toBe('paused'); });
+    it('pause returns false for unknown', () => { expect(m.pause('ghost')).toBe(false); });
+    it('complete', () => { const x = m.start('A'); m.activate(x.id); m.complete(x.id); expect(m.stats.totalCompleted).toBe(1); });
+    it('complete returns false for unknown', () => { expect(m.complete('ghost')).toBe(false); });
+    it('blow', () => { const x = m.start('A'); m.blow(x.id); expect(m.isBlown(x.id)).toBe(true); });
+    it('blow returns false for unknown', () => { expect(m.blow('ghost')).toBe(false); });
+    it('setMethod', () => { const x = m.start('A'); m.setMethod(x.id, 'scrying'); expect(m.get(x.id).method).toBe('scrying'); });
+    it('setMethod rejects invalid', () => { const x = m.start('A'); expect(m.setMethod(x.id, 'invalid')).toBe(false); });
+    it('setMethod returns false for unknown', () => { expect(m.setMethod('ghost', 'visual')).toBe(false); });
+    it('isActive and isCompleted and isBlown', () => { const x = m.start('A'); expect(m.isActive(x.id)).toBe(false); m.activate(x.id); expect(m.isActive(x.id)).toBe(true); m.complete(x.id); expect(m.isCompleted(x.id)).toBe(true); });
+    it('isCompleted for unknown', () => { expect(m.isCompleted('ghost')).toBe(false); });
+    it('duration for not started', () => { const x = m.start('A'); expect(m.duration(x.id)).toBe(0); });
+    it('duration for started', () => { const x = m.start('A'); m.activate(x.id); expect(m.duration(x.id)).toBeGreaterThanOrEqual(0); });
+    it('duration for unknown', () => { expect(m.duration('ghost')).toBe(0); });
+    it('targetFor for unknown', () => { expect(m.targetFor('ghost')).toBeNull(); });
+    it('report aggregates', () => { m.start('A'); expect(m.report().total).toBe(1); });
+    it('reset clears', () => { m.start('A'); m.reset(); expect(m.stats.total).toBe(0); });
+    it('exposes SURVEILLANCE_METHODS', () => { expect(SURVEILLANCE_METHODS).toContain('visual'); });
+});

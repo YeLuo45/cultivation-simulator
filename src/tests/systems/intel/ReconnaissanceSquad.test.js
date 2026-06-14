@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ReconnaissanceSquad, SQUAD_STATUS } from '../../../systems/intel/ReconnaissanceSquad.js';
+
+describe('ReconnaissanceSquad', () => {
+    let s;
+    beforeEach(() => { s = new ReconnaissanceSquad(); });
+    it('initializes with defaults', () => { expect(s.stats.total).toBe(0); });
+    it('form', () => { expect(s.form('Squad1', ['a1', 'a2'])).not.toBeNull(); });
+    it('form rejects missing', () => { expect(s.form('', ['a1'])).toBeNull(); });
+    it('form rejects non-array', () => { expect(s.form('S', 'not array')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(s.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listDeployed', () => {
+        s.form('S1', ['a1']);
+        s.form('S2', ['a2']);
+        expect(s.listAll().length).toBe(2);
+        expect(s.listByStatus('forming').length).toBe(2);
+    });
+    it('addMember and removeMember', () => { const x = s.form('S1'); s.addMember(x.id, 'a1'); s.removeMember(x.id, 'a1'); expect(s.memberCount(x.id)).toBe(0); });
+    it('addMember rejects duplicate', () => { const x = s.form('S1', ['a1']); expect(s.addMember(x.id, 'a1')).toBe(false); });
+    it('addMember returns false for unknown', () => { expect(s.addMember('ghost', 'a1')).toBe(false); });
+    it('removeMember returns false for unknown', () => { expect(s.removeMember('ghost', 'a1')).toBe(false); });
+    it('setStatus', () => { const x = s.form('S1'); expect(s.setStatus(x.id, 'returning')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = s.form('S1'); expect(s.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(s.setStatus('ghost', 'forming')).toBe(false); });
+    it('deploy and recall and disband', () => { const x = s.form('S1', ['a1']); s.deploy(x.id, 'mission1'); expect(s.isDeployed(x.id)).toBe(true); s.recall(x.id); expect(s.get(x.id).status).toBe('returning'); const y = s.form('S2'); s.disband(y.id); expect(s.get(y.id).status).toBe('disbanded'); });
+    it('deploy fails for non-forming', () => { const x = s.form('S1'); s.deploy(x.id); expect(s.deploy(x.id)).toBe(false); });
+    it('deploy returns false for unknown', () => { expect(s.deploy('ghost', 'm1')).toBe(false); });
+    it('recall fails for non-deployed', () => { const x = s.form('S1'); expect(s.recall(x.id)).toBe(false); });
+    it('recall returns false for unknown', () => { expect(s.recall('ghost')).toBe(false); });
+    it('isDeployed and isDisbanded', () => { const x = s.form('S1'); s.deploy(x.id, 'm1'); expect(s.isDeployed(x.id)).toBe(true); const y = s.form('S2'); s.disband(y.id); expect(s.isDisbanded(y.id)).toBe(true); });
+    it('isDeployed for unknown', () => { expect(s.isDeployed('ghost')).toBe(false); });
+    it('memberCount and missionFor', () => { const x = s.form('S1', ['a1', 'a2']); s.deploy(x.id, 'm1'); expect(s.memberCount(x.id)).toBe(2); expect(s.missionFor(x.id)).toBe('m1'); });
+    it('memberCount for unknown', () => { expect(s.memberCount('ghost')).toBe(0); });
+    it('missionFor for unknown', () => { expect(s.missionFor('ghost')).toBeNull(); });
+    it('isFull', () => { const x = s.form('S1', new Array(6).fill('a')); expect(s.isFull(x.id)).toBe(true); });
+    it('isFull for unknown', () => { expect(s.isFull('ghost')).toBe(false); });
+    it('averageSize', () => { s.form('S1', ['a1', 'a2']); expect(s.averageSize()).toBe(2); });
+    it('report aggregates', () => { s.form('S1'); expect(s.report().total).toBe(1); });
+    it('reset clears', () => { s.form('S1'); s.reset(); expect(s.stats.total).toBe(0); });
+    it('exposes SQUAD_STATUS', () => { expect(SQUAD_STATUS).toContain('forming'); });
+});

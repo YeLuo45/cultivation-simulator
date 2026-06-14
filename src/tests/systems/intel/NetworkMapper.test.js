@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { NetworkMapper, NODE_TYPES } from '../../../systems/intel/NetworkMapper.js';
+
+describe('NetworkMapper', () => {
+    let m;
+    beforeEach(() => { m = new NetworkMapper(); });
+    it('initializes with defaults', () => { expect(m.stats.totalNodes).toBe(0); });
+    it('addNode', () => { expect(m.addNode('A')).not.toBeNull(); });
+    it('addNode rejects missing', () => { expect(m.addNode('')).toBeNull(); });
+    it('addNode normalizes invalid type', () => { const x = m.addNode('A', 'invalid'); expect(x.type).toBe('agent'); });
+    it('getNode returns null for unknown', () => { expect(m.getNode('ghost')).toBeNull(); });
+    it('listAllNodes and listByType', () => { m.addNode('A', 'agent'); m.addNode('B', 'safe_house'); expect(m.listAllNodes().length).toBe(2); expect(m.listByType('safe_house').length).toBe(1); });
+    it('connect', () => { const a = m.addNode('A'); const b = m.addNode('B'); expect(m.connect(a.id, b.id)).not.toBeNull(); });
+    it('connect rejects unknown nodes', () => { const a = m.addNode('A'); expect(m.connect(a.id, 'ghost')).toBeNull(); });
+    it('connect normalizes invalid type', () => { const a = m.addNode('A'); const b = m.addNode('B'); const e = m.connect(a.id, b.id, 'invalid'); expect(e.type).toBe('communicates'); });
+    it('getEdge returns null for unknown', () => { expect(m.getEdge('ghost')).toBeNull(); });
+    it('listAllEdges and listEdgesFrom and listEdgesTo and listByEdgeType', () => {
+        const a = m.addNode('A');
+        const b = m.addNode('B');
+        m.connect(a.id, b.id);
+        expect(m.listAllEdges().length).toBe(1);
+        expect(m.listEdgesFrom(a.id).length).toBe(1);
+        expect(m.listEdgesTo(b.id).length).toBe(1);
+    });
+    it('removeNode', () => { const a = m.addNode('A'); expect(m.removeNode(a.id)).toBe(true); });
+    it('removeNode returns false for unknown', () => { expect(m.removeNode('ghost')).toBe(false); });
+    it('removeEdge', () => { const a = m.addNode('A'); const b = m.addNode('B'); const e = m.connect(a.id, b.id); expect(m.removeEdge(e.id)).toBe(true); });
+    it('removeEdge returns false for unknown', () => { expect(m.removeEdge('ghost')).toBe(false); });
+    it('neighbors and degree', () => { const a = m.addNode('A'); const b = m.addNode('B'); m.connect(a.id, b.id); expect(m.neighbors(a.id)).toContain(b.id); expect(m.degree(a.id)).toBe(1); });
+    it('degree for no edges', () => { const a = m.addNode('A'); expect(m.degree(a.id)).toBe(0); });
+    it('degree for unknown', () => { expect(m.degree('ghost')).toBe(0); });
+    it('setStrength and setWeight', () => { const a = m.addNode('A'); const b = m.addNode('B'); m.setStrength(a.id, 0.8); m.connect(a.id, b.id); m.setWeight(m.listEdgesFrom(a.id)[0].id, 0.7); expect(a.strength).toBe(0.8); });
+    it('setStrength clamps', () => { const a = m.addNode('A'); m.setStrength(a.id, 2); expect(a.strength).toBe(1); });
+    it('setStrength returns false for unknown', () => { expect(m.setStrength('ghost', 0.5)).toBe(false); });
+    it('setWeight returns false for unknown', () => { expect(m.setWeight('ghost', 0.5)).toBe(false); });
+    it('totalStrength and averageDegree', () => { m.addNode('A'); expect(m.totalStrength()).toBeGreaterThan(0); });
+    it('averageDegree for no nodes', () => { expect(m.averageDegree()).toBe(0); });
+    it('report aggregates', () => { m.addNode('A'); expect(m.report().totalNodes).toBe(1); });
+    it('reset clears', () => { m.addNode('A'); m.reset(); expect(m.stats.totalNodes).toBe(0); });
+    it('exposes NODE_TYPES', () => { expect(NODE_TYPES).toContain('agent'); });
+});

@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SecureChannel, ENCRYPTION_LEVELS } from '../../../systems/intel/SecureChannel.js';
+
+describe('SecureChannel', () => {
+    let c;
+    beforeEach(() => { c = new SecureChannel(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('open', () => { expect(c.open('a', 'b')).not.toBeNull(); });
+    it('open rejects missing', () => { expect(c.open('', 'b')).toBeNull(); expect(c.open('a', '')).toBeNull(); });
+    it('open normalizes invalid encryption', () => { const x = c.open('a', 'b', 'invalid'); expect(x.encryption).toBe('strong'); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByEncryption and listActive', () => {
+        c.open('a', 'b');
+        c.open('b', 'c', 'military');
+        expect(c.listAll().length).toBe(2);
+        expect(c.listByStatus('active').length).toBe(2);
+        expect(c.listByEncryption('military').length).toBe(1);
+    });
+    it('setStatus', () => { const x = c.open('a', 'b'); expect(c.setStatus(x.id, 'dormant')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = c.open('a', 'b'); expect(c.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(c.setStatus('ghost', 'active')).toBe(false); });
+    it('setEncryption', () => { const x = c.open('a', 'b'); expect(c.setEncryption(x.id, 'military')).toBe(true); });
+    it('setEncryption rejects invalid', () => { const x = c.open('a', 'b'); expect(c.setEncryption(x.id, 'invalid')).toBe(false); });
+    it('setEncryption returns false for unknown', () => { expect(c.setEncryption('ghost', 'military')).toBe(false); });
+    it('use', () => { const x = c.open('a', 'b'); expect(c.use(x.id)).not.toBeNull(); });
+    it('use returns null for non-active', () => { const x = c.open('a', 'b'); c.archive(x.id); expect(c.use(x.id)).toBeNull(); });
+    it('use returns null for unknown', () => { expect(c.use('ghost')).toBeNull(); });
+    it('compromise and archive', () => { const x = c.open('a', 'b'); c.compromise(x.id); expect(c.isCompromised(x.id)).toBe(true); const y = c.open('c', 'd'); c.archive(y.id); expect(c.listByStatus('archived').length).toBe(1); });
+    it('compromise returns false for unknown', () => { expect(c.compromise('ghost')).toBe(false); });
+    it('archive returns false for unknown', () => { expect(c.archive('ghost')).toBe(false); });
+    it('isActive and isCompromised', () => { const x = c.open('a', 'b'); expect(c.isActive(x.id)).toBe(true); });
+    it('messageCount and encryptionOf', () => { const x = c.open('a', 'b'); c.use(x.id); expect(c.messageCount(x.id)).toBe(1); expect(c.encryptionOf(x.id)).toBe('strong'); });
+    it('messageCount for unknown', () => { expect(c.messageCount('ghost')).toBe(0); });
+    it('encryptionOf for unknown', () => { expect(c.encryptionOf('ghost')).toBeNull(); });
+    it('mostUsed', () => { const a = c.open('a', 'b'); const b = c.open('c', 'd'); c.use(a.id, 5); c.use(b.id, 3); expect(c.mostUsed().id).toBe(a.id); });
+    it('mostUsed null for empty', () => { expect(c.mostUsed()).toBeNull(); });
+    it('report aggregates', () => { c.open('a', 'b'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.open('a', 'b'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes ENCRYPTION_LEVELS', () => { expect(ENCRYPTION_LEVELS).toContain('strong'); });
+});

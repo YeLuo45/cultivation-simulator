@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BorderWatcher, THREAT_DIRECTIONS } from '../../../systems/intel/BorderWatcher.js';
+
+describe('BorderWatcher', () => {
+    let w;
+    beforeEach(() => { w = new BorderWatcher(); });
+    it('initializes with defaults', () => { expect(w.stats.total).toBe(0); });
+    it('addPost', () => { expect(w.addPost('Post1', 'north')).not.toBeNull(); });
+    it('addPost rejects missing', () => { expect(w.addPost('', 'north')).toBeNull(); });
+    it('addPost normalizes invalid direction', () => { const x = w.addPost('A', 'invalid'); expect(x.direction).toBe('north'); });
+    it('get returns null for unknown', () => { expect(w.get('ghost')).toBeNull(); });
+    it('listAll and listByDirection and listByAlert and listRed', () => {
+        w.addPost('A', 'north');
+        w.addPost('B', 'south');
+        expect(w.listAll().length).toBe(2);
+        expect(w.listByDirection('north').length).toBe(1);
+        expect(w.listByAlert('green').length).toBe(2);
+    });
+    it('setAlert', () => { const x = w.addPost('A', 'north'); expect(w.setAlert(x.id, 'yellow')).toBe(true); });
+    it('setAlert rejects invalid', () => { const x = w.addPost('A', 'north'); expect(w.setAlert(x.id, 'invalid')).toBe(false); });
+    it('setAlert returns false for unknown', () => { expect(w.setAlert('ghost', 'yellow')).toBe(false); });
+    it('escalate', () => { const x = w.addPost('A', 'north'); w.escalate(x.id); expect(w.alertOf(x.id)).toBe('yellow'); });
+    it('escalate null for red', () => { const x = w.addPost('A', 'north'); w.setAlert(x.id, 'red'); expect(w.escalate(x.id)).toBeNull(); });
+    it('escalate returns null for unknown', () => { expect(w.escalate('ghost')).toBeNull(); });
+    it('deEscalate', () => { const x = w.addPost('A', 'north'); w.setAlert(x.id, 'red'); w.deEscalate(x.id); expect(w.alertOf(x.id)).toBe('orange'); });
+    it('deEscalate null for green', () => { const x = w.addPost('A', 'north'); expect(w.deEscalate(x.id)).toBeNull(); });
+    it('recordSighting', () => { const x = w.addPost('A', 'north'); expect(w.recordSighting(x.id, 'target1')).toBe(true); });
+    it('recordSighting returns false for unknown', () => { expect(w.recordSighting('ghost', 't1')).toBe(false); });
+    it('isOnAlert and isRed', () => { const x = w.addPost('A', 'north'); w.setAlert(x.id, 'red'); expect(w.isOnAlert(x.id)).toBe(true); expect(w.isRed(x.id)).toBe(true); });
+    it('isOnAlert for green', () => { const x = w.addPost('A', 'north'); expect(w.isOnAlert(x.id)).toBe(false); });
+    it('alertOf for unknown', () => { expect(w.alertOf('ghost')).toBeNull(); });
+    it('sightingCount', () => { const x = w.addPost('A', 'north'); w.recordSighting(x.id, 't1'); expect(w.sightingCount(x.id)).toBe(1); });
+    it('sightingCount for unknown', () => { expect(w.sightingCount('ghost')).toBe(0); });
+    it('recentSightings', () => { const x = w.addPost('A', 'north'); w.recordSighting(x.id, 't1'); expect(w.recentSightings(x.id).length).toBe(1); });
+    it('recentSightings for unknown', () => { expect(w.recentSightings('ghost')).toEqual([]); });
+    it('mostActive', () => { w.addPost('A', 'north'); w.addPost('B', 'south'); w.recordSighting(w.listAll()[1].id, 't1'); expect(w.mostActive().name).toBe('B'); });
+    it('mostActive null for empty', () => { expect(w.mostActive()).toBeNull(); });
+    it('listRed', () => { const x = w.addPost('A', 'north'); w.setAlert(x.id, 'red'); expect(w.listRed().length).toBe(1); });
+    it('report aggregates', () => { w.addPost('A', 'north'); expect(w.report().total).toBe(1); });
+    it('reset clears', () => { w.addPost('A', 'north'); w.reset(); expect(w.stats.total).toBe(0); });
+    it('exposes THREAT_DIRECTIONS', () => { expect(THREAT_DIRECTIONS).toContain('north'); });
+});
