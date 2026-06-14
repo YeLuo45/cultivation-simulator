@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ApprenticeMatcher, APPRENTICESHIP_TYPES } from '../../../systems/alchemy/ApprenticeMatcher.js';
+
+describe('ApprenticeMatcher', () => {
+    let m;
+    beforeEach(() => { m = new ApprenticeMatcher(); });
+    it('initializes with defaults', () => { expect(m.stats.total).toBe(0); });
+    it('match', () => { expect(m.match('master1', 'apprentice1')).not.toBeNull(); });
+    it('match rejects missing', () => { expect(m.match('', 'a1')).toBeNull(); expect(m.match('m1', '')).toBeNull(); });
+    it('match normalizes invalid type', () => { const x = m.match('m1', 'a1', 'invalid'); expect(x.type).toBe('crafting'); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByMaster and listByApprentice and listByType and listByStatus', () => {
+        m.match('m1', 'a1', 'crafting');
+        m.match('m1', 'a2', 'combat');
+        m.match('m2', 'a1', 'meditation');
+        expect(m.listAll().length).toBe(3);
+        expect(m.listByMaster('m1').length).toBe(2);
+        expect(m.listByApprentice('a1').length).toBe(2);
+        expect(m.listByType('crafting').length).toBe(1);
+        expect(m.listByStatus('pending').length).toBe(3);
+    });
+    it('start', () => { const x = m.match('m1', 'a1'); expect(m.start(x.id)).toBe(true); });
+    it('start fails for non-pending', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.start(x.id)).toBe(false); });
+    it('start returns false for unknown', () => { expect(m.start('ghost')).toBe(false); });
+    it('complete', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.complete(x.id)).toBe(true); });
+    it('complete fails for non-active', () => { const x = m.match('m1', 'a1'); expect(m.complete(x.id)).toBe(false); });
+    it('complete returns false for unknown', () => { expect(m.complete('ghost')).toBe(false); });
+    it('fail', () => { const x = m.match('m1', 'a1'); expect(m.fail(x.id)).toBe(true); });
+    it('fail returns false for unknown', () => { expect(m.fail('ghost')).toBe(false); });
+    it('isActive', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.isActive(x.id)).toBe(true); });
+    it('isActive for pending', () => { const x = m.match('m1', 'a1'); expect(m.isActive(x.id)).toBe(false); });
+    it('activeApprentices and activeMaster', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.activeApprentices('m1').length).toBe(1); expect(m.activeMaster('a1').length).toBe(1); });
+    it('masterFor', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.masterFor('a1')).toBe('m1'); });
+    it('masterFor for no active', () => { expect(m.masterFor('a1')).toBeNull(); });
+    it('apprenticeCount', () => { const x = m.match('m1', 'a1'); m.start(x.id); expect(m.apprenticeCount('m1')).toBe(1); });
+    it('apprenticeCount for unknown', () => { expect(m.apprenticeCount('ghost')).toBe(0); });
+    it('report aggregates', () => { m.match('m1', 'a1'); expect(m.report().total).toBe(1); });
+    it('reset clears', () => { m.match('m1', 'a1'); m.reset(); expect(m.stats.total).toBe(0); });
+    it('exposes APPRENTICESHIP_TYPES', () => { expect(APPRENTICESHIP_TYPES).toContain('crafting'); });
+});

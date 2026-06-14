@@ -1,0 +1,33 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { HeatController, HEAT_LEVELS } from '../../../systems/alchemy/HeatController.js';
+
+describe('HeatController', () => {
+    let c;
+    beforeEach(() => { c = new HeatController(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('startSession', () => { expect(c.startSession('hot', 500)).not.toBeNull(); });
+    it('startSession normalizes invalid target', () => { const s = c.startSession('invalid', 100); expect(s.target).toBe(500); });
+    it('levelFor temp', () => { expect(c._levelFor(50)).toBe('cold'); expect(c._levelFor(1500)).toBe('blazing'); });
+    it('levelFor infernal', () => { expect(c._levelFor(2500)).toBe('infernal'); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll', () => { c.startSession(); expect(c.listAll().length).toBe(1); });
+    it('increase', () => { const x = c.startSession(); c.increase(x.id, 100); expect(c.get(x.id).temp).toBe(120); });
+    it('increase returns false for unknown', () => { expect(c.increase('ghost', 50)).toBe(false); });
+    it('decrease', () => { const x = c.startSession('hot', 500); c.decrease(x.id, 100); expect(c.get(x.id).temp).toBe(400); });
+    it('decrease clamps to 0', () => { const x = c.startSession('hot', 100); c.decrease(x.id, 500); expect(c.get(x.id).temp).toBe(0); });
+    it('decrease returns false for unknown', () => { expect(c.decrease('ghost', 50)).toBe(false); });
+    it('setTemp', () => { const x = c.startSession(); c.setTemp(x.id, 1000); expect(c.get(x.id).temp).toBe(1000); });
+    it('setTemp clamps', () => { const x = c.startSession(); c.setTemp(x.id, -100); expect(c.get(x.id).temp).toBe(0); });
+    it('setTemp returns false for unknown', () => { expect(c.setTemp('ghost', 100)).toBe(false); });
+    it('cool', () => { const x = c.startSession('hot', 1000); c.cool(x.id); expect(c.get(x.id).temp).toBeLessThan(1000); });
+    it('isOnTarget', () => { const x = c.startSession('hot', 500); expect(c.isOnTarget(x.id)).toBe(true); });
+    it('isOnTarget false for unknown', () => { expect(c.isOnTarget('ghost')).toBe(false); });
+    it('distanceToTarget', () => { const x = c.startSession('hot', 0); expect(c.distanceToTarget(x.id)).toBe(500); });
+    it('currentLevel', () => { const x = c.startSession(); c.setTemp(x.id, 1200); expect(c.currentLevel(x.id)).toBe('blazing'); });
+    it('history', () => { const x = c.startSession(); c.increase(x.id, 50); expect(c.history(x.id).length).toBe(2); });
+    it('maxTemp', () => { const x = c.startSession(); c.increase(x.id, 100); c.increase(x.id, 200); expect(c.maxTemp(x.id)).toBe(320); });
+    it('averageTemp', () => { c.startSession('hot', 200); expect(c.averageTemp()).toBe(200); });
+    it('report aggregates', () => { c.startSession(); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.startSession(); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes HEAT_LEVELS', () => { expect(HEAT_LEVELS).toContain('hot'); });
+});

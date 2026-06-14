@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { HerbGarden, GROWTH_STAGES } from '../../../systems/alchemy/HerbGarden.js';
+
+describe('HerbGarden', () => {
+    let g;
+    beforeEach(() => { g = new HerbGarden(); });
+    it('initializes with defaults', () => { expect(g.stats.total).toBe(0); });
+    it('plant', () => { expect(g.plant('Spirit Herb')).not.toBeNull(); });
+    it('plant rejects missing', () => { expect(g.plant('')).toBeNull(); });
+    it('plant normalizes invalid rarity', () => { const x = g.plant('A', 'invalid'); expect(x.rarity).toBe('common'); });
+    it('get returns null for unknown', () => { expect(g.get('ghost')).toBeNull(); });
+    it('listAll and listByStage and listByRarity and listHarvestable', () => {
+        g.plant('A', 'common');
+        g.plant('B', 'rare');
+        expect(g.listAll().length).toBe(2);
+        expect(g.listByStage('seed').length).toBe(2);
+        expect(g.listByRarity('rare').length).toBe(1);
+        expect(g.listHarvestable().length).toBe(0);
+    });
+    it('water', () => { const x = g.plant('A'); g.water(x.id, 50); expect(g.waterOf(x.id)).toBe(100); });
+    it('water grows plant', () => { const x = g.plant('A'); g.water(x.id, 50); expect(g.growthOf(x.id)).toBeGreaterThan(0); });
+    it('water returns false for unknown', () => { expect(g.water('ghost', 50)).toBe(false); });
+    it('grow', () => { const x = g.plant('A'); g.grow(x.id, 30); expect(g.growthOf(x.id)).toBe(30); });
+    it('grow returns false for unknown', () => { expect(g.grow('ghost', 30)).toBe(false); });
+    it('updateStage - seed sprout growing mature', () => { const x = g.plant('A'); g.grow(x.id, 50); expect(g.stageOf(x.id)).toBe('growing'); });
+    it('harvest', () => { const x = g.plant('A'); g.grow(x.id, 90); expect(g.harvest(x.id)).not.toBeNull(); });
+    it('harvest returns null for not mature', () => { const x = g.plant('A'); expect(g.harvest(x.id)).toBeNull(); });
+    it('harvest returns null for unknown', () => { expect(g.harvest('ghost')).toBeNull(); });
+    it('remove', () => { const x = g.plant('A'); expect(g.remove(x.id)).toBe(true); });
+    it('isMature', () => { const x = g.plant('A'); g.grow(x.id, 90); expect(g.isMature(x.id)).toBe(true); });
+    it('isMature for unknown', () => { expect(g.isMature('ghost')).toBe(false); });
+    it('growthOf and waterOf', () => { const x = g.plant('A'); g.water(x.id, 20); expect(g.waterOf(x.id)).toBe(70); });
+    it('waterOf for unknown', () => { expect(g.waterOf('ghost')).toBe(0); });
+    it('stageOf for unknown', () => { expect(g.stageOf('ghost')).toBeNull(); });
+    it('averageGrowth', () => { g.plant('A'); g.plant('B'); expect(g.averageGrowth()).toBe(0); });
+    it('countByStage', () => { g.plant('A'); expect(g.countByStage().seed).toBe(1); });
+    it('report aggregates', () => { g.plant('A'); expect(g.report().total).toBe(1); });
+    it('reset clears', () => { g.plant('A'); g.reset(); expect(g.stats.total).toBe(0); });
+    it('exposes GROWTH_STAGES', () => { expect(GROWTH_STAGES).toContain('seed'); });
+});

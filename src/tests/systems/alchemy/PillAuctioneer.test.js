@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { PillAuctioneer, AUCTION_STATUS } from '../../../systems/alchemy/PillAuctioneer.js';
+
+describe('PillAuctioneer', () => {
+    let a;
+    beforeEach(() => { a = new PillAuctioneer(); });
+    it('initializes with defaults', () => { expect(a.stats.totalAuctions).toBe(0); });
+    it('listAuction', () => { expect(a.listAuction('Pill', 100)).not.toBeNull(); });
+    it('listAuction rejects missing', () => { expect(a.listAuction('', 100)).toBeNull(); expect(a.listAuction('Pill', -1)).toBeNull(); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listLive and listEnded', () => {
+        const x = a.listAuction('Pill', 100);
+        a.start(x.id);
+        expect(a.listAll().length).toBe(1);
+        expect(a.listByStatus('live').length).toBe(1);
+        expect(a.listLive().length).toBe(1);
+        a.end(x.id);
+        expect(a.listEnded().length).toBe(1);
+    });
+    it('start', () => { const x = a.listAuction('Pill', 100); expect(a.start(x.id)).toBe(true); });
+    it('start fails for non-upcoming', () => { const x = a.listAuction('Pill', 100); a.start(x.id); expect(a.start(x.id)).toBe(false); });
+    it('start returns false for unknown', () => { expect(a.start('ghost')).toBe(false); });
+    it('bid', () => { const x = a.listAuction('Pill', 100); a.start(x.id); expect(a.bid(x.id, 'b1', 200)).not.toBeNull(); });
+    it('bid rejects non-live', () => { const x = a.listAuction('Pill', 100); expect(a.bid(x.id, 'b1', 200)).toBeNull(); });
+    it('bid rejects lower', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); expect(a.bid(x.id, 'b2', 150)).toBeNull(); });
+    it('bid returns null for unknown', () => { expect(a.bid('ghost', 'b1', 200)).toBeNull(); });
+    it('end', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); expect(a.end(x.id)).toBe(true); });
+    it('end fails for non-live', () => { const x = a.listAuction('Pill', 100); expect(a.end(x.id)).toBe(false); });
+    it('end returns false for unknown', () => { expect(a.end('ghost')).toBe(false); });
+    it('cancel', () => { const x = a.listAuction('Pill', 100); a.start(x.id); expect(a.cancel(x.id)).toBe(true); });
+    it('cancel returns false for unknown', () => { expect(a.cancel('ghost')).toBe(false); });
+    it('highestBid and leaderOf', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); expect(a.highestBid(x.id)).toBe(200); expect(a.leaderOf(x.id)).toBe('b1'); });
+    it('highestBid for unknown', () => { expect(a.highestBid('ghost')).toBe(0); });
+    it('leaderOf for unknown', () => { expect(a.leaderOf('ghost')).toBeNull(); });
+    it('isLive and isEnded', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); a.end(x.id); expect(a.isEnded(x.id)).toBe(true); });
+    it('bidCount and bidHistory', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); a.bid(x.id, 'b2', 300); expect(a.bidCount(x.id)).toBe(2); expect(a.bidHistory(x.id).length).toBe(2); });
+    it('isLeading', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); expect(a.isLeading(x.id, 'b1')).toBe(true); });
+    it('revenue', () => { const x = a.listAuction('Pill', 100); a.start(x.id); a.bid(x.id, 'b1', 200); a.end(x.id); expect(a.revenue()).toBe(200); });
+    it('report aggregates', () => { a.listAuction('Pill', 100); expect(a.report().totalAuctions).toBe(1); });
+    it('reset clears', () => { a.listAuction('Pill', 100); a.reset(); expect(a.stats.totalAuctions).toBe(0); });
+    it('exposes AUCTION_STATUS', () => { expect(AUCTION_STATUS).toContain('upcoming'); });
+});

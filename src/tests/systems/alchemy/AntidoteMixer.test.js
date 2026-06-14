@@ -1,0 +1,44 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { AntidoteMixer, POISON_TYPES } from '../../../systems/alchemy/AntidoteMixer.js';
+
+describe('AntidoteMixer', () => {
+    let m;
+    beforeEach(() => { m = new AntidoteMixer(); });
+    it('initializes with defaults', () => { expect(m.stats.total).toBe(0); });
+    it('mix', () => { expect(m.mix('toxic', ['h1', 'h2'])).not.toBeNull(); });
+    it('mix rejects missing', () => { expect(m.mix('', [])).toBeNull(); });
+    it('mix rejects invalid type', () => { expect(m.mix('invalid', [])).toBeNull(); });
+    it('mix rejects non-array', () => { expect(m.mix('toxic', 'not array')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByPoison and listByStatus', () => {
+        m.mix('toxic', []);
+        expect(m.listAll().length).toBe(1);
+        expect(m.listByPoison('toxic').length).toBe(1);
+        expect(m.listByStatus('pending').length).toBe(1);
+    });
+    it('setStatus', () => { const x = m.mix('toxic', []); expect(m.setStatus(x.id, 'brewing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = m.mix('toxic', []); expect(m.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(m.setStatus('ghost', 'brewing')).toBe(false); });
+    it('setEffectiveness', () => { const x = m.mix('toxic', []); m.setEffectiveness(x.id, 75); expect(m.get(x.id).effectiveness).toBe(75); });
+    it('setEffectiveness clamps', () => { const x = m.mix('toxic', []); m.setEffectiveness(x.id, 200); expect(m.get(x.id).effectiveness).toBe(100); });
+    it('setEffectiveness returns false for unknown', () => { expect(m.setEffectiveness('ghost', 50)).toBe(false); });
+    it('brew', () => { const x = m.mix('toxic', []); expect(m.brew(x.id)).toBe(true); });
+    it('brew rejects non-pending', () => { const x = m.mix('toxic', []); m.brew(x.id); expect(m.brew(x.id)).toBe(false); });
+    it('brew returns false for unknown', () => { expect(m.brew('ghost')).toBe(false); });
+    it('finalize success', () => { const x = m.mix('toxic', []); m.brew(x.id); expect(m.finalize(x.id, true)).toBe(true); });
+    it('finalize fail', () => { const x = m.mix('toxic', []); m.brew(x.id); expect(m.finalize(x.id, false)).toBe(true); });
+    it('finalize returns false for unknown', () => { expect(m.finalize('ghost', true)).toBe(false); });
+    it('consume', () => { const x = m.mix('toxic', []); m.brew(x.id); m.finalize(x.id, true); expect(m.consume(x.id)).toBe(true); });
+    it('consume rejects not ready', () => { const x = m.mix('toxic', []); expect(m.consume(x.id)).toBe(false); });
+    it('consume returns false for unknown', () => { expect(m.consume('ghost')).toBe(false); });
+    it('isReady and isConsumed and isFailed', () => { const x = m.mix('toxic', []); m.brew(x.id); m.finalize(x.id, true); expect(m.isReady(x.id)).toBe(true); });
+    it('isFailed', () => { const x = m.mix('toxic', []); m.brew(x.id); m.finalize(x.id, false); expect(m.isFailed(x.id)).toBe(true); });
+    it('canCure', () => { const x = m.mix('toxic', []); m.brew(x.id); m.setEffectiveness(x.id, 80); expect(m.canCure(x.id, 50)).toBe(true); });
+    it('canCure false', () => { const x = m.mix('toxic', []); m.brew(x.id); m.setEffectiveness(x.id, 20); expect(m.canCure(x.id, 50)).toBe(false); });
+    it('canCure for unknown', () => { expect(m.canCure('ghost', 10)).toBe(false); });
+    it('averageEffectiveness', () => { const x = m.mix('toxic', []); m.brew(x.id); m.finalize(x.id, true); m.setEffectiveness(x.id, 80); expect(m.averageEffectiveness()).toBe(80); });
+    it('successRate', () => { const x = m.mix('toxic', []); m.brew(x.id); m.finalize(x.id, true); expect(m.successRate()).toBe(1); });
+    it('report aggregates', () => { m.mix('toxic', []); expect(m.report().total).toBe(1); });
+    it('reset clears', () => { m.mix('toxic', []); m.reset(); expect(m.stats.total).toBe(0); });
+    it('exposes POISON_TYPES', () => { expect(POISON_TYPES).toContain('toxic'); });
+});
