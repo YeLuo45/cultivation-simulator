@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { MeridianActivator, MERIDIAN_TYPES } from '../../../systems/alchemy/MeridianActivator.js';
+
+describe('MeridianActivator', () => {
+    let a;
+    beforeEach(() => { a = new MeridianActivator(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('create', () => { expect(a.create('ren', 'p1')).not.toBeNull(); });
+    it('create rejects invalid type', () => { expect(a.create('invalid', 'p1')).toBeNull(); });
+    it('create rejects missing owner', () => { expect(a.create('ren', '')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType', () => {
+        a.create('ren', 'p1');
+        a.create('du', 'p1');
+        a.create('ren', 'p2');
+        expect(a.listAll().length).toBe(3);
+        expect(a.listByOwner('p1').length).toBe(2);
+        expect(a.listByType('ren').length).toBe(2);
+    });
+    it('listActivated', () => { const x = a.create('ren', 'p1'); a.activate(x.id); expect(a.listActivated().length).toBe(1); });
+    it('listForOwnerByType', () => { a.create('ren', 'p1'); a.create('ren', 'p2'); expect(a.listForOwnerByType('p1', 'ren').length).toBe(1); });
+    it('addEnergy', () => { const x = a.create('ren', 'p1'); expect(a.addEnergy(x.id, 500)).toBe(true); });
+    it('addEnergy triggers activation', () => { const x = a.create('ren', 'p1'); a.addEnergy(x.id, 2000); expect(a.isActivated(x.id)).toBe(true); });
+    it('addEnergy returns false for unknown', () => { expect(a.addEnergy('ghost', 100)).toBe(false); });
+    it('activate', () => { const x = a.create('ren', 'p1'); expect(a.activate(x.id)).toBe(true); });
+    it('activate returns false for already activated', () => { const x = a.create('ren', 'p1'); a.activate(x.id); expect(a.activate(x.id)).toBe(false); });
+    it('activate returns false for unknown', () => { expect(a.activate('ghost')).toBe(false); });
+    it('setEnergy', () => { const x = a.create('ren', 'p1'); a.setEnergy(x.id, 500); expect(a.energyOf(x.id)).toBe(500); });
+    it('setEnergy triggers activation', () => { const x = a.create('ren', 'p1'); a.setEnergy(x.id, 1000); expect(a.isActivated(x.id)).toBe(true); });
+    it('setEnergy returns false for unknown', () => { expect(a.setEnergy('ghost', 100)).toBe(false); });
+    it('progress', () => { const x = a.create('ren', 'p1'); a.setEnergy(x.id, 500); expect(a.progress(x.id)).toBe(0.5); });
+    it('progress for unknown', () => { expect(a.progress('ghost')).toBe(0); });
+    it('isActivated and energyOf', () => { const x = a.create('ren', 'p1'); expect(a.isActivated(x.id)).toBe(false); expect(a.energyOf(x.id)).toBe(0); });
+    it('activatedCount', () => { const x = a.create('ren', 'p1'); a.activate(x.id); expect(a.activatedCount('p1')).toBe(1); });
+    it('activatedCount for unknown', () => { expect(a.activatedCount('ghost')).toBe(0); });
+    it('ownerProgress', () => { const x = a.create('ren', 'p1'); a.activate(x.id); expect(a.ownerProgress('p1')).toBe(1); });
+    it('ownerProgress for no meridians', () => { expect(a.ownerProgress('p1')).toBe(0); });
+    it('report aggregates', () => { a.create('ren', 'p1'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.create('ren', 'p1'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes MERIDIAN_TYPES', () => { expect(MERIDIAN_TYPES).toContain('ren'); });
+});

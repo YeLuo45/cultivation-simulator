@@ -1,0 +1,44 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BatchProducer, BATCH_STATUS } from '../../../systems/alchemy/BatchProducer.js';
+
+describe('BatchProducer', () => {
+    let b;
+    beforeEach(() => { b = new BatchProducer(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('plan', () => { expect(b.plan('recipe1', 100)).not.toBeNull(); });
+    it('plan rejects missing', () => { expect(b.plan('', 100)).toBeNull(); });
+    it('plan rejects non-positive quantity', () => { expect(b.plan('r', 0)).toBeNull(); expect(b.plan('r', -1)).toBeNull(); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByRecipe', () => {
+        b.plan('r1', 100);
+        b.plan('r1', 50);
+        b.plan('r2', 30);
+        expect(b.listAll().length).toBe(3);
+        expect(b.listByStatus('planning').length).toBe(3);
+        expect(b.listByRecipe('r1').length).toBe(2);
+    });
+    it('start', () => { const x = b.plan('r', 100); expect(b.start(x.id)).toBe(true); });
+    it('start fails for non-planning', () => { const x = b.plan('r', 100); b.start(x.id); expect(b.start(x.id)).toBe(false); });
+    it('start returns false for unknown', () => { expect(b.start('ghost')).toBe(false); });
+    it('progress', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 50); expect(b.get(x.id).produced).toBe(50); });
+    it('progress returns false for non-producing', () => { const x = b.plan('r', 100); expect(b.progress(x.id, 50)).toBe(false); });
+    it('progress auto-completes', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 100); expect(b.isComplete(x.id)).toBe(true); });
+    it('progress returns false for unknown', () => { expect(b.progress('ghost', 50)).toBe(false); });
+    it('complete', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 50); expect(b.complete(x.id)).toBe(true); });
+    it('complete returns false for unknown', () => { expect(b.complete('ghost')).toBe(false); });
+    it('fail', () => { const x = b.plan('r', 100); b.start(x.id); expect(b.fail(x.id, 'reason')).toBe(true); });
+    it('fail returns false for unknown', () => { expect(b.fail('ghost')).toBe(false); });
+    it('cancel', () => { const x = b.plan('r', 100); expect(b.cancel(x.id)).toBe(true); });
+    it('cancel returns false for unknown', () => { expect(b.cancel('ghost')).toBe(false); });
+    it('progressOf', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 50); expect(b.progressOf(x.id)).toBe(0.5); });
+    it('progressOf for unknown', () => { expect(b.progressOf('ghost')).toBe(0); });
+    it('isComplete and isFailed', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 100); expect(b.isComplete(x.id)).toBe(true); });
+    it('isFailed', () => { const x = b.plan('r', 100); b.start(x.id); b.fail(x.id); expect(b.isFailed(x.id)).toBe(true); });
+    it('producedCount and remaining', () => { const x = b.plan('r', 100); b.start(x.id); b.progress(x.id, 30); expect(b.producedCount(x.id)).toBe(30); expect(b.remaining(x.id)).toBe(70); });
+    it('duration for not started', () => { const x = b.plan('r', 100); expect(b.duration(x.id)).toBe(0); });
+    it('duration for started', () => { const x = b.plan('r', 100); b.start(x.id); expect(b.duration(x.id)).toBeGreaterThanOrEqual(0); });
+    it('duration for unknown', () => { expect(b.duration('ghost')).toBe(0); });
+    it('report aggregates', () => { b.plan('r', 100); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.plan('r', 100); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes BATCH_STATUS', () => { expect(BATCH_STATUS).toContain('planning'); });
+});

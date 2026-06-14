@@ -1,0 +1,33 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { QualityGrader, QUALITY_GRADES } from '../../../systems/alchemy/QualityGrader.js';
+
+describe('QualityGrader', () => {
+    let g;
+    beforeEach(() => { g = new QualityGrader(); });
+    it('initializes with defaults', () => { expect(g.stats.total).toBe(0); });
+    it('grade', () => { expect(g.grade('item1', 95)).not.toBeNull(); });
+    it('grade rejects missing', () => { expect(g.grade('', 50)).toBeNull(); });
+    it('grade rejects non-number', () => { expect(g.grade('a', 'b')).toBeNull(); });
+    it('grade clamps to 0', () => { const x = g.grade('a', -50); expect(x.score).toBe(0); });
+    it('grade clamps to 100', () => { const x = g.grade('a', 200); expect(x.score).toBe(100); });
+    it('gradeF for low score', () => { expect(g.grade('a', 0).grade).toBe('F'); });
+    it('grade S for high', () => { expect(g.grade('a', 95).grade).toBe('S'); });
+    it('grade SS for max', () => { expect(g.grade('a', 100).grade).toBe('SS'); });
+    it('get returns null for unknown', () => { expect(g.get('ghost')).toBeNull(); });
+    it('listAll and listByGrade', () => { g.grade('a', 50); g.grade('b', 95); expect(g.listAll().length).toBe(2); expect(g.listByGrade('S').length).toBe(1); });
+    it('gradeOf and scoreOf', () => { g.grade('a', 50); expect(g.gradeOf('a')).toBe('C'); expect(g.scoreOf('a')).toBe(50); });
+    it('gradeOf for unknown', () => { expect(g.gradeOf('ghost')).toBeNull(); });
+    it('scoreOf for unknown', () => { expect(g.scoreOf('ghost')).toBe(0); });
+    it('isTopGrade', () => { g.grade('a', 95); expect(g.isTopGrade('a')).toBe(true); g.grade('b', 50); expect(g.isTopGrade('b')).toBe(false); });
+    it('isAcceptable', () => { g.grade('a', 50); expect(g.isAcceptable('a', 'D')).toBe(true); });
+    it('isAcceptable false for low', () => { g.grade('a', 5); expect(g.isAcceptable('a', 'D')).toBe(false); });
+    it('isAcceptable for unknown', () => { expect(g.isAcceptable('ghost', 'D')).toBe(false); });
+    it('averageScore', () => { g.grade('a', 50); g.grade('b', 70); expect(g.averageScore()).toBe(60); });
+    it('distribution', () => { g.grade('a', 50); g.grade('b', 50); expect(g.distribution().C).toBe(2); });
+    it('best', () => { g.grade('a', 50); g.grade('b', 95); expect(g.best().score).toBe(95); });
+    it('best for empty', () => { expect(g.best()).toBeNull(); });
+    it('ssRatio', () => { g.grade('a', 100); g.grade('b', 50); expect(g.ssRatio()).toBe(0.5); });
+    it('report aggregates', () => { g.grade('a', 50); expect(g.report().total).toBe(1); });
+    it('reset clears', () => { g.grade('a', 50); g.reset(); expect(g.stats.total).toBe(0); });
+    it('exposes QUALITY_GRADES', () => { expect(QUALITY_GRADES).toContain('S'); });
+});

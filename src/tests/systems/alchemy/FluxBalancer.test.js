@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FluxBalancer, FLUX_TYPES } from '../../../systems/alchemy/FluxBalancer.js';
+
+describe('FluxBalancer', () => {
+    let b;
+    beforeEach(() => { b = new FluxBalancer(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('create', () => { expect(b.create('qi', 100, 1)).not.toBeNull(); });
+    it('create rejects invalid type', () => { expect(b.create('invalid')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByType', () => {
+        b.create('qi');
+        b.create('heat');
+        expect(b.listAll().length).toBe(2);
+        expect(b.listByType('qi').length).toBe(1);
+    });
+    it('setRate', () => { const x = b.create('qi'); b.setRate(x.id, 10); expect(b.get(x.id).rate).toBe(10); });
+    it('setRate returns false for unknown', () => { expect(b.setRate('ghost', 10)).toBe(false); });
+    it('setTarget', () => { const x = b.create('qi'); b.setTarget(x.id, 50); expect(b.get(x.id).target).toBe(50); });
+    it('setTarget returns false for unknown', () => { expect(b.setTarget('ghost', 50)).toBe(false); });
+    it('feed', () => { const x = b.create('qi'); expect(b.feed(x.id, 50)).toBe(true); });
+    it('feed rejects non-number', () => { const x = b.create('qi'); expect(b.feed(x.id, 'a')).toBe(false); });
+    it('feed returns false for unknown', () => { expect(b.feed('ghost', 50)).toBe(false); });
+    it('drain', () => { const x = b.create('qi'); b.feed(x.id, 100); expect(b.drain(x.id, 50)).toBe(true); });
+    it('drain rejects non-number', () => { const x = b.create('qi'); expect(b.drain(x.id, 'a')).toBe(false); });
+    it('drain returns false for unknown', () => { expect(b.drain('ghost', 10)).toBe(false); });
+    it('tick returns rate', () => { const x = b.create('qi', 0, 5); expect(b.tick(x.id)).toBe(5); });
+    it('tick returns 0 for unknown', () => { expect(b.tick('ghost')).toBe(0); });
+    it('isBalanced', () => { const x = b.create('qi', 0, 0); b.feed(x.id, 3); expect(b.isBalanced(x.id)).toBe(true); });
+    it('isBalanced for unknown', () => { expect(b.isBalanced('ghost')).toBe(false); });
+    it('distance', () => { const x = b.create('qi', 100, 0); expect(b.distance(x.id)).toBe(100); });
+    it('distance for unknown', () => { expect(b.distance('ghost')).toBe(0); });
+    it('balance', () => { const x = b.create('qi'); b.feed(x.id, 50); expect(b.balance(x.id)).toBe(50); });
+    it('balance for unknown', () => { expect(b.balance('ghost')).toBe(0); });
+    it('history', () => { const x = b.create('qi'); b.feed(x.id, 50); expect(b.history(x.id).length).toBe(1); });
+    it('history for unknown', () => { expect(b.history('ghost')).toEqual([]); });
+    it('report aggregates', () => { b.create('qi'); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.create('qi'); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes FLUX_TYPES', () => { expect(FLUX_TYPES).toContain('qi'); });
+});
