@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { WordCensor, CENSOR_REASONS } from '../../../systems/fulu/WordCensor.js';
+
+describe('WordCensor', () => {
+    let c;
+    beforeEach(() => { c = new WordCensor(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('review', () => { expect(c.review('dark_word', 'rev1')).not.toBeNull(); });
+    it('review rejects missing', () => { expect(c.review('', 'rev1')).toBeNull(); expect(c.review('w', '')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByWord and listByReviewer and listByStatus and listApproved and listRejected', () => {
+        c.review('w1', 'rev1');
+        c.review('w1', 'rev2');
+        c.review('w2', 'rev1');
+        expect(c.listAll().length).toBe(3);
+        expect(c.listByWord('w1').length).toBe(2);
+        expect(c.listByReviewer('rev1').length).toBe(2);
+        expect(c.listByStatus('reviewing').length).toBe(3);
+    });
+    it('setStatus', () => { const x = c.review('w1', 'rev1'); expect(c.setStatus(x.id, 'approved')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = c.review('w1', 'rev1'); expect(c.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(c.setStatus('ghost', 'approved')).toBe(false); });
+    it('approve and reject and flag', () => { const x = c.review('w1', 'rev1'); c.approve(x.id); expect(c.isApproved(x.id)).toBe(true); const y = c.review('w2', 'rev1'); c.reject(y.id); const z = c.review('w3', 'rev1'); c.flag(z.id); expect(c.isFlagged(z.id)).toBe(true); });
+    it('setReason', () => { const x = c.review('w1', 'rev1'); expect(c.setReason(x.id, 'profanity')).toBe(true); });
+    it('setReason rejects invalid', () => { const x = c.review('w1', 'rev1'); expect(c.setReason(x.id, 'invalid')).toBe(false); });
+    it('setReason returns false for unknown', () => { expect(c.setReason('ghost', 'profanity')).toBe(false); });
+    it('setScore', () => { const x = c.review('w1', 'rev1'); c.setScore(x.id, 90); expect(x.score).toBe(90); });
+    it('setScore clamps', () => { const x = c.review('w1', 'rev1'); c.setScore(x.id, 200); expect(x.score).toBe(100); });
+    it('setScore returns false for unknown', () => { expect(c.setScore('ghost', 50)).toBe(false); });
+    it('isApproved and isRejected and isFlagged and isReviewing', () => { const x = c.review('w1', 'rev1'); expect(c.isReviewing(x.id)).toBe(true); });
+    it('isApproved for unknown', () => { expect(c.isApproved('ghost')).toBe(false); });
+    it('scoreOf and reasonOf for unknown', () => { expect(c.scoreOf('ghost')).toBe(0); expect(c.reasonOf('ghost')).toBeNull(); });
+    it('wordCount and reviewerCount', () => { c.review('w1', 'rev1'); expect(c.wordCount('w1')).toBe(1); expect(c.reviewerCount('rev1')).toBe(1); });
+    it('wordCount and reviewerCount for unknown', () => { expect(c.wordCount('ghost')).toBe(0); expect(c.reviewerCount('ghost')).toBe(0); });
+    it('approvalRate', () => { const x = c.review('w1', 'rev1'); c.approve(x.id); expect(c.approvalRate()).toBe(1); });
+    it('averageScore', () => { c.review('w1', 'rev1', 50); expect(c.averageScore()).toBe(50); });
+    it('countByReason', () => { c.review('w1', 'rev1'); c.setReason(c.listAll()[0].id, 'profanity'); expect(c.countByReason().profanity).toBe(1); });
+    it('report aggregates', () => { c.review('w1', 'rev1'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.review('w1', 'rev1'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes CENSOR_REASONS', () => { expect(CENSOR_REASONS).toContain('profanity'); });
+});

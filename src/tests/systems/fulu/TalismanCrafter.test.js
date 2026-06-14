@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanCrafter, CRAFT_DIFFICULTY } from '../../../systems/fulu/TalismanCrafter.js';
+
+describe('TalismanCrafter', () => {
+    let c;
+    beforeEach(() => { c = new TalismanCrafter(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('start', () => { expect(c.start('T1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(c.start('')).toBeNull(); });
+    it('start normalizes invalid difficulty', () => { const x = c.start('T1', 'invalid'); expect(x.difficulty).toBe('normal'); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByTalisman and listByStatus and listByDifficulty and listActive', () => {
+        c.start('T1');
+        c.start('T1', 'hard');
+        c.start('T2');
+        expect(c.listAll().length).toBe(3);
+        expect(c.listByTalisman('T1').length).toBe(2);
+        expect(c.listByStatus('crafting').length).toBe(3);
+        expect(c.listByDifficulty('hard').length).toBe(1);
+    });
+    it('setStatus', () => { const x = c.start('T1'); expect(c.setStatus(x.id, 'success')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = c.start('T1'); expect(c.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(c.setStatus('ghost', 'success')).toBe(false); });
+    it('succeed and fail and master', () => { const x = c.start('T1'); c.succeed(x.id); expect(c.isSuccess(x.id)).toBe(true); const y = c.start('T2'); c.fail(y.id); const z = c.start('T3'); c.master(z.id); expect(c.isMastered(z.id)).toBe(true); });
+    it('setProgress', () => { const x = c.start('T1'); c.setProgress(x.id, 50); expect(c.progressOf(x.id)).toBe(50); });
+    it('setProgress clamps', () => { const x = c.start('T1'); c.setProgress(x.id, 150); expect(c.progressOf(x.id)).toBe(100); });
+    it('setProgress returns false for unknown', () => { expect(c.setProgress('ghost', 50)).toBe(false); });
+    it('setDifficulty', () => { const x = c.start('T1'); expect(c.setDifficulty(x.id, 'master')).toBe(true); });
+    it('setDifficulty rejects invalid', () => { const x = c.start('T1'); expect(c.setDifficulty(x.id, 'invalid')).toBe(false); });
+    it('setDifficulty returns false for unknown', () => { expect(c.setDifficulty('ghost', 'master')).toBe(false); });
+    it('isActive and isSuccess and isFailed and isMastered', () => { const x = c.start('T1'); expect(c.isActive(x.id)).toBe(true); });
+    it('isSuccess for unknown', () => { expect(c.isSuccess('ghost')).toBe(false); });
+    it('progressOf and difficultyOf for unknown', () => { expect(c.progressOf('ghost')).toBe(0); expect(c.difficultyOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(c.duration('ghost')).toBe(0); });
+    it('successRate', () => { const x = c.start('T1'); c.succeed(x.id); expect(c.successRate()).toBe(1); });
+    it('talismanCount', () => { c.start('T1'); c.start('T1'); expect(c.talismanCount('T1')).toBe(2); });
+    it('talismanCount for unknown', () => { expect(c.talismanCount('ghost')).toBe(0); });
+    it('averageProgress', () => { c.start('T1'); expect(c.averageProgress()).toBe(0); });
+    it('countByStatus', () => { c.start('T1'); expect(c.countByStatus().crafting).toBe(1); });
+    it('report aggregates', () => { c.start('T1'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.start('T1'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes CRAFT_DIFFICULTY', () => { expect(CRAFT_DIFFICULTY).toContain('normal'); });
+});

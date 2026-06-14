@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SealTemplate, TEMPLATE_TYPES } from '../../../systems/fulu/SealTemplate.js';
+
+describe('SealTemplate', () => {
+    let t;
+    beforeEach(() => { t = new SealTemplate(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('createTemplate', () => { expect(t.createTemplate('M', 'combat')).not.toBeNull(); });
+    it('createTemplate rejects missing', () => { expect(t.createTemplate('', 'combat')).toBeNull(); });
+    it('createTemplate normalizes invalid type', () => { const x = t.createTemplate('M', 'invalid'); expect(x.type).toBe('combat'); });
+    it('createTemplate normalizes invalid level', () => { const x = t.createTemplate('M', 'combat', [], 'invalid'); expect(x.level).toBe('basic'); });
+    it('createTemplate normalizes non-array slots', () => { const x = t.createTemplate('M', 'combat', 'not array'); expect(x.slots).toEqual([]); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByLevel and listGrandmaster', () => {
+        t.createTemplate('A', 'combat', ['s1'], 'basic', 'p1');
+        t.createTemplate('B', 'support', ['s1', 's2'], 'grandmaster');
+        expect(t.listAll().length).toBe(2);
+        expect(t.listByOwner('p1').length).toBe(1);
+        expect(t.listByType('combat').length).toBe(1);
+        expect(t.listByLevel('grandmaster').length).toBe(1);
+        expect(t.listGrandmaster().length).toBe(1);
+    });
+    it('addSlot and removeSlot', () => { const x = t.createTemplate('M', 'combat'); t.addSlot(x.id, 's1'); t.removeSlot(x.id, 's1'); expect(t.slotCount(x.id)).toBe(0); });
+    it('addSlot returns false for unknown', () => { expect(t.addSlot('ghost', 's1')).toBe(false); });
+    it('removeSlot returns false for unknown', () => { expect(t.removeSlot('ghost', 's1')).toBe(false); });
+    it('setLevel and setOwner', () => { const x = t.createTemplate('M', 'combat'); t.setLevel(x.id, 'master'); t.setOwner(x.id, 'p2'); expect(x.level).toBe('master'); expect(x.owner).toBe('p2'); });
+    it('setLevel rejects invalid', () => { const x = t.createTemplate('M', 'combat'); expect(t.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel and setOwner return false for unknown', () => { expect(t.setLevel('ghost', 'master')).toBe(false); expect(t.setOwner('ghost', 'p2')).toBe(false); });
+    it('isGrandmaster', () => { const x = t.createTemplate('M', 'combat', [], 'grandmaster'); expect(t.isGrandmaster(x.id)).toBe(true); });
+    it('isGrandmaster for unknown', () => { expect(t.isGrandmaster('ghost')).toBe(false); });
+    it('slotCount and levelOf and typeOf and slotsOf and hasSymbol for unknown', () => { expect(t.slotCount('ghost')).toBe(0); expect(t.levelOf('ghost')).toBeNull(); expect(t.typeOf('ghost')).toBeNull(); expect(t.slotsOf('ghost')).toEqual([]); expect(t.hasSymbol('ghost', 's1')).toBe(false); });
+    it('hasSymbol', () => { const x = t.createTemplate('M', 'combat', ['s1']); expect(t.hasSymbol(x.id, 's1')).toBe(true); });
+    it('averageSlots', () => { t.createTemplate('M', 'combat', ['s1', 's2']); expect(t.averageSlots()).toBe(2); });
+    it('ownerCount and bestTemplate', () => { t.createTemplate('M', 'combat', [], 'basic', 'p1'); expect(t.ownerCount('p1')).toBe(1); expect(t.bestTemplate()).not.toBeNull(); });
+    it('ownerCount for unknown', () => { expect(t.ownerCount('ghost')).toBe(0); });
+    it('bestTemplate null for empty', () => { expect(t.bestTemplate()).toBeNull(); });
+    it('report aggregates', () => { t.createTemplate('M', 'combat'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.createTemplate('M', 'combat'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TEMPLATE_TYPES', () => { expect(TEMPLATE_TYPES).toContain('combat'); });
+});

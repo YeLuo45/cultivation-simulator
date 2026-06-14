@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanRegistry, TALISMAN_TYPES } from '../../../systems/fulu/TalismanRegistry.js';
+
+describe('TalismanRegistry', () => {
+    let t;
+    beforeEach(() => { t = new TalismanRegistry(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('register', () => { expect(t.register('A', 'attack')).not.toBeNull(); });
+    it('register rejects missing', () => { expect(t.register('', 'attack')).toBeNull(); });
+    it('register normalizes invalid type', () => { const x = t.register('A', 'invalid'); expect(x.type).toBe('attack'); });
+    it('register normalizes invalid rarity', () => { const x = t.register('A', 'attack', 1, 1, 'invalid'); expect(x.rarity).toBe('common'); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByRarity and listImmortal and listActive', () => {
+        t.register('A', 'attack', 1, 5, 'common', 'p1');
+        t.register('B', 'defense', 50, 1, 'immortal');
+        t.register('C', 'speed', 1, 0, 'common');
+        expect(t.listAll().length).toBe(3);
+        expect(t.listByOwner('p1').length).toBe(1);
+        expect(t.listByType('attack').length).toBe(1);
+        expect(t.listByRarity('immortal').length).toBe(1);
+        expect(t.listImmortal().length).toBe(1);
+        expect(t.listActive().length).toBe(2);
+    });
+    it('setPower and setCharges and setOwner', () => { const x = t.register('A', 'attack'); t.setPower(x.id, 100); t.setCharges(x.id, 10); t.setOwner(x.id, 'p2'); expect(x.power).toBe(100); expect(x.charges).toBe(10); expect(x.owner).toBe('p2'); });
+    it('setPower clamps', () => { const x = t.register('A', 'attack'); t.setPower(x.id, -5); expect(x.power).toBe(0); });
+    it('setPower/Charges/Owner return false for unknown', () => { expect(t.setPower('ghost', 100)).toBe(false); expect(t.setCharges('ghost', 10)).toBe(false); expect(t.setOwner('ghost', 'p2')).toBe(false); });
+    it('consume', () => { const x = t.register('A', 'attack', 1, 5); expect(t.consume(x.id)).toBe(true); expect(x.charges).toBe(4); });
+    it('consume rejects exhausted', () => { const x = t.register('A', 'attack', 1, 0); expect(t.consume(x.id)).toBe(false); });
+    it('consume returns false for unknown', () => { expect(t.consume('ghost')).toBe(false); });
+    it('isImmortal and isExhausted', () => { const x = t.register('A', 'attack', 1, 0, 'immortal'); expect(t.isImmortal(x.id)).toBe(true); expect(t.isExhausted(x.id)).toBe(true); });
+    it('isImmortal for unknown', () => { expect(t.isImmortal('ghost')).toBe(false); });
+    it('powerOf and chargesOf and typeOf and rarityOf and ownerOf for unknown', () => { expect(t.powerOf('ghost')).toBe(0); expect(t.chargesOf('ghost')).toBe(0); expect(t.typeOf('ghost')).toBeNull(); expect(t.rarityOf('ghost')).toBeNull(); expect(t.ownerOf('ghost')).toBeNull(); });
+    it('averagePower', () => { t.register('A', 'attack', 50); expect(t.averagePower()).toBe(50); });
+    it('ownerCount and bestPower', () => { t.register('A', 'attack', 1, 1, 'common', 'p1'); expect(t.ownerCount('p1')).toBe(1); expect(t.bestPower()).not.toBeNull(); });
+    it('ownerCount for unknown', () => { expect(t.ownerCount('ghost')).toBe(0); });
+    it('bestPower null for empty', () => { expect(t.bestPower()).toBeNull(); });
+    it('countByType', () => { t.register('A', 'attack'); expect(t.countByType().attack).toBe(1); });
+    it('report aggregates', () => { t.register('A', 'attack'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.register('A', 'attack'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TALISMAN_TYPES', () => { expect(TALISMAN_TYPES).toContain('attack'); });
+});
