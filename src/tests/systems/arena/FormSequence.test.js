@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FormSequence, FORM_STATUS } from '../../../systems/arena/FormSequence.js';
+
+describe('FormSequence', () => {
+    let f;
+    beforeEach(() => { f = new FormSequence(); });
+    it('initializes with defaults', () => { expect(f.stats.total).toBe(0); });
+    it('create', () => { expect(f.create('Iron Palm', ['palm1', 'palm2', 'palm3'])).not.toBeNull(); });
+    it('create rejects missing', () => { expect(f.create('', ['a'])).toBeNull(); expect(f.create('F', 'not array')).toBeNull(); });
+    it('create rejects too long', () => { expect(f.create('F', new Array(20).fill('a'))).toBeNull(); });
+    it('create normalizes invalid status', () => { const x = f.create('F', ['a'], 'invalid'); expect(x.status).toBe('learning'); });
+    it('get returns null for unknown', () => { expect(f.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus', () => { f.create('F1', ['a']); expect(f.listAll().length).toBe(1); expect(f.listByStatus('learning').length).toBe(1); });
+    it('assign and learn', () => { const x = f.create('F1', ['a']); expect(f.assign(x.id, 'p1')).toBe(true); expect(f.learn('p1', x.id)).toBe(true); });
+    it('assign returns false for unknown', () => { expect(f.assign('ghost', 'p1')).toBe(false); });
+    it('unlearn', () => { const x = f.create('F1', ['a']); f.assign(x.id, 'p1'); expect(f.unlearn('p1', x.id)).toBe(true); });
+    it('unlearn returns false', () => { expect(f.unlearn('ghost', 'f')).toBe(false); });
+    it('forPlayer and learnedCount and hasForm', () => { const x = f.create('F1', ['a']); f.assign(x.id, 'p1'); expect(f.forPlayer('p1').length).toBe(1); expect(f.learnedCount('p1')).toBe(1); expect(f.hasForm('p1', x.id)).toBe(true); });
+    it('practice', () => { const x = f.create('F1', ['a']); expect(f.practice(x.id, 50)).toBe(true); });
+    it('practice returns false for unknown', () => { expect(f.practice('ghost')).toBe(false); });
+    it('practice reaches mastered', () => { const x = f.create('F1', ['a']); f.practice(x.id, 100); expect(f.isMastered(x.id)).toBe(true); });
+    it('masteryOf and isMastered', () => { const x = f.create('F1', ['a']); f.practice(x.id, 50); expect(f.masteryOf(x.id)).toBe(50); });
+    it('canPerform false for not learned', () => { const x = f.create('F1', ['a']); expect(f.canPerform(x.id, 'p1')).toBe(false); });
+    it('canPerform true for mastered', () => { const x = f.create('F1', ['a']); f.assign(x.id, 'p1'); f.practice(x.id, 100); expect(f.canPerform(x.id, 'p1')).toBe(true); });
+    it('execute', () => { const x = f.create('F1', ['a', 'b']); f.assign(x.id, 'p1'); f.practice(x.id, 100); expect(f.execute(x.id, 'p1').sequence.length).toBe(2); });
+    it('execute returns null for unknown', () => { expect(f.execute('ghost', 'p1')).toBeNull(); });
+    it('setStatus', () => { const x = f.create('F1', ['a']); expect(f.setStatus(x.id, 'forgotten')).toBe(true); });
+    it('report aggregates', () => { f.create('F1', ['a']); expect(f.report().total).toBe(1); });
+    it('reset clears', () => { f.create('F1', ['a']); f.reset(); expect(f.stats.total).toBe(0); });
+    it('exposes FORM_STATUS', () => { expect(FORM_STATUS).toContain('learning'); });
+});
