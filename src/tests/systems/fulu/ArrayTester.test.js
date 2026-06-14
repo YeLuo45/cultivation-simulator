@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ArrayTester, TEST_TYPES } from '../../../systems/fulu/ArrayTester.js';
+
+describe('ArrayTester', () => {
+    let t;
+    beforeEach(() => { t = new ArrayTester(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('queue', () => { expect(t.queue('A1')).not.toBeNull(); });
+    it('queue rejects missing', () => { expect(t.queue('')).toBeNull(); });
+    it('queue normalizes invalid type', () => { const x = t.queue('A1', 'invalid'); expect(x.type).toBe('unit'); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and _listByArray and listByStatus and listByType and listActive and listPassed', () => {
+        t.queue('A1');
+        t.queue('A1', 'stress');
+        t.queue('A2');
+        expect(t.listAll().length).toBe(3);
+        expect(t._listByArray('A1').length).toBe(2);
+        expect(t.listByStatus('queued').length).toBe(3);
+        expect(t.listByType('stress').length).toBe(1);
+    });
+    it('setStatus', () => { const x = t.queue('A1'); expect(t.setStatus(x.id, 'testing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = t.queue('A1'); expect(t.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(t.setStatus('ghost', 'testing')).toBe(false); });
+    it('start and pass and fail and inconclusive', () => { const x = t.queue('A1'); t.start(x.id); t.pass(x.id); expect(t.isPassed(x.id)).toBe(true); const y = t.queue('A2'); t.start(y.id); t.fail(y.id); const z = t.queue('A3'); t.inconclusive(z.id); expect(t.isInconclusive(z.id)).toBe(true); });
+    it('setScore', () => { const x = t.queue('A1'); t.setScore(x.id, 90); expect(x.score).toBe(90); });
+    it('setScore clamps', () => { const x = t.queue('A1'); t.setScore(x.id, 200); expect(x.score).toBe(100); });
+    it('setScore returns false for unknown', () => { expect(t.setScore('ghost', 50)).toBe(false); });
+    it('setType', () => { const x = t.queue('A1'); expect(t.setType(x.id, 'stress')).toBe(true); });
+    it('setType rejects invalid', () => { const x = t.queue('A1'); expect(t.setType(x.id, 'invalid')).toBe(false); });
+    it('setType returns false for unknown', () => { expect(t.setType('ghost', 'stress')).toBe(false); });
+    it('isActive and isPassed and isFailed and isInconclusive', () => { const x = t.queue('A1'); t.start(x.id); expect(t.isActive(x.id)).toBe(true); });
+    it('isPassed for unknown', () => { expect(t.isPassed('ghost')).toBe(false); });
+    it('scoreOf and typeOf for unknown', () => { expect(t.scoreOf('ghost')).toBe(0); expect(t.typeOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(t.duration('ghost')).toBe(0); });
+    it('passRate', () => { const x = t.queue('A1'); t.start(x.id); t.pass(x.id); expect(t.passRate()).toBe(1); });
+    it('arrayCount', () => { t.queue('A1'); t.queue('A1'); expect(t.arrayCount('A1')).toBe(2); });
+    it('arrayCount for unknown', () => { expect(t.arrayCount('ghost')).toBe(0); });
+    it('averageScore', () => { t.queue('A1'); t.setScore(t.listAll()[0].id, 50); expect(t.averageScore()).toBe(50); });
+    it('countByType', () => { t.queue('A1', 'stress'); expect(t.countByType().stress).toBe(1); });
+    it('report aggregates', () => { t.queue('A1'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.queue('A1'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TEST_TYPES', () => { expect(TEST_TYPES).toContain('unit'); });
+});

@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanDrawer, DRAW_STATUS } from '../../../systems/fulu/TalismanDrawer.js';
+
+describe('TalismanDrawer', () => {
+    let d;
+    beforeEach(() => { d = new TalismanDrawer(); });
+    it('initializes with defaults', () => { expect(d.stats.total).toBe(0); });
+    it('start', () => { expect(d.start('T1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(d.start('')).toBeNull(); });
+    it('start normalizes invalid tool', () => { const x = d.start('T1', 'invalid'); expect(x.tool).toBe('pen'); });
+    it('get returns null for unknown', () => { expect(d.get('ghost')).toBeNull(); });
+    it('listAll and listByTalisman and listByStatus and listByTool and listActive and listCompleted', () => {
+        d.start('T1');
+        d.start('T1', 'brush');
+        d.start('T2');
+        expect(d.listAll().length).toBe(3);
+        expect(d.listByTalisman('T1').length).toBe(2);
+        expect(d.listByStatus('starting').length).toBe(3);
+        expect(d.listByTool('brush').length).toBe(1);
+    });
+    it('setStatus', () => { const x = d.start('T1'); expect(d.setStatus(x.id, 'drawing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = d.start('T1'); expect(d.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(d.setStatus('ghost', 'drawing')).toBe(false); });
+    it('beginDrawing and seal and complete and fail', () => { const x = d.start('T1'); d.beginDrawing(x.id); d.seal(x.id); d.complete(x.id); expect(d.isCompleted(x.id)).toBe(true); const y = d.start('T2'); d.fail(y.id); expect(d.isFailed(y.id)).toBe(true); });
+    it('addStroke', () => { const x = d.start('T1'); d.addStroke(x.id); d.addStroke(x.id); expect(d.strokeCount(x.id)).toBe(2); });
+    it('addStroke returns false for unknown', () => { expect(d.addStroke('ghost')).toBe(false); });
+    it('setTool', () => { const x = d.start('T1'); expect(d.setTool(x.id, 'brush')).toBe(true); });
+    it('setTool rejects invalid', () => { const x = d.start('T1'); expect(d.setTool(x.id, 'invalid')).toBe(false); });
+    it('setTool returns false for unknown', () => { expect(d.setTool('ghost', 'brush')).toBe(false); });
+    it('isActive and isCompleted and isFailed', () => { const x = d.start('T1'); expect(d.isActive(x.id)).toBe(true); });
+    it('isCompleted for unknown', () => { expect(d.isCompleted('ghost')).toBe(false); });
+    it('strokeCount and toolOf for unknown', () => { expect(d.strokeCount('ghost')).toBe(0); expect(d.toolOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(d.duration('ghost')).toBe(0); });
+    it('successRate', () => { const x = d.start('T1'); d.complete(x.id); expect(d.successRate()).toBe(1); });
+    it('talismanCount', () => { d.start('T1'); d.start('T1'); expect(d.talismanCount('T1')).toBe(2); });
+    it('talismanCount for unknown', () => { expect(d.talismanCount('ghost')).toBe(0); });
+    it('averageStrokes', () => { d.start('T1'); d.addStroke(d.listAll()[0].id); expect(d.averageStrokes()).toBe(1); });
+    it('countByStatus', () => { d.start('T1'); expect(d.countByStatus().starting).toBe(1); });
+    it('report aggregates', () => { d.start('T1'); expect(d.report().total).toBe(1); });
+    it('reset clears', () => { d.start('T1'); d.reset(); expect(d.stats.total).toBe(0); });
+    it('exposes DRAW_STATUS', () => { expect(DRAW_STATUS).toContain('starting'); });
+});

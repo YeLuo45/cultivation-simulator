@@ -1,0 +1,44 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanAuctioneer, AUCTION_TYPES } from '../../../systems/fulu/TalismanAuctioneer.js';
+
+describe('TalismanAuctioneer', () => {
+    let a;
+    beforeEach(() => { a = new TalismanAuctioneer(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('list', () => { expect(a.list('T1')).not.toBeNull(); });
+    it('list rejects missing', () => { expect(a.list('')).toBeNull(); });
+    it('list normalizes invalid type', () => { const x = a.list('T1', 10, 0, 'invalid'); expect(x.type).toBe('standard'); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByType and listByBidder and listActive', () => {
+        a.list('T1');
+        a.list('T2', 10, 0, 'reserve');
+        expect(a.listAll().length).toBe(2);
+        expect(a.listByStatus('pending').length).toBe(2);
+        expect(a.listByType('reserve').length).toBe(1);
+    });
+    it('setStatus', () => { const x = a.list('T1'); expect(a.setStatus(x.id, 'active')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = a.list('T1'); expect(a.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(a.setStatus('ghost', 'active')).toBe(false); });
+    it('start and cancel', () => { const x = a.list('T1'); a.start(x.id); expect(a.isActive(x.id)).toBe(true); const y = a.list('T2'); a.cancel(y.id); expect(a.isCancelled(y.id)).toBe(true); });
+    it('bid', () => { const x = a.list('T1', 10); a.start(x.id); expect(a.bid(x.id, 'b1', 20)).toBe(true); });
+    it('bid rejects lower', () => { const x = a.list('T1', 10); a.start(x.id); a.bid(x.id, 'b1', 20); expect(a.bid(x.id, 'b2', 15)).toBe(false); });
+    it('bid returns false for unknown', () => { expect(a.bid('ghost', 'b1', 20)).toBe(false); });
+    it('finalize with reserve met', () => { const x = a.list('T1', 10, 5); a.start(x.id); a.bid(x.id, 'b1', 20); expect(a.finalize(x.id)).toBe(true); expect(a.isSold(x.id)).toBe(true); });
+    it('finalize with reserve not met', () => { const x = a.list('T1', 10, 100); a.start(x.id); a.bid(x.id, 'b1', 20); expect(a.finalize(x.id)).toBe(true); expect(a.isUnsold(x.id)).toBe(true); });
+    it('finalize rejects non-active', () => { const x = a.list('T1'); expect(a.finalize(x.id)).toBe(false); });
+    it('finalize returns false for unknown', () => { expect(a.finalize('ghost')).toBe(false); });
+    it('setReserve', () => { const x = a.list('T1'); a.setReserve(x.id, 100); expect(a.reserveOf(x.id)).toBe(100); });
+    it('setReserve clamps', () => { const x = a.list('T1'); a.setReserve(x.id, -10); expect(a.reserveOf(x.id)).toBe(0); });
+    it('setReserve returns false for unknown', () => { expect(a.setReserve('ghost', 100)).toBe(false); });
+    it('isActive and isSold and isUnsold and isCancelled', () => { const x = a.list('T1'); a.start(x.id); expect(a.isActive(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(a.isActive('ghost')).toBe(false); });
+    it('currentBidOf and reserveOf and bidderOf for unknown', () => { expect(a.currentBidOf('ghost')).toBe(0); expect(a.reserveOf('ghost')).toBe(0); expect(a.bidderOf('ghost')).toBeNull(); });
+    it('sellRate and bidderCount', () => { const x = a.list('T1'); a.start(x.id); a.bid(x.id, 'b1', 20); a.finalize(x.id); expect(a.sellRate()).toBe(1); expect(a.bidderCount('b1')).toBe(1); });
+    it('bidderCount for unknown', () => { expect(a.bidderCount('ghost')).toBe(0); });
+    it('bestBid', () => { a.list('T1', 10); a.start(a.listAll()[0].id); a.bid(a.listAll()[0].id, 'b1', 50); expect(a.bestBid().currentBid).toBe(50); });
+    it('bestBid null for empty', () => { expect(a.bestBid()).toBeNull(); });
+    it('countByStatus', () => { a.list('T1'); expect(a.countByStatus().pending).toBe(1); });
+    it('report aggregates', () => { a.list('T1'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.list('T1'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes AUCTION_TYPES', () => { expect(AUCTION_TYPES).toContain('standard'); });
+});

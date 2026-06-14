@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SealApplier, APPLY_RESISTANCE } from '../../../systems/fulu/SealApplier.js';
+
+describe('SealApplier', () => {
+    let a;
+    beforeEach(() => { a = new SealApplier(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('apply', () => { expect(a.apply('S1', 'T1')).not.toBeNull(); });
+    it('apply rejects missing', () => { expect(a.apply('', 'T1')).toBeNull(); expect(a.apply('S1', '')).toBeNull(); });
+    it('apply normalizes invalid resistance', () => { const x = a.apply('S1', 'T1', 'invalid'); expect(x.resistance).toBe('normal'); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listBySeal and listByTarget and listByStatus and listActive and listRejected', () => {
+        a.apply('S1', 'T1');
+        a.apply('S1', 'T2');
+        a.apply('S2', 'T1');
+        expect(a.listAll().length).toBe(3);
+        expect(a.listBySeal('S1').length).toBe(2);
+        expect(a.listByTarget('T1').length).toBe(2);
+        expect(a.listByStatus('attaching').length).toBe(3);
+    });
+    it('setStatus', () => { const x = a.apply('S1', 'T1'); expect(a.setStatus(x.id, 'active')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = a.apply('S1', 'T1'); expect(a.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(a.setStatus('ghost', 'active')).toBe(false); });
+    it('activate and expire and reject', () => { const x = a.apply('S1', 'T1'); a.activate(x.id); expect(a.isActive(x.id)).toBe(true); const y = a.apply('S2', 'T2'); a.expire(y.id); expect(a.isExpired(y.id)).toBe(true); const z = a.apply('S3', 'T3'); a.reject(z.id); expect(a.isRejected(z.id)).toBe(true); });
+    it('setResistance', () => { const x = a.apply('S1', 'T1'); expect(a.setResistance(x.id, 'immune')).toBe(true); });
+    it('setResistance rejects invalid', () => { const x = a.apply('S1', 'T1'); expect(a.setResistance(x.id, 'invalid')).toBe(false); });
+    it('setResistance returns false for unknown', () => { expect(a.setResistance('ghost', 'immune')).toBe(false); });
+    it('isActive and isExpired and isRejected and isAttaching', () => { const x = a.apply('S1', 'T1'); expect(a.isAttaching(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(a.isActive('ghost')).toBe(false); });
+    it('resistanceOf for unknown', () => { expect(a.resistanceOf('ghost')).toBeNull(); });
+    it('sealCount and targetCount', () => { a.apply('S1', 'T1'); a.apply('S1', 'T2'); expect(a.sealCount('S1')).toBe(2); expect(a.targetCount('T1')).toBe(1); });
+    it('sealCount and targetCount for unknown', () => { expect(a.sealCount('ghost')).toBe(0); expect(a.targetCount('ghost')).toBe(0); });
+    it('activeCount and rejectionRate', () => { const x = a.apply('S1', 'T1'); a.activate(x.id); expect(a.activeCount()).toBe(1); const y = a.apply('S2', 'T2'); a.reject(y.id); expect(a.rejectionRate()).toBe(0.5); });
+    it('bestSealFor', () => { const x = a.apply('S1', 'T1'); a.activate(x.id); expect(a.bestSealFor('T1')).not.toBeNull(); });
+    it('bestSealFor null for none', () => { expect(a.bestSealFor('ghost')).toBeNull(); });
+    it('countByResistance', () => { a.apply('S1', 'T1', 'immune'); expect(a.countByResistance().immune).toBe(1); });
+    it('report aggregates', () => { a.apply('S1', 'T1'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.apply('S1', 'T1'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes APPLY_RESISTANCE', () => { expect(APPLY_RESISTANCE).toContain('normal'); });
+});

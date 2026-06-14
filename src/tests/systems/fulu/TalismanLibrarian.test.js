@@ -1,0 +1,45 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanLibrarian, LIBRARIAN_RANKS } from '../../../systems/fulu/TalismanLibrarian.js';
+
+describe('TalismanLibrarian', () => {
+    let l;
+    beforeEach(() => { l = new TalismanLibrarian(); });
+    it('initializes with defaults', () => { expect(l.stats.total).toBe(0); });
+    it('hire', () => { expect(l.hire('A1')).not.toBeNull(); });
+    it('hire rejects missing', () => { expect(l.hire('')).toBeNull(); });
+    it('hire normalizes invalid rank', () => { const x = l.hire('A', 'invalid'); expect(x.rank).toBe('apprentice'); });
+    it('get returns null for unknown', () => { expect(l.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByRank and listByStatus and listAvailable and listGrandmaster', () => {
+        l.hire('A1', 'apprentice', 'p1');
+        l.hire('B1', 'grandmaster');
+        l.hire('C1', 'grandmaster');
+        expect(l.listAll().length).toBe(3);
+        expect(l.listByOwner('p1').length).toBe(1);
+        expect(l.listByRank('grandmaster').length).toBe(2);
+        expect(l.listByStatus('available').length).toBe(3);
+        expect(l.listAvailable().length).toBe(3);
+        expect(l.listGrandmaster().length).toBe(2);
+    });
+    it('setStatus', () => { const x = l.hire('A1'); expect(l.setStatus(x.id, 'busy')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = l.hire('A1'); expect(l.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(l.setStatus('ghost', 'busy')).toBe(false); });
+    it('setRank', () => { const x = l.hire('A1'); expect(l.setRank(x.id, 'master')).toBe(true); });
+    it('setRank rejects invalid', () => { const x = l.hire('A1'); expect(l.setRank(x.id, 'invalid')).toBe(false); });
+    it('setRank returns false for unknown', () => { expect(l.setRank('ghost', 'master')).toBe(false); });
+    it('transaction', () => { const x = l.hire('A1'); expect(l.transaction(x.id)).toBe(true); });
+    it('transaction returns false for unknown', () => { expect(l.transaction('ghost')).toBe(false); });
+    it('promote', () => { const x = l.hire('A1'); expect(l.promote(x.id)).toBe('journeyman'); });
+    it('promote null at max', () => { const x = l.hire('A1', 'grandmaster'); expect(l.promote(x.id)).toBeNull(); });
+    it('promote returns null for unknown', () => { expect(l.promote('ghost')).toBeNull(); });
+    it('rest and startResearch and startTeaching', () => { const x = l.hire('A1'); l.rest(x.id); l.startResearch(x.id); l.startTeaching(x.id); expect(l.listByStatus('teaching').length).toBe(1); });
+    it('isAvailable and isGrandmaster', () => { const x = l.hire('A1', 'grandmaster'); expect(l.isAvailable(x.id)).toBe(true); expect(l.isGrandmaster(x.id)).toBe(true); });
+    it('isAvailable for unknown', () => { expect(l.isAvailable('ghost')).toBe(false); });
+    it('transactionCount and rankOf and rankIndex for unknown', () => { expect(l.transactionCount('ghost')).toBe(0); expect(l.rankOf('ghost')).toBeNull(); expect(l.rankIndex('ghost')).toBe(-1); });
+    it('averageTransactions', () => { l.hire('A1'); expect(l.averageTransactions()).toBe(0); });
+    it('best', () => { l.hire('A1'); expect(l.best()).not.toBeNull(); });
+    it('best null for empty', () => { expect(l.best()).toBeNull(); });
+    it('countByRank', () => { l.hire('A1', 'master'); expect(l.countByRank().master).toBe(1); });
+    it('report aggregates', () => { l.hire('A1'); expect(l.report().total).toBe(1); });
+    it('reset clears', () => { l.hire('A1'); l.reset(); expect(l.stats.total).toBe(0); });
+    it('exposes LIBRARIAN_RANKS', () => { expect(LIBRARIAN_RANKS).toContain('grandmaster'); });
+});

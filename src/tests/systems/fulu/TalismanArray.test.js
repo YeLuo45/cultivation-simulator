@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TalismanArray, ARRAY_TYPES } from '../../../systems/fulu/TalismanArray.js';
+
+describe('TalismanArray', () => {
+    let a;
+    beforeEach(() => { a = new TalismanArray(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('create', () => { expect(a.create('A1', 'attack', ['t1', 't2'])).not.toBeNull(); });
+    it('create rejects missing', () => { expect(a.create('', 'attack', ['t1'])).toBeNull(); });
+    it('create normalizes invalid type', () => { const x = a.create('A1', 'invalid', []); expect(x.type).toBe('attack'); });
+    it('create normalizes invalid size', () => { const x = a.create('A1', 'attack', [], 'invalid'); expect(x.size).toBe('small'); });
+    it('create normalizes non-array talismans', () => { const x = a.create('A1', 'attack', 'not array'); expect(x.talismans).toEqual([]); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listBySize and listGrand', () => {
+        a.create('A1', 'attack', ['t1'], 'small', 'p1');
+        a.create('B1', 'defense', ['t1', 't2', 't3', 't4', 't5'], 'grand');
+        expect(a.listAll().length).toBe(2);
+        expect(a.listByOwner('p1').length).toBe(1);
+        expect(a.listByType('attack').length).toBe(1);
+        expect(a.listBySize('grand').length).toBe(1);
+        expect(a.listGrand().length).toBe(1);
+    });
+    it('addTalisman and removeTalisman', () => { const x = a.create('A1', 'attack', []); a.addTalisman(x.id, 't1'); a.removeTalisman(x.id, 't1'); expect(a.talismanCount(x.id)).toBe(0); });
+    it('addTalisman returns false for unknown', () => { expect(a.addTalisman('ghost', 't1')).toBe(false); });
+    it('removeTalisman returns false for unknown', () => { expect(a.removeTalisman('ghost', 't1')).toBe(false); });
+    it('setSize and setOwner', () => { const x = a.create('A1', 'attack', []); a.setSize(x.id, 'grand'); a.setOwner(x.id, 'p2'); expect(x.size).toBe('grand'); expect(x.owner).toBe('p2'); });
+    it('setSize rejects invalid', () => { const x = a.create('A1', 'attack', []); expect(a.setSize(x.id, 'invalid')).toBe(false); });
+    it('setSize and setOwner return false for unknown', () => { expect(a.setSize('ghost', 'grand')).toBe(false); expect(a.setOwner('ghost', 'p2')).toBe(false); });
+    it('isGrand', () => { const x = a.create('A1', 'attack', [], 'grand'); expect(a.isGrand(x.id)).toBe(true); });
+    it('isGrand for unknown', () => { expect(a.isGrand('ghost')).toBe(false); });
+    it('powerOf and typeOf and sizeOf for unknown', () => { expect(a.powerOf('ghost')).toBe(0); expect(a.typeOf('ghost')).toBeNull(); expect(a.sizeOf('ghost')).toBeNull(); });
+    it('talismanCount and talismansOf for unknown', () => { expect(a.talismanCount('ghost')).toBe(0); expect(a.talismansOf('ghost')).toEqual([]); });
+    it('averagePower', () => { a.create('A1', 'attack', ['t1', 't2']); expect(a.averagePower()).toBe(20); });
+    it('ownerCount and bestPower', () => { a.create('A1', 'attack', ['t1'], 'small', 'p1'); expect(a.ownerCount('p1')).toBe(1); expect(a.bestPower()).not.toBeNull(); });
+    it('ownerCount for unknown', () => { expect(a.ownerCount('ghost')).toBe(0); });
+    it('countByType', () => { a.create('A1', 'attack'); expect(a.countByType().attack).toBe(1); });
+    it('report aggregates', () => { a.create('A1', 'attack'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.create('A1', 'attack'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes ARRAY_TYPES', () => { expect(ARRAY_TYPES).toContain('attack'); });
+});

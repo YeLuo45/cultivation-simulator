@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SealVault, VAULT_LEVELS } from '../../../systems/fulu/SealVault.js';
+
+describe('SealVault', () => {
+    let v;
+    beforeEach(() => { v = new SealVault(); });
+    it('initializes with defaults', () => { expect(v.stats.total).toBe(0); });
+    it('openVault', () => { expect(v.openVault('A', 'V1')).not.toBeNull(); });
+    it('openVault rejects missing', () => { expect(v.openVault('', 'V1')).toBeNull(); expect(v.openVault('A', '')).toBeNull(); });
+    it('openVault normalizes invalid size', () => { const x = v.openVault('A', 'V1', 'invalid'); expect(x.size).toBe('medium'); });
+    it('openVault normalizes invalid level', () => { const x = v.openVault('A', 'V1', 'medium', 'invalid'); expect(x.level).toBe('public'); });
+    it('get returns null for unknown', () => { expect(v.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByLevel and listBySize and listForbidden', () => {
+        v.openVault('A', 'V1', 'medium', 'public');
+        v.openVault('A', 'V2', 'large', 'restricted');
+        v.openVault('B', 'V3', 'vast', 'forbidden');
+        expect(v.listAll().length).toBe(3);
+        expect(v.listByOwner('A').length).toBe(2);
+        expect(v.listByLevel('forbidden').length).toBe(1);
+        expect(v.listBySize('large').length).toBe(1);
+        expect(v.listForbidden().length).toBe(1);
+    });
+    it('store', () => { const x = v.openVault('A', 'V1'); expect(v.store(x.id, 'seal1')).toBe(true); });
+    it('store rejects full', () => { const x = v.openVault('A', 'V1', 'small', 'public', 1); v.store(x.id, 'seal1'); expect(v.store(x.id, 'seal2')).toBe(false); });
+    it('store returns false for unknown', () => { expect(v.store('ghost', 'seal1')).toBe(false); });
+    it('retrieve', () => { const x = v.openVault('A', 'V1'); v.store(x.id, 'seal1'); expect(v.retrieve(x.id, 'seal1')).toBe(true); });
+    it('retrieve rejects missing', () => { const x = v.openVault('A', 'V1'); v.store(x.id, 'seal1'); expect(v.retrieve(x.id, 'seal2')).toBe(false); });
+    it('retrieve returns false for unknown', () => { expect(v.retrieve('ghost', 'seal1')).toBe(false); });
+    it('setLevel and setSize and setCapacity', () => { const x = v.openVault('A', 'V1'); v.setLevel(x.id, 'forbidden'); v.setSize(x.id, 'vast'); v.setCapacity(x.id, 200); expect(x.level).toBe('forbidden'); expect(x.size).toBe('vast'); expect(x.capacity).toBe(200); });
+    it('setLevel rejects invalid', () => { const x = v.openVault('A', 'V1'); expect(v.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel/Size/Capacity return false for unknown', () => { expect(v.setLevel('ghost', 'forbidden')).toBe(false); expect(v.setSize('ghost', 'vast')).toBe(false); expect(v.setCapacity('ghost', 200)).toBe(false); });
+    it('isFull and isEmpty', () => { const x = v.openVault('A', 'V1', 'small', 'public', 1); expect(v.isEmpty(x.id)).toBe(true); v.store(x.id, 'seal1'); expect(v.isFull(x.id)).toBe(true); });
+    it('isFull and isEmpty for unknown', () => { expect(v.isFull('ghost')).toBe(false); expect(v.isEmpty('ghost')).toBe(true); });
+    it('hasSeal and countOf and capacityOf and levelOf and sealsOf for unknown', () => { expect(v.hasSeal('ghost', 's')).toBe(false); expect(v.countOf('ghost')).toBe(0); expect(v.capacityOf('ghost')).toBe(0); expect(v.levelOf('ghost')).toBeNull(); expect(v.sealsOf('ghost')).toEqual([]); });
+    it('hasSeal', () => { const x = v.openVault('A', 'V1'); v.store(x.id, 'seal1'); expect(v.hasSeal(x.id, 'seal1')).toBe(true); });
+    it('utilization and averageUtilization', () => { v.openVault('A', 'V1', 'small', 'public', 10); v.store(v.listAll()[0].id, 's1'); expect(v.utilization(v.listAll()[0].id)).toBe(0.1); expect(v.averageUtilization()).toBe(0.1); });
+    it('utilization for unknown', () => { expect(v.utilization('ghost')).toBe(0); });
+    it('ownerCount and countByLevel', () => { v.openVault('A', 'V1', 'medium', 'forbidden'); expect(v.ownerCount('A')).toBe(1); expect(v.countByLevel().forbidden).toBe(1); });
+    it('ownerCount for unknown', () => { expect(v.ownerCount('ghost')).toBe(0); });
+    it('report aggregates', () => { v.openVault('A', 'V1'); expect(v.report().total).toBe(1); });
+    it('reset clears', () => { v.openVault('A', 'V1'); v.reset(); expect(v.stats.total).toBe(0); });
+    it('exposes VAULT_LEVELS', () => { expect(VAULT_LEVELS).toContain('public'); });
+});
