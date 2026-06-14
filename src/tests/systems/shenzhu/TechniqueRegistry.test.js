@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TechniqueRegistry, TECHNIQUE_RARITY } from '../../../systems/shenzhu/TechniqueRegistry.js';
+
+describe('TechniqueRegistry', () => {
+    let r;
+    beforeEach(() => { r = new TechniqueRegistry(); });
+    it('initializes with defaults', () => { expect(r.stats.total).toBe(0); });
+    it('register', () => { expect(r.register('A', 'fire')).not.toBeNull(); });
+    it('register rejects missing', () => { expect(r.register('', 'fire')).toBeNull(); });
+    it('register normalizes invalid element', () => { const x = r.register('A', 'invalid'); expect(x.element).toBe('none'); });
+    it('register normalizes invalid rarity', () => { const x = r.register('A', 'fire', 'invalid'); expect(x.rarity).toBe('common'); });
+    it('get returns null for unknown', () => { expect(r.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByElement and listByRarity and listImmortal', () => {
+        r.register('A', 'fire', 'common', 'p1');
+        r.register('A', 'water', 'immortal', 'p1');
+        r.register('B', 'fire', 'rare');
+        expect(r.listAll().length).toBe(3);
+        expect(r.listByOwner('p1').length).toBe(2);
+        expect(r.listByElement('fire').length).toBe(2);
+        expect(r.listByRarity('rare').length).toBe(1);
+        expect(r.listImmortal().length).toBe(1);
+    });
+    it('setMastery', () => { const x = r.register('A', 'fire'); r.setMastery(x.id, 0.95); expect(r.masteryOf(x.id)).toBe(0.95); });
+    it('setMastery clamps', () => { const x = r.register('A', 'fire'); r.setMastery(x.id, 2); expect(r.masteryOf(x.id)).toBe(1); });
+    it('setMastery returns false for unknown', () => { expect(r.setMastery('ghost', 0.5)).toBe(false); });
+    it('setOwner', () => { const x = r.register('A', 'fire'); expect(r.setOwner(x.id, 'B')).toBe(true); });
+    it('setOwner returns false for unknown', () => { expect(r.setOwner('ghost', 'B')).toBe(false); });
+    it('isImmortal and isMastered', () => { const x = r.register('A', 'fire', 'immortal'); r.setMastery(x.id, 0.95); expect(r.isImmortal(x.id)).toBe(true); expect(r.isMastered(x.id)).toBe(true); });
+    it('isImmortal for unknown', () => { expect(r.isImmortal('ghost')).toBe(false); });
+    it('masteryOf and rarityOf and elementOf and ownerOf for unknown', () => { expect(r.masteryOf('ghost')).toBe(0); expect(r.rarityOf('ghost')).toBeNull(); expect(r.elementOf('ghost')).toBeNull(); expect(r.ownerOf('ghost')).toBeNull(); });
+    it('averageMastery', () => { r.register('A', 'fire'); r.setMastery(r.listAll()[0].id, 0.5); expect(r.averageMastery()).toBe(0.5); });
+    it('bestMastered', () => { r.register('A', 'fire'); expect(r.bestMastered()).not.toBeNull(); });
+    it('bestMastered null for empty', () => { expect(r.bestMastered()).toBeNull(); });
+    it('ownerCount', () => { r.register('A', 'fire', 'common', 'p1'); expect(r.ownerCount('p1')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(r.ownerCount('ghost')).toBe(0); });
+    it('countByRarity', () => { r.register('A', 'fire', 'legendary'); expect(r.countByRarity().legendary).toBe(1); });
+    it('report aggregates', () => { r.register('A', 'fire'); expect(r.report().total).toBe(1); });
+    it('reset clears', () => { r.register('A', 'fire'); r.reset(); expect(r.stats.total).toBe(0); });
+    it('exposes TECHNIQUE_RARITY', () => { expect(TECHNIQUE_RARITY).toContain('immortal'); });
+});

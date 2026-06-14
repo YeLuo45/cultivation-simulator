@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BeastArena, ARENA_TYPES } from '../../../systems/shenzhu/BeastArena.js';
+
+describe('BeastArena', () => {
+    let a;
+    beforeEach(() => { a = new BeastArena(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('create', () => { expect(a.create(['b1', 'b2'])).not.toBeNull(); });
+    it('create rejects less than 2 beasts', () => { expect(a.create(['b1'])).toBeNull(); expect(a.create([])).toBeNull(); });
+    it('create rejects non-array', () => { expect(a.create('not array')).toBeNull(); });
+    it('create normalizes invalid type', () => { const x = a.create(['b1', 'b2'], 'invalid'); expect(x.type).toBe('single'); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByType and listByBeast and listActive', () => {
+        a.create(['b1', 'b2']);
+        a.create(['b1', 'b3'], 'team');
+        expect(a.listAll().length).toBe(2);
+        expect(a.listByStatus('pending').length).toBe(2);
+        expect(a.listByType('team').length).toBe(1);
+        expect(a.listByBeast('b1').length).toBe(2);
+    });
+    it('setStatus', () => { const x = a.create(['b1', 'b2']); expect(a.setStatus(x.id, 'fighting')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = a.create(['b1', 'b2']); expect(a.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(a.setStatus('ghost', 'fighting')).toBe(false); });
+    it('start', () => { const x = a.create(['b1', 'b2']); expect(a.start(x.id)).toBe(true); });
+    it('start returns false for unknown', () => { expect(a.start('ghost')).toBe(false); });
+    it('finish', () => { const x = a.create(['b1', 'b2']); a.start(x.id); expect(a.finish(x.id, 'b1')).toBe(true); });
+    it('finish rejects non-fighting', () => { const x = a.create(['b1', 'b2']); expect(a.finish(x.id, 'b1')).toBe(false); });
+    it('finish rejects invalid winner', () => { const x = a.create(['b1', 'b2']); a.start(x.id); expect(a.finish(x.id, 'ghost')).toBe(false); });
+    it('finish returns false for unknown', () => { expect(a.finish('ghost', 'b1')).toBe(false); });
+    it('cancel', () => { const x = a.create(['b1', 'b2']); expect(a.cancel(x.id)).toBe(true); });
+    it('cancel returns false for unknown', () => { expect(a.cancel('ghost')).toBe(false); });
+    it('isActive and isFinished and isPending', () => { const x = a.create(['b1', 'b2']); a.start(x.id); expect(a.isActive(x.id)).toBe(true); a.finish(x.id, 'b1'); expect(a.isFinished(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(a.isActive('ghost')).toBe(false); });
+    it('winnerOf and beastsOf for unknown', () => { expect(a.winnerOf('ghost')).toBeNull(); expect(a.beastsOf('ghost')).toEqual([]); });
+    it('duration for not ended', () => { const x = a.create(['b1', 'b2']); expect(a.duration(x.id)).toBe(0); });
+    it('duration for unknown', () => { expect(a.duration('ghost')).toBe(0); });
+    it('wins and losses and winRate', () => { const x = a.create(['b1', 'b2']); a.start(x.id); a.finish(x.id, 'b1'); expect(a.wins('b1')).toBe(1); expect(a.losses('b2')).toBe(1); expect(a.winRate('b1')).toBe(1); });
+    it('beastStats', () => { const x = a.create(['b1', 'b2']); a.start(x.id); a.finish(x.id, 'b1'); expect(a.beastStats('b1').wins).toBe(1); });
+    it('averageDuration for empty', () => { expect(a.averageDuration()).toBe(0); });
+    it('report aggregates', () => { a.create(['b1', 'b2']); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.create(['b1', 'b2']); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes ARENA_TYPES', () => { expect(ARENA_TYPES).toContain('single'); });
+});

@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CultivationSimulator, CULTIVATION_MODES } from '../../../systems/shenzhu/CultivationSimulator.js';
+
+describe('CultivationSimulator', () => {
+    let s;
+    beforeEach(() => { s = new CultivationSimulator(); });
+    it('initializes with defaults', () => { expect(s.stats.total).toBe(0); });
+    it('start', () => { expect(s.start('A')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(s.start('')).toBeNull(); });
+    it('start normalizes invalid mode', () => { const x = s.start('A', 'invalid'); expect(x.mode).toBe('closed_door'); });
+    it('get returns null for unknown', () => { expect(s.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByStatus and listByMode', () => {
+        s.start('A');
+        s.start('A', 'combat');
+        s.start('B', 'alchemy');
+        expect(s.listAll().length).toBe(3);
+        expect(s.listByOwner('A').length).toBe(2);
+        expect(s.listByStatus('meditating').length).toBe(3);
+        expect(s.listByMode('alchemy').length).toBe(1);
+    });
+    it('setStatus', () => { const x = s.start('A'); expect(s.setStatus(x.id, 'breakthrough')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = s.start('A'); expect(s.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(s.setStatus('ghost', 'idle')).toBe(false); });
+    it('breakthrough and startTribulation and fail', () => { const x = s.start('A'); s.breakthrough(x.id); s.startTribulation(x.id); s.fail(x.id); expect(s.isFailed(x.id)).toBe(true); });
+    it('gainExp and gainQi', () => { const x = s.start('A'); s.gainExp(x.id, 100); s.gainQi(x.id, 50); expect(s.expOf(x.id)).toBe(100); expect(s.qiOf(x.id)).toBe(50); });
+    it('gainExp rejects non-positive', () => { const x = s.start('A'); expect(s.gainExp(x.id, 0)).toBe(false); expect(s.gainExp(x.id, -1)).toBe(false); });
+    it('gainExp returns false for unknown', () => { expect(s.gainExp('ghost', 100)).toBe(false); });
+    it('gainQi returns false for unknown', () => { expect(s.gainQi('ghost', 50)).toBe(false); });
+    it('isActive and isFailed and isBreakthrough and isTribulation', () => { const x = s.start('A'); expect(s.isActive(x.id)).toBe(true); s.breakthrough(x.id); expect(s.isBreakthrough(x.id)).toBe(true); s.startTribulation(x.id); expect(s.isTribulation(x.id)).toBe(true); s.fail(x.id); expect(s.isFailed(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(s.isActive('ghost')).toBe(false); });
+    it('expOf and qiOf for unknown', () => { expect(s.expOf('ghost')).toBe(0); expect(s.qiOf('ghost')).toBe(0); });
+    it('duration', () => { const x = s.start('A'); s.fail(x.id); expect(s.duration(x.id)).toBeGreaterThanOrEqual(0); });
+    it('duration for unknown', () => { expect(s.duration('ghost')).toBe(0); });
+    it('totalExpFor and totalQiFor', () => { const x = s.start('A'); s.gainExp(x.id, 100); s.gainQi(x.id, 50); expect(s.totalExpFor('A')).toBe(100); expect(s.totalQiFor('A')).toBe(50); });
+    it('totalExpFor for unknown', () => { expect(s.totalExpFor('ghost')).toBe(0); });
+    it('averageExp and averageQi', () => { s.start('A'); expect(s.averageExp()).toBe(0); });
+    it('activeCount', () => { s.start('A'); expect(s.activeCount()).toBe(1); });
+    it('report aggregates', () => { s.start('A'); expect(s.report().total).toBe(1); });
+    it('reset clears', () => { s.start('A'); s.reset(); expect(s.stats.total).toBe(0); });
+    it('exposes CULTIVATION_MODES', () => { expect(CULTIVATION_MODES).toContain('closed_door'); });
+});

@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { DestinyTracker, DESTINY_TYPES } from '../../../systems/shenzhu/DestinyTracker.js';
+
+describe('DestinyTracker', () => {
+    let t;
+    beforeEach(() => { t = new DestinyTracker(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('forge', () => { expect(t.forge('A', 'cultivation')).not.toBeNull(); });
+    it('forge rejects missing', () => { expect(t.forge('', 'cultivation')).toBeNull(); });
+    it('forge normalizes invalid type', () => { const x = t.forge('A', 'invalid'); expect(x.type).toBe('cultivation'); });
+    it('forge normalizes strength', () => { const x = t.forge('A', 'cultivation', 2); expect(x.strength).toBe(1); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByStatus and listManifested and listFulfilled', () => {
+        t.forge('A', 'cultivation');
+        t.forge('A', 'romance');
+        t.forge('B', 'combat');
+        expect(t.listAll().length).toBe(3);
+        expect(t.listByOwner('A').length).toBe(2);
+        expect(t.listByType('cultivation').length).toBe(1);
+    });
+    it('setStatus', () => { const x = t.forge('A', 'cultivation'); expect(t.setStatus(x.id, 'manifested')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = t.forge('A', 'cultivation'); expect(t.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(t.setStatus('ghost', 'manifested')).toBe(false); });
+    it('manifest and fulfill and break_ and reset_', () => { const x = t.forge('A', 'cultivation'); t.manifest(x.id); t.fulfill(x.id); expect(t.isFulfilled(x.id)).toBe(true); const y = t.forge('A', 'romance'); t.break_(y.id); expect(t.isBroken(y.id)).toBe(true); const z = t.forge('A', 'combat'); t.reset_(z.id); expect(t.isForming(z.id)).toBe(true); });
+    it('setStrength', () => { const x = t.forge('A', 'cultivation'); t.setStrength(x.id, 0.8); expect(x.strength).toBe(0.8); });
+    it('setStrength clamps', () => { const x = t.forge('A', 'cultivation'); t.setStrength(x.id, 2); expect(x.strength).toBe(1); });
+    it('setStrength returns false for unknown', () => { expect(t.setStrength('ghost', 0.8)).toBe(false); });
+    it('setPartner', () => { const x = t.forge('A', 'romance'); expect(t.setPartner(x.id, 'B')).toBe(true); });
+    it('setPartner returns false for unknown', () => { expect(t.setPartner('ghost', 'B')).toBe(false); });
+    it('isManifested and isFulfilled and isBroken and isForming', () => { const x = t.forge('A', 'cultivation'); t.manifest(x.id); expect(t.isManifested(x.id)).toBe(true); });
+    it('isFulfilled for unknown', () => { expect(t.isFulfilled('ghost')).toBe(false); });
+    it('strengthOf and typeOf and partnerOf for unknown', () => { expect(t.strengthOf('ghost')).toBe(0); expect(t.typeOf('ghost')).toBeNull(); expect(t.partnerOf('ghost')).toBeNull(); });
+    it('ownerCount and strengthFor', () => { t.forge('A', 'cultivation'); t.forge('A', 'romance'); expect(t.ownerCount('A')).toBe(2); });
+    it('ownerCount for unknown', () => { expect(t.ownerCount('ghost')).toBe(0); });
+    it('averageStrength', () => { t.forge('A', 'cultivation'); expect(t.averageStrength()).toBe(0.5); });
+    it('fulfillmentRate', () => { const x = t.forge('A', 'cultivation'); t.fulfill(x.id); expect(t.fulfillmentRate()).toBe(1); });
+    it('bestFor', () => { t.forge('A', 'cultivation'); t.setStrength(t.listByOwner('A')[0].id, 0.9); expect(t.bestFor('A')).not.toBeNull(); });
+    it('bestFor null for empty', () => { expect(t.bestFor('ghost')).toBeNull(); });
+    it('countByType', () => { t.forge('A', 'combat'); expect(t.countByType().combat).toBe(1); });
+    it('report aggregates', () => { t.forge('A', 'cultivation'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.forge('A', 'cultivation'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes DESTINY_TYPES', () => { expect(DESTINY_TYPES).toContain('cultivation'); });
+});

@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BreakthroughCatalyst, CATALYST_TYPES } from '../../../systems/shenzhu/BreakthroughCatalyst.js';
+
+describe('BreakthroughCatalyst', () => {
+    let c;
+    beforeEach(() => { c = new BreakthroughCatalyst(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('craft', () => { expect(c.craft('Pill', 'pill')).not.toBeNull(); });
+    it('craft rejects missing', () => { expect(c.craft('', 'pill')).toBeNull(); });
+    it('craft normalizes invalid type', () => { const x = c.craft('A', 'invalid'); expect(x.type).toBe('pill'); });
+    it('craft normalizes invalid rarity', () => { const x = c.craft('A', 'pill', 1, 'invalid'); expect(x.rarity).toBe('common'); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByRarity and listUnused and listUsed', () => {
+        c.craft('A', 'pill', 1, 'common', 'p1');
+        c.craft('B', 'herb', 5, 'legendary', 'p1');
+        c.craft('C', 'formation', 1);
+        expect(c.listAll().length).toBe(3);
+        expect(c.listByOwner('p1').length).toBe(2);
+        expect(c.listByType('pill').length).toBe(1);
+        expect(c.listByRarity('legendary').length).toBe(1);
+    });
+    it('setPower', () => { const x = c.craft('A', 'pill'); c.setPower(x.id, 100); expect(c.powerOf(x.id)).toBe(100); });
+    it('setPower clamps', () => { const x = c.craft('A', 'pill'); c.setPower(x.id, -5); expect(c.powerOf(x.id)).toBe(0); });
+    it('setPower returns false for unknown', () => { expect(c.setPower('ghost', 100)).toBe(false); });
+    it('setOwner', () => { const x = c.craft('A', 'pill'); expect(c.setOwner(x.id, 'B')).toBe(true); });
+    it('setOwner returns false for unknown', () => { expect(c.setOwner('ghost', 'B')).toBe(false); });
+    it('use', () => { const x = c.craft('A', 'pill'); expect(c.use(x.id)).toBe(true); });
+    it('use rejects already used', () => { const x = c.craft('A', 'pill'); c.use(x.id); expect(c.use(x.id)).toBe(false); });
+    it('use returns false for unknown', () => { expect(c.use('ghost')).toBe(false); });
+    it('isDivine and isUsed', () => { const x = c.craft('A', 'pill', 1, 'divine'); expect(c.isDivine(x.id)).toBe(true); c.use(x.id); expect(c.isUsed(x.id)).toBe(true); });
+    it('isDivine for unknown', () => { expect(c.isDivine('ghost')).toBe(false); });
+    it('powerOf and typeOf and rarityOf and ownerOf for unknown', () => { expect(c.powerOf('ghost')).toBe(0); expect(c.typeOf('ghost')).toBeNull(); expect(c.rarityOf('ghost')).toBeNull(); expect(c.ownerOf('ghost')).toBeNull(); });
+    it('bestFor', () => { c.craft('A', 'pill', 1, 'common', 'p1'); c.craft('B', 'pill', 10, 'common', 'p1'); expect(c.bestFor('p1').power).toBe(10); });
+    it('bestFor null for empty', () => { expect(c.bestFor('ghost')).toBeNull(); });
+    it('averagePower', () => { c.craft('A', 'pill', 5); expect(c.averagePower()).toBe(5); });
+    it('usageRate', () => { const x = c.craft('A', 'pill'); c.use(x.id); expect(c.usageRate()).toBe(1); });
+    it('ownerCount', () => { c.craft('A', 'pill', 1, 'common', 'p1'); expect(c.ownerCount('p1')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(c.ownerCount('ghost')).toBe(0); });
+    it('countByRarity', () => { c.craft('A', 'pill', 1, 'divine'); expect(c.countByRarity().divine).toBe(1); });
+    it('report aggregates', () => { c.craft('A', 'pill'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.craft('A', 'pill'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes CATALYST_TYPES', () => { expect(CATALYST_TYPES).toContain('pill'); });
+});

@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BeastTamer, TAMER_LEVELS } from '../../../systems/shenzhu/BeastTamer.js';
+
+describe('BeastTamer', () => {
+    let t;
+    beforeEach(() => { t = new BeastTamer(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('hire', () => { expect(t.hire('T1')).not.toBeNull(); });
+    it('hire rejects missing', () => { expect(t.hire('')).toBeNull(); });
+    it('hire normalizes invalid level', () => { const x = t.hire('A', 'invalid'); expect(x.level).toBe('novice'); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByLevel and listByStatus and listAvailable', () => {
+        t.hire('A', 'novice', 'p1');
+        t.hire('B', 'master');
+        t.hire('C', 'legendary');
+        expect(t.listAll().length).toBe(3);
+        expect(t.listByOwner('p1').length).toBe(1);
+        expect(t.listByLevel('master').length).toBe(1);
+        expect(t.listByStatus('available').length).toBe(3);
+    });
+    it('setStatus', () => { const x = t.hire('A'); expect(t.setStatus(x.id, 'resting')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = t.hire('A'); expect(t.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(t.setStatus('ghost', 'resting')).toBe(false); });
+    it('setLevel', () => { const x = t.hire('A'); expect(t.setLevel(x.id, 'master')).toBe(true); });
+    it('setLevel rejects invalid', () => { const x = t.hire('A'); expect(t.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel returns false for unknown', () => { expect(t.setLevel('ghost', 'master')).toBe(false); });
+    it('tame', () => { const x = t.hire('A'); expect(t.tame(x.id)).toBe(true); });
+    it('tame rejects non-available', () => { const x = t.hire('A'); t.tame(x.id); t.rest(x.id); t.tame(x.id); expect(t.tame(x.id)).toBe(false); });
+    it('tame returns false for unknown', () => { expect(t.tame('ghost')).toBe(false); });
+    it('rest and retire', () => { const x = t.hire('A'); t.rest(x.id); t.retire(x.id); expect(t.isRetired(x.id)).toBe(true); });
+    it('isAvailable and isLegendary and isRetired', () => { const x = t.hire('A', 'legendary'); expect(t.isLegendary(x.id)).toBe(true); expect(t.isAvailable(x.id)).toBe(true); });
+    it('isAvailable for unknown', () => { expect(t.isAvailable('ghost')).toBe(false); });
+    it('tamedCount and levelOf and ownerOf for unknown', () => { expect(t.tamedCount('ghost')).toBe(0); expect(t.levelOf('ghost')).toBeNull(); expect(t.ownerOf('ghost')).toBeNull(); });
+    it('averageTamed', () => { t.hire('A'); expect(t.averageTamed()).toBe(0); });
+    it('best', () => { t.hire('A'); expect(t.best()).not.toBeNull(); });
+    it('best null for empty', () => { expect(t.best()).toBeNull(); });
+    it('ownerCount', () => { t.hire('A', 'novice', 'p1'); expect(t.ownerCount('p1')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(t.ownerCount('ghost')).toBe(0); });
+    it('countByLevel', () => { t.hire('A', 'master'); expect(t.countByLevel().master).toBe(1); });
+    it('report aggregates', () => { t.hire('A'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.hire('A'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TAMER_LEVELS', () => { expect(TAMER_LEVELS).toContain('legendary'); });
+});

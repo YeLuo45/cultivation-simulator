@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SkillArchive, ARCHIVE_CATEGORIES } from '../../../systems/shenzhu/SkillArchive.js';
+
+describe('SkillArchive', () => {
+    let a;
+    beforeEach(() => { a = new SkillArchive(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('archive', () => { expect(a.archive('A', 'technique')).not.toBeNull(); });
+    it('archive rejects missing', () => { expect(a.archive('', 'technique')).toBeNull(); });
+    it('archive normalizes invalid category', () => { const x = a.archive('A', 'invalid'); expect(x.category).toBe('technique'); });
+    it('archive normalizes invalid level', () => { const x = a.archive('A', 'technique', 'invalid'); expect(x.level).toBe('novice'); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByCategory and listByLevel and listGrandmaster', () => {
+        a.archive('A', 'technique', 'novice', 'p1');
+        a.archive('B', 'ability', 'grandmaster');
+        a.archive('C', 'formation', 'grandmaster');
+        expect(a.listAll().length).toBe(3);
+        expect(a.listByOwner('p1').length).toBe(1);
+        expect(a.listByCategory('technique').length).toBe(1);
+        expect(a.listByLevel('grandmaster').length).toBe(2);
+    });
+    it('setLevel', () => { const x = a.archive('A', 'technique'); expect(a.setLevel(x.id, 'master')).toBe(true); });
+    it('setLevel rejects invalid', () => { const x = a.archive('A', 'technique'); expect(a.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel returns false for unknown', () => { expect(a.setLevel('ghost', 'master')).toBe(false); });
+    it('setPower', () => { const x = a.archive('A', 'technique'); a.setPower(x.id, 50); expect(a.powerOf(x.id)).toBe(50); });
+    it('setPower clamps', () => { const x = a.archive('A', 'technique'); a.setPower(x.id, -5); expect(a.powerOf(x.id)).toBe(0); });
+    it('setPower returns false for unknown', () => { expect(a.setPower('ghost', 50)).toBe(false); });
+    it('isGrandmaster', () => { const x = a.archive('A', 'technique', 'grandmaster'); expect(a.isGrandmaster(x.id)).toBe(true); });
+    it('isGrandmaster for unknown', () => { expect(a.isGrandmaster('ghost')).toBe(false); });
+    it('levelOf and powerOf and categoryOf and ownerOf for unknown', () => { expect(a.levelOf('ghost')).toBeNull(); expect(a.powerOf('ghost')).toBe(0); expect(a.categoryOf('ghost')).toBeNull(); expect(a.ownerOf('ghost')).toBeNull(); });
+    it('averagePower', () => { a.archive('A', 'technique', 'novice', null, 50); expect(a.averagePower()).toBe(50); });
+    it('ownerCount and categoryCount', () => { a.archive('A', 'technique', 'novice', 'p1'); expect(a.ownerCount('p1')).toBe(1); expect(a.categoryCount('technique')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(a.ownerCount('ghost')).toBe(0); });
+    it('bestFor', () => { a.archive('A', 'technique', 'novice', 'p1', 5); a.archive('B', 'technique', 'novice', 'p1', 50); expect(a.bestFor('p1').power).toBe(50); });
+    it('bestFor null for empty', () => { expect(a.bestFor('ghost')).toBeNull(); });
+    it('countByLevel', () => { a.archive('A', 'technique', 'master'); expect(a.countByLevel().master).toBe(1); });
+    it('report aggregates', () => { a.archive('A', 'technique'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.archive('A', 'technique'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes ARCHIVE_CATEGORIES', () => { expect(ARCHIVE_CATEGORIES).toContain('technique'); });
+});
