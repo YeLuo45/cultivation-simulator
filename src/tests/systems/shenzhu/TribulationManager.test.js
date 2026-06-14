@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TribulationManager, TRIBULATION_TYPES } from '../../../systems/shenzhu/TribulationManager.js';
+
+describe('TribulationManager', () => {
+    let t;
+    beforeEach(() => { t = new TribulationManager(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('trigger', () => { expect(t.trigger('A')).not.toBeNull(); });
+    it('trigger rejects missing', () => { expect(t.trigger('')).toBeNull(); });
+    it('trigger normalizes invalid type', () => { const x = t.trigger('A', 'invalid'); expect(x.type).toBe('lightning'); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByPhase and listActive', () => {
+        t.trigger('A', 'lightning');
+        t.trigger('A', 'fire');
+        t.trigger('B', 'lightning');
+        expect(t.listAll().length).toBe(3);
+        expect(t.listByOwner('A').length).toBe(2);
+        expect(t.listByType('lightning').length).toBe(2);
+    });
+    it('setPhase', () => { const x = t.trigger('A'); expect(t.setPhase(x.id, 'passed')).toBe(true); });
+    it('setPhase rejects invalid', () => { const x = t.trigger('A'); expect(t.setPhase(x.id, 'invalid')).toBe(false); });
+    it('setPhase returns false for unknown', () => { expect(t.setPhase('ghost', 'passed')).toBe(false); });
+    it('startStriking and pass and fail', () => { const x = t.trigger('A'); t.startStriking(x.id); t.pass(x.id); expect(t.isPassed(x.id)).toBe(true); const y = t.trigger('A'); t.fail(y.id); expect(t.isFailed(y.id)).toBe(true); });
+    it('loseLife', () => { const x = t.trigger('A'); t.loseLife(x.id); expect(t.livesOf(x.id)).toBe(8); });
+    it('loseLife auto fail at 0', () => { const x = t.trigger('A'); for (let i = 0; i < 9; i++) t.loseLife(x.id); expect(t.isFailed(x.id)).toBe(true); });
+    it('loseLife returns false for unknown', () => { expect(t.loseLife('ghost')).toBe(false); });
+    it('setIntensity', () => { const x = t.trigger('A'); t.setIntensity(x.id, 5); expect(t.intensityOf(x.id)).toBe(5); });
+    it('setIntensity returns false for unknown', () => { expect(t.setIntensity('ghost', 5)).toBe(false); });
+    it('isPassed and isFailed and isActive and isStriking', () => { const x = t.trigger('A'); t.startStriking(x.id); expect(t.isStriking(x.id)).toBe(true); expect(t.isActive(x.id)).toBe(true); });
+    it('isPassed for unknown', () => { expect(t.isPassed('ghost')).toBe(false); });
+    it('livesOf and intensityOf and typeOf for unknown', () => { expect(t.livesOf('ghost')).toBe(0); expect(t.intensityOf('ghost')).toBe(0); expect(t.typeOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(t.duration('ghost')).toBe(0); });
+    it('passRate', () => { const x = t.trigger('A'); t.pass(x.id); expect(t.passRate()).toBe(1); });
+    it('ownerCount and ownerPassed', () => { t.trigger('A', 'lightning'); t.trigger('A', 'fire'); expect(t.ownerCount('A')).toBe(2); const y = t.trigger('A'); t.pass(y.id); expect(t.ownerPassed('A')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(t.ownerCount('ghost')).toBe(0); });
+    it('averageIntensity', () => { t.trigger('A', 'lightning', 5); expect(t.averageIntensity()).toBe(5); });
+    it('report aggregates', () => { t.trigger('A'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.trigger('A'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TRIBULATION_TYPES', () => { expect(TRIBULATION_TYPES).toContain('lightning'); });
+});

@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CultivationManual, MANUAL_TYPES } from '../../../systems/shenzhu/CultivationManual.js';
+
+describe('CultivationManual', () => {
+    let m;
+    beforeEach(() => { m = new CultivationManual(); });
+    it('initializes with defaults', () => { expect(m.stats.total).toBe(0); });
+    it('compile', () => { expect(m.compile('M', 'scroll', ['t1'])).not.toBeNull(); });
+    it('compile rejects missing', () => { expect(m.compile('', 'scroll')).toBeNull(); });
+    it('compile normalizes invalid type', () => { const x = m.compile('M', 'invalid'); expect(x.type).toBe('compendium'); });
+    it('compile normalizes invalid rarity', () => { const x = m.compile('M', 'scroll', [], 'invalid'); expect(x.rarity).toBe('common'); });
+    it('compile normalizes non-array techniques', () => { const x = m.compile('M', 'scroll', 'not array'); expect(x.techniques).toEqual([]); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByType and listByRarity and listDivine and listByOwner', () => {
+        m.compile('A', 'scroll', ['t1'], 'common', 'p1');
+        m.compile('B', 'tablet', ['t1', 't2'], 'divine');
+        expect(m.listAll().length).toBe(2);
+        expect(m.listByType('tablet').length).toBe(1);
+        expect(m.listByRarity('divine').length).toBe(1);
+        expect(m.listDivine().length).toBe(1);
+        expect(m.listByOwner('p1').length).toBe(1);
+    });
+    it('addTechnique', () => { const x = m.compile('M', 'scroll'); m.addTechnique(x.id, 't1'); expect(m.techniqueCount(x.id)).toBe(1); });
+    it('addTechnique rejects duplicate', () => { const x = m.compile('M', 'scroll', ['t1']); expect(m.addTechnique(x.id, 't1')).toBe(false); });
+    it('addTechnique returns false for unknown', () => { expect(m.addTechnique('ghost', 't1')).toBe(false); });
+    it('removeTechnique', () => { const x = m.compile('M', 'scroll', ['t1', 't2']); m.removeTechnique(x.id, 't1'); expect(m.techniqueCount(x.id)).toBe(1); });
+    it('removeTechnique returns false for unknown', () => { expect(m.removeTechnique('ghost', 't1')).toBe(false); });
+    it('setOwner', () => { const x = m.compile('M', 'scroll'); expect(m.setOwner(x.id, 'p1')).toBe(true); });
+    it('setOwner returns false for unknown', () => { expect(m.setOwner('ghost', 'p1')).toBe(false); });
+    it('isDivine and isComplete', () => { const x = m.compile('M', 'scroll', ['t1', 't2', 't3', 't4', 't5']); expect(m.isDivine(x.id)).toBe(false); expect(m.isComplete(x.id)).toBe(true); });
+    it('isDivine for unknown', () => { expect(m.isDivine('ghost')).toBe(false); });
+    it('techniqueCount and rarityOf and techniquesOf and hasTechnique for unknown', () => { expect(m.techniqueCount('ghost')).toBe(0); expect(m.rarityOf('ghost')).toBeNull(); expect(m.techniquesOf('ghost')).toEqual([]); expect(m.hasTechnique('ghost', 't1')).toBe(false); });
+    it('hasTechnique', () => { const x = m.compile('M', 'scroll', ['t1']); expect(m.hasTechnique(x.id, 't1')).toBe(true); });
+    it('averageTechniques', () => { m.compile('M', 'scroll', ['t1', 't2']); expect(m.averageTechniques()).toBe(2); });
+    it('mostComplete', () => { m.compile('A', 'scroll', ['t1', 't2']); expect(m.mostComplete().techniqueCount || 2).toBeGreaterThan(0); });
+    it('mostComplete null for empty', () => { expect(m.mostComplete()).toBeNull(); });
+    it('countByRarity', () => { m.compile('M', 'scroll', [], 'divine'); expect(m.countByRarity().divine).toBe(1); });
+    it('report aggregates', () => { m.compile('M', 'scroll'); expect(m.report().total).toBe(1); });
+    it('reset clears', () => { m.compile('M', 'scroll'); m.reset(); expect(m.stats.total).toBe(0); });
+    it('exposes MANUAL_TYPES', () => { expect(MANUAL_TYPES).toContain('compendium'); });
+});

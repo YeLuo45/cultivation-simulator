@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CultivationDiary, DIARY_MOODS } from '../../../systems/shenzhu/CultivationDiary.js';
+
+describe('CultivationDiary', () => {
+    let d;
+    beforeEach(() => { d = new CultivationDiary(); });
+    it('initializes with defaults', () => { expect(d.stats.total).toBe(0); });
+    it('write', () => { expect(d.write('A', 'title')).not.toBeNull(); });
+    it('write rejects missing', () => { expect(d.write('', 'title')).toBeNull(); expect(d.write('A', '')).toBeNull(); });
+    it('write normalizes invalid mood', () => { const x = d.write('A', 'title', '', 'invalid'); expect(x.mood).toBe('calm'); });
+    it('get returns null for unknown', () => { expect(d.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByStatus and listByMood and listActive and listArchived', () => {
+        d.write('A', 'T1', '', 'inspired');
+        d.write('A', 'T2', '', 'calm');
+        d.write('B', 'T3', '', 'reflective');
+        expect(d.listAll().length).toBe(3);
+        expect(d.listByOwner('A').length).toBe(2);
+        expect(d.listByStatus('active').length).toBe(3);
+    });
+    it('updateContent', () => { const x = d.write('A', 'T1'); d.updateContent(x.id, 'new content'); expect(x.content).toBe('new content'); });
+    it('updateContent returns false for unknown', () => { expect(d.updateContent('ghost', 'c')).toBe(false); });
+    it('setMood', () => { const x = d.write('A', 'T1'); expect(d.setMood(x.id, 'excited')).toBe(true); });
+    it('setMood rejects invalid', () => { const x = d.write('A', 'T1'); expect(d.setMood(x.id, 'invalid')).toBe(false); });
+    it('setMood returns false for unknown', () => { expect(d.setMood('ghost', 'excited')).toBe(false); });
+    it('setStatus', () => { const x = d.write('A', 'T1'); expect(d.setStatus(x.id, 'archived')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = d.write('A', 'T1'); expect(d.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(d.setStatus('ghost', 'archived')).toBe(false); });
+    it('archive and delete', () => { const x = d.write('A', 'T1'); d.archive(x.id); expect(d.isArchived(x.id)).toBe(true); const y = d.write('A', 'T2'); d.delete(y.id); expect(d.isDeleted(y.id)).toBe(true); });
+    it('isActive and isArchived and isDeleted', () => { const x = d.write('A', 'T1'); expect(d.isActive(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(d.isActive('ghost')).toBe(false); });
+    it('moodOf and statusOf and ownerOf and titleOf for unknown', () => { expect(d.moodOf('ghost')).toBeNull(); expect(d.statusOf('ghost')).toBeNull(); expect(d.ownerOf('ghost')).toBeNull(); expect(d.titleOf('ghost')).toBeNull(); });
+    it('recent', () => { d.write('A', 'T1'); d.write('A', 'T2'); expect(d.recent().length).toBe(2); });
+    it('ownerCount and moodCount', () => { d.write('A', 'T1', '', 'inspired'); d.write('A', 'T2', '', 'calm'); expect(d.ownerCount('A')).toBe(2); expect(d.moodCount('A', 'inspired')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(d.ownerCount('ghost')).toBe(0); });
+    it('averageLength', () => { d.write('A', 'T1', 'abc'); d.write('A', 'T2', 'abcdef'); expect(d.averageLength()).toBe(4.5); });
+    it('mostFrequentMood', () => { d.write('A', 'T1', '', 'calm'); d.write('A', 'T2', '', 'calm'); d.write('A', 'T3', '', 'excited'); expect(d.mostFrequentMood()).toBe('calm'); });
+    it('mostFrequentMood null for empty', () => { expect(d.mostFrequentMood()).toBeNull(); });
+    it('countByMood', () => { d.write('A', 'T1', '', 'calm'); expect(d.countByMood().calm).toBe(1); });
+    it('report aggregates', () => { d.write('A', 'T1'); expect(d.report().total).toBe(1); });
+    it('reset clears', () => { d.write('A', 'T1'); d.reset(); expect(d.stats.total).toBe(0); });
+    it('exposes DIARY_MOODS', () => { expect(DIARY_MOODS).toContain('calm'); });
+});

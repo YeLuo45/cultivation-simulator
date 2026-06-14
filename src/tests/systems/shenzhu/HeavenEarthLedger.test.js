@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { HeavenEarthLedger, LEDGER_TYPES } from '../../../systems/shenzhu/HeavenEarthLedger.js';
+
+describe('HeavenEarthLedger', () => {
+    let l;
+    beforeEach(() => { l = new HeavenEarthLedger(); });
+    it('initializes with defaults', () => { expect(l.stats.total).toBe(0); });
+    it('record', () => { expect(l.record('A', 'karma', 10)).not.toBeNull(); });
+    it('record rejects missing', () => { expect(l.record('', 'karma', 10)).toBeNull(); });
+    it('record rejects invalid type', () => { expect(l.record('A', 'invalid', 10)).toBeNull(); });
+    it('record rejects zero amount', () => { expect(l.record('A', 'karma', 0)).toBeNull(); });
+    it('get returns null for unknown', () => { expect(l.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByStatus and listPending and listCommitted', () => {
+        l.record('A', 'karma', 10);
+        l.record('A', 'merit', -5);
+        l.record('B', 'karma', 20);
+        expect(l.listAll().length).toBe(3);
+        expect(l.listByOwner('A').length).toBe(2);
+        expect(l.listByType('karma').length).toBe(2);
+        expect(l.listByStatus('pending').length).toBe(3);
+    });
+    it('commit', () => { const x = l.record('A', 'karma', 10); expect(l.commit(x.id)).toBe(true); });
+    it('commit rejects non-pending', () => { const x = l.record('A', 'karma', 10); l.commit(x.id); expect(l.commit(x.id)).toBe(false); });
+    it('commit returns false for unknown', () => { expect(l.commit('ghost')).toBe(false); });
+    it('cancel', () => { const x = l.record('A', 'karma', 10); expect(l.cancel(x.id)).toBe(true); expect(x.status).toBe('cancelled'); });
+    it('cancel returns false for unknown', () => { expect(l.cancel('ghost')).toBe(false); });
+    it('isPending and isCommitted and isCancelled and isPositive and isNegative', () => { const x = l.record('A', 'karma', 10); l.commit(x.id); expect(l.isCommitted(x.id)).toBe(true); expect(l.isPositive(x.id)).toBe(true); const y = l.record('A', 'merit', -5); expect(l.isNegative(y.id)).toBe(true); });
+    it('isPending for unknown', () => { expect(l.isPending('ghost')).toBe(false); });
+    it('amountOf and typeOf for unknown', () => { expect(l.amountOf('ghost')).toBe(0); expect(l.typeOf('ghost')).toBeNull(); });
+    it('balanceFor and pendingFor and positiveFor and negativeFor', () => { l.record('A', 'karma', 100); l.record('A', 'merit', -30); l.record('A', 'karma', 10); l.commit(l.listByOwner('A')[0].id); l.commit(l.listByOwner('A')[1].id); expect(l.balanceFor('A')).toBe(70); expect(l.pendingFor('A')).toBe(10); expect(l.positiveFor('A')).toBe(100); expect(l.negativeFor('A')).toBe(-30); });
+    it('balanceFor for unknown', () => { expect(l.balanceFor('ghost')).toBe(0); });
+    it('commitRate', () => { const x = l.record('A', 'karma', 10); l.commit(x.id); expect(l.commitRate()).toBe(1); });
+    it('averageAmount', () => { l.record('A', 'karma', 10); l.record('A', 'merit', -5); expect(l.averageAmount()).toBe(2.5); });
+    it('ownerCount', () => { l.record('A', 'karma', 10); l.record('A', 'merit', 5); expect(l.ownerCount('A')).toBe(2); });
+    it('ownerCount for unknown', () => { expect(l.ownerCount('ghost')).toBe(0); });
+    it('countByType', () => { l.record('A', 'karma', 10); expect(l.countByType().karma).toBe(1); });
+    it('report aggregates', () => { l.record('A', 'karma', 10); expect(l.report().total).toBe(1); });
+    it('reset clears', () => { l.record('A', 'karma', 10); l.reset(); expect(l.stats.total).toBe(0); });
+    it('exposes LEDGER_TYPES', () => { expect(LEDGER_TYPES).toContain('karma'); });
+});

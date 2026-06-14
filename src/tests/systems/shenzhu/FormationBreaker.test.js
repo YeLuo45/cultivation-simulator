@@ -1,0 +1,44 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FormationBreaker, BREAK_METHODS } from '../../../systems/shenzhu/FormationBreaker.js';
+
+describe('FormationBreaker', () => {
+    let b;
+    beforeEach(() => { b = new FormationBreaker(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('start', () => { expect(b.start('F1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(b.start('')).toBeNull(); });
+    it('start normalizes invalid method', () => { const x = b.start('F1', 'invalid'); expect(x.method).toBe('overwhelming_force'); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByFormation and listByStatus and listByMethod and listActive', () => {
+        b.start('F1');
+        b.start('F1', 'counter_formation');
+        b.start('F2');
+        expect(b.listAll().length).toBe(3);
+        expect(b.listByFormation('F1').length).toBe(2);
+        expect(b.listByStatus('analyzing').length).toBe(3);
+    });
+    it('setStatus', () => { const x = b.start('F1'); expect(b.setStatus(x.id, 'striking')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = b.start('F1'); expect(b.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(b.setStatus('ghost', 'striking')).toBe(false); });
+    it('analyze and strike and succeed and fail and escape', () => { const x = b.start('F1'); b.strike(x.id); b.succeed(x.id); expect(b.isBroken(x.id)).toBe(true); const y = b.start('F2'); b.fail(y.id); const z = b.start('F3'); b.escape(z.id); expect(b.isEscaped(z.id)).toBe(true); });
+    it('setMethod', () => { const x = b.start('F1'); expect(b.setMethod(x.id, 'qi_disruption')).toBe(true); });
+    it('setMethod rejects invalid', () => { const x = b.start('F1'); expect(b.setMethod(x.id, 'invalid')).toBe(false); });
+    it('setMethod returns false for unknown', () => { expect(b.setMethod('ghost', 'qi_disruption')).toBe(false); });
+    it('setPower', () => { const x = b.start('F1'); b.setPower(x.id, 50); expect(b.powerOf(x.id)).toBe(50); });
+    it('setPower clamps', () => { const x = b.start('F1'); b.setPower(x.id, -5); expect(b.powerOf(x.id)).toBe(0); });
+    it('setPower returns false for unknown', () => { expect(b.setPower('ghost', 50)).toBe(false); });
+    it('isActive and isBroken and isFailed and isEscaped', () => { const x = b.start('F1'); expect(b.isActive(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(b.isActive('ghost')).toBe(false); });
+    it('powerOf and methodOf for unknown', () => { expect(b.powerOf('ghost')).toBe(0); expect(b.methodOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(b.duration('ghost')).toBe(0); });
+    it('successRate', () => { const x = b.start('F1'); b.succeed(x.id); expect(b.successRate()).toBe(1); });
+    it('averagePower', () => { b.start('F1', 'counter_formation', 50); expect(b.averagePower()).toBe(50); });
+    it('formationCount', () => { b.start('F1'); b.start('F1'); expect(b.formationCount('F1')).toBe(2); });
+    it('formationCount for unknown', () => { expect(b.formationCount('ghost')).toBe(0); });
+    it('bestFor', () => { b.start('F1'); b.succeed(b.listAll()[0].id); b.setPower(b.listAll()[0].id, 50); expect(b.bestFor('F1')).not.toBeNull(); });
+    it('bestFor null for none broken', () => { b.start('F1'); expect(b.bestFor('F1')).toBeNull(); });
+    it('countByMethod', () => { b.start('F1', 'qi_disruption'); expect(b.countByMethod().qi_disruption).toBe(1); });
+    it('report aggregates', () => { b.start('F1'); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.start('F1'); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes BREAK_METHODS', () => { expect(BREAK_METHODS).toContain('overwhelming_force'); });
+});
