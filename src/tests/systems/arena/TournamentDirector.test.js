@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TournamentDirector, TOURNAMENT_STATUS } from '../../../systems/arena/TournamentDirector.js';
+
+describe('TournamentDirector', () => {
+    let d;
+    beforeEach(() => { d = new TournamentDirector(); });
+    it('initializes with defaults', () => { expect(d.stats.total).toBe(0); });
+    it('create', () => { expect(d.create('Spring Cup', 'single_elim')).not.toBeNull(); });
+    it('create rejects missing', () => { expect(d.create('', 'single_elim')).toBeNull(); });
+    it('create rejects invalid format', () => { expect(d.create('A', 'invalid')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(d.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus', () => { d.create('A', 'single_elim'); expect(d.listAll().length).toBe(1); expect(d.listByStatus('planning').length).toBe(1); });
+    it('openRegistration', () => { const x = d.create('A', 'single_elim'); expect(d.openRegistration(x.id)).toBe(true); });
+    it('openRegistration fails for non-planning', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); expect(d.openRegistration(x.id)).toBe(false); });
+    it('registerPlayer and unregister', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); expect(d.unregister(x.id, 'p1')).toBe(true); });
+    it('registerPlayer fails for non-registration', () => { const x = d.create('A', 'single_elim'); expect(d.registerPlayer(x.id, 'p1')).toBe(false); });
+    it('registerPlayer fails for full', () => { const x = d.create('A', 'single_elim', 1); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); expect(d.registerPlayer(x.id, 'p2')).toBe(false); });
+    it('registerPlayer fails for duplicate', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); expect(d.registerPlayer(x.id, 'p1')).toBe(false); });
+    it('start fails for insufficient players', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); expect(d.start(x.id)).toBe(false); });
+    it('start succeeds', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); d.registerPlayer(x.id, 'p2'); expect(d.start(x.id)).toBe(true); });
+    it('complete and cancel', () => { const x = d.create('A', 'single_elim'); expect(d.complete(x.id, 'p1')).toBe(true); const y = d.create('B', 'single_elim'); expect(d.cancel(y.id, 'test')).toBe(true); });
+    it('complete and cancel return false for unknown', () => { expect(d.complete('ghost', 'p1')).toBe(false); expect(d.cancel('ghost')).toBe(false); });
+    it('setBracket', () => { const x = d.create('A', 'single_elim'); expect(d.setBracket(x.id, { r: 1 })).toBe(true); });
+    it('isFull', () => { const x = d.create('A', 'single_elim', 1); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); expect(d.isFull(x.id)).toBe(true); });
+    it('registered and count and isRegistered', () => { const x = d.create('A', 'single_elim'); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); expect(d.registered(x.id).length).toBe(1); expect(d.count(x.id)).toBe(1); expect(d.isRegistered(x.id, 'p1')).toBe(true); });
+    it('winner', () => { const x = d.create('A', 'single_elim'); d.complete(x.id, 'p1'); expect(d.winner(x.id)).toBe('p1'); });
+    it('prizePerWinner', () => { const x = d.create('A', 'single_elim', 4, 100); d.openRegistration(x.id); d.registerPlayer(x.id, 'p1'); d.registerPlayer(x.id, 'p2'); d.registerPlayer(x.id, 'p3'); d.registerPlayer(x.id, 'p4'); expect(d.prizePerWinner(x.id)).toBe(25); });
+    it('report aggregates', () => { d.create('A', 'single_elim'); expect(d.report().total).toBe(1); });
+    it('reset clears', () => { d.create('A', 'single_elim'); d.reset(); expect(d.stats.total).toBe(0); });
+    it('exposes TOURNAMENT_STATUS', () => { expect(TOURNAMENT_STATUS).toContain('planning'); });
+});

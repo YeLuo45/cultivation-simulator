@@ -1,0 +1,32 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { MentorMatcher, MENTOR_STATUS } from '../../../systems/arena/MentorMatcher.js';
+
+describe('MentorMatcher', () => {
+    let m;
+    beforeEach(() => { m = new MentorMatcher(); });
+    it('initializes with defaults', () => { expect(m.stats.totalMentors).toBe(0); });
+    it('registerMentor', () => { expect(m.registerMentor('m1', 'Master', 'sword', 5)).not.toBeNull(); });
+    it('registerMentor rejects missing', () => { expect(m.registerMentor('', 'A')).toBeNull(); expect(m.registerMentor('m1', '')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listBySpecialty and listByStatus and listAvailable', () => { m.registerMentor('m1', 'A', 'sword'); expect(m.listAll().length).toBe(1); expect(m.listBySpecialty('sword').length).toBe(1); expect(m.listByStatus('available').length).toBe(1); expect(m.listAvailable().length).toBe(1); });
+    it('setStatus', () => { m.registerMentor('m1', 'A'); expect(m.setStatus('m1', 'busy')).toBe(true); });
+    it('setStatus rejects invalid', () => { expect(m.setStatus('ghost', 'busy')).toBe(false); expect(m.registerMentor('m1', 'A') && m.setStatus('m1', 'invalid')).toBe(false); });
+    it('setSpecialty', () => { m.registerMentor('m1', 'A'); expect(m.setSpecialty('m1', 'blade')).toBe(true); });
+    it('setSpecialty returns false for unknown', () => { expect(m.setSpecialty('ghost', 'sword')).toBe(false); });
+    it('findMentor', () => { m.registerMentor('m1', 'A', 'sword', 5); expect(m.findMentor('sword', 3)).not.toBeNull(); });
+    it('findMentor no match', () => { expect(m.findMentor('nonexistent')).toBeNull(); });
+    it('findBest', () => { m.registerMentor('m1', 'A', 'sword', 5); m.registerMentor('m2', 'B', 'sword', 3); expect(m.findBest('sword', 1).level).toBe(5); });
+    it('findBest null', () => { expect(m.findBest('nonexistent', 1)).toBeNull(); });
+    it('match', () => { m.registerMentor('m1', 'A'); expect(m.match('m1', 'p1')).not.toBeNull(); });
+    it('match fails for non-available', () => { m.registerMentor('m1', 'A'); m.setStatus('m1', 'busy'); expect(m.match('m1', 'p1')).toBeNull(); });
+    it('match fails for unknown', () => { expect(m.match('ghost', 'p1')).toBeNull(); });
+    it('accept and end and fail', () => { m.registerMentor('m1', 'A'); const r = m.match('m1', 'p1'); expect(m.accept(r.id)).toBe(true); expect(m.end(r.id, 5)).toBe(true); const r2 = m.match('m1', 'p2'); expect(m.fail(r2.id)).toBe(true); });
+    it('accept fails for non-pending', () => { m.registerMentor('m1', 'A'); const r = m.match('m1', 'p1'); m.accept(r.id); expect(m.accept(r.id)).toBe(false); });
+    it('end and fail return false for unknown', () => { expect(m.end('ghost')).toBe(false); expect(m.fail('ghost')).toBe(false); });
+    it('forMentor and forStudent', () => { m.registerMentor('m1', 'A'); m.match('m1', 'p1'); expect(m.forMentor('m1').length).toBe(1); expect(m.forStudent('p1').length).toBe(1); });
+    it('studentCount and isMentoring', () => { m.registerMentor('m1', 'A'); expect(m.studentCount('m1')).toBe(0); expect(m.isMentoring('m1')).toBe(false); });
+    it('activeFor', () => { m.registerMentor('m1', 'A'); const r = m.match('m1', 'p1'); m.accept(r.id); expect(m.activeFor('p1').length).toBe(1); });
+    it('report aggregates', () => { m.registerMentor('m1', 'A'); expect(m.report().totalMentors).toBe(1); });
+    it('reset clears', () => { m.registerMentor('m1', 'A'); m.reset(); expect(m.stats.totalMentors).toBe(0); });
+    it('exposes MENTOR_STATUS', () => { expect(MENTOR_STATUS).toContain('available'); });
+});

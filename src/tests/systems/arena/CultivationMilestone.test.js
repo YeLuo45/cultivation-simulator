@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CultivationMilestone, REALM_LEVELS } from '../../../systems/arena/CultivationMilestone.js';
+
+describe('CultivationMilestone', () => {
+    let m;
+    beforeEach(() => { m = new CultivationMilestone(); });
+    it('initializes with defaults', () => { expect(m.stats.totalExp).toBe(0); });
+    it('init', () => { expect(m.init('p1', 100)).toBe(true); });
+    it('init rejects missing', () => { expect(m.init('')).toBe(false); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByRealm', () => { m.init('p1', 100); m.init('p2', 200); expect(m.listAll().length).toBe(2); expect(m.listByRealm('foundation_building').length).toBe(2); });
+    it('addExp and triggers breakthrough', () => { m.init('p1', 50); m.addExp('p1', 100); expect(m.currentRealm('p1')).toBe('foundation_building'); });
+    it('addExp accumulates', () => { m.init('p1', 50); m.addExp('p1', 30); m.addExp('p1', 20); expect(m.currentExp('p1')).toBe(100); });
+    it('removeExp', () => { m.init('p1', 100); expect(m.removeExp('p1', 50)).toBe(50); });
+    it('removeExp clamps to 0', () => { m.init('p1', 50); m.removeExp('p1', 100); expect(m.currentExp('p1')).toBe(0); });
+    it('currentExp for unknown', () => { expect(m.currentExp('ghost')).toBe(0); });
+    it('currentRealm', () => { m.init('p1', 300); expect(m.currentRealm('p1')).toBe('golden_core'); });
+    it('expToNext', () => { m.init('p1', 50); expect(m.expToNext('p1')).toBe(50); });
+    it('expToNext for max', () => { m.init('p1', 15000); expect(m.expToNext('p1')).toBe(0); });
+    it('progressToNext', () => { m.init('p1', 50); expect(m.progressToNext('p1')).toBe(0.5); });
+    it('progressToNext for max', () => { m.init('p1', 15000); expect(m.progressToNext('p1')).toBe(1); });
+    it('isAtMax', () => { m.init('p1', 15000); expect(m.isAtMax('p1')).toBe(true); });
+    it('canBreakthrough', () => { m.init('p1', 200); expect(m.canBreakthrough('p1')).toBe(true); });
+    it('canBreakthrough for max', () => { m.init('p1', 15000); expect(m.canBreakthrough('p1')).toBe(false); });
+    it('canBreakthrough for unknown', () => { expect(m.canBreakthrough('ghost')).toBe(false); });
+    it('history', () => { m.init('p1'); m.addExp('p1', 50); expect(m.history('p1').length).toBe(1); });
+    it('countByRealm', () => { m.init('p1', 100); expect(m.countByRealm().foundation_building).toBe(1); });
+    it('report aggregates', () => { m.init('p1'); m.addExp('p1', 50); expect(m.report().totalExp).toBe(50); });
+    it('reset clears', () => { m.init('p1'); m.reset(); expect(m.stats.totalExp).toBe(0); });
+    it('exposes REALM_LEVELS', () => { expect(REALM_LEVELS).toContain('qi_refining'); });
+});

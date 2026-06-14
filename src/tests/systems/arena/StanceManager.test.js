@@ -1,0 +1,30 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { StanceManager, STANCE_TYPES } from '../../../systems/arena/StanceManager.js';
+
+describe('StanceManager', () => {
+    let m;
+    beforeEach(() => { m = new StanceManager(); });
+    it('initializes with defaults', () => { expect(m.stats.totalChanges).toBe(0); });
+    it('enter sets stance', () => { expect(m.enter('p1', 'offensive')).toBe(true); });
+    it('enter rejects invalid', () => { expect(m.enter('p1', 'invalid')).toBe(false); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('currentStance', () => { m.enter('p1', 'offensive'); expect(m.currentStance('p1')).toBe('offensive'); });
+    it('isInStance', () => { m.enter('p1', 'offensive'); expect(m.isInStance('p1', 'offensive')).toBe(true); expect(m.isInStance('p1', 'defensive')).toBe(false); });
+    it('timeInStance > 0', () => { m.enter('p1', 'offensive'); expect(m.timeInStance('p1')).toBeGreaterThanOrEqual(0); });
+    it('history', () => { m.enter('p1', 'offensive'); m.enter('p1', 'berserk'); expect(m.history('p1').length).toBe(2); });
+    it('canTransition valid', () => { m.enter('p1', 'offensive'); expect(m.canTransition('p1', 'berserk')).toBe(true); });
+    it('canTransition invalid', () => { m.enter('p1', 'offensive'); expect(m.canTransition('p1', 'meditative')).toBe(false); });
+    it('canTransition for no current', () => { expect(m.canTransition('p1', 'offensive')).toBe(true); });
+    it('allowed', () => { m.enter('p1', 'offensive'); expect(m.allowed('p1')).toContain('berserk'); });
+    it('allowed for no current', () => { expect(m.allowed('ghost')).toEqual(STANCE_TYPES); });
+    it('bonus for offensive', () => { m.enter('p1', 'offensive'); expect(m.bonus('p1').atk).toBeGreaterThan(0); });
+    it('bonus for neutral', () => { m.enter('p1', 'neutral'); expect(Object.keys(m.bonus('p1')).length).toBe(0); });
+    it('hasBonus', () => { m.enter('p1', 'offensive'); expect(m.hasBonus('p1', 'atk')).toBe(true); });
+    it('isAggressive and isDefensive', () => { m.enter('p1', 'offensive'); expect(m.isAggressive('p1')).toBe(true); m.enter('p1', 'berserk'); m.enter('p1', 'defensive'); expect(m.isDefensive('p1')).toBe(true); });
+    it('isAggressive for berserk', () => { m.enter('p1', 'berserk'); expect(m.isAggressive('p1')).toBe(true); });
+    it('mostCommon', () => { m.enter('p1', 'offensive'); m.enter('p1', 'berserk'); m.enter('p1', 'defensive'); m.enter('p1', 'meditative'); expect(m.mostCommon('p1')).toBeDefined(); });
+    it('mostCommon for no history', () => { expect(m.mostCommon('ghost')).toBeNull(); });
+    it('report aggregates', () => { m.enter('p1', 'offensive'); expect(m.report().totalChanges).toBe(1); });
+    it('reset clears', () => { m.enter('p1', 'offensive'); m.reset(); expect(m.stats.totalChanges).toBe(0); });
+    it('exposes STANCE_TYPES', () => { expect(STANCE_TYPES).toContain('offensive'); });
+});
