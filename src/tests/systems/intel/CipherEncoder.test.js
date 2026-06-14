@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CipherEncoder, CIPHER_TYPES } from '../../../systems/intel/CipherEncoder.js';
+
+describe('CipherEncoder', () => {
+    let c;
+    beforeEach(() => { c = new CipherEncoder(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('create', () => { expect(c.create('C1')).not.toBeNull(); });
+    it('create rejects missing', () => { expect(c.create('')).toBeNull(); });
+    it('create normalizes invalid type', () => { const x = c.create('C1', 'invalid'); expect(x.type).toBe('caesar'); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByType', () => { c.create('C1'); c.create('C2', 'substitution'); expect(c.listAll().length).toBe(2); expect(c.listByType('substitution').length).toBe(1); });
+    it('encode caesar', () => { const x = c.create('C1', 'caesar', 3); expect(c.encode(x.id, 'abc')).toBe('def'); });
+    it('encode rejects non-string', () => { const x = c.create('C1'); expect(c.encode(x.id, 123)).toBeNull(); });
+    it('encode returns null for unknown', () => { expect(c.encode('ghost', 'a')).toBeNull(); });
+    it('decode caesar', () => { const x = c.create('C1', 'caesar', 3); expect(c.decode(x.id, 'def')).toBe('abc'); });
+    it('decode returns null for unknown', () => { expect(c.decode('ghost', 'a')).toBeNull(); });
+    it('encode qi_seal', () => { const x = c.create('C1', 'qi_seal'); expect(c.encode(x.id, 'a')).toBe('[qi:a]'); });
+    it('encode lotus_script', () => { const x = c.create('C1', 'lotus_script'); expect(c.encode(x.id, 'abc')).toBe('cba'); });
+    it('encode substitution', () => { const x = c.create('C1', 'substitution', 1); expect(c.encode(x.id, 'a')).toBe('b'); });
+    it('encode transposition', () => { const x = c.create('C1', 'transposition', 2); const enc = c.encode(x.id, 'abcd'); const dec = c.decode(x.id, enc); expect(dec).toBe('abcd'); });
+    it('setKey and setType', () => { const x = c.create('C1'); c.setKey(x.id, 5); c.setType(x.id, 'substitution'); expect(x.key).toBe(5); });
+    it('setType rejects invalid', () => { const x = c.create('C1'); expect(c.setType(x.id, 'invalid')).toBe(false); });
+    it('setType returns false for unknown', () => { expect(c.setType('ghost', 'caesar')).toBe(false); });
+    it('setKey returns false for unknown', () => { expect(c.setKey('ghost', 5)).toBe(false); });
+    it('encodedCount', () => { const x = c.create('C1'); c.encode(x.id, 'a'); expect(c.encodedCount(x.id)).toBe(1); });
+    it('encodedCount for unknown', () => { expect(c.encodedCount('ghost')).toBe(0); });
+    it('report aggregates', () => { c.create('C1'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.create('C1'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes CIPHER_TYPES', () => { expect(CIPHER_TYPES).toContain('caesar'); });
+});

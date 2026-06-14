@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SignalJammer, SIGNAL_TYPES } from '../../../systems/intel/SignalJammer.js';
+
+describe('SignalJammer', () => {
+    let j;
+    beforeEach(() => { j = new SignalJammer(); });
+    it('initializes with defaults', () => { expect(j.stats.total).toBe(0); });
+    it('create', () => { expect(j.create('qi')).not.toBeNull(); });
+    it('create rejects invalid type', () => { expect(j.create('invalid')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(j.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listBySignal and listActive', () => {
+        j.create('qi');
+        j.create('sound');
+        expect(j.listAll().length).toBe(2);
+        expect(j.listByStatus('idle').length).toBe(2);
+        expect(j.listBySignal('qi').length).toBe(1);
+    });
+    it('activate', () => { const x = j.create('qi'); expect(j.activate(x.id)).toBe(true); });
+    it('activate fails for non-idle', () => { const x = j.create('qi'); j.activate(x.id); expect(j.activate(x.id)).toBe(false); });
+    it('activate returns false for unknown', () => { expect(j.activate('ghost')).toBe(false); });
+    it('deactivate', () => { const x = j.create('qi'); j.activate(x.id); expect(j.deactivate(x.id)).toBe(true); });
+    it('deactivate returns false for unknown', () => { expect(j.deactivate('ghost')).toBe(false); });
+    it('overload', () => { const x = j.create('qi'); expect(j.overload(x.id)).toBe(true); });
+    it('overload returns false for unknown', () => { expect(j.overload('ghost')).toBe(false); });
+    it('maintain and setStatus', () => { const x = j.create('qi'); expect(j.setStatus(x.id, 'maintenance')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = j.create('qi'); expect(j.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(j.setStatus('ghost', 'idle')).toBe(false); });
+    it('setPower and setRange', () => { const x = j.create('qi'); j.setPower(x.id, 80); j.setRange(x.id, 200); expect(j.get(x.id).power).toBe(80); });
+    it('setPower clamps', () => { const x = j.create('qi'); j.setPower(x.id, 200); expect(j.get(x.id).power).toBe(100); });
+    it('setPower returns false for unknown', () => { expect(j.setPower('ghost', 50)).toBe(false); });
+    it('setRange returns false for unknown', () => { expect(j.setRange('ghost', 50)).toBe(false); });
+    it('effectivePower', () => { const x = j.create('qi', 50); j.activate(x.id); expect(j.effectivePower(x.id)).toBe(50); });
+    it('effectivePower for idle', () => { const x = j.create('qi'); expect(j.effectivePower(x.id)).toBe(0); });
+    it('effectivePower for unknown', () => { expect(j.effectivePower('ghost')).toBe(0); });
+    it('isActive and isOverload', () => { const x = j.create('qi'); j.activate(x.id); expect(j.isActive(x.id)).toBe(true); j.overload(x.id); expect(j.isOverload(x.id)).toBe(true); });
+    it('totalActivePower', () => { j.create('qi', 50); j.activate(j.listAll()[0].id); expect(j.totalActivePower()).toBe(50); });
+    it('report aggregates', () => { j.create('qi'); expect(j.report().total).toBe(1); });
+    it('reset clears', () => { j.create('qi'); j.reset(); expect(j.stats.total).toBe(0); });
+    it('exposes SIGNAL_TYPES', () => { expect(SIGNAL_TYPES).toContain('qi'); });
+});

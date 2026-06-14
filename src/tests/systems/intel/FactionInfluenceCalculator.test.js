@@ -1,0 +1,32 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FactionInfluenceCalculator, INFLUENCE_FACTORS } from '../../../systems/intel/FactionInfluenceCalculator.js';
+
+describe('FactionInfluenceCalculator', () => {
+    let c;
+    beforeEach(() => { c = new FactionInfluenceCalculator(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('create', () => { expect(c.create('A', { military: 50 })).not.toBeNull(); });
+    it('create rejects missing', () => { expect(c.create('')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll', () => { c.create('A'); expect(c.listAll().length).toBe(1); });
+    it('updateScore', () => { const x = c.create('A'); expect(c.updateScore(x.id, 'military', 80)).toBe(true); });
+    it('updateScore rejects invalid factor', () => { const x = c.create('A'); expect(c.updateScore(x.id, 'invalid', 50)).toBe(false); });
+    it('updateScore returns false for unknown', () => { expect(c.updateScore('ghost', 'military', 50)).toBe(false); });
+    it('updateScores', () => { const x = c.create('A'); c.updateScores(x.id, { military: 80, economic: 60 }); expect(x.scores.military).toBe(80); });
+    it('scoreOf and totalOf', () => { const x = c.create('A', { military: 50, economic: 50 }); expect(c.scoreOf(x.id, 'military')).toBe(50); expect(c.totalOf(x.id)).toBeGreaterThan(0); });
+    it('dominantFactor', () => { const x = c.create('A', { military: 100 }); expect(c.dominantFactor(x.id)).toBe('military'); });
+    it('dominantFactor for unknown', () => { expect(c.dominantFactor('ghost')).toBeNull(); });
+    it('rank', () => { c.create('A', { military: 30 }); c.create('B', { military: 80 }); expect(c.rank()[0].name).toBe('B'); });
+    it('rankOf', () => { const x = c.create('A', { military: 30 }); c.create('B', { military: 80 }); expect(c.rankOf(x.id)).toBe(2); });
+    it('compare and isStronger', () => { const a = c.create('A', { military: 30 }); const b = c.create('B', { military: 80 }); expect(c.isStronger(b.id, a.id)).toBe(true); });
+    it('leading and weakest', () => { c.create('A', { military: 30 }); c.create('B', { military: 80 }); expect(c.leading().name).toBe('B'); expect(c.weakest().name).toBe('A'); });
+    it('leading for no factions', () => { expect(c.leading()).toBeNull(); expect(c.weakest()).toBeNull(); });
+    it('averageTotal', () => { c.create('A', { military: 50 }); expect(c.averageTotal()).toBeGreaterThan(0); });
+    it('scoreOf for unknown', () => { expect(c.scoreOf('ghost', 'military')).toBe(0); });
+    it('totalOf for unknown', () => { expect(c.totalOf('ghost')).toBe(0); });
+    it('isStronger for unknown', () => { expect(c.isStronger('ghost', 'a')).toBe(false); });
+    it('rankOf for unknown', () => { expect(c.rankOf('ghost')).toBe(-1); });
+    it('report aggregates', () => { c.create('A'); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.create('A'); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes INFLUENCE_FACTORS', () => { expect(INFLUENCE_FACTORS).toContain('military'); });
+});

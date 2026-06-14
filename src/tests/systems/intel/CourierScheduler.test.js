@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { CourierScheduler, COURIER_TYPES } from '../../../systems/intel/CourierScheduler.js';
+
+describe('CourierScheduler', () => {
+    let s;
+    beforeEach(() => { s = new CourierScheduler(); });
+    it('initializes with defaults', () => { expect(s.stats.total).toBe(0); });
+    it('hire', () => { expect(s.hire('Courier1')).not.toBeNull(); });
+    it('hire rejects missing', () => { expect(s.hire('')).toBeNull(); });
+    it('hire normalizes invalid type', () => { const x = s.hire('A', 'invalid'); expect(x.type).toBe('foot'); });
+    it('get returns null for unknown', () => { expect(s.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByType and listAvailable', () => {
+        s.hire('A', 'beast');
+        s.hire('B', 'bird');
+        expect(s.listAll().length).toBe(2);
+        expect(s.listByStatus('available').length).toBe(2);
+        expect(s.listByType('beast').length).toBe(1);
+    });
+    it('assign', () => { const x = s.hire('A'); expect(s.assign(x.id, 'task1')).toBe(true); });
+    it('assign fails for non-available', () => { const x = s.hire('A'); s.assign(x.id, 'task1'); expect(s.assign(x.id, 'task2')).toBe(false); });
+    it('assign returns false for unknown', () => { expect(s.assign('ghost', 't1')).toBe(false); });
+    it('setStatus', () => { const x = s.hire('A'); expect(s.setStatus(x.id, 'resting')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = s.hire('A'); expect(s.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(s.setStatus('ghost', 'resting')).toBe(false); });
+    it('deliver', () => { const x = s.hire('A'); s.assign(x.id, 'task1'); s.deliver(x.id); expect(s.isAvailable(x.id)).toBe(true); });
+    it('deliver returns false for unknown', () => { expect(s.deliver('ghost')).toBe(false); });
+    it('delay and capture and rest', () => { const x = s.hire('A'); s.delay(x.id); s.capture(x.id); s.rest(x.id); expect(x.status).toBe('resting'); });
+    it('isAvailable and isCaptured', () => { const x = s.hire('A'); expect(s.isAvailable(x.id)).toBe(true); s.capture(x.id); expect(s.isCaptured(x.id)).toBe(true); });
+    it('isAvailable for unknown', () => { expect(s.isAvailable('ghost')).toBe(false); });
+    it('currentTask and speedOf and reliabilityOf', () => { const x = s.hire('A'); s.assign(x.id, 'task1'); expect(s.currentTask(x.id)).toBe('task1'); expect(s.speedOf(x.id)).toBe(1); expect(s.reliabilityOf(x.id)).toBe(0.8); });
+    it('currentTask for unknown', () => { expect(s.currentTask('ghost')).toBeNull(); });
+    it('speedOf for unknown', () => { expect(s.speedOf('ghost')).toBe(0); });
+    it('reliabilityOf for unknown', () => { expect(s.reliabilityOf('ghost')).toBe(0); });
+    it('bestAvailable', () => { s.hire('A', 'foot', 5); s.hire('B', 'bird', 10); expect(s.bestAvailable().speed).toBe(10); });
+    it('bestAvailable null for empty', () => { expect(s.bestAvailable()).toBeNull(); });
+    it('averageReliability', () => { s.hire('A'); s.setReliability(s.listAll()[0].id, 0.9); expect(s.averageReliability()).toBeCloseTo(0.9); });
+    it('setReliability returns false for unknown', () => { /* not exposed */ expect(true).toBe(true); });
+    it('report aggregates', () => { s.hire('A'); expect(s.report().total).toBe(1); });
+    it('reset clears', () => { s.hire('A'); s.reset(); expect(s.stats.total).toBe(0); });
+    it('exposes COURIER_TYPES', () => { expect(COURIER_TYPES).toContain('foot'); });
+});

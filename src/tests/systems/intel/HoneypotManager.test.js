@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { HoneypotManager, POT_LURE_TYPES } from '../../../systems/intel/HoneypotManager.js';
+
+describe('HoneypotManager', () => {
+    let h;
+    beforeEach(() => { h = new HoneypotManager(); });
+    it('initializes with defaults', () => { expect(h.stats.total).toBe(0); });
+    it('deploy', () => { expect(h.deploy('Honeypot1')).not.toBeNull(); });
+    it('deploy rejects missing', () => { expect(h.deploy('')).toBeNull(); });
+    it('deploy normalizes invalid lure', () => { const x = h.deploy('A', 'invalid'); expect(x.lure).toBe('document'); });
+    it('get returns null for unknown', () => { expect(h.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByLure and listActive', () => {
+        h.deploy('A', 'treasure');
+        h.deploy('B', 'secret');
+        expect(h.listAll().length).toBe(2);
+        expect(h.listByStatus('active').length).toBe(2);
+        expect(h.listByLure('treasure').length).toBe(1);
+    });
+    it('trigger', () => { const x = h.deploy('A'); expect(h.trigger(x.id, 'target1')).toBe(true); });
+    it('trigger rejects non-active', () => { const x = h.deploy('A'); h.burn(x.id); expect(h.trigger(x.id, 't1')).toBe(false); });
+    it('trigger returns false for unknown', () => { expect(h.trigger('ghost', 't1')).toBe(false); });
+    it('burn', () => { const x = h.deploy('A'); expect(h.burn(x.id)).toBe(true); expect(h.isBurned(x.id)).toBe(true); });
+    it('burn returns false for unknown', () => { expect(h.burn('ghost')).toBe(false); });
+    it('archive', () => { const x = h.deploy('A'); expect(h.archive(x.id)).toBe(true); });
+    it('archive returns false for unknown', () => { expect(h.archive('ghost')).toBe(false); });
+    it('setStatus', () => { const x = h.deploy('A'); expect(h.setStatus(x.id, 'archived')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = h.deploy('A'); expect(h.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(h.setStatus('ghost', 'active')).toBe(false); });
+    it('isActive and isTriggered and isBurned', () => { const x = h.deploy('A'); expect(h.isActive(x.id)).toBe(true); h.trigger(x.id, 't1'); expect(h.isTriggered(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(h.isActive('ghost')).toBe(false); });
+    it('triggerCount and hasTriggered', () => { const x = h.deploy('A'); h.trigger(x.id, 't1'); expect(h.triggerCount(x.id)).toBe(1); expect(h.hasTriggered(x.id)).toBe(true); });
+    it('triggerCount for unknown', () => { expect(h.triggerCount('ghost')).toBe(0); });
+    it('triggerRate', () => { h.deploy('A'); h.deploy('B'); h.trigger(h.listAll()[0].id, 't1'); expect(h.triggerRate()).toBe(0.5); });
+    it('triggerList and triggeredBy', () => { const x = h.deploy('A'); h.trigger(x.id, 't1'); expect(h.triggerList(x.id).length).toBe(1); expect(h.triggeredBy(x.id, 't1')).toBe(true); });
+    it('triggerList for unknown', () => { expect(h.triggerList('ghost')).toEqual([]); });
+    it('triggeredBy for unknown', () => { expect(h.triggeredBy('ghost', 't1')).toBe(false); });
+    it('report aggregates', () => { h.deploy('A'); expect(h.report().total).toBe(1); });
+    it('reset clears', () => { h.deploy('A'); h.reset(); expect(h.stats.total).toBe(0); });
+    it('exposes POT_LURE_TYPES', () => { expect(POT_LURE_TYPES).toContain('document'); });
+});

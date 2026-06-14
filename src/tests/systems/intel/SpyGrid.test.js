@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SpyGrid, GRID_RESOLUTION } from '../../../systems/intel/SpyGrid.js';
+
+describe('SpyGrid', () => {
+    let g;
+    beforeEach(() => { g = new SpyGrid(); });
+    it('initializes with defaults', () => { expect(g.stats.total).toBe(0); });
+    it('createCell', () => { expect(g.createCell(0, 0)).not.toBeNull(); });
+    it('createCell rejects non-number', () => { expect(g.createCell('a', 0)).toBeNull(); });
+    it('createCell normalizes invalid resolution', () => { const x = g.createCell(0, 0, 'invalid'); expect(x.resolution).toBe('medium'); });
+    it('get returns null for unknown', () => { expect(g.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByResolution and listAt and listOccupied', () => {
+        g.createCell(0, 0);
+        g.createCell(0, 1, 'high');
+        expect(g.listAll().length).toBe(2);
+        expect(g.listByStatus('empty').length).toBe(2);
+        expect(g.listByResolution('high').length).toBe(1);
+        expect(g.listAt(0, 0).length).toBe(1);
+    });
+    it('assign', () => { const x = g.createCell(0, 0); expect(g.assign(x.id, 'agent1')).toBe(true); });
+    it('assign rejects non-empty', () => { const x = g.createCell(0, 0); g.assign(x.id, 'a1'); expect(g.assign(x.id, 'a2')).toBe(false); });
+    it('assign returns false for unknown', () => { expect(g.assign('ghost', 'a1')).toBe(false); });
+    it('unassign', () => { const x = g.createCell(0, 0); g.assign(x.id, 'a1'); expect(g.unassign(x.id)).toBe(true); });
+    it('unassign returns false for unknown', () => { expect(g.unassign('ghost')).toBe(false); });
+    it('monitor', () => { const x = g.createCell(0, 0); expect(g.monitor(x.id)).toBe(true); });
+    it('monitor returns false for unknown', () => { expect(g.monitor('ghost')).toBe(false); });
+    it('compromise', () => { const x = g.createCell(0, 0); expect(g.compromise(x.id)).toBe(true); });
+    it('compromise returns false for unknown', () => { expect(g.compromise('ghost')).toBe(false); });
+    it('setCoverage', () => { const x = g.createCell(0, 0); g.setCoverage(x.id, 0.5); expect(g.coverageOf(x.id)).toBe(0.5); });
+    it('setCoverage clamps', () => { const x = g.createCell(0, 0); g.setCoverage(x.id, 2); expect(g.coverageOf(x.id)).toBe(1); });
+    it('setCoverage returns false for unknown', () => { expect(g.setCoverage('ghost', 0.5)).toBe(false); });
+    it('isOccupied and isCompromised', () => { const x = g.createCell(0, 0); g.assign(x.id, 'a1'); expect(g.isOccupied(x.id)).toBe(true); g.compromise(x.id); expect(g.isCompromised(x.id)).toBe(true); });
+    it('isOccupied for unknown', () => { expect(g.isOccupied('ghost')).toBe(false); });
+    it('agentOf and coverageOf for unknown', () => { expect(g.agentOf('ghost')).toBeNull(); expect(g.coverageOf('ghost')).toBe(0); });
+    it('averageCoverage', () => { g.createCell(0, 0); expect(g.averageCoverage()).toBe(0); });
+    it('listOccupied', () => { const x = g.createCell(0, 0); g.assign(x.id, 'a1'); expect(g.listOccupied().length).toBe(1); });
+    it('report aggregates', () => { g.createCell(0, 0); expect(g.report().total).toBe(1); });
+    it('reset clears', () => { g.createCell(0, 0); g.reset(); expect(g.stats.total).toBe(0); });
+    it('exposes GRID_RESOLUTION', () => { expect(GRID_RESOLUTION).toContain('high'); });
+});

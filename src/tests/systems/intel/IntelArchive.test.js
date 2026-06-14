@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { IntelArchive, ARCHIVE_CATEGORIES } from '../../../systems/intel/IntelArchive.js';
+
+describe('IntelArchive', () => {
+    let a;
+    beforeEach(() => { a = new IntelArchive(); });
+    it('initializes with defaults', () => { expect(a.stats.total).toBe(0); });
+    it('archive', () => { expect(a.archive('Title', 'content', 'report')).not.toBeNull(); });
+    it('archive rejects missing title', () => { expect(a.archive('', 'c', 'report')).toBeNull(); });
+    it('archive normalizes invalid category', () => { const x = a.archive('A', 'c', 'invalid'); expect(x.category).toBe('report'); });
+    it('archive normalizes invalid classification', () => { const x = a.archive('A', 'c', 'report', 'invalid'); expect(x.classification).toBe('restricted'); });
+    it('archive normalizes non-array tags', () => { const x = a.archive('A', 'c', 'report', 'restricted', 'not array'); expect(x.tags).toEqual([]); });
+    it('get returns null for unknown', () => { expect(a.get('ghost')).toBeNull(); });
+    it('listAll and listByCategory and listByClassification and listByTag', () => {
+        a.archive('A', 'a', 'rumor', 'public', ['t1']);
+        a.archive('B', 'b', 'report', 'top_secret', ['t2']);
+        expect(a.listAll().length).toBe(2);
+        expect(a.listByCategory('rumor').length).toBe(1);
+        expect(a.listByClassification('public').length).toBe(1);
+        expect(a.listByTag('t1').length).toBe(1);
+    });
+    it('addTag and removeTag', () => { const x = a.archive('A', 'a', 'report'); a.addTag(x.id, 't1'); a.removeTag(x.id, 't1'); expect(a.hasTag(x.id, 't1')).toBe(false); });
+    it('addTag rejects duplicate', () => { const x = a.archive('A', 'a', 'report'); a.addTag(x.id, 't1'); expect(a.addTag(x.id, 't1')).toBe(false); });
+    it('addTag returns false for unknown', () => { expect(a.addTag('ghost', 't1')).toBe(false); });
+    it('removeTag returns false for unknown', () => { expect(a.removeTag('ghost', 't1')).toBe(false); });
+    it('setClassification', () => { const x = a.archive('A', 'a', 'report'); expect(a.setClassification(x.id, 'top_secret')).toBe(true); });
+    it('setClassification rejects invalid', () => { const x = a.archive('A', 'a', 'report'); expect(a.setClassification(x.id, 'invalid')).toBe(false); });
+    it('setClassification returns false for unknown', () => { expect(a.setClassification('ghost', 'top_secret')).toBe(false); });
+    it('search', () => { a.archive('Foo', 'bar content', 'report'); expect(a.search('bar').length).toBe(1); expect(a.search('xyz').length).toBe(0); });
+    it('search for empty', () => { expect(a.search('')).toEqual([]); });
+    it('isTopSecret and classificationOf', () => { const x = a.archive('A', 'a', 'report', 'top_secret'); expect(a.isTopSecret(x.id)).toBe(true); expect(a.classificationOf(x.id)).toBe('top_secret'); });
+    it('isTopSecret for unknown', () => { expect(a.isTopSecret('ghost')).toBe(false); });
+    it('tagsOf and hasTag', () => { const x = a.archive('A', 'a', 'report', 'restricted', ['t1']); expect(a.tagsOf(x.id)).toContain('t1'); expect(a.hasTag(x.id, 't1')).toBe(true); });
+    it('hasTag for unknown', () => { expect(a.hasTag('ghost', 't1')).toBe(false); });
+    it('countByCategory', () => { a.archive('A', 'a', 'rumor'); expect(a.countByCategory().rumor).toBe(1); });
+    it('recent', () => { a.archive('A', 'a', 'rumor'); a.archive('B', 'b', 'rumor'); expect(a.recent().length).toBe(2); });
+    it('report aggregates', () => { a.archive('A', 'a', 'rumor'); expect(a.report().total).toBe(1); });
+    it('reset clears', () => { a.archive('A', 'a', 'rumor'); a.reset(); expect(a.stats.total).toBe(0); });
+    it('exposes ARCHIVE_CATEGORIES', () => { expect(ARCHIVE_CATEGORIES).toContain('rumor'); });
+});
