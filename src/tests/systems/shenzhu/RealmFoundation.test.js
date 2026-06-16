@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { RealmFoundation, REALM_LEVELS } from '../../../systems/shenzhu/RealmFoundation.js';
+
+describe('RealmFoundation', () => {
+    let f;
+    beforeEach(() => { f = new RealmFoundation(); });
+    it('initializes with defaults', () => { expect(f.stats.total).toBe(0); });
+    it('establish', () => { expect(f.establish('A', 'qi_refining')).not.toBeNull(); });
+    it('establish rejects missing', () => { expect(f.establish('', 'qi_refining')).toBeNull(); });
+    it('establish normalizes invalid level', () => { const x = f.establish('A', 'invalid'); expect(x.level).toBe('qi_refining'); });
+    it('establish normalizes invalid quality', () => { const x = f.establish('A', 'qi_refining', 'invalid'); expect(x.quality).toBe('normal'); });
+    it('get returns null for unknown', () => { expect(f.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByLevel and listByQuality', () => {
+        f.establish('A', 'qi_refining', 'normal');
+        f.establish('A', 'foundation', 'perfect');
+        f.establish('B', 'qi_refining', 'supreme');
+        expect(f.listAll().length).toBe(3);
+        expect(f.listByOwner('A').length).toBe(2);
+        expect(f.listByLevel('qi_refining').length).toBe(2);
+        expect(f.listByQuality('perfect').length).toBe(1);
+    });
+    it('setQuality', () => { const x = f.establish('A', 'qi_refining'); expect(f.setQuality(x.id, 'supreme')).toBe(true); });
+    it('setQuality rejects invalid', () => { const x = f.establish('A', 'qi_refining'); expect(f.setQuality(x.id, 'invalid')).toBe(false); });
+    it('setQuality returns false for unknown', () => { expect(f.setQuality('ghost', 'supreme')).toBe(false); });
+    it('setStability', () => { const x = f.establish('A', 'qi_refining'); f.setStability(x.id, 0.5); expect(f.stabilityOf(x.id)).toBe(0.5); });
+    it('setStability clamps', () => { const x = f.establish('A', 'qi_refining'); f.setStability(x.id, 2); expect(f.stabilityOf(x.id)).toBe(1); });
+    it('setStability returns false for unknown', () => { expect(f.setStability('ghost', 0.5)).toBe(false); });
+    it('isSupreme and isImmortal', () => { const x = f.establish('A', 'immortal', 'supreme'); expect(f.isSupreme(x.id)).toBe(true); expect(f.isImmortal(x.id)).toBe(true); });
+    it('isSupreme for unknown', () => { expect(f.isSupreme('ghost')).toBe(false); });
+    it('stabilityOf and levelOf and qualityOf for unknown', () => { expect(f.stabilityOf('ghost')).toBe(0); expect(f.levelOf('ghost')).toBeNull(); expect(f.qualityOf('ghost')).toBeNull(); });
+    it('levelIndex', () => { const x = f.establish('A', 'mahayana'); expect(f.levelIndex(x.id)).toBeGreaterThan(0); });
+    it('levelIndex for unknown', () => { expect(f.levelIndex('ghost')).toBe(-1); });
+    it('isStronger', () => { const a = f.establish('A', 'foundation'); const b = f.establish('B', 'core_formation'); expect(f.isStronger(b.id, a.id)).toBe(true); });
+    it('isStronger for unknown', () => { expect(f.isStronger('ghost', 'a')).toBe(false); });
+    it('highest', () => { f.establish('A', 'foundation'); f.establish('B', 'mahayana'); expect(f.highest().level).toBe('mahayana'); });
+    it('highest null for empty', () => { expect(f.highest()).toBeNull(); });
+    it('countByQuality', () => { f.establish('A', 'qi_refining', 'supreme'); expect(f.countByQuality().supreme).toBe(1); });
+    it('report aggregates', () => { f.establish('A', 'qi_refining'); expect(f.report().total).toBe(1); });
+    it('reset clears', () => { f.establish('A', 'qi_refining'); f.reset(); expect(f.stats.total).toBe(0); });
+    it('exposes REALM_LEVELS', () => { expect(REALM_LEVELS).toContain('immortal'); });
+});

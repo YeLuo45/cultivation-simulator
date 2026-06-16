@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SealInspector, INSPECTION_OUTCOMES } from '../../../systems/fulu/SealInspector.js';
+
+describe('SealInspector', () => {
+    let i;
+    beforeEach(() => { i = new SealInspector(); });
+    it('initializes with defaults', () => { expect(i.stats.total).toBe(0); });
+    it('inspect', () => { expect(i.inspect('S1', 'ins1')).not.toBeNull(); });
+    it('inspect rejects missing', () => { expect(i.inspect('', 'ins1')).toBeNull(); expect(i.inspect('S1', '')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(i.get('ghost')).toBeNull(); });
+    it('listAll and listBySeal and listByInspector and listByStatus and listVerified and listFlagged', () => {
+        i.inspect('S1', 'ins1');
+        i.inspect('S1', 'ins2');
+        i.inspect('S2', 'ins1');
+        expect(i.listAll().length).toBe(3);
+        expect(i.listBySeal('S1').length).toBe(2);
+        expect(i.listByInspector('ins1').length).toBe(2);
+        expect(i.listByStatus('inspecting').length).toBe(3);
+    });
+    it('setStatus', () => { const x = i.inspect('S1', 'ins1'); expect(i.setStatus(x.id, 'verified')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = i.inspect('S1', 'ins1'); expect(i.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(i.setStatus('ghost', 'verified')).toBe(false); });
+    it('verify and reject and flag', () => { const x = i.inspect('S1', 'ins1'); i.verify(x.id); expect(i.isVerified(x.id)).toBe(true); const y = i.inspect('S2', 'ins1'); i.reject(y.id); const z = i.inspect('S3', 'ins1'); i.flag(z.id); expect(i.isFlagged(z.id)).toBe(true); });
+    it('setOutcome', () => { const x = i.inspect('S1', 'ins1'); expect(i.setOutcome(x.id, 'safe')).toBe(true); });
+    it('setOutcome rejects invalid', () => { const x = i.inspect('S1', 'ins1'); expect(i.setOutcome(x.id, 'invalid')).toBe(false); });
+    it('setOutcome returns false for unknown', () => { expect(i.setOutcome('ghost', 'safe')).toBe(false); });
+    it('setScore', () => { const x = i.inspect('S1', 'ins1'); i.setScore(x.id, 90); expect(x.score).toBe(90); });
+    it('setScore clamps', () => { const x = i.inspect('S1', 'ins1'); i.setScore(x.id, 200); expect(x.score).toBe(100); });
+    it('setScore returns false for unknown', () => { expect(i.setScore('ghost', 50)).toBe(false); });
+    it('isVerified and isRejected and isFlagged and isInspecting', () => { const x = i.inspect('S1', 'ins1'); expect(i.isInspecting(x.id)).toBe(true); });
+    it('isVerified for unknown', () => { expect(i.isVerified('ghost')).toBe(false); });
+    it('scoreOf and outcomeOf for unknown', () => { expect(i.scoreOf('ghost')).toBe(0); expect(i.outcomeOf('ghost')).toBeNull(); });
+    it('sealCount and inspectorCount', () => { i.inspect('S1', 'ins1'); expect(i.sealCount('S1')).toBe(1); expect(i.inspectorCount('ins1')).toBe(1); });
+    it('sealCount and inspectorCount for unknown', () => { expect(i.sealCount('ghost')).toBe(0); expect(i.inspectorCount('ghost')).toBe(0); });
+    it('verificationRate', () => { const x = i.inspect('S1', 'ins1'); i.verify(x.id); expect(i.verificationRate()).toBe(1); });
+    it('averageScore', () => { i.inspect('S1', 'ins1', 50); expect(i.averageScore()).toBe(50); });
+    it('countByOutcome', () => { i.inspect('S1', 'ins1'); i.setOutcome(i.listAll()[0].id, 'safe'); expect(i.countByOutcome().safe).toBe(1); });
+    it('report aggregates', () => { i.inspect('S1', 'ins1'); expect(i.report().total).toBe(1); });
+    it('reset clears', () => { i.inspect('S1', 'ins1'); i.reset(); expect(i.stats.total).toBe(0); });
+    it('exposes INSPECTION_OUTCOMES', () => { expect(INSPECTION_OUTCOMES).toContain('safe'); });
+});

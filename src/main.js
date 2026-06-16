@@ -55,6 +55,33 @@ import { YinYangWuXingService, getYinYangWuXingService, YIN_YANG_WUXING_TOOLS } 
 // 天雷劫数系统 (V241 Direction C: 天雷劫数系统 - thunderbolt/claude-code)
 import { ThunderTribulationService, THUNDER_TRIBULATION_TOOLS } from './domains/cultivation/services/ThunderTribulationService.js';
 
+// 万法归一系统 (V243 Direction P: 万法归一系统 - ruflo/thunderbolt)
+import { getLawUnificationService, LAW_UNIFICATION_TOOLS, listLaws, comprehendLaw, fuseLaws, unifyLaws, listUltimateTechniques, evolveTechnique, verifyUnification } from './domains/cultivation/services/LawUnificationService.js';
+
+// 万法归一系统 (V250: MagicUnificationService MCP工具注册)
+import { queryMagicStatus, analyzeEntityMagic, balanceMagic, unifyMagics, forgetMagic, MAGIC_MCP_TOOLS } from './domains/cultivation/services/MagicUnificationService.js';
+
+// 仙府洞天系统 (V245: 仙府洞天+洞府经营)
+import { createCaveHeavenService, CAVE_HEAVEN_MCP_TOOLS, createCaveHeaven, upgradeCaveHeavenById, collectFromCave, buildCaveFacility, queryCaveHeaven, listCaveHeavens, upgradeCaveFacility, demolishCaveFacility } from './domains/cultivation/services/CaveHeavenService.js';
+
+// 仙宠进化系统 (V244: 仙宠进化+血脉系统)
+import { SpiritBeastService, SPIRIT_BEAST_MCP_TOOLS, acquireSpiritBeast, listSpiritBeasts, selectSpiritBeast, evolveSpiritBeast, getSpiritBeastInfo, getSpiritBeastEvolutionInfo, getSpiritBeastPower, getAllSpiritBeastTiers } from './domains/cultivation/services/SpiritBeastService.js';
+
+// 血脉天赋系统 (V244: 仙宠进化+血脉系统)
+import { BloodlineService, BLOODLINE_MCP_TOOLS, gainBloodlineEssence, awakenBloodline, addBloodlineProgress, getBeastBloodlineInfo, checkBloodlineResonance, createBloodlineResonancePair, removeBloodlineResonancePair } from './domains/cultivation/services/BloodlineService.js';
+
+// 仙界贸易系统 (V249: 仙界贸易系统 - 贸易服务)
+import { TradeService, TRADE_MCP_TOOLS, listMarketGoods, buyGoods, sellGoods, transportGoods, queryTradeStatus } from './domains/cultivation/services/TradeService.js';
+
+// 仙宠羁绊系统 (V261: 仙宠羁绊+合体技能)
+import { createBeastBondService, BEAST_BOND_TOOLS } from './domains/cultivation/services/BeastBondService.js';
+
+// 仙界拍卖行系统 (V261: 仙界拍卖行+交易系统)
+import { createAuctionHouseService, AUCTION_TOOLS } from './domains/cultivation/services/AuctionHouseService.js';
+
+// 仙道大会系统 (V261: 仙道大会+竞技赛事)
+import { createTournamentService, TOURNAMENT_TOOLS } from './domains/cultivation/services/TournamentService.js';
+
 // 仙界宗门系统 (V231 Direction S: 仙界宗门系统 - chatdev/nanobot)
 import { createImmortalSectService } from './domains/sect/services/ImmortalSectService.js';
 
@@ -290,7 +317,7 @@ function createInitialGameState() {
         // 游戏进度
         days: 1,
         totalPlayTime: 0,
-        gameVersion: 'V242',
+        gameVersion: 'V250',
         
         // 设置
         settings: {
@@ -540,6 +567,173 @@ function initializeDomainModules() {
         (params) => caveRealmHandlers['cave.spirit'](params));
     mcpRegistry.registerTool('cave.harvest', CaveRealmService.TOOLS['cave.harvest'], 
         (params) => caveRealmHandlers['cave.harvest'](params));
+
+    // 万法归一系统MCP工具 (V243 Direction P: 万法归一系统)
+    mcpRegistry.registerTool('law.list', LAW_UNIFICATION_TOOLS[0], 
+        () => listLaws(gameState));
+    mcpRegistry.registerTool('law.comprehend', LAW_UNIFICATION_TOOLS[1], 
+        (params) => comprehendLaw(gameState, params.lawId));
+    mcpRegistry.registerTool('law.fuse', LAW_UNIFICATION_TOOLS[2], 
+        (params) => fuseLaws(gameState, params.lawIds, params.targetTechnique));
+    mcpRegistry.registerTool('law.unify', LAW_UNIFICATION_TOOLS[3], 
+        () => unifyLaws(gameState));
+    mcpRegistry.registerTool('law.technique', LAW_UNIFICATION_TOOLS[4], 
+        () => listUltimateTechniques(gameState));
+    mcpRegistry.registerTool('law.evolve', LAW_UNIFICATION_TOOLS[5], 
+        (params) => evolveTechnique(gameState, params.techniqueId));
+    mcpRegistry.registerTool('law.verify', LAW_UNIFICATION_TOOLS[6], 
+        () => verifyUnification(gameState));
+
+    // 万法归一系统MCP工具 (V250: MagicUnificationService)
+    mcpRegistry.registerTool('magic.query', MAGIC_MCP_TOOLS[0], 
+        () => queryMagicStatus());
+    mcpRegistry.registerTool('magic.analyze', MAGIC_MCP_TOOLS[1], 
+        (params) => analyzeEntityMagic(params.entityId));
+    mcpRegistry.registerTool('magic.unify', MAGIC_MCP_TOOLS[2], 
+        (params) => unifyMagics(params.sourceMagicId, params.targetMagicId));
+    mcpRegistry.registerTool('magic.balance', MAGIC_MCP_TOOLS[3], 
+        () => balanceMagic());
+    mcpRegistry.registerTool('magic.forget', MAGIC_MCP_TOOLS[4], 
+        (params) => forgetMagic(params.magicId));
+
+    // 仙府洞天系统MCP工具 (V245: 仙府洞天+洞府经营)
+    mcpRegistry.registerTool('caveheaven.create', CAVE_HEAVEN_MCP_TOOLS[0], 
+        (params) => createCaveHeaven(gameState, params.name));
+    mcpRegistry.registerTool('caveheaven.upgrade', CAVE_HEAVEN_MCP_TOOLS[1], 
+        (params) => upgradeCaveHeavenById(gameState, params.id, params.targetLevel));
+    mcpRegistry.registerTool('caveheaven.collect', CAVE_HEAVEN_MCP_TOOLS[2], 
+        (params) => collectFromCave(gameState, params.id));
+    mcpRegistry.registerTool('caveheaven.build', CAVE_HEAVEN_MCP_TOOLS[3], 
+        (params) => buildCaveFacility(gameState, params.id, params.facility));
+    mcpRegistry.registerTool('caveheaven.query', CAVE_HEAVEN_MCP_TOOLS[4], 
+        (params) => queryCaveHeaven(gameState, params.id));
+
+    // 仙宠进化系统MCP工具 (V244: 仙宠进化+血脉系统)
+    mcpRegistry.registerTool('spiritbeast.acquire', SPIRIT_BEAST_MCP_TOOLS[0], 
+        (params) => acquireSpiritBeast(gameState, params.name, params.type));
+    mcpRegistry.registerTool('spiritbeast.list', SPIRIT_BEAST_MCP_TOOLS[1], 
+        () => listSpiritBeasts(gameState));
+    mcpRegistry.registerTool('spiritbeast.select', SPIRIT_BEAST_MCP_TOOLS[2], 
+        (params) => selectSpiritBeast(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.evolve', SPIRIT_BEAST_MCP_TOOLS[3], 
+        (params) => evolveSpiritBeast(gameState, params.beastId, params.branchId));
+    mcpRegistry.registerTool('spiritbeast.info', SPIRIT_BEAST_MCP_TOOLS[4], 
+        (params) => getSpiritBeastInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.evolution_info', SPIRIT_BEAST_MCP_TOOLS[5], 
+        (params) => getSpiritBeastEvolutionInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.power', SPIRIT_BEAST_MCP_TOOLS[6], 
+        (params) => getSpiritBeastPower(gameState, params.beastId));
+    mcpRegistry.registerTool('spiritbeast.tiers', SPIRIT_BEAST_MCP_TOOLS[7], 
+        () => getAllSpiritBeastTiers());
+
+    // 血脉天赋系统MCP工具 (V244: 仙宠进化+血脉系统)
+    mcpRegistry.registerTool('bloodline.essence.gain', BLOODLINE_MCP_TOOLS[0], 
+        (params) => gainBloodlineEssence(gameState, params.amount, params.reason));
+    mcpRegistry.registerTool('bloodline.awaken', BLOODLINE_MCP_TOOLS[1], 
+        (params) => awakenBloodline(gameState, params.beastId, params.bloodlineType));
+    mcpRegistry.registerTool('bloodline.progress', BLOODLINE_MCP_TOOLS[2], 
+        (params) => addBloodlineProgress(gameState, params.beastId, params.amount));
+    mcpRegistry.registerTool('bloodline.info', BLOODLINE_MCP_TOOLS[3], 
+        (params) => getBeastBloodlineInfo(gameState, params.beastId));
+    mcpRegistry.registerTool('bloodline.resonance.check', BLOODLINE_MCP_TOOLS[4], 
+        (params) => checkBloodlineResonance(gameState, params.beastId1, params.beastId2));
+    mcpRegistry.registerTool('bloodline.resonance.create', BLOODLINE_MCP_TOOLS[5], 
+        (params) => createBloodlineResonancePair(gameState, params.beastId1, params.beastId2));
+    mcpRegistry.registerTool('bloodline.resonance.remove', BLOODLINE_MCP_TOOLS[6], 
+        (params) => removeBloodlineResonancePair(gameState, params.pairId));
+
+    // 仙宠羁绊系统MCP工具 (V261: 仙宠羁绊+合体技能)
+    mcpRegistry.registerTool('bond.create', BEAST_BOND_TOOLS[0], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.createBond(params.beastId1, params.beastId2, params.bondType);
+        });
+    mcpRegistry.registerTool('bond.trigger', BEAST_BOND_TOOLS[1], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.triggerFusionSkill(params.beastId1, params.beastId2);
+        });
+    mcpRegistry.registerTool('bond.list', BEAST_BOND_TOOLS[2], 
+        () => {
+            const svc = createBeastBondService(gameState);
+            return svc.listBonds();
+        });
+    mcpRegistry.registerTool('bond.dissolve', BEAST_BOND_TOOLS[3], 
+        (params) => {
+            const svc = createBeastBondService(gameState);
+            return svc.dissolveBond(params.beastId1, params.beastId2);
+        });
+
+    // 仙界拍卖行MCP工具 (V261: 仙界拍卖行+交易系统)
+    mcpRegistry.registerTool('auction.list', AUCTION_TOOLS[0], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.listItem(params.itemId, params.itemName, params.quality, params.startingPrice, params.duration);
+        });
+    mcpRegistry.registerTool('auction.bid', AUCTION_TOOLS[1], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.placeBid(params.listingId, params.amount);
+        });
+    mcpRegistry.registerTool('auction.claimSale', AUCTION_TOOLS[2], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.claimSale(params.listingId);
+        });
+    mcpRegistry.registerTool('auction.claimWin', AUCTION_TOOLS[3], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.claimAuctionWin(params.listingId);
+        });
+    mcpRegistry.registerTool('auction.active', AUCTION_TOOLS[4], 
+        (params) => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.getActiveListings(params.filter);
+        });
+    mcpRegistry.registerTool('auction.mine', AUCTION_TOOLS[5], 
+        () => {
+            const svc = createAuctionHouseService(gameState);
+            return svc.getMyListings();
+        });
+
+    // 仙道大会MCP工具 (V261: 仙道大会+竞技赛事)
+    mcpRegistry.registerTool('tournament.register', TOURNAMENT_TOOLS[0], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.register(params.tier);
+        });
+    mcpRegistry.registerTool('tournament.match', TOURNAMENT_TOOLS[1], 
+        () => {
+            const svc = createTournamentService(gameState);
+            return svc.startMatch();
+        });
+    mcpRegistry.registerTool('tournament.unregister', TOURNAMENT_TOOLS[2], 
+        () => {
+            const svc = createTournamentService(gameState);
+            return svc.unregister();
+        });
+    mcpRegistry.registerTool('tournament.rankings', TOURNAMENT_TOOLS[3], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.getRankings(params.tier);
+        });
+    mcpRegistry.registerTool('tournament.history', TOURNAMENT_TOOLS[4], 
+        (params) => {
+            const svc = createTournamentService(gameState);
+            return svc.getHistory(params.limit);
+        });
+
+    // 仙界贸易系统MCP工具 (V249: 仙界贸易系统 - 贸易服务)
+    mcpRegistry.registerTool('trade.list', TRADE_MCP_TOOLS[0], 
+        (params) => listMarketGoods(params.marketId));
+    mcpRegistry.registerTool('trade.buy', TRADE_MCP_TOOLS[1], 
+        (params) => buyGoods(params.marketId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.sell', TRADE_MCP_TOOLS[2], 
+        (params) => sellGoods(params.marketId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.transport', TRADE_MCP_TOOLS[3], 
+        (params) => transportGoods(params.routeId, params.goodId, params.quantity));
+    mcpRegistry.registerTool('trade.query', TRADE_MCP_TOOLS[4], 
+        () => queryTradeStatus());
 
     console.log('[Main] 领域模块初始化完成');
 }
@@ -2284,6 +2478,99 @@ export {
     GAME_LOOP_CONFIG
 };
 
+// ===== 版本信息 =====
+
+// 从构建时注入的全局变量获取版本信息
+function getVersionInfo() {
+    const versionStr = typeof window !== 'undefined' && window.__GAME_VERSION__ 
+        ? window.__GAME_VERSION__ 
+        : 'V242-dev';
+    
+    // 解析版本字符串: DDD-v1.0.0-COMMIT-DATE
+    const parts = versionStr.split('-');
+    const version = parts[1] || 'unknown';
+    const commitId = parts[2] || 'unknown';
+    const buildTime = parts.slice(3).join('-') || 'unknown';
+    
+    // 部署分支
+    const deployBranch = 'gh-pages';
+    
+    return {
+        version: version,      // e.g., V242
+        commitId: commitId,    // e.g., 69f8864
+        deployBranch: deployBranch,
+        buildTime: buildTime,  // e.g., 2026-05-31T06-59-45-881Z
+        fullVersion: versionStr
+    };
+}
+
+// 显示版本信息的模态框
+function showVersionModal() {
+    const info = getVersionInfo();
+    
+    // 如果已存在模态框，先移除
+    const existing = document.getElementById('version-modal');
+    if (existing) existing.remove();
+    
+    // 创建模态框
+    const modal = document.createElement('div');
+    modal.id = 'version-modal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7); z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    modal.innerHTML = `
+    <div style="
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 1px solid #4a9eff;
+        border-radius: 16px;
+        padding: 32px 40px;
+        color: #e0e0e0;
+        font-family: 'Courier New', monospace;
+        min-width: 400px;
+        box-shadow: 0 0 60px rgba(74,158,255,0.3);
+    ">
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:28px; color:#4a9eff; margin-bottom:8px;">🌟 修仙模拟器</div>
+            <div style="font-size:14px; color:#888;">${info.version}</div>
+        </div>
+        <div style="display:grid; grid-template-columns:120px 1fr; gap:12px 16px; font-size:14px;">
+            <span style="color:#888;">版本</span><span style="color:#4a9eff;">${info.version}</span>
+            <span style="color:#888;">Commit</span><span style="color:#fff;">${info.commitId}</span>
+            <span style="color:#888;">部署分支</span><span style="color:#fff;">${info.deployBranch}</span>
+            <span style="color:#888;">构建时间</span><span style="color:#888;">${info.buildTime.replace('T', ' ').replace(/-/g, '/')}</span>
+        </div>
+        <div style="margin-top:24px; text-align:center;">
+            <button onclick="document.getElementById('version-modal').remove()" style="
+                background: #4a9eff; color: #000; border: none;
+                padding: 8px 24px; border-radius: 8px; cursor: pointer;
+                font-size: 14px;
+            ">关闭</button>
+        </div>
+    </div>
+    `;
+    
+    // 点击背景关闭
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// 注册Shift+Ctrl+V快捷键
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => {
+        if (e.shiftKey && e.ctrlKey && e.key === 'V') {
+            e.preventDefault();
+            showVersionModal();
+        }
+    });
+}
+
 // 浏览器环境全局暴露
 if (typeof window !== 'undefined') {
     window.init = init;
@@ -2308,6 +2595,8 @@ if (typeof window !== 'undefined') {
     window.getGameStats = getGameStats;
     window.gameState = gameState;
     window.saveAndExit = saveAndExit;
+    window.getVersionInfo = getVersionInfo;
+    window.showVersionModal = showVersionModal;
 }
 
 console.log('[Main] main.js 模块加载完成');

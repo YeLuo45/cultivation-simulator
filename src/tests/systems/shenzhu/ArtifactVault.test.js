@@ -1,0 +1,45 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ArtifactVault, VAULT_SECTIONS } from '../../../systems/shenzhu/ArtifactVault.js';
+
+describe('ArtifactVault', () => {
+    let v;
+    beforeEach(() => { v = new ArtifactVault(); });
+    it('initializes with defaults', () => { expect(v.stats.total).toBe(0); });
+    it('open', () => { expect(v.open('A')).not.toBeNull(); });
+    it('open rejects missing', () => { expect(v.open('')).toBeNull(); });
+    it('open normalizes invalid section', () => { const x = v.open('A', 100, 'invalid'); expect(x.section).toBe('weapons'); });
+    it('get returns null for unknown', () => { expect(v.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listBySection', () => {
+        v.open('A', 100, 'weapons');
+        v.open('A', 50, 'armor');
+        v.open('B', 200, 'treasures');
+        expect(v.listAll().length).toBe(3);
+        expect(v.listByOwner('A').length).toBe(2);
+        expect(v.listBySection('armor').length).toBe(1);
+    });
+    it('deposit', () => { const x = v.open('A', 10); expect(v.deposit(x.id, 'art1')).toBe(true); });
+    it('deposit rejects full', () => { const x = v.open('A', 1); v.deposit(x.id, 'art1'); expect(v.deposit(x.id, 'art2')).toBe(false); });
+    it('deposit returns false for unknown', () => { expect(v.deposit('ghost', 'art1')).toBe(false); });
+    it('withdraw', () => { const x = v.open('A', 10); v.deposit(x.id, 'art1'); expect(v.withdraw(x.id, 'art1')).toBe(true); });
+    it('withdraw rejects missing', () => { const x = v.open('A', 10); v.deposit(x.id, 'art1'); expect(v.withdraw(x.id, 'art2')).toBe(false); });
+    it('withdraw returns false for unknown', () => { expect(v.withdraw('ghost', 'art1')).toBe(false); });
+    it('setCapacity', () => { const x = v.open('A', 10); v.setCapacity(x.id, 100); expect(v.capacityOf(x.id)).toBe(100); });
+    it('setCapacity clamps', () => { const x = v.open('A', 10); v.setCapacity(x.id, -5); expect(v.capacityOf(x.id)).toBe(0); });
+    it('setCapacity returns false for unknown', () => { expect(v.setCapacity('ghost', 100)).toBe(false); });
+    it('setSection', () => { const x = v.open('A'); expect(v.setSection(x.id, 'armor')).toBe(true); });
+    it('setSection rejects invalid', () => { const x = v.open('A'); expect(v.setSection(x.id, 'invalid')).toBe(false); });
+    it('setSection returns false for unknown', () => { expect(v.setSection('ghost', 'armor')).toBe(false); });
+    it('isFull and isEmpty', () => { const x = v.open('A', 1); expect(v.isEmpty(x.id)).toBe(true); v.deposit(x.id, 'art1'); expect(v.isFull(x.id)).toBe(true); });
+    it('isFull and isEmpty for unknown', () => { expect(v.isFull('ghost')).toBe(false); expect(v.isEmpty('ghost')).toBe(true); });
+    it('hasArtifact and countOf and capacityOf and sectionOf and slotsOf for unknown', () => { expect(v.hasArtifact('ghost', 'a')).toBe(false); expect(v.countOf('ghost')).toBe(0); expect(v.capacityOf('ghost')).toBe(0); expect(v.sectionOf('ghost')).toBeNull(); expect(v.slotsOf('ghost')).toEqual([]); });
+    it('hasArtifact', () => { const x = v.open('A', 10); v.deposit(x.id, 'art1'); expect(v.hasArtifact(x.id, 'art1')).toBe(true); });
+    it('utilization', () => { const x = v.open('A', 10); v.deposit(x.id, 'art1'); expect(v.utilization(x.id)).toBe(0.1); });
+    it('utilization for unknown', () => { expect(v.utilization('ghost')).toBe(0); });
+    it('averageUtilization', () => { v.open('A', 10); v.deposit(v.listAll()[0].id, 'a1'); expect(v.averageUtilization()).toBe(0.1); });
+    it('ownerCount', () => { v.open('A'); v.open('A'); expect(v.ownerCount('A')).toBe(2); });
+    it('ownerCount for unknown', () => { expect(v.ownerCount('ghost')).toBe(0); });
+    it('countBySection', () => { v.open('A', 100, 'armor'); expect(v.countBySection().armor).toBe(1); });
+    it('report aggregates', () => { v.open('A'); expect(v.report().total).toBe(1); });
+    it('reset clears', () => { v.open('A'); v.reset(); expect(v.stats.total).toBe(0); });
+    it('exposes VAULT_SECTIONS', () => { expect(VAULT_SECTIONS).toContain('weapons'); });
+});

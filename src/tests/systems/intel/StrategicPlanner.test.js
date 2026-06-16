@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { StrategicPlanner, PLAN_TIMEFRAMES } from '../../../systems/intel/StrategicPlanner.js';
+
+describe('StrategicPlanner', () => {
+    let p;
+    beforeEach(() => { p = new StrategicPlanner(); });
+    it('initializes with defaults', () => { expect(p.stats.total).toBe(0); });
+    it('create', () => { expect(p.create('Plan1', 'medium', ['obj1', 'obj2'])).not.toBeNull(); });
+    it('create rejects missing', () => { expect(p.create('', 'medium', [])).toBeNull(); });
+    it('create normalizes invalid timeframe', () => { const x = p.create('P', 'invalid', []); expect(x.timeframe).toBe('medium'); });
+    it('create normalizes non-array objectives', () => { const x = p.create('P', 'medium', 'not array'); expect(x.objectives).toEqual([]); });
+    it('get returns null for unknown', () => { expect(p.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByTimeframe and listActive', () => {
+        p.create('A', 'short', ['o1']);
+        p.create('B', 'long', ['o1']);
+        expect(p.listAll().length).toBe(2);
+        expect(p.listByStatus('drafting').length).toBe(2);
+        expect(p.listByTimeframe('long').length).toBe(1);
+    });
+    it('setStatus', () => { const x = p.create('P'); expect(p.setStatus(x.id, 'approved')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = p.create('P'); expect(p.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(p.setStatus('ghost', 'approved')).toBe(false); });
+    it('approve and execute and complete and cancel', () => { const x = p.create('P'); p.approve(x.id); p.execute(x.id); p.complete(x.id); expect(p.stats.completed).toBe(1); const y = p.create('Q'); p.cancel(y.id); expect(y.status).toBe('cancelled'); });
+    it('addObjective', () => { const x = p.create('P', 'medium', []); expect(p.addObjective(x.id, { name: 'o' })).toBe(true); });
+    it('addObjective returns false for unknown', () => { expect(p.addObjective('ghost', {})).toBe(false); });
+    it('setProgress', () => { const x = p.create('P'); p.setProgress(x.id, 0.5); expect(x.progress).toBe(0.5); });
+    it('setProgress clamps', () => { const x = p.create('P'); p.setProgress(x.id, 2); expect(x.progress).toBe(1); });
+    it('setProgress returns false for unknown', () => { expect(p.setProgress('ghost', 0.5)).toBe(false); });
+    it('completeObjective', () => { const x = p.create('P', 'medium', [{ name: 'a' }, { name: 'b' }]); p.execute(x.id); p.completeObjective(x.id, 0); expect(p.progressOf(x.id)).toBe(0.5); });
+    it('completeObjective rejects invalid', () => { const x = p.create('P', 'medium', []); expect(p.completeObjective(x.id, 0)).toBe(false); });
+    it('completeObjective returns false for unknown', () => { expect(p.completeObjective('ghost', 0)).toBe(false); });
+    it('isExecuting and isCompleted', () => { const x = p.create('P'); expect(p.isExecuting(x.id)).toBe(false); p.execute(x.id); expect(p.isExecuting(x.id)).toBe(true); p.complete(x.id); expect(p.isCompleted(x.id)).toBe(true); });
+    it('isExecuting for unknown', () => { expect(p.isExecuting('ghost')).toBe(false); });
+    it('progressOf and objectiveCount and timeframeOf', () => { const x = p.create('P', 'long', [{}, {}]); expect(p.objectiveCount(x.id)).toBe(2); expect(p.timeframeOf(x.id)).toBe('long'); });
+    it('progressOf for unknown', () => { expect(p.progressOf('ghost')).toBe(0); });
+    it('objectiveCount for unknown', () => { expect(p.objectiveCount('ghost')).toBe(0); });
+    it('timeframeOf for unknown', () => { expect(p.timeframeOf('ghost')).toBeNull(); });
+    it('averageProgress', () => { p.create('P'); p.setProgress(p.listAll()[0].id, 0.5); expect(p.averageProgress()).toBe(0.5); });
+    it('report aggregates', () => { p.create('P'); expect(p.report().total).toBe(1); });
+    it('reset clears', () => { p.create('P'); p.reset(); expect(p.stats.total).toBe(0); });
+    it('exposes PLAN_TIMEFRAMES', () => { expect(PLAN_TIMEFRAMES).toContain('short'); });
+});

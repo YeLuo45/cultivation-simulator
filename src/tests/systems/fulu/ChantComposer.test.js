@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ChantComposer, CHANT_STYLES } from '../../../systems/fulu/ChantComposer.js';
+
+describe('ChantComposer', () => {
+    let c;
+    beforeEach(() => { c = new ChantComposer(); });
+    it('initializes with defaults', () => { expect(c.stats.total).toBe(0); });
+    it('compose', () => { expect(c.compose('A', ['syl1', 'syl2'])).not.toBeNull(); });
+    it('compose rejects missing', () => { expect(c.compose('', ['s1'])).toBeNull(); });
+    it('compose normalizes invalid style', () => { const x = c.compose('A', ['s1'], 'invalid'); expect(x.style).toBe('classical'); });
+    it('compose normalizes non-array syllables', () => { const x = c.compose('A', 'not array'); expect(x.syllables).toEqual([]); });
+    it('get returns null for unknown', () => { expect(c.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByStatus and listByStyle and listReady', () => {
+        c.compose('A', ['s1'], 'classical', 1, 'p1');
+        c.compose('B', ['s1', 's2'], 'modern', 5);
+        expect(c.listAll().length).toBe(2);
+        expect(c.listByOwner('p1').length).toBe(1);
+        expect(c.listByStatus('drafting').length).toBe(2);
+    });
+    it('setStatus', () => { const x = c.compose('A', ['s1']); expect(c.setStatus(x.id, 'composing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = c.compose('A', ['s1']); expect(c.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(c.setStatus('ghost', 'composing')).toBe(false); });
+    it('composing and tuning and archive', () => { const x = c.compose('A', ['s1']); c.composing(x.id); c.tuning(x.id); c.archive(x.id); expect(c.isArchived(x.id)).toBe(true); const y = c.compose('B', ['s1']); c.setStatus(y.id, 'ready'); expect(c.isReady(y.id)).toBe(true); });
+    it('addSyllable and removeSyllable', () => { const x = c.compose('A', []); c.addSyllable(x.id, 's1'); c.removeSyllable(x.id, 0); expect(c.syllableCount(x.id)).toBe(0); });
+    it('addSyllable returns false for unknown', () => { expect(c.addSyllable('ghost', 's1')).toBe(false); });
+    it('removeSyllable rejects invalid index', () => { const x = c.compose('A', []); c.addSyllable(x.id, 's1'); expect(c.removeSyllable(x.id, 99)).toBe(false); });
+    it('removeSyllable returns false for unknown', () => { expect(c.removeSyllable('ghost', 0)).toBe(false); });
+    it('setStyle and setPower', () => { const x = c.compose('A', []); c.setStyle(x.id, 'modern'); c.setPower(x.id, 50); expect(x.style).toBe('modern'); expect(x.power).toBe(50); });
+    it('setStyle rejects invalid', () => { const x = c.compose('A', []); expect(c.setStyle(x.id, 'invalid')).toBe(false); });
+    it('setStyle and setPower return false for unknown', () => { expect(c.setStyle('ghost', 'modern')).toBe(false); expect(c.setPower('ghost', 50)).toBe(false); });
+    it('isReady and isComposing and isArchived', () => { const x = c.compose('A', []); c.composing(x.id); expect(c.isComposing(x.id)).toBe(true); });
+    it('isReady for unknown', () => { expect(c.isReady('ghost')).toBe(false); });
+    it('syllableCount and styleOf and powerOf for unknown', () => { expect(c.syllableCount('ghost')).toBe(0); expect(c.styleOf('ghost')).toBeNull(); expect(c.powerOf('ghost')).toBe(0); });
+    it('averageSyllables', () => { c.compose('A', ['s1', 's2']); expect(c.averageSyllables()).toBe(2); });
+    it('ownerCount and best', () => { c.compose('A', [], 'classical', 1, 'p1'); expect(c.ownerCount('p1')).toBe(1); expect(c.best()).not.toBeNull(); });
+    it('ownerCount for unknown', () => { expect(c.ownerCount('ghost')).toBe(0); });
+    it('countByStatus', () => { c.compose('A', []); expect(c.countByStatus().drafting).toBe(1); });
+    it('report aggregates', () => { c.compose('A', []); expect(c.report().total).toBe(1); });
+    it('reset clears', () => { c.compose('A', []); c.reset(); expect(c.stats.total).toBe(0); });
+    it('exposes CHANT_STYLES', () => { expect(CHANT_STYLES).toContain('classical'); });
+});

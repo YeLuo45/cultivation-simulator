@@ -1,0 +1,30 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { MasteryTracker, MASTERY_LEVELS } from '../../../systems/alchemy/MasteryTracker.js';
+
+describe('MasteryTracker', () => {
+    let t;
+    beforeEach(() => { t = new MasteryTracker(); });
+    it('initializes with defaults', () => { expect(t.stats.totalExp).toBe(0); });
+    it('init', () => { expect(t.init('p1', 0)).toBe(true); });
+    it('init rejects missing', () => { expect(t.init('')).toBe(false); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByLevel', () => { t.init('p1', 0); t.init('p2', 5000); expect(t.listAll().length).toBe(2); expect(t.listByLevel('expert').length).toBe(1); });
+    it('gain and levelup', () => { t.init('p1', 0); t.gain('p1', 200); expect(t.currentLevel('p1')).toBe('apprentice'); });
+    it('gain accumulates', () => { t.init('p1', 0); t.gain('p1', 50); t.gain('p1', 60); expect(t.currentExp('p1')).toBe(110); });
+    it('currentExp for unknown', () => { expect(t.currentExp('ghost')).toBe(0); });
+    it('currentLevel', () => { t.init('p1', 1000); expect(t.currentLevel('p1')).toBe('journeyman'); });
+    it('expToNext', () => { t.init('p1', 0); expect(t.expToNext('p1')).toBe(100); });
+    it('expToNext for max', () => { t.init('p1', 30000); expect(t.expToNext('p1')).toBe(0); });
+    it('progressToNext', () => { t.init('p1', 50); expect(t.progressToNext('p1')).toBe(0.5); });
+    it('progressToNext for max', () => { t.init('p1', 30000); expect(t.progressToNext('p1')).toBe(1); });
+    it('isMax', () => { t.init('p1', 30000); expect(t.isMax('p1')).toBe(true); });
+    it('isAtLeast', () => { t.init('p1', 1000); expect(t.isAtLeast('p1', 'apprentice')).toBe(true); });
+    it('isMaster', () => { t.init('p1', 10000); expect(t.isMaster('p1')).toBe(true); });
+    it('isMaster false for novice', () => { t.init('p1', 0); expect(t.isMaster('p1')).toBe(false); });
+    it('countByLevel', () => { t.init('p1', 0); expect(t.countByLevel().novice).toBe(1); });
+    it('history', () => { t.init('p1'); t.gain('p1', 50); expect(t.history('p1').length).toBe(1); });
+    it('history for unknown', () => { expect(t.history('ghost')).toEqual([]); });
+    it('report aggregates', () => { t.init('p1'); t.gain('p1', 50); expect(t.report().totalExp).toBe(50); });
+    it('reset clears', () => { t.init('p1'); t.reset(); expect(t.stats.totalExp).toBe(0); });
+    it('exposes MASTERY_LEVELS', () => { expect(MASTERY_LEVELS).toContain('novice'); });
+});

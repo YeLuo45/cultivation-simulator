@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { QiFlowController, FLOW_RATES } from '../../../systems/arena/QiFlowController.js';
+
+describe('QiFlowController', () => {
+    let q;
+    beforeEach(() => { q = new QiFlowController(); });
+    it('initializes with defaults', () => { expect(q.stats.totalFlows).toBe(0); });
+    it('init', () => { expect(q.init('p1', 100, 50)).toBe(true); });
+    it('init rejects missing', () => { expect(q.init('')).toBe(false); });
+    it('get returns null for unknown', () => { expect(q.get('ghost')).toBeNull(); });
+    it('currentQi and maxQi', () => { q.init('p1', 100, 50); expect(q.currentQi('p1')).toBe(50); expect(q.maxQi('p1')).toBe(100); });
+    it('setMax clamps current', () => { q.init('p1', 100, 80); q.setMax('p1', 50); expect(q.currentQi('p1')).toBe(50); });
+    it('setMax returns false for unknown', () => { expect(q.setMax('ghost', 100)).toBe(false); });
+    it('spend', () => { q.init('p1', 100, 80); expect(q.spend('p1', 30)).toBe(true); });
+    it('spend rejects non-positive', () => { q.init('p1'); expect(q.spend('p1', 0)).toBe(false); });
+    it('spend rejects insufficient', () => { q.init('p1', 100, 20); expect(q.spend('p1', 50)).toBe(false); });
+    it('spend returns false for unknown', () => { expect(q.spend('ghost', 10)).toBe(false); });
+    it('gain', () => { q.init('p1', 100, 50); expect(q.gain('p1', 20)).toBe(true); });
+    it('gain clamps to max', () => { q.init('p1', 100, 80); q.gain('p1', 50); expect(q.currentQi('p1')).toBe(100); });
+    it('gain returns false for unknown', () => { expect(q.gain('ghost', 10)).toBe(false); });
+    it('setFlowRate and tick', () => { q.init('p1', 100, 50); q.setFlowRate('p1', FLOW_RATES.active); expect(q.tick('p1')).toBeGreaterThan(0); });
+    it('drain', () => { q.init('p1', 100, 50); expect(q.drain('p1')).toBe(50); });
+    it('fill', () => { q.init('p1', 100, 50); expect(q.fill('p1')).toBe(true); });
+    it('isFull and isEmpty', () => { q.init('p1', 100, 100); expect(q.isFull('p1')).toBe(true); q.init('p2', 100, 0); expect(q.isEmpty('p2')).toBe(true); });
+    it('percent', () => { q.init('p1', 100, 50); expect(q.percent('p1')).toBe(0.5); });
+    it('canAfford', () => { q.init('p1', 100, 50); expect(q.canAfford('p1', 30)).toBe(true); });
+    it('history_', () => { q.init('p1'); q.spend('p1', 10); expect(q.history_('p1').length).toBe(1); });
+    it('report aggregates', () => { q.init('p1'); expect(q.report().totalPools).toBe(1); });
+    it('reset clears', () => { q.init('p1'); q.reset(); expect(q.stats.totalFlows).toBe(0); });
+    it('exposes FLOW_RATES', () => { expect(FLOW_RATES.passive).toBe(1); });
+});

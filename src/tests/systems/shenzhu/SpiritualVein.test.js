@@ -1,0 +1,43 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SpiritualVein, VEIN_TYPES } from '../../../systems/shenzhu/SpiritualVein.js';
+
+describe('SpiritualVein', () => {
+    let v;
+    beforeEach(() => { v = new SpiritualVein(); });
+    it('initializes with defaults', () => { expect(v.stats.total).toBe(0); });
+    it('discover', () => { expect(v.discover('A', 'major', 'Beijing')).not.toBeNull(); });
+    it('discover rejects missing', () => { expect(v.discover('', 'major', 'B')).toBeNull(); });
+    it('discover normalizes invalid type', () => { const x = v.discover('A', 'invalid', 'B'); expect(x.type).toBe('minor'); });
+    it('discover normalizes invalid quality', () => { const x = v.discover('A', 'major', 'B', 'invalid'); expect(x.quality).toBe('normal'); });
+    it('get returns null for unknown', () => { expect(v.get('ghost')).toBeNull(); });
+    it('listAll and listByType and listByQuality and listByLocation', () => {
+        v.discover('A', 'major', 'Beijing', 'rich');
+        v.discover('B', 'minor', 'Shanghai');
+        expect(v.listAll().length).toBe(2);
+        expect(v.listByType('major').length).toBe(1);
+        expect(v.listByQuality('rich').length).toBe(1);
+        expect(v.listByLocation('Beijing').length).toBe(1);
+    });
+    it('draw', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); expect(v.draw(x.id, 50)).toBe(true); });
+    it('draw rejects non-positive', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); expect(v.draw(x.id, 0)).toBe(false); expect(v.draw(x.id, -1)).toBe(false); });
+    it('draw rejects exceed capacity', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); expect(v.draw(x.id, 200)).toBe(false); });
+    it('draw returns false for unknown', () => { expect(v.draw('ghost', 50)).toBe(false); });
+    it('refill', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); v.draw(x.id, 50); expect(v.refill(x.id, 20)).toBe(true); });
+    it('refill returns false for unknown', () => { expect(v.refill('ghost', 20)).toBe(false); });
+    it('setQuality', () => { const x = v.discover('A', 'major', 'B'); expect(v.setQuality(x.id, 'primordial')).toBe(true); });
+    it('setQuality rejects invalid', () => { const x = v.discover('A', 'major', 'B'); expect(v.setQuality(x.id, 'invalid')).toBe(false); });
+    it('setQuality returns false for unknown', () => { expect(v.setQuality('ghost', 'primordial')).toBe(false); });
+    it('setCapacity', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); v.setCapacity(x.id, 200); expect(v.capacityOf(x.id)).toBe(200); });
+    it('setCapacity returns false for unknown', () => { expect(v.setCapacity('ghost', 200)).toBe(false); });
+    it('isPrimordial and isDepleted', () => { const x = v.discover('A', 'major', 'B', 'primordial', 10); v.draw(x.id, 10); expect(v.isPrimordial(x.id)).toBe(true); expect(v.isDepleted(x.id)).toBe(true); });
+    it('isPrimordial for unknown', () => { expect(v.isPrimordial('ghost')).toBe(false); });
+    it('capacityOf and loadOf and qualityOf for unknown', () => { expect(v.capacityOf('ghost')).toBe(0); expect(v.loadOf('ghost')).toBe(0); expect(v.qualityOf('ghost')).toBeNull(); });
+    it('loadPercent', () => { const x = v.discover('A', 'major', 'B', 'normal', 100); v.draw(x.id, 50); expect(v.loadPercent(x.id)).toBe(0.5); });
+    it('loadPercent for unknown', () => { expect(v.loadPercent('ghost')).toBe(0); });
+    it('totalCapacity and totalLoad and averageLoad', () => { v.discover('A', 'major', 'B', 'normal', 100); v.discover('B', 'minor', 'C', 'normal', 200); expect(v.totalCapacity()).toBe(300); });
+    it('best', () => { v.discover('A', 'major', 'B', 'normal', 100); expect(v.best().capacity).toBe(100); });
+    it('best null for empty', () => { expect(v.best()).toBeNull(); });
+    it('report aggregates', () => { v.discover('A', 'major', 'B'); expect(v.report().total).toBe(1); });
+    it('reset clears', () => { v.discover('A', 'major', 'B'); v.reset(); expect(v.stats.total).toBe(0); });
+    it('exposes VEIN_TYPES', () => { expect(VEIN_TYPES).toContain('major'); });
+});

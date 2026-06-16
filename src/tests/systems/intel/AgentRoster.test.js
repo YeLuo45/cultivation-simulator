@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { AgentRoster, SPECIALIZATIONS } from '../../../systems/intel/AgentRoster.js';
+
+describe('AgentRoster', () => {
+    let r;
+    beforeEach(() => { r = new AgentRoster(); });
+    it('initializes with defaults', () => { expect(r.stats.total).toBe(0); });
+    it('enroll', () => { expect(r.enroll('A1', 'combat')).not.toBeNull(); });
+    it('enroll rejects missing', () => { expect(r.enroll('', 'combat')).toBeNull(); });
+    it('enroll normalizes invalid spec', () => { const x = r.enroll('A', 'invalid'); expect(x.specialization).toBe('combat'); });
+    it('get returns null for unknown', () => { expect(r.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listBySpecialization and listActive and listOnMission', () => {
+        r.enroll('A', 'combat');
+        r.enroll('B', 'social');
+        expect(r.listAll().length).toBe(2);
+        expect(r.listByStatus('active').length).toBe(2);
+        expect(r.listBySpecialization('social').length).toBe(1);
+    });
+    it('setStatus', () => { const x = r.enroll('A'); expect(r.setStatus(x.id, 'training')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = r.enroll('A'); expect(r.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(r.setStatus('ghost', 'active')).toBe(false); });
+    it('setLoyalty', () => { const x = r.enroll('A'); r.setLoyalty(x.id, 0.5); expect(r.loyaltyOf(x.id)).toBe(0.5); });
+    it('setLoyalty clamps', () => { const x = r.enroll('A'); r.setLoyalty(x.id, 2); expect(r.loyaltyOf(x.id)).toBe(1); });
+    it('setLoyalty returns false for unknown', () => { expect(r.setLoyalty('ghost', 0.5)).toBe(false); });
+    it('promote', () => { const x = r.enroll('A'); expect(r.promote(x.id, 5)).toBe(true); });
+    it('promote clamps to 1', () => { const x = r.enroll('A'); r.promote(x.id, 0); expect(x.level).toBe(1); });
+    it('promote returns false for unknown', () => { expect(r.promote('ghost', 5)).toBe(false); });
+    it('isActive and isOnMission and isDeceased', () => { const x = r.enroll('A'); expect(r.isActive(x.id)).toBe(true); r.setStatus(x.id, 'on_mission'); expect(r.isOnMission(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(r.isActive('ghost')).toBe(false); });
+    it('levelOf and loyaltyOf and specializationOf', () => { const x = r.enroll('A', 'combat', 5); expect(r.levelOf(x.id)).toBe(5); expect(r.specializationOf(x.id)).toBe('combat'); });
+    it('levelOf for unknown', () => { expect(r.levelOf('ghost')).toBe(0); });
+    it('specializationOf for unknown', () => { expect(r.specializationOf('ghost')).toBeNull(); });
+    it('countBySpecialization', () => { r.enroll('A', 'combat'); expect(r.countBySpecialization().combat).toBe(1); });
+    it('averageLevel', () => { r.enroll('A', 'combat', 5); expect(r.averageLevel()).toBe(5); });
+    it('bestAgent', () => { r.enroll('A', 'combat', 3); r.enroll('B', 'combat', 7); expect(r.bestAgent('combat').level).toBe(7); });
+    it('bestAgent null for empty', () => { expect(r.bestAgent('combat')).toBeNull(); });
+    it('report aggregates', () => { r.enroll('A'); expect(r.report().total).toBe(1); });
+    it('reset clears', () => { r.enroll('A'); r.reset(); expect(r.stats.total).toBe(0); });
+    it('exposes SPECIALIZATIONS', () => { expect(SPECIALIZATIONS).toContain('combat'); });
+});

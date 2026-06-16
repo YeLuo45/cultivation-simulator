@@ -1,0 +1,44 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BeastEvolution, EVOLUTION_PATHS } from '../../../systems/shenzhu/BeastEvolution.js';
+
+describe('BeastEvolution', () => {
+    let e;
+    beforeEach(() => { e = new BeastEvolution(); });
+    it('initializes with defaults', () => { expect(e.stats.total).toBe(0); });
+    it('start', () => { expect(e.start('beast1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(e.start('')).toBeNull(); });
+    it('start normalizes invalid path', () => { const x = e.start('beast1', 'invalid'); expect(x.path).toBe('ascension'); });
+    it('get returns null for unknown', () => { expect(e.get('ghost')).toBeNull(); });
+    it('listAll and listByBeast and listByStatus and listByPath and listEvolved', () => {
+        e.start('beast1', 'ascension');
+        e.start('beast1', 'awakening');
+        e.start('beast2');
+        expect(e.listAll().length).toBe(3);
+        expect(e.listByBeast('beast1').length).toBe(2);
+        expect(e.listByStatus('in_progress').length).toBe(3);
+        expect(e.listByPath('awakening').length).toBe(1);
+    });
+    it('setStatus', () => { const x = e.start('beast1'); expect(e.setStatus(x.id, 'evolved')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = e.start('beast1'); expect(e.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(e.setStatus('ghost', 'evolved')).toBe(false); });
+    it('succeed and fail and unlock', () => { const x = e.start('beast1'); e.succeed(x.id); expect(e.isEvolved(x.id)).toBe(true); const y = e.start('beast2'); e.fail(y.id); expect(e.isFailed(y.id)).toBe(true); const z = e.start('beast3'); e.unlock(z.id); expect(e.isAvailable(z.id)).toBe(true); });
+    it('setLevel', () => { const x = e.start('beast1'); e.setLevel(x.id, 5); expect(e.levelOf(x.id)).toBe(5); });
+    it('setLevel clamps', () => { const x = e.start('beast1'); e.setLevel(x.id, -1); expect(e.levelOf(x.id)).toBe(0); });
+    it('setLevel returns false for unknown', () => { expect(e.setLevel('ghost', 5)).toBe(false); });
+    it('setPath', () => { const x = e.start('beast1'); expect(e.setPath(x.id, 'awakening')).toBe(true); });
+    it('setPath rejects invalid', () => { const x = e.start('beast1'); expect(e.setPath(x.id, 'invalid')).toBe(false); });
+    it('setPath returns false for unknown', () => { expect(e.setPath('ghost', 'awakening')).toBe(false); });
+    it('isEvolved and isFailed and isAvailable and isInProgress', () => { const x = e.start('beast1'); e.succeed(x.id); expect(e.isEvolved(x.id)).toBe(true); });
+    it('isEvolved for unknown', () => { expect(e.isEvolved('ghost')).toBe(false); });
+    it('levelOf and pathOf for unknown', () => { expect(e.levelOf('ghost')).toBe(0); expect(e.pathOf('ghost')).toBeNull(); });
+    it('beastCount', () => { e.start('beast1'); e.start('beast1'); expect(e.beastCount('beast1')).toBe(2); });
+    it('beastCount for unknown', () => { expect(e.beastCount('ghost')).toBe(0); });
+    it('successRate', () => { const x = e.start('beast1'); e.succeed(x.id); expect(e.successRate()).toBe(1); });
+    it('averageLevel', () => { e.start('beast1'); expect(e.averageLevel()).toBe(0); });
+    it('bestFor', () => { e.start('beast1', 'ascension'); e.succeed(e.listAll()[0].id); e.setLevel(e.listAll()[0].id, 5); expect(e.bestFor('beast1')).not.toBeNull(); });
+    it('bestFor null for no evolved', () => { e.start('beast1'); expect(e.bestFor('beast1')).toBeNull(); });
+    it('countByPath', () => { e.start('beast1', 'awakening'); expect(e.countByPath().awakening).toBe(1); });
+    it('report aggregates', () => { e.start('beast1'); expect(e.report().total).toBe(1); });
+    it('reset clears', () => { e.start('beast1'); e.reset(); expect(e.stats.total).toBe(0); });
+    it('exposes EVOLUTION_PATHS', () => { expect(EVOLUTION_PATHS).toContain('ascension'); });
+});

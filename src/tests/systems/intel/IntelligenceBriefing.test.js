@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { IntelligenceBriefing, BRIEFING_LEVELS } from '../../../systems/intel/IntelligenceBriefing.js';
+
+describe('IntelligenceBriefing', () => {
+    let b;
+    beforeEach(() => { b = new IntelligenceBriefing(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('create', () => { expect(b.create('Briefing1')).not.toBeNull(); });
+    it('create rejects missing', () => { expect(b.create('')).toBeNull(); });
+    it('create normalizes invalid level', () => { const x = b.create('B', 'invalid'); expect(x.level).toBe('routine'); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByStatus and listByLevel and listPublished', () => {
+        b.create('A', 'routine');
+        b.create('B', 'critical');
+        expect(b.listAll().length).toBe(2);
+        expect(b.listByStatus('drafting').length).toBe(2);
+        expect(b.listByLevel('critical').length).toBe(1);
+    });
+    it('addItem and removeItem', () => { const x = b.create('B'); b.addItem(x.id, 'item1'); b.removeItem(x.id, 0); expect(b.itemCount(x.id)).toBe(0); });
+    it('addItem rejects missing', () => { const x = b.create('B'); expect(b.addItem(x.id, '')).toBe(false); });
+    it('addItem returns false for unknown', () => { expect(b.addItem('ghost', 'a')).toBe(false); });
+    it('removeItem rejects invalid', () => { const x = b.create('B'); b.addItem(x.id, 'a'); expect(b.removeItem(x.id, 99)).toBe(false); });
+    it('removeItem returns false for unknown', () => { expect(b.removeItem('ghost', 0)).toBe(false); });
+    it('setStatus', () => { const x = b.create('B'); expect(b.setStatus(x.id, 'review')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = b.create('B'); expect(b.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(b.setStatus('ghost', 'review')).toBe(false); });
+    it('setLevel', () => { const x = b.create('B'); expect(b.setLevel(x.id, 'urgent')).toBe(true); });
+    it('setLevel rejects invalid', () => { const x = b.create('B'); expect(b.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel returns false for unknown', () => { expect(b.setLevel('ghost', 'urgent')).toBe(false); });
+    it('review and publish and archive', () => { const x = b.create('B'); b.review(x.id); b.publish(x.id); expect(b.isPublished(x.id)).toBe(true); b.archive(x.id); expect(x.status).toBe('archived'); });
+    it('isPublished and isCritical', () => { const x = b.create('B', 'critical'); expect(b.isCritical(x.id)).toBe(true); });
+    it('isPublished for unknown', () => { expect(b.isPublished('ghost')).toBe(false); });
+    it('itemCount and levelOf and items', () => { const x = b.create('B'); b.addItem(x.id, 'a'); expect(b.itemCount(x.id)).toBe(1); expect(b.levelOf(x.id)).toBe('routine'); expect(b.items(x.id).length).toBe(1); });
+    it('itemCount for unknown', () => { expect(b.itemCount('ghost')).toBe(0); });
+    it('levelOf for unknown', () => { expect(b.levelOf('ghost')).toBeNull(); });
+    it('mostRecent', () => { const x = b.create('A'); b.review(x.id); b.publish(x.id); expect(b.mostRecent().id).toBe(x.id); });
+    it('mostRecent null for none published', () => { expect(b.mostRecent()).toBeNull(); });
+    it('report aggregates', () => { b.create('A'); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.create('A'); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes BRIEFING_LEVELS', () => { expect(BRIEFING_LEVELS).toContain('routine'); });
+});

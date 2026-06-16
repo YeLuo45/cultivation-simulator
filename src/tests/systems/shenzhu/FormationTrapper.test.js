@@ -1,0 +1,42 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FormationTrapper, TRAP_TYPES } from '../../../systems/shenzhu/FormationTrapper.js';
+
+describe('FormationTrapper', () => {
+    let t;
+    beforeEach(() => { t = new FormationTrapper(); });
+    it('initializes with defaults', () => { expect(t.stats.total).toBe(0); });
+    it('set', () => { expect(t.set('damage', 'cave', 'A')).not.toBeNull(); });
+    it('set rejects missing location', () => { expect(t.set('damage', '', 'A')).toBeNull(); });
+    it('set normalizes invalid type', () => { const x = t.set('invalid', 'cave', 'A'); expect(x.type).toBe('damage'); });
+    it('get returns null for unknown', () => { expect(t.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByType and listByStatus and listArmed', () => {
+        t.set('damage', 'cave', 'A');
+        t.set('silence', 'tunnel', 'A');
+        t.set('damage', 'road', 'B');
+        expect(t.listAll().length).toBe(3);
+        expect(t.listByOwner('A').length).toBe(2);
+        expect(t.listByType('damage').length).toBe(2);
+        expect(t.listByStatus('armed').length).toBe(3);
+    });
+    it('setStatus', () => { const x = t.set('damage', 'cave', 'A'); expect(t.setStatus(x.id, 'disarmed')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = t.set('damage', 'cave', 'A'); expect(t.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(t.setStatus('ghost', 'disarmed')).toBe(false); });
+    it('trigger and disarm and expire', () => { const x = t.set('damage', 'cave', 'A'); expect(t.trigger(x.id)).toBe(true); expect(t.isTriggered(x.id)).toBe(true); const y = t.set('silence', 'tunnel', 'A'); t.disarm(y.id, 'hero1'); expect(t.isDisarmed(y.id)).toBe(true); const z = t.set('damage', 'road', 'A'); t.expire(z.id); expect(t.disarm(z.id)).toBe(false); });
+    it('trigger rejects non-armed', () => { const x = t.set('damage', 'cave', 'A'); t.trigger(x.id); expect(t.trigger(x.id)).toBe(false); });
+    it('trigger returns false for unknown', () => { expect(t.trigger('ghost')).toBe(false); });
+    it('disarm returns false for unknown', () => { expect(t.disarm('ghost')).toBe(false); });
+    it('setPower', () => { const x = t.set('damage', 'cave', 'A'); t.setPower(x.id, 50); expect(t.powerOf(x.id)).toBe(50); });
+    it('setPower clamps', () => { const x = t.set('damage', 'cave', 'A'); t.setPower(x.id, -5); expect(t.powerOf(x.id)).toBe(0); });
+    it('setPower returns false for unknown', () => { expect(t.setPower('ghost', 50)).toBe(false); });
+    it('isArmed and isTriggered and isDisarmed', () => { const x = t.set('damage', 'cave', 'A'); expect(t.isArmed(x.id)).toBe(true); });
+    it('isArmed for unknown', () => { expect(t.isArmed('ghost')).toBe(false); });
+    it('powerOf and typeOf and locationOf and ownerOf for unknown', () => { expect(t.powerOf('ghost')).toBe(0); expect(t.typeOf('ghost')).toBeNull(); expect(t.locationOf('ghost')).toBeNull(); expect(t.ownerOf('ghost')).toBeNull(); });
+    it('triggerRate', () => { const x = t.set('damage', 'cave', 'A'); t.trigger(x.id); expect(t.triggerRate()).toBe(1); });
+    it('averagePower', () => { t.set('damage', 'cave', 'A', 50); expect(t.averagePower()).toBe(50); });
+    it('bestFor', () => { t.set('damage', 'cave', 'A', 5); t.set('silence', 'tunnel', 'A', 50); t.trigger(t.listByOwner('A')[1].id); expect(t.bestFor('A').power).toBe(50); });
+    it('bestFor null for none triggered', () => { t.set('damage', 'cave', 'A'); expect(t.bestFor('A')).toBeNull(); });
+    it('countByType', () => { t.set('damage', 'cave', 'A'); expect(t.countByType().damage).toBe(1); });
+    it('report aggregates', () => { t.set('damage', 'cave', 'A'); expect(t.report().total).toBe(1); });
+    it('reset clears', () => { t.set('damage', 'cave', 'A'); t.reset(); expect(t.stats.total).toBe(0); });
+    it('exposes TRAP_TYPES', () => { expect(TRAP_TYPES).toContain('damage'); });
+});

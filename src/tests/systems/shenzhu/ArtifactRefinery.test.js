@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ArtifactRefinery, REFINEMENT_STATUS } from '../../../systems/shenzhu/ArtifactRefinery.js';
+
+describe('ArtifactRefinery', () => {
+    let r;
+    beforeEach(() => { r = new ArtifactRefinery(); });
+    it('initializes with defaults', () => { expect(r.stats.total).toBe(0); });
+    it('start', () => { expect(r.start('art1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(r.start('')).toBeNull(); });
+    it('start normalizes invalid material', () => { const x = r.start('art1', 'invalid'); expect(x.material).toBe('spirit_stone'); });
+    it('get returns null for unknown', () => { expect(r.get('ghost')).toBeNull(); });
+    it('listAll and listByArtifact and listByStatus and listByMaterial and listActive', () => {
+        r.start('art1');
+        r.start('art2', 'phoenix_feather');
+        expect(r.listAll().length).toBe(2);
+        expect(r.listByArtifact('art1').length).toBe(1);
+        expect(r.listByStatus('heating').length).toBe(2);
+    });
+    it('setStatus', () => { const x = r.start('art1'); expect(r.setStatus(x.id, 'infusing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = r.start('art1'); expect(r.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(r.setStatus('ghost', 'infusing')).toBe(false); });
+    it('infuse and cool and succeed and fail and destroy', () => { const x = r.start('art1'); r.cool(x.id); r.succeed(x.id); expect(r.isSuccess(x.id)).toBe(true); const y = r.start('art2'); r.fail(y.id); const z = r.start('art3'); r.destroy(z.id); expect(r.isDestroyed(z.id)).toBe(true); });
+    it('setPowerGain', () => { const x = r.start('art1'); r.setPowerGain(x.id, 50); expect(r.powerGainOf(x.id)).toBe(50); });
+    it('setPowerGain clamps', () => { const x = r.start('art1'); r.setPowerGain(x.id, -1); expect(r.powerGainOf(x.id)).toBe(0); });
+    it('setPowerGain returns false for unknown', () => { expect(r.setPowerGain('ghost', 50)).toBe(false); });
+    it('isActive and isSuccess and isFailed and isDestroyed', () => { const x = r.start('art1'); expect(r.isActive(x.id)).toBe(true); });
+    it('isActive for unknown', () => { expect(r.isActive('ghost')).toBe(false); });
+    it('powerGainOf and materialOf for unknown', () => { expect(r.powerGainOf('ghost')).toBe(0); expect(r.materialOf('ghost')).toBeNull(); });
+    it('duration for unknown', () => { expect(r.duration('ghost')).toBe(0); });
+    it('successRate', () => { const x = r.start('art1'); r.succeed(x.id); expect(r.successRate()).toBe(1); });
+    it('artifactCount', () => { r.start('art1'); r.start('art1'); expect(r.artifactCount('art1')).toBe(2); });
+    it('artifactCount for unknown', () => { expect(r.artifactCount('ghost')).toBe(0); });
+    it('averageGain', () => { r.start('art1'); expect(r.averageGain()).toBe(0); });
+    it('bestFor', () => { r.start('art1'); r.succeed(r.listAll()[0].id); r.setPowerGain(r.listAll()[0].id, 50); expect(r.bestFor('art1')).not.toBeNull(); });
+    it('bestFor null for no success', () => { r.start('art1'); expect(r.bestFor('art1')).toBeNull(); });
+    it('countByMaterial', () => { r.start('art1', 'phoenix_feather'); expect(r.countByMaterial().phoenix_feather).toBe(1); });
+    it('report aggregates', () => { r.start('art1'); expect(r.report().total).toBe(1); });
+    it('reset clears', () => { r.start('art1'); r.reset(); expect(r.stats.total).toBe(0); });
+    it('exposes REFINEMENT_STATUS', () => { expect(REFINEMENT_STATUS).toContain('heating'); });
+});

@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FormationBuilder, BUILD_STATUS } from '../../../systems/shenzhu/FormationBuilder.js';
+
+describe('FormationBuilder', () => {
+    let b;
+    beforeEach(() => { b = new FormationBuilder(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('start', () => { expect(b.start('F1')).not.toBeNull(); });
+    it('start rejects missing', () => { expect(b.start('')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByFormation and listByStatus and listActive and listComplete', () => {
+        b.start('F1');
+        b.start('F1');
+        b.start('F2');
+        expect(b.listAll().length).toBe(3);
+        expect(b.listByFormation('F1').length).toBe(2);
+        expect(b.listByStatus('planning').length).toBe(3);
+    });
+    it('setStatus', () => { const x = b.start('F1'); expect(b.setStatus(x.id, 'placing')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = b.start('F1'); expect(b.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(b.setStatus('ghost', 'placing')).toBe(false); });
+    it('addNode', () => { const x = b.start('F1'); expect(b.addNode(x.id, 'eye', 0, 0)).toBe(true); });
+    it('addNode rejects invalid type', () => { const x = b.start('F1'); expect(b.addNode(x.id, 'invalid', 0, 0)).toBe(false); });
+    it('addNode returns false for unknown', () => { expect(b.addNode('ghost', 'eye', 0, 0)).toBe(false); });
+    it('removeNode', () => { const x = b.start('F1'); b.addNode(x.id, 'eye', 0, 0); b.removeNode(x.id, 0); expect(b.nodeCount(x.id)).toBe(0); });
+    it('removeNode rejects invalid', () => { const x = b.start('F1'); b.addNode(x.id, 'eye', 0, 0); expect(b.removeNode(x.id, 99)).toBe(false); });
+    it('removeNode returns false for unknown', () => { expect(b.removeNode('ghost', 0)).toBe(false); });
+    it('place and anchor and activate and complete and fail', () => { const x = b.start('F1'); b.place(x.id); b.anchor(x.id); b.activate(x.id); b.complete(x.id); expect(b.isComplete(x.id)).toBe(true); const y = b.start('F2'); b.fail(y.id); expect(b.isFailed(y.id)).toBe(true); });
+    it('isComplete and isFailed and isActive', () => { const x = b.start('F1'); b.place(x.id); expect(b.isActive(x.id)).toBe(true); });
+    it('isComplete for unknown', () => { expect(b.isComplete('ghost')).toBe(false); });
+    it('nodeCount and nodesOf and hasNode for unknown', () => { expect(b.nodeCount('ghost')).toBe(0); expect(b.nodesOf('ghost')).toEqual([]); expect(b.hasNode('ghost', 'eye')).toBe(false); });
+    it('hasNode', () => { const x = b.start('F1'); b.addNode(x.id, 'eye', 0, 0); expect(b.hasNode(x.id, 'eye')).toBe(true); });
+    it('duration for unknown', () => { expect(b.duration('ghost')).toBe(0); });
+    it('successRate', () => { const x = b.start('F1'); b.complete(x.id); expect(b.successRate()).toBe(1); });
+    it('averageNodes', () => { b.start('F1'); b.addNode(b.listAll()[0].id, 'eye', 0, 0); expect(b.averageNodes()).toBe(1); });
+    it('countByStatus', () => { b.start('F1'); expect(b.countByStatus().planning).toBe(1); });
+    it('report aggregates', () => { b.start('F1'); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.start('F1'); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes BUILD_STATUS', () => { expect(BUILD_STATUS).toContain('planning'); });
+});

@@ -1,0 +1,40 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ResourceEstimator, RESOURCE_TYPES } from '../../../systems/intel/ResourceEstimator.js';
+
+describe('ResourceEstimator', () => {
+    let e;
+    beforeEach(() => { e = new ResourceEstimator(); });
+    it('initializes with defaults', () => { expect(e.stats.total).toBe(0); });
+    it('estimate', () => { expect(e.estimate('A', 'gold', 1000)).not.toBeNull(); });
+    it('estimate rejects missing faction', () => { expect(e.estimate('', 'gold', 100)).toBeNull(); });
+    it('estimate rejects invalid type', () => { expect(e.estimate('A', 'invalid', 100)).toBeNull(); });
+    it('estimate rejects negative amount', () => { expect(e.estimate('A', 'gold', -1)).toBeNull(); });
+    it('get returns null for unknown', () => { expect(e.get('ghost')).toBeNull(); });
+    it('listAll and listByFaction and listByType', () => {
+        e.estimate('A', 'gold', 100);
+        e.estimate('B', 'food', 200);
+        expect(e.listAll().length).toBe(2);
+        expect(e.listByFaction('A').length).toBe(1);
+        expect(e.listByType('gold').length).toBe(1);
+    });
+    it('update', () => { const x = e.estimate('A', 'gold', 100); e.update(x.id, 200, 0.8); expect(x.amount).toBe(200); });
+    it('update returns false for unknown', () => { expect(e.update('ghost', 100)).toBe(false); });
+    it('setConfidence', () => { const x = e.estimate('A', 'gold', 100); e.setConfidence(x.id, 0.9); expect(x.confidence).toBe(0.9); });
+    it('setConfidence clamps', () => { const x = e.estimate('A', 'gold', 100); e.setConfidence(x.id, 2); expect(x.confidence).toBe(1); });
+    it('setConfidence returns false for unknown', () => { expect(e.setConfidence('ghost', 0.5)).toBe(false); });
+    it('totalForFaction', () => { e.estimate('A', 'gold', 100); e.estimate('A', 'food', 200); expect(e.totalForFaction('A')).toBe(300); });
+    it('totalForFaction by type', () => { e.estimate('A', 'gold', 100); e.estimate('A', 'food', 200); expect(e.totalForFaction('A', 'gold')).toBe(100); });
+    it('confidenceOf and amountOf', () => { const x = e.estimate('A', 'gold', 100); expect(e.confidenceOf(x.id)).toBe(0.7); expect(e.amountOf(x.id)).toBe(100); });
+    it('isReliable', () => { const x = e.estimate('A', 'gold', 100); expect(e.isReliable(x.id)).toBe(true); });
+    it('isReliable for unknown', () => { expect(e.isReliable('ghost')).toBe(false); });
+    it('best', () => { e.estimate('A', 'gold', 100, 0.5); e.estimate('A', 'gold', 100, 0.9); expect(e.best('gold').confidence).toBe(0.9); });
+    it('best null for no data', () => { expect(e.best('gold')).toBeNull(); });
+    it('mostFor', () => { e.estimate('A', 'gold', 100); e.estimate('A', 'food', 500); expect(e.mostFor('A').type).toBe('food'); });
+    it('countByType', () => { e.estimate('A', 'gold', 100); expect(e.countByType().gold).toBe(1); });
+    it('confidenceOf for unknown', () => { expect(e.confidenceOf('ghost')).toBe(0); });
+    it('amountOf for unknown', () => { expect(e.amountOf('ghost')).toBe(0); });
+    it('totalForFaction for no data', () => { expect(e.totalForFaction('ghost')).toBe(0); });
+    it('report aggregates', () => { e.estimate('A', 'gold', 100); expect(e.report().total).toBe(1); });
+    it('reset clears', () => { e.estimate('A', 'gold', 100); e.reset(); expect(e.stats.total).toBe(0); });
+    it('exposes RESOURCE_TYPES', () => { expect(RESOURCE_TYPES).toContain('gold'); });
+});

@@ -1,0 +1,41 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { BeastBond, BOND_LEVELS } from '../../../systems/shenzhu/BeastBond.js';
+
+describe('BeastBond', () => {
+    let b;
+    beforeEach(() => { b = new BeastBond(); });
+    it('initializes with defaults', () => { expect(b.stats.total).toBe(0); });
+    it('form', () => { expect(b.form('t1', 'beast1')).not.toBeNull(); });
+    it('form rejects missing', () => { expect(b.form('', 'beast1')).toBeNull(); expect(b.form('t1', '')).toBeNull(); });
+    it('get returns null for unknown', () => { expect(b.get('ghost')).toBeNull(); });
+    it('listAll and listByTamer and listByBeast and listByLevel and listActive', () => {
+        b.form('t1', 'beast1');
+        b.form('t1', 'beast2');
+        b.form('t2', 'beast1');
+        expect(b.listAll().length).toBe(3);
+        expect(b.listByTamer('t1').length).toBe(2);
+        expect(b.listByBeast('beast1').length).toBe(2);
+    });
+    it('setLevel', () => { const x = b.form('t1', 'beast1'); expect(b.setLevel(x.id, 'soulmate')).toBe(true); });
+    it('setLevel rejects invalid', () => { const x = b.form('t1', 'beast1'); expect(b.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel returns false for unknown', () => { expect(b.setLevel('ghost', 'soulmate')).toBe(false); });
+    it('setStatus', () => { const x = b.form('t1', 'beast1'); expect(b.setStatus(x.id, 'active')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = b.form('t1', 'beast1'); expect(b.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(b.setStatus('ghost', 'active')).toBe(false); });
+    it('activate and break_ and startBreaking', () => { const x = b.form('t1', 'beast1'); b.activate(x.id); const y = b.form('t2', 'beast2'); b.startBreaking(y.id); b.break_(y.id); expect(b.isBroken(y.id)).toBe(true); });
+    it('isSoulmate and isActive and isBroken', () => { const x = b.form('t1', 'beast1'); b.setLevel(x.id, 'soulmate'); expect(b.isSoulmate(x.id)).toBe(true); });
+    it('isSoulmate for unknown', () => { expect(b.isSoulmate('ghost')).toBe(false); });
+    it('strengthOf and levelOf and levelIndex for unknown', () => { expect(b.strengthOf('ghost')).toBe(0); expect(b.levelOf('ghost')).toBeNull(); expect(b.levelIndex('ghost')).toBe(-1); });
+    it('promote', () => { const x = b.form('t1', 'beast1'); expect(b.promote(x.id)).not.toBeNull(); });
+    it('promote null at max', () => { const x = b.form('t1', 'beast1'); b.setLevel(x.id, 'soulmate'); expect(b.promote(x.id)).toBeNull(); });
+    it('promote returns null for unknown', () => { expect(b.promote('ghost')).toBeNull(); });
+    it('tamerCount', () => { b.form('t1', 'beast1'); b.form('t1', 'beast2'); expect(b.tamerCount('t1')).toBe(2); });
+    it('tamerCount for unknown', () => { expect(b.tamerCount('ghost')).toBe(0); });
+    it('bestBond', () => { b.form('t1', 'beast1'); b.form('t1', 'beast2'); expect(b.bestBond('t1')).not.toBeNull(); });
+    it('bestBond null for empty', () => { expect(b.bestBond('ghost')).toBeNull(); });
+    it('averageStrength', () => { b.form('t1', 'beast1'); expect(b.averageStrength()).toBeGreaterThan(0); });
+    it('countByLevel', () => { b.form('t1', 'beast1'); expect(b.countByLevel().stranger).toBe(1); });
+    it('report aggregates', () => { b.form('t1', 'beast1'); expect(b.report().total).toBe(1); });
+    it('reset clears', () => { b.form('t1', 'beast1'); b.reset(); expect(b.stats.total).toBe(0); });
+    it('exposes BOND_LEVELS', () => { expect(BOND_LEVELS).toContain('soulmate'); });
+});

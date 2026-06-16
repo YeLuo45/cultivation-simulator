@@ -1,0 +1,45 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FormationMaster, MASTER_LEVELS } from '../../../systems/shenzhu/FormationMaster.js';
+
+describe('FormationMaster', () => {
+    let m;
+    beforeEach(() => { m = new FormationMaster(); });
+    it('initializes with defaults', () => { expect(m.stats.total).toBe(0); });
+    it('train', () => { expect(m.train('A1')).not.toBeNull(); });
+    it('train rejects missing', () => { expect(m.train('')).toBeNull(); });
+    it('train normalizes invalid level', () => { const x = m.train('A', 'invalid'); expect(x.level).toBe('apprentice'); });
+    it('get returns null for unknown', () => { expect(m.get('ghost')).toBeNull(); });
+    it('listAll and listByOwner and listByLevel and listByStatus and listGrandmasters', () => {
+        m.train('A', 'apprentice', 'p1');
+        m.train('B', 'grandmaster');
+        m.train('C', 'grandmaster');
+        expect(m.listAll().length).toBe(3);
+        expect(m.listByOwner('p1').length).toBe(1);
+        expect(m.listByLevel('grandmaster').length).toBe(2);
+    });
+    it('setLevel', () => { const x = m.train('A'); expect(m.setLevel(x.id, 'master')).toBe(true); });
+    it('setLevel rejects invalid', () => { const x = m.train('A'); expect(m.setLevel(x.id, 'invalid')).toBe(false); });
+    it('setLevel returns false for unknown', () => { expect(m.setLevel('ghost', 'master')).toBe(false); });
+    it('setStatus', () => { const x = m.train('A'); expect(m.setStatus(x.id, 'deploying')).toBe(true); });
+    it('setStatus rejects invalid', () => { const x = m.train('A'); expect(m.setStatus(x.id, 'invalid')).toBe(false); });
+    it('setStatus returns false for unknown', () => { expect(m.setStatus('ghost', 'deploying')).toBe(false); });
+    it('deploy', () => { const x = m.train('A'); expect(m.deploy(x.id)).toBe(true); });
+    it('deploy rejects retired', () => { const x = m.train('A'); m.retire(x.id); expect(m.deploy(x.id)).toBe(false); });
+    it('deploy returns false for unknown', () => { expect(m.deploy('ghost')).toBe(false); });
+    it('rest and retire', () => { const x = m.train('A'); m.rest(x.id); m.retire(x.id); expect(m.isRetired(x.id)).toBe(true); });
+    it('promote', () => { const x = m.train('A'); expect(m.promote(x.id)).toBe('adept'); });
+    it('promote null at max', () => { const x = m.train('A', 'grandmaster'); expect(m.promote(x.id)).toBeNull(); });
+    it('promote returns null for unknown', () => { expect(m.promote('ghost')).toBeNull(); });
+    it('isGrandmaster and isRetired and isActive', () => { const x = m.train('A', 'grandmaster'); m.deploy(x.id); expect(m.isActive(x.id)).toBe(true); });
+    it('isGrandmaster for unknown', () => { expect(m.isGrandmaster('ghost')).toBe(false); });
+    it('deployedCount and levelOf and ownerOf and levelIndex for unknown', () => { expect(m.deployedCount('ghost')).toBe(0); expect(m.levelOf('ghost')).toBeNull(); expect(m.ownerOf('ghost')).toBeNull(); expect(m.levelIndex('ghost')).toBe(-1); });
+    it('best', () => { m.train('A'); expect(m.best()).not.toBeNull(); });
+    it('best null for empty', () => { expect(m.best()).toBeNull(); });
+    it('averageDeployed', () => { m.train('A'); expect(m.averageDeployed()).toBe(0); });
+    it('ownerCount', () => { m.train('A', 'apprentice', 'p1'); expect(m.ownerCount('p1')).toBe(1); });
+    it('ownerCount for unknown', () => { expect(m.ownerCount('ghost')).toBe(0); });
+    it('countByLevel', () => { m.train('A', 'master'); expect(m.countByLevel().master).toBe(1); });
+    it('report aggregates', () => { m.train('A'); expect(m.report().total).toBe(1); });
+    it('reset clears', () => { m.train('A'); m.reset(); expect(m.stats.total).toBe(0); });
+    it('exposes MASTER_LEVELS', () => { expect(MASTER_LEVELS).toContain('grandmaster'); });
+});
